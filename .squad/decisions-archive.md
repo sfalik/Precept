@@ -34418,3 +34418,23 @@ Implemented `PRECEPT0024` as a Roslyn analyzer in `src/Precept.Analyzers/Precept
 
 
 - Same-day review follow-through superseded the original inline-expansion and five-state assumptions; the corrected durable state is captured by the later 18:25, 18:41, and 19:11 entries.
+
+---
+
+## Archive Batch — 2026-05-14T03:22:05Z
+
+---
+
+### 2025-07-16T00:00:00Z: Diagnostic precision backlog records message rewrites for PRE0019/PRE0022/PRE0051 and adds PRE0048 as the next swap candidate
+
+**By:** Scribe
+
+**Status:** Merged, reconciled, inbox cleared (2 files -> 1 canonical entry).
+
+**Merged sources:** `elaine-precision-messages.md`, `frank-precision-scan.md`.
+
+- Elaine judged PRE0019's old fix hint actively backwards, recommended field-first guidance for PRE0051 interpolation failures, and treated PRE0022's message as mostly sound but in need of real recovery steps instead of tautologies.
+- Frank's precision-gap scan added PRE0048 `ScalarOperationOnCollection` as a high-value TypeMismatch swap candidate and explicitly separated PRE0047, choice-domain checks, collection-inner-type checks, and similar cases into the emission-gap bucket rather than the precision-upgrade bucket.
+- The durable triage split is now: targeted code swaps for true precision gaps, structural follow-up work for missing emitters.
+
+---

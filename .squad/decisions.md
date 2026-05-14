@@ -21,6 +21,20 @@
 
 ---
 
+### 2026-05-14T03:22:05Z: ProofEngine gap audit closes on Slice 12 presence obligations and keeps PRE0019 cleanup separate
+
+**By:** Scribe
+
+**Status:** Merged from Frank's comprehensive ProofEngine gap audit.
+
+**Merged source:** `frank-proofengine-gap-audit.md`.
+
+- Frank confirmed the critical gap is structural, not discharge logic: `PresenceProofRequirement` is fully plumbed through satisfactions, strategies, diagnostics, and fault-site links, but production code never constructs the obligation.
+- The interval proof engine plan now carries **Slice 12: Presence Obligation Generation**, including the `FaultCode.UnexpectedNull` metadata correction from PRE0019 to PRE0116 and the old Slice 12 renumbering to Slice 13.
+- PRE0019 remains dead-code retirement work outside the interval slice, PRE0079 remains tracked by diagnostic-enforcement Slice 9C, and the recommended tests should ship with Slice 12 rather than as a pre-slice red test.
+
+---
+
 ### 2026-05-14T02:33:16Z: Diagnostic naming canon now uses `when` vocabulary, `CaseMismatch*`, and condition-first proof names
 
 **By:** Scribe
@@ -77,47 +91,6 @@
 
 ---
 
-### 2026-05-14T00:00:00Z: Interval proof engine resume locked five implementation truths and validated slices 1–4 green
-
-**By:** Scribe
-
-**Status:** Merged from George's interval resume record.
-
-**Merged source:** `george-interval-resume.md`.
-
-- `quantity` is a reserved DSL keyword, so interval tests must use names like `qty`; `nonnegative` is a proof attribute only and does not populate `DeclaredMin`, so interval-bound tests must use explicit `min` modifiers instead.
-- Guard narrowing only handles field-to-constant comparisons, and Strategy 2 division-by-zero proof only succeeds when the divisor is a field with a proving modifier like `positive`.
-- Sample bounds are an all-path contract: every event arg assigned into a bounded field must carry compatible bounds, and George validated the slice with all 5227 `Precept.Tests` passing.
-
----
-
-### 2026-05-13T00:00:00Z: PRE0091 `AmbiguousTypedConstant` ships narrow first and enforcement infrastructure stays explicit and comment-stripped
-
-**By:** Scribe
-
-**Status:** Merged, reconciled, inbox cleared (5 files -> 1 canonical entry).
-
-**Merged sources:** `frank-q4-narrow.md`, `frank-q6-allowlist-granularity.md`, `frank-q7-analyzer-scan-scope.md`, `frank-q8-doc-comment-stripping.md`, `frank-q9-allowlist-coordination.md`.
-
-- PRE0091's first implementation stays limited to temporal quantity ambiguity because `ResolveTypedConstant` normally receives `expectedType`; broad candidate enumeration would be speculative infrastructure for error-recovery-only paths.
-- Gate 1 allow-list entries need only root-cause cluster comments, while Gate 2 scans an explicit pipeline-centered file set and strips `//`, `/** */`, and `///` comments before matching `DiagnosticCode.*` references.
-- PRE0078 allow-list cleanup is owned by the interval-engine PR itself: once a real emission site exists, the stale-entry analyzer forces the same PR to remove the allow-list entry.
-
----
-
-### 2025-07-16T00:00:00Z: Diagnostic precision backlog records message rewrites for PRE0019/PRE0022/PRE0051 and adds PRE0048 as the next swap candidate
-
-**By:** Scribe
-
-**Status:** Merged, reconciled, inbox cleared (2 files -> 1 canonical entry).
-
-**Merged sources:** `elaine-precision-messages.md`, `frank-precision-scan.md`.
-
-- Elaine judged PRE0019's old fix hint actively backwards, recommended field-first guidance for PRE0051 interpolation failures, and treated PRE0022's message as mostly sound but in need of real recovery steps instead of tautologies.
-- Frank's precision-gap scan added PRE0048 `ScalarOperationOnCollection` as a high-value TypeMismatch swap candidate and explicitly separated PRE0047, choice-domain checks, collection-inner-type checks, and similar cases into the emission-gap bucket rather than the precision-upgrade bucket.
-- The durable triage split is now: targeted code swaps for true precision gaps, structural follow-up work for missing emitters.
-
----
 ### 2026-05-14T00:05:43Z: Diagnostic enforcement revision now treats PRE0078 as an interval-proof obligation and narrows PRE0079
 
 **By:** Scribe
@@ -132,6 +105,20 @@
 
 ---
 
+### 2026-05-14T00:00:00Z: Interval proof engine resume locked five implementation truths and validated slices 1–4 green
+
+**By:** Scribe
+
+**Status:** Merged from George's interval resume record.
+
+**Merged source:** `george-interval-resume.md`.
+
+- `quantity` is a reserved DSL keyword, so interval tests must use names like `qty`; `nonnegative` is a proof attribute only and does not populate `DeclaredMin`, so interval-bound tests must use explicit `min` modifiers instead.
+- Guard narrowing only handles field-to-constant comparisons, and Strategy 2 division-by-zero proof only succeeds when the divisor is a field with a proving modifier like `positive`.
+- Sample bounds are an all-path contract: every event arg assigned into a bounded field must carry compatible bounds, and George validated the slice with all 5227 `Precept.Tests` passing.
+
+---
+
 ### 2026-05-13T23:55:10Z: Overflow-prevention analysis now defers arithmetic bounds enforcement to Strategy 7
 
 **By:** Scribe
@@ -143,6 +130,20 @@
 - Frank revised `overflow-prevention-design-analysis.md` in place so obsolete `@bounds`, bounded-integer, validator-phase, runtime-fallback, extra-diagnostic, and three-wave rollout claims are clearly superseded by the interval proof engine design.
 - Strategy 7 (`IntervalContainment`) now owns bounded arithmetic range checking, `NumericOverflow` emission, modifier-derived bound extraction, guard narrowing, catalog-driven interval transfer, and hover interval display.
 - The overflow-prevention analysis keeps only durable value: problem framing, strategy comparison, and historical context, with explicit cross-references to `interval-proof-engine-design.md`.
+
+---
+
+### 2026-05-13T04:52:18Z: Diagnostic gap closures now require paired positive and negative integration tests
+
+**By:** Scribe
+
+**Status:** Merged from Frank's test-quality standards note.
+
+**Merged source:** `frank-test-recommendations.md`.
+
+- Every diagnostic gap closure must ship both a positive `CheckExpectingError` case and a negative `CheckExpectingClean` case; positive-only coverage is below the team quality bar.
+- Gate 2 remains a tripwire rather than proof of behavioral coverage because literal `DiagnosticCode.X` references can come from metadata or catalog tests without exercising emission behavior.
+- Message-text checks stay optional, TypeChecker span checks stay recommended-not-required, and domain-specific test files remain the preferred placement for new gap tests.
 
 ---
 
@@ -174,17 +175,16 @@
 
 ---
 
-### 2026-05-13T04:52:18Z: Diagnostic gap closures now require paired positive and negative integration tests
+### 2026-05-13T04:32:04Z: User directive keeps all work on `spike/Precept-V2-Radical` with no new branches
 
 **By:** Scribe
 
-**Status:** Merged from Frank's test-quality standards note.
+**Status:** Merged from user directive inbox note.
 
-**Merged source:** `frank-test-recommendations.md`.
+**Merged source:** `copilot-directive-no-new-branches.md`.
 
-- Every diagnostic gap closure must ship both a positive `CheckExpectingError` case and a negative `CheckExpectingClean` case; positive-only coverage is below the team quality bar.
-- Gate 2 remains a tripwire rather than proof of behavioral coverage because literal `DiagnosticCode.X` references can come from metadata or catalog tests without exercising emission behavior.
-- Message-text checks stay optional, TypeChecker span checks stay recommended-not-required, and domain-specific test files remain the preferred placement for new gap tests.
+- Shane directed that no new branches be created; all work stays on `spike/Precept-V2-Radical` while the team remains in spike mode.
+- This is durable team-memory guidance and should be treated as a branch-discipline constraint for follow-on work in the current spike.
 
 ---
 
@@ -198,19 +198,6 @@
 
 - `ValidateConstructionGuarantees` now analyzes only initial-event rows whose `FromState` is an initial state, so lifecycle transitions on the same initial event no longer participate in construction guarantees.
 - `samples\Test.precept` compiles clean again, `D94_NonInitialStateRow_NotChecked` covers the regression, and `dotnet test test\Precept.Tests\Precept.Tests.csproj` closed green at `5138/5138` with commit `4c567cdc`.
-
----
-
-### 2026-05-13T04:32:04Z: User directive keeps all work on `spike/Precept-V2-Radical` with no new branches
-
-**By:** Scribe
-
-**Status:** Merged from user directive inbox note.
-
-**Merged source:** `copilot-directive-no-new-branches.md`.
-
-- Shane directed that no new branches be created; all work stays on `spike/Precept-V2-Radical` while the team remains in spike mode.
-- This is durable team-memory guidance and should be treated as a branch-discipline constraint for follow-on work in the current spike.
 
 ---
 
@@ -298,17 +285,17 @@
 
 ---
 
-### 2026-05-13T00:26:25Z: Circular static-init crash in Tokens/Types is closed with lazy keyword-set initialization
+### 2026-05-13T00:26:25Z: Required-field initialization semantics stay compile-time complete across all three precept forms
 
 **By:** Scribe
 
-**Status:** Merged from George's runtime fix note.
+**Status:** Merged from Frank's field-initialization analysis.
 
-**Merged source:** `george-circular-static-init-fix.md`.
+**Merged source:** `frank-field-init-semantics.md`.
 
-- `Tokens.KeywordsValidAsMemberName` now uses a `Lazy<FrozenSet<TokenKind>>` backing field, so `Types.All` is not touched during `Tokens..cctor()`.
-- The crash path was a CLR static-constructor cycle: `Types.GetMeta()` re-entered `Tokens..cctor()`, which previously read `Types.All` before assignment and faulted in `SelectMany`.
-- George reported the public API shape unchanged and the repository suite green at `4996/4996` tests passing.
+- Stateful precepts with an initial event remain compile-time safe because `InitialEventMissingAssignments` must force every required no-default field to be assigned during construction.
+- Stateful precepts without an initial event cannot carry required no-default fields at all because `RequiredFieldsNeedInitialEvent` rejects that shape, while stateless precepts follow the same constructor guarantees without state-entry semantics.
+- The open spec gap remains omit→non-omit reentry: non-optional, no-default fields need a must-set rule on the transition, while defaulted and optional fields can re-materialize from their valid baseline values.
 
 ---
 
@@ -327,17 +314,171 @@
 
 ---
 
-### 2026-05-13T00:26:25Z: Required-field initialization semantics stay compile-time complete across all three precept forms
+### 2026-05-13T00:26:25Z: Circular static-init crash in Tokens/Types is closed with lazy keyword-set initialization
 
 **By:** Scribe
 
-**Status:** Merged from Frank's field-initialization analysis.
+**Status:** Merged from George's runtime fix note.
 
-**Merged source:** `frank-field-init-semantics.md`.
+**Merged source:** `george-circular-static-init-fix.md`.
 
-- Stateful precepts with an initial event remain compile-time safe because `InitialEventMissingAssignments` must force every required no-default field to be assigned during construction.
-- Stateful precepts without an initial event cannot carry required no-default fields at all because `RequiredFieldsNeedInitialEvent` rejects that shape, while stateless precepts follow the same constructor guarantees without state-entry semantics.
-- The open spec gap remains omit→non-omit reentry: non-optional, no-default fields need a must-set rule on the transition, while defaulted and optional fields can re-materialize from their valid baseline values.
+- `Tokens.KeywordsValidAsMemberName` now uses a `Lazy<FrozenSet<TokenKind>>` backing field, so `Types.All` is not touched during `Tokens..cctor()`.
+- The crash path was a CLR static-constructor cycle: `Types.GetMeta()` re-entered `Tokens..cctor()`, which previously read `Types.All` before assignment and faulted in `SelectMany`.
+- George reported the public API shape unchanged and the repository suite green at `4996/4996` tests passing.
+
+---
+
+### 2026-05-13T00:00:39Z: Kramer's B4 fix pass closed the no-obligations copy bug and proof-summary de-dup coverage
+
+**By:** Scribe
+
+**Status:** Merged from Kramer's B4 fix note.
+
+**Merged source:** `kramer-b4-fixes.md`.
+
+- Kramer extended `StateGraph.EdgeProofStatus` with `HasObligations`, populated it during compiler enrichment, and switched rich state hover to render the locked no-obligations wording when connected edges exist but none carry proof obligations.
+- The fix pass also added the missing regression anchors: language-server coverage for the connected-edge/no-proof-obligation path and core projection coverage that duplicate `Requirement.Description` values collapse to one unresolved summary.
+- `docs/Working/hover-design.md` was updated to match the shipped projection/rendering rule, and targeted language-server tests, compiler-edge-proof tests, and the language-server build all passed.
+
+
+### 2026-05-13T00:00:38Z: Hover B4 review approved the edge-proof projection shape but blocked a no-obligation copy bug and missing de-dup coverage
+
+**By:** Scribe
+
+**Status:** Merged from Frank's B4 review.
+
+**Merged source:** `frank-b4-review.md`.
+
+- Frank approved the overall B4 architecture: `StateGraph.EdgeProofStatus`, compiler enrichment, incident-edge filtering, and rich state-card rendering were all wired in the expected places.
+- Two blockers remained before closeout: the no-obligations branch used the wrong emptiness check and the projection suite did not yet lock `Requirement.Description` de-duplication.
+- Targeted B4 tests passed even though an unrelated pre-existing modifier-catalog failure still kept the broader core suite red.
+
+---
+
+### 2026-05-13T00:00:00Z: PRE0091 `AmbiguousTypedConstant` ships narrow first and enforcement infrastructure stays explicit and comment-stripped
+
+**By:** Scribe
+
+**Status:** Merged, reconciled, inbox cleared (5 files -> 1 canonical entry).
+
+**Merged sources:** `frank-q4-narrow.md`, `frank-q6-allowlist-granularity.md`, `frank-q7-analyzer-scan-scope.md`, `frank-q8-doc-comment-stripping.md`, `frank-q9-allowlist-coordination.md`.
+
+- PRE0091's first implementation stays limited to temporal quantity ambiguity because `ResolveTypedConstant` normally receives `expectedType`; broad candidate enumeration would be speculative infrastructure for error-recovery-only paths.
+- Gate 1 allow-list entries need only root-cause cluster comments, while Gate 2 scans an explicit pipeline-centered file set and strips `//`, `/** */`, and `///` comments before matching `DiagnosticCode.*` references.
+- PRE0078 allow-list cleanup is owned by the interval-engine PR itself: once a real emission site exists, the stale-entry analyzer forces the same PR to remove the allow-list entry.
+
+---
+
+### 2026-05-12T23:56:04Z: B4 edge-proof status projection landed across the compiler, graph model, and rich state hover
+
+**By:** Scribe
+
+**Status:** Merged from George's B4 completion note.
+
+**Merged source:** `george-b4-complete.md`.
+
+- George added `StateGraph.EdgeProofStatuses` plus the `EdgeProofStatus` record so graph-level proof projections survive into tooling without rejoining proof data inside the language server.
+- Compiler enrichment now maps unresolved transition-row obligations onto concrete graph edges, de-duplicates repeated descriptions, and marks edges proven when no unresolved summaries remain.
+- The rich state card now renders per-edge proof gaps or the matching proven/no-obligations copy, and targeted test counts rose to `278` language-server tests and `4973` core tests.
+
+---
+
+### 2026-05-12T23:50:08Z: Modifier-gap regression coverage landed across price, exchangerate, business magnitudes, and identity types
+
+**By:** Scribe
+
+**Status:** Merged from Soup Nazi's modifier-gap regression suite note.
+
+**Merged source:** `soup-nazi-modifier-gap-tests.md`.
+
+- Soup Nazi added 22 tests across three files: a 17-test `PriceExchangeRateModifierTests.cs` suite, a 3-test `IdentityTypeModifierTests.cs` suite, and two `maxplaces` additions in `MoneyQuantityModifierRegressionTests.cs`.
+- The suite locked the expected split between newly-fixed price paths, already-green exchangerate and identity-type behavior, and the deliberate negative coverage that `exchangerate min/max` must stay invalid.
+- The tester note also preserved two useful cautions: the price regression guards were not asserting the actual pre-fix diagnostic code, and five `ModifiersTests` theory failures were pre-existing drift rather than fallout from this batch.
+
+---
+
+### 2026-05-12T23:50:08Z: Modifier catalog gaps were closed for `price`, `exchangerate`, business-magnitude `maxplaces`, and identity-type redundancy handling
+
+**By:** Scribe
+
+**Status:** Merged from George's modifier-gap implementation note.
+
+**Merged source:** `george-modifier-catalog-gaps-fixed.md`.
+
+- Commit `a727dddb` widened `ZeroBoundNumericTypes` to include `Price` and `ExchangeRate`, widened ranged modifiers to include `Price`, and introduced `BusinessMagnitudeTypes` so `maxplaces` now applies across decimal, money, quantity, price, and exchangerate.
+- The TypeChecker applicability guard now skips implied modifiers, collapsing identity-type `notempty` handling to `RedundantModifier` instead of the previous double-diagnostic shape.
+- George validated the implementation at `4969/4969` core tests green and handed Soup Nazi the missing regression scenarios to lock.
+
+---
+
+### 2026-05-12T23:48:11Z: Hover B2/B3 final re-review approved after `omit all` hover coverage landed
+
+**By:** Scribe
+
+**Status:** Merged from Frank's final B2/B3 re-review.
+
+**Merged source:** `frank-b2-b3-review-v3.md`.
+
+- Frank approved the final B2/B3 pass once construct-card routing, omit-aware mutability summaries, and `omit all` behavior all matched `docs/Working/hover-design.md`.
+- The missing regression coverage was closed with two new hover tests that lock the `omit all` path on both affected surfaces.
+- Targeted validation closed green at `275/275` language-server tests.
+
+---
+
+### 2026-05-12T23:45:45Z: Required-field constructor enforcement is specified but entirely unimplemented
+
+**By:** Scribe
+
+**Status:** Merged from Frank's required-field initialization gap analysis.
+
+**Merged source:** `frank-required-fields-analysis.md`.
+
+- Frank confirmed PRE0093 and PRE0094 already exist in the diagnostic catalog and message templates, but no pipeline stage emits them and no tests or samples exercise the constructor contract.
+- The gap is broader than one check: `Precept.Create()` is still a stub, samples currently rely on editable Draft-state initialization, and even event-argument syntax appears incomplete for the spec's constructor examples.
+- The durable owner-direction question is whether to implement the spec as written now, refine the spec around the shipped Draft-edit path, or split compile-time advisory from runtime enforcement.
+
+---
+
+### 2026-05-12T23:42:25Z: Hover B2/B3 re-review stayed blocked until `omit all` gained explicit regression coverage
+
+**By:** Scribe
+
+**Status:** Merged from Frank's B2/B3 re-review.
+
+**Merged source:** `frank-b2-b3-review-v2.md`.
+
+- Frank confirmed the routing-order fix and omit-driven mutability summaries were structurally correct and that targeted language-server tests were green.
+- The remaining blocker was narrow and explicit: no hover regression yet locked the `omit all` path on field and state cards.
+- Durable review guidance is that B2/B3 were functionally close, but not mergeable until the `omit all` surface was test-covered.
+
+---
+
+### 2026-05-12T23:38:00Z: Field-state guarantees v2 consistency review blocked readonly/access-condition enforcement on event-driven `set`
+
+**By:** Scribe
+
+**Status:** Merged from Frank's v2 consistency review.
+
+**Merged source:** `frank-v2-consistency-review.md`.
+
+- Frank confirmed D133, the multi-field parser fix, omit/access-mode unification, and D42/D43 emission are architecturally sound and grounded in the spec.
+- He blocked the wider design where it crossed the spec boundary: `readonly` and guarded `editable` restrict Update-path patches, not event-driven `set` actions, so D132, D134, and the proposed Phase 2 proof surface were not approved.
+- The review also recorded that general from-state D130 and guard-read D131 need either narrower justification or explicit spec extension rather than being presented as already-shipped language law.
+- Numbering note: this review uses the provisional field-state numbering; canonical v3 renumbering later mapped old D131 -> D130 and old D133 -> D131, with D135 becoming D132.
+
+---
+
+### 2026-05-12T23:36:02Z: Field-state guarantees v2 doc was finalized pending owner sign-off after resolving its tracked open questions
+
+**By:** Scribe
+
+**Status:** Merged from Frank's v2 doc update.
+
+**Merged source:** `frank-v2-doc-update.md`.
+
+- Frank advanced `docs/Working/field-state-guarantees-v2.md` to "Design Finalized — Pending Implementation" after documenting resolutions for Q1-Q5, B1-B3, and the W5 false-positive limitation.
+- The finalized draft records `IsBroadcast`, spec-truth baselines, DNF handling for OR conditions, wildcard multiplicity, and the self-loop dual-diagnostic decision as the working implementation contract.
+- This record stays explicitly pending Shane's sign-off rather than claiming the design was owner-approved.
 
 ---
 
@@ -365,6 +506,76 @@
 - Frank approved commits `53d68d51` and `cf3c6a81`: `ResolvedStateTarget` now carries explicit wildcard truth inside the TypeChecker, while `NormalizeTransitionRow` remains the intentional compatibility boundary that projects wildcard rows back to `TypedTransitionRow.FromState = null`.
 - The review confirmed the spike stayed metadata-disciplined where it matters: wildcard detection remains token-metadata-driven, runtime/graph/proof behavior stays unchanged, and comma-list expansion remains pure syntactic sugar with first-match preservation plus strengthened regression coverage.
 - Follow-up is proposal hardening, not implementation repair: the formal issue should defend the wildcard compatibility boundary, stay honest about the localized hand-shaped parser grammar scan, and strengthen locked decisions `D3`/`D4` with rejected alternatives, accepted tradeoffs, and explicit research/corpus grounding.
+
+---
+
+### 2026-05-12T23:20:42Z: Soup Nazi re-review approves George's blocker closeout and the explicit-wildcard `ResolvedStateTarget` redesign
+
+**By:** Scribe
+
+**Status:** Merged from Soup Nazi's re-review verdict.
+
+**Merged source:** `soup-nazi-re-review-verdict.md`.
+
+- George's commit `53d68d51` closed blocker set B1-B5 plus nit N1 with parser AST anchors, stronger expansion and guard-clone assertions, multi-unknown-state diagnostic fan-out coverage, and the corrected `4969` core-test count in the spike doc.
+- George's commit `cf3c6a81` replaced the `ResolvedStateTarget` null-sentinel with an explicit `IsWildcard` contract while preserving the nullable wildcard bridge only at `NormalizeTransitionRow`.
+- Soup Nazi re-reviewed both commits, reported `0 blockers / 2 good findings`, and approved the spike for merge readiness.
+
+---
+
+### 2026-05-12T23:20:42Z: Hover B2/B3 follow-up shipped rich state routing and mutability-honest summaries
+
+**By:** Scribe
+
+**Status:** Merged from Kramer's completion note.
+
+**Merged source:** `kramer-b2-b3-complete.md`.
+
+- `HoverHandler.cs` now routes state identifiers and construct cards through the rich-hover path before generic token help can mask them.
+- `RichHoverFactory.cs` now reuses the rich field/state/event/arg symbol cards and reports only unconditional writable truth in V1 mutability summaries, excluding guarded access while keeping omit-state locks.
+- Validation closed green at `271/271` language-server tests plus a successful language-server build.
+
+---
+
+### 2026-05-12T23:20:42Z: Frank's B2/B3 hover review keeps declaration-span routing and omit-aware mutability blocked
+
+**By:** Scribe
+
+**Status:** Merged from Frank's blocked review.
+
+**Merged source:** `frank-b2-b3-review.md`.
+
+- Frank confirmed the good news first: state identifier routing is fixed, `reject` and qualifier precedence are correct, and `271/271` language-server tests passed.
+- Blocker B1 remains: `TryCreateTypeHover(...)` and `TryCreateActionHover(...)` still return before rich construct routing, so declaration-span `money` and action keywords can bypass the construct card.
+- Blockers B2 and B3 remain: the field and state mutability summaries still ignore state-local `omit` declarations in the global/unconditional writable fallbacks, so omitted surfaces can still be reported as `✏️` instead of `🔒`.
+
+---
+
+### 2026-05-12T23:02:04Z: Hover B1 review locked the compact-card proof-hover contract before the fix pass
+
+**By:** Scribe
+
+**Status:** Merged from Frank's pre-fix blocked review.
+
+**Merged source:** `frank-b1-review.md`.
+
+- Frank's blocker list made the contract explicit: qualifier proof diagnostics, qualifier proof expressions, and qualifier declarations all had to use the compact 3-line card shapes from `docs/Working/hover-design.md` instead of the older forensic sections.
+- The review also locked the exact wording surface: `✅ Proven`, `⚡ Enforced`, `⚠️ Gap`, plus `proven` instead of `proved`, with transition hover using `Gap:` rather than `Proof gap:`.
+- Routing itself was not the problem: proof-first dispatch in `HoverHandler` and the rich proof/qualifier precedence inside `RichHoverFactory` were already judged structurally correct; the rendered copy and stale red tests were the blocked surface.
+
+---
+
+### 2026-05-12T23:02:04Z: George's B1 hover fix pass landed the compact-card contract and cleared the targeted language-server suites
+
+**By:** Scribe
+
+**Status:** Merged from George's hover-fix closeout note.
+
+**Merged source:** `george-b1-fixes.md`.
+
+- Commit `c2a38a56` replaced verbose proof-gap hover blocks with the compact qualifier/proof cards, locked the shared badge vocabulary to `✅ Proven`, `⚡ Enforced`, and `⚠️ Gap`, and normalized shipped copy from `proved` to `proven`.
+- `HoverHandler.cs` required no routing change; the fix stayed inside `RichHoverFactory.cs` and matching `HoverHandlerTests.cs` expectations.
+- Validation closed green at `41/41` `HoverHandlerTests` and `269/269` full language-server tests, while repo-wide `dotnet test` still hits the unrelated multi-unknown-state baseline in `TypeCheckerTransitionTests`.
 
 ---
 
@@ -397,48 +608,6 @@
 
 ---
 
-### 2026-05-12T23:02:04Z: George's B1 hover fix pass landed the compact-card contract and cleared the targeted language-server suites
-
-**By:** Scribe
-
-**Status:** Merged from George's hover-fix closeout note.
-
-**Merged source:** `george-b1-fixes.md`.
-
-- Commit `c2a38a56` replaced verbose proof-gap hover blocks with the compact qualifier/proof cards, locked the shared badge vocabulary to `✅ Proven`, `⚡ Enforced`, and `⚠️ Gap`, and normalized shipped copy from `proved` to `proven`.
-- `HoverHandler.cs` required no routing change; the fix stayed inside `RichHoverFactory.cs` and matching `HoverHandlerTests.cs` expectations.
-- Validation closed green at `41/41` `HoverHandlerTests` and `269/269` full language-server tests, while repo-wide `dotnet test` still hits the unrelated multi-unknown-state baseline in `TypeCheckerTransitionTests`.
-
----
-
-### 2026-05-12T23:02:04Z: Hover B1 review locked the compact-card proof-hover contract before the fix pass
-
-**By:** Scribe
-
-**Status:** Merged from Frank's pre-fix blocked review.
-
-**Merged source:** `frank-b1-review.md`.
-
-- Frank's blocker list made the contract explicit: qualifier proof diagnostics, qualifier proof expressions, and qualifier declarations all had to use the compact 3-line card shapes from `docs/Working/hover-design.md` instead of the older forensic sections.
-- The review also locked the exact wording surface: `✅ Proven`, `⚡ Enforced`, `⚠️ Gap`, plus `proven` instead of `proved`, with transition hover using `Gap:` rather than `Proof gap:`.
-- Routing itself was not the problem: proof-first dispatch in `HoverHandler` and the rich proof/qualifier precedence inside `RichHoverFactory` were already judged structurally correct; the rendered copy and stale red tests were the blocked surface.
-
----
-
-### 2026-05-12T22:25:28Z: Language docs and README now match shipped comma-list `StateTarget` behavior
-
-**By:** Scribe
-
-**Status:** Merged from Frank's docs-closeout note.
-
-**Merged source:** `frank-s6-docs-done.md`.
-
-- `docs/language/precept-language-spec.md`, `docs/language/precept-grammar.md`, `docs/compiler/parser.md`, `docs/compiler/type-checker.md`, `docs/compiler/name-binder.md`, and `README.md` now describe `StateTarget := Identifier ("," Identifier)* | any` while keeping `EventTarget` single-name.
-- The synced docs now record pure-copy expansion semantics plus per-name span/resolution behavior for comma-list state targets, and the parser docs now describe the shipped variable-offset state-scoped disambiguation scan.
-- `docs/language/catalog-system.md` and `docs/compiler/diagnostic-system.md` were explicitly verified as already accurate for the shipped comma-list subset and needed no further change.
-
----
-
 ### 2026-05-12T22:39:45Z: Field-state guarantees v2 will enforce structural access violations in the TypeChecker and conditional access through proof obligations
 
 **By:** Scribe
@@ -468,15 +637,17 @@
 
 ---
 
-### 2026-05-12T22:18:18Z: Construct metadata now describes `StateTarget` as a single state, `any`, or a comma-delimited state list
+### 2026-05-12T22:25:28Z: Language docs and README now match shipped comma-list `StateTarget` behavior
 
 **By:** Scribe
 
-**Status:** Merged from George's manifest closeout; inbox artifact was absent, so the ledger was updated directly from the spawn manifest.
+**Status:** Merged from Frank's docs-closeout note.
 
-- `src/Precept/Language/ConstructSlot.cs:18` now documents `ConstructSlotKind.StateTarget` as accepting a state name, `any`, or a comma-delimited list of state names.
-- `src/Precept/Language/Constructs.cs:29` now gives the shared `SlotStateTarget` description the same list-capable wording, keeping catalog-facing construct metadata aligned with the shipped parser and type-checker behavior.
-- George reported the S5 catalog wording pass complete and confirmed the validation build passed.
+**Merged source:** `frank-s6-docs-done.md`.
+
+- `docs/language/precept-language-spec.md`, `docs/language/precept-grammar.md`, `docs/compiler/parser.md`, `docs/compiler/type-checker.md`, `docs/compiler/name-binder.md`, and `README.md` now describe `StateTarget := Identifier ("," Identifier)* | any` while keeping `EventTarget` single-name.
+- The synced docs now record pure-copy expansion semantics plus per-name span/resolution behavior for comma-list state targets, and the parser docs now describe the shipped variable-offset state-scoped disambiguation scan.
+- `docs/language/catalog-system.md` and `docs/compiler/diagnostic-system.md` were explicitly verified as already accurate for the shipped comma-list subset and needed no further change.
 
 ---
 
@@ -491,6 +662,34 @@
 - The hard rule is now durable team memory: no one uses `claude-opus-4.7` unless Shane explicitly authorizes it for the session or task.
 - The clarification also locks the non-ban boundary: `claude-opus-4.6` remains available for complex work under the existing model-selection policy and is not part of the prohibition.
 - Model-selection guidance should therefore treat the directive as a surgical ban on `claude-opus-4.7`, not a general no-opus policy.
+
+---
+
+### 2026-05-12T22:18:18Z: Hover V1 now routes construct cards first, reports only unconditional mutability truth, and exposes graph-edge proof gaps through StateGraph metadata
+
+**By:** Scribe
+
+**Status:** Merged and deduplicated from Kramer's hover-closeout notes.
+
+**Merged sources:** `kramer-b2-b3-routing-and-mutability.md`, `kramer-b4-edge-proof-status.md`, `elaine-b4-design-doc-update.md`.
+
+- `HoverHandler.cs` now lets construct-span cards beat generic operator/function/accessor fallbacks while preserving the existing proof-first behavior and identifier-driven symbol hovers where they are still the honest trigger surface.
+- `RichHoverFactory.cs` now limits writable counts and state mutability summaries to unconditional `AccessModes`, omitting guarded access from V1 mutability claims instead of synthesizing misleading read-only complements.
+- `StateGraph` now carries edge proof-status metadata projected from unresolved transition proof obligations, allowing state hover to explain unproven graph edges without re-joining proof data inside the language server.
+- `docs/Working/hover-design.md` is now synced to the shipped B4 state-proof narrative, including the `📍` / `✅ Proven` / `⚠️ Gap` badge vocabulary and the fact that B4 appends to the rich state hover instead of shipping as a standalone hover kind.
+- Kramer's B2/B3/B4 validation stayed green on the full build plus core and language-server test suites (`4966` core tests, `281` LS tests).
+
+---
+
+### 2026-05-12T22:18:18Z: Construct metadata now describes `StateTarget` as a single state, `any`, or a comma-delimited state list
+
+**By:** Scribe
+
+**Status:** Merged from George's manifest closeout; inbox artifact was absent, so the ledger was updated directly from the spawn manifest.
+
+- `src/Precept/Language/ConstructSlot.cs:18` now documents `ConstructSlotKind.StateTarget` as accepting a state name, `any`, or a comma-delimited list of state names.
+- `src/Precept/Language/Constructs.cs:29` now gives the shared `SlotStateTarget` description the same list-capable wording, keeping catalog-facing construct metadata aligned with the shipped parser and type-checker behavior.
+- George reported the S5 catalog wording pass complete and confirmed the validation build passed.
 
 ---
 
@@ -523,19 +722,17 @@
 
 ---
 
-### 2026-05-12T22:18:18Z: Hover V1 now routes construct cards first, reports only unconditional mutability truth, and exposes graph-edge proof gaps through StateGraph metadata
+### 2026-05-12T15:15:10Z: Remaining `inventory-item.precept` proof fallout splits into shipped G1, BUG-C event-arg qualifiers, and deferred algebraic G2
 
 **By:** Scribe
 
-**Status:** Merged and deduplicated from Kramer's hover-closeout notes.
+**Status:** Merged from Frank's inbox note.
 
-**Merged sources:** `kramer-b2-b3-routing-and-mutability.md`, `kramer-b4-edge-proof-status.md`, `elaine-b4-design-doc-update.md`.
+**Merged source:** `frank-proof-coverage-expansion.md`.
 
-- `HoverHandler.cs` now lets construct-span cards beat generic operator/function/accessor fallbacks while preserving the existing proof-first behavior and identifier-driven symbol hovers where they are still the honest trigger surface.
-- `RichHoverFactory.cs` now limits writable counts and state mutability summaries to unconditional `AccessModes`, omitting guarded access from V1 mutability claims instead of synthesizing misleading read-only complements.
-- `StateGraph` now carries edge proof-status metadata projected from unresolved transition proof obligations, allowing state hover to explain unproven graph edges without re-joining proof data inside the language server.
-- `docs/Working/hover-design.md` is now synced to the shipped B4 state-proof narrative, including the `📍` / `✅ Proven` / `⚠️ Gap` badge vocabulary and the fact that B4 appends to the rich state hover instead of shipping as a standalone hover kind.
-- Kramer's B2/B3/B4 validation stayed green on the full build plus core and language-server test suites (`4966` core tests, `281` LS tests).
+- Frank closed the root-cause triage: RC1 was the compound-unit qualifier bug in `ResolveQualifierFromInterpolatedConstant`, RC2 is blocked on BUG-C because unqualified `exchangerate` event args cannot carry `in ... to ...` metadata yet, and RC3 is a later algebraic proof-composition problem.
+- The decision explicitly reframed F4 as already implemented in runtime semantics; the remaining ReceiveShipment currency fallout is a data-shape gap, not a missing `CurrencyConversion` policy.
+- G1 stayed the immediate slice because it clears four diagnostics surgically; G2 remains deferred until BUG-C exposes qualifier data on event args.
 
 ---
 
@@ -553,34 +750,6 @@
 
 ---
 
-### 2026-05-12T15:15:10Z: Remaining `inventory-item.precept` proof fallout splits into shipped G1, BUG-C event-arg qualifiers, and deferred algebraic G2
-
-**By:** Scribe
-
-**Status:** Merged from Frank's inbox note.
-
-**Merged source:** `frank-proof-coverage-expansion.md`.
-
-- Frank closed the root-cause triage: RC1 was the compound-unit qualifier bug in `ResolveQualifierFromInterpolatedConstant`, RC2 is blocked on BUG-C because unqualified `exchangerate` event args cannot carry `in ... to ...` metadata yet, and RC3 is a later algebraic proof-composition problem.
-- The decision explicitly reframed F4 as already implemented in runtime semantics; the remaining ReceiveShipment currency fallout is a data-shape gap, not a missing `CurrencyConversion` policy.
-- G1 stayed the immediate slice because it clears four diagnostics surgically; G2 remains deferred until BUG-C exposes qualifier data on event args.
-
----
-
-### 2026-05-12T15:15:10Z: Compound-unit interpolated constants now resolve full `{A}/{B}` qualifiers before denominator fallback
-
-**By:** Scribe
-
-**Status:** Merged from George's inbox note.
-
-**Merged source:** `george-g1-compound-unit-fix.md`.
-
-- George fixed `ResolveQualifierFromInterpolatedConstant` so typed constants carrying both numerator and denominator unit slots build the full compound qualifier string instead of collapsing to the denominator.
-- The G1 pass shipped in commit `cb4fbf57`, kept `StaticMagnitude` on the typed interpolated constant node, and reused trusted positive-rule proofs so downstream nonzero obligations can discharge from the cleaned qualifier evidence.
-- RC1 fallout is cleared in `samples/inventory-item.precept`: the PRE0114s at plan lines 122/123 and the cascading DivisionByZero diagnostics at lines 137/142 are gone, with docs/history synced in `1ee54bdb`.
-
----
-
 ### 2026-05-12T15:15:10Z: Proof hover ships honest fallback reasons until compile-time proof exposes a stable failure-reason payload
 
 **By:** Scribe
@@ -595,17 +764,17 @@
 
 ---
 
-### 2026-05-12T13:52:04Z: Proof diagnostic root cause is missing same-qualifier operation metadata, not a new proof strategy gap
+### 2026-05-12T15:15:10Z: Compound-unit interpolated constants now resolve full `{A}/{B}` qualifiers before denominator fallback
 
 **By:** Scribe
 
-**Status:** Merged from Frank's inbox note.
+**Status:** Merged from George's inbox note.
 
-**Merged source:** `frank-expression-qualifier-diagnostic.md`.
+**Merged source:** `george-g1-compound-unit-fix.md`.
 
-- Frank isolated the nested `(A - B) - C` PRE0114 failures to a catalog input gap: same-qualifier `+/-` operations lacked `Match: QualifierMatch.Same`, so intermediate `TypedBinaryOp` results did not advertise inherited qualifiers and the existing recursive proof path never activated.
-- The approved fix stays metadata-driven and surgical: add `Match: Same` to the six same-qualifier money/quantity/price arithmetic operations and cover nested regressions; no provenance redesign or new proof algorithm is required.
-- The message UX follow-up remains independently valuable: `ProofEngine` should describe subexpressions recursively and show resolved qualifier values instead of `<expression>` placeholders so legitimate qualifier failures explain the real mismatch.
+- George fixed `ResolveQualifierFromInterpolatedConstant` so typed constants carrying both numerator and denominator unit slots build the full compound qualifier string instead of collapsing to the denominator.
+- The G1 pass shipped in commit `cb4fbf57`, kept `StaticMagnitude` on the typed interpolated constant node, and reused trusted positive-rule proofs so downstream nonzero obligations can discharge from the cleaned qualifier evidence.
+- RC1 fallout is cleared in `samples/inventory-item.precept`: the PRE0114s at plan lines 122/123 and the cascading DivisionByZero diagnostics at lines 137/142 are gone, with docs/history synced in `1ee54bdb`.
 
 ---
 
@@ -637,6 +806,20 @@
 
 ---
 
+### 2026-05-12T13:52:04Z: Proof hover working spec is filed for Shane sign-off before implementation
+
+**By:** Scribe
+
+**Status:** Merged from Elaine's inbox note.
+
+**Merged source:** `elaine-hover-design-filed.md`.
+
+- Elaine wrote `docs/working/proof-hover-design.md` as the canonical working spec for proof-hover UX before Kramer starts implementation work.
+- The doc covers precedence failures in the current hover stack, scenario-specific card requirements, routing rules, and the proof-evidence data shape the implementation must have available.
+- Status is now durable: the hover design is ready for Shane review and annotation, not for silent implementation drift.
+
+---
+
 ### 2026-05-12T13:52:04Z: Proof diagnostics now use explicit 'Cannot prove…' wording with structured qualifier payloads
 
 **By:** Scribe
@@ -651,17 +834,17 @@
 
 ---
 
-### 2026-05-12T13:52:04Z: Proof hover working spec is filed for Shane sign-off before implementation
+### 2026-05-12T13:52:04Z: Proof diagnostic root cause is missing same-qualifier operation metadata, not a new proof strategy gap
 
 **By:** Scribe
 
-**Status:** Merged from Elaine's inbox note.
+**Status:** Merged from Frank's inbox note.
 
-**Merged source:** `elaine-hover-design-filed.md`.
+**Merged source:** `frank-expression-qualifier-diagnostic.md`.
 
-- Elaine wrote `docs/working/proof-hover-design.md` as the canonical working spec for proof-hover UX before Kramer starts implementation work.
-- The doc covers precedence failures in the current hover stack, scenario-specific card requirements, routing rules, and the proof-evidence data shape the implementation must have available.
-- Status is now durable: the hover design is ready for Shane review and annotation, not for silent implementation drift.
+- Frank isolated the nested `(A - B) - C` PRE0114 failures to a catalog input gap: same-qualifier `+/-` operations lacked `Match: QualifierMatch.Same`, so intermediate `TypedBinaryOp` results did not advertise inherited qualifiers and the existing recursive proof path never activated.
+- The approved fix stays metadata-driven and surgical: add `Match: Same` to the six same-qualifier money/quantity/price arithmetic operations and cover nested regressions; no provenance redesign or new proof algorithm is required.
+- The message UX follow-up remains independently valuable: `ProofEngine` should describe subexpressions recursively and show resolved qualifier values instead of `<expression>` placeholders so legitimate qualifier failures explain the real mismatch.
 
 ---
 
@@ -679,31 +862,17 @@
 
 ---
 
-### 2026-05-12T05:04:03Z: DTO-free MCP architecture analysis confirms hybrid curated projection
+### 2026-05-12T05:04:03Z: E2 and E3 qualifier fixes cut inventory-item PRE0114 to 16
 
 **By:** Scribe
 
-**Status:** Merged from Frank's inbox note.
+**Status:** Merged from George's inbox note.
 
-**Merged source:** `frank-mcp-dto-free-design.md`.
+**Merged source:** `george-e2-e3-complete.md`.
 
-- Frank evaluated multiple DTO-free MCP approaches under the no-codegen constraint and rejected raw core serialization plus attribute-driven converter sprawl.
-- The accepted direction keeps the contract curated while removing DTO type maintenance: catalog/reference tools move toward compact rendered output and only genuinely programmatic surfaces keep minimal structured JSON.
-- The core ruling remains that transport shape is a deliberate MCP contract concern, not something to leak back into `src/Precept` domain types.
-
----
-
-### 2026-05-12T05:04:03Z: DTO-free MCP architecture is implementation-ready for Newman
-
-**By:** Scribe
-
-**Status:** Merged from Frank's inbox note.
-
-**Merged source:** `frank-mcp-impl-plan.md`.
-
-- `docs/Working/mcp-dto-free-design.md` now carries an execution-grade implementation plan covering catalog-tool string returns, formatter extraction, `precept_compile` contract reduction, cleanup scope, and test rewrites.
-- The dependency ruling is locked: no `src/Precept`, language-server, or VS Code extension work is required for this implementation pass.
-- Newman can start coding from the working doc without further architecture elaboration.
+- George landed E2 in `8785d753` and E3 in `d3f5aa98`, then followed with `f4db093e` for the ReceiveShipment parenthesization fix.
+- `samples/inventory-item.precept` PRE0114 count dropped from `66` to `16` after typed interpolated constant qualifier extraction, subexpression qualifier propagation, and compound-unit cancellation improvements.
+- The remaining 16 PRE0114 diagnostics are deferred exchange-rate / GrossProfit fallout; two separate `TypeMismatch` sample edits remain outside the committed parenthesization fix.
 
 ---
 
@@ -721,43 +890,31 @@
 
 ---
 
-### 2026-05-12T05:04:03Z: E2 and E3 qualifier fixes cut inventory-item PRE0114 to 16
+### 2026-05-12T05:04:03Z: DTO-free MCP architecture is implementation-ready for Newman
 
 **By:** Scribe
 
-**Status:** Merged from George's inbox note.
+**Status:** Merged from Frank's inbox note.
 
-**Merged source:** `george-e2-e3-complete.md`.
+**Merged source:** `frank-mcp-impl-plan.md`.
 
-- George landed E2 in `8785d753` and E3 in `d3f5aa98`, then followed with `f4db093e` for the ReceiveShipment parenthesization fix.
-- `samples/inventory-item.precept` PRE0114 count dropped from `66` to `16` after typed interpolated constant qualifier extraction, subexpression qualifier propagation, and compound-unit cancellation improvements.
-- The remaining 16 PRE0114 diagnostics are deferred exchange-rate / GrossProfit fallout; two separate `TypeMismatch` sample edits remain outside the committed parenthesization fix.
+- `docs/Working/mcp-dto-free-design.md` now carries an execution-grade implementation plan covering catalog-tool string returns, formatter extraction, `precept_compile` contract reduction, cleanup scope, and test rewrites.
+- The dependency ruling is locked: no `src/Precept`, language-server, or VS Code extension work is required for this implementation pass.
+- Newman can start coding from the working doc without further architecture elaboration.
 
 ---
 
-### 2026-05-12T04:29:05Z: Diagnostic Message Fixes Implemented and Validated
-
-
+### 2026-05-12T05:04:03Z: DTO-free MCP architecture analysis confirms hybrid curated projection
 
 **By:** Scribe
 
+**Status:** Merged from Frank's inbox note.
 
+**Merged source:** `frank-mcp-dto-free-design.md`.
 
-**Status:** Merged from George's inbox note.
-
-
-
-**Merged source:** `george-diagnostic-message-fixes.md`.
-
-
-
-- George implemented all 10 approved diagnostic-message fixes from Elaine's audit in `commit 4535aaa6`.
-
-- Validation stayed green on the targeted path: `818/818` tests passed.
-
-- The batch also synced proof-context formatting, removed the hardcoded `"unknown"` payload from PRE0114, and updated the proof-engine diagnostic documentation.
-
-- The RuleIdentity follow-up remained intentionally skipped because the runtime model still lacks an author-facing label beyond `RuleIndex`.
+- Frank evaluated multiple DTO-free MCP approaches under the no-codegen constraint and rejected raw core serialization plus attribute-driven converter sprawl.
+- The accepted direction keeps the contract curated while removing DTO type maintenance: catalog/reference tools move toward compact rendered output and only genuinely programmatic surfaces keep minimal structured JSON.
+- The core ruling remains that transport shape is a deliberate MCP contract concern, not something to leak back into `src/Precept` domain types.
 
 ---
 
@@ -833,7 +990,7 @@
 
 ---
 
-### 2026-05-12T00:50:06Z: Derivation operations do not infer qualifiers on resulting `price` values
+### 2026-05-12T04:29:05Z: Diagnostic Message Fixes Implemented and Validated
 
 
 
@@ -841,19 +998,87 @@
 
 
 
-**Status:** Merged from Frank's inbox notes.
+**Status:** Merged from George's inbox note.
 
 
 
-**Merged source:** `frank-q2-derivation-no-inference.md`.
+**Merged source:** `george-diagnostic-message-fixes.md`.
 
 
 
-- `money ÷ quantity`, `money ÷ period`, and `money ÷ duration` produce bare `price` results; the compiler does not infer denominator qualifiers from the divisor.
+- George implemented all 10 approved diagnostic-message fixes from Elaine's audit in `commit 4535aaa6`.
 
-- Authors who need temporal-denominated derived prices must assign into fields explicitly declared with `of 'time'` or `of 'date'`.
+- Validation stayed green on the targeted path: `818/818` tests passed.
 
-- The rationale is now locked as D19 in `docs/language/business-domain-types.md`: qualifier inference on derivation would violate Precept's explicit, deterministic, inspectable domain-contract model.
+- The batch also synced proof-context formatting, removed the hardcoded `"unknown"` payload from PRE0114, and updated the proof-engine diagnostic documentation.
+
+- The RuleIdentity follow-up remained intentionally skipped because the runtime model still lacks an author-facing label beyond `RuleIndex`.
+
+---
+
+### 2026-05-12T04:00:00Z: Modifier applicability drift was confirmed as catalog gaps for `price`, `maxplaces`, and identity-type redundancy handling
+
+**By:** Scribe
+
+**Status:** Merged from Frank's modifier applicability audit.
+
+**Merged source:** `frank-modifier-price-analysis.md`.
+
+- Frank grounded the issue in catalog metadata, not checker logic: `price` bound modifiers and business-magnitude `maxplaces` were missing from `Modifiers.cs`, while the checker was faithfully enforcing incomplete metadata.
+- The audit locked the design line that `price` magnitude modifiers are semantically valid, `exchangerate min/max` remain deliberately invalid, and `notempty` must stay off scalar business magnitudes.
+- It also recorded the validator-shape bug on identity types: explicit `currency`/`unitofmeasure`/`dimension notempty` should degrade to redundancy-only handling.
+
+---
+
+### 2026-05-12T01:05:25Z: inventory-item coverage audit confirms compound-unit interpolation follow-up
+
+
+
+**By:** Scribe
+
+
+
+**Status:** Merged from Frank's inbox note.
+
+
+
+**Merged source:** `frank-inventory-item-coverage.md`.
+
+
+
+- `samples/inventory-item.precept` still needs a typed-constant follow-up for compound-unit interpolation: forms like `'{StockingUnit}/{PurchaseUnit}'` and `'0 {StockingUnit}/{PurchaseUnit}'` are outside the current `unitofmeasure` and `quantity` interpolation grammars, so Slice 2 needs a Slice 2B-style extension for compound-unit patterns plus dimensional validation.
+
+- BUG-B remains covered once interpolated typed constants and Slice 9's Unit→Dimension fallback land; the Rate × money path is already covered by existing operation/catalog work.
+
+- BUG-A still looks like an interpolation-driven cascade rather than a separate proof defect, but explicit regressions for event-arg qualifier use in `ensure` comparisons and arithmetic expressions should ship before calling that path closed.
+
+- Remaining sample fallout after the plan lands is design-level, not compiler-level: `SupplierUnitCost` is modeled as `money` where `price` semantics are needed, `Sku is set` still targets a non-optional field, and the average-cost calculation still needs a division-by-zero guard.
+
+---
+
+### 2026-05-12T01:05:25Z: Slice 11B shipped and unblocked temporal price-chain validation
+
+
+
+**By:** Scribe
+
+
+
+**Status:** Merged from George's inbox note.
+
+
+
+**Merged source:** `george-slice11b-complete.md`.
+
+
+
+- `price of 'time'` and `price of 'date'` now stay on the existing `of` qualifier surface: `ExtractQualifiers` routes those price qualifiers to temporal dimensions while `quantity of 'time'` remains invalid.
+
+- The proof pipeline now carries the required temporal comparison infrastructure: `ExtractComparableValue` understands `TemporalUnit` / `TemporalDimension`, `ResolveQualifierOnAxis` falls back `Dimension → TemporalDimension`, and `TypeMeta.ImpliedQualifiers` lets `duration` contribute implied temporal-denominator metadata.
+
+- MCP type-catalog output now serializes implied qualifiers, and George locked the implementation with 13 new Slice 11B tests. Slice 12 can proceed on top of the completed temporal denominator substrate.
+
+- Tooling follow-up remains open for Kramer: `price of ...` completions should offer `'time'` and `'date'` alongside physical dimensions.
 
 ---
 
@@ -880,6 +1105,30 @@
 - G15 is closed as a false gap: derivation-direction operations do not need qualifier-chain proofs because the operands share no qualifier axis, and assignment validation already enforces declared-target compatibility in the practical cases.
 
 - The plan-status correction is durable: Slices 7–11 were confirmed already implemented; only Slice 11B and Slice 12 remain open work.
+
+---
+
+### 2026-05-12T00:50:06Z: Derivation operations do not infer qualifiers on resulting `price` values
+
+
+
+**By:** Scribe
+
+
+
+**Status:** Merged from Frank's inbox notes.
+
+
+
+**Merged source:** `frank-q2-derivation-no-inference.md`.
+
+
+
+- `money ÷ quantity`, `money ÷ period`, and `money ÷ duration` produce bare `price` results; the compiler does not infer denominator qualifiers from the divisor.
+
+- Authors who need temporal-denominated derived prices must assign into fields explicitly declared with `of 'time'` or `of 'date'`.
+
+- The rationale is now locked as D19 in `docs/language/business-domain-types.md`: qualifier inference on derivation would violate Precept's explicit, deterministic, inspectable domain-contract model.
 
 ---
 
@@ -911,7 +1160,7 @@
 
 ---
 
-### 2026-05-11T22:41:49Z: Proof Engine Qualifier Coverage — Part B (Slices 7+8+9)
+### 2026-05-11T22:41:49Z: string Excluded from Typed Constant Interpolation Holes
 
 
 
@@ -919,21 +1168,19 @@
 
 
 
-**Status:** Merged from George's inbox note.
+**Status:** Merged from Frank's inbox note.
 
 
 
-**Merged source:** `george-proof-qualifier-coverage-partb.md`.
+**Merged source:** `frank-string-excluded-from-interpolation.md`.
 
 
 
-- Added `QualifierCompatibilityProofRequirement` on `QualifierAxis.Currency` to all 8 money operations so same-currency enforcement is no longer implicit-only.
+- `string` stays invalid in every typed-constant interpolation hole position; compile-time rejection is the canonical behavior.
 
-- Introduced `QualifierChainProofRequirement` for cross-type qualifier validation on `ExchangeRateTimesMoney` and `PriceTimesQuantity`, with dual-axis comparison support.
+- The decision restores the prior compile-time guarantee and rejects runtime-deferral as a structural escape hatch.
 
-- Added Unit→Dimension fallback in `ResolveQualifierOnAxis()` so dimension-only fields can satisfy unit-axis proof obligations.
-
-- Validation landed with 19 new ProofEngine tests and 193/193 proof tests passing.
+- No new diagnostic code is needed because `InterpolatedTypedConstantHoleTypeMismatch` already covers the failure.
 
 ---
 
@@ -1015,57 +1262,7 @@
 
 ---
 
-### 2026-05-11T22:41:49Z: string Excluded from Typed Constant Interpolation Holes
-
-
-
-**By:** Scribe
-
-
-
-**Status:** Merged from Frank's inbox note.
-
-
-
-**Merged source:** `frank-string-excluded-from-interpolation.md`.
-
-
-
-- `string` stays invalid in every typed-constant interpolation hole position; compile-time rejection is the canonical behavior.
-
-- The decision restores the prior compile-time guarantee and rejects runtime-deferral as a structural escape hatch.
-
-- No new diagnostic code is needed because `InterpolatedTypedConstantHoleTypeMismatch` already covers the failure.
-
----
-
-### 2026-05-12T01:05:25Z: inventory-item coverage audit confirms compound-unit interpolation follow-up
-
-
-
-**By:** Scribe
-
-
-
-**Status:** Merged from Frank's inbox note.
-
-
-
-**Merged source:** `frank-inventory-item-coverage.md`.
-
-
-
-- `samples/inventory-item.precept` still needs a typed-constant follow-up for compound-unit interpolation: forms like `'{StockingUnit}/{PurchaseUnit}'` and `'0 {StockingUnit}/{PurchaseUnit}'` are outside the current `unitofmeasure` and `quantity` interpolation grammars, so Slice 2 needs a Slice 2B-style extension for compound-unit patterns plus dimensional validation.
-
-- BUG-B remains covered once interpolated typed constants and Slice 9's Unit→Dimension fallback land; the Rate × money path is already covered by existing operation/catalog work.
-
-- BUG-A still looks like an interpolation-driven cascade rather than a separate proof defect, but explicit regressions for event-arg qualifier use in `ensure` comparisons and arithmetic expressions should ship before calling that path closed.
-
-- Remaining sample fallout after the plan lands is design-level, not compiler-level: `SupplierUnitCost` is modeled as `money` where `price` semantics are needed, `Sku is set` still targets a non-optional field, and the average-cost calculation still needs a division-by-zero guard.
-
----
-
-### 2026-05-12T01:05:25Z: Slice 11B shipped and unblocked temporal price-chain validation
+### 2026-05-11T22:41:49Z: Proof Engine Qualifier Coverage — Part B (Slices 7+8+9)
 
 
 
@@ -1077,213 +1274,17 @@
 
 
 
-**Merged source:** `george-slice11b-complete.md`.
+**Merged source:** `george-proof-qualifier-coverage-partb.md`.
 
 
 
-- `price of 'time'` and `price of 'date'` now stay on the existing `of` qualifier surface: `ExtractQualifiers` routes those price qualifiers to temporal dimensions while `quantity of 'time'` remains invalid.
+- Added `QualifierCompatibilityProofRequirement` on `QualifierAxis.Currency` to all 8 money operations so same-currency enforcement is no longer implicit-only.
 
-- The proof pipeline now carries the required temporal comparison infrastructure: `ExtractComparableValue` understands `TemporalUnit` / `TemporalDimension`, `ResolveQualifierOnAxis` falls back `Dimension → TemporalDimension`, and `TypeMeta.ImpliedQualifiers` lets `duration` contribute implied temporal-denominator metadata.
+- Introduced `QualifierChainProofRequirement` for cross-type qualifier validation on `ExchangeRateTimesMoney` and `PriceTimesQuantity`, with dual-axis comparison support.
 
-- MCP type-catalog output now serializes implied qualifiers, and George locked the implementation with 13 new Slice 11B tests. Slice 12 can proceed on top of the completed temporal denominator substrate.
+- Added Unit→Dimension fallback in `ResolveQualifierOnAxis()` so dimension-only fields can satisfy unit-axis proof obligations.
 
-- Tooling follow-up remains open for Kramer: `price of ...` completions should offer `'time'` and `'date'` alongside physical dimensions.
-
----
-
-### 2026-05-12T23:20:42Z: Hover B2/B3 follow-up shipped rich state routing and mutability-honest summaries
-
-**By:** Scribe
-
-**Status:** Merged from Kramer's completion note.
-
-**Merged source:** `kramer-b2-b3-complete.md`.
-
-- `HoverHandler.cs` now routes state identifiers and construct cards through the rich-hover path before generic token help can mask them.
-- `RichHoverFactory.cs` now reuses the rich field/state/event/arg symbol cards and reports only unconditional writable truth in V1 mutability summaries, excluding guarded access while keeping omit-state locks.
-- Validation closed green at `271/271` language-server tests plus a successful language-server build.
+- Validation landed with 19 new ProofEngine tests and 193/193 proof tests passing.
 
 ---
-
-### 2026-05-12T23:20:42Z: Soup Nazi re-review approves George's blocker closeout and the explicit-wildcard `ResolvedStateTarget` redesign
-
-**By:** Scribe
-
-**Status:** Merged from Soup Nazi's re-review verdict.
-
-**Merged source:** `soup-nazi-re-review-verdict.md`.
-
-- George's commit `53d68d51` closed blocker set B1-B5 plus nit N1 with parser AST anchors, stronger expansion and guard-clone assertions, multi-unknown-state diagnostic fan-out coverage, and the corrected `4969` core-test count in the spike doc.
-- George's commit `cf3c6a81` replaced the `ResolvedStateTarget` null-sentinel with an explicit `IsWildcard` contract while preserving the nullable wildcard bridge only at `NormalizeTransitionRow`.
-- Soup Nazi re-reviewed both commits, reported `0 blockers / 2 good findings`, and approved the spike for merge readiness.
-
----
-
-### 2026-05-12T23:20:42Z: Frank's B2/B3 hover review keeps declaration-span routing and omit-aware mutability blocked
-
-**By:** Scribe
-
-**Status:** Merged from Frank's blocked review.
-
-**Merged source:** `frank-b2-b3-review.md`.
-
-- Frank confirmed the good news first: state identifier routing is fixed, `reject` and qualifier precedence are correct, and `271/271` language-server tests passed.
-- Blocker B1 remains: `TryCreateTypeHover(...)` and `TryCreateActionHover(...)` still return before rich construct routing, so declaration-span `money` and action keywords can bypass the construct card.
-- Blockers B2 and B3 remain: the field and state mutability summaries still ignore state-local `omit` declarations in the global/unconditional writable fallbacks, so omitted surfaces can still be reported as `✏️` instead of `🔒`.
-
----
-
-### 2026-05-12T04:00:00Z: Modifier applicability drift was confirmed as catalog gaps for `price`, `maxplaces`, and identity-type redundancy handling
-
-**By:** Scribe
-
-**Status:** Merged from Frank's modifier applicability audit.
-
-**Merged source:** `frank-modifier-price-analysis.md`.
-
-- Frank grounded the issue in catalog metadata, not checker logic: `price` bound modifiers and business-magnitude `maxplaces` were missing from `Modifiers.cs`, while the checker was faithfully enforcing incomplete metadata.
-- The audit locked the design line that `price` magnitude modifiers are semantically valid, `exchangerate min/max` remain deliberately invalid, and `notempty` must stay off scalar business magnitudes.
-- It also recorded the validator-shape bug on identity types: explicit `currency`/`unitofmeasure`/`dimension notempty` should degrade to redundancy-only handling.
-
----
-
-### 2026-05-12T23:36:02Z: Field-state guarantees v2 doc was finalized pending owner sign-off after resolving its tracked open questions
-
-**By:** Scribe
-
-**Status:** Merged from Frank's v2 doc update.
-
-**Merged source:** `frank-v2-doc-update.md`.
-
-- Frank advanced `docs/Working/field-state-guarantees-v2.md` to "Design Finalized — Pending Implementation" after documenting resolutions for Q1-Q5, B1-B3, and the W5 false-positive limitation.
-- The finalized draft records `IsBroadcast`, spec-truth baselines, DNF handling for OR conditions, wildcard multiplicity, and the self-loop dual-diagnostic decision as the working implementation contract.
-- This record stays explicitly pending Shane's sign-off rather than claiming the design was owner-approved.
-
----
-
-### 2026-05-12T23:38:00Z: Field-state guarantees v2 consistency review blocked readonly/access-condition enforcement on event-driven `set`
-
-**By:** Scribe
-
-**Status:** Merged from Frank's v2 consistency review.
-
-**Merged source:** `frank-v2-consistency-review.md`.
-
-- Frank confirmed D133, the multi-field parser fix, omit/access-mode unification, and D42/D43 emission are architecturally sound and grounded in the spec.
-- He blocked the wider design where it crossed the spec boundary: `readonly` and guarded `editable` restrict Update-path patches, not event-driven `set` actions, so D132, D134, and the proposed Phase 2 proof surface were not approved.
-- The review also recorded that general from-state D130 and guard-read D131 need either narrower justification or explicit spec extension rather than being presented as already-shipped language law.
-- Numbering note: this review uses the provisional field-state numbering; canonical v3 renumbering later mapped old D131 -> D130 and old D133 -> D131, with D135 becoming D132.
-
----
-
-### 2026-05-12T23:42:25Z: Hover B2/B3 re-review stayed blocked until `omit all` gained explicit regression coverage
-
-**By:** Scribe
-
-**Status:** Merged from Frank's B2/B3 re-review.
-
-**Merged source:** `frank-b2-b3-review-v2.md`.
-
-- Frank confirmed the routing-order fix and omit-driven mutability summaries were structurally correct and that targeted language-server tests were green.
-- The remaining blocker was narrow and explicit: no hover regression yet locked the `omit all` path on field and state cards.
-- Durable review guidance is that B2/B3 were functionally close, but not mergeable until the `omit all` surface was test-covered.
-
----
-
-### 2026-05-12T23:45:45Z: Required-field constructor enforcement is specified but entirely unimplemented
-
-**By:** Scribe
-
-**Status:** Merged from Frank's required-field initialization gap analysis.
-
-**Merged source:** `frank-required-fields-analysis.md`.
-
-- Frank confirmed PRE0093 and PRE0094 already exist in the diagnostic catalog and message templates, but no pipeline stage emits them and no tests or samples exercise the constructor contract.
-- The gap is broader than one check: `Precept.Create()` is still a stub, samples currently rely on editable Draft-state initialization, and even event-argument syntax appears incomplete for the spec's constructor examples.
-- The durable owner-direction question is whether to implement the spec as written now, refine the spec around the shipped Draft-edit path, or split compile-time advisory from runtime enforcement.
-
----
-
-### 2026-05-12T23:48:11Z: Hover B2/B3 final re-review approved after `omit all` hover coverage landed
-
-**By:** Scribe
-
-**Status:** Merged from Frank's final B2/B3 re-review.
-
-**Merged source:** `frank-b2-b3-review-v3.md`.
-
-- Frank approved the final B2/B3 pass once construct-card routing, omit-aware mutability summaries, and `omit all` behavior all matched `docs/Working/hover-design.md`.
-- The missing regression coverage was closed with two new hover tests that lock the `omit all` path on both affected surfaces.
-- Targeted validation closed green at `275/275` language-server tests.
-
----
-
-### 2026-05-12T23:50:08Z: Modifier catalog gaps were closed for `price`, `exchangerate`, business-magnitude `maxplaces`, and identity-type redundancy handling
-
-**By:** Scribe
-
-**Status:** Merged from George's modifier-gap implementation note.
-
-**Merged source:** `george-modifier-catalog-gaps-fixed.md`.
-
-- Commit `a727dddb` widened `ZeroBoundNumericTypes` to include `Price` and `ExchangeRate`, widened ranged modifiers to include `Price`, and introduced `BusinessMagnitudeTypes` so `maxplaces` now applies across decimal, money, quantity, price, and exchangerate.
-- The TypeChecker applicability guard now skips implied modifiers, collapsing identity-type `notempty` handling to `RedundantModifier` instead of the previous double-diagnostic shape.
-- George validated the implementation at `4969/4969` core tests green and handed Soup Nazi the missing regression scenarios to lock.
-
----
-
-### 2026-05-12T23:50:08Z: Modifier-gap regression coverage landed across price, exchangerate, business magnitudes, and identity types
-
-**By:** Scribe
-
-**Status:** Merged from Soup Nazi's modifier-gap regression suite note.
-
-**Merged source:** `soup-nazi-modifier-gap-tests.md`.
-
-- Soup Nazi added 22 tests across three files: a 17-test `PriceExchangeRateModifierTests.cs` suite, a 3-test `IdentityTypeModifierTests.cs` suite, and two `maxplaces` additions in `MoneyQuantityModifierRegressionTests.cs`.
-- The suite locked the expected split between newly-fixed price paths, already-green exchangerate and identity-type behavior, and the deliberate negative coverage that `exchangerate min/max` must stay invalid.
-- The tester note also preserved two useful cautions: the price regression guards were not asserting the actual pre-fix diagnostic code, and five `ModifiersTests` theory failures were pre-existing drift rather than fallout from this batch.
-
----
-
-### 2026-05-12T23:56:04Z: B4 edge-proof status projection landed across the compiler, graph model, and rich state hover
-
-**By:** Scribe
-
-**Status:** Merged from George's B4 completion note.
-
-**Merged source:** `george-b4-complete.md`.
-
-- George added `StateGraph.EdgeProofStatuses` plus the `EdgeProofStatus` record so graph-level proof projections survive into tooling without rejoining proof data inside the language server.
-- Compiler enrichment now maps unresolved transition-row obligations onto concrete graph edges, de-duplicates repeated descriptions, and marks edges proven when no unresolved summaries remain.
-- The rich state card now renders per-edge proof gaps or the matching proven/no-obligations copy, and targeted test counts rose to `278` language-server tests and `4973` core tests.
-
----
-
-### 2026-05-13T00:00:38Z: Hover B4 review approved the edge-proof projection shape but blocked a no-obligation copy bug and missing de-dup coverage
-
-**By:** Scribe
-
-**Status:** Merged from Frank's B4 review.
-
-**Merged source:** `frank-b4-review.md`.
-
-- Frank approved the overall B4 architecture: `StateGraph.EdgeProofStatus`, compiler enrichment, incident-edge filtering, and rich state-card rendering were all wired in the expected places.
-- Two blockers remained before closeout: the no-obligations branch used the wrong emptiness check and the projection suite did not yet lock `Requirement.Description` de-duplication.
-- Targeted B4 tests passed even though an unrelated pre-existing modifier-catalog failure still kept the broader core suite red.
-
----
-
-### 2026-05-13T00:00:39Z: Kramer's B4 fix pass closed the no-obligations copy bug and proof-summary de-dup coverage
-
-**By:** Scribe
-
-**Status:** Merged from Kramer's B4 fix note.
-
-**Merged source:** `kramer-b4-fixes.md`.
-
-- Kramer extended `StateGraph.EdgeProofStatus` with `HasObligations`, populated it during compiler enrichment, and switched rich state hover to render the locked no-obligations wording when connected edges exist but none carry proof obligations.
-- The fix pass also added the missing regression anchors: language-server coverage for the connected-edge/no-proof-obligation path and core projection coverage that duplicate `Requirement.Description` values collapse to one unresolved summary.
-- `docs/Working/hover-design.md` was updated to match the shipped projection/rendering rule, and targeted language-server tests, compiler-edge-proof tests, and the language-server build all passed.
-
 
