@@ -12,6 +12,45 @@
 
 ---
 
+## Contents
+
+- [Overview](#overview)
+- [Responsibilities and Boundaries](#responsibilities-and-boundaries)
+- [Right-Sizing](#right-sizing)
+- [Inputs and Outputs](#inputs-and-outputs)
+- [The Diagnostic Output Type](#the-diagnostic-output-type)
+  - [Source Spans](#source-spans)
+  - [Related Spans](#related-spans)
+  - [Diagnostic Stages](#diagnostic-stages)
+  - [Severity](#severity)
+- [DiagnosticCode Registry](#diagnosticcode-registry)
+- [DiagnosticMeta and the Exhaustive Switch](#diagnosticmeta-and-the-exhaustive-switch)
+  - [Why an exhaustive switch, not attributes + reflection](#why-an-exhaustive-switch-not-attributes--reflection)
+  - [Pipeline stage usage](#pipeline-stage-usage)
+  - [MCP enumeration (no compilation needed)](#mcp-enumeration-no-compilation-needed)
+- [FaultCode → DiagnosticCode Chain](#faultcode-→-diagnosticcode-chain)
+  - [The chain](#the-chain)
+  - [FaultCode enum](#faultcode-enum)
+  - [Faults — exhaustive switch](#faults--exhaustive-switch)
+  - [Evaluator usage](#evaluator-usage)
+  - [Enforcement: what catches what](#enforcement-what-catches-what)
+  - [The full enforcement chain — no reflection](#the-full-enforcement-chain--no-reflection)
+  - [Why PRECEPT0003 and PRECEPT0004 are both needed](#why-precept0003-and-precept0004-are-both-needed)
+  - [The divide-by-zero example, end to end](#the-divide-by-zero-example-end-to-end)
+- [Language Server Consumption](#language-server-consumption)
+  - [Diagnostic Suppression](#diagnostic-suppression)
+  - [LSP Mapping](#lsp-mapping)
+  - [MCP Consumption](#mcp-consumption)
+- [Design Rationale and Decisions](#design-rationale-and-decisions)
+  - [The enumeration surface earns its keep](#the-enumeration-surface-earns-its-keep)
+  - [Prevention applies inward](#prevention-applies-inward)
+  - [D4 — Diagnostic Attribution](#d4--diagnostic-attribution)
+  - [Relationship to Prototype](#relationship-to-prototype)
+- [Open Questions / Implementation Notes](#open-questions--implementation-notes)
+- [Deliberate Exclusions](#deliberate-exclusions)
+- [Cross-References](#cross-references)
+- [Source Files](#source-files)
+
 ## Overview
 
 The Precept compiler pipeline produces diagnostics at six stages: lexing, parsing, name binding, type checking, graph analysis, and proof. This document defines:

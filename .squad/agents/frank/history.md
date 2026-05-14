@@ -20,6 +20,15 @@
 
 ## Recent Updates
 
+### 2026-05-14T01:23:00-04:00 — Interpolated quantity expression analysis for normalization design
+
+- Discovered that the actual `samples/Test.precept` `NumericOverflow` fires on an **interpolated** expression (`'{test2} [lb_av]'` → `TypedInterpolatedTypedConstant`), not a static literal (`TypedTypedConstant`).
+- Traced two independent failure paths: Strategy 7 (`IntervalOfNarrowed` has no case for `TypedInterpolatedTypedConstant` → `Unbounded`) and Strategy 6 (`SatisfactionCovers` returns null for `DeclarationValue` bounds → conservative fail).
+- Confirmed the static-literal normalization fix (Slices 14–18) does NOT fix the interpolated case — these are independent problems hitting different code paths.
+- Extended `docs/Working/quantity-normalization-design.md` with §1.5 (interpolated analysis), §5.3 (Slices 19–21 for interpolated interval track), and Q5/Q6 in §7.
+- Filed decision record `.squad/decisions/inbox/frank-interpolated-quantity-analysis.md` with D1–D4.
+- Key design extension needed: `TypedInterpolatedTypedConstant` must carry a `UcumParsedUnit?` for static unit portions; `IntervalOfNarrowed` must recurse into magnitude slots; interval scaling by UCUM factor enables cross-unit proof discharge.
+
 ### 2026-05-14T05:12:08Z — Quantity normalization design for cross-unit bound comparison
 
 - Authored `docs/Working/quantity-normalization-design.md` for the false-positive `NumericOverflow` path where typed-constant magnitudes are compared before UCUM scaling is applied.
@@ -48,3 +57,11 @@
 - `set` into an `omit` target-state field is the decisive field-state rule; Update access modes do not constrain Fire semantics.
 - Proof diagnostic naming should describe the state of the author's definition (condition-first), not the compiler's failed attempt.
 - When typed-constant tuples already carry UCUM scale information, prefer a shared normalization helper over inventing new metadata shapes.
+- `precept_compile` runs the full compilation pipeline including the ProofEngine — `Compiler.Compile()` calls `ProofEngine.Prove()` and returns all diagnostics. Do not claim MCP tools skip proof obligations.
+- `PreceptValue`'s bytes 8–23 union payload is three-way: `decimal`, `long`, or a **reference region** (managed pointer). Do not characterize it as decimal-only. 23 of 32 `TypeKind` members use the reference lane. Business-domain composite types like `quantity` can carry unit information via the reference region — the "no space for unit reference" claim is incorrect. The exact internal layout is a pending implementation decision per `evaluator.md`.
+- Adding ## Contents after status blocks materially improves long-form doc navigation for both humans and AI agents.
+- When a compile pipeline runs per-keystroke, the performance question is never "is this computation expensive?" (decimal math is nanoseconds) but "is it redundant?" — normalize once, store on the semantic model, let downstream consumers read pre-computed results.
+- Abstract interpretation (proof engine intervals) and concrete execution (evaluator opcodes) should never share an intermediate representation — they share source data (normalized bounds on `TypedField`), not execution plans.
+- Universal post-step patterns (compute raw interval → scale by static unit) are strictly superior to per-node-type normalization scattered across switch arms in `IntervalOfNarrowed`. The `TryGetStaticUnit` helper unifies static and interpolated typed constants.
+- "Store both original and normalized" on `TypedField` resolves the display-vs-comparison tension permanently — 2 extra `decimal?` fields per field is negligible cost for eliminating an entire class of design questions.
+- Long runtime/tooling docs need a `## Contents` section driven by live H2/H3 headings so AI navigation stays reliable.

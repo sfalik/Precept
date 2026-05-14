@@ -13,6 +13,30 @@
 
 ---
 
+## Contents
+
+- [Overview](#overview)
+- [Algorithm Overview](#algorithm-overview)
+- [Pattern Template Strategy](#pattern-template-strategy)
+  - [Keyword vs. operator discrimination](#keyword-vs-operator-discrimination)
+  - [Alternation ordering](#alternation-ordering)
+  - [Scope grouping](#scope-grouping)
+  - [Scope-to-repository-key mapping](#scope-to-repository-key-mapping)
+- [Structural Composition](#structural-composition)
+  - [Hand-written patterns](#hand-written-patterns)
+  - [Top-level include ordering](#top-level-include-ordering)
+  - [begin/end pairs](#beginend-pairs)
+  - [Repository key uniqueness](#repository-key-uniqueness)
+- [Message-String Positional Context](#message-string-positional-context)
+- [Rule-Desugaring Modifier Context](#rule-desugaring-modifier-context)
+- [Scope Vocabulary](#scope-vocabulary)
+- [Output Contract](#output-contract)
+  - [Semantic equivalence](#semantic-equivalence)
+  - [Stale patterns must not appear](#stale-patterns-must-not-appear)
+  - [Maturity threshold](#maturity-threshold)
+- [Deliberate Exclusions](#deliberate-exclusions)
+- [Cross-References](#cross-references)
+
 ## Overview
 
 The grammar generator is a standalone .NET console tool that reads catalog metadata and emits a valid `precept.tmLanguage.json`. Its job is precisely the gap between "catalog metadata exists" and "a syntactically and semantically correct TextMate grammar is on disk."

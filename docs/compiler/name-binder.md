@@ -12,6 +12,46 @@
 
 ---
 
+## Contents
+
+- [2. Overview](#2-overview)
+  - [Architectural Motivation](#architectural-motivation)
+- [3. Responsibilities and Boundaries](#3-responsibilities-and-boundaries)
+  - [What It Does](#what-it-does)
+  - [What It Does NOT Do](#what-it-does-not-do)
+- [4. Right-Sizing](#4-right-sizing)
+- [5. Inputs and Outputs](#5-inputs-and-outputs)
+  - [Input](#input)
+  - [Output](#output)
+  - [Entry Point](#entry-point)
+- [6. Architecture](#6-architecture)
+  - [Pass 1: Declaration Collection](#pass-1-declaration-collection)
+  - [Pass 2: Reference Resolution](#pass-2-reference-resolution)
+  - [Diagnostic Emission Strategy](#diagnostic-emission-strategy)
+- [7. Component Mechanics](#7-component-mechanics)
+  - [7.1 Declaration Records](#71-declaration-records)
+  - [7.2 Symbol Resolution](#72-symbol-resolution)
+  - [7.3 Scoping Rules](#73-scoping-rules)
+  - [7.4 Qualified Event Argument Access](#74-qualified-event-argument-access)
+  - [7.5 Forward Reference Detection](#75-forward-reference-detection)
+- [8. Dependencies and Integration Points](#8-dependencies-and-integration-points)
+  - [What NameBinder Reads from ConstructManifest](#what-namebinder-reads-from-constructmanifest)
+  - [What TypeChecker Expects from SymbolTable](#what-typechecker-expects-from-symboltable)
+- [9. Failure Modes and Recovery](#9-failure-modes-and-recovery)
+  - [Partial Results Strategy](#partial-results-strategy)
+  - [Duplicate Declaration Handling](#duplicate-declaration-handling)
+  - [Undeclared Reference Handling](#undeclared-reference-handling)
+- [10. Contracts and Guarantees](#10-contracts-and-guarantees)
+- [11. Design Rationale and Decisions](#11-design-rationale-and-decisions)
+  - [Why a Separate Stage?](#why-a-separate-stage)
+  - [Quantifier Binding Shadows Field — Hard Error](#quantifier-binding-shadows-field--hard-error)
+  - [Forward-Reference Detection in NameBinder](#forward-reference-detection-in-namebinder)
+- [12. Innovation](#12-innovation)
+- [13. Open Questions / Implementation Notes](#13-open-questions--implementation-notes)
+- [14. Deliberate Exclusions](#14-deliberate-exclusions)
+- [15. Cross-References](#15-cross-references)
+- [16. Source Files](#16-source-files)
+
 ## 2. Overview
 
 The name binder is a **declaration collector and reference resolver** — a discrete pipeline stage between the Parser and the TypeChecker. It transforms a `ConstructManifest` into a `SymbolTable` containing all declared symbols (fields, states, events, event args) and all resolved identifier references, with diagnostics for duplicate declarations and undeclared names.

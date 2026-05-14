@@ -1,4 +1,4 @@
-﻿# Collection Types
+# Collection Types
 
 ---
 
@@ -12,6 +12,45 @@
 | Related | [Primitive Types](primitive-types.md) · [Language Spec](precept-language-spec.md) §§2.3, 3.6, 3.8 · [Type Checker](../compiler/type-checker.md) |
 
 ---
+
+## Contents
+
+- [Overview](#overview)
+- [`set`](#set)
+- [`queue`](#queue)
+- [`stack`](#stack)
+- [`log of T`](#log-of-t)
+- [`log of T by P`](#log-of-t-by-p)
+- [Inner Type System](#inner-type-system)
+  - [`~string` — case-insensitive inner type](#string--case-insensitive-inner-type)
+  - [Temporal and Business-Domain Inner Types](#temporal-and-business-domain-inner-types)
+  - [Token vocabulary](#token-vocabulary)
+- [Membership Operator](#membership-operator)
+- [Emptiness Safety](#emptiness-safety)
+  - [Access proof obligations](#access-proof-obligations)
+  - [Mutation proof obligations](#mutation-proof-obligations)
+  - [Safe operations (no proof required)](#safe-operations-no-proof-required)
+  - [Guard pattern](#guard-pattern)
+- [Constraint Catalog](#constraint-catalog)
+- [Quantifier Predicates](#quantifier-predicates)
+- [List Literal Defaults](#list-literal-defaults)
+- [String Interpolation](#string-interpolation)
+- [Action Summary](#action-summary)
+- [Accessor Summary](#accessor-summary)
+- [`bag of T`](#bag-of-t)
+- [`list of T`](#list-of-t)
+- [`queue of T by P`](#queue-of-t-by-p)
+- [`lookup of K to V`](#lookup-of-k-to-v)
+- [Deferred and Rejected Types](#deferred-and-rejected-types)
+  - [Evaluation Criteria](#evaluation-criteria)
+  - [Candidate 3: `deque of T`](#candidate-3-deque-of-t)
+  - [Rejected: Ring Buffer / Circular Buffer](#rejected-ring-buffer--circular-buffer)
+  - [Rejected: Bounded Collection (`capacity` modifier)](#rejected-bounded-collection-capacity-modifier)
+  - [Rejected: Multimap](#rejected-multimap)
+  - [Rejected: `sortedset of T`](#rejected-sortedset-of-t)
+  - [Priority Summary](#priority-summary)
+- [Comparison With Other Collection Systems](#comparison-with-other-collection-systems)
+- [Cross-References](#cross-references)
 
 ## Overview
 

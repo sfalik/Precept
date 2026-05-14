@@ -13,6 +13,42 @@
 
 ---
 
+## Contents
+
+- [Overview](#overview)
+- [`string`](#string)
+- [`integer`](#integer)
+- [`decimal`](#decimal)
+- [`number`](#number)
+- [`boolean`](#boolean)
+- [`choice`](#choice)
+- [Numeric Lane Rules](#numeric-lane-rules)
+  - [The three lanes](#the-three-lanes)
+  - [Lane rules](#lane-rules)
+  - [Complete conversion map](#complete-conversion-map)
+  - [Context-by-context matrix](#context-by-context-matrix)
+  - [Why no comparison exception?](#why-no-comparison-exception)
+  - [Widening ceiling for business-domain types](#widening-ceiling-for-business-domain-types)
+- [Context-Sensitive Literal Resolution](#context-sensitive-literal-resolution)
+- [Type Operator Surface Summary](#type-operator-surface-summary)
+- [Case-Insensitive Comparison](#case-insensitive-comparison)
+  - [Usage examples](#usage-examples)
+  - [Design rationale](#design-rationale)
+- [Constraint Catalog](#constraint-catalog)
+- [Built-in Functions (Primitive)](#built-in-functions-primitive)
+  - [Numeric functions](#numeric-functions)
+  - [Rounding functions](#rounding-functions)
+  - [Bridge functions](#bridge-functions)
+  - [Edge-value behavior](#edge-value-behavior)
+  - [String functions](#string-functions)
+  - [Function lane integrity rule](#function-lane-integrity-rule)
+- [Open Questions / Implementation Notes](#open-questions--implementation-notes)
+- [Teachable Error Messages](#teachable-error-messages)
+  - [Numeric type errors](#numeric-type-errors)
+  - [String / `~string` errors](#string--string-errors)
+  - [Unresolved literal](#unresolved-literal)
+- [Cross-References](#cross-references)
+
 ## Overview
 
 Precept has six primitive types. Each has a fixed backing type, a defined operator surface, and explicit constraints. There is no implicit coercion between non-numeric types, no truthy/falsy conversion, and no user-defined types.
