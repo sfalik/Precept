@@ -469,12 +469,12 @@ Test method names:
 
 **Files:** `src/Precept/Pipeline/TypeChecker.Expressions.cs` (modify), `test/Precept.Tests/TypeChecker/TypeCheckerCurrencyUnitTests.cs` (create)
 
-- [ ] Add `ValidateQualifierCompatibility` method in `TypeChecker.Expressions.cs`
-- [ ] Add `TryGetStaticQualifier` helper to extract qualifier from resolved types
-- [ ] Wire into binary operation resolution path
-- [ ] Tests: 8 tests (positive + negative for each diagnostic code)
-- [ ] Remove 5 codes from Gate 1 allow-list in `src/Precept.Analyzers/DiagnosticCoverageAllowLists.cs`
-- [ ] Verify Gate 1 staleness check now flags removed entries (proves the round-trip works)
+- [x] Add `ValidateQualifierCompatibility` method in `TypeChecker.Expressions.cs`
+- [x] Add `TryGetStaticQualifiers` helper to extract qualifier from resolved types
+- [x] Wire into binary operation resolution path
+- [x] Tests: 8 tests (positive + negative for each diagnostic code)
+- [x] Remove 5 codes from Gate 1 allow-list in `src/Precept.Analyzers/DiagnosticCoverageAllowLists.cs`
+- [x] Verify Gate 1 staleness check now flags removed entries (proves the round-trip works)
 
 ---
 
@@ -1040,7 +1040,7 @@ Priority 0 is a blocking prerequisite: no gap-closure slice is complete until `P
 - [ ] **Slice 0:** Roslyn analyzers (Gate 1 + Gate 2) — `PRECEPT0027` + `PRECEPT0028`
 
 ### Priority 1 — Integrity Violations (Silent Wrong Behavior)
-- [ ] **Slice 1:** Currency/unit arithmetic safety (PRE0070–0074) — `TypeChecker.Expressions.cs` qualifier comparison
+- [x] **Slice 1:** Currency/unit arithmetic safety (PRE0070–0074) — `TypeChecker.Expressions.cs` qualifier comparison
 - [ ] **Slice 2:** Choice value validation (PRE0086–0089) — `TypeChecker.Expressions.cs` choice literal check
 - [x] **Slice 3:** ~~InitialEventMissingAssignments (PRE0094)~~ — **already wired** in `TypeChecker.Validation.FieldState.cs`; no gap-closure work needed
 - [ ] **Slice 4:** EventHandlerInStatefulPrecept (PRE0092) — trivial structural check in `ValidateStructural`

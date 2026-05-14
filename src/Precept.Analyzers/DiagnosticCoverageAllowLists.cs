@@ -23,12 +23,6 @@ internal static class DiagnosticCoverageAllowLists
         "MissingTemporalUnit",               // B1: temporal arithmetic rules not wired
         "FractionalUnitValue",               // B1: temporal arithmetic rules not wired
 
-        // ── Root Cause B2 — Currency/Unit Arithmetic Safety ──────────────────────
-        "CrossCurrencyArithmetic",            // B2: qualifier comparison not wired
-        "CrossDimensionArithmetic",           // B2: qualifier comparison not wired
-        "DenominatorUnitMismatch",            // B2: qualifier comparison not wired
-        "DurationDenominatorMismatch",        // B2: qualifier comparison not wired
-        "CompoundPeriodDenominator",          // B2: qualifier comparison not wired
 
         // ── Root Cause B3 — Choice Value Validation ──────────────────────────────
         "ChoiceLiteralNotInSet",              // B3: choice literal comparison not wired
@@ -82,5 +76,13 @@ internal static class DiagnosticCoverageAllowLists
     internal static readonly HashSet<string> Gate2AllowList = new()
     {
         // ── Slice 6 — PRE0100 and PRE0104 have tests in TypeCheckerCollectionSafetyTests
+
+        // ── Slice 1 (B2) — Tests in TypeCheckerCurrencyUnitTests.cs ─────────────
+        // Cross-project analyzer cannot detect test references in Precept.Tests.
+        "CrossCurrencyArithmetic",
+        "CrossDimensionArithmetic",
+        "DenominatorUnitMismatch",
+        "DurationDenominatorMismatch",
+        "CompoundPeriodDenominator",
     };
 }
