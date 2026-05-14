@@ -90,9 +90,12 @@ public static class Functions
         // ── Numeric: clamp ──────────────────────────────────────────────────────
         FunctionKind.Clamp => new(kind, "clamp", "Clamp value between lo and hi (common numeric type)",
         [
-            new([new(TypeKind.Integer, "value"), new(TypeKind.Integer, "lo"), new(TypeKind.Integer, "hi")], TypeKind.Integer),
-            new([new(TypeKind.Decimal, "value"), new(TypeKind.Decimal, "lo"), new(TypeKind.Decimal, "hi")], TypeKind.Decimal),
-            new([new(TypeKind.Number,  "value"), new(TypeKind.Number,  "lo"), new(TypeKind.Number,  "hi")], TypeKind.Number),
+            new([new(TypeKind.Integer, "value"), new(TypeKind.Integer, "lo"), new(TypeKind.Integer, "hi")], TypeKind.Integer)
+                { IntervalTransfer = args => new NumericInterval(Math.Max(args[1].Min, args[0].Min), Math.Min(args[2].Max, args[0].Max)) },
+            new([new(TypeKind.Decimal, "value"), new(TypeKind.Decimal, "lo"), new(TypeKind.Decimal, "hi")], TypeKind.Decimal)
+                { IntervalTransfer = args => new NumericInterval(Math.Max(args[1].Min, args[0].Min), Math.Min(args[2].Max, args[0].Max)) },
+            new([new(TypeKind.Number,  "value"), new(TypeKind.Number,  "lo"), new(TypeKind.Number,  "hi")], TypeKind.Number)
+                { IntervalTransfer = args => new NumericInterval(Math.Max(args[1].Min, args[0].Min), Math.Min(args[2].Max, args[0].Max)) },
             new([new(TypeKind.Money,   "value"), new(TypeKind.Money,   "lo"), new(TypeKind.Money,   "hi")], TypeKind.Money, QualifierMatch.Same),
             new([new(TypeKind.Quantity,"value"), new(TypeKind.Quantity,"lo"), new(TypeKind.Quantity,"hi")], TypeKind.Quantity, QualifierMatch.Same),
         ],
@@ -104,8 +107,10 @@ public static class Functions
         // ── Numeric: rounding family (decimal|number → integer) ─────────────────
         FunctionKind.Floor => new(kind, "floor", "Round toward negative infinity → integer",
         [
-            new([PDecimal], TypeKind.Integer),
-            new([PNumber], TypeKind.Integer),
+            new([PDecimal], TypeKind.Integer)
+                { IntervalTransfer = args => new NumericInterval((decimal)Math.Floor(args[0].Min), (decimal)Math.Floor(args[0].Max)) },
+            new([PNumber], TypeKind.Integer)
+                { IntervalTransfer = args => new NumericInterval((decimal)Math.Floor((double)args[0].Min), (decimal)Math.Floor((double)args[0].Max)) },
         ],
         FunctionCategory.Numeric,
         UsageExample: "floor(rate)",
@@ -114,8 +119,10 @@ public static class Functions
 
         FunctionKind.Ceil => new(kind, "ceil", "Round toward positive infinity → integer",
         [
-            new([PDecimal], TypeKind.Integer),
-            new([PNumber], TypeKind.Integer),
+            new([PDecimal], TypeKind.Integer)
+                { IntervalTransfer = args => new NumericInterval((decimal)Math.Ceiling(args[0].Min), (decimal)Math.Ceiling(args[0].Max)) },
+            new([PNumber], TypeKind.Integer)
+                { IntervalTransfer = args => new NumericInterval((decimal)Math.Ceiling((double)args[0].Min), (decimal)Math.Ceiling((double)args[0].Max)) },
         ],
         FunctionCategory.Numeric,
         UsageExample: "ceil(rate)",
@@ -124,8 +131,10 @@ public static class Functions
 
         FunctionKind.Truncate => new(kind, "truncate", "Round toward zero → integer",
         [
-            new([PDecimal], TypeKind.Integer),
-            new([PNumber], TypeKind.Integer),
+            new([PDecimal], TypeKind.Integer)
+                { IntervalTransfer = args => new NumericInterval((decimal)Math.Truncate(args[0].Min), (decimal)Math.Truncate(args[0].Max)) },
+            new([PNumber], TypeKind.Integer)
+                { IntervalTransfer = args => new NumericInterval((decimal)Math.Truncate((double)args[0].Min), (decimal)Math.Truncate((double)args[0].Max)) },
         ],
         FunctionCategory.Numeric,
         UsageExample: "truncate(amount)",
@@ -134,8 +143,10 @@ public static class Functions
 
         FunctionKind.Round => new(kind, "round", "Banker's rounding → integer",
         [
-            new([PDecimal], TypeKind.Integer),
-            new([PNumber], TypeKind.Integer),
+            new([PDecimal], TypeKind.Integer)
+                { IntervalTransfer = args => new NumericInterval((decimal)Math.Round((double)args[0].Min), (decimal)Math.Round((double)args[0].Max)) },
+            new([PNumber], TypeKind.Integer)
+                { IntervalTransfer = args => new NumericInterval((decimal)Math.Round((double)args[0].Min), (decimal)Math.Round((double)args[0].Max)) },
         ],
         FunctionCategory.Numeric,
         UsageExample: "round(amount)",
