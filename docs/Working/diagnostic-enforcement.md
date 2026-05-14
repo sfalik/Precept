@@ -699,12 +699,12 @@ Test method names (representative):
 - Zero-candidate paths still emit PRE0052/PRE0053 rather than PRE0091
 - `AmbiguousTypedConstant` is removed from the Gate 1 allow-list once emission + tests exist
 
-- [ ] Confirm the parser/typechecker split has stabilized the owning typed-constant file boundary (`TypeChecker.Expressions.cs` vs. `TypeChecker.Expressions.TypedConstants.cs`)
-- [ ] Add a candidate-enumeration helper in the TypeChecker typed-constant path
-- [ ] Preserve the single-expected-type fast path
-- [ ] Emit PRE0091 when multiple validated survivors remain
-- [ ] Tests: ambiguity + unique-candidate + zero-candidate + explicit-context cases
-- [ ] Remove `AmbiguousTypedConstant` from Gate 1 allow-list
+- [x] Confirm the parser/typechecker split has stabilized the owning typed-constant file boundary (`TypeChecker.Expressions.cs` vs. `TypeChecker.Expressions.TypedConstants.cs`)
+- [x] Add a candidate-enumeration helper in the TypeChecker typed-constant path
+- [x] Preserve the single-expected-type fast path
+- [x] Emit PRE0091 when multiple validated survivors remain
+- [x] Tests: ambiguity + unique-candidate + zero-candidate + explicit-context cases
+- [x] Remove `AmbiguousTypedConstant` from Gate 1 allow-list
 
 ---
 
@@ -1047,7 +1047,7 @@ Priority 0 is a blocking prerequisite: no gap-closure slice is complete until `P
 
 ### Priority 2 — User Experience Gaps
 - [x] **Slice 5:** ~~Temporal constant precision (PRE0055–0058)~~ — **subsumed by Slice 9B** catalog-mediated emission
-- [ ] **Slice 5A:** Ambiguous typed constant resolution (PRE0091) — TypeChecker typed-constant candidate arbitration, sequenced after typed-constant split stabilization
+- [x] **Slice 5A:** Ambiguous typed constant resolution (PRE0091) — TypeChecker typed-constant candidate arbitration, sequenced after typed-constant split stabilization
 - [ ] **Slice 6:** Collection safety extensions (PRE0099–0101, PRE0104) — ProofEngine + TypeChecker
 - [x] **Slice 7:** Parser guard gates (PRE0013–0015) — explicit rejection paths in `Parser.cs`
 

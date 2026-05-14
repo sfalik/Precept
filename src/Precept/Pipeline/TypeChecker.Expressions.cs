@@ -228,9 +228,13 @@ internal static partial class TypeChecker
     {
         var rawText = lit.Text;
 
-        // No context: we don't know which type to validate against
+        // No context: attempt multi-candidate resolution for temporal quantity ambiguity
         if (expectedType is null || expectedType == TypeKind.Error)
         {
+            var ambiguityResult = ResolveTypedConstantCandidates(rawText, lit.Span, ctx);
+            if (ambiguityResult is not null)
+                return ambiguityResult;
+
             ctx.Diagnostics.Add(
                 Diagnostics.Create(DiagnosticCode.UnresolvedTypedConstant, lit.Span, rawText));
             return new TypedErrorExpression(lit.Span);
@@ -263,6 +267,58 @@ internal static partial class TypeChecker
         }
 
         return new TypedErrorExpression(lit.Span);
+    }
+
+    /// <summary>
+    /// Temporal quantity candidate types for ambiguity detection.
+    /// Duration and Period both accept the TemporalQuantity literal form (e.g., '30 days').
+    /// </summary>
+    private static readonly TypeKind[] TemporalQuantityCandidates = [TypeKind.Duration, TypeKind.Period];
+
+    /// <summary>
+    /// Attempt multi-candidate typed-constant resolution when no expected type is available.
+    /// Currently scoped to temporal quantity ambiguity (duration vs. period).
+    /// Returns a resolved expression if exactly one candidate validates, emits PRE0091 and returns
+    /// an error expression if multiple candidates validate, or returns null if no candidates match
+    /// (allowing the caller to fall through to UnresolvedTypedConstant).
+    /// </summary>
+    private static TypedExpression? ResolveTypedConstantCandidates(
+        string rawText,
+        SourceSpan span,
+        CheckContext ctx)
+    {
+        List<(TypeKind Type, TypedConstantParseResult Result)>? survivors = null;
+
+        foreach (var candidateType in TemporalQuantityCandidates)
+        {
+            var meta = Types.GetMeta(candidateType);
+            if (meta.ContentValidation is null)
+                continue;
+
+            var result = TypedConstantValidation.Validate(meta.ContentValidation, rawText, candidateType);
+            if (result.IsValid)
+            {
+                survivors ??= [];
+                survivors.Add((candidateType, result));
+            }
+        }
+
+        if (survivors is null || survivors.Count == 0)
+            return null;
+
+        if (survivors.Count == 1)
+        {
+            var (resolvedType, resolvedResult) = survivors[0];
+            var declaredQualifiers = ExtractQualifiersFromParsedValue(resolvedType, resolvedResult.Value);
+            return new TypedTypedConstant(resolvedType, rawText, resolvedResult.Value, declaredQualifiers, span);
+        }
+
+        // Multiple candidates validated — emit PRE0091
+        var type1 = Types.GetMeta(survivors[0].Type).DisplayName;
+        var type2 = Types.GetMeta(survivors[1].Type).DisplayName;
+        ctx.Diagnostics.Add(
+            Diagnostics.Create(DiagnosticCode.AmbiguousTypedConstant, span, rawText, type1, type2));
+        return new TypedErrorExpression(span);
     }
 
     /// <summary>
@@ -585,7 +641,20 @@ internal static partial class TypeChecker
                 ctx.CIFields.Contains(field.Name), field.DeclaredQualifiers, id.Span);
         }
 
-        // Unknown identifier
+        // Unknown identifier — check if it matches an event arg out of scope (PRE0050)
+        foreach (var evt in ctx.Events)
+        {
+            foreach (var evtArg in evt.Args)
+            {
+                if (string.Equals(evtArg.Name, name, StringComparison.Ordinal))
+                {
+                    ctx.Diagnostics.Add(
+                        Diagnostics.Create(DiagnosticCode.EventArgOutOfScope, id.Span, evt.Name));
+                    return new TypedErrorExpression(id.Span);
+                }
+            }
+        }
+
         ctx.Diagnostics.Add(
             Diagnostics.Create(DiagnosticCode.UndeclaredField, id.Span, name));
         return new TypedErrorExpression(id.Span);

@@ -61,9 +61,6 @@ internal static class DiagnosticCoverageAllowLists
 
         // ── Deferred — OutOfRange ────────────────────────────────────────────────
         "OutOfRange",                         // Deferred: constant-literal bounds check not wired
-
-        // ── Root Cause B1 Companion — Ambiguous Typed Constant ───────────────────
-        "AmbiguousTypedConstant",             // B1-companion: multi-candidate resolution not wired
     };
 
     /// <summary>
@@ -88,5 +85,9 @@ internal static class DiagnosticCoverageAllowLists
         "ChoiceLiteralNotInSet",
         "ChoiceArgOutsideFieldSet",
         "ChoiceRankConflict",
+
+        // ── Slice 5A — Tests in TypeCheckerTypedConstantTests.cs ─────────────────
+        // Cross-project analyzer cannot detect test references in Precept.Tests.
+        "AmbiguousTypedConstant",
     };
 }

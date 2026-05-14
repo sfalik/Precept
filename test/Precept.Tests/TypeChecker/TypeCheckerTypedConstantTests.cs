@@ -1602,4 +1602,57 @@ public class TypeCheckerTypedConstantTests
             """;
         TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.InvalidDateValue);
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  Slice 5A — PRE0091: Ambiguous Typed Constant Resolution
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void TypedConstant_MultipleTemporalCandidates_EmitsAmbiguousTypedConstant()
+    {
+        // '30 days' validates as both duration and period when no expected type is provided.
+        // This triggers the ambiguity path via a guard expression where type context is absent.
+        var ctx = MinimalContext();
+        var result = Resolve(TypedConstant("30 days"), ctx, expectedType: null);
+
+        result.Should().BeOfType<TypedErrorExpression>();
+        ctx.Diagnostics.Should().ContainSingle(d =>
+            d.Code == DiagnosticCode.AmbiguousTypedConstant.ToString());
+    }
+
+    [Fact]
+    public void TypedConstant_WithExplicitExpectedType_SkipsAmbiguityPath()
+    {
+        // Same literal with explicit duration type → resolves cleanly, no ambiguity.
+        var ctx = MinimalContext();
+        var result = Resolve(TypedConstant("30 days"), ctx, expectedType: TypeKind.Duration);
+
+        result.Should().BeOfType<TypedTypedConstant>();
+        ctx.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TypedConstant_SingleCandidate_ResolvesWithoutDiagnostic()
+    {
+        // 'P30D' is ISO period format — validates only as period (Duration validator rejects it).
+        var ctx = MinimalContext();
+        var result = Resolve(TypedConstant("P30D"), ctx, expectedType: null);
+
+        result.Should().BeOfType<TypedTypedConstant>();
+        var tc = (TypedTypedConstant)result;
+        tc.ResultType.Should().Be(TypeKind.Period);
+        ctx.Diagnostics.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void TypedConstant_NoCandidateMatch_PreservesUnresolvedBehavior()
+    {
+        // 'not-a-temporal-value' fails all candidates → falls through to UnresolvedTypedConstant.
+        var ctx = MinimalContext();
+        var result = Resolve(TypedConstant("not-a-temporal-value"), ctx, expectedType: null);
+
+        result.Should().BeOfType<TypedErrorExpression>();
+        ctx.Diagnostics.Should().ContainSingle(d =>
+            d.Code == DiagnosticCode.UnresolvedTypedConstant.ToString());
+    }
 }
