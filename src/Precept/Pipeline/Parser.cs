@@ -319,6 +319,21 @@ public static partial class Parser
 
             for (int i = 0; i < meta.Slots.Count; i++)
             {
+                // ── Guard gate: TransitionRow pre-event guard rejection ──────────
+                // If a 'when' appears before the disambiguation 'on' token in a
+                // TransitionRow, it's a misplaced guard. Emit PRE0015 and skip it.
+                // TODO(allow-list): remove PRE0015 from allow-list after Slice 0 ships
+                if (meta.Kind == ConstructKind.TransitionRow
+                    && i > 0 && !disambConsumed
+                    && Peek().Kind == TokenKind.When)
+                {
+                    var whenSpan = Advance().Span; // consume 'when'
+                    SkipGuardExpression(disambTokens);
+                    _diagnostics.Add(DiagnosticsCatalog.Create(
+                        DiagnosticCode.PreEventGuardNotAllowed, whenSpan));
+                    // Fall through: disamb check below will now see 'on' (or error)
+                }
+
                 if (i > 0 && !disambConsumed && disambTokens.Contains(Peek().Kind))
                 {
                     if (Peek().Kind != TokenKind.Arrow)
@@ -332,10 +347,44 @@ public static partial class Parser
                     slots.Add(value);
             }
 
+            // ── Guard gates: post-slot rejection for constructs that forbid guards ──
+            // TODO(allow-list): remove PRE0013/PRE0014 from allow-list after Slice 0 ships
+            if (Peek().Kind == TokenKind.When)
+            {
+                if (meta.Kind == ConstructKind.OmitDeclaration)
+                {
+                    var whenSpan = Advance().Span;
+                    SkipToConstructBoundary();
+                    _diagnostics.Add(DiagnosticsCatalog.Create(
+                        DiagnosticCode.OmitDoesNotSupportGuard, whenSpan));
+                }
+                else if (meta.Kind == ConstructKind.EventHandler)
+                {
+                    var whenSpan = Advance().Span;
+                    SkipToConstructBoundary();
+                    _diagnostics.Add(DiagnosticsCatalog.Create(
+                        DiagnosticCode.EventHandlerDoesNotSupportGuard, whenSpan));
+                }
+            }
+
             var endSpan = LastSignificantConsumedSpan(startSpan);
             var span = SourceSpan.Covering(startSpan, endSpan);
 
             _constructs.Add(new ParsedConstruct(meta, slots.ToImmutableArray(), span, startToken.Kind));
+        }
+
+        /// <summary>
+        /// Skips tokens that form a guard expression until a disambiguation token,
+        /// construct boundary, or end of source is reached.
+        /// </summary>
+        private void SkipGuardExpression(FrozenSet<TokenKind> stopTokens)
+        {
+            while (!IsAtEnd
+                   && !stopTokens.Contains(Peek().Kind)
+                   && !ConstructsCatalog.LeadingTokens.Contains(Peek().Kind))
+            {
+                Advance();
+            }
         }
 
         // ── Slot sub-parsers ────────────────────────────────────────────────────
