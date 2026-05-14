@@ -24,7 +24,7 @@
 | **10** | Qualifier Compatibility Checks | George | ✅ Done | `dotnet test test/Precept.Tests/Precept.Tests.csproj --filter "FullyQualifiedName~TypeCheckerQualifierCompatibilityTests\|FullyQualifiedName~TypeCheckerModifierTests"` (11+17 pass); `dotnet test test/Precept.Tests/Precept.Tests.csproj` (5280/5280) | Added `BoundsQualifierMismatch` (PRE0134) diagnostic; per-bound qualifier compatibility check in `ValidateBoundQualifierCompatibility` enforces qualifier match when both field and typed-constant bound carry qualifiers; also enforces `BoundsRequireQualifier` when qualified field has a plain numeric bound. |
 | **11** | String/Collection Constraint Obligations | George | ✅ Done | `dotnet test --filter ProofEngineStringCollectionBoundTests` (19 tests) | Slice 7; conservative literal-only strategy for string bounds |
 | **12** | Presence Obligation Generation | George | ✅ Done | `dotnet test test/Precept.Tests/Precept.Tests.csproj --filter "FullyQualifiedName~ProofEnginePresenceTests"` (13/13) | Depends on Slice 7; parallel with Slices 8–11 |
-| **13** | Type-Family Coverage Regression Suite | Soup Nazi | ⏳ Pending | — | Depends on Slices 8–12 |
+| **13** | Type-Family Coverage Regression Suite | Soup Nazi | ✅ Done | `dotnet test test/Precept.Tests/Precept.Tests.csproj --filter "FullyQualifiedName~TypeFamilyCoverageTests"` (28/28) | Per-family positive + negative companion tests for all §12 matrix rows; two meta-tests (`AllConstrainableTypes_DeclaredConstraint_NeverSilentlyIgnored`, `OptionalField_InValuePosition_GeneratesPresenceObligation`); catalog-driven coverage verified |
 
 **Initiated:** 2026-05-13T19:19:55Z
 **Updated by:** Scribe (live status updates as agents complete slices)
