@@ -38,7 +38,7 @@ This document is the operational companion. It does not replace `catalog-system.
    → Verify every exhaustive switch compiles, every distributed dispatcher still has full `[HandlesCatalogExhaustively]` / `[HandlesCatalogMember]` coverage, and every switch over a `[CatalogDU]` hierarchy has explicit subtype arms with no `_` / `default` catch-all.
 
 10. **Did you update all downstream artifacts?**
-    - MCP catalog surfaces in `tools/Precept.Mcp/CatalogFormatters.cs` and any affected tool outputs
+    - MCP catalog surfaces in `tools/Precept.Mcp/CatalogFormatters.cs` and any affected tool outputs; if the language surface changed (keywords, types, operators, constructs), verify the relevant scoped MCP tools still return correct output: `precept_syntax`, `precept_types`, `precept_operations`, `precept_domains`
     - Language server completions, hover, semantic tokens, outline/snippets if a user-visible language surface changed
     - TextMate grammar in `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json` — do not hand-edit; regenerate it via `tools/Precept.GrammarGen`
 
@@ -58,7 +58,7 @@ Verify each of the following is true:
 - [ ] No inline disambiguation conditions duplicate information already in `Constructs`, `Outcomes`, `ExpressionForms`, `Operators`, `Tokens`, or other catalogs
 - [ ] No downstream pipeline stage reads `Typed*.Syntax` back-pointers outside `TypeChecker`
 - [ ] All exhaustive switch methods compile with no `default` suppressions added
-- [ ] MCP catalog formatters verified against any catalog shape changes
+- [ ] MCP catalog formatters and affected tool outputs verified against any catalog shape changes; if the language surface changed (keywords, types, operators, constructs), `precept_syntax`, `precept_types`, `precept_operations`, and `precept_domains` still return correct output
 - [ ] If any user-visible language surface changed, LS completions / hover / semantic tokens / outline / snippets still derive correctly
 - [ ] If any language surface changed, the TextMate grammar was regenerated (not hand-edited)
 
@@ -92,7 +92,7 @@ Verify each of the following is true:
 - `TypedField.Syntax`, `TypedState.Syntax`, `TypedEvent.Syntax`, or similar `Typed*.Syntax` access outside `TypeChecker` → downstream stages must consume typed semantic data, not parse-tree back-pointers
 
 **MCP / tooling sync**
-- A core catalog changed but `tools/Precept.Mcp/CatalogFormatters.cs`, `tools/Precept.GrammarGen`, or language-server handlers stayed untouched
+- A core catalog changed but `tools/Precept.Mcp/CatalogFormatters.cs`, the relevant scoped MCP tools (`precept_syntax`, `precept_types`, `precept_operations`, `precept_domains`), `tools/Precept.GrammarGen`, or language-server handlers were not validated or stayed untouched
 - A new user-visible element was added but completions, hover, semantic tokens, outline/snippets, or generated grammar show no corresponding change in behavior
 - `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json` was hand-edited directly
 
