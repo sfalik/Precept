@@ -40,7 +40,17 @@
 
 ## Recent Updates
 
-### 2026-05-14T05:30:09Z — Interpolated quantity analysis batch recorded
+### 2026-05-14T22:00:00Z — Quantity normalization resolution batch recorded
+
+- Pre-check: `decisions.md` at 102255 bytes (> 51200 B gate); inbox had 3 files. All decisions.md entries dated 2026-05-11 or later — no entries older than 7 days, archive pass found 0 eligible entries.
+- Merged 3 inbox notes into 3 canonical decision entries; deleted processed inbox files; inbox cleared to 0.
+- Wrote orchestration logs: `2026-05-14T22-00-00Z-frank.md`, `2026-05-14T22-00-00Z-frank-pre0027.md`, `2026-05-14T22-00-00Z-frank-doc-sync.md`.
+- Wrote session log: `2026-05-14T22-00-00Z-quantity-normalization-resolution.md`.
+- Cross-agent: Frank's history already had all three update entries (written by agents). George's history updated with PRE0027 revert recommendation and Slice 15b event-arg normalization approval.
+- History gate: no file exceeded 15 KB; 0 files summarized.
+- Health report: `decisions.md` 102255 B → 107529 B; inbox processed = 3; history files summarized = 0.
+
+
 
 - Pre-check measured `.squad/decisions.md` at 73250 bytes with 2 inbox file(s); the hard-gate 7-day archive pass moved 0 older decision entry(s) before the inbox merge.
 - Merged Frank's interpolated-quantity analysis plus the follow-up MCP compile correction into one canonical decision, deleted the processed inbox files, and wrote the Frank orchestration record plus the brief interpolated-quantity session log.

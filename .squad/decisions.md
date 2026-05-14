@@ -6,7 +6,64 @@
 
 ---
 
-# Decision Record: Exhaustive Architectural Review — Interpolated Forms & Normalization Design
+### 2026-05-14T22:00:00Z: Quantity normalization §5.5.6 conditions fully resolved — implementation gate cleared
+
+**By:** Scribe
+
+**Status:** Merged from Frank's design-resolution pass.
+
+**Merged source:** `frank-normalization-conditions-resolved.md`.
+
+- Frank resolved all six §5.5.6 conditions in a single edit pass on `docs/Working/quantity-normalization-design.md`. Implementation of Slices 14–21 may proceed after Shane's sign-off on the design document.
+- **Condition 1 (bounds-storage contradiction):** SUPERSEDED markers placed on §3.6, §3.7, and §7 Q2. §0's "store both original and normalized on `TypedField`" is the single authoritative design.
+- **Condition 2 (`IntervalOf` post-step scope):** Replaced "universal post-step" language with expression-type-dispatched `TryGetStaticScalingFactor` pseudocode. Scales `TypedTypedConstant` with static unit and `TypedInterpolatedTypedConstant` with Magnitude slot + static unit only. Excludes `TypedFieldRef`, `TypedArgRef`, and WholeValue-slot interpolated constants.
+- **Condition 3 (`GetFieldBounds` raw reads):** Slice 16 now specifies `NormalizedDeclaredMin ?? DeclaredMin` fallback.
+- **Condition 4 (`TryGetStaticNumericValue` raw facts):** Slice 16 now normalizes `StaticMagnitude` via `TryGetStaticScalingFactor` before returning trusted facts.
+- **Condition 5 (`TypedEventArg` normalization):** Decided Option (a) — add `NormalizedDeclaredMin/Max` to `TypedEventArg`, architecturally parallel to `TypedField`. Slice 15b added.
+- **Condition 6 (`NumericInterval.Scale` parameter type):** `Scale(decimal factor)` confirmed. Factor conversion in `TryGetStaticScalingFactor`, not inside interval algebra.
+- Added §5.6 Extended Slice Details (Slices 22–26) from George's gap audit with full objective/files/approach/tests/dependencies for each.
+- Added §0.6 Design Resolution Summary; replaced George's §0.6 header. Key architectural invariant: `TryGetStaticScalingFactor(TypedExpression) → decimal?` is the single dispatch point for all expression-type → scaling-factor decisions.
+
+---
+
+### 2026-05-14T22:00:00Z: PRE0027 diagnosis — no DuplicateArgName errors exist anywhere in the repository
+
+**By:** Scribe
+
+**Status:** Merged from Frank's PRE0027 investigation.
+
+**Merged source:** `frank-pre0027-diagnosis.md`.
+
+- Frank scanned all 30 sample files for PRE0027 (`DuplicateArgName`) errors. **Result: none exist.** The suspicion was unfounded.
+- The only active error in `samples/Test.precept` is **PRE0078** (`NumericOverflow`), which is pre-existing. The original literal `'6 [lb_av]'` already violated the `max '5 kg'` bound before George's edit.
+- George's modification (`'6 [lb_av]'` → `'{test2} [lb_av]'`) changed the proof shape from concrete-interval to unbounded-interval but did not introduce a new error category; PRE0078 fires in both versions.
+- `test/Precept.Analyzers.Tests/AnalyzerTestHelper.cs` contains George's new `AnalyzeWithFilePathsAsync<TAnalyzer>()` helper — legitimate C# test infrastructure, not a DSL artifact.
+- **Recommended action:** Revert `samples/Test.precept` to the original (`git checkout samples/Test.precept`). If interpolated-quantity test coverage is needed for normalization work, create a new sample file with satisfiable bounds rather than mutating the existing Test.precept fixture.
+
+---
+
+### 2026-05-14T22:00:00Z: Slice 27 (Doc Sync) added — 6 surfaces need updates after quantity normalization Slices 14–21
+
+**By:** Scribe
+
+**Status:** Merged from Frank's doc-sync audit.
+
+**Merged source:** `frank-doc-sync-slice.md`.
+
+- Frank audited all canonical documentation surfaces for staleness relative to quantity normalization (Slices 14–21) and added Slice 27 (Doc Sync) to `docs/Working/quantity-normalization-design.md`.
+- **Surfaces requiring updates:**
+  - `docs/language/precept-language-spec.md` — §0.6 Proof Engine Contract: add unit-aware normalization bullet; §5 Proof Engine: add cross-unit interval containment paragraph.
+  - `docs/compiler/proof-engine.md` — `IntervalContainmentProofRequirement` record: annotate DeclaredMin/Max as normalized for quantity/price; interval source table: note normalization; Strategy 6: note StaticMagnitude normalization.
+  - `docs/Working/interval-proof-engine-design.md` — tracker cross-reference to normalization design; §2.2/§2.3/§3.2: annotate that bounds are now UCUM-normalized for quantity/price types.
+  - `docs/runtime/runtime-api.md` — add three-layer enforcement model section (compile-time / ingress / defense-in-depth); this named architectural concept from §0.5 has no canonical home in published docs.
+  - `tools/Precept.Mcp/Dtos/CompileToolDtos.cs` — add `NormalizedDeclaredMin/Max` to `CompileProofObligationDto`.
+  - `tools/Precept.Mcp/Tools/CompileTool.cs` — project normalized bounds in DTO.
+- **Confirmed clean (no changes needed):** `docs/language/catalog-system.md`, `README.md`, `docs/philosophy.md`, `samples/`, `docs/mcp/` (directory doesn't exist).
+- Most significant gap: the three-layer enforcement model (compile-time / ingress / defense-in-depth) is a named architectural concept from §0.5 with no canonical published home. Slice 27 assigns it to `docs/runtime/runtime-api.md`.
+
+---
+
+# Decision Record: Exhaustive Architectural Review— Interpolated Forms & Normalization Design
 
 **Author:** Frank (Lead Architect)
 **Date:** 2026-05-14T17:08:27-04:00

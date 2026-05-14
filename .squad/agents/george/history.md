@@ -26,7 +26,20 @@
 - Durable severity callout: three false-positive classes and one silent-wrong acceptance are already real; only fully dynamic qualifier text (`'{n} {u}'`-style forms) should remain conservative/unproved by design.
 - Recommended the next planning set as slices 22-26: capture static interpolated qualifier metadata, route it through qualifier consumers, extend interval extraction beyond quantity, add field-default proof coverage, and decide event-arg default resolution.
 
-### 2026-05-14T17:10:32.283-04:00 — Frank's architectural review set the guardrails for implementation
+### 2026-05-14T22:00:00Z — PRE0027 diagnosis: Test.precept revert recommended
+
+- Frank investigated suspected PRE0027 (`DuplicateArgName`) errors. Result: **none exist anywhere** in the repository.
+- The only error in `samples/Test.precept` is **PRE0078** (pre-existing), present before George's edit. George's change (`'6 [lb_av]'` → `'{test2} [lb_av]'`) changed proof shape but not error category.
+- **Recommendation from Frank:** revert `samples/Test.precept` via `git checkout samples/Test.precept`. If interpolated-quantity test coverage is needed for normalization work, create a new sample file with satisfiable bounds.
+- `test/Precept.Analyzers.Tests/AnalyzerTestHelper.cs` addition (`AnalyzeWithFilePathsAsync<TAnalyzer>()`) is clean, legitimate C# test infrastructure.
+
+### 2026-05-14T22:00:00Z — Frank's conditions resolution + Slice 15b confirmed: event-arg bound normalization approved
+
+- Frank resolved all six §5.5.6 conditions — the implementation gate for Slices 14–21 is cleared (pending Shane's sign-off).
+- Key outcome for George: **Slice 15b** adds `NormalizedDeclaredMin/Max` to `TypedEventArg` (Option a). This is now a design-locked requirement, architecturally parallel to `TypedField`.
+- Slices 22–26 have full §5.6 detail entries; George can reference those for implementation planning.
+
+
 
 - Frank independently approved the normalization design with conditions and identified the same high-risk areas George's audit hit from the code side: `IntervalOf` scoping, normalized-field bound reads, normalized `StaticMagnitude`, and missing event-arg bound parity.
 - Treat the combined George + Frank result as the current architectural baseline before any implementation slices are started.
