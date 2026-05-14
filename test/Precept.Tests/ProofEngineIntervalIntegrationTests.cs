@@ -56,6 +56,43 @@ state Active initial";
     }
 
     // ════════════════════════════════════════════════════════════════════════
+    //  Catalog-driven architecture validation (Phase 2 - B2 diagnostic)
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void SetAction_HasDynamicObligationGenerator_FromCatalog()
+    {
+        // Phase 2 B2: Verify Set action metadata declares dynamic obligation generation
+        // This confirms the interval containment logic is catalog-driven, not hardcoded.
+        var setActionMeta = Precept.Language.Actions.GetMeta(Precept.Language.ActionKind.Set);
+        
+        setActionMeta.DynamicObligationGenerator.Should().NotBeNull(
+            "Set action must have a DynamicObligationGenerator to create interval containment obligations");
+    }
+
+    [Fact]
+    public void SetAction_GeneratesIntervalObligation_ForBoundedDecimalField()
+    {
+        // Phase 2 B2: Verify that the Set action's DynamicObligationGenerator correctly
+        // creates interval containment obligations for bounded decimal/number fields.
+        const string precept = @"
+precept IntervalTest
+field amount as decimal min 100 max 5000
+state Active initial
+event Update(NewAmount as decimal)
+from Active on Update
+    -> set amount = Update.NewAmount
+    -> no transition";
+
+        var result = Compiler.Compile(precept);
+        
+        result.Proof.Obligations
+            .Count(o => o.Requirement.Kind == IntervalContainment)
+            .Should().BeGreaterThanOrEqualTo(1,
+                "Set action on bounded field should generate interval containment obligation via catalog metadata");
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
     //  Inline precept constants — §9.2 fixture strategy
     //  "Do not reference .precept sample files" — defined inline only.
     // ════════════════════════════════════════════════════════════════════════

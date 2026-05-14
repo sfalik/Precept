@@ -85,7 +85,7 @@ public static partial class ProofEngine
     {
         if (!semantics.FieldsByName.TryGetValue(fieldName, out var field))
             return NumericInterval.Unbounded;
-        var (min, max) = ExtractBoundsFromField(field);
+        var (min, max) = GetFieldBounds(field);
         if (!min.HasValue && !max.HasValue) return NumericInterval.Unbounded;
         return new NumericInterval(min ?? decimal.MinValue, max ?? decimal.MaxValue);
     }
@@ -107,7 +107,7 @@ public static partial class ProofEngine
         return NumericInterval.Unbounded;
     }
 
-    internal static (decimal? min, decimal? max) ExtractBoundsFromField(TypedField field)
+    internal static (decimal? min, decimal? max) GetFieldBounds(TypedField field)
         => (field.DeclaredMin, field.DeclaredMax);
 
     private static bool TryIntervalContainmentProof(

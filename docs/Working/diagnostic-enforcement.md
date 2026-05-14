@@ -1190,7 +1190,14 @@ The following areas must retain direct `Diagnostics.Create(DiagnosticCode.X, ...
 
 6. **Gate 1 allow-list granularity.** The initial allow-list has all 50 unemitted codes. Should each entry cite a specific tracking issue (e.g., `// tracked in #245`), or is a cluster comment (`// Root Cause B2 — not yet implemented`) sufficient? The issue-level citation is richer but requires creating 50 tracking issues. Direction on granularity before Slice 0 implementation.
 
+   **Decision:** RESOLVED — cluster comment annotation. Each allow-list entry carries a comment identifying its root cause cluster (e.g., `// Root Cause B2 — not yet implemented`). No per-issue citations. Rationale: implementation progress is already tracked at the slice/cluster level; individual codes within a cluster will not slip independently, so issue-level traceability adds maintenance overhead with no traceability benefit.
+
 7. **Analyzer scan scope: Pipeline-only vs. all source.** The recommended initial scope covers `src/Precept/Pipeline/*.cs` + `Operations.cs` + `Functions.cs` (+ ProofEngine emission paths). If future emission patterns emerge outside these files (e.g., a new `RuntimeValidator` in `src/Precept/Runtime/`), the scan set needs manual updating. Should the analyzer scan all of `src/Precept/**/*.cs` minus known non-emission files instead, making it automatically inclusive? Broader scope means fewer false negatives but potentially more false positives from non-emission references. Direction before Slice 0 is finalized.
+
+   **Decision:** RESOLVED — pipeline-only explicit scan set.
+   - **Scan set:** `src/Precept/Pipeline/*.cs` + `Operations.cs` + `Functions.cs` + ProofEngine emission paths. This is the complete set of known emission sites today.
+   - **Rationale:** False positives from a broad all-source scan outweigh the benefit of automatic inclusion. The known emission patterns are stable and well-defined, and the explicit list keeps the analyzer contract clear and auditable.
+   - **Maintenance rule:** If a new emission path opens outside Pipeline (for example, a future `RuntimeValidator`), that is a conscious architectural decision and the scan set is updated manually at that time.
 
 8. **Doc-comment false positives.** The emission-site scan picks up `DiagnosticCode.X` in XML doc comments (`/// <see cref="DiagnosticCode.X"/>`). Currently rare — only one instance exists and `X` is not a real member name. If it becomes a pattern, the scan should strip `// ...` and `/** */` comments before matching. For now, does Shane want comment stripping from the start, or accept the current minimal risk?
 

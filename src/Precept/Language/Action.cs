@@ -1,4 +1,6 @@
 using System.Collections.Frozen;
+using System.Collections.Immutable;
+using Precept.Pipeline;
 
 namespace Precept.Language;
 
@@ -18,13 +20,21 @@ public sealed record ActionMeta(
     string?      HoverDescription = null,
     string?      UsageExample     = null,
     string?      SnippetTemplate  = null,
-    ActionKind?  PrimaryActionKind = null)
+    ActionKind?  PrimaryActionKind = null,
+    Func<TypedAction, SemanticIndex, ImmutableArray<ProofObligation>>? DynamicObligationGenerator = null)
 {
     /// <summary>Proof obligations the type checker must verify at call sites.</summary>
     public ProofRequirement[] ProofRequirements { get; } = ProofRequirements ?? [];
 
     /// <summary>Construct kinds where this action may appear.</summary>
     public ConstructKind[] AllowedIn { get; } = AllowedIn ?? [];
+    
+    /// <summary>
+    /// Optional delegate to generate dynamic proof obligations based on runtime context.
+    /// Used for obligations that depend on field properties (e.g., interval containment depends on field bounds).
+    /// Returns an empty array if no dynamic obligations apply.
+    /// </summary>
+    public Func<TypedAction, SemanticIndex, ImmutableArray<ProofObligation>>? DynamicObligationGenerator { get; } = DynamicObligationGenerator;
 }
 
 /// <summary>

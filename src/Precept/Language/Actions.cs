@@ -1,4 +1,6 @@
 using System.Collections.Frozen;
+using System.Collections.Immutable;
+using Precept.Pipeline;
 
 namespace Precept.Language;
 
@@ -67,7 +69,8 @@ public static class Actions
             "Assign a value to a scalar field",
             AnyType, ActionSyntaxShape.AssignValue, ValueRequired: true, AllowedIn: AllActionContexts,
             HoverDescription: "Assigns a value to a field. Works on any scalar, temporal, or business-domain field.",
-            SnippetTemplate: "set ${1:Field} = ${2:value}"),
+            SnippetTemplate: "set ${1:Field} = ${2:value}",
+            DynamicObligationGenerator: GenerateIntervalContainmentObligations),
 
         ActionKind.Add => new(
             kind, Tokens.GetMeta(TokenKind.Add),
@@ -211,6 +214,49 @@ public static class Actions
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind,
             $"Unknown ActionKind: {kind}"),
     };
+
+    // ════════════════════════════════════════════════════════════════════════════
+    //  Dynamic Obligation Generation Helpers
+    // ════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Generates interval containment proof obligations for Set actions on bounded decimal/number fields.
+    /// Returns an empty array if the action's target is not a bounded decimal/number field.
+    /// </summary>
+    private static ImmutableArray<ProofObligation> GenerateIntervalContainmentObligations(
+        TypedAction action,
+        SemanticIndex semantics)
+    {
+        if (action is not TypedInputAction inputAction || inputAction.Kind != ActionKind.Set)
+            return [];
+        
+        if (!semantics.FieldsByName.TryGetValue(inputAction.FieldName, out var targetField))
+            return [];
+        
+        if (targetField.ResolvedType != TypeKind.Decimal && targetField.ResolvedType != TypeKind.Number)
+            return [];
+        
+        var (min, max) = ProofEngine.GetFieldBounds(targetField);
+        if (!min.HasValue && !max.HasValue)
+            return [];
+        
+        var intervalReq = new IntervalContainmentProofRequirement(
+            new SelfSubject(),
+            inputAction.FieldName,
+            min, max,
+            $"Interval containment: {inputAction.FieldName} must stay within declared bounds [{min?.ToString() ?? "−∞"} .. {max?.ToString() ?? "+∞"}]");
+        
+        // ProofObligation will be updated with proper context in ProofEngine.WalkActions()
+        var obligation = new ProofObligation(
+            intervalReq,
+            inputAction.InputExpression,
+            null!, // Will be replaced with proper context
+            ProofDisposition.Unresolved,
+            null,
+            null);
+        
+        return [obligation];
+    }
 
     // ════════════════════════════════════════════════════════════════════════════
     //  GetShapeMeta — exhaustive switch over ActionSyntaxShape

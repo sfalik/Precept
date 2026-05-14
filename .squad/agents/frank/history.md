@@ -77,3 +77,5 @@
 - `set` into an `omit` target-state field is the decisive field-state rule; Update access modes do not constrain Fire semantics.
 - Catalog static initialization may not reach downstream catalog statics during cctor execution; reverse references should defer through `Lazy<T>`.
 - Before using a diagnostic as an ordering dependency, verify whether the checker wiring already shipped; stale sequencing premises should not override integrity-first prioritization.
+- Gate 1 allow-list entries only need root-cause cluster comments; per-issue citations duplicate slice-level tracking when codes cannot slip independently from their cluster.
+- Gate 2's emission-site analyzer should stay on an explicit pipeline-centered scan set; broad all-source scans create more false-positive risk than value while the known emission paths remain stable and well-defined.
