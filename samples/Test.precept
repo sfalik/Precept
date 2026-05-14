@@ -1,6 +1,7 @@
-precept Test
+﻿precept Test
 
-field test as integer max 5
+field test as quantity of 'mass' max '5 kg'
+field test2 as integer max 2 optional
 
 state offState initial
 state onState 
@@ -10,8 +11,12 @@ event toggle initial
 in offState omit test
 
 from offState on toggle 
-    -> set test = 6
+    -> set test = '6 [lb_av]'
     -> transition onState
+
+from onState on toggle when test2 is set and test2 > 0
+    -> clear test2
+    -> transition offState
 
 from onState on toggle
     -> transition offState

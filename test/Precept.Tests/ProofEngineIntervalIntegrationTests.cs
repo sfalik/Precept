@@ -180,6 +180,32 @@ from Active on Recalculate
         requirement.DeclaredMax.Should().Be(5m);
     }
 
+    [Fact]
+    public void IntervalContainment_QuantityTypedLiteralWithinBounds_DoesNotEmitNumericOverflow()
+    {
+        const string precept = @"
+precept QuantityAssignment
+field test as quantity of 'mass' max '5 kg'
+state offState initial
+state onState
+event toggle initial
+from offState on toggle
+    -> set test = '1 kg'
+    -> transition onState";
+
+        var result = Compiler.Compile(precept);
+
+        result.Diagnostics
+            .Where(d => d.Code == nameof(DiagnosticCode.NumericOverflow))
+            .Should().BeEmpty(
+                "typed quantity literals should contribute a bounded numeric interval from their magnitude");
+
+        result.Proof.Obligations
+            .Where(o => o.Requirement is IntervalContainmentProofRequirement { TargetField: "test" })
+            .Should().ContainSingle()
+            .Which.Disposition.Should().Be(ProofDisposition.Proved);
+    }
+
     // ════════════════════════════════════════════════════════════════════════
     //  Catalog-driven architecture validation (Phase 2 - B2 diagnostic)
     // ════════════════════════════════════════════════════════════════════════

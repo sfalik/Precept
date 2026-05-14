@@ -10,17 +10,19 @@ namespace Precept.Mcp.Tools;
 public static class CompileTool
 {
     [McpServerTool(Name = "precept_compile")]
-    [Description("Parse, type-check, and analyze a precept definition. Returns minimal JSON with `success`, `diagnosticCount`, compact `diagnostics`, and a one-line `summary`.")]
+    [Description("Parse, type-check, and analyze a precept definition. Returns compact JSON with `success`, `diagnosticCount`, compact `diagnostics`, `proofObligations`, and a one-line `summary`.")]
     public static CompileResultDto Compile(string text)
     {
         var compilation = Compiler.Compile(text);
         var diagnostics = compilation.Diagnostics.Select(MapDiagnostic).ToArray();
+        var proofObligations = compilation.Proof.Obligations.Select(MapProofObligation).ToArray();
 
         return new CompileResultDto(
             !compilation.HasErrors,
             diagnostics.Length,
             diagnostics,
-            BuildSummary(compilation));
+            BuildSummary(compilation),
+            proofObligations);
     }
 
     private static CompileDiagnosticDto MapDiagnostic(Diagnostic diagnostic)
@@ -30,6 +32,22 @@ public static class CompileTool
             FormatSeverity(diagnostic.Severity),
             FormatDiagnosticCode(diagnostic),
             diagnostic.Message);
+
+    private static CompileProofObligationDto MapProofObligation(ProofObligation obligation)
+    {
+        var intervalRequirement = obligation.Requirement as IntervalContainmentProofRequirement;
+
+        return new CompileProofObligationDto(
+            obligation.Requirement.Kind.ToString(),
+            obligation.Disposition.ToString(),
+            obligation.Strategy?.ToString(),
+            obligation.EmittedDiagnostic?.ToString(),
+            obligation.Requirement.Description,
+            obligation.ComputedInterval?.ToString(),
+            intervalRequirement?.TargetField,
+            intervalRequirement?.DeclaredMin,
+            intervalRequirement?.DeclaredMax);
+    }
 
     private static string BuildSummary(Compilation compilation)
     {

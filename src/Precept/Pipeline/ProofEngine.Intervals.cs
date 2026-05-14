@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Runtime.CompilerServices;
 using Precept.Language;
 
 namespace Precept.Pipeline;
@@ -21,12 +22,11 @@ public static partial class ProofEngine
     {
         switch (expr)
         {
-            case TypedLiteral { Value: decimal d }:
-                return NumericInterval.Point(d);
-            case TypedLiteral { Value: int i }:
-                return NumericInterval.Point((decimal)i);
-            case TypedLiteral { Value: long l }:
-                return NumericInterval.Point((decimal)l);
+            case TypedLiteral literal when TryExtractNumericLiteralMagnitude(literal.Value, out var literalMagnitude):
+                return NumericInterval.Point(literalMagnitude);
+
+            case TypedTypedConstant typedConstant when TryGetTypedConstantMagnitude(typedConstant.ParsedValue, out var typedConstantMagnitude):
+                return NumericInterval.Point(typedConstantMagnitude);
 
             case TypedFieldRef fieldRef:
                 if (narrowed is not null && narrowed.TryGetValue(fieldRef.FieldName, out var narrowedInterval))
@@ -78,6 +78,27 @@ public static partial class ProofEngine
 
             default:
                 return NumericInterval.Unbounded;
+        }
+    }
+
+    private static bool TryExtractNumericLiteralMagnitude(object? value, out decimal magnitude)
+    {
+        switch (value)
+        {
+            case decimal d:
+                magnitude = d;
+                return true;
+            case int i:
+                magnitude = i;
+                return true;
+            case long l:
+                magnitude = l;
+                return true;
+            case ITuple tuple when tuple.Length > 0:
+                return TryExtractNumericLiteralMagnitude(tuple[0], out magnitude);
+            default:
+                magnitude = default;
+                return false;
         }
     }
 

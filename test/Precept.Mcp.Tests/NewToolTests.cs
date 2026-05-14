@@ -102,6 +102,14 @@ public class NewToolTests
     }
 
     [Fact]
+    public void LanguageTool_ProofRequirements_IncludesIntervalContainment()
+    {
+        var result = ProofsTool.Proofs();
+
+        result.Should().Contain("**IntervalContainment**");
+    }
+
+    [Fact]
     public void Patterns_DefaultCall_ReturnsMarkdown()
     {
         var result = PatternsTool.Patterns();

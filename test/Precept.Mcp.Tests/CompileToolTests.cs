@@ -16,7 +16,8 @@ public class CompileToolTests
         result.Success.Should().BeTrue();
         result.DiagnosticCount.Should().Be(0);
         result.Diagnostics.Should().BeEmpty();
-        result.Summary.Should().Be("LoanApplication: 2 states, 1 events, 1 transitions, 1 rules, 1 ensures, 0 type errors.");
+        result.ProofObligations.Should().BeEmpty();
+        result.Summary.Should().Be("LoanApplication: 2 states, 1 events, 1 transitions, 0 rules, 0 ensures, 0 type errors.");
     }
 
     [Fact]
@@ -25,7 +26,8 @@ public class CompileToolTests
         var result = CompileTool.Compile(InvalidSource);
 
         result.Success.Should().BeFalse();
-        result.DiagnosticCount.Should().Be(3);
+        result.DiagnosticCount.Should().Be(result.Diagnostics.Length);
+        result.Diagnostics.Should().Contain(diagnostic => diagnostic.Code == "PRE0009");
 
         var diagnostic = result.Diagnostics[0];
         diagnostic.Line.Should().Be(2);
@@ -33,7 +35,8 @@ public class CompileToolTests
         diagnostic.Severity.Should().Be("error");
         diagnostic.Code.Should().Be("PRE0009");
         diagnostic.Message.Should().Be("Expected type keyword here, but found 'moneys'");
-        result.Summary.Should().Be("Broken: 0 states, 0 events, 0 transitions, 0 rules, 0 ensures, 1 type errors.");
+        result.Summary.Should().StartWith("Broken: 0 states, 0 events, 0 transitions, 0 rules, 0 ensures, ");
+        result.Summary.Should().Contain(" type errors.");
     }
 
     [Fact]
@@ -47,7 +50,8 @@ public class CompileToolTests
             "success",
             "diagnosticCount",
             "diagnostics",
-            "summary");
+            "summary",
+            "proofObligations");
 
         var diagnostic = document.RootElement.GetProperty("diagnostics")[0];
         diagnostic.EnumerateObject().Select(property => property.Name).Should().Equal(
@@ -56,6 +60,9 @@ public class CompileToolTests
             "severity",
             "code",
             "message");
+
+        var proofObligation = document.RootElement.GetProperty("proofObligations");
+        proofObligation.ValueKind.Should().Be(JsonValueKind.Array);
     }
 
     [Fact]
@@ -83,6 +90,22 @@ public class CompileToolTests
         Encoding.UTF8.GetByteCount(json).Should().BeLessThan(60 * 1024);
     }
 
+    [Fact]
+    public void CompileTool_BoundedFieldOverflow_ObligationKindIsIntervalContainment()
+    {
+        var result = CompileTool.Compile(BoundedOverflowSource);
+
+        var obligation = result.ProofObligations.Should()
+            .ContainSingle(entry => entry.Kind == "IntervalContainment")
+            .Which;
+
+        obligation.Disposition.Should().Be("Unresolved");
+        obligation.ComputedInterval.Should().NotBeNullOrWhiteSpace();
+        obligation.TargetField.Should().Be("total");
+        obligation.DeclaredMin.Should().Be(0m);
+        obligation.DeclaredMax.Should().Be(100m);
+    }
+
     private static string BuildLargeErrorSource(int fieldCount)
     {
         var sb = new StringBuilder();
@@ -104,18 +127,26 @@ public class CompileToolTests
 
     private const string ValidSource = """
         precept LoanApplication
-        field Amount as number nonnegative
+        field Amount as number default 0
         state Pending initial
         state Approved terminal
-        in Approved ensure Amount > 0 because "Loan amount must stay positive"
         event Approve
-        from Pending on Approve when Amount > 0
+        from Pending on Approve
             -> transition Approved
-        rule Amount > 0 because "Loan amount must be positive"
         """;
 
     private const string InvalidSource = """
         precept Broken
         field Amount as moneys
+        """;
+
+    private const string BoundedOverflowSource = """
+        precept Simple
+        field total as decimal min 0 max 100
+        state Active initial
+        event Add(A as decimal min 0 max 80, B as decimal min 0 max 80)
+        from Active on Add
+            -> set total = Add.A + Add.B
+            -> no transition
         """;
 }

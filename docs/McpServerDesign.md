@@ -15,7 +15,7 @@ Current MCP surface for `tools/Precept.Mcp/`.
 | `precept_patterns` | none | markdown patterns and anti-patterns |
 | `precept_diagnostic` | `code` | markdown diagnostic explanation |
 | `precept_domains` | `scope?` | markdown domain catalog |
-| `precept_compile` | `text` | minimal JSON diagnostics + summary |
+| `precept_compile` | `text` | compact JSON diagnostics + proof obligations + summary |
 
 `precept_language` is removed. There is no compatibility shim.
 
@@ -172,14 +172,15 @@ Full output shape:
 
 ## precept_compile
 
-Returns minimal JSON only:
+Returns compact JSON with diagnostics and proof obligations:
 
 ```json
 {
   "success": true,
   "diagnosticCount": 0,
   "diagnostics": [],
-  "summary": "TrafficLight: 4 states, 3 events, 12 transitions, 2 rules, 0 ensures, 0 type errors."
+  "summary": "TrafficLight: 4 states, 3 events, 12 transitions, 2 rules, 0 ensures, 0 type errors.",
+  "proofObligations": []
 }
 ```
 
@@ -196,3 +197,19 @@ Diagnostic entry shape:
 ```
 
 `summary` is a compact prose description, not a projected definition graph.
+
+Proof obligation entry shape:
+
+```json
+{
+  "kind": "IntervalContainment",
+  "disposition": "Unresolved",
+  "strategy": "IntervalContainment",
+  "emittedDiagnostic": "NumericOverflow",
+  "description": "Expression assigned to 'Balance' must stay within declared bounds.",
+  "computedInterval": "[0 .. 160]",
+  "targetField": "Balance",
+  "declaredMin": 0,
+  "declaredMax": 100
+}
+```
