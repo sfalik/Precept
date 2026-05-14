@@ -18,6 +18,8 @@ Of the 132 diagnostics defined in `DiagnosticCode.cs`, **50 have no emission sit
 
 This design does two things: it closes the most critical gaps and it installs two Roslyn analyzer gates that prevent future regressions. The analyzers are the enforcement mechanism; the gap closure work is the remediation. Together they form a complete answer to the question "how do we know the catalog's promises are kept?"
 
+**Cross-plan dependency (interval proof engine):** One of the 50 unemitted codes — PRE0078 `NumericOverflow` — is **not addressed by this plan's gap-closure slices.** It is addressed by the interval proof engine (`docs/Working/interval-proof-engine-design.md`), which introduces Strategy 7 (`IntervalContainment`) as the emission mechanism for arithmetic bounds violations. This plan's Gate 1 allow-list carries PRE0078 until interval engine Slice 2 ships, at which point it is removed. See § 8 "Cross-Plan Dependency" for the full coordination table.
+
 **Important correction from the initial gap analysis:** Four diagnostics (PRE0066, PRE0095, PRE0097, PRE0098) were initially reported as "never emitted." These ARE emitted — by `ValidateCIEnforcement` in `TypeChecker.Validation.cs` via catalog-driven dispatch through `Operations.GetMeta().CIDiagnosticCode` and `Functions.GetMeta().CIDiagnosticCode`. The original grep missed them because indirect catalog references don't produce a literal `DiagnosticCode.X` token at the emission call site. **The true gap count is 50, not 54.** This catalog-driven emission pattern is the reason the analyzer emission-site pass must check for indirect dispatch, not just literal references.
 
 ---
@@ -32,14 +34,16 @@ The pipeline produces diagnostics through three patterns:
 
 2. **Catalog-mediated emission:** `CIDiagnosticCode: DiagnosticCode.X` in `Operations.cs` or `Functions.cs`. The CI enforcement cluster (PRE0066, PRE0095, PRE0097, PRE0098) uses this pattern — `ValidateCIEnforcement` reads the catalog property and dispatches without ever mentioning the code by name in the pipeline source.
 
-3. **ProofEngine dispatch:** `DiagnosticCode.X` in ProofEngine switch branches for proof obligation failures.
+3. **ProofEngine dispatch:** `DiagnosticCode.X` in ProofEngine switch branches for proof obligation failures. This includes the new **Strategy 7 (IntervalContainment)** path: unresolved `IntervalContainmentProofRequirement` obligations emit `NumericOverflow` (PRE0078). See `docs/Working/interval-proof-engine-design.md` §3.3. Once the interval proof engine Slice 2 ships, PRE0078 transitions from "unemitted" to "emitted via ProofEngine dispatch" — this is the mechanism that closes the PRE0078 gap, not a TypeChecker wire.
 
 **Current emission inventory (as of 2026-05-13):**
 - 132 diagnostic codes defined in `DiagnosticCode.cs`
 - 83 have emission sites in the pipeline or catalog-emission files
-- 50 have no emission site (the gap)
+- 50 have no emission site (the gap) — **49 after interval proof engine Slice 2 ships** (PRE0078 `NumericOverflow` transitions to "emitted via ProofEngine Strategy 7")
 - 7 have neither emission nor test (see § 4.5 below)
 - 0 emitted codes are untested — all 83 emitted codes have at least one test reference
+
+**⚠️ Hard dependency on interval proof engine:** PRE0078 (`NumericOverflow`) is NOT addressed by this enforcement plan's gap-closure slices. It is addressed by the interval proof engine (`docs/Working/interval-proof-engine-design.md`), which introduces Strategy 7 (`IntervalContainment`) as the emission mechanism. The interval engine's Slice 2 is the completion gate for PRE0078's transition from "unemitted" to "emitted." This plan's Gate 1 allow-list entry for PRE0078 is removed when interval engine Slice 2 ships — not when this plan's Slice 8 ships.
 
 ### What the pipeline does NOT do (and must)
 
@@ -160,7 +164,7 @@ Individual emission sites missing across multiple TypeChecker validation methods
 
 **D1: Parser expression precision (PRE0010–0012)** — chained comparisons, keywords-as-values, invalid call targets. Parser catches the error condition but emits generic `ExpectedToken` instead of the domain-specific code.
 
-**D2: TypeChecker validation gaps (14 codes):**
+**D2: TypeChecker validation gaps (13 codes):**
 
 | PRE | Name | Theme |
 |-----|------|-------|
@@ -174,10 +178,15 @@ Individual emission sites missing across multiple TypeChecker validation methods
 | PRE0050 | `EventArgOutOfScope` | Scope rules |
 | PRE0051 | `InvalidInterpolationCoercion` | Interpolation |
 | PRE0067 | `MaxPlacesExceeded` | Business domain |
-| PRE0078 | `NumericOverflow` | Value safety |
 | PRE0085 | `NonChoiceAssignedToChoice` | Choice types |
 | PRE0105 | `CollectionInnerTypeError` | Collections |
 | PRE0043 | `RedundantAccessMode` | Access modes |
+
+**D3: ProofEngine-owned gap — now addressed by interval proof engine (1 code):**
+
+| PRE | Name | Resolution |
+|-----|------|------------|
+| PRE0078 | `NumericOverflow` | **Owned by Strategy 7 (IntervalContainment) in the interval proof engine.** Not a TypeChecker gap — it is a ProofEngine obligation failure diagnostic. See `docs/Working/interval-proof-engine-design.md` §3.2–§3.3. The interval engine emits `NumericOverflow` when an `IntervalContainmentProofRequirement` is unresolved (computed interval exceeds target field's declared bounds). Gate 1 allow-list removal coordinated with interval engine Slice 2 completion. |
 
 ### 3.8 Codes With Neither Emission Nor Test (7 codes)
 
@@ -189,7 +198,7 @@ These 7 codes have no emission site AND no test file reference anywhere in the t
 | `EventHandlerDoesNotSupportGuard` (PRE0014) | Root Cause A — parser gate never wired |
 | `EventHandlerInStatefulPrecept` (PRE0092) | Root Cause C — trivial structural check not wired |
 | `OmitDoesNotSupportGuard` (PRE0013) | Root Cause A — parser gate never wired |
-| `OutOfRange` (PRE0079) | Catalog declares `DiagnosticStage.Type` but bounds checking of runtime values is impossible statically. Reclassify as proof obligation or wire for constant assignments only. |
+| `OutOfRange` (PRE0079) | Catalog declares `DiagnosticStage.Type` but bounds checking of runtime values is impossible statically. The interval proof engine (`docs/Working/interval-proof-engine-design.md`) now owns *expression-level* bounds checking via `IntervalContainmentProofRequirement` → `NumericOverflow`. PRE0079 retains a narrower scope: constant assignments where a literal exceeds `min`/`max` bounds can be caught trivially at type-check time without interval arithmetic. Reclassify PRE0079 as "constant-assignment bounds check" (TypeChecker) and let the interval engine own the general case. |
 | `PreEventGuardNotAllowed` (PRE0015) | Root Cause A — parser gate never wired |
 | `RedundantAccessMode` (PRE0043) | Root Cause D — specced (§3.8), implementation not wired |
 
@@ -309,11 +318,13 @@ Slice 5A (PRE0091)         ──→ after typed-constant resolution extraction 
 Slice 6 (B4 collection)    ──→ independent
 Slice 7 (A parser gates)   ──→ independent
 
-Slice 8 (scattered D)      ──→ independent (individual wires)
+Slice 8 (scattered D)      ──→ independent (individual wires); PRE0078 REMOVED — owned by interval engine
 
 Slice 9A (modifier catalog)──→ after Slice 8 wires PRE0035/PRE0042 (mechanism migration, not gap closure)
 Slice 9B (typed-const cat.) ──→ after Slice 5 OR independent (subsumes Slice 5 if ordered first)
-Slice 9C (proof catalog)   ──→ independent of gap-closure slices (mechanism audit)
+Slice 9C (proof catalog)   ──→ AFTER interval engine Slice 2 (must include Strategy 7 in audit)
+
+PRE0078 Gate 1 removal     ──→ AFTER interval engine Slice 2 completes (external dependency)
 ```
 
 All gap-closure slices (1–8, plus 5A) depend on Slice 0 only in the soft sense: Slice 0 is the mechanism that validates completion. The code changes in Slices 1–8 and 5A do not have a code dependency on Slice 0.
@@ -326,7 +337,7 @@ PRE0091 is the one deliberate exception to the otherwise-independent ordering ru
 
 ### Slice 0 — Roslyn Analyzer Foundation: Gate 1 + Gate 2
 
-**Purpose:** Install the two-gate enforcement mechanism in `Precept.Analyzers`. Once this slice ships, all future gap-closure work is automatically validated at build/IDE time. The Gate 1 allow-list starts with all 50 currently-unemitted codes; each subsequent slice removes entries as gaps are closed.
+**Purpose:** Install the two-gate enforcement mechanism in `Precept.Analyzers`. Once this slice ships, all future gap-closure work is automatically validated at build/IDE time. The Gate 1 allow-list starts with all 50 currently-unemitted codes (including PRE0078, which will be removed by the interval proof engine's Slice 2 rather than by this plan's gap-closure slices); each subsequent slice removes entries as gaps are closed.
 
 **Analyzer architecture (authoritative for Gate 1 + Gate 2):**
 - `PRECEPT0027` and `PRECEPT0028` are separate analyzers that share one semantic scanner and one allow-list source.
@@ -825,7 +836,9 @@ Test method names:
 | Medium | PRE0050 `EventArgOutOfScope` | `TypeChecker.Expressions.cs` | Event arg referenced outside a transition row for that event |
 | Medium | PRE0067 `MaxPlacesExceeded` | `TypeChecker.Expressions.cs` | Money value exceeds declared max decimal places |
 | Medium | PRE0105 `CollectionInnerTypeError` | `TypeChecker.Expressions.cs` | Collection inner type mismatch |
-| Deferred | PRE0019, PRE0022, PRE0051, PRE0078 | Various | Require deeper analysis — may already be handled by `TypeMismatch` under a different code |
+| Deferred | PRE0019, PRE0022, PRE0051 | Various | Require deeper analysis — may already be handled by `TypeMismatch` under a different code |
+
+> **Note:** PRE0078 `NumericOverflow` was previously listed in this table. It has been removed — PRE0078 is **not a TypeChecker gap**. It is a ProofEngine obligation failure diagnostic owned by Strategy 7 (`IntervalContainment`) in the interval proof engine. See §3.7 D3 and `docs/Working/interval-proof-engine-design.md` §3.2–§3.3. Gate 1 allow-list removal for PRE0078 is coordinated with interval engine Slice 2, not with this plan's Slice 8.
 
 **Test placement:**
 
@@ -863,7 +876,8 @@ Test method names:
 - [ ] Wire `EventArgOutOfScope` (PRE0050) + tests
 - [ ] Wire `MaxPlacesExceeded` (PRE0067) + tests
 - [ ] Wire `CollectionInnerTypeError` (PRE0105) + tests
-- [ ] Analyze PRE0019, PRE0022, PRE0051, PRE0078 before wiring (may be duplicates under different codes)
+- [ ] Analyze PRE0019, PRE0022, PRE0051 before wiring (may be duplicates under different codes)
+- [ ] ~~PRE0078~~ — removed from Slice 8 scope; owned by interval proof engine Strategy 7
 - [ ] Remove wired codes from Gate 1 allow-list as each is completed
 
 ---
@@ -941,9 +955,11 @@ Test method names:
 
 ### Slice 9C — Catalog-Mediated Emission: Proof Obligation Consistency
 
-**Objective:** Verify and complete catalog-mediated emission for proof obligations. `ProofRequirements.GetMeta(kind).DiagnosticCode` is partially used today. This slice audits all ProofEngine emission paths and migrates any remaining hardcoded `DiagnosticCode.X` literals to consistent catalog dispatch.
+**Objective:** Verify and complete catalog-mediated emission for proof obligations. `ProofRequirements.GetMeta(kind).DiagnosticCode` is partially used today. This slice audits all ProofEngine emission paths — including the new **Strategy 7 (IntervalContainment)** path added by the interval proof engine — and migrates any remaining hardcoded `DiagnosticCode.X` literals to consistent catalog dispatch.
 
 **Governing policy:** Proof obligations satisfy all three criteria: (1) stable 1:1 mapping from proof obligation kind to its diagnostic, (2) the emission logic is uniform ("obligation not met → emit diagnostic"), (3) the check is on resolved proof results, not structural parsing. Where a ProofEngine branch applies per-obligation branching logic beyond simple "met/not-met" (e.g., conditional message formatting), direct emission remains correct for that specific branch.
+
+**Interval proof engine integration (hard dependency):** Strategy 7 (`IntervalContainment`) emits `NumericOverflow` for unresolved `IntervalContainmentProofRequirement` obligations. This slice must verify that `ProofRequirements.GetMeta(ProofRequirementKind.IntervalContainment).DiagnosticCode == DiagnosticCode.NumericOverflow` and that Strategy 7's emission uses catalog dispatch rather than a hardcoded literal. If the interval engine ships with a hardcoded emission path, this slice migrates it. **Slice 9C should be sequenced after interval engine Slice 2 completes** — otherwise there is no Strategy 7 emission path to audit.
 
 **Target files:**
 - `src/Precept/Pipeline/ProofEngine.cs` — migrate hardcoded emission to `ProofRequirements.GetMeta(kind).DiagnosticCode`
@@ -964,6 +980,7 @@ Test method names:
 - `TypeCheckerCITests.cs` — unaffected, must pass.
 
 - [ ] Audit ProofEngine: count `ProofRequirements.GetMeta(...).DiagnosticCode` vs. hardcoded `DiagnosticCode.X`
+- [ ] **Include Strategy 7 (IntervalContainment) in the audit** — verify `ProofRequirements.GetMeta(ProofRequirementKind.IntervalContainment).DiagnosticCode == DiagnosticCode.NumericOverflow`; migrate if hardcoded
 - [ ] Document any branches that legitimately require direct emission (per-obligation formatting)
 - [ ] Migrate remaining hardcoded paths to catalog dispatch
 - [ ] Verify existing ProofEngine tests pass unchanged
@@ -1037,13 +1054,31 @@ These slices are in-scope for the current execution plan. They refactor emission
 
 - [ ] **Slice 9A:** Modifier constraint violations → `ModifierMeta.ConstraintDiagnosticCode` — generic loop in `ValidateModifiers` (after Slice 8 wires PRE0035/PRE0042)
 - [ ] **Slice 9B:** Typed-constant family diagnostics → `TypedConstantFamilyMeta.FormatErrorCode`/`SemanticErrorCode` — catalog dispatch in `TypedConstantValidation` (after Slice 5 or subsumes it)
-- [ ] **Slice 9C:** Proof obligation consistency → `ProofRequirements.GetMeta(kind).DiagnosticCode` everywhere — audit and migrate remaining hardcoded ProofEngine emission
+- [ ] **Slice 9C:** Proof obligation consistency → `ProofRequirements.GetMeta(kind).DiagnosticCode` everywhere — audit and migrate remaining hardcoded ProofEngine emission **(sequence after interval engine Slice 2; must include Strategy 7)**
 
 ### Deferred
 - [ ] **Period arithmetic safety** (PRE0060–0062) — qualifier-aware temporal type checking, parallel to B2; deferred pending B2 pattern establishment
-- [ ] **Precision upgrades** (PRE0019, PRE0022, PRE0051, PRE0078) — deeper analysis needed; may already be covered by `TypeMismatch` or proof obligations under different codes
-- [ ] **OutOfRange** (PRE0079) — reclassify; constant-assignment bounds checking only; runtime value bounds checking is proof-level
+- [ ] **Precision upgrades** (PRE0019, PRE0022, PRE0051) — deeper analysis needed; may already be covered by `TypeMismatch` or proof obligations under different codes
+- [ ] **OutOfRange** (PRE0079) — reclassify to "constant-assignment bounds check" (TypeChecker-scope); the general expression-level bounds case is now owned by the interval proof engine's Strategy 7 (`IntervalContainmentProofRequirement` → `NumericOverflow`). See `docs/Working/interval-proof-engine-design.md` §4.4.
 - [ ] **Parser expression precision** (PRE0010–0012) — chained comparisons, keywords-as-values, invalid call targets; lower priority than guard gates
+
+### Cross-Plan Dependency: Interval Proof Engine → Diagnostic Enforcement
+
+The interval proof engine (`docs/Working/interval-proof-engine-design.md`) has direct implications for this enforcement plan:
+
+| Interval Engine Slice | Effect on Diagnostic Enforcement |
+|---|---|
+| **Slice 1** (Catalog + NumericInterval) | `ProofRequirementKind.IntervalContainment = 7` added to catalog. Slice 9C audit must include it. `ProofRequirements.All.Length` increases from 6 to 7. |
+| **Slice 2** (Obligation Collection + Strategy 7) | `NumericOverflow` (PRE0078) becomes actively emitted via ProofEngine dispatch. **Remove PRE0078 from Gate 1 allow-list at this point.** Gate 1 analyzer must recognize the Strategy 7 emission path (ProofEngine dispatch pattern). |
+| **Slice 3** (Guard Narrowing) | No direct enforcement impact. Reduces false negatives on interval proofs — fewer unresolved obligations means fewer `NumericOverflow` emissions on correct definitions. |
+| **Slice 5** (Hover Extension) | No enforcement impact. Hover is display-only. |
+| **Slice 6** (MCP Sync) | `precept_language` vocabulary output gains `IntervalContainment` member. No enforcement plan change needed — MCP derives from catalog automatically. |
+
+**Gate 1 analyzer note:** Once interval engine Slice 2 ships, the Gate 1 analyzer must detect ProofEngine Strategy 7's emission of `NumericOverflow` as a valid emission site. The emission pattern is: proof obligation `Disposition != Proved` → emit `Diagnostics.Create(DiagnosticCode.NumericOverflow, ...)`. This falls under existing "ProofEngine dispatch branch" recognition in the analyzer scanner (§5.1). No additional scanner logic is needed beyond what Slice 0 already specifies.
+
+**Slice 9C interaction:** The interval engine adds `IntervalContainment = 7` to `ProofRequirementKind`. Slice 9C's audit of ProofEngine emission paths must include Strategy 7. Specifically: verify that `ProofRequirements.GetMeta(ProofRequirementKind.IntervalContainment).DiagnosticCode == DiagnosticCode.NumericOverflow`. If Strategy 7 uses a hardcoded `DiagnosticCode.NumericOverflow` literal rather than reading from catalog metadata, Slice 9C should migrate it to the catalog-mediated pattern.
+
+**PRE0079 `OutOfRange` boundary with interval engine:** The interval engine handles *expression-level* bounds checking: "does this arithmetic result interval fit within the target field's declared `min`/`max`?" This is the general case of bounds checking. PRE0079 `OutOfRange` retains only the narrow *constant-assignment* case: "does this literal value `42` exceed the field's declared `max 10`?" — a trivial TypeChecker check that doesn't need interval arithmetic because the value is known at compile time as a point interval `[42, 42]`. These two surfaces are complementary, not overlapping.
 
 ---
 
@@ -1087,7 +1122,7 @@ The following areas must retain direct `Diagnostics.Create(DiagnosticCode.X, ...
 |------|--------|
 | **Parser rejection paths** (PRE0013–0015, PRE0010–0012) | Context-sensitive structural judgments during parsing. No catalog member maps 1:1 to these — they fire on syntactic position, not catalog-member identity. |
 | **Structural checks** (PRE0092 `EventHandlerInStatefulPrecept`, PRE0094 `InitialEventMissingAssignments`) | One-off structural invariants. No catalog axis exists to generalize across. |
-| **TypeChecker expression-level precision** (PRE0019, PRE0051, PRE0078) | Condition-specific checks that depend on expression subtree shape, not catalog-member classification. Adding a catalog property would be pretend-genericity for a single consumer. |
+| **TypeChecker expression-level precision** (PRE0019, PRE0051) | Condition-specific checks that depend on expression subtree shape, not catalog-member classification. Adding a catalog property would be pretend-genericity for a single consumer. |
 | **Cross-entity qualifier comparison** (PRE0070–0074 currency/unit arithmetic) | The emission logic is uniform for B2, but the qualifier-matching rules are structurally diverse across arithmetic vs. denomination vs. compound-period cases — per-member branching is inherent to the domain. |
 | **Gate analyzers themselves** (`PRECEPT0027`/`PRECEPT0028`) | Meta-enforcement. These analyze emission patterns; they are not themselves governed by catalog dispatch. |
 
@@ -1095,7 +1130,7 @@ The following areas must retain direct `Diagnostics.Create(DiagnosticCode.X, ...
 
 ## 10. Open Questions for Shane
 
-1. **PRE0079 `OutOfRange` — compile-time or reclassify?** The catalog declares `DiagnosticStage.Type` (compile-time), but bounds checking against runtime values (`set X = Y` where `Y` could be anything) can't be done statically. Options: (a) wire only for constant assignments where the value is known at compile time, (b) reclassify as a proof obligation and move to ProofEngine, or (c) treat as runtime-only fault. Recommendation is (a) or (b); (c) means removing from the type-checker catalog entry. Direction needed before Slice 8 attempts to wire it.
+1. **PRE0079 `OutOfRange` — scope narrowed by interval engine.** The general case of "expression result exceeds field bounds" is now owned by the interval proof engine (Strategy 7 → `NumericOverflow`). PRE0079's remaining scope is the narrow *constant-assignment* case: `set field to 42` where `42` exceeds the field's declared `max 10`. This is a trivial TypeChecker check (compare literal value against declared bounds). Options: (a) wire PRE0079 for constant assignments only at type-check time (recommended — the literal value is known, no interval arithmetic needed), (b) let Strategy 7 subsume this case too (it would, since `IntervalOf(literal 42) = [42, 42]` exceeds `max 10`, but that emits `NumericOverflow` not `OutOfRange` — two codes for the same user-visible problem), or (c) deprecate PRE0079 entirely and let `NumericOverflow` cover both cases. **Recommendation:** (a) for the constant-literal case as a precision diagnostic ("this literal is out of range" is more helpful than "arithmetic may overflow"), plus document the boundary: PRE0079 fires on literal assignments, PRE0078 fires on expression results. Direction needed.
 
 2. **PRE0070–0074: Dynamic qualifier handling.** When a field has a dynamic qualifier like `money in '{CatalogCurrency}'`, the TypeChecker cannot statically compare currencies. Should the TypeChecker: (a) silently skip cross-currency checks for dynamic qualifiers and let the ProofEngine handle them via Strategy 5, or (b) emit the diagnostic at compile time with a message noting the dynamic qualifier and that the check is partial? The design assumes (a) — confirm before Slice 1 implementation.
 
@@ -1110,3 +1145,7 @@ The following areas must retain direct `Diagnostics.Create(DiagnosticCode.X, ...
 7. **Analyzer scan scope: Pipeline-only vs. all source.** The recommended initial scope covers `src/Precept/Pipeline/*.cs` + `Operations.cs` + `Functions.cs` (+ ProofEngine emission paths). If future emission patterns emerge outside these files (e.g., a new `RuntimeValidator` in `src/Precept/Runtime/`), the scan set needs manual updating. Should the analyzer scan all of `src/Precept/**/*.cs` minus known non-emission files instead, making it automatically inclusive? Broader scope means fewer false negatives but potentially more false positives from non-emission references. Direction before Slice 0 is finalized.
 
 8. **Doc-comment false positives.** The emission-site scan picks up `DiagnosticCode.X` in XML doc comments (`/// <see cref="DiagnosticCode.X"/>`). Currently rare — only one instance exists and `X` is not a real member name. If it becomes a pattern, the scan should strip `// ...` and `/** */` comments before matching. For now, does Shane want comment stripping from the start, or accept the current minimal risk?
+
+9. **Interval engine Slice 2 → Gate 1 allow-list coordination.** When interval engine Slice 2 ships and `NumericOverflow` becomes actively emitted, who removes PRE0078 from the Gate 1 allow-list — the interval engine PR itself, or a follow-up enforcement-plan PR? **Recommendation:** The interval engine PR removes it. The Gate 1 stale-entry check will flag it automatically once the emission site exists, so the interval engine PR will fail the analyzer gate unless it removes the entry. This is the correct forcing function — no separate coordination needed. Confirm this matches Shane's expectation for cross-plan allow-list management.
+
+10. **PRE0078 vs. PRE0079 deduplication risk.** With the interval engine emitting `NumericOverflow` (PRE0078) for expression-level bounds violations, and PRE0079 `OutOfRange` potentially covering constant-literal bounds violations (see Question 1), there is a narrow overlap: `set field to 42` where `42` exceeds `max 10` could theoretically trigger both PRE0079 (literal out of range) and PRE0078 (interval `[42, 42]` exceeds `[min, 10]`). Should the TypeChecker's PRE0079 check suppress the ProofEngine's PRE0078 on the same span (avoid double-diagnostic), or should PRE0079 be deprecated entirely in favor of letting Strategy 7 handle all bounds cases? Direction needed before PRE0079 is wired.

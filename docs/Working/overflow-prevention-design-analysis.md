@@ -1,33 +1,65 @@
 # Numeric Overflow Prevention Design Analysis
 
 **Author:** Frank (Analysis Agent)  
-**Status:** Design recommendation — interval arithmetic chosen as implementation path  
+**Status:** ⚠️ SUPERSEDED by implementation — see `interval-proof-engine-design.md`  
 **Scope:** Overflow prevention for `decimal`, `number`, and bounded `integer` types in Precept  
-**Date:** 2026-05-13
+**Date:** 2026-05-13 (original); 2026-05-13 (revised)
+
+---
+
+> **⚠️ Relationship to the Interval Proof Engine Design**
+>
+> This document was the exploratory analysis that led to the design decision. The **authoritative implementation specification** is now `docs/Working/interval-proof-engine-design.md` (Strategy 7: IntervalContainment). That document is approved and under active implementation.
+>
+> **What this document still owns:**
+> - Problem statement and rationale for why overflow prevention matters (§ Problem Statement)
+> - The strategy comparison matrix — why interval arithmetic won over 7 alternatives (§ Analysis: Eight Strategies)
+> - Historical context of the v1 implementation and its deletion (§ Historical Context)
+>
+> **What the interval proof engine design now owns (do not duplicate here):**
+> - Implementation architecture, file inventory, vertical slices
+> - Proof obligation mechanics (`IntervalContainmentProofRequirement`)
+> - Catalog-driven transfer functions (`BinaryOperationMeta.IntervalTransfer`)
+> - Guard-narrowing integration
+> - Hover display contract
+> - Test strategy and regression anchors
+> - Pipeline position (Strategy 7 in ProofEngine, not a separate phase)
+>
+> **Key decisions that invalidate claims in this document:**
+> 1. **No `@bounds` annotation syntax.** The interval engine reads bounds from existing `min`/`max` field modifiers. This document's references to `@bounds(min: X, max: Y)` are obsolete.
+> 2. **`integer` fields are exempt.** `TypeKind.Integer` = BigInteger — mathematically unbounded. No interval obligation is generated for integer targets. This document's "bounded integer" framing is incorrect.
+> 3. **No separate BoundsValidator phase.** The interval engine is Strategy 7 inside the existing ProofEngine pipeline, not a new phase between TypeChecker and GraphAnalyzer.
+> 4. **Hard error only — no runtime fallback for bounded fields.** Unresolved obligations emit `NumericOverflow` ERROR and block compilation. There is no "Option B" runtime check insertion for provable operations. Unbounded fields generate no obligation (gradual adoption), but bounded fields with unprovable expressions are hard errors.
+> 5. **No `NumericOverflowOnAssignment` diagnostic.** The existing `NumericOverflow` diagnostic is the sole emission code.
+> 6. **6 vertical slices, not 3 waves.** The phasing strategy in this document is obsolete.
 
 ---
 
 ## Executive Summary
 
-After comprehensive architectural analysis of Precept's numeric type system, this document presents eight viable overflow prevention strategies and recommends **interval arithmetic** as the path forward for compile-time bound guarantee and prevention of numeric overflow. This recommendation is conditional on pervasive annotation (`@bounds`), but mathematically sound and sufficient for Precept's financial domain focus.
+After comprehensive architectural analysis of Precept's numeric type system, this document presents eight viable overflow prevention strategies and recommends **interval arithmetic** as the path forward for compile-time bound guarantee and prevention of numeric overflow.
+
+**This recommendation was accepted and is now under implementation** as Strategy 7 (`IntervalContainment`) in the proof engine. See `interval-proof-engine-design.md` for the complete, approved design.
 
 ---
 
 ## Problem Statement
 
-Precept's numeric type system currently faces an overflow vulnerability:
+Precept's numeric type system faces an overflow vulnerability on bounded types:
 
-- **`integer`** = `System.Numerics.BigInteger` (unbounded, prevents arithmetic overflow)
-- **`decimal`** = fixed-point ~10^28 (bounded, overflow silently possible, runtime-faulted)
-- **`number`** = IEEE 754 (bounded, overflow silently possible, runtime-faulted)
+- **`integer`** = `System.Numerics.BigInteger` (unbounded — cannot overflow by type definition; **exempt from interval proof obligations**)
+- **`decimal`** = fixed-point ~10^28 (bounded, overflow possible, requires compile-time proof)
+- **`number`** = IEEE 754 (bounded, overflow possible, requires compile-time proof)
 
-### Critical Gaps
+### Critical Gaps (as identified in the original analysis)
 
-1. **Undocumented BigInteger design:** No rationale documented for why `integer` is unbounded when `decimal` and `number` are bounded.
-2. **Missing overflow proof:** The proof engine has six strategies (Literal, Declaration Attribute, Guard-in-Path, Flow-Narrowing, Qualifier Compatibility, Compositional Constraint), **none of which handle arithmetic result-range checking**. Arithmetic operations (+, −, ×) carry **zero ProofRequirements**.
-3. **Diagnostic gap:** `NumericOverflow` diagnostic exists, marked `[StaticallyPreventable]`, but has no corresponding proof strategy.
-4. **Type representable bounds not cataloged:** The bounds of each numeric type (e.g., decimal's ~10^28 limit) are not in the Operations or Type catalogs, making them unavailable to the proof engine.
-5. **Semantic confusion:** Field-bound violations (`OutOfRange`) and type-representable violations (`NumericOverflow`) are conflated; the system treats them as a single concern but they require different prevention strategies.
+> **Status:** Gaps 2 and 3 are now closed by Strategy 7 (`IntervalContainment`) in the proof engine. Gaps 4 and 5 are addressed by the interval engine's design (see `interval-proof-engine-design.md` § 4.4). Gap 1 remains a documentation follow-up.
+
+1. **Undocumented BigInteger design:** No rationale documented for why `integer` is unbounded when `decimal` and `number` are bounded. *(Still open — documentation gap, not a prevention gap.)*
+2. ~~**Missing overflow proof:**~~ **CLOSED.** Strategy 7 (`IntervalContainment`) now discharges `IntervalContainmentProofRequirement` obligations on bounded fields. See `interval-proof-engine-design.md` § 3.
+3. ~~**Diagnostic gap:**~~ **CLOSED.** `NumericOverflow` is now emitted by Strategy 7 when interval containment fails.
+4. ~~**Type representable bounds not cataloged:**~~ **ADDRESSED.** The interval engine uses author-declared `min`/`max` modifiers as the bound source. Type-representable limits serve as implicit bounds for the initial implementation (gradual adoption — see `interval-proof-engine-design.md` § 5.1).
+5. ~~**Semantic confusion:**~~ **CLARIFIED.** The interval engine handles both field-bound and type-representable overflow via the same containment check. See `interval-proof-engine-design.md` § 4.4 for the distinction.
 
 ### Historical Context
 
@@ -77,10 +109,12 @@ interval(expr) ⊆ [0, 10]  ?  ✓ PROVED  :  emit ERROR (or fallback to runtime
 
 ### Proof Mechanism
 
-1. **Constraint declaration:** User annotates fields with bounds:
+> **⚠️ OBSOLETE SYNTAX.** The `@bounds` annotation shown below was the analysis-phase proposal. The approved design uses **existing `min`/`max` field modifiers** — no new annotation syntax. See `interval-proof-engine-design.md` § 4.1 for the canonical bound extraction logic.
+
+1. **Constraint declaration:** User declares bounds with existing modifiers:
    ```precept
-   field balance: decimal @bounds(min: 0m, max: 999999999.99m)
-   field amount: decimal @bounds(min: 0m, max: 50000m)
+   field balance: decimal min 0 max 999999999.99
+   field amount: decimal min 0 max 50000
    ```
 
 2. **Interval extraction:** Type checker extracts declared bounds and creates intervals:
@@ -119,9 +153,9 @@ interval(expr) ⊆ [0, 10]  ?  ✓ PROVED  :  emit ERROR (or fallback to runtime
 
 - **Conditional but sound:** Overflow is mathematically guaranteed NOT to occur if all operands have declared bounds.
 - **Custom solver sufficient:** Financial arithmetic is mostly linear (±, ×) and straightforward rounding. No SMT solver needed.
-- **Annotation burden is acceptable:** Precept fields *already require* `max` constraints in most cases. Adding an explicit `@bounds` annotation is one extra line per field.
-- **Two-layer defense:** Compile-time proof + runtime checks for edge cases that can't be proved.
-- **Gradual adoption:** Fields without `@bounds` fall back to runtime checks; system remains safe.
+- **No annotation burden:** The approved design uses existing `min`/`max` modifiers — fields that already declare bounds get interval proofs at zero additional annotation cost.
+- **Two-layer defense:** Compile-time proof for bounded fields + runtime `NumericOverflow` fault for unbounded fields (gradual adoption).
+- **Gradual adoption:** Fields without declared bounds generate no interval obligation; the system remains safe via runtime fallback.
 
 ---
 
@@ -138,12 +172,12 @@ If operands are unconstrained, unconstrained results expose the full representab
 
 ### Runtime Fallback
 
-Unprovable operations don't fail at compile time (with careful configuration):
+> **⚠️ DECISION MADE.** The approved design chose **Option A (Hard error)** exclusively. There is no Option B runtime fallback path for bounded fields. See `interval-proof-engine-design.md` § 5.1 for the gradual adoption model (unbounded fields generate no obligation; bounded fields with unprovable expressions are hard compile errors).
 
-1. **Option A (Hard error):** Proof fails → emit ERROR diagnostic → block compilation. User must add guards or constraints.
-2. **Option B (Runtime check):** Proof fails → emit WARN diagnostic → insert runtime checked arithmetic → continue compilation. At runtime, if overflow occurs, the evaluator raises `NumericOverflow` fault.
+~~Unprovable operations don't fail at compile time (with careful configuration):~~
 
-**Recommendation: Use Option A initially** (hard error) to enforce sound constraints. Relax to Option B only after the system has proven sound and users demand more flexibility.
+1. **Option A (Hard error) ← CHOSEN:** Proof fails → emit ERROR diagnostic → block compilation. User must add guards or constraints.
+2. ~~**Option B (Runtime check):**~~ **NOT ADOPTED.** Rejected because it violates the prevention guarantee for bounded fields. Authors who declare bounds are making a structural safety claim — the compiler must enforce it.
 
 ### Interval Arithmetic Can Solve Overflow
 
@@ -195,7 +229,18 @@ Saturation (overflow → type bounds, e.g., overflow to `decimal.MaxValue`) sile
 
 ---
 
-## Implementation Architecture: 3-Tier Approach
+## ~~Implementation Architecture: 3-Tier Approach~~ — SUPERSEDED
+
+> **⚠️ This entire section is obsolete.** The approved implementation architecture is documented in `interval-proof-engine-design.md` § 8 (Implementation Plan). Key differences from what was proposed here:
+>
+> - **No `@bounds` annotation.** Bounds come from existing `min`/`max` field modifiers.
+> - **No separate BoundsValidator phase.** Strategy 7 runs inside the existing ProofEngine pipeline.
+> - **No `NumericOverflowOnAssignment` diagnostic.** The single `NumericOverflow` diagnostic code handles all cases.
+> - **No Wave 1 "bounded integer" tier.** `integer` is BigInteger (unbounded) — exempt from interval obligations entirely.
+> - **6 vertical slices** (Catalog Foundation → Obligation Collection → Guard Narrowing → Function Intervals → Hover → MCP Sync) replace the 3-wave timeline.
+> - **Transfer functions are catalog-driven** (`BinaryOperationMeta.IntervalTransfer` delegates), not hardcoded in the solver.
+>
+> The content below is preserved for historical reference only.
 
 ### Tier 1 — Minimal Working Implementation (Weeks 1–2)
 
@@ -299,7 +344,17 @@ Saturation (overflow → type bounds, e.g., overflow to `decimal.MaxValue`) sile
 
 ---
 
-## Integration Points
+## ~~Integration Points~~ — SUPERSEDED
+
+> **⚠️ This section is obsolete.** The correct integration architecture is:
+>
+> - **Pipeline position:** `Lexer → Parser → TypeChecker → GraphAnalyzer → ProofEngine (Strategy 7 here) → Compiler output`. There is no separate BoundsValidator phase.
+> - **Operations catalog:** `BinaryOperationMeta.IntervalTransfer` delegate (see `interval-proof-engine-design.md` § 3.3).
+> - **Diagnostics:** The single existing `NumericOverflow` code is emitted. No new `NumericOverflowOnAssignment` code.
+> - **Language server:** Hover extends existing proof-expression cards with interval sub-lines (see `interval-proof-engine-design.md` § 6).
+> - **Runtime:** No runtime fallback insertion for bounded fields. Unbounded fields retain the existing `NumericOverflow` fault path.
+>
+> The content below is preserved for historical reference only.
 
 ### 1. Type Checker
 
@@ -360,7 +415,22 @@ decimal result = checked(a + b);  // throws OverflowException if overflow occurs
 
 ---
 
-## Phasing Strategy: 3-Wave Timeline
+## ~~Phasing Strategy: 3-Wave Timeline~~ — SUPERSEDED
+
+> **⚠️ This section is obsolete.** The approved phasing is 6 vertical slices documented in `interval-proof-engine-design.md` § 8.2:
+>
+> | Slice | Objective |
+> |-------|-----------|
+> | 1 | Catalog Foundation + `NumericInterval` struct |
+> | 2 | Obligation Collection + Strategy 7 Wiring (decimal) |
+> | 3 | Guard-Narrowing Integration |
+> | 4 | `number` Type + Unary Negation + Function Intervals |
+> | 5 | Hover Expression Display + Diagnostic Squiggle |
+> | 6 | MCP Sync Assessment + Tooling Propagation |
+>
+> The "Wave 1: bounded integer" concept is invalid — `integer` is BigInteger and exempt.
+>
+> The content below is preserved for historical reference only.
 
 ### Wave 1: Bounded `integer` (Weeks 1–2)
 
@@ -396,6 +466,8 @@ decimal result = checked(a + b);  // throws OverflowException if overflow occurs
 ---
 
 ## Concrete Example: LineItem with Bounds
+
+> **⚠️ OBSOLETE SYNTAX.** The example below uses `@bounds` annotation which was never implemented. The correct syntax uses existing `min`/`max` modifiers. See `interval-proof-engine-design.md` § 6 for canonical examples using correct syntax (e.g., `field itemPrice: decimal min 0 max 100000`).
 
 ```precept
 precept LineItem
@@ -433,31 +505,27 @@ precept LineItem
 
 ## Critical Design Decisions
 
-1. **Annotation burden is acceptable:** Precept fields typically need bounds anyway (`max 10`, etc.). `@bounds` is additive, not disruptive.
+> **Note:** These were the analysis-phase recommendations. The approved decisions are documented in `interval-proof-engine-design.md`. Key corrections:
 
-2. **Hard error on unprovable operations (initially):** Proof failure → ERROR diagnostic → blocks compilation. This enforces sound constraints. After the system is proven sound, relax to runtime checks.
+1. ~~**Annotation burden is acceptable:**~~ **Eliminated.** The approved design uses existing `min`/`max` modifiers — no new `@bounds` annotation. Zero additional annotation cost for fields that already declare bounds.
 
-3. **No SMT solver in MVP:** Custom interval solver is sufficient for financial arithmetic. Z3 can be added as an optional feature later.
+2. **Hard error on unprovable operations:** ✅ Confirmed as approved. Proof failure → ERROR diagnostic → blocks compilation. No runtime fallback path for bounded fields.
 
-4. **Interval arithmetic handles arithmetic overflow only:** Field-bound violations (`OutOfRange`) are handled separately by existing proof engine. Don't conflate.
+3. **No SMT solver:** ✅ Confirmed. Custom interval solver is sufficient for financial arithmetic.
 
-5. **Unconstrained operands are unsafe:** If an operand has no `@bounds`, its interval is unbounded (decimal.MinValue to decimal.MaxValue). Operations on unbounded values produce unbounded results → proof fails. This is correct behavior; it forces users to declare bounds.
+4. ~~**Interval arithmetic handles arithmetic overflow only:**~~ **Corrected.** The interval engine handles BOTH field-bound overflow and type-representable overflow via the same containment check (see `interval-proof-engine-design.md` § 4.4). `OutOfRange` remains a separate concern for non-arithmetic bound violations.
+
+5. **Unconstrained operands are unsafe:** ✅ Confirmed. Unbounded operands propagate unbounded intervals → proof fails for bounded targets. Unbounded targets generate no obligation (gradual adoption).
 
 ---
 
 ## Fallback Strategies (If Constraints Arise)
 
-### If Annotation Burden Proves Unacceptable
+> **Note:** These remain valid future-work considerations. The interval proof engine design addresses the first fallback (annotation burden) by eliminating it entirely.
 
-**Option 1: Qualified types**
-- Add `NonOverflow<T>` nominal type for "proven-safe" values
-- Allows mixing safe and unsafe values gracefully
-- Can coexist with interval arithmetic
+### ~~If Annotation Burden Proves Unacceptable~~ — RESOLVED
 
-**Option 2: Inferred bounds from invariants**
-- If field `x` appears only in transition guards like `require x < 100`, infer `x ∈ [0, 100)`
-- Reduces need for explicit `@bounds`
-- Complexity: guard analysis is expensive; only for high-value cases
+The approved design uses existing `min`/`max` modifiers — no new annotation required. This concern is fully eliminated.
 
 ### If Performance Issues Arise
 
@@ -482,7 +550,9 @@ precept LineItem
 
 ---
 
-## Documentation Updates Required
+## ~~Documentation Updates Required~~ — SUPERSEDED
+
+> **⚠️ This section is obsolete.** Documentation requirements are now tracked in `interval-proof-engine-design.md` § 8.5 (Breaking Change Assessment) and the implementation tracker. The key documentation obligation: **release notes must clearly document that existing precepts with bounded fields may receive new `NumericOverflow` errors after implementation.**
 
 1. **`docs/language/primitive-types.md`**
    - Document BigInteger design choice and rationale
@@ -509,31 +579,35 @@ precept LineItem
 
 ## Success Metrics
 
-1. **Compilation gates overflow:** No `decimal` field can exceed its declared bounds at compile time (or with explicit fallback to runtime check).
+> **Note:** Revised to align with the approved implementation.
 
-2. **Constraint coverage:** 100% of financial operations in sample domain have explicit `@bounds` declarations.
+1. **Compilation gates overflow for bounded fields:** No `decimal`/`number` field with declared `min`/`max` bounds can have an unproven arithmetic assignment.
 
-3. **No silent overflow:** If overflow occurs (field assigned value exceeding bounds), the system either proves it impossible or fails loudly (ERROR diagnostic or runtime `NumericOverflow` fault).
+2. ~~**Constraint coverage:**~~ **Removed.** Gradual adoption means unbounded fields are not forced to add bounds. Coverage is opt-in via `min`/`max` modifiers.
 
-4. **Performance acceptable:** Interval arithmetic adds <5% to type-checking time (for typical precepts with ~20 fields).
+3. **No silent overflow on bounded fields:** If a bounded field is assigned an expression whose interval exceeds the declared bounds, the compiler emits `NumericOverflow` ERROR. No silent failures.
 
-5. **User experience:** New `@bounds` annotation feels natural and is documented clearly; no confusion with existing `max` constraints.
+4. **Performance acceptable:** Interval arithmetic adds <5% to proof-engine time (for typical precepts with ~20 fields). Interval computation is O(n) in expression depth.
+
+5. ~~**User experience:**~~ **Simplified.** No new `@bounds` annotation to learn. Existing `min`/`max` modifiers are the bound source. Hover display shows interval proof status using existing badge vocabulary.
 
 ---
 
 ## Conclusion
 
-**Interval arithmetic is the right choice for Precept's numeric overflow problem.** It combines:
+**Interval arithmetic was chosen and is now under implementation as Strategy 7 (`IntervalContainment`) in the proof engine.**
 
-- **Soundness:** Mathematically proven (v1 runtime reference implementation, 255 tests)
-- **Tractability:** Custom solver sufficient for financial domain
-- **Gradualism:** Unconstrained fields fall back to runtime checks; adoption can be phased
-- **Domain fit:** Financial operations are mostly linear; annotation burden aligns with existing practices
+The analysis in this document led to the correct recommendation. The approved implementation (see `interval-proof-engine-design.md`) improves on this analysis in several ways:
 
-The 6-week phasing strategy (Wave 1: integer, Wave 2: decimal, Wave 3: computed bounds) reduces risk and allows early feedback from financial domain experts.
+- **Zero annotation burden** — uses existing `min`/`max` modifiers, not a new `@bounds` syntax
+- **Catalog-driven architecture** — transfer functions declared in `BinaryOperationMeta.IntervalTransfer`, not hardcoded
+- **Integrated into existing pipeline** — Strategy 7 inside ProofEngine, not a separate validation phase
+- **Sound and conservative** — no false positives; false negatives addressed incrementally via guard narrowing (Slice 3)
+- **Honest gradual adoption** — unbounded fields get no obligation (runtime fallback remains); bounded fields get full compile-time proof
 
-**Next steps:**
-1. Design review and owner sign-off
-2. Create GitHub issues per wave
-3. Implement Wave 1 (bounded `integer`)
-4. Collect feedback and adjust as needed
+**This document is now a historical artifact.** For the authoritative design, implementation plan, and test strategy, see `interval-proof-engine-design.md`.
+
+**What remains unaddressed by either document:**
+1. **BigInteger rationale documentation** — why `integer` is unbounded needs a durable rationale in `docs/language/primitive-types.md` (low priority, documentation gap only)
+2. **Definition-level `require-bounds` pragma** — future mechanism to force interval obligations on all numeric fields in a definition (mentioned in `interval-proof-engine-design.md` § 5.1 as future work)
+3. **Cross-field bounds (constraint equations)** — e.g., `max: {sum of line items}` — deferred beyond the current 6-slice scope
