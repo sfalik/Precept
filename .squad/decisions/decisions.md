@@ -21725,3 +21725,38 @@ The "9" prefix ties these slices to § 9 (Long-Term Evolution) where the expansi
 **By:** shane (via Copilot)
 **What:** Treat the expansion work as current in-scope execution now, not long-term evolution.
 **Why:** User request — captured for team memory
+
+
+# Decision: Quantity Normalization Design — Cross-Phase Unit-Aware Comparison
+
+**Author:** Frank
+**Date:** 2026-05-14T01:12:08-04:00
+**Status:** Pending Shane review
+
+## Decision
+
+Designed the architecture for fixing false-positive `NumericOverflow` diagnostics on cross-unit quantity comparisons (e.g., `set x = '6 [lb_av]'` against `max '5 kg'`). The bug is in two compile-time pipeline stages: `TypeChecker.Validation.Modifiers.cs` (`TryExtractTypedConstantMagnitude`) and `ProofEngine.Composition.cs` (`TryGetTypedConstantMagnitude`), both of which extract raw `.Item1` magnitude from typed-constant tuples and discard the `UcumParsedUnit` scale factor.
+
+## Key Architectural Decisions
+
+1. **Shared normalizer utility** at `src/Precept/Language/Numeric/TypedConstantNormalizer.cs` — single normalization implementation consumed by both pipeline stages.
+2. **No TypeMeta.NumericNormalization DU** — prior proposal's DU is unnecessary; the tuple shape already carries all normalization information. Flagged as a discrepancy with the earlier session's proposal.
+3. **NormalizedNumericValue is compile-time only** — does not flow into PreceptValue slots. Runtime normalization is a Phase 3 (D8/R4) concern.
+4. **Money excluded from normalization** — currencies are type errors, not conversion opportunities. This is non-negotiable.
+5. **UCUM infrastructure is complete** — `UcumExactFactor` and `UcumParsedUnit.Scale` already provide exact rational scale factors. No new scale table needed.
+
+## Open Questions for Shane
+
+- Q1: Diagnostic display format (original vs. normalized magnitudes)
+- Q2: Whether DeclaredMin/Max on TypedField stores original or normalized values (recommendation: original, normalize at proof time)
+- Q3: Scope — compile-time fix only or include Builder/runtime design
+- Q4: Normalizer namespace (`Language/Numeric/` vs `Language/Ucum/`)
+
+## Design Document
+
+`docs/Working/quantity-normalization-design.md`
+
+## Implementation Slices
+
+Slices 14–18 continuing from the interval-proof-engine-design tracker.
+

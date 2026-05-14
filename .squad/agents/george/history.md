@@ -221,3 +221,11 @@
 
 - Commit `d9edee97` added the three D94 follow-up tests covering omitted-initial-state fields, multiple initial states, and the documented stateless-initial-event bailout.
 - `Diagnostics.cs` now states D94 in terms of construction paths from initial-state rows, and both targeted plus full `test\Precept.Tests\Precept.Tests.csproj` runs closed green.
+
+## Recent Updates
+
+### 2026-05-14T05:12:08Z — Quantity normalization design is ready for implementation follow-on
+
+- Frank's new design in `docs/Working/quantity-normalization-design.md` defines slices 14–18 for the cross-unit bound-comparison bug where typed constants currently compare raw magnitudes instead of normalized UCUM-scaled values.
+- Implementation guidance: add one shared helper at `src/Precept/Language/Numeric/TypedConstantNormalizer.cs` and use it from `TypeChecker.Validation.Modifiers.cs:TryExtractTypedConstantMagnitude` plus `ProofEngine.Composition.cs:TryGetTypedConstantMagnitude`.
+- Guardrails: keep this batch compile-time-only, do not widen `PreceptValue` or runtime evaluator surfaces yet, and treat money as a type-error path rather than a normalization/conversion path.
