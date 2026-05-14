@@ -40,6 +40,13 @@
 
 ## Recent Updates
 
+### 2026-05-14T05:30:09Z — Interpolated quantity analysis batch recorded
+
+- Pre-check measured `.squad/decisions.md` at 73250 bytes with 2 inbox file(s); the hard-gate 7-day archive pass moved 0 older decision entry(s) before the inbox merge.
+- Merged Frank's interpolated-quantity analysis plus the follow-up MCP compile correction into one canonical decision, deleted the processed inbox files, and wrote the Frank orchestration record plus the brief interpolated-quantity session log.
+- Durable outcome: the interpolated `TypedInterpolatedTypedConstant` overflow path is independent of the static-literal normalization fix, while `precept_compile` remains a full-pipeline surface that includes proof diagnostics.
+
+
 
 
 ### 2026-05-10T15:34:08Z — Slice 2E record sync complete

@@ -6,6 +6,21 @@
 
 ---
 
+### 2026-05-14T05:30:09Z: Interpolated quantity normalization splits static-literal and interpolated paths, and `precept_compile` still runs proof diagnostics
+
+**By:** Scribe
+
+**Status:** Merged, reconciled, inbox cleared (2 files -> 1 canonical entry).
+
+**Merged sources:** `frank-interpolated-quantity-analysis.md`, `frank-mcp-compile-correction.md`.
+
+- Frank confirmed the live `NumericOverflow` sample in `samples/Test.precept` is the interpolated expression `'{test2} [lb_av]'`, which resolves to `TypedInterpolatedTypedConstant`, not the static-literal `TypedTypedConstant` path targeted by the existing normalization slices.
+- The false positive comes from two independent proof gaps: Strategy 7 treats `TypedInterpolatedTypedConstant` as unbounded because `IntervalOfNarrowed` has no interpolated case, and Strategy 6 cannot discharge `DeclarationValue`-sourced bounds in `SatisfactionCovers`.
+- The static-literal normalization fix remains valid but separate; interpolated quantities now carry their own Slices 19–21 track, including static-unit capture on `TypedInterpolatedTypedConstant` and UCUM-based scaling of slot-derived intervals.
+- Frank also corrected the design note's tooling claim: MCP `precept_compile` runs the full compiler pipeline including the ProofEngine, so the earlier 0-diagnostic observation was a case-specific behavior note rather than evidence that proof diagnostics were absent from the tool.
+
+---
+
 ### 2026-05-14T04:43:00Z: Final review corrected PRE0094 inventory drift and annotated PRE0019 retirement in diagnostic enforcement
 
 **By:** Scribe
@@ -1314,4 +1329,3 @@
 - Validation landed with 19 new ProofEngine tests and 193/193 proof tests passing.
 
 ---
-
