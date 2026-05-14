@@ -10,6 +10,19 @@ internal static partial class TypeChecker
     /// </summary>
     private static void ValidateStructural(CheckContext ctx)
     {
+        // ── PRE0092 — EventHandlerInStatefulPrecept ─────────────────────────
+        // Event handlers are the stateless-precept equivalent of transition rows.
+        // Using them in a stateful precept creates ambiguous execution semantics.
+        // TODO(allow-list): remove PRE0092 after Slice 0 ships
+        if (ctx.States.Count > 0 && ctx.EventHandlers.Count > 0)
+        {
+            foreach (var handler in ctx.EventHandlers)
+            {
+                ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.EventHandlerInStatefulPrecept,
+                    handler.Syntax.Span, handler.EventName));
+            }
+        }
+
         // ── Computed field cycle detection (DFS) ──────────────────────────
         // Build adjacency list from ComputedDeps: fieldName → set of dependent field names.
         // O(n) construction, O(n) DFS traversal.

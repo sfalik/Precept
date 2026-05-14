@@ -338,4 +338,64 @@ public class TypeCheckerStructuralTests
             .Where(d => d.Code == nameof(DiagnosticCode.DefaultForwardReference))
             .Should().BeEmpty("no fields means no forward references");
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  Category: PRE0092 — EventHandlerInStatefulPrecept
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void EventHandler_InStatefulPrecept_EmitsEventHandlerInStatefulPrecept()
+    {
+        var precept = """
+            precept Widget
+            field Name as string
+            state Draft initial
+            state Done
+            event Rename
+            on Rename -> set Name = Rename.Name
+            from Draft on Rename -> transition Done
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.EventHandlerInStatefulPrecept);
+    }
+
+    [Fact]
+    public void EventHandler_InStatelessPrecept_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Name as string
+            event Rename
+            on Rename -> set Name = Rename.Name
+            """;
+
+        var (index, diagnostics) = TypeCheckerTestHelpers.Check(precept);
+
+        diagnostics
+            .Where(d => d.Code == nameof(DiagnosticCode.EventHandlerInStatefulPrecept))
+            .Should().BeEmpty("event handlers are valid in stateless precepts");
+    }
+
+    [Fact]
+    public void EventHandler_MultipleHandlers_InStatefulPrecept_EmitsForEach()
+    {
+        var precept = """
+            precept Widget
+            field Name as string
+            field Count as number
+            state Draft initial
+            state Done
+            event Rename
+            event Increment
+            on Rename -> set Name = Rename.Name
+            on Increment -> set Count = Count + 1
+            from Draft on Rename -> transition Done
+            """;
+
+        var (index, diagnostics) = TypeCheckerTestHelpers.Check(precept);
+
+        diagnostics
+            .Where(d => d.Code == nameof(DiagnosticCode.EventHandlerInStatefulPrecept))
+            .Should().HaveCount(2, "each event handler in a stateful precept should emit PRE0092");
+    }
 }

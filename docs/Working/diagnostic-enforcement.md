@@ -605,9 +605,9 @@ Test method names:
 
 **Files:** `src/Precept/Pipeline/TypeChecker.Validation.cs` (modify), `test/Precept.Tests/TypeChecker/TypeCheckerStructuralTests.cs` (modify)
 
-- [ ] Add PRE0092 check in `ValidateStructural`
-- [ ] Tests: 3 tests
-- [ ] Remove `EventHandlerInStatefulPrecept` from Gate 1 allow-list
+- [x] Add PRE0092 check in `ValidateStructural`
+- [x] Tests: 3 tests
+- [ ] Remove `EventHandlerInStatefulPrecept` from Gate 1 allow-list (allow-list file does not exist yet; TODO comment added at emission site)
 
 ---
 
