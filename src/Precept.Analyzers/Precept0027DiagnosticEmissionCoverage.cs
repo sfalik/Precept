@@ -21,7 +21,8 @@ public sealed class Precept0027DiagnosticEmissionCoverage : DiagnosticAnalyzer
         description:
             "Every DiagnosticCode member must have at least one emission site in the pipeline " +
             "(Diagnostics.Create, CIDiagnosticCode assignment, or ProofEngine dispatch), " +
-            "or be listed in the Gate 1 allow-list with a tracking comment.");
+            "or be listed in the Gate 1 allow-list with a tracking comment.",
+        customTags: WellKnownDiagnosticTags.CompilationEnd);
 
     private static readonly DiagnosticDescriptor StaleAllowListRule = new(
         DiagnosticId_StaleAllowList,
@@ -33,7 +34,8 @@ public sealed class Precept0027DiagnosticEmissionCoverage : DiagnosticAnalyzer
         description:
             "A Gate 1 allow-list entry has become stale because the code now has an emission " +
             "site. This typically means a gap-closure slice shipped but forgot to remove " +
-            "the allow-list entry.");
+            "the allow-list entry.",
+        customTags: WellKnownDiagnosticTags.CompilationEnd);
 
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
         ImmutableArray.Create(MissingEmissionRule, StaleAllowListRule);
