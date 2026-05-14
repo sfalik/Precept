@@ -41,8 +41,8 @@ from New on Triage
     -> no transition
 from New, WaitingOnCustomer on Assign when AgentQueue.count > 0
     -> set LastQueuedAgent = AgentQueue.peek
+    -> set AssignedAgent = AgentQueue.peek
     -> dequeue AgentQueue
-    -> set AssignedAgent = LastQueuedAgent
     -> transition Assigned
 from New, WaitingOnCustomer on Assign
     -> reject "No support agent is currently available"

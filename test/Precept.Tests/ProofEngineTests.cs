@@ -958,10 +958,15 @@ public class ProofEngineTests
                             MakeSetAction("Length", TypeKind.Integer, optionalLength)))),
                 StateGraph.Empty);
 
-            var obligation = ledger.Obligations.Single(o => o.Requirement is PresenceProofRequirement);
-
-            obligation.Disposition.Should().Be(ProofDisposition.Proved);
-            obligation.Strategy.Should().Be(ProofStrategy.GuardInPath);
+            var presenceObligations = ledger.Obligations.Where(o => o.Requirement is PresenceProofRequirement).ToList();
+            presenceObligations.Should().NotBeEmpty("presence obligations must be generated for optional field refs");
+            presenceObligations.Should().AllSatisfy(o =>
+            {
+                o.Disposition.Should().Be(ProofDisposition.Proved,
+                    "guarded optional field ref presence obligations must be discharged");
+                o.Strategy.Should().Be(ProofStrategy.GuardInPath,
+                    "guard-in-path strategy must discharge the presence obligation");
+            });
         }
 
         [Fact]
@@ -986,14 +991,19 @@ public class ProofEngineTests
                             MakeSetAction("Length", TypeKind.Integer, optionalLength)))),
                 StateGraph.Empty);
 
-            var obligation = ledger.Obligations.Single(o => o.Requirement is PresenceProofRequirement);
+            var presenceObligations = ledger.Obligations.Where(o => o.Requirement is PresenceProofRequirement).ToList();
+            presenceObligations.Should().NotBeEmpty("presence obligations must be generated for optional field refs");
+            presenceObligations.Should().AllSatisfy(o =>
+            {
+                o.Disposition.Should().Be(ProofDisposition.Unresolved,
+                    "unguarded optional field ref presence obligations must remain unresolved");
+                o.Strategy.Should().BeNull("no strategy should be applied to unresolved obligations");
+            });
 
-            obligation.Disposition.Should().Be(ProofDisposition.Unresolved);
-            obligation.Strategy.Should().BeNull();
-
-            var diagnostic = ledger.Diagnostics.Single(d =>
-                d.Code == nameof(DiagnosticCode.UnprovedPresenceRequirement));
-            diagnostic.Message.Should().Be("Cannot prove that 'OptionalText' is present (used on event 'Submit' from state 'Draft') — guard with 'when OptionalText is set', initialize it earlier, or make it required");
+            ledger.Diagnostics.Where(d => d.Code == nameof(DiagnosticCode.UnprovedPresenceRequirement))
+                .Should().NotBeEmpty("PRE0116 must be emitted for unresolved presence obligations")
+                .And.AllSatisfy(d => d.Message.Should().Be(
+                    "Cannot prove that 'OptionalText' is present (used on event 'Submit' from state 'Draft') — guard with 'when OptionalText is set', initialize it earlier, or make it required"));
         }
 
         [Fact]
@@ -1061,8 +1071,10 @@ public class ProofEngineTests
                 StateGraph.Empty);
 
             guard.Should().BeOfType<TypedPostfixOp>();
-            ledger.Obligations.Single(o => o.Requirement is PresenceProofRequirement).Strategy
-                .Should().Be(ProofStrategy.GuardInPath);
+            ledger.Obligations.Where(o => o.Requirement is PresenceProofRequirement)
+                .Should().NotBeEmpty("presence obligations must be generated for optional field refs")
+                .And.AllSatisfy(o => o.Strategy.Should().Be(ProofStrategy.GuardInPath,
+                    "all presence obligations should be discharged via guard-in-path"));
         }
 
         [Fact]
@@ -1087,10 +1099,15 @@ public class ProofEngineTests
                     stateHooks: ImmutableArray.Create(hook)),
                 StateGraph.Empty);
 
-            var obligation = ledger.Obligations.Single(o => o.Context is StateHookContext);
-
-            obligation.Disposition.Should().Be(ProofDisposition.Proved);
-            obligation.Strategy.Should().Be(ProofStrategy.GuardInPath);
+            var stateHookObligations = ledger.Obligations.Where(o => o.Context is StateHookContext).ToList();
+            stateHookObligations.Should().NotBeEmpty("obligations in StateHookContext must be generated");
+            stateHookObligations.Should().AllSatisfy(o =>
+            {
+                o.Disposition.Should().Be(ProofDisposition.Proved,
+                    "guarded state-hook presence obligations must be discharged");
+                o.Strategy.Should().Be(ProofStrategy.GuardInPath,
+                    "state-hook obligations must be discharged via guard-in-path");
+            });
         }
     }
 

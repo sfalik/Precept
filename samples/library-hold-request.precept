@@ -21,7 +21,7 @@ in HoldReady ensure ReadyPatron is set because "A ready hold must name the patro
 in HoldReady ensure PickupCode is set because "A ready hold must have a pickup code"
 
 # Entering HoldReady sets the temporary pickup details for the promoted patron.
-to HoldReady -> set ReadyPatron = PromotedPatron -> set PickupCode = "READY" -> set PickupExpiryDay = CurrentDay + 3
+to HoldReady when PromotedPatron is set -> set ReadyPatron = PromotedPatron -> set PickupCode = "READY" -> set PickupExpiryDay = CurrentDay + 3
 
 # Leaving HoldReady clears the temporary handoff fields.
 from HoldReady -> clear PromotedPatron -> clear ReadyPatron -> clear PickupCode
@@ -85,8 +85,8 @@ from HoldReady on AdvanceDay when AdvanceDay.DayNumber > CurrentDay and AdvanceD
     -> no transition
 from HoldReady on AdvanceDay when AdvanceDay.DayNumber > CurrentDay and HoldQueue.count > 0
     -> set CurrentDay = AdvanceDay.DayNumber
+    -> set ReadyPatron = HoldQueue.peek
     -> dequeue HoldQueue into PromotedPatron
-    -> set ReadyPatron = PromotedPatron
     -> set PickupCode = "READY"
     -> set PickupExpiryDay = AdvanceDay.DayNumber + 3
     -> no transition

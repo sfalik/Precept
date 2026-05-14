@@ -6,8 +6,8 @@ precept ApartmentRentalApplication
 # Applicant fills in the form in Draft state before submitting.
 
 field ApplicantName as string optional
-field MonthlyIncome as money in 'USD' optional
-field RequestedRent as money in 'USD' optional
+field MonthlyIncome as money in 'USD' default '0.00 USD'
+field RequestedRent as money in 'USD' default '0.00 USD'
 field CreditScore as integer default 0 nonnegative
 field HouseholdSize as integer default 1 positive
 field ReviewerNote as string optional

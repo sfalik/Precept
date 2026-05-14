@@ -20,7 +20,7 @@ public enum FaultCode
     [StaticallyPreventable(DiagnosticCode.UndeclaredField)]
     UndeclaredField            =  4,
 
-    [StaticallyPreventable(DiagnosticCode.NullInNonNullableContext)]
+    [StaticallyPreventable(DiagnosticCode.UnprovedPresenceRequirement)]
     UnexpectedNull             =  5,
 
     [StaticallyPreventable(DiagnosticCode.InvalidMemberAccess)]

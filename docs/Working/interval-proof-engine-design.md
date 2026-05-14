@@ -23,7 +23,7 @@
 | **9** | Typed-Constant Bound Extraction | George | ✅ Done | `dotnet test test/Precept.Tests/Precept.Tests.csproj --filter "FullyQualifiedName~ProofEngineIntervalIntegrationTests\|FullyQualifiedName~Track2PhaseAModifierValidationTests\|FullyQualifiedName~TypeCheckerModifierTests"` (101/101) | Typed-constant min/max extraction now populates declared bounds for money/quantity/price and persists bound qualifier metadata for Slice 10 follow-up checks. |
 | **10** | Qualifier Compatibility Checks | George | ✅ Done | `dotnet test test/Precept.Tests/Precept.Tests.csproj --filter "FullyQualifiedName~TypeCheckerQualifierCompatibilityTests\|FullyQualifiedName~TypeCheckerModifierTests"` (11+17 pass); `dotnet test test/Precept.Tests/Precept.Tests.csproj` (5280/5280) | Added `BoundsQualifierMismatch` (PRE0134) diagnostic; per-bound qualifier compatibility check in `ValidateBoundQualifierCompatibility` enforces qualifier match when both field and typed-constant bound carry qualifiers; also enforces `BoundsRequireQualifier` when qualified field has a plain numeric bound. |
 | **11** | String/Collection Constraint Obligations | George | ✅ Done | `dotnet test --filter ProofEngineStringCollectionBoundTests` (19 tests) | Slice 7; conservative literal-only strategy for string bounds |
-| **12** | Presence Obligation Generation | George | ⏳ Pending | — | Depends on Slice 7; parallel with Slices 8–11 |
+| **12** | Presence Obligation Generation | George | ✅ Done | `dotnet test test/Precept.Tests/Precept.Tests.csproj --filter "FullyQualifiedName~ProofEnginePresenceTests"` (13/13) | Depends on Slice 7; parallel with Slices 8–11 |
 | **13** | Type-Family Coverage Regression Suite | Soup Nazi | ⏳ Pending | — | Depends on Slices 8–12 |
 
 **Initiated:** 2026-05-13T19:19:55Z

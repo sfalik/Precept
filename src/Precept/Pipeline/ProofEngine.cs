@@ -188,7 +188,7 @@ public static partial class ProofEngine
         for (int i = 0; i < semantics.Rules.Length; i++)
         {
             var ctx = new ConstraintContext(new RuleIdentity(i));
-            WalkExpression(semantics.Rules[i].Condition, ctx, obligations);
+            WalkExpression(semantics.Rules[i].Condition, ctx, obligations, semantics);
         }
 
         // Ensures[].Condition
@@ -196,7 +196,7 @@ public static partial class ProofEngine
         {
             var ensure = semantics.Ensures[i];
             var ctx = new ConstraintContext(new EnsureIdentity(ensure.Kind, ensure.AnchorState ?? ensure.AnchorEvent, i));
-            WalkExpression(ensure.Condition, ctx, obligations);
+            WalkExpression(ensure.Condition, ctx, obligations, semantics);
         }
 
         // Fields[].ComputedExpression
@@ -205,67 +205,88 @@ public static partial class ProofEngine
             if (field.ComputedExpression is not null)
             {
                 var ctx = new FieldExpressionContext(field);
-                WalkExpression(field.ComputedExpression, ctx, obligations);
+                WalkExpression(field.ComputedExpression, ctx, obligations, semantics);
             }
         }
 
         return obligations;
     }
 
-    private static void WalkExpression(TypedExpression expr, ObligationContext ctx, List<ProofObligation> obligations)
+    // Slice 12: SemanticIndex is threaded through WalkExpression so that optional field
+    // refs in value positions can generate PresenceProofRequirement obligations.
+    private static void WalkExpression(TypedExpression expr, ObligationContext ctx, List<ProofObligation> obligations, SemanticIndex semantics)
     {
         switch (expr)
         {
+            case TypedFieldRef fieldRef:
+                // Slice 12 — Presence Obligation Generation:
+                // Every reference to an optional field in a value position generates a
+                // PresenceProofRequirement.  Strategy 2 (Guaranteed presence) and Strategy 3
+                // (when X is set guard-in-path) discharge these obligations; unresolved
+                // obligations emit PRE0116 (UnprovedPresenceRequirement).
+                if (semantics.FieldsByName.TryGetValue(fieldRef.FieldName, out var referencedField)
+                    && referencedField.Presence is DeclaredPresenceMeta.Optional)
+                {
+                    var presenceReq = new PresenceProofRequirement(
+                        new SelfSubject(),
+                        $"Field '{fieldRef.FieldName}' is optional and may be absent");
+                    obligations.Add(new ProofObligation(presenceReq, fieldRef, ctx, ProofDisposition.Unresolved, null, null));
+                }
+                break;
+
             case TypedBinaryOp bin:
                 foreach (var req in bin.ProofRequirements)
                     obligations.Add(new ProofObligation(req, bin, ctx, ProofDisposition.Unresolved, null, null));
-                WalkExpression(bin.Left, ctx, obligations);
-                WalkExpression(bin.Right, ctx, obligations);
+                WalkExpression(bin.Left, ctx, obligations, semantics);
+                WalkExpression(bin.Right, ctx, obligations, semantics);
                 break;
 
             case TypedFunctionCall call:
                 foreach (var req in call.ProofRequirements)
                     obligations.Add(new ProofObligation(req, call, ctx, ProofDisposition.Unresolved, null, null));
                 foreach (var arg in call.Arguments)
-                    WalkExpression(arg, ctx, obligations);
+                    WalkExpression(arg, ctx, obligations, semantics);
                 break;
 
             case TypedMemberAccess ma:
                 foreach (var req in ma.ProofRequirements)
                     obligations.Add(new ProofObligation(req, ma, ctx, ProofDisposition.Unresolved, null, null));
-                WalkExpression(ma.Object, ctx, obligations);
+                WalkExpression(ma.Object, ctx, obligations, semantics);
                 break;
 
             case TypedUnaryOp un:
-                WalkExpression(un.Operand, ctx, obligations);
+                WalkExpression(un.Operand, ctx, obligations, semantics);
                 break;
 
             case TypedConditional cond:
-                WalkExpression(cond.Condition, ctx, obligations);
-                WalkExpression(cond.ThenBranch, ctx, obligations);
-                WalkExpression(cond.ElseBranch, ctx, obligations);
+                WalkExpression(cond.Condition, ctx, obligations, semantics);
+                WalkExpression(cond.ThenBranch, ctx, obligations, semantics);
+                WalkExpression(cond.ElseBranch, ctx, obligations, semantics);
                 break;
 
             case TypedQuantifier quant:
-                WalkExpression(quant.Collection, ctx, obligations);
-                WalkExpression(quant.Predicate, ctx, obligations);
+                WalkExpression(quant.Collection, ctx, obligations, semantics);
+                WalkExpression(quant.Predicate, ctx, obligations, semantics);
                 break;
 
-            case TypedPostfixOp post:
-                WalkExpression(post.Operand, ctx, obligations);
+            case TypedPostfixOp:
+                // Do NOT recurse into the operand of `X is set` / `X is not set`.
+                // TypedPostfixOp is a presence check, not a value-position usage of its operand.
+                // Recursing would generate a spurious PresenceProofRequirement on an optional X,
+                // defeating the purpose of the presence guard.
                 break;
 
             case TypedInterpolatedString interp:
                 foreach (var seg in interp.Segments)
                 {
                     if (seg is TypedHoleSegment hole)
-                        WalkExpression(hole.Expression, ctx, obligations);
+                        WalkExpression(hole.Expression, ctx, obligations, semantics);
                 }
                 break;
 
             case TypedListLiteral list:
                 foreach (var elem in list.Elements)
-                    WalkExpression(elem, ctx, obligations);
+                    WalkExpression(elem, ctx, obligations, semantics);
                 break;
         }
     }
@@ -312,9 +333,9 @@ public static partial class ProofEngine
 
             if (action is TypedInputAction inputAction)
             {
-                WalkExpression(inputAction.InputExpression, ctx, obligations);
+                WalkExpression(inputAction.InputExpression, ctx, obligations, semantics);
                 if (inputAction.SecondaryExpression is not null)
-                    WalkExpression(inputAction.SecondaryExpression, ctx, obligations);
+                    WalkExpression(inputAction.SecondaryExpression, ctx, obligations, semantics);
             }
         }
     }
