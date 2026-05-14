@@ -1,5 +1,15 @@
 # compiler/ — Pipeline Stage Blueprints
 
+> [!IMPORTANT]
+> **Before implementing any pipeline stage, complete the [catalog-driven-checklist.md](../contributing/catalog-driven-checklist.md).** Key rules:
+>
+> - New tokens, operators, and constructs go in the catalog — not inline sets or hardcoded conditions
+> - Parser lookahead uses `Constructs.ByLeadingToken` and `ConstructMeta.Entries` — derived from catalog, not re-encoded
+> - Operator binding power comes from the Operators catalog `BindingPower` property — not hardcoded in `ParseExpression`
+> - SemanticIndex is a flat semantic inventory — NOT a structural mirror of the parse tree
+>
+> See: **[catalog-system.md — § Architectural Identity](../language/catalog-system.md#architectural-identity-metadata-driven)**
+
 Implementation blueprints for each stage of the Precept compiler pipeline. Each doc follows the 16-section canonical template: Status → Overview → Responsibilities and Boundaries → Right-Sizing → Inputs and Outputs → Architecture → Component Mechanics → Dependencies and Integration Points → Failure Modes and Recovery → Contracts and Guarantees → Design Rationale and Decisions → Innovation → Open Questions / Implementation Notes → Deliberate Exclusions → Cross-References → Source Files.
 
 ## Pipeline Order

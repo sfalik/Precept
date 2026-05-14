@@ -1,5 +1,11 @@
 # docs/ — Design Documentation
 
+> [!IMPORTANT]
+> **Before implementing anything in this codebase, read these two docs first:**
+>
+> - **[catalog-system.md — § Architectural Identity](language/catalog-system.md#architectural-identity-metadata-driven)** — the non-negotiable architecture rules. Domain knowledge goes in catalogs; pipeline stages are generic machinery. Derive from catalogs, never duplicate.
+> - **[catalog-driven-checklist.md](contributing/catalog-driven-checklist.md)** — the operational pre-implementation checklist. Answer every question before writing code.
+
 Design documents for the Precept compiler pipeline and language surface.
 
 ## Structure
@@ -17,6 +23,7 @@ Design documents for the Precept compiler pipeline and language surface.
 |----------|---------|--------|
 | [compiler-and-runtime-design.md](compiler-and-runtime-design.md) | Compiler pipeline, runtime surfaces, artifact relationships, LS integration | Draft |
 | [catalog-system.md](language/catalog-system.md) | Catalog pattern for closed enum registries (tokens, diagnostics, faults, functions, operators) with `[Meta]` attributes and exhaustive switches | Draft |
+| [contributing/catalog-driven-checklist.md](contributing/catalog-driven-checklist.md) | Pre-implementation checklist — verify catalog compliance before writing any pipeline stage code | Reference |
 
 ## Reading Order
 

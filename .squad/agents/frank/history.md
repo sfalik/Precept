@@ -58,6 +58,7 @@
 
 ## Learnings
 
+- Folder README callouts should explicitly route implementers to both `catalog-system.md` § Architectural Identity and `docs/contributing/catalog-driven-checklist.md` before any pipeline work begins.
 - If a design depends on an existing diagnostic, confirm the live emitting pipeline stage instead of trusting catalog metadata or prose.
 - Gate 2 is a tripwire, not proof of behavioral correctness; every gap closure still needs positive and negative tests.
 - Gate 1 allow-list entries should stay root-cause oriented; per-code citation churn adds noise without improving enforcement.

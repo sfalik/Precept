@@ -1,5 +1,15 @@
 # language/ — Language Specification and Type System Design
 
+> [!IMPORTANT]
+> **The catalog-system.md [§ Architectural Identity](catalog-system.md#architectural-identity-metadata-driven) section is non-negotiable.** Before implementing any language feature, verify:
+>
+> - Does this language element get cataloged? (tokens, types, operators, actions, modifiers, constructs, constraints, proof requirements — all get cataloged)
+> - Does any pipeline stage switch on enum identity to apply per-member behavior? That behavior belongs in the catalog entry.
+> - Are shapes uniform or varied? Flat `sealed record` vs discriminated union — no nullable fields to paper over shape differences.
+> - Is anything deriving from the catalog, or maintaining a parallel copy?
+>
+> See also: **[contributing/catalog-driven-checklist.md](../contributing/catalog-driven-checklist.md)**
+
 Documents defining the Precept DSL surface — what the language looks like to authors — and the type system extensions that expand its expressiveness.
 
 ## Documents
