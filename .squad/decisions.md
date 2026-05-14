@@ -6,6 +6,118 @@
 
 ---
 
+
+### 2026-05-14T06:53:00Z: PRE0019 is retired in favor of proof-stage presence obligations routed through PRE0116
+
+**By:** Scribe
+
+**Status:** Merged, reconciled, inbox cleared (3 files -> 1 canonical entry).
+
+**Merged sources:** `frank-pre0019-audit.md`, `frank-pre0019-wiring.md`, `frank-pre0019-wire-vs-retire.md`.
+
+- Frank's audit confirmed PRE0019 `NullInNonNullableContext` has no live emitters in `src\Precept\`; the catalog entry, metadata, and `FaultCode.UnexpectedNull` link exist, but nothing in the TypeChecker, ProofEngine, or runtime produces the code today.
+- The intermediate wiring analysis concluded the enforcement plan's old "upgrade TypeMismatch" premise was stale because presence checking already belongs to the guard-aware ProofEngine surface, not to a new TypeChecker-side duplicate.
+- The final verdict is RETIRE: presence-proof infrastructure is already plumbed through PRE0116 `UnprovedPresenceRequirement`, but no production code generates `PresenceProofRequirement`; the real fix is to inject those obligations for optional field references and eventually re-point `FaultCode.UnexpectedNull` to PRE0116.
+
+---
+
+### 2026-05-14T02:33:16Z: Diagnostic naming canon now uses `when` vocabulary, `CaseMismatch*`, and condition-first proof names
+
+**By:** Scribe
+
+**Status:** Merged, reconciled, inbox cleared (3 files -> 1 canonical entry).
+
+**Merged sources:** `elaine-diagnostic-review.md`, `frank-diagnostic-review.md`, `elaine-guard-term-revision.md`.
+
+- Graph-theory and proof-engine jargon are below bar for author-facing diagnostics; the durable naming standard is now plain DSL vocabulary that describes the author's condition rather than compiler internals.
+- The adopted family updates are: collection-safety names move to `*WithoutWhen`, CI enforcement names move to `CaseMismatchOn*`, proof diagnostics move to `ModifierNotGuaranteed` / `DimensionQualifierMissing` / `QualifiersMayBeIncompatible` / `InitialStateConstraintUnsatisfied` / `FieldMayBeAbsent`, and PRE0119 settles on `NonTerminalDeadEnd`.
+- Rename passes now carry two standing conventions: messages should stay `Subject — Condition — Repair` parseable, and every rename pass must update `FixHint`, `RecoverySteps`, `TriggerCondition`, and examples in the same change.
+
+---
+
+### 2026-05-14T01:04:03Z: B2 currency and unit integrity gaps stay ahead of PRE0094 because D94 already shipped
+
+**By:** Scribe
+
+**Status:** Merged from Frank's sequencing decision.
+
+**Merged source:** `frank-q3-sequencing.md`.
+
+- Shane locked B2 (`PRE0070`–`PRE0074`) ahead of any PRE0094 sequencing change on integrity severity alone.
+- Frank confirmed the old rationale for fast-tracking PRE0094 is gone because `ValidateConstructionGuarantees` already wires `InitialEventMissingAssignments` in the type-checking pipeline.
+- The field-state-guarantees slices should no longer cite PRE0094 as a blocking dependency in diagnostic-enforcement ordering arguments.
+
+---
+
+### 2026-05-14T00:56:58Z: Dynamic qualifier mismatches stay silent at type-check time and resolve in proof
+
+**By:** Scribe
+
+**Status:** Merged from Frank's Q2 resolution.
+
+**Merged source:** `frank-q2-dynamic-qualifier.md`.
+
+- The TypeChecker silently skips PRE0070–PRE0074 cross-currency and related qualifier checks when the qualifier value is dynamic.
+- No partial compile-time diagnostic is emitted for forms like `money in '{CatalogCurrency}'`; Strategy 5 in the ProofEngine remains the enforcement surface.
+- The architectural boundary is now durable team memory: dynamic qualifier validation is a proof-time concern, not a static comparison pass.
+
+---
+
+### 2026-05-14T00:52:34Z: PRE0079 stays literal-only, PRE0078 stays interval-proof, and Q10 deduplication is subsumed by that boundary
+
+**By:** Scribe
+
+**Status:** Merged, reconciled, inbox cleared (2 files -> 1 canonical entry).
+
+**Merged sources:** `frank-q1-q10-resolved.md`, `frank-q10-deduplication-subsumed.md`.
+
+- PRE0079 `OutOfRange` is locked to constant-literal assignments in the TypeChecker, while PRE0078 `NumericOverflow` remains the ProofEngine / Strategy 7 diagnostic for non-literal interval failures.
+- Frank's initial Q10 note proposed obligation-generation gating to avoid double-reporting, but the final ruling tightened further: no separate dedup mechanism is needed because the pipeline boundary itself keeps literal PRE0079 cases out of the PRE0078 interval path.
+- The durable rule is stage separation, not post-hoc suppression.
+
+---
+
+### 2026-05-14T00:00:00Z: Interval proof engine resume locked five implementation truths and validated slices 1–4 green
+
+**By:** Scribe
+
+**Status:** Merged from George's interval resume record.
+
+**Merged source:** `george-interval-resume.md`.
+
+- `quantity` is a reserved DSL keyword, so interval tests must use names like `qty`; `nonnegative` is a proof attribute only and does not populate `DeclaredMin`, so interval-bound tests must use explicit `min` modifiers instead.
+- Guard narrowing only handles field-to-constant comparisons, and Strategy 2 division-by-zero proof only succeeds when the divisor is a field with a proving modifier like `positive`.
+- Sample bounds are an all-path contract: every event arg assigned into a bounded field must carry compatible bounds, and George validated the slice with all 5227 `Precept.Tests` passing.
+
+---
+
+### 2026-05-13T00:00:00Z: PRE0091 `AmbiguousTypedConstant` ships narrow first and enforcement infrastructure stays explicit and comment-stripped
+
+**By:** Scribe
+
+**Status:** Merged, reconciled, inbox cleared (5 files -> 1 canonical entry).
+
+**Merged sources:** `frank-q4-narrow.md`, `frank-q6-allowlist-granularity.md`, `frank-q7-analyzer-scan-scope.md`, `frank-q8-doc-comment-stripping.md`, `frank-q9-allowlist-coordination.md`.
+
+- PRE0091's first implementation stays limited to temporal quantity ambiguity because `ResolveTypedConstant` normally receives `expectedType`; broad candidate enumeration would be speculative infrastructure for error-recovery-only paths.
+- Gate 1 allow-list entries need only root-cause cluster comments, while Gate 2 scans an explicit pipeline-centered file set and strips `//`, `/** */`, and `///` comments before matching `DiagnosticCode.*` references.
+- PRE0078 allow-list cleanup is owned by the interval-engine PR itself: once a real emission site exists, the stale-entry analyzer forces the same PR to remove the allow-list entry.
+
+---
+
+### 2025-07-16T00:00:00Z: Diagnostic precision backlog records message rewrites for PRE0019/PRE0022/PRE0051 and adds PRE0048 as the next swap candidate
+
+**By:** Scribe
+
+**Status:** Merged, reconciled, inbox cleared (2 files -> 1 canonical entry).
+
+**Merged sources:** `elaine-precision-messages.md`, `frank-precision-scan.md`.
+
+- Elaine judged PRE0019's old fix hint actively backwards, recommended field-first guidance for PRE0051 interpolation failures, and treated PRE0022's message as mostly sound but in need of real recovery steps instead of tautologies.
+- Frank's precision-gap scan added PRE0048 `ScalarOperationOnCollection` as a high-value TypeMismatch swap candidate and explicitly separated PRE0047, choice-domain checks, collection-inner-type checks, and similar cases into the emission-gap bucket rather than the precision-upgrade bucket.
+- The durable triage split is now: targeted code swaps for true precision gaps, structural follow-up work for missing emitters.
+
+---
 ### 2026-05-14T00:05:43Z: Diagnostic enforcement revision now treats PRE0078 as an interval-proof obligation and narrows PRE0079
 
 **By:** Scribe
@@ -1173,3 +1285,5 @@
 - Kramer extended `StateGraph.EdgeProofStatus` with `HasObligations`, populated it during compiler enrichment, and switched rich state hover to render the locked no-obligations wording when connected edges exist but none carry proof obligations.
 - The fix pass also added the missing regression anchors: language-server coverage for the connected-edge/no-proof-obligation path and core projection coverage that duplicate `Requirement.Description` values collapse to one unresolved summary.
 - `docs/Working/hover-design.md` was updated to match the shipped projection/rendering rule, and targeted language-server tests, compiler-edge-proof tests, and the language-server build all passed.
+
+
