@@ -45,15 +45,15 @@ public static class Operations
         // ── Unary ──────────────────────────────────────────────────
         OperationKind.NegateInteger => new UnaryOperationMeta(
             kind, OperatorKind.Negate, PInteger, TypeKind.Integer,
-            "Integer negation"),
+            "Integer negation") { IntervalTransfer = static i => i.Negate() },
 
         OperationKind.NegateDecimal => new UnaryOperationMeta(
             kind, OperatorKind.Negate, PDecimal, TypeKind.Decimal,
-            "Decimal negation"),
+            "Decimal negation") { IntervalTransfer = static i => i.Negate() },
 
         OperationKind.NegateNumber => new UnaryOperationMeta(
             kind, OperatorKind.Negate, PNumber, TypeKind.Number,
-            "Number negation"),
+            "Number negation") { IntervalTransfer = static i => i.Negate() },
 
         OperationKind.NegateMoney => new UnaryOperationMeta(
             kind, OperatorKind.Negate, PMoney, TypeKind.Money,
@@ -134,15 +134,15 @@ public static class Operations
         // ── Scalar: decimal ────────────────────────────────────────
         OperationKind.DecimalPlusDecimal => new BinaryOperationMeta(
             kind, OperatorKind.Plus, PDecimal, PDecimal, TypeKind.Decimal,
-            "Decimal addition"),
+            "Decimal addition") { IntervalTransfer = AddTransfer },
 
         OperationKind.DecimalMinusDecimal => new BinaryOperationMeta(
             kind, OperatorKind.Minus, PDecimal, PDecimal, TypeKind.Decimal,
-            "Decimal subtraction"),
+            "Decimal subtraction") { IntervalTransfer = SubtractTransfer },
 
         OperationKind.DecimalTimesDecimal => new BinaryOperationMeta(
             kind, OperatorKind.Times, PDecimal, PDecimal, TypeKind.Decimal,
-            "Decimal multiplication"),
+            "Decimal multiplication") { IntervalTransfer = MultiplyTransfer },
 
         OperationKind.DecimalDivideDecimal => new BinaryOperationMeta(
             kind, OperatorKind.Divide, PDecimal, PDecimal, TypeKind.Decimal,
@@ -151,7 +151,7 @@ public static class Operations
             [
                 new NumericProofRequirement(new ParamSubject(PDecimal), OperatorKind.NotEquals, 0m,
                     "Divisor must be non-zero"),
-            ]),
+            ]) { IntervalTransfer = DivideTransfer },
 
         OperationKind.DecimalModuloDecimal => new BinaryOperationMeta(
             kind, OperatorKind.Modulo, PDecimal, PDecimal, TypeKind.Decimal,
@@ -165,15 +165,15 @@ public static class Operations
         // ── Scalar: number ─────────────────────────────────────────
         OperationKind.NumberPlusNumber => new BinaryOperationMeta(
             kind, OperatorKind.Plus, PNumber, PNumber, TypeKind.Number,
-            "Number addition (IEEE 754)"),
+            "Number addition (IEEE 754)") { IntervalTransfer = AddTransfer },
 
         OperationKind.NumberMinusNumber => new BinaryOperationMeta(
             kind, OperatorKind.Minus, PNumber, PNumber, TypeKind.Number,
-            "Number subtraction (IEEE 754)"),
+            "Number subtraction (IEEE 754)") { IntervalTransfer = SubtractTransfer },
 
         OperationKind.NumberTimesNumber => new BinaryOperationMeta(
             kind, OperatorKind.Times, PNumber, PNumber, TypeKind.Number,
-            "Number multiplication (IEEE 754)"),
+            "Number multiplication (IEEE 754)") { IntervalTransfer = NumberMultiplyTransfer },
 
         OperationKind.NumberDivideNumber => new BinaryOperationMeta(
             kind, OperatorKind.Divide, PNumber, PNumber, TypeKind.Number,
@@ -182,7 +182,7 @@ public static class Operations
             [
                 new NumericProofRequirement(new ParamSubject(PNumber), OperatorKind.NotEquals, 0m,
                     "Divisor must be non-zero"),
-            ]),
+            ]) { IntervalTransfer = NumberDivideTransfer },
 
         OperationKind.NumberModuloNumber => new BinaryOperationMeta(
             kind, OperatorKind.Modulo, PNumber, PNumber, TypeKind.Number,
@@ -196,15 +196,15 @@ public static class Operations
         // ── Scalar: widening integer → decimal ─────────────────────
         OperationKind.IntegerPlusDecimal => new BinaryOperationMeta(
             kind, OperatorKind.Plus, PInteger, PDecimal, TypeKind.Decimal,
-            "Integer + decimal (widens to decimal)", BidirectionalLookup: true),
+            "Integer + decimal (widens to decimal)", BidirectionalLookup: true) { IntervalTransfer = AddTransfer },
 
         OperationKind.IntegerMinusDecimal => new BinaryOperationMeta(
             kind, OperatorKind.Minus, PInteger, PDecimal, TypeKind.Decimal,
-            "Integer − decimal (widens to decimal)", BidirectionalLookup: true),
+            "Integer − decimal (widens to decimal)", BidirectionalLookup: true) { IntervalTransfer = SubtractTransfer },
 
         OperationKind.IntegerTimesDecimal => new BinaryOperationMeta(
             kind, OperatorKind.Times, PInteger, PDecimal, TypeKind.Decimal,
-            "Integer × decimal (widens to decimal)", BidirectionalLookup: true),
+            "Integer × decimal (widens to decimal)", BidirectionalLookup: true) { IntervalTransfer = MultiplyTransfer },
 
         OperationKind.IntegerDivideDecimal => new BinaryOperationMeta(
             kind, OperatorKind.Divide, PInteger, PDecimal, TypeKind.Decimal,
@@ -213,7 +213,7 @@ public static class Operations
             [
                 new NumericProofRequirement(new ParamSubject(PDecimal), OperatorKind.NotEquals, 0m,
                     "Divisor must be non-zero"),
-            ]),
+            ]) { IntervalTransfer = DivideTransfer },
 
         OperationKind.IntegerModuloDecimal => new BinaryOperationMeta(
             kind, OperatorKind.Modulo, PInteger, PDecimal, TypeKind.Decimal,
@@ -1271,4 +1271,34 @@ public static class Operations
         BinaryIndex.TryGetValue((op, lhs, rhs), out var entries)
             ? entries.AsSpan()
             : ReadOnlySpan<BinaryOperationMeta>.Empty;
+
+    // ════════════════════════════════════════════════════════════════════════════
+    //  Interval transfer functions — referenced by catalog entries above
+    // ════════════════════════════════════════════════════════════════════════════
+
+    private static NumericInterval AddTransfer(NumericInterval l, NumericInterval r) => l.Add(r);
+
+    private static NumericInterval SubtractTransfer(NumericInterval l, NumericInterval r) => l.Subtract(r);
+
+    private static NumericInterval MultiplyTransfer(NumericInterval l, NumericInterval r) => l.Multiply(r);
+
+    private static NumericInterval DivideTransfer(NumericInterval l, NumericInterval r) => l.Divide(r);
+
+    private static NumericInterval NumberMultiplyTransfer(NumericInterval l, NumericInterval r)
+    {
+        var result = l.Multiply(r);
+        if (result.IsUnbounded) return result;
+        var ulp = Math.Max(Math.Abs((double)result.Min), Math.Abs((double)result.Max)) * 1e-15;
+        var widen = (decimal)ulp;
+        return new NumericInterval(result.Min - widen, result.Max + widen);
+    }
+
+    private static NumericInterval NumberDivideTransfer(NumericInterval l, NumericInterval r)
+    {
+        var result = l.Divide(r);
+        if (result.IsUnbounded) return result;
+        var ulp = Math.Max(Math.Abs((double)result.Min), Math.Abs((double)result.Max)) * 1e-15;
+        var widen = (decimal)ulp;
+        return new NumericInterval(result.Min - widen, result.Max + widen);
+    }
 }

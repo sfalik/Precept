@@ -100,46 +100,15 @@ public static partial class ProofEngine
             if (!string.Equals(arg.Name, argName, StringComparison.Ordinal))
                 continue;
 
-            decimal? min = null, max = null;
-            foreach (var modifier in arg.Modifiers)
-            {
-                var meta = Modifiers.GetMeta(modifier);
-                if (meta is not ValueModifierMeta vmm) continue;
-                foreach (var sat in vmm.ProofSatisfactions)
-                {
-                    if (sat is ProofSatisfaction.Numeric { Comparison: OperatorKind.GreaterThanOrEqual } ns
-                        && ns.Bound is NumericBoundSource.Constant c)
-                        min = c.Value;
-                    if (sat is ProofSatisfaction.Numeric { Comparison: OperatorKind.LessThanOrEqual } ns2
-                        && ns2.Bound is NumericBoundSource.Constant c2)
-                        max = c2.Value;
-                }
-            }
-            if (!min.HasValue && !max.HasValue) return NumericInterval.Unbounded;
-            return new NumericInterval(min ?? decimal.MinValue, max ?? decimal.MaxValue);
+            if (!arg.DeclaredMin.HasValue && !arg.DeclaredMax.HasValue)
+                return NumericInterval.Unbounded;
+            return new NumericInterval(arg.DeclaredMin ?? decimal.MinValue, arg.DeclaredMax ?? decimal.MaxValue);
         }
         return NumericInterval.Unbounded;
     }
 
     internal static (decimal? min, decimal? max) ExtractBoundsFromField(TypedField field)
-    {
-        decimal? min = null, max = null;
-        foreach (var modifier in field.Modifiers.Concat(field.ImpliedModifiers))
-        {
-            var meta = Modifiers.GetMeta(modifier);
-            if (meta is not ValueModifierMeta vmm) continue;
-            foreach (var sat in vmm.ProofSatisfactions)
-            {
-                if (sat is ProofSatisfaction.Numeric { Comparison: OperatorKind.GreaterThanOrEqual } ns
-                    && ns.Bound is NumericBoundSource.Constant c)
-                    min = c.Value;
-                if (sat is ProofSatisfaction.Numeric { Comparison: OperatorKind.LessThanOrEqual } ns2
-                    && ns2.Bound is NumericBoundSource.Constant c2)
-                    max = c2.Value;
-            }
-        }
-        return (min, max);
-    }
+        => (field.DeclaredMin, field.DeclaredMax);
 
     private static bool TryIntervalContainmentProof(
         ProofObligation obligation,

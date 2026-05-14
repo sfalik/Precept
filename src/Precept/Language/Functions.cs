@@ -40,9 +40,12 @@ public static class Functions
         // ── Numeric: min / max ──────────────────────────────────────────────────
         FunctionKind.Min => new(kind, "min", "Minimum of two values (common numeric type)",
         [
-            new([PInteger, PInteger], TypeKind.Integer),
-            new([PDecimal, PDecimal], TypeKind.Decimal),
-            new([PNumber, PNumber], TypeKind.Number),
+            new([PInteger, PInteger], TypeKind.Integer)
+                { IntervalTransfer = args => new NumericInterval(Math.Min(args[0].Min, args[1].Min), Math.Min(args[0].Max, args[1].Max)) },
+            new([PDecimal, PDecimal], TypeKind.Decimal)
+                { IntervalTransfer = args => new NumericInterval(Math.Min(args[0].Min, args[1].Min), Math.Min(args[0].Max, args[1].Max)) },
+            new([PNumber, PNumber], TypeKind.Number)
+                { IntervalTransfer = args => new NumericInterval(Math.Min(args[0].Min, args[1].Min), Math.Min(args[0].Max, args[1].Max)) },
             new([PMoney, PMoney], TypeKind.Money, QualifierMatch.Same),
             new([PQuantity, PQuantity], TypeKind.Quantity, QualifierMatch.Same),
         ],
@@ -53,9 +56,12 @@ public static class Functions
 
         FunctionKind.Max => new(kind, "max", "Maximum of two values (common numeric type)",
         [
-            new([PInteger, PInteger], TypeKind.Integer),
-            new([PDecimal, PDecimal], TypeKind.Decimal),
-            new([PNumber, PNumber], TypeKind.Number),
+            new([PInteger, PInteger], TypeKind.Integer)
+                { IntervalTransfer = args => new NumericInterval(Math.Max(args[0].Min, args[1].Min), Math.Max(args[0].Max, args[1].Max)) },
+            new([PDecimal, PDecimal], TypeKind.Decimal)
+                { IntervalTransfer = args => new NumericInterval(Math.Max(args[0].Min, args[1].Min), Math.Max(args[0].Max, args[1].Max)) },
+            new([PNumber, PNumber], TypeKind.Number)
+                { IntervalTransfer = args => new NumericInterval(Math.Max(args[0].Min, args[1].Min), Math.Max(args[0].Max, args[1].Max)) },
             new([PMoney, PMoney], TypeKind.Money, QualifierMatch.Same),
             new([PQuantity, PQuantity], TypeKind.Quantity, QualifierMatch.Same),
         ],
@@ -67,9 +73,12 @@ public static class Functions
         // ── Numeric: abs ────────────────────────────────────────────────────────
         FunctionKind.Abs => new(kind, "abs", "Absolute value (same type as input)",
         [
-            new([new(TypeKind.Integer, "value")], TypeKind.Integer, ReturnNonnegative: true),
-            new([new(TypeKind.Decimal, "value")], TypeKind.Decimal, ReturnNonnegative: true),
-            new([new(TypeKind.Number,  "value")], TypeKind.Number, ReturnNonnegative: true),
+            new([new(TypeKind.Integer, "value")], TypeKind.Integer, ReturnNonnegative: true)
+                { IntervalTransfer = args => args[0].Min >= 0 ? args[0] : args[0].Max <= 0 ? args[0].Negate() : new NumericInterval(0, Math.Max(-args[0].Min, args[0].Max)) },
+            new([new(TypeKind.Decimal, "value")], TypeKind.Decimal, ReturnNonnegative: true)
+                { IntervalTransfer = args => args[0].Min >= 0 ? args[0] : args[0].Max <= 0 ? args[0].Negate() : new NumericInterval(0, Math.Max(-args[0].Min, args[0].Max)) },
+            new([new(TypeKind.Number,  "value")], TypeKind.Number, ReturnNonnegative: true)
+                { IntervalTransfer = args => args[0].Min >= 0 ? args[0] : args[0].Max <= 0 ? args[0].Negate() : new NumericInterval(0, Math.Max(-args[0].Min, args[0].Max)) },
             new([new(TypeKind.Money,   "value")], TypeKind.Money, QualifierMatch.Same, ReturnNonnegative: true),
             new([new(TypeKind.Quantity,"value")], TypeKind.Quantity, QualifierMatch.Same, ReturnNonnegative: true),
         ],

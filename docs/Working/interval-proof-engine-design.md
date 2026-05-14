@@ -12,10 +12,10 @@
 
 | Slice | Objective | Agent | Status | Tests | Notes |
 |-------|-----------|-------|--------|-------|-------|
-| **1** | Catalog Foundation + `NumericInterval` struct | George | ⏳ Pending | — | Blocking Slice 2 |
-| **2** | Obligation Collection + Strategy 7 Wiring (decimal) | George | ⏳ Pending | — | Depends on Slice 1 |
-| **3** | Guard-Narrowing Integration | George | ⏳ Pending | — | Depends on Slice 2 |
-| **4** | Function Overload Intervals | George | ⏳ Pending | — | Independent after Slice 2 |
+| **1** | Catalog Foundation + `NumericInterval` struct | George | ✅ Done | — | Blocking Slice 2 |
+| **2** | Obligation Collection + Strategy 7 Wiring (decimal) | George | ✅ Done | — | Depends on Slice 1 |
+| **3** | Guard-Narrowing Integration | George | ✅ Done | — | Depends on Slice 2 |
+| **4** | Function Overload Intervals | George | ✅ Done | — | Independent after Slice 2 |
 | **5** | Hover Expression Display + Diagnostic Squiggle | Kramer | ⏳ Pending | — | Depends on Slice 2 |
 | **6** | Regression + Symbol Export | Soup Nazi | ⏳ Pending | — | Final validation |
 

@@ -101,7 +101,16 @@ public static partial class ProofEngine
             }
 
             var (disposition, strategy) = TryDischarge(obligation, semantics);
-            obligations[i] = obligation with { Disposition = disposition, Strategy = strategy };
+            var enriched = obligation with { Disposition = disposition, Strategy = strategy };
+
+            // Enrich ComputedInterval for interval containment obligations (proved or unresolved)
+            if (enriched.Requirement is IntervalContainmentProofRequirement
+                && TryIntervalContainmentProofNarrowed(obligation, semantics, out var computed))
+            {
+                enriched = enriched with { ComputedInterval = computed };
+            }
+
+            obligations[i] = enriched;
         }
 
         ApplyTrustedRuleFacts(obligations, suppressDiagnostics, semantics);
@@ -155,21 +164,21 @@ public static partial class ProofEngine
         foreach (var row in semantics.TransitionRows)
         {
             var ctx = new TransitionRowContext(row);
-            WalkActions(row.Actions, ctx, obligations);
+            WalkActions(row.Actions, ctx, obligations, semantics);
         }
 
         // EventHandlers[].Actions[]
         foreach (var handler in semantics.EventHandlers)
         {
             var ctx = new EventHandlerContext(handler);
-            WalkActions(handler.Actions, ctx, obligations);
+            WalkActions(handler.Actions, ctx, obligations, semantics);
         }
 
         // StateHooks[].Actions[]
         foreach (var hook in semantics.StateHooks)
         {
             var ctx = new StateHookContext(hook);
-            WalkActions(hook.Actions, ctx, obligations);
+            WalkActions(hook.Actions, ctx, obligations, semantics);
         }
 
         // Rules[].Condition
@@ -258,7 +267,7 @@ public static partial class ProofEngine
         }
     }
 
-    private static void WalkActions(ImmutableArray<TypedAction> actions, ObligationContext ctx, List<ProofObligation> obligations)
+    private static void WalkActions(ImmutableArray<TypedAction> actions, ObligationContext ctx, List<ProofObligation> obligations, SemanticIndex semantics)
     {
         foreach (var action in actions)
         {
@@ -270,6 +279,23 @@ public static partial class ProofEngine
                 WalkExpression(inputAction.InputExpression, ctx, obligations);
                 if (inputAction.SecondaryExpression is not null)
                     WalkExpression(inputAction.SecondaryExpression, ctx, obligations);
+
+                // Interval containment obligation for set actions on bounded decimal/number fields
+                if (inputAction.Kind == ActionKind.Set
+                    && semantics.FieldsByName.TryGetValue(inputAction.FieldName, out var targetField)
+                    && (targetField.ResolvedType == TypeKind.Decimal || targetField.ResolvedType == TypeKind.Number))
+                {
+                    var (min, max) = ExtractBoundsFromField(targetField);
+                    if (min.HasValue || max.HasValue)
+                    {
+                        var intervalReq = new IntervalContainmentProofRequirement(
+                            new SelfSubject(),
+                            inputAction.FieldName,
+                            min, max,
+                            $"Interval containment: {inputAction.FieldName} must stay within declared bounds [{min?.ToString() ?? "−∞"} .. {max?.ToString() ?? "+∞"}]");
+                        obligations.Add(new ProofObligation(intervalReq, inputAction.InputExpression, ctx, ProofDisposition.Unresolved, null, null));
+                    }
+                }
             }
         }
     }
@@ -466,6 +492,8 @@ public static partial class ProofEngine
             return (ProofDisposition.Proved, ProofStrategy.QualifierCompatibility);
         if (TryCompositionalConstraintProof(obligation, semantics))
             return (ProofDisposition.Proved, ProofStrategy.CompositionalConstraint);
+        if (TryIntervalContainmentProofNarrowed(obligation, semantics, out _))
+            return (ProofDisposition.Proved, ProofStrategy.IntervalContainment);
 
         return (ProofDisposition.Unresolved, null);
     }

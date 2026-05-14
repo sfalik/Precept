@@ -550,34 +550,44 @@ public static partial class Parser
                     var parsedType = ParseTypeReference(asToken.Span);
 
                     var modifiers = ImmutableArray.CreateBuilder<ModifierKind>();
+                    var parsedModifiers = ImmutableArray.CreateBuilder<ParsedModifier>();
                     while (Modifiers.ByValueToken.TryGetValue(Peek().Kind, out var modMeta)
                            && modMeta.ApplicableDeclarationSites.HasFlag(argSite))
                     {
+                        var modToken = Peek();
                         modifiers.Add(modMeta.Kind);
                         Advance();
 
                         if (!modMeta.HasValue)
+                        {
+                            parsedModifiers.Add(new ParsedModifier(modMeta.Kind, null, modToken.Span));
                             continue;
+                        }
 
                         if (!ExpressionStartTokens.Contains(Peek().Kind))
                         {
                             _diagnostics.Add(DiagnosticsCatalog.Create(
                                 DiagnosticCode.ExpectedToken, Peek().Span, "expression", Peek().Text));
+                            parsedModifiers.Add(new ParsedModifier(modMeta.Kind, null, modToken.Span));
                             continue;
                         }
 
-                        ParseExpression(0, () =>
+                        var valueExpr = ParseExpression(0, () =>
                             Peek().Kind is TokenKind.Comma or TokenKind.RightParen
                             || IsAtConstructBoundary()
                             || (Modifiers.ByValueToken.TryGetValue(Peek().Kind, out var nextMod)
                                 && nextMod.ApplicableDeclarationSites.HasFlag(argSite)));
+                        parsedModifiers.Add(new ParsedModifier(
+                            modMeta.Kind, valueExpr,
+                            SourceSpan.Covering(modToken.Span, valueExpr.Span)));
                     }
 
                     args.Add(new ArgumentSyntax(
                         nameToken.Text,
                         parsedType,
                         modifiers.ToImmutable(),
-                        nameToken.Span));
+                        nameToken.Span,
+                        parsedModifiers.ToImmutable()));
                 }
 
                 if (Peek().Kind == TokenKind.Comma)

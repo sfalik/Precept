@@ -374,7 +374,13 @@ internal static partial class TypeChecker
                     : new DeclaredPresenceMeta.Guaranteed(),
                 DeclaredQualifiers: ExtractQualifiers(declared.Type, ctx),
                 NameSpan: declared.NameSpan,
-                Syntax: declared.Syntax);
+                Syntax: declared.Syntax,
+                DeclaredMin: declared.Modifiers.FirstOrDefault(m => m.Kind == ModifierKind.Min) is { Value: { } minExpr }
+                    ? TryGetComparableModifierValue(minExpr)
+                    : null,
+                DeclaredMax: declared.Modifiers.FirstOrDefault(m => m.Kind == ModifierKind.Max) is { Value: { } maxExpr }
+                    ? TryGetComparableModifierValue(maxExpr)
+                    : null);
 
             ctx.Fields.Add(typedField);
             ctx.FieldLookup[declared.Name] = typedField;
@@ -489,7 +495,15 @@ internal static partial class TypeChecker
                         ? new DeclaredPresenceMeta.Optional()
                         : new DeclaredPresenceMeta.Guaranteed(),
                     DeclaredQualifiers: ExtractQualifiers(arg.Type, ctx),
-                    Span: arg.NameSpan));
+                    Span: arg.NameSpan,
+                    DeclaredMin: arg.ParsedModifiers.IsDefaultOrEmpty ? null
+                        : arg.ParsedModifiers.FirstOrDefault(m => m.Kind == ModifierKind.Min) is { Value: { } minExpr }
+                            ? TryGetComparableModifierValue(minExpr)
+                            : null,
+                    DeclaredMax: arg.ParsedModifiers.IsDefaultOrEmpty ? null
+                        : arg.ParsedModifiers.FirstOrDefault(m => m.Kind == ModifierKind.Max) is { Value: { } maxExpr }
+                            ? TryGetComparableModifierValue(maxExpr)
+                            : null));
             }
 
             var typedEvent = new TypedEvent(

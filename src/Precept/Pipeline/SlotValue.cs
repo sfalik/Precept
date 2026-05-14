@@ -40,7 +40,8 @@ public readonly record struct ArgumentSyntax(
     string Name,
     ParsedTypeReference Type,
     ImmutableArray<ModifierKind> Modifiers,
-    SourceSpan NameSpan);
+    SourceSpan NameSpan,
+    ImmutableArray<ParsedModifier> ParsedModifiers = default);
 
 /// <summary>Event parameter list "(name as type, ...)".</summary>
 public sealed record ArgumentListSlot(ImmutableArray<ArgumentSyntax> Args, SourceSpan Span)

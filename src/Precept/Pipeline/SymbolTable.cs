@@ -90,7 +90,8 @@ public sealed record DeclaredArg(
     ParsedTypeReference Type,
     string EventName,
     ImmutableArray<ModifierKind> Modifiers,
-    SourceSpan NameSpan
+    SourceSpan NameSpan,
+    ImmutableArray<ParsedModifier> ParsedModifiers = default
 );
 
 // ════════════════════════════════════════════════════════════════════════════

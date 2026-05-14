@@ -24,7 +24,7 @@ event RequestCancellation(
     Reason as string notempty)
 on RequestCancellation ensure RequestCancellation.Price >= 0 because "The plan price cannot be negative"
 
-event MakeSaveOffer(DiscountPercent as number default 10)
+event MakeSaveOffer(DiscountPercent as number min 0 max 100 default 10)
 on MakeSaveOffer ensure MakeSaveOffer.DiscountPercent > 0 because "Save offers must include a positive discount"
 on MakeSaveOffer ensure MakeSaveOffer.DiscountPercent <= 100 because "Save offers cannot exceed 100 percent"
 

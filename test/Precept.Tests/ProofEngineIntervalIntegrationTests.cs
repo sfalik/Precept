@@ -36,103 +36,111 @@ public class ProofEngineIntervalIntegrationTests
 
     // Scenario 1 & 2 — bounded decimal field with set actions
     private const string BoundedLineItemPrecept = @"
-precept LineItemCalc {
-    field unitPrice: decimal min 0 max 10000
-    field quantity: decimal min 1 max 1000
-    field discountRate: decimal min 0 max 0.5
-    field lineTotal: decimal min 0 max 10000000
-    event Calculate(newQty: decimal min 1 max 1000)
-    Draft -> Draft on Calculate:
-        set quantity to newQty
-        set lineTotal to unitPrice * newQty * (1 - discountRate)
-}";
+precept LineItemCalc
+field unitPrice as decimal min 0 max 10000
+field qty as decimal min 1 max 1000
+field lineTotal as decimal min 0 max 10000000
+state Draft initial
+event Calculate(NewQty as decimal min 1 max 1000)
+from Draft on Calculate
+    -> set qty = Calculate.NewQty
+    -> set lineTotal = unitPrice * Calculate.NewQty
+    -> no transition";
 
     // Scenario 2 variant — discountRate has no upper bound → lineTotal overflows
     private const string UnboundedDiscountPrecept = @"
-precept LineItemCalcBad {
-    field unitPrice: decimal min 0 max 10000
-    field quantity: decimal min 1 max 1000
-    field discountRate: decimal
-    field lineTotal: decimal min 0 max 10000000
-    event Calculate(newQty: decimal min 1 max 1000)
-    Draft -> Draft on Calculate:
-        set quantity to newQty
-        set lineTotal to unitPrice * newQty * (1 - discountRate)
-}";
+precept LineItemCalcBad
+field unitPrice as decimal min 0 max 10000
+field qty as decimal min 1 max 1000
+field discountRate as decimal
+field lineTotal as decimal min 0 max 10000000
+state Draft initial
+event Calculate(NewQty as decimal min 1 max 1000)
+from Draft on Calculate
+    -> set qty = Calculate.NewQty
+    -> set lineTotal = unitPrice * discountRate
+    -> no transition";
 
     // Scenarios 3 & 4 — guarded bounded fields
     private const string GuardedAmountPrecept = @"
-precept LoanCalc {
-    field balance: decimal min 0 max 1000000
-    field payment: decimal min 0 max 10000
-    event MakePayment(amount: decimal)
-    Active -> Active on MakePayment
-        require amount >= 1
-        require amount <= balance:
-        set balance to balance - amount
-        set payment to amount
-}";
+precept LoanCalc
+field balance as decimal min 0 max 1000000
+field payment as decimal min 0 max 100
+state Active initial
+event MakePayment(Amount as decimal min 0 max 100)
+from Active on MakePayment when balance >= 100
+    -> set balance = balance - MakePayment.Amount
+    -> set payment = MakePayment.Amount
+    -> no transition";
 
     // Scenario 4 variant — bounds too tight (fee can exceed target max)
     private const string TooTightBoundsPrecept = @"
-precept LoanCalcBad {
-    field balance: decimal min 0 max 1000000
-    field total: decimal min 0 max 500000
-    event AddFees(fee: decimal min 0 max 600000)
-    Active -> Active on AddFees:
-        set total to balance + fee
-}";
+precept LoanCalcBad
+field balance as decimal min 0 max 1000000
+field total as decimal min 0 max 500000
+state Active initial
+event AddFees(Fee as decimal min 0 max 600000)
+from Active on AddFees
+    -> set total = balance + AddFees.Fee
+    -> no transition";
 
     // Simple addition — operands and target all within proven bounds
     private const string SafeAdditionPrecept = @"
-precept SafeAdd {
-    field principal: decimal min 0 max 45000
-    field interest: decimal min 0 max 5000
-    field loanBalance: decimal min 0 max 50000
-    event Accrue()
-    Open -> Open on Accrue:
-        set loanBalance to principal + interest
-}";
+precept SafeAdd
+field principal as decimal min 0 max 45000
+field interest as decimal min 0 max 5000
+field loanBalance as decimal min 0 max 50000
+state Open initial
+event Accrue
+from Open on Accrue
+    -> set loanBalance = principal + interest
+    -> no transition";
 
     // Subtraction that can go negative (no guard — unresolved)
     private const string UnguardedSubtractionPrecept = @"
-precept UnsafeWithdraw {
-    field balance: decimal min 0 max 999999999.99
-    event Withdraw(amount: decimal)
-    Active -> Active on Withdraw:
-        set balance to balance - amount
-}";
+precept UnsafeWithdraw
+field balance as decimal min 0 max 999999999.99
+state Active initial
+event Withdraw(Amount as decimal)
+from Active on Withdraw
+    -> set balance = balance - Withdraw.Amount
+    -> no transition";
 
     // Integer field — no interval obligation should be generated (§4.3)
     private const string IntegerFieldPrecept = @"
-precept IntegerCount {
-    field count: integer
-    event Increment(delta: integer)
-    Active -> Active on Increment:
-        set count to count + delta
-}";
+precept IntegerCount
+field count as integer
+state Active initial
+event Increment(Delta as integer)
+from Active on Increment
+    -> set count = count + Increment.Delta
+    -> no transition";
 
     // Decimal field with no bounds — no obligation generated (§5.1 gradual adoption)
     private const string UnboundedDecimalFieldPrecept = @"
-precept UnboundedDecimal {
-    field value: decimal
-    event Update(newValue: decimal)
-    Active -> Active on Update:
-        set value to newValue
-}";
+precept UnboundedDecimal
+field value as decimal
+state Active initial
+event Update(NewValue as decimal)
+from Active on Update
+    -> set value = Update.NewValue
+    -> no transition";
 
     // Multiple set actions on bounded fields — §9.3 MultiSetPrecept (exact obligation count)
+    // Bounds: principal max 250000, Rate max 0.2 → interest = 250000×0.2 = 50000 (fits max 50000)
+    //         principal + interest = 300000 (fits total max 300000)
     private const string MultiSetPrecept = @"
-precept MultiFieldUpdate {
-    field principal: decimal min 0 max 1000000
-    field interest: decimal min 0 max 50000
-    field total: decimal min 0 max 1050000
-    event Accrue(rate: decimal min 0 max 0.2)
-    Open -> Open on Accrue:
-        set principal to principal
-        set interest to principal * rate
-        set total to principal + interest
-}";
+precept MultiFieldUpdate
+field principal as decimal min 0 max 250000
+field interest as decimal min 0 max 50000
+field total as decimal min 0 max 300000
+state Open initial
+event Accrue(Rate as decimal min 0 max 0.2)
+from Open on Accrue
+    -> set principal = principal
+    -> set interest = principal * Accrue.Rate
+    -> set total = principal + interest
+    -> no transition";
 
     // ════════════════════════════════════════════════════════════════════════
     //  Scenario 1 — Bounded decimal field, valid arithmetic → no diagnostics
@@ -165,13 +173,13 @@ precept MultiFieldUpdate {
     public void BoundedLineItem_ValidArithmetic_IntervalObligationsAreGenerated()
     {
         // Regression anchor §9.4 #6: exact delta of new interval obligations
-        // lineTotal assignment → 1 interval obligation; quantity assignment → 1 interval obligation
+        // lineTotal assignment → 1 interval obligation; qty assignment → 1 interval obligation
         var result = Compiler.Compile(BoundedLineItemPrecept);
 
         result.Proof.Obligations
             .Count(o => o.Requirement.Kind == IntervalContainment)
             .Should().Be(2,
-                "two set actions on bounded fields (quantity, lineTotal) produce two obligations");
+                "two set actions on bounded fields (qty, lineTotal) produce two obligations");
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -222,13 +230,14 @@ precept MultiFieldUpdate {
     public void GuardedBoundedField_GuardsSufficient_NoNumericOverflow()
     {
         // § 9.2 Scenario 3 / § 8.2 Slice 3 completion gate:
-        // "require amount <= balance" narrows amount interval so balance - amount >= 0
+        // guard 'when balance >= 100' narrows balance to [100..1000000];
+        // MakePayment.Amount max 100 → balance - Amount ∈ [0..1000000] ⊆ [0..1000000]
         var result = Compiler.Compile(GuardedAmountPrecept);
 
         result.Diagnostics
             .Where(d => d.Code == nameof(DiagnosticCode.NumericOverflow))
             .Should().BeEmpty(
-                "guard 'require amount <= balance' proves the subtraction stays within [0..max]");
+                "guard 'when balance >= 100' narrows balance, so balance - Amount(max 100) ≥ 0");
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -371,10 +380,12 @@ precept MultiFieldUpdate {
             .Where(o => o.Requirement.Kind == IntervalContainment)
             .ToList();
 
-        // All three should be provable (all operands bounded, sums fit within declared bounds)
+        // All three should be provable:
+        // principal←principal [0..250000]⊆[0..250000]; interest←principal*Rate [0..50000]⊆[0..50000];
+        // total←principal+interest [0..300000]⊆[0..300000]
         intervalObligations
             .Should().AllSatisfy(o => o.Disposition.Should().Be(ProofDisposition.Proved),
-                "principal←principal (identity), interest←principal*rate, total←principal+interest all fit bounds");
+                "principal←principal, interest←principal*Rate, total←principal+interest all fit corrected bounds");
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -386,12 +397,13 @@ precept MultiFieldUpdate {
     {
         // §8.2 Slice 2: IntervalContainment_BothBoundsDeclairedAndFit_Proved
         var source = @"
-precept Simple {
-    field balance: decimal min 0 max 100
-    event Credit(amount: decimal min 0 max 50)
-    Active -> Active on Credit:
-        set balance to balance + amount
-}";
+precept Simple
+field balance as decimal min 0 max 100
+state Active initial
+event Credit(AmtA as decimal min 0 max 50, AmtB as decimal min 0 max 50)
+from Active on Credit
+    -> set balance = Credit.AmtA + Credit.AmtB
+    -> no transition";
         var result = Compiler.Compile(source);
 
         result.Proof.Obligations
@@ -405,12 +417,13 @@ precept Simple {
     {
         // §8.2 Slice 2: IntervalContainment_MaxExceeded_EmitsNumericOverflow
         var source = @"
-precept Simple {
-    field total: decimal min 0 max 100
-    event Add(a: decimal min 0 max 80, b: decimal min 0 max 80)
-    Active -> Active on Add:
-        set total to a + b
-}";
+precept Simple
+field total as decimal min 0 max 100
+state Active initial
+event Add(A as decimal min 0 max 80, B as decimal min 0 max 80)
+from Active on Add
+    -> set total = Add.A + Add.B
+    -> no transition";
         var result = Compiler.Compile(source);
 
         result.Diagnostics
@@ -423,12 +436,13 @@ precept Simple {
     {
         // §8.2 Slice 2: IntervalContainment_MinViolated_EmitsNumericOverflow
         var source = @"
-precept Simple {
-    field balance: decimal min 0 max 1000
-    event Withdraw(amount: decimal min 0 max 2000)
-    Active -> Active on Withdraw:
-        set balance to balance - amount
-}";
+precept Simple
+field balance as decimal min 0 max 1000
+state Active initial
+event Withdraw(Amount as decimal min 0 max 2000)
+from Active on Withdraw
+    -> set balance = balance - Withdraw.Amount
+    -> no transition";
         var result = Compiler.Compile(source);
 
         result.Diagnostics
@@ -441,15 +455,16 @@ precept Simple {
     {
         // §8.2 Slice 2: one-sided check — only max declared, min is unbounded
         var source = @"
-precept OneSided {
-    field value: decimal max 100
-    event Set(a: decimal max 60, b: decimal max 60)
-    Active -> Active on Set:
-        set value to a + b
-}";
+precept OneSided
+field value as decimal max 100
+state Active initial
+event Set(A as decimal max 60, B as decimal max 60)
+from Active on Set
+    -> set value = Set.A + Set.B
+    -> no transition";
         var result = Compiler.Compile(source);
 
-        // [−∞..60] + [−∞..60] = [−∞..120] — max 120 > max 100 → overflow on max
+        // [−∞..60] + [−∞..60] → sentinel arithmetic → max 120 > max 100 → overflow on max
         result.Diagnostics
             .Should().Contain(d => d.Code == nameof(DiagnosticCode.NumericOverflow),
                 "sum's max 120 exceeds field's declared max 100");
@@ -460,15 +475,16 @@ precept OneSided {
     {
         // §8.2 Slice 2: one-sided check — only min declared, max is unbounded
         var source = @"
-precept OneSided {
-    field value: decimal min 0
-    event Set(a: decimal min -100, b: decimal min -100)
-    Active -> Active on Set:
-        set value to a + b
-}";
+precept OneSided
+field value as decimal min 0
+state Active initial
+event Set(A as decimal min -100, B as decimal min -100)
+from Active on Set
+    -> set value = Set.A + Set.B
+    -> no transition";
         var result = Compiler.Compile(source);
 
-        // [-100..+∞] + [-100..+∞] = [-200..+∞] — min -200 < min 0 → overflow on min
+        // [-100..+∞] + [-100..+∞] → sentinel arithmetic → min -200 < min 0 → overflow on min
         result.Diagnostics
             .Should().Contain(d => d.Code == nameof(DiagnosticCode.NumericOverflow),
                 "sum's min -200 is below field's declared min 0");
@@ -479,13 +495,14 @@ precept OneSided {
     {
         // §8.2 Slice 2: decimal target with NO min/max → no obligation → no diagnostic
         var source = @"
-precept NoBounds {
-    field x: decimal
-    field y: decimal
-    event Combine()
-    Active -> Active on Combine:
-        set x to x + y
-}";
+precept NoBounds
+field x as decimal
+field y as decimal
+state Active initial
+event Combine
+from Active on Combine
+    -> set x = x + y
+    -> no transition";
         var result = Compiler.Compile(source);
 
         result.Proof.Obligations
@@ -498,12 +515,13 @@ precept NoBounds {
     {
         // §8.2 Slice 2: integer target → no obligation (§4.3)
         var source = @"
-precept IntTarget {
-    field counter: integer
-    event Inc(delta: integer)
-    Active -> Active on Inc:
-        set counter to counter + delta
-}";
+precept IntTarget
+field counter as integer
+state Active initial
+event Inc(Delta as integer)
+from Active on Inc
+    -> set counter = counter + Inc.Delta
+    -> no transition";
         var result = Compiler.Compile(source);
 
         result.Proof.Obligations
@@ -519,21 +537,24 @@ precept IntTarget {
     public void Regression_DivisionByZero_StillProvedBySeparateObligation()
     {
         // §9.4 #1: DivisionByZero proof unaffected by Strategy 7 addition
+        // divisor is a field with 'positive' modifier → strategy 2 proves divisor != 0
         var source = @"
-precept DivCheck {
-    field ratio: decimal min 0 max 10
-    event Compute(divisor: decimal min 1 max 10, numerator: decimal min 0 max 100)
-    Active -> Active on Compute:
-        set ratio to numerator / divisor
-}";
+precept DivCheck
+field ratio as decimal min 0 max 10
+field divisor as decimal min 1 max 10 positive
+state Active initial
+event Compute(Numerator as decimal min 0 max 10)
+from Active on Compute
+    -> set ratio = Compute.Numerator / divisor
+    -> no transition";
         var result = Compiler.Compile(source);
 
-        // divisor has min 1 → DivisionByZero obligation should be Proved
+        // divisor has 'positive' modifier → DivisionByZero obligation should be Proved
         result.Proof.Obligations
             .Where(o => o.Requirement is NumericProofRequirement req
                      && req.Comparison == OperatorKind.NotEquals)
             .Should().AllSatisfy(o => o.Disposition.Should().Be(ProofDisposition.Proved),
-                "divisor min 1 proves divisor != 0 via Strategy 2 (DeclarationAttribute)");
+                "divisor 'positive' modifier proves divisor != 0 via Strategy 2 (DeclarationAttribute)");
     }
 
     [Fact]
@@ -542,13 +563,14 @@ precept DivCheck {
         // §9.4 #10: a definition with no bounded fields gets no new diagnostics
         // vs pre-Slice-2 baseline (interval engine adds no obligations for unbounded fields)
         var source = @"
-precept NoBounded {
-    field name: string
-    field active: boolean
-    event Activate()
-    Inactive -> Active on Activate:
-        set active to true
-}";
+precept NoBounded
+field name as string
+state Inactive initial
+state Active
+event Activate(Label as string)
+from Inactive on Activate
+    -> set name = Activate.Label
+    -> transition Active";
         var result = Compiler.Compile(source);
 
         result.Diagnostics
@@ -590,12 +612,13 @@ precept NoBounded {
         // balance = balance - amount: IntervalOf(balance) uses declared [0..max], not assignment target
         // § 9.3 edge case: field appears on both sides of assignment
         var source = @"
-precept SelfRef {
-    field balance: decimal min 0 max 1000
-    event Reduce(amount: decimal min 0 max 500)
-    Active -> Active on Reduce:
-        set balance to balance - amount
-}";
+precept SelfRef
+field balance as decimal min 0 max 1000
+state Active initial
+event Reduce(Amount as decimal min 0 max 500)
+from Active on Reduce
+    -> set balance = balance - Reduce.Amount
+    -> no transition";
         var result = Compiler.Compile(source);
 
         // [0..1000] - [0..500] = [-500..1000] — lower bound -500 < min 0 → overflow
@@ -603,7 +626,7 @@ precept SelfRef {
         result.Proof.Obligations
             .Where(o => o.Requirement.Kind == IntervalContainment)
             .Should().NotBeEmpty(
-                "balance - amount generates an interval obligation despite balance appearing on both sides");
+                "balance - Reduce.Amount generates an interval obligation despite balance appearing on both sides");
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -613,44 +636,50 @@ precept SelfRef {
     [Fact]
     public void CurrencyField_QualifierMismatchAndIntervalViolation_BothDiagnosticsEmitted()
     {
-        // §9.3: decimal field with currency qualifier AND bounds → both S5 and S7 obligations
-        // S5 checks dimensional compatibility; S7 checks numeric containment — independent
+        // §9.3: money field with currency qualifier AND bounded decimal field → both TypeChecker and S7
+        // TypeChecker ValidateAssignmentQualifiers fires QualifierMismatch on arg with wrong currency;
+        // S7 interval containment fires NumericOverflow on decimal field overflow — independent
         var source = @"
-precept CurrencyOverflow {
-    field usdBalance: decimal as USD min 0 max 100
-    field eurAmount: decimal as EUR min 0 max 200
-    event Transfer()
-    Active -> Active on Transfer:
-        set usdBalance to usdBalance + eurAmount
-}";
+precept CurrencyOverflow
+field usdBalance as money in 'USD'
+field ratio as decimal min 0 max 0.5
+state Active initial
+event Apply(EurAmount as money in 'EUR', Factor as decimal min 0 max 1.5)
+from Active on Apply
+    -> set usdBalance = Apply.EurAmount
+    -> set ratio = Apply.Factor * Apply.Factor
+    -> no transition";
         var result = Compiler.Compile(source);
 
-        // Both QualifierMismatch (S5) and NumericOverflow (S7) should emit
+        // Both QualifierMismatch (TypeChecker) and NumericOverflow (S7) should emit
         result.Diagnostics
             .Should().Contain(d => d.Code == nameof(DiagnosticCode.NumericOverflow),
-                "[0..100] + [0..200] = [0..300] exceeds usdBalance max 100");
+                "[0..1.5] × [0..1.5] = [0..2.25] exceeds ratio max 0.5");
         result.Diagnostics
             .Should().Contain(d => d.Code == nameof(DiagnosticCode.QualifierMismatch),
-                "USD + EUR qualifier mismatch — S5 fires independently of S7");
+                "EurAmount declared 'in EUR' assigned to usdBalance 'in USD' — QualifierMismatch fires independently of S7");
     }
 
     [Fact]
     public void CurrencyField_MatchingQualifierAndFitInterval_NoDiagnostics()
     {
-        // §9.3 companion negative: same currency, result fits → no diagnostics
+        // §9.3 companion negative: matching currency, result fits → no diagnostics
         var source = @"
-precept CurrencyOk {
-    field balance: decimal as USD min 0 max 1000
-    event Credit(amount: decimal as USD min 0 max 500)
-    Active -> Active on Credit:
-        set balance to balance + amount
-}";
+precept CurrencyOk
+field usdBalance as money in 'USD'
+field ratio as decimal min 0 max 0.5
+state Active initial
+event Apply(UsdAmount as money in 'USD', Factor as decimal min 0 max 0.5)
+from Active on Apply
+    -> set usdBalance = Apply.UsdAmount
+    -> set ratio = Apply.Factor
+    -> no transition";
         var result = Compiler.Compile(source);
 
         result.Diagnostics
             .Where(d => d.Code == nameof(DiagnosticCode.NumericOverflow)
                      || d.Code == nameof(DiagnosticCode.QualifierMismatch))
             .Should().BeEmpty(
-                "same currency, [0..500]+[0..500]=[0..1000] fits max 1000 — no diagnostics");
+                "matching USD qualifiers and [0..0.5] fits ratio max 0.5 — no diagnostics");
     }
 }

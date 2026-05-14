@@ -308,7 +308,9 @@ public sealed record TypedField(
     DeclaredPresenceMeta Presence,
     ImmutableArray<DeclaredQualifierMeta> DeclaredQualifiers,
     SourceSpan NameSpan,
-    ParsedConstruct Syntax
+    ParsedConstruct Syntax,
+    decimal? DeclaredMin = null,
+    decimal? DeclaredMax = null
 );
 
 /// <summary>Typed state declaration.</summary>
@@ -342,7 +344,9 @@ public sealed record TypedArg(
     bool IsOptional,
     DeclaredPresenceMeta Presence,
     ImmutableArray<DeclaredQualifierMeta> DeclaredQualifiers,
-    SourceSpan Span
+    SourceSpan Span,
+    decimal? DeclaredMin = null,
+    decimal? DeclaredMax = null
 );
 
 // ════════════════════════════════════════════════════════════════════════════

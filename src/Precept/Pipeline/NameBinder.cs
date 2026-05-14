@@ -174,7 +174,8 @@ public static class NameBinder
                         Type: argEntry.Type,
                         EventName: eventName,
                         Modifiers: argEntry.Modifiers,
-                        NameSpan: argEntry.NameSpan));
+                        NameSpan: argEntry.NameSpan,
+                        ParsedModifiers: argEntry.ParsedModifiers));
                 }
 
                 var evt = new DeclaredEvent(

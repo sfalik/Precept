@@ -36,7 +36,15 @@
 
 
 
-## Recent Updates
+### 2026-05-14 — Interval Proof Engine Slices 1–4 complete
+
+- All four interval proof engine slices (catalog foundation, obligation collection + S7 wiring, guard-narrowing, function overload intervals) were already implemented; this session validated, fixed, and tested the full implementation.
+- Fixed CS8602 null-dereference in `TypeChecker.cs` (DeclaredMin/DeclaredMax on event args).
+- Fixed 2 sample files: added min/max bounds to `Triage.Level` (it-helpdesk-ticket) and `MakeSaveOffer.DiscountPercent` (subscription-cancellation-retention) to satisfy interval containment obligations.
+- Rewrote all Precept DSL strings in `ProofEngineIntervalIntegrationTests.cs` (9 constants + 12 inline sources) from invalid C-style syntax to valid Precept DSL. Key lesson: `quantity` is a reserved keyword (Quantity type) — use `qty` instead.
+- Key design insight confirmed: `nonnegative` modifier does NOT set DeclaredMin; only `ModifierKind.Min` does. Guard narrowing only handles field-to-constant comparisons, not arg refs.
+- Closed green at 5227/5227 Precept.Tests.
+- Updated tracker in `docs/Working/interval-proof-engine-design.md` — all slices 1–4 marked ✅ Done.
 
 ### 2026-05-13T04:32:04Z — D94 construction analysis now stays on real construction rows
 
