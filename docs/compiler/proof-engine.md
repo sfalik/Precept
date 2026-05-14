@@ -10,6 +10,81 @@
 | Upstream | SemanticIndex + StateGraph, catalog metadata (Operations, Functions, Types, Modifiers, Actions, Diagnostics, Faults) |
 | Downstream | Compilation (proof ledger), Precept Builder (fault backstops, constraint influence map) |
 
+> [!IMPORTANT]
+> **Non-Negotiable Rules — Read Before Implementing**
+>
+> - **Instantiate obligations from catalog metadata** — proof obligations come from the `ProofRequirement` catalog records stamped into typed artifacts, not from a hardcoded engine-side list. See [§6. Architecture](#6-architecture) and [§Catalog-Driven Obligation Instantiation](#catalog-driven-obligation-instantiation).
+> - **Extend proof kinds through the catalog DU** — `ProofRequirement` is a discriminated union, so adding a new proof kind requires a new catalog entry and DU subtype rather than another identity-based switch arm. See [§ProofRequirement Catalog DU](#proofrequirement-catalog-du) and [§10. Contracts and Guarantees](#10-contracts-and-guarantees).
+> - **Never guess** — the engine proves an obligation, rejects it with diagnostics/fault linkage, or leaves it explicitly unresolved; it does not approximate hidden certainty. See [§7. Component Mechanics](#7-component-mechanics), [§9. Failure Modes and Recovery](#9-failure-modes-and-recovery), and [§10. Contracts and Guarantees](#10-contracts-and-guarantees).
+
+## Contents
+
+- [2. Overview](#2-overview)
+- [3. Responsibilities and Boundaries](#3-responsibilities-and-boundaries)
+  - [In Scope](#in-scope)
+  - [Out of Scope](#out-of-scope)
+- [4. Right-Sizing](#4-right-sizing)
+- [5. Inputs and Outputs](#5-inputs-and-outputs)
+  - [Input](#input)
+  - [Output](#output)
+- [6. Architecture](#6-architecture)
+  - [Two-Pass Design](#two-pass-design)
+  - [Catalog-Driven Obligation Instantiation](#catalog-driven-obligation-instantiation)
+  - [ProofRequirement Catalog DU](#proofrequirement-catalog-du)
+- [7. Component Mechanics](#7-component-mechanics)
+  - [Six Proof Strategies](#six-proof-strategies)
+  - [Subject Resolution Utilities](#subject-resolution-utilities)
+  - [ProofSatisfaction DU](#proofsatisfaction-du)
+  - [Carrier Types](#carrier-types)
+  - [Qualifier Resolution Reference](#qualifier-resolution-reference)
+  - [Proof/Fault Chain](#prooffault-chain)
+  - [Constraint Influence Analysis](#constraint-influence-analysis)
+  - [Initial-State Satisfiability](#initial-state-satisfiability)
+  - [Collection Non-Empty Proof](#collection-non-empty-proof)
+  - [ProofForwardingFact Consumption Contract](#proofforwardingfact-consumption-contract)
+  - [Stateless Precept Handling (PE-G15)](#stateless-precept-handling-pe-g15)
+- [8. Dependencies and Integration Points](#8-dependencies-and-integration-points)
+  - [Upstream Dependencies](#upstream-dependencies)
+  - [Downstream Consumers](#downstream-consumers)
+- [9. Failure Modes and Recovery](#9-failure-modes-and-recovery)
+  - [Error Accumulation](#error-accumulation)
+  - [Diagnostic Message Formatting (PE-G12)](#diagnostic-message-formatting-pe-g12)
+  - [Partial Results](#partial-results)
+  - [Upstream Error Handling (PE-G13)](#upstream-error-handling-pe-g13)
+- [10. Contracts and Guarantees](#10-contracts-and-guarantees)
+  - [Obligation Completeness](#obligation-completeness)
+  - [Disposition Exhaustiveness](#disposition-exhaustiveness)
+  - [Fault Chain Integrity](#fault-chain-integrity)
+  - [Determinism](#determinism)
+  - [Catalog Correspondence](#catalog-correspondence)
+- [11. Design Rationale and Decisions](#11-design-rationale-and-decisions)
+  - [Decision 1: Five-Strategy Bounded Set vs. SMT Solver](#decision-1-five-strategy-bounded-set-vs-smt-solver)
+  - [Decision 2: ProofLedger Does NOT Cross Compile-Runtime Boundary](#decision-2-proofledger-does-not-cross-compile-runtime-boundary)
+  - [Decision 3: Obligations Stamped by Type Checker, Not Identified by Proof Engine](#decision-3-obligations-stamped-by-type-checker-not-identified-by-proof-engine)
+  - [Decision 4: Constraint Influence as Proof Engine Output](#decision-4-constraint-influence-as-proof-engine-output)
+  - [Decision 5: Modifier-Proof via Catalog Metadata](#decision-5-modifier-proof-via-catalog-metadata)
+- [12. Innovation](#12-innovation)
+  - [Catalog-Declared Proof Obligations](#catalog-declared-proof-obligations)
+  - [Roslyn-Enforced FaultCode↔DiagnosticCode Correspondence](#roslyn-enforced-faultcodediagnosticcode-correspondence)
+  - [Bounded, Non-Extensible Strategy Set](#bounded-non-extensible-strategy-set)
+  - [Compile-Time Satisfiability](#compile-time-satisfiability)
+  - [Constraint Influence Analysis](#constraint-influence-analysis-1)
+- [13. Open Questions / Implementation Notes](#13-open-questions--implementation-notes)
+  - [Implementation Status](#implementation-status)
+  - [Validation Required](#validation-required)
+  - [Blocking Dependencies](#blocking-dependencies)
+  - [Catalog Metadata Needed](#catalog-metadata-needed)
+  - [Future Considerations](#future-considerations)
+- [14. Deliberate Exclusions](#14-deliberate-exclusions)
+  - [No SMT Solver](#no-smt-solver)
+  - [No Runtime Obligation Checking](#no-runtime-obligation-checking)
+  - [No Constraint Evaluation](#no-constraint-evaluation)
+  - [No General Dataflow Analysis](#no-general-dataflow-analysis)
+  - [No Inductive Proof](#no-inductive-proof)
+  - [No User-Defined Proof Hints](#no-user-defined-proof-hints)
+- [15. Cross-References](#15-cross-references)
+- [16. Source Files](#16-source-files)
+
 ---
 
 ## 2. Overview

@@ -11,6 +11,64 @@
 | Grounding | `docs/PreceptLanguageDesign.md` (v1 spec); vision archived at `docs/archive/language-design/precept-language-vision.md` |
 | Clean room rule | References v1 grammar and keyword inventory; does not import v1 implementation details |
 
+> [!IMPORTANT]
+> **Non-Negotiable Rules — Read Before Implementing**
+>
+> - **Prevention, not detection** — invalid configurations must be structurally impossible before any change is committed, not merely caught afterward. See [§0.1 Design Principles](#01-design-principles).
+> - **One file, complete rules** — the `.precept` definition is the whole contract, with no scattered enforcement across service layers, validators, or handlers. See [§0.1 Design Principles](#01-design-principles).
+> - **Deterministic semantics** — the same definition and the same data must always produce the same outcome. See [§0.1 Design Principles](#01-design-principles).
+> - **Mandatory rationale** — every rule and ensure must carry a syntactically required `because` clause; rationale is part of the language contract. See [§0.1 Design Principles](#01-design-principles).
+> - **Full inspectability** — every possible action and its outcome must be previewable without executing the operation. See [§0.1 Design Principles](#01-design-principles).
+
+## Contents
+
+- [Tooling Surface Snapshot](#tooling-surface-snapshot)
+- [0. Preamble](#0-preamble)
+  - [0.1 Design Principles](#01-design-principles)
+  - [0.2 Language Model](#02-language-model)
+  - [0.3 Governance, Not Validation](#03-governance-not-validation)
+  - [0.4 Execution Model Properties](#04-execution-model-properties)
+  - [0.5 Graph Analyzer Design Contract](#05-graph-analyzer-design-contract)
+  - [0.6 Proof Engine Design Contract](#06-proof-engine-design-contract)
+- [1. Lexer](#1-lexer)
+  - [1.1 Token Vocabulary](#11-token-vocabulary)
+  - [1.2 Reserved Keywords](#12-reserved-keywords)
+  - [1.3 Literal Syntax](#13-literal-syntax)
+  - [1.4 Comments and Whitespace](#14-comments-and-whitespace)
+  - [1.5 Operator and Punctuation Scanning](#15-operator-and-punctuation-scanning)
+  - [1.6 Dual-Use Token Disambiguation](#16-dual-use-token-disambiguation)
+  - [1.8 Lexer Diagnostics](#18-lexer-diagnostics)
+- [2. Parser](#2-parser)
+  - [2.1 Expression Precedence](#21-expression-precedence)
+  - [2.2 Declaration Grammar](#22-declaration-grammar)
+  - [2.3 Type References](#23-type-references)
+  - [2.4 Field Modifiers](#24-field-modifiers)
+  - [2.5 Interpolation Reassembly](#25-interpolation-reassembly)
+  - [2.6 Error Recovery](#26-error-recovery)
+  - [2.7 Parser Diagnostics](#27-parser-diagnostics)
+- [3. Name Binding and Type Checking](#3-name-binding-and-type-checking)
+  - [3.1 Processing Model](#31-processing-model)
+  - [3.2 Type Widening Rules](#32-type-widening-rules)
+  - [3.3 Context-Sensitive Type Resolution](#33-context-sensitive-type-resolution)
+  - [3.4 Name Resolution](#34-name-resolution)
+  - [3.5 Scope Rules](#35-scope-rules)
+  - [3.6 Expression Typing Rules](#36-expression-typing-rules)
+  - [3.7 Built-in Function Catalog](#37-built-in-function-catalog)
+  - [3.8 Semantic Checks](#38-semantic-checks)
+  - [3.9 Error Recovery](#39-error-recovery)
+  - [3.10 Diagnostic Catalog](#310-diagnostic-catalog)
+- [3A. Language Semantics](#3a-language-semantics)
+  - [3A.1 Constraint Semantics](#3a1-constraint-semantics)
+  - [3A.2 Outcomes and Semantic Verdicts](#3a2-outcomes-and-semantic-verdicts)
+  - [3A.3 Constraint Violation Subject Attribution](#3a3-constraint-violation-subject-attribution)
+  - [3A.4 Mutation Atomicity](#3a4-mutation-atomicity)
+  - [3A.5 Entity Construction](#3a5-entity-construction)
+  - [3A.6 Inspection as a First-Class Operation](#3a6-inspection-as-a-first-class-operation)
+- [4. Graph Analyzer](#4-graph-analyzer)
+- [5. Proof Engine](#5-proof-engine)
+- [Open Questions / Implementation Notes](#open-questions--implementation-notes)
+- [Cross-References](#cross-references)
+
 ---
 
 ## Tooling Surface Snapshot

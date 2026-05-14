@@ -10,6 +10,87 @@
 | Implementation state | Implemented — all 14 catalogs in `src/Precept/`; team review complete (2026-04-25) |
 | Related | `docs/compiler/diagnostic-system.md` · `docs/runtime/fault-system.md` · `docs/compiler-and-runtime-design.md` |
 
+> [!IMPORTANT]
+> **Non-Negotiable Rules — Read Before Implementing**
+>
+> - **Catalog the full language surface** — everything language-relevant belongs in a catalog: keywords, types, operators, actions, modifiers, constructs, constraints, proof requirements, diagnostics, and faults. See [§Vision: Metadata for the Entire Language](#vision-metadata-for-the-entire-language) and [§Completeness Principle](#completeness-principle).
+> - **Keep pipeline stages generic** — parser, type checker, proof engine, evaluator, tooling, and docs consumers read catalog metadata; they do not encode language knowledge themselves. See [§Architectural Identity: Metadata-Driven](#architectural-identity-metadata-driven).
+> - **Put per-member behavior in metadata** — if behavior varies by catalog member, that behavior belongs in the catalog entry's metadata rather than switch statements on enum identity. See [§Architectural Identity: Metadata-Driven](#architectural-identity-metadata-driven) and [§Pattern Definition](#pattern-definition).
+> - **Match metadata shape to member shape** — use a discriminated union when members need different metadata shapes, use a flat sealed record when they do not, and never paper over shape differences with nullable fields. See [§Pattern Definition](#pattern-definition) and [§Proof Obligations](#proof-obligations).
+> - **Derive from catalogs, never mirror them** — do not maintain parallel token sets, keyword lists, or other copies of knowledge the catalogs already own. See [§Architectural Identity: Metadata-Driven](#architectural-identity-metadata-driven), [§Cross-Catalog Derivation](#cross-catalog-derivation), and [§Pipeline Stage Impact](#pipeline-stage-impact).
+
+## Contents
+
+- [Overview](#overview)
+- [Vision: Metadata for the Entire Language](#vision-metadata-for-the-entire-language)
+- [Completeness Principle](#completeness-principle)
+  - [Enums that remain bare](#enums-that-remain-bare)
+- [Architectural Identity: Metadata-Driven](#architectural-identity-metadata-driven)
+  - [Vision precedes consumers](#vision-precedes-consumers)
+  - [The decision framework](#the-decision-framework)
+  - [Enforcement](#enforcement)
+  - [Derive, never duplicate](#derive-never-duplicate)
+- [Catalog Schema](#catalog-schema)
+  - [Level 1 — Catalog Overview Map](#level-1--catalog-overview-map)
+  - [Level 2 — Schema Anatomy](#level-2--schema-anatomy)
+  - [Level 3 — Member Inventories](#level-3--member-inventories)
+- [Pattern Definition](#pattern-definition)
+  - [1. Kind enum — the closed set](#1-kind-enum--the-closed-set)
+  - [2. Meta record — what consumers need to know](#2-meta-record--what-consumers-need-to-know)
+  - [Meta record shape: flat record vs discriminated union](#meta-record-shape-flat-record-vs-discriminated-union)
+  - [3. Static catalog class — the exhaustive switch](#3-static-catalog-class--the-exhaustive-switch)
+  - [4. Output value type — what the pipeline produces](#4-output-value-type--what-the-pipeline-produces)
+- [Why Exhaustive Switch, Not Attributes + Reflection](#why-exhaustive-switch-not-attributes--reflection)
+- [Roslyn Enforcement Layer](#roslyn-enforcement-layer)
+  - [Implemented Rules](#implemented-rules)
+  - [Two-Layer Enforcement Model](#two-layer-enforcement-model)
+  - [Future Rules](#future-rules)
+- [Exhaustiveness Enforcement Strategies](#exhaustiveness-enforcement-strategies)
+  - [Strategy 1: CS8509 — Compiler-Enforced Exhaustive Switch](#strategy-1-cs8509--compiler-enforced-exhaustive-switch)
+  - [Strategy 2: `[HandlesCatalogExhaustively]` + `[HandlesCatalogMember]` — Analyzer-Enforced Distributed Dispatch](#strategy-2-handlescatalogexhaustively--handlescatalogmember--analyzer-enforced-distributed-dispatch)
+  - [Decision Rule for New Dispatchers](#decision-rule-for-new-dispatchers)
+  - [Implementation Dispatchers](#implementation-dispatchers)
+- [Naming Convention](#naming-convention)
+- [Catalog Inventory](#catalog-inventory)
+  - [Language Definition Catalogs](#language-definition-catalogs)
+  - [Failure Mode Catalogs](#failure-mode-catalogs)
+- [Supporting Types](#supporting-types)
+  - [TypeTarget discriminated union](#typetarget-discriminated-union)
+- [Qualifier Propagation](#qualifier-propagation)
+  - [The split](#the-split)
+  - [Qualifier propagation patterns](#qualifier-propagation-patterns)
+  - [Five qualifier-bearing types](#five-qualifier-bearing-types)
+  - [Unknown qualifier handling](#unknown-qualifier-handling)
+- [Proof Obligations](#proof-obligations)
+  - [ProofSubject discriminated union](#proofsubject-discriminated-union)
+  - [ProofRequirement discriminated union](#proofrequirement-discriminated-union)
+  - [Valid subjects and requirement types per catalog entry](#valid-subjects-and-requirement-types-per-catalog-entry)
+  - [ParameterMeta — object-reference safety](#parametermeta--object-reference-safety)
+  - [Complete proof obligation inventory](#complete-proof-obligation-inventory)
+- [Construct Slot Model](#construct-slot-model)
+- [Qualifier Registries (Not Catalogs)](#qualifier-registries-not-catalogs)
+- [Syntax Reference](#syntax-reference)
+- [Cross-Catalog Derivation](#cross-catalog-derivation)
+- [Future Opportunities](#future-opportunities)
+- [Test Strategy](#test-strategy)
+  - [Non-negotiable rules](#non-negotiable-rules)
+  - [Cross-catalog integrity tests](#cross-catalog-integrity-tests)
+- [Pipeline Stage Impact](#pipeline-stage-impact)
+  - [Parser-catalog integration pattern](#parser-catalog-integration-pattern)
+  - [TypeChecker-catalog integration pattern](#typechecker-catalog-integration-pattern)
+  - [GraphAnalyzer-catalog integration pattern](#graphanalyzer-catalog-integration-pattern)
+  - [ProofEngine-catalog integration pattern](#proofengine-catalog-integration-pattern)
+  - [Evaluator-catalog integration pattern](#evaluator-catalog-integration-pattern)
+  - [PreceptBuilder-catalog integration pattern](#preceptbuilder-catalog-integration-pattern)
+  - [LanguageServer-catalog integration pattern](#languageserver-catalog-integration-pattern)
+- [Open Questions / Implementation Notes](#open-questions--implementation-notes)
+  - [ValueModifierMeta.ProofSatisfactions](#valuemodifiermetaproofsatisfactions)
+  - [ConstructMeta.ModelContribution (Candidate)](#constructmetamodelcontribution-candidate)
+  - [FieldDescriptor.AccessModes](#fielddescriptoraccessmodes)
+  - [FaultCode.AmbiguousDispatch](#faultcodeambiguousdispatch)
+  - [Catalog documentation strings (HoverDescription / SnippetTemplate)](#catalog-documentation-strings-hoverdescription--snippettemplate)
+- [Cross-References](#cross-references)
+
 ## Overview
 
 The catalog system is the **authoritative machine-readable definition of the Precept language.** Fourteen catalogs — twelve describing what the language IS, two describing how it reports failures — form a closed, compiler-enforced registry. This document defines the catalog pattern, the fourteen-catalog inventory, their shapes, cross-catalog derivation relationships, and future opportunities.

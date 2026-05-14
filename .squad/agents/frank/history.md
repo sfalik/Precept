@@ -20,6 +20,15 @@
 
 ## Recent Updates
 
+### 2026-05-14T01:46:51-04:00 — Deep architectural reassessment of quantity normalization design
+
+- Answered Shane's 6 questions on pipeline placement, shared representations, and optimal seams.
+- Key verdicts: no shared opcodes between ProofEngine and Evaluator (share source data not execution plans); no Builder in compile pipeline; universal `IntervalOf` post-step instead of per-node normalization; `TypedField` stores both original and normalized bounds; no `QuantityValue` wrapper; normalizer stays in `Language/Numeric/`.
+- Simplified Slice 14 by dropping `NormalizedNumericValue` record — bare `decimal` return is sufficient.
+- Unified Slices 19–20 (interpolated case) with static-literal path via `TryGetStaticUnit` helper.
+- Filed decision record at `.squad/decisions/inbox/frank-architecture-reassessment.md` with D1–D7.
+- Three new open questions (Q7–Q9) for Shane on requirement shape, interval API, and TypedField width.
+
 ### 2026-05-14T01:23:00-04:00 — Interpolated quantity expression analysis for normalization design
 
 - Discovered that the actual `samples/Test.precept` `NumericOverflow` fires on an **interpolated** expression (`'{test2} [lb_av]'` → `TypedInterpolatedTypedConstant`), not a static literal (`TypedTypedConstant`).
@@ -65,3 +74,4 @@
 - Universal post-step patterns (compute raw interval → scale by static unit) are strictly superior to per-node-type normalization scattered across switch arms in `IntervalOfNarrowed`. The `TryGetStaticUnit` helper unifies static and interpolated typed constants.
 - "Store both original and normalized" on `TypedField` resolves the display-vs-comparison tension permanently — 2 extra `decimal?` fields per field is negligible cost for eliminating an entire class of design questions.
 - Long runtime/tooling docs need a `## Contents` section driven by live H2/H3 headings so AI navigation stays reliable.
+- Added `## Contents` sections and `> [!IMPORTANT]` non-negotiable callout boxes to the five critical architecture docs so agents hit architectural invariants before diving into body prose.

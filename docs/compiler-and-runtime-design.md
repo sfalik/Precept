@@ -5,6 +5,85 @@
 
 **How to read this document.** Sections 1–3 establish what Precept promises, its architectural approach (catalog-driven, purpose-built, unified pipeline), and the end-to-end pipeline overview — read these first for the design's spine. Sections 4–5 cover Lexer and Parser. Section 5b covers NameBinder. Sections 6–10 are the per-stage contracts (Type Checker through Precept Builder), each opening with how that stage serves the structural guarantee; read them in order for the compilation story, or jump to a specific stage when doing component work. Section 6 (Type Checker) also defines the `SemanticIndex` artifact — its flat semantic-inventory shape, syntax-node back-pointers, and the anti-mirroring rules that keep downstream consumers independent of source structure. Section 11 covers the runtime surface and operations. Section 12 covers type and immutability strategy — a cross-cutting architectural concern that governs every artifact in the pipeline; it is placed here because it is most meaningful after seeing the full compilation and runtime picture. Sections 13–15 cover tooling integration (TextMate grammar generation, MCP, language server) — the consumer-facing contracts that tie compilation output to real product surfaces.
 
+> [!IMPORTANT]
+> **Non-Negotiable Rules — Read Before Implementing**
+>
+> - **Catalog-driven first** — language surface changes start in the catalogs; TextMate grammar, completions, hover, and MCP vocabulary derive from those catalog entries rather than separate hand-maintained lists. See [§2. Architectural approach](#2-architectural-approach), [§13. TextMate grammar generation](#13-textmate-grammar-generation), [§14. MCP integration](#14-mcp-integration), and [§15. Language-server integration](#15-language-server-integration).
+> - **Do not mirror syntax in semantics** — `SemanticIndex` is a flat semantic inventory, not a structural mirror of the parse tree, and the pipeline must not accumulate parallel intermediate tree nodes just to preserve parser shape. See [§6. Type Checker](#6-type-checker), [§SemanticIndex: flat semantic inventory, not a mirrored tree](#semanticindex-flat-semantic-inventory-not-a-mirrored-tree), and [§Anti-mirroring rules](#anti-mirroring-rules).
+> - **Stage boundaries are type contracts** — each pipeline stage consumes artifact types and produces artifact types, and those artifact contracts are the architecture. See [§3. The pipeline](#3-the-pipeline), [§Parser/NameBinder/TypeChecker contract boundary](#parsernamebindertypechecker-contract-boundary), and [§9. Compilation](#9-compilation).
+
+## Contents
+
+- [1. What Precept promises](#1-what-precept-promises)
+- [2. Architectural approach](#2-architectural-approach)
+  - [Catalog-driven design](#catalog-driven-design)
+  - [Purpose-built](#purpose-built)
+  - [Unified pipeline](#unified-pipeline)
+- [3. The pipeline](#3-the-pipeline)
+  - [Artifact inventory](#artifact-inventory)
+  - [What crosses into the executable model](#what-crosses-into-the-executable-model)
+- [4. Lexer](#4-lexer)
+  - [Completion filtering via `ValidAfter`](#completion-filtering-via-validafter)
+- [5. Parser](#5-parser)
+  - [Parser/NameBinder/TypeChecker contract boundary](#parsernamebindertypechecker-contract-boundary)
+  - [Error recovery](#error-recovery)
+  - [Output: `ParsedConstruct` and `SlotValue`](#output-parsedconstruct-and-slotvalue)
+  - [Catalog-to-grammar mapping](#catalog-to-grammar-mapping)
+  - [Right-sized parser patterns](#right-sized-parser-patterns)
+  - [`ActionKind` dual-use note](#actionkind-dual-use-note)
+- [6. Type Checker](#6-type-checker)
+  - [SemanticIndex: flat semantic inventory, not a mirrored tree](#semanticindex-flat-semantic-inventory-not-a-mirrored-tree)
+  - [SemanticIndex inventory](#semanticindex-inventory)
+  - [Anti-mirroring rules](#anti-mirroring-rules)
+  - [Right-sized type checking: generic resolution passes](#right-sized-type-checking-generic-resolution-passes)
+  - [Typed action family — three shapes only](#typed-action-family--three-shapes-only)
+  - [Earliest-knowable kind assignment](#earliest-knowable-kind-assignment)
+- [7. Graph Analyzer](#7-graph-analyzer)
+  - [StateGraph inventory](#stategraph-inventory)
+- [8. Proof Engine](#8-proof-engine)
+  - [ProofLedger inventory](#proofledger-inventory)
+  - [Proof strategy set](#proof-strategy-set)
+  - [Per-obligation disposition model](#per-obligation-disposition-model)
+  - [Initial-state satisfiability](#initial-state-satisfiability)
+  - [Proof/fault chain](#prooffault-chain)
+- [9. Compilation](#9-compilation)
+  - [Artifact inventory](#artifact-inventory-1)
+  - [Incremental compilation model](#incremental-compilation-model)
+  - [Contract digest hash](#contract-digest-hash)
+  - [Definition versioning](#definition-versioning)
+- [10. Precept Builder](#10-precept-builder)
+  - [Precept inventory](#precept-inventory)
+  - [Executable-model contract](#executable-model-contract)
+  - [Descriptor type shapes](#descriptor-type-shapes)
+  - [Expression evaluation model](#expression-evaluation-model)
+  - [Precept Builder: restructuring, not renaming](#precept-builder-restructuring-not-renaming)
+  - [Constraint activation indexes](#constraint-activation-indexes)
+  - [`Version` serialization contract](#version-serialization-contract)
+  - [Current surface](#current-surface)
+- [11. Runtime surface and operations](#11-runtime-surface-and-operations)
+  - [Evaluator](#evaluator)
+  - [Constraint evaluation matrix](#constraint-evaluation-matrix)
+  - [Create](#create)
+  - [Restore](#restore)
+  - [Fire](#fire)
+  - [Update](#update)
+  - [Structured outcomes](#structured-outcomes)
+  - [Commit outcomes by operation](#commit-outcomes-by-operation)
+  - [Inspection](#inspection)
+  - [Constraint query contract](#constraint-query-contract)
+  - [Structured "why not" violation explanations](#structured-why-not-violation-explanations)
+  - [Operation-facing plan selection](#operation-facing-plan-selection)
+- [12. Type and immutability strategy](#12-type-and-immutability-strategy)
+- [13. TextMate grammar generation](#13-textmate-grammar-generation)
+  - [Catalog contributions to the grammar](#catalog-contributions-to-the-grammar)
+  - [Anti-pattern](#anti-pattern)
+- [14. MCP integration](#14-mcp-integration)
+  - [Tool inventory](#tool-inventory)
+  - [Architectural principles](#architectural-principles)
+  - [AI-first design principle](#ai-first-design-principle)
+- [15. Language-server integration](#15-language-server-integration)
+  - [Consumer artifact map](#consumer-artifact-map)
+
 ## 1. What Precept promises
 
 Precept is a domain integrity engine for .NET. A single declarative contract governs how a business entity's data evolves under business rules across its lifecycle, making invalid configurations structurally impossible. You declare fields, constraints, lifecycle states, and transitions in one `.precept` file. The runtime compiles that declaration into an immutable engine that enforces every rule on every operation. No invalid combination of lifecycle position and field data can persist.
