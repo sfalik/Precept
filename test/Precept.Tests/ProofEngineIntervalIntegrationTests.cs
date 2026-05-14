@@ -92,6 +92,69 @@ from Active on Update
                 "Set action on bounded field should generate interval containment obligation via catalog metadata");
     }
 
+    [Fact]
+    public void ObligationCollection_DecimalFieldWithBounds_StillGeneratesObligation()
+    {
+        const string precept = @"
+precept DecimalBounds
+field amount as decimal min 0 max 100
+state Active initial
+event Update(NewAmount as decimal)
+from Active on Update
+    -> set amount = amount
+    -> no transition";
+
+        CountIntervalContainmentObligations(precept).Should().Be(1);
+    }
+
+    [Fact]
+    public void ObligationCollection_NumberFieldWithBounds_StillGeneratesObligation()
+    {
+        const string precept = @"
+precept NumberBounds
+field amount as number min 0 max 100
+state Active initial
+event Update(NewAmount as number)
+from Active on Update
+    -> set amount = amount
+    -> no transition";
+
+        CountIntervalContainmentObligations(precept).Should().Be(1);
+    }
+
+    [Fact]
+    public void ObligationCollection_IntegerField_NoObligationGenerated()
+    {
+        const string precept = @"
+precept IntegerField
+field count as integer
+state Active initial
+event Increment(NewCount as integer)
+from Active on Increment
+    -> set count = count
+    -> no transition";
+
+        CountIntervalContainmentObligations(precept).Should().Be(0);
+    }
+
+    [Fact]
+    public void ObligationCollection_FieldWithNoConstraintModifiers_NoObligation()
+    {
+        const string precept = @"
+precept UnboundedField
+field amount as decimal
+state Active initial
+event Update(NewAmount as decimal)
+from Active on Update
+    -> set amount = amount
+    -> no transition";
+
+        CountIntervalContainmentObligations(precept).Should().Be(0);
+    }
+
+    private static int CountIntervalContainmentObligations(string source)
+        => Compiler.Compile(source).Proof.Obligations.Count(o => o.Requirement.Kind == IntervalContainment);
+
     // ════════════════════════════════════════════════════════════════════════
     //  Inline precept constants — §9.2 fixture strategy
     //  "Do not reference .precept sample files" — defined inline only.

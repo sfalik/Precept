@@ -18,7 +18,7 @@
 | **4** | Function Overload Intervals | George | ✅ Done | — | Independent after Slice 2 |
 | **5** | Hover Expression Display + Diagnostic Squiggle | Kramer | ⏳ Pending | — | Depends on Slice 2 |
 | **6** | Regression + Symbol Export | Soup Nazi | ⏳ Pending | — | Final validation |
-| **7** | Catalog-Driven Obligation Generator Refactor | George | ⏳ Pending | — | Depends on Slice 2 |
+| **7** | Catalog-Driven Obligation Generator Refactor | George | ✅ Done | ProofEngineIntervalIntegrationTests; ProofEngineTests.Slice1_ObligationCollection; Precept.Tests | Catalog-driven bounds extraction from modifier metadata (ApplicableTo + ProofSatisfactions) wired for obligation generation; Slice 2 anchors remain green. |
 | **8** | Qualified-Type Bound Semantics | George | ⏳ Pending | — | Depends on Slice 7 |
 | **9** | Typed-Constant Bound Extraction | George | ⏳ Pending | — | Depends on Slice 8 |
 | **10** | Qualifier Compatibility Checks | George | ⏳ Pending | — | Depends on Slice 8 |

@@ -220,8 +220,8 @@ public static class Actions
     // ════════════════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Generates interval containment proof obligations for Set actions on bounded decimal/number fields.
-    /// Returns an empty array if the action's target is not a bounded decimal/number field.
+    /// Generates interval containment proof obligations for Set actions on constrained fields.
+    /// Returns an empty array if the action's target has no catalog-declared interval bounds.
     /// </summary>
     private static ImmutableArray<ProofObligation> GenerateIntervalContainmentObligations(
         TypedAction action,
@@ -231,9 +231,6 @@ public static class Actions
             return [];
         
         if (!semantics.FieldsByName.TryGetValue(inputAction.FieldName, out var targetField))
-            return [];
-        
-        if (targetField.ResolvedType != TypeKind.Decimal && targetField.ResolvedType != TypeKind.Number)
             return [];
         
         var (min, max) = ProofEngine.GetFieldBounds(targetField);

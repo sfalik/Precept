@@ -108,7 +108,95 @@ public static partial class ProofEngine
     }
 
     internal static (decimal? min, decimal? max) GetFieldBounds(TypedField field)
-        => (field.DeclaredMin, field.DeclaredMax);
+    {
+        decimal? min = null;
+        decimal? max = null;
+
+        foreach (var modifierKind in field.Modifiers.Concat(field.ImpliedModifiers))
+        {
+            if (Modifiers.GetMeta(modifierKind) is not ValueModifierMeta modifierMeta)
+                continue;
+            if (!ModifierAppliesToField(modifierMeta, field))
+                continue;
+
+            foreach (var satisfaction in modifierMeta.ProofSatisfactions.OfType<ProofSatisfaction.Numeric>())
+            {
+                if (satisfaction.Projection is not SatisfactionProjection.SelfValue)
+                    continue;
+                if (satisfaction.Bound is not NumericBoundSource.DeclarationValue)
+                    continue;
+                if (!TryResolveNumericBoundValue(field, modifierKind, satisfaction.Bound, out var boundValue))
+                    continue;
+
+                switch (satisfaction.Comparison)
+                {
+                    case OperatorKind.GreaterThanOrEqual:
+                        min = min.HasValue ? Math.Max(min.Value, boundValue) : boundValue;
+                        break;
+                    case OperatorKind.LessThanOrEqual:
+                        max = max.HasValue ? Math.Min(max.Value, boundValue) : boundValue;
+                        break;
+                }
+            }
+        }
+
+        return (min, max);
+    }
+
+    private static bool ModifierAppliesToField(ValueModifierMeta modifierMeta, TypedField field)
+    {
+        if (modifierMeta.ApplicableTo.Length == 0)
+            return true;
+
+        foreach (var target in modifierMeta.ApplicableTo)
+        {
+            if (target.Kind is not null && target.Kind != field.ResolvedType)
+                continue;
+
+            if (target is ModifiedTypeTarget modifiedTarget)
+            {
+                if (!modifiedTarget.RequiredModifiers.All(required =>
+                        field.Modifiers.Contains(required) || field.ImpliedModifiers.Contains(required)))
+                {
+                    continue;
+                }
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool TryResolveNumericBoundValue(
+        TypedField field,
+        ModifierKind modifierKind,
+        NumericBoundSource source,
+        out decimal value)
+    {
+        switch (source)
+        {
+            case NumericBoundSource.DeclarationValue:
+            {
+                var declarationBound = modifierKind switch
+                {
+                    ModifierKind.Min => field.DeclaredMin,
+                    ModifierKind.Max => field.DeclaredMax,
+                    _ => null
+                };
+
+                if (declarationBound.HasValue)
+                {
+                    value = declarationBound.Value;
+                    return true;
+                }
+                break;
+            }
+        }
+
+        value = default;
+        return false;
+    }
 
     private static bool TryIntervalContainmentProof(
         ProofObligation obligation,
