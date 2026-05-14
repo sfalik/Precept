@@ -20,6 +20,16 @@
 
 ## Recent Updates
 
+### 2026-05-14T01:55:05-04:00 — Catalog integration analysis for quantity normalization
+
+- Answered Shane's 4-part question on whether UCUM normalization belongs in catalog entries (Functions/Operations/Opcodes).
+- Key verdict: **No catalog changes required.** Normalization fails the "Is this part of a complete description of Precept?" test — it's implementation infrastructure, not language surface.
+- The evaluator never normalizes at runtime; the Builder pre-bakes normalized bounds into `LOAD_LIT` opcodes via `TypedField.NormalizedDeclaredMin/Max`.
+- The correct sharing seam between ProofEngine and Evaluator is the semantic model (`TypedField`), not catalog metadata.
+- No revision to Slices 14–21 required.
+- Added §0.1 to `docs/Working/quantity-normalization-design.md`.
+- Filed decision record at `.squad/decisions/inbox/frank-catalog-normalization.md` with D1–D5.
+
 ### 2026-05-14T01:46:51-04:00 — Deep architectural reassessment of quantity normalization design
 
 - Answered Shane's 6 questions on pipeline placement, shared representations, and optimal seams.
@@ -76,3 +86,9 @@
 - "Store both original and normalized" on `TypedField` resolves the display-vs-comparison tension permanently — 2 extra `decimal?` fields per field is negligible cost for eliminating an entire class of design questions.
 - Long runtime/tooling docs need a `## Contents` section driven by live H2/H3 headings so AI navigation stays reliable.
 - Added `## Contents` sections and `> [!IMPORTANT]` non-negotiable callout boxes to the five critical architecture docs so agents hit architectural invariants before diving into body prose.
+- UCUM quantity normalization is NOT a catalog concern — it fails the "Is this part of a complete description of Precept?" test. It is implementation logic (compile-time transformation + builder literal embedding), not language surface. The correct sharing seam between ProofEngine and Evaluator is `TypedField.NormalizedDeclaredMin/Max` (semantic model), not catalog metadata.
+- The evaluator never normalizes at runtime — the Builder pre-bakes normalized bounds into `LOAD_LIT` opcodes during Pass 5 (Constraint Plan). The evaluator only executes prebuilt plans with concrete comparisons.
+- "Should X be in the catalog?" has a sharp test: would X appear in MCP `precept_language` output, LS completions, or a complete description of the language surface? If no, it's implementation infrastructure regardless of how many pipeline stages consume it.
+- `docs/contributing/catalog-driven-checklist.md` had drifted behind the live catalog system: the current inventory is 14 catalogs, not 12, and the operational checklist must name `ExpressionForms` and `Outcomes` explicitly.
+- Parser guidance must match live derivation points: precedence now derives from `Operators` plus `ExpressionForms`, outcome dispatch derives from `Outcomes.ByLeadingToken`, and member-name legality derives from `Types` accessors through `Tokens.KeywordsValidAsMemberName`.
+- The checklist should call out the current Roslyn enforcement layer, especially distributed dispatcher coverage (`[HandlesCatalogExhaustively]` / `[HandlesCatalogMember]`) and `[CatalogDU]` wildcard/completeness rules.
