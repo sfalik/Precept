@@ -1,4 +1,6 @@
 using System.Collections.Immutable;
+using System.Globalization;
+using System.Runtime.CompilerServices;
 using Precept.Language;
 
 namespace Precept.Pipeline;
@@ -165,7 +167,7 @@ internal static partial class TypeChecker
         }
 
         ValidateBoundQualifierRequirements(modifiers, resolvedType, declaredQualifiers, ctx);
-        ValidateModifierBounds(modifiers, span, ctx);
+        ValidateModifierBounds(modifiers, resolvedType, declaredQualifiers, span, ctx);
     }
 
     private static void ValidateBoundQualifierRequirements(
@@ -252,6 +254,8 @@ internal static partial class TypeChecker
 
     private static void ValidateModifierBounds(
         ImmutableArray<ParsedModifier> modifiers,
+        TypeKind resolvedType,
+        ImmutableArray<DeclaredQualifierMeta> declaredQualifiers,
         SourceSpan span,
         CheckContext ctx)
     {
@@ -271,9 +275,9 @@ internal static partial class TypeChecker
             if (!byKind.TryGetValue(meta.BoundCounterpart.Value, out var counterpart))
                 continue;
 
-            var lowerValue = TryGetComparableModifierValue(modifier.Value);
-            var upperValue = TryGetComparableModifierValue(counterpart.Value);
-            if (lowerValue is null || upperValue is null || lowerValue <= upperValue)
+            var lowerValue = TryGetComparableModifierValue(modifier.Value, resolvedType, declaredQualifiers);
+            var upperValue = TryGetComparableModifierValue(counterpart.Value, resolvedType, declaredQualifiers);
+            if (lowerValue is null || upperValue is null || lowerValue.Value.Magnitude <= upperValue.Value.Magnitude)
                 continue;
 
             var counterpartMeta = (ValueModifierMeta)Modifiers.GetMeta(meta.BoundCounterpart.Value);
@@ -282,9 +286,9 @@ internal static partial class TypeChecker
                     DiagnosticCode.InvalidModifierBounds,
                     span,
                     meta.Token.Text ?? modifier.Kind.ToString(),
-                    lowerValue.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    lowerValue.Value.Magnitude.ToString(CultureInfo.InvariantCulture),
                     counterpartMeta.Token.Text ?? counterpart.Kind.ToString(),
-                    upperValue.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+                    upperValue.Value.Magnitude.ToString(CultureInfo.InvariantCulture)));
         }
     }
 
@@ -294,22 +298,73 @@ internal static partial class TypeChecker
             .Select(proof => proof.Comparison)
             .FirstOrDefault() is OperatorKind.GreaterThan or OperatorKind.GreaterThanOrEqual;
 
-    private static decimal? TryGetComparableModifierValue(ParsedExpression? expr) => expr switch
+    private static ExtractedBoundValue? TryGetComparableModifierValue(
+        ParsedExpression? expr,
+        TypeKind expectedType,
+        ImmutableArray<DeclaredQualifierMeta> declaredQualifiers) => expr switch
     {
         LiteralExpression { LiteralKind: TokenKind.NumberLiteral, Text: var text }
-            when decimal.TryParse(text, System.Globalization.NumberStyles.Number,
-                System.Globalization.CultureInfo.InvariantCulture, out var value)
-            => value,
+            when decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out var value)
+            => new(value, ImmutableArray<DeclaredQualifierMeta>.Empty),
+        LiteralExpression { LiteralKind: TokenKind.TypedConstant, Text: var text }
+            => TryGetComparableTypedConstantValue(text, expectedType, declaredQualifiers),
         UnaryOperationExpression
         {
             Operator: TokenKind.Minus,
             Operand: LiteralExpression { LiteralKind: TokenKind.NumberLiteral, Text: var text }
         }
-            when decimal.TryParse(text, System.Globalization.NumberStyles.Number,
-                System.Globalization.CultureInfo.InvariantCulture, out var value)
-            => -value,
+            when decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out var value)
+            => new(-value, ImmutableArray<DeclaredQualifierMeta>.Empty),
         _ => null,
     };
+
+    private static ExtractedBoundValue? TryGetComparableTypedConstantValue(
+        string rawText,
+        TypeKind expectedType,
+        ImmutableArray<DeclaredQualifierMeta> declaredQualifiers)
+    {
+        if (expectedType == TypeKind.Error)
+            return null;
+
+        var contentValidation = Types.GetMeta(expectedType).ContentValidation;
+        if (contentValidation is null)
+            return null;
+
+        var typedConstantContext = declaredQualifiers.IsDefaultOrEmpty
+            ? null
+            : new TypedConstantContext(DeclaredQualifiers: declaredQualifiers);
+        var parseResult = TypedConstantValidation.Validate(contentValidation, rawText, expectedType, typedConstantContext);
+        if (!parseResult.IsValid || !TryExtractTypedConstantMagnitude(parseResult.Value, out var magnitude))
+            return null;
+
+        var qualifiers = ExtractQualifiersFromParsedValue(expectedType, parseResult.Value)
+            ?? ImmutableArray<DeclaredQualifierMeta>.Empty;
+        return new ExtractedBoundValue(magnitude, qualifiers);
+    }
+
+    private static bool TryExtractTypedConstantMagnitude(object? parsedValue, out decimal magnitude)
+    {
+        if (parsedValue is decimal decimalValue)
+        {
+            magnitude = decimalValue;
+            return true;
+        }
+
+        if (parsedValue is ITuple tuple
+            && tuple.Length > 0
+            && tuple[0] is decimal tupleMagnitude)
+        {
+            magnitude = tupleMagnitude;
+            return true;
+        }
+
+        magnitude = default;
+        return false;
+    }
+
+    private readonly record struct ExtractedBoundValue(
+        decimal Magnitude,
+        ImmutableArray<DeclaredQualifierMeta> Qualifiers);
 
     /// <summary>
     /// Check whether a resolved type matches any entry in a modifier's ApplicableTo array.

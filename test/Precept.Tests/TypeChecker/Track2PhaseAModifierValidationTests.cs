@@ -43,6 +43,18 @@ public class Track2PhaseAModifierValidationTests
     }
 
     [Fact]
+    public void InvalidModifierBounds_MoneyTypedConstants_MinExceedsMax_EmitsDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Balance as money in 'USD' min '10 USD' max '5 USD'
+            state Draft initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.InvalidModifierBounds);
+    }
+
+    [Fact]
     public void WritableOnEventArg_RejectedByParserWithExpectedToken()
     {
         var precept = """

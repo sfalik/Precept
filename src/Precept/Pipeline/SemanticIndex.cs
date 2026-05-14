@@ -310,7 +310,9 @@ public sealed record TypedField(
     SourceSpan NameSpan,
     ParsedConstruct Syntax,
     decimal? DeclaredMin = null,
-    decimal? DeclaredMax = null
+    decimal? DeclaredMax = null,
+    ImmutableArray<DeclaredQualifierMeta> DeclaredMinBoundQualifiers = default,
+    ImmutableArray<DeclaredQualifierMeta> DeclaredMaxBoundQualifiers = default
 );
 
 /// <summary>Typed state declaration.</summary>
@@ -346,7 +348,9 @@ public sealed record TypedArg(
     ImmutableArray<DeclaredQualifierMeta> DeclaredQualifiers,
     SourceSpan Span,
     decimal? DeclaredMin = null,
-    decimal? DeclaredMax = null
+    decimal? DeclaredMax = null,
+    ImmutableArray<DeclaredQualifierMeta> DeclaredMinBoundQualifiers = default,
+    ImmutableArray<DeclaredQualifierMeta> DeclaredMaxBoundQualifiers = default
 );
 
 // ════════════════════════════════════════════════════════════════════════════

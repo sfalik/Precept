@@ -55,6 +55,131 @@ state Active initial";
         qtyField.DeclaredMax.Should().Be(1000m, "max 1000 modifier should be extracted");
     }
 
+    [Fact]
+    public void TypeChecker_MoneyFieldWithTypedConstantBounds_PopulatesDeclaredMinMaxAndQualifiers()
+    {
+        const string precept = @"
+precept MoneyBounds
+field cost as money in 'USD' min '0 USD' max '100000 USD'
+state Active initial";
+
+        var result = Compiler.Compile(precept);
+        var costField = result.Semantics.FieldsByName["cost"];
+
+        costField.DeclaredMin.Should().Be(0m);
+        costField.DeclaredMax.Should().Be(100000m);
+        costField.DeclaredMinBoundQualifiers.OfType<DeclaredQualifierMeta.Currency>().Select(q => q.CurrencyCode)
+            .Should().ContainSingle().Which.Should().Be("USD");
+        costField.DeclaredMaxBoundQualifiers.OfType<DeclaredQualifierMeta.Currency>().Select(q => q.CurrencyCode)
+            .Should().ContainSingle().Which.Should().Be("USD");
+    }
+
+    [Fact]
+    public void TypeChecker_QuantityFieldWithTypedConstantBounds_PopulatesDeclaredMaxAndQualifier()
+    {
+        const string precept = @"
+precept QuantityBounds
+field weight as quantity in 'kg' max '5 kg'
+state Active initial";
+
+        var result = Compiler.Compile(precept);
+        var weightField = result.Semantics.FieldsByName["weight"];
+
+        weightField.DeclaredMax.Should().Be(5m);
+        weightField.DeclaredMaxBoundQualifiers.OfType<DeclaredQualifierMeta.Unit>().Select(q => q.UnitCode)
+            .Should().ContainSingle().Which.Should().Be("kg");
+    }
+
+    [Fact]
+    public void TypeChecker_TypedConstantBounds_WithNegativeAndDecimalValues_PopulatesComparableValues()
+    {
+        const string precept = @"
+precept MoneyBounds
+field cost as money in 'USD' min '-50 USD' max '99.99 USD'
+state Active initial";
+
+        var result = Compiler.Compile(precept);
+        var costField = result.Semantics.FieldsByName["cost"];
+
+        costField.DeclaredMin.Should().Be(-50m);
+        costField.DeclaredMax.Should().Be(99.99m);
+    }
+
+    [Fact]
+    public void TypeChecker_PlainNumericAndUnaryMinusBounds_RemainRegressionSafe()
+    {
+        const string precept = @"
+precept NumericBounds
+field delta as decimal min -5 max 10
+state Active initial";
+
+        var result = Compiler.Compile(precept);
+        var deltaField = result.Semantics.FieldsByName["delta"];
+
+        deltaField.DeclaredMin.Should().Be(-5m);
+        deltaField.DeclaredMax.Should().Be(10m);
+    }
+
+    [Fact]
+    public void TypeChecker_InvalidTypedConstantBound_DoesNotPopulateDeclaredMin()
+    {
+        const string precept = @"
+precept MoneyBounds
+field cost as money in 'USD' min 'bad-value' max '100 USD'
+state Active initial";
+
+        var result = Compiler.Compile(precept);
+        var costField = result.Semantics.FieldsByName["cost"];
+
+        costField.DeclaredMin.Should().BeNull();
+        costField.DeclaredMax.Should().Be(100m);
+        result.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.InvalidTypedConstantContent));
+    }
+
+    [Fact]
+    public void IntervalObligation_MoneyFieldWithTypedConstantBounds_GeneratesCorrectBounds()
+    {
+        const string precept = @"
+precept MoneyBounds
+field cost as money in 'USD' min '0 USD' max '100000 USD'
+state Active initial
+event Recalculate
+from Active on Recalculate
+    -> set cost = cost
+    -> no transition";
+
+        var result = Compiler.Compile(precept);
+        var requirement = result.Proof.Obligations
+            .Select(o => o.Requirement)
+            .OfType<IntervalContainmentProofRequirement>()
+            .Single(r => r.TargetField == "cost");
+
+        requirement.DeclaredMin.Should().Be(0m);
+        requirement.DeclaredMax.Should().Be(100000m);
+    }
+
+    [Fact]
+    public void IntervalObligation_QuantityFieldWithTypedConstantBounds_GeneratesCorrectBounds()
+    {
+        const string precept = @"
+precept QuantityBounds
+field weight as quantity in 'kg' min '1 kg' max '5 kg'
+state Active initial
+event Recalculate
+from Active on Recalculate
+    -> set weight = weight
+    -> no transition";
+
+        var result = Compiler.Compile(precept);
+        var requirement = result.Proof.Obligations
+            .Select(o => o.Requirement)
+            .OfType<IntervalContainmentProofRequirement>()
+            .Single(r => r.TargetField == "weight");
+
+        requirement.DeclaredMin.Should().Be(1m);
+        requirement.DeclaredMax.Should().Be(5m);
+    }
+
     // ════════════════════════════════════════════════════════════════════════
     //  Catalog-driven architecture validation (Phase 2 - B2 diagnostic)
     // ════════════════════════════════════════════════════════════════════════

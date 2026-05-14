@@ -352,6 +352,13 @@ internal static partial class TypeChecker
             var impliedModifiers = resolvedType != TypeKind.Error
                 ? Types.GetMeta(resolvedType).ImpliedModifiers.ToImmutableArray()
                 : ImmutableArray<ModifierKind>.Empty;
+            var declaredQualifiers = ExtractQualifiers(declared.Type, ctx);
+            var declaredMinBound = declared.Modifiers.FirstOrDefault(m => m.Kind == ModifierKind.Min) is { Value: { } minExpr }
+                ? TryGetComparableModifierValue(minExpr, resolvedType, declaredQualifiers)
+                : null;
+            var declaredMaxBound = declared.Modifiers.FirstOrDefault(m => m.Kind == ModifierKind.Max) is { Value: { } maxExpr }
+                ? TryGetComparableModifierValue(maxExpr, resolvedType, declaredQualifiers)
+                : null;
 
             bool isOptional = modifiers.Contains(ModifierKind.Optional);
             bool isWritable = modifiers.Contains(ModifierKind.Writable);
@@ -372,15 +379,13 @@ internal static partial class TypeChecker
                 Presence: isOptional
                     ? new DeclaredPresenceMeta.Optional()
                     : new DeclaredPresenceMeta.Guaranteed(),
-                DeclaredQualifiers: ExtractQualifiers(declared.Type, ctx),
+                DeclaredQualifiers: declaredQualifiers,
                 NameSpan: declared.NameSpan,
                 Syntax: declared.Syntax,
-                DeclaredMin: declared.Modifiers.FirstOrDefault(m => m.Kind == ModifierKind.Min) is { Value: { } minExpr }
-                    ? TryGetComparableModifierValue(minExpr)
-                    : null,
-                DeclaredMax: declared.Modifiers.FirstOrDefault(m => m.Kind == ModifierKind.Max) is { Value: { } maxExpr }
-                    ? TryGetComparableModifierValue(maxExpr)
-                    : null);
+                DeclaredMin: declaredMinBound?.Magnitude,
+                DeclaredMax: declaredMaxBound?.Magnitude,
+                DeclaredMinBoundQualifiers: declaredMinBound?.Qualifiers ?? ImmutableArray<DeclaredQualifierMeta>.Empty,
+                DeclaredMaxBoundQualifiers: declaredMaxBound?.Qualifiers ?? ImmutableArray<DeclaredQualifierMeta>.Empty);
 
             ctx.Fields.Add(typedField);
             ctx.FieldLookup[declared.Name] = typedField;
@@ -483,6 +488,15 @@ internal static partial class TypeChecker
             foreach (var arg in declared.Args)
             {
                 var (resolvedType, _, _) = ResolveTypeKind(arg.Type);
+                var declaredQualifiers = ExtractQualifiers(arg.Type, ctx);
+                var declaredMinBound = arg.ParsedModifiers.IsDefaultOrEmpty ? null
+                    : arg.ParsedModifiers.FirstOrDefault(m => m.Kind == ModifierKind.Min) is { Value: { } minExpr }
+                        ? TryGetComparableModifierValue(minExpr, resolvedType, declaredQualifiers)
+                        : null;
+                var declaredMaxBound = arg.ParsedModifiers.IsDefaultOrEmpty ? null
+                    : arg.ParsedModifiers.FirstOrDefault(m => m.Kind == ModifierKind.Max) is { Value: { } maxExpr }
+                        ? TryGetComparableModifierValue(maxExpr, resolvedType, declaredQualifiers)
+                        : null;
                 argsBuilder.Add(new TypedArg(
                     Name: arg.Name,
                     EventName: arg.EventName,
@@ -494,16 +508,12 @@ internal static partial class TypeChecker
                     Presence: arg.Modifiers.Contains(ModifierKind.Optional)
                         ? new DeclaredPresenceMeta.Optional()
                         : new DeclaredPresenceMeta.Guaranteed(),
-                    DeclaredQualifiers: ExtractQualifiers(arg.Type, ctx),
+                    DeclaredQualifiers: declaredQualifiers,
                     Span: arg.NameSpan,
-                    DeclaredMin: arg.ParsedModifiers.IsDefaultOrEmpty ? null
-                        : arg.ParsedModifiers.FirstOrDefault(m => m.Kind == ModifierKind.Min) is { Value: { } minExpr }
-                            ? TryGetComparableModifierValue(minExpr)
-                            : null,
-                    DeclaredMax: arg.ParsedModifiers.IsDefaultOrEmpty ? null
-                        : arg.ParsedModifiers.FirstOrDefault(m => m.Kind == ModifierKind.Max) is { Value: { } maxExpr }
-                            ? TryGetComparableModifierValue(maxExpr)
-                            : null));
+                    DeclaredMin: declaredMinBound?.Magnitude,
+                    DeclaredMax: declaredMaxBound?.Magnitude,
+                    DeclaredMinBoundQualifiers: declaredMinBound?.Qualifiers ?? ImmutableArray<DeclaredQualifierMeta>.Empty,
+                    DeclaredMaxBoundQualifiers: declaredMaxBound?.Qualifiers ?? ImmutableArray<DeclaredQualifierMeta>.Empty));
             }
 
             var typedEvent = new TypedEvent(
