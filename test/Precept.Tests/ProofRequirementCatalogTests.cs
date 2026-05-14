@@ -216,4 +216,80 @@ public class ProofRequirementCatalogTests
         singleSubject.Should().HaveCount(7,
             "IntervalContainment, LengthContainment, and CountContainment join Numeric, Presence, Dimension, Modifier as single-subject");
     }
+
+    // ── Slice 9C — Catalog-mediated DiagnosticCode ──────────────────────────────
+
+    [Fact]
+    public void IntervalContainment_DiagnosticCode_IsNumericOverflow()
+    {
+        ProofRequirements.GetMeta(ProofRequirementKind.IntervalContainment)
+            .DiagnosticCode.Should().Be(DiagnosticCode.NumericOverflow);
+    }
+
+    [Fact]
+    public void LengthContainment_DiagnosticCode_IsLengthBoundViolation()
+    {
+        ProofRequirements.GetMeta(ProofRequirementKind.LengthContainment)
+            .DiagnosticCode.Should().Be(DiagnosticCode.LengthBoundViolation);
+    }
+
+    [Fact]
+    public void CountContainment_DiagnosticCode_IsCountBoundViolation()
+    {
+        ProofRequirements.GetMeta(ProofRequirementKind.CountContainment)
+            .DiagnosticCode.Should().Be(DiagnosticCode.CountBoundViolation);
+    }
+
+    [Fact]
+    public void Presence_DiagnosticCode_IsUnprovedPresenceRequirement()
+    {
+        ProofRequirements.GetMeta(ProofRequirementKind.Presence)
+            .DiagnosticCode.Should().Be(DiagnosticCode.UnprovedPresenceRequirement);
+    }
+
+    [Fact]
+    public void Modifier_DiagnosticCode_IsUnprovedModifierRequirement()
+    {
+        ProofRequirements.GetMeta(ProofRequirementKind.Modifier)
+            .DiagnosticCode.Should().Be(DiagnosticCode.UnprovedModifierRequirement);
+    }
+
+    [Fact]
+    public void Dimension_DiagnosticCode_IsUnprovedDimensionRequirement()
+    {
+        ProofRequirements.GetMeta(ProofRequirementKind.Dimension)
+            .DiagnosticCode.Should().Be(DiagnosticCode.UnprovedDimensionRequirement);
+    }
+
+    [Fact]
+    public void QualifierCompatibility_DiagnosticCode_IsUnprovedQualifierCompatibility()
+    {
+        ProofRequirements.GetMeta(ProofRequirementKind.QualifierCompatibility)
+            .DiagnosticCode.Should().Be(DiagnosticCode.UnprovedQualifierCompatibility);
+    }
+
+    [Fact]
+    public void QualifierChain_DiagnosticCode_IsUnprovedQualifierCompatibility()
+    {
+        ProofRequirements.GetMeta(ProofRequirementKind.QualifierChain)
+            .DiagnosticCode.Should().Be(DiagnosticCode.UnprovedQualifierCompatibility);
+    }
+
+    [Fact]
+    public void Numeric_DiagnosticCode_IsNull_BecauseContextDependent()
+    {
+        ProofRequirements.GetMeta(ProofRequirementKind.Numeric)
+            .DiagnosticCode.Should().BeNull(
+                "Numeric obligations have a 1:many diagnostic mapping requiring per-obligation context dispatch");
+    }
+
+    [Fact]
+    public void AllNonNumericKinds_HaveNonNullDiagnosticCode()
+    {
+        var nonNumeric = ProofRequirements.All
+            .Where(m => m.Kind != ProofRequirementKind.Numeric)
+            .ToList();
+        nonNumeric.Should().AllSatisfy(m =>
+            m.DiagnosticCode.Should().NotBeNull($"{m.Kind} should have a catalog-mediated DiagnosticCode"));
+    }
 }

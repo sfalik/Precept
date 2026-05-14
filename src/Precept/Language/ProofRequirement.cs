@@ -167,6 +167,18 @@ public sealed record CountContainmentProofRequirement(
     string Description
 ) : ProofRequirement(ProofRequirementKind.CountContainment, Description);
 
+/// <summary>
+/// Key presence proof: a collection must contain (or must NOT contain) a specific
+/// element/key before the action is safe to perform.
+/// <see cref="RequireAbsence"/> = false → element must be present (PRE0099 on failure).
+/// <see cref="RequireAbsence"/> = true → element must NOT be present (PRE0101 on failure).
+/// </summary>
+public sealed record KeyPresenceProofRequirement(
+    ProofSubject Subject,
+    bool RequireAbsence,
+    string Description
+) : ProofRequirement(ProofRequirementKind.KeyPresence, Description);
+
 // ════════════════════════════════════════════════════════════════════════════════
 //  ProofRequirementMeta — catalog meta (DU as identity)
 // ════════════════════════════════════════════════════════════════════════════════
@@ -176,28 +188,43 @@ public sealed record CountContainmentProofRequirement(
 /// the subtype IS the semantic signal. <see cref="QualifierCompatibility"/> is explicitly distinct
 /// as the only dual-subject kind; consumers can check <c>meta is ProofRequirementMeta.QualifierCompatibility</c>
 /// without inspecting a <c>SubjectArity</c> field.
+///
+/// <see cref="DiagnosticCode"/> is the catalog-mediated diagnostic for this obligation kind.
+/// Null only for <see cref="Numeric"/> — which has a 1:many mapping that requires per-obligation
+/// context dispatch (see <c>GetNumericRequirementDiagnosticCode</c>).
 /// </summary>
-public abstract record ProofRequirementMeta(ProofRequirementKind Kind, string Description)
+public abstract record ProofRequirementMeta(
+    ProofRequirementKind Kind,
+    string Description,
+    DiagnosticCode? DiagnosticCode)
 {
-    /// <summary>Numeric interval check — value comparison against threshold.</summary>
+    /// <summary>
+    /// Numeric interval check — value comparison against threshold.
+    /// DiagnosticCode is null: Numeric obligations map to DivisionByZero, SqrtOfNegative,
+    /// UnguardedCollectionAccess, or UnguardedCollectionMutation depending on context.
+    /// </summary>
     public sealed record Numeric()
         : ProofRequirementMeta(ProofRequirementKind.Numeric,
-            "Numeric interval check — value comparison against threshold (e.g. divisor != 0)");
+            "Numeric interval check — value comparison against threshold (e.g. divisor != 0)",
+            null);
 
     /// <summary>Presence check — optional field must be set before access.</summary>
     public sealed record Presence()
         : ProofRequirementMeta(ProofRequirementKind.Presence,
-            "Presence check — optional field must be set before access");
+            "Presence check — optional field must be set before access",
+            Language.DiagnosticCode.UnprovedPresenceRequirement);
 
     /// <summary>Dimension check — period operand must have required time dimension.</summary>
     public sealed record Dimension()
         : ProofRequirementMeta(ProofRequirementKind.Dimension,
-            "Dimension check — period operand must have required time dimension");
+            "Dimension check — period operand must have required time dimension",
+            Language.DiagnosticCode.UnprovedDimensionRequirement);
 
     /// <summary>Modifier check — field must declare required modifier (e.g. <c>ordered</c>).</summary>
     public sealed record Modifier()
         : ProofRequirementMeta(ProofRequirementKind.Modifier,
-            "Modifier check — field must declare required modifier");
+            "Modifier check — field must declare required modifier",
+            Language.DiagnosticCode.UnprovedModifierRequirement);
 
     /// <summary>
     /// Qualifier axis compatibility — two operands must share a qualifier value.
@@ -207,27 +234,32 @@ public abstract record ProofRequirementMeta(ProofRequirementKind Kind, string De
     /// </summary>
     public sealed record QualifierCompatibility()
         : ProofRequirementMeta(ProofRequirementKind.QualifierCompatibility,
-            "Qualifier compatibility — two operands must share a qualifier value on the specified axis");
+            "Qualifier compatibility — two operands must share a qualifier value on the specified axis",
+            Language.DiagnosticCode.UnprovedQualifierCompatibility);
 
     /// <summary>Qualifier chain — cross-type, cross-axis qualifier validation.</summary>
     public sealed record QualifierChain()
         : ProofRequirementMeta(ProofRequirementKind.QualifierChain,
-            "Qualifier chain — cross-type, cross-axis qualifier validation");
+            "Qualifier chain — cross-type, cross-axis qualifier validation",
+            Language.DiagnosticCode.UnprovedQualifierCompatibility);
 
     /// <summary>Interval containment — result interval must fit within target field's declared bounds.</summary>
     public sealed record IntervalContainment()
         : ProofRequirementMeta(ProofRequirementKind.IntervalContainment,
-            "Interval containment — result interval must fit within target field's declared bounds");
+            "Interval containment — result interval must fit within target field's declared bounds",
+            Language.DiagnosticCode.NumericOverflow);
 
     /// <summary>Length containment — assigned string's character length must fit within declared minlength/maxlength.</summary>
     public sealed record LengthContainment()
         : ProofRequirementMeta(ProofRequirementKind.LengthContainment,
-            "Length containment — assigned string's character length must fit within declared minlength/maxlength");
+            "Length containment — assigned string's character length must fit within declared minlength/maxlength",
+            Language.DiagnosticCode.LengthBoundViolation);
 
     /// <summary>Count containment — collection element count must fit within declared mincount/maxcount.</summary>
     public sealed record CountContainment()
         : ProofRequirementMeta(ProofRequirementKind.CountContainment,
-            "Count containment — collection element count must fit within declared mincount/maxcount");
+            "Count containment — collection element count must fit within declared mincount/maxcount",
+            Language.DiagnosticCode.CountBoundViolation);
 }
 
 // ProofSatisfaction DU — positive carrier fact that can satisfy a ProofRequirement

@@ -231,29 +231,14 @@ public static partial class ProofEngine
 
     private static FaultSiteLink CreateFaultSiteLink(ProofObligation obligation)
     {
-        switch (obligation.Requirement)
-        {
-            case NumericProofRequirement numeric:
-                return CreateFaultSiteLink(obligation, GetNumericRequirementDiagnosticCode(obligation, numeric));
-            case ModifierRequirement:
-                return CreateFaultSiteLink(obligation, DiagnosticCode.UnprovedModifierRequirement);
-            case DimensionProofRequirement:
-                return CreateFaultSiteLink(obligation, DiagnosticCode.UnprovedDimensionRequirement);
-            case QualifierCompatibilityProofRequirement:
-                return CreateFaultSiteLink(obligation, DiagnosticCode.UnprovedQualifierCompatibility);
-            case QualifierChainProofRequirement:
-                return CreateFaultSiteLink(obligation, DiagnosticCode.UnprovedQualifierCompatibility);
-            case PresenceProofRequirement:
-                return CreateFaultSiteLink(obligation, DiagnosticCode.UnprovedPresenceRequirement);
-            case IntervalContainmentProofRequirement:
-                return CreateFaultSiteLink(obligation, DiagnosticCode.NumericOverflow);
-            case LengthContainmentProofRequirement:
-                return CreateFaultSiteLink(obligation, DiagnosticCode.LengthBoundViolation);
-            case CountContainmentProofRequirement:
-                return CreateFaultSiteLink(obligation, DiagnosticCode.CountBoundViolation);
-        }
+        // Numeric obligations have a 1:many diagnostic mapping that requires per-obligation
+        // context dispatch — legitimate direct emission per governing policy.
+        if (obligation.Requirement is NumericProofRequirement numeric)
+            return CreateFaultSiteLink(obligation, GetNumericRequirementDiagnosticCode(obligation, numeric));
 
-        throw new InvalidOperationException($"Unexpected proof requirement type '{obligation.Requirement.GetType().FullName}'.");
+        // All other obligation kinds have a stable 1:1 kind→diagnostic mapping in catalog metadata.
+        var meta = ProofRequirements.GetMeta(obligation.Requirement.Kind);
+        return CreateFaultSiteLink(obligation, meta.DiagnosticCode!.Value);
     }
 
     private static FaultSiteLink CreateFaultSiteLink(ProofObligation obligation, DiagnosticCode diagnosticCode)

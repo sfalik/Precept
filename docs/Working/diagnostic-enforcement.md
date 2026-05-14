@@ -811,12 +811,12 @@ Test method names:
 
 **Files:** `src/Precept/Pipeline/Parser.cs` (modify), `test/Precept.Tests/Parser/ParserGuardValidationTests.cs` (create)
 
-- [ ] Add `OmitDoesNotSupportGuard` rejection in `ParseOmitDeclaration` (or equivalent)
-- [ ] Add `EventHandlerDoesNotSupportGuard` rejection in `ParseEventHandler`
-- [ ] Add `TransitionGuardMustFollowEvent` rejection in `ParseTransitionRow` pre-event guard detection
-- [ ] Parser recovery after each rejection (continue parsing remaining constructs)
-- [ ] Tests: 6 tests
-- [ ] Remove 3 codes from Gate 1 allow-list
+- [x] Add `OmitDoesNotSupportGuard` rejection in `ParseOmitDeclaration` (or equivalent)
+- [x] Add `EventHandlerDoesNotSupportGuard` rejection in `ParseEventHandler`
+- [x] Add `TransitionGuardMustFollowEvent` rejection in `ParseTransitionRow` pre-event guard detection
+- [x] Parser recovery after each rejection (continue parsing remaining constructs)
+- [x] Tests: 6 tests
+- [x] Remove 3 codes from Gate 1 allow-list
 
 ---
 
@@ -1049,7 +1049,7 @@ Priority 0 is a blocking prerequisite: no gap-closure slice is complete until `P
 - [ ] **Slice 5:** Temporal constant precision (PRE0055–0058) — specialize `TypedConstantValidation`
 - [ ] **Slice 5A:** Ambiguous typed constant resolution (PRE0091) — TypeChecker typed-constant candidate arbitration, sequenced after typed-constant split stabilization
 - [ ] **Slice 6:** Collection safety extensions (PRE0099–0101, PRE0104) — ProofEngine + TypeChecker
-- [ ] **Slice 7:** Parser guard gates (PRE0013–0015) — explicit rejection paths in `Parser.cs`
+- [x] **Slice 7:** Parser guard gates (PRE0013–0015) — explicit rejection paths in `Parser.cs`
 
 ### Priority 3 — Scattered TypeChecker Gaps
 - [ ] **Slice 8:** Scattered emission sites (PRE0027, PRE0035, PRE0039, PRE0042, PRE0043, PRE0044, PRE0050, PRE0067, PRE0085, PRE0105) — individual TypeChecker wires
@@ -1059,7 +1059,7 @@ These slices are in-scope for the current execution plan. They refactor emission
 
 - [ ] **Slice 9A:** Modifier constraint violations → `ModifierMeta.ConstraintDiagnosticCode` — generic loop in `ValidateModifiers` (after Slice 8 wires PRE0035/PRE0042)
 - [ ] **Slice 9B:** Typed-constant family diagnostics → `TypedConstantFamilyMeta.FormatErrorCode`/`SemanticErrorCode` — catalog dispatch in `TypedConstantValidation` (after Slice 5 or subsumes it)
-- [ ] **Slice 9C:** Proof obligation consistency → `ProofRequirements.GetMeta(kind).DiagnosticCode` everywhere — audit and migrate remaining hardcoded ProofEngine emission **(sequence after interval engine Slice 2; must include Strategy 7)**
+- [x] **Slice 9C:** Proof obligation consistency → `ProofRequirements.GetMeta(kind).DiagnosticCode` everywhere — audit and migrate remaining hardcoded ProofEngine emission **(sequence after interval engine Slice 2; must include Strategy 7)** — ✅ Completed 2025-07-14: Added `DiagnosticCode` property to `ProofRequirementMeta`; refactored `CreateFaultSiteLink` to use catalog dispatch for all non-Numeric kinds; `Numeric` retained as documented exception (1:many context-dependent mapping); `CreateDiagnostic` retained as legitimate per-obligation formatting; Strategy 7 verified: `IntervalContainment.DiagnosticCode == NumericOverflow`.
 
 ### Deferred
 - [ ] **Period arithmetic safety** (PRE0060–0062) — qualifier-aware temporal type checking, parallel to B2; deferred pending B2 pattern establishment
