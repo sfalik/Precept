@@ -6,6 +6,46 @@
 
 ---
 
+# Decision Record: Catalog Integration for Quantity Normalization
+
+**Author:** Frank (Lead Architect)
+**Date:** 2026-05-14
+**Status:** Proposed
+**Scope:** Whether UCUM quantity normalization requires catalog entries, and how it integrates with the runtime opcode/function infrastructure
+
+---
+
+### 2026-05-14: Catalog-driven checklist audit
+**By:** Frank (Shane's request)
+**What:** Audited catalog-driven-checklist.md against live codebase and catalog-system.md
+**Findings:** The checklist still reflected a 12-catalog model, omitted `ExpressionForms` and `Outcomes`, described stale parser derivation points (`OperatorPrecedence`, token-level member-name flags), and understated the current enforcement/tooling surfaces. Live code now derives parser behavior from `Constructs`, `Outcomes`, `Operators`, `ExpressionForms`, and `Types` accessors, with Roslyn enforcement for distributed dispatch and `[CatalogDU]` exhaustiveness.
+**Action:** Updated the checklist to reflect the 14-catalog system, current parser derivation rules, current Roslyn enforcement patterns, and current MCP / grammar / language-server sync surfaces.
+
+---
+
+# Decision: Code Sharing Between Compiler and Runtime for Quantity Normalization
+
+**Author:** Frank (Lead Architect)
+**Date:** 2026-05-14
+**Trigger:** Shane's pushback — "How will the runtime share the same code as the compiler if compiler uses decimals and runtime uses PreceptValue?"
+
+---
+
+### 2026-05-14: Corrected stale precept_language reference
+**By:** Frank
+**What:** Removed reference to deprecated `precept_language` MCP tool from catalog-driven-checklist.md. Replaced with guidance pointing to current scoped tools.
+**Note:** Found `docs/McpServerDesign.md` still referencing `precept_language` as removed, and `.github/copilot-instructions.md` still has a stale `LanguageTool.cs` / `precept_language` sync note. Not edited here.
+
+---
+
+# Decision: Two-Layer Value Architecture for Normalized Bounds
+
+**Author:** Frank (Lead Architect)
+**Date:** 2026-05-14T02:08:59-04:00
+**Trigger:** Shane's representational consistency pushback on §0/§0.1 of quantity-normalization-design.md
+
+---
+
 ### 2026-05-14T05:34:18Z: PreceptValue quantity storage uses the union reference lane, so unit identity is not ruled out by the 32-byte layout
 
 **By:** Scribe
@@ -1343,3 +1383,110 @@
 - Validation landed with 19 new ProofEngine tests and 193/193 proof tests passing.
 
 ---
+
+## Decisions
+
+### D1: Normalization Is NOT a Catalog Concern
+
+UCUM quantity normalization does not belong in any catalog (Functions, Operations, or otherwise). It fails the catalog-system.md § Completeness Principle test: "Is this part of a complete description of Precept?" Normalization is never author-invocable — it is implicit correctness infrastructure for cross-unit bound comparison.
+
+### D2: No New Opcodes Required
+
+The Builder's existing opcode inventory (`LOAD_SLOT`, `MEMBER_ACCESS`, `LOAD_LIT`, `BINARY_OP`) is sufficient for runtime bound enforcement. The Builder reads `TypedField.NormalizedDeclaredMin/Max` and embeds pre-normalized decimal values as `LOAD_LIT` operands. No `NORMALIZE_UNIT` or `SCALE_BY_FACTOR` opcode is needed.
+
+### D3: Proof Engine and Evaluator Share Through Semantic Model, Not Catalog
+
+The sharing seam between compile-time proof obligations and runtime constraint enforcement is `TypedField.NormalizedDeclaredMin/Max` — a semantic model property. Both the ProofEngine (which reads it for interval construction) and the Builder (which reads it for constraint plan compilation) consume the same TypeChecker-produced value. Catalog metadata is not the correct sharing mechanism for computed analysis artifacts.
+
+### D4: No Revision to Slices 14–21
+
+The current implementation plan requires zero changes based on this analysis. No catalog entries are added, no opcodes are added, no existing catalog entries are modified.
+
+### D5: Future Phase 3 Runtime Convention Is Independent
+
+Whether `PreceptValue` stores quantity magnitudes in base UCUM units (pre-normalized at write) or authored units (normalized at compare) is a Phase 3 decision that affects `FieldDescriptor` and the Builder's expression compiler — not the catalog layer.
+
+---
+
+## Rationale
+
+The catalog-system.md § Architectural Identity principle ("pipeline stages read catalog metadata") governs *language knowledge* — the closed set of operations, functions, types, and constructs that define what `.precept` files can contain. UCUM normalization is not language knowledge; it is a correctness implementation detail of how existing catalog-defined operations (comparison, interval containment) handle values with attached unit metadata.
+
+The anti-pattern the catalog principle prevents is: "pipeline stage X hardcodes language knowledge Y that should be in a catalog." Normalization has no equivalent — no pipeline stage hardcodes "which UCUM factors exist" in a way that should be metadata. The UCUM factor comes from the parsed unit string (external reference data), not from any Precept language definition.
+
+---
+
+## References
+
+- `docs/Working/quantity-normalization-design.md` §0.1
+- `docs/language/catalog-system.md` § Architectural Identity, § Completeness Principle
+- `docs/runtime/evaluator.md` §3 Out of Scope ("The evaluator never calls Operations.GetMeta()...")
+- `docs/runtime/precept-builder.md` §7 Pass 4–5
+
+---
+
+## Decisions
+
+**D1:** The UCUM normalization logic (scale factor application) lives in ONE place: `Language/Numeric/TypedConstantNormalizer`. Both `Pipeline/` and `Runtime/` can call it because both depend on `Language/`.
+
+**D2:** The "code sharing" concern is resolved by architecture, not by making the normalizer operate on `PreceptValue`. Normalization (domain math) and type-wrapping (`decimal` → `PreceptValue`) are separate concerns that compose at the Builder boundary.
+
+**D3:** The evaluator NEVER normalizes at runtime. The Builder pre-applies normalization at deploy time by reading `TypedField.NormalizedDeclaredMin/Max` and wrapping into `LoadLit(PreceptValue)`. There is no second normalization implementation to drift.
+
+**D4:** Option C (shared decimal-based utility in Language/) is the chosen architecture. Options A (PreceptValue-based utility), B (catalog function), and D (utility in Runtime/) are rejected for dependency direction, catalog principle, and visibility reasons respectively.
+
+**D5:** No changes to Slices 14–21 are required. The current plan already implements Option C correctly — the missing piece was the explicit documentation of WHY it avoids duplication.
+
+**D6:** Future Phase 3 storage convention decision (authored units vs. base units at write time) does not change this architecture. Even in the authored-units scenario, the core `ApplyFactor` math stays singular; only a thin extraction wrapper would be added.
+
+---
+
+## Rationale
+
+Shane's concern presupposes two separate normalization implementations: one in the compiler (decimal-based) and one in the runtime (PreceptValue-based). This duplication is structurally impossible in the current architecture because:
+1. Normalization logic exists in exactly one place.
+2. The Builder reads the SAME pre-computed normalized values — it doesn't re-derive.
+3. The evaluator never normalizes — it executes prebuilt comparisons on pre-normalized literals.
+
+The `PreceptValue.FromClr(decimal)` call in the Builder is TYPE WRAPPING, not normalization logic. The domain math (UCUM scale factors) remains singular.
+
+---
+
+## Context
+
+Shane argued that compile-time bound values (`max '5 kg'`) should use the same representation (`PreceptValue`) as runtime values, because:
+1. `LOAD_LIT` carries `PreceptValue` (confirmed)
+2. Opcode delegates are `Func<PreceptValue, PreceptValue, PreceptValue>` (confirmed)
+3. The operations library works exclusively with `PreceptValue` (confirmed)
+
+## Decisions
+
+### D1: `TypedField.NormalizedDeclaredMin/Max` stays `decimal?`
+
+**Rationale:** `TypedField` is a compile-time semantic model artifact. Its primary consumer is the ProofEngine (per-keystroke), which does abstract interval arithmetic (`NumericInterval` — union, intersection, containment, scaling) on `decimal` ranges. PreceptValue has no interval algebra. Making it `PreceptValue?` adds extraction cost for zero benefit.
+
+### D2: `IntervalContainmentProofRequirement.NormalizedMin/Max` stays `decimal?`
+
+**Rationale:** Feeds directly into `NumericInterval.Contains(min, max)` — pure decimal arithmetic. No consumer benefits from PreceptValue wrapping at this level.
+
+### D3: `LOAD_LIT` carries `PreceptValue` (already correct, no change)
+
+**Rationale:** `public sealed record LoadLit(PreceptValue Value) : Opcode; // literals pre-wrapped at build time`. This was already specified correctly. Shane's consistency requirement IS satisfied at the evaluator level.
+
+### D4: The Builder is the explicit `decimal → PreceptValue` conversion boundary
+
+**Rationale:** Builder Pass 5 reads `TypedField.NormalizedDeclaredMax` (decimal), calls `PreceptValue.FromClr(normalizedMax)`, and embeds it in `LoadLit`. After this point, bounds and runtime values are indistinguishable `PreceptValue` operands. The conversion happens once per deploy, not per-keystroke.
+
+### D5: Design doc language must be precise about what LOAD_LIT carries
+
+**Rationale:** The previous draft said "pre-bakes normalized `decimal` bounds into `LOAD_LIT` opcodes" — which reads as if LOAD_LIT carries raw decimal. It doesn't; it carries PreceptValue. This imprecision caused Shane's valid concern. Fixed in §0.1 Q2 and §0.2.
+
+## Summary
+
+Shane identified a real clarity gap, not a real type gap. The design's TYPES were correct but the EXPLANATION was misleading. Representational consistency IS satisfied at the evaluator level (both bounds and runtime values are PreceptValue in LoadLit opcodes). The semantic model correctly uses `decimal?` because the ProofEngine's abstract interval arithmetic has no PreceptValue analogue.
+
+## Affected Artifacts
+
+- `docs/Working/quantity-normalization-design.md` — §0 Revised Key Types (clarification added), §0.1 Q2 (rewritten), §0.2 (new section)
+- No type changes to Slices 14–21
+- No changes to `TypedField`, `IntervalContainmentProofRequirement`, or Builder design
