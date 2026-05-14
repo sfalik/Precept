@@ -398,4 +398,121 @@ public class TypeCheckerStructuralTests
             .Where(d => d.Code == nameof(DiagnosticCode.EventHandlerInStatefulPrecept))
             .Should().HaveCount(2, "each event handler in a stateful precept should emit PRE0092");
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  Category 6: Choice value validation (PRE0086, PRE0087, PRE0089)
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void ChoiceField_LiteralNotInSet_EmitsChoiceLiteralNotInSet()
+    {
+        var precept = """
+            precept Widget
+            field Status as choice of string("Active", "Done") default "Active"
+            state Open initial
+            state Closed
+            event Close
+            from Open on Close when Status == "Pending" -> transition Closed
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.ChoiceLiteralNotInSet);
+    }
+
+    [Fact]
+    public void ChoiceField_ValidLiteral_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Status as choice of string("Active", "Done") default "Active"
+            state Open initial
+            state Closed
+            event Close
+            from Open on Close when Status == "Active" -> transition Closed
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void ChoiceField_LiteralCaseMismatch_EmitsChoiceLiteralNotInSet()
+    {
+        var precept = """
+            precept Widget
+            field Status as choice of string("Active", "Done") default "Active"
+            state Open initial
+            state Closed
+            event Close
+            from Open on Close when Status == "active" -> transition Closed
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.ChoiceLiteralNotInSet);
+    }
+
+    [Fact]
+    public void ChoiceArg_ValueOutsideFieldSet_EmitsChoiceArgOutsideFieldSet()
+    {
+        var precept = """
+            precept Widget
+            field Status as choice of string("Active", "Done") default "Active"
+            state Open initial
+            state Closed
+            event Update(NewStatus as choice of string("Active", "Pending"))
+            from Open on Update
+                -> set Status = Update.NewStatus
+                -> no transition
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.ChoiceArgOutsideFieldSet);
+    }
+
+    [Fact]
+    public void ChoiceArg_ValuesSubsetOfFieldSet_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Status as choice of string("Active", "Done") default "Active"
+            state Open initial
+            state Closed
+            event Update(NewStatus as choice of string("Active", "Done"))
+            from Open on Update
+                -> set Status = Update.NewStatus
+                -> no transition
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void ChoiceArg_RankConflictsWithField_EmitsChoiceRankConflict()
+    {
+        var precept = """
+            precept Widget
+            field Status as choice of string("Active", "Done", "Archived") default "Active"
+            state Open initial
+            state Closed
+            event Update(NewStatus as choice of string("Done", "Active"))
+            from Open on Update
+                -> set Status = Update.NewStatus
+                -> no transition
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.ChoiceRankConflict);
+    }
+
+    [Fact]
+    public void ChoiceArg_RankMatchesField_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Status as choice of string("Active", "Done", "Archived") default "Active"
+            state Open initial
+            state Closed
+            event Update(NewStatus as choice of string("Active", "Done"))
+            from Open on Update
+                -> set Status = Update.NewStatus
+                -> no transition
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
 }

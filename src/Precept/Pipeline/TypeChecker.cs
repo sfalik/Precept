@@ -433,6 +433,10 @@ internal static partial class TypeChecker
                         }
                     }
                 }
+
+                // Track choice domain for PRE0086/0087/0089 validation in expressions
+                if (!choiceRef.Domain.IsEmpty)
+                    ctx.ChoiceDomains[declared.Name] = choiceRef.Domain;
             }
 
             // Diagnostic for unknown type (MissingTypeReference → TypeKind.Error).
@@ -531,6 +535,10 @@ internal static partial class TypeChecker
                     DeclaredMax: declaredMaxBound?.Magnitude,
                     DeclaredMinBoundQualifiers: declaredMinBound?.Qualifiers ?? ImmutableArray<DeclaredQualifierMeta>.Empty,
                     DeclaredMaxBoundQualifiers: declaredMaxBound?.Qualifiers ?? ImmutableArray<DeclaredQualifierMeta>.Empty));
+
+                // Track choice domain for event args (PRE0087/PRE0089)
+                if (arg.Type is ChoiceTypeReference argChoiceRef && !argChoiceRef.Domain.IsEmpty)
+                    ctx.ArgChoiceDomains[(declared.Name, arg.Name)] = argChoiceRef.Domain;
             }
 
             var typedEvent = new TypedEvent(

@@ -145,6 +145,20 @@ internal static partial class TypeChecker
                         ctx);
                 }
 
+                // PRE0086/PRE0087/PRE0089: Choice value validation on assignment
+                if (value is not TypedErrorExpression && fieldType == TypeKind.Choice)
+                {
+                    if (value is TypedLiteral choiceLit && choiceLit.ResultType == TypeKind.Choice)
+                    {
+                        ValidateChoiceLiteralAgainstField(choiceLit, fieldName, assign.Value.Span, ctx);
+                    }
+                    else if (value is TypedArgRef argRef && argRef.ResultType == TypeKind.Choice)
+                    {
+                        ValidateChoiceArgAgainstField(
+                            argRef.ArgName, argRef.EventName, fieldName, assign.Value.Span, ctx);
+                    }
+                }
+
                 return new TypedInputAction(
                     assign.Kind, fieldName, fieldType,
                     InputExpression: value,

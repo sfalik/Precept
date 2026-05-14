@@ -636,6 +636,10 @@ internal static partial class TypeChecker
         if (left is TypedErrorExpression || right is TypedErrorExpression)
             return new TypedErrorExpression(bin.Span);
 
+        // PRE0086: Validate choice literal against field's declared domain
+        if (opMeta.Family == OperatorFamily.Comparison)
+            ValidateChoiceComparisonLiterals(left, right, bin.Span, ctx);
+
         // Attempt resolution: exact → left widen → right widen → both widen
         var result = TryResolveBinaryWithWidening(opMeta.Kind, left.ResultType, right.ResultType);
         if (result is not null)
@@ -1014,6 +1018,116 @@ internal static partial class TypeChecker
             if (q is DeclaredQualifierMeta.Dimension d) return d.DimensionName;
         }
         return null;
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  Choice value validation (PRE0086, PRE0087, PRE0089)
+    // ════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Validate choice literal values in comparison expressions (PRE0086).
+    /// When a choice-typed field is compared to a choice literal, the literal must
+    /// be one of the field's declared domain values.
+    /// </summary>
+    private static void ValidateChoiceComparisonLiterals(
+        TypedExpression left, TypedExpression right, SourceSpan span, CheckContext ctx)
+    {
+        // Field on left, literal on right
+        if (left is TypedFieldRef leftField && right is TypedLiteral rightLit
+            && leftField.ResultType == TypeKind.Choice && rightLit.ResultType == TypeKind.Choice)
+        {
+            ValidateChoiceLiteralAgainstField(rightLit, leftField.FieldName, span, ctx);
+        }
+
+        // Field on right, literal on left
+        if (right is TypedFieldRef rightField && left is TypedLiteral leftLit
+            && rightField.ResultType == TypeKind.Choice && leftLit.ResultType == TypeKind.Choice)
+        {
+            ValidateChoiceLiteralAgainstField(leftLit, rightField.FieldName, span, ctx);
+        }
+    }
+
+    /// <summary>
+    /// Emit PRE0086 if the literal's value is not in the field's declared choice domain.
+    /// </summary>
+    private static void ValidateChoiceLiteralAgainstField(
+        TypedLiteral literal, string fieldName, SourceSpan span, CheckContext ctx)
+    {
+        if (!ctx.ChoiceDomains.TryGetValue(fieldName, out var domain))
+            return;
+
+        var literalValue = literal.Value?.ToString();
+        if (literalValue is null)
+            return;
+
+        if (!domain.Any(v => string.Equals(v, literalValue, StringComparison.Ordinal)))
+        {
+            ctx.Diagnostics.Add(
+                Diagnostics.Create(DiagnosticCode.ChoiceLiteralNotInSet, span,
+                    literalValue, fieldName));
+        }
+    }
+
+    /// <summary>
+    /// Validate an event arg's choice domain against a target field's choice domain (PRE0087, PRE0089).
+    /// Emits PRE0087 if the arg's domain contains values not in the field's domain.
+    /// Emits PRE0089 if the arg's values are in the field's domain but in a conflicting order.
+    /// </summary>
+    internal static void ValidateChoiceArgAgainstField(
+        string argName, string eventName, string fieldName, SourceSpan span, CheckContext ctx)
+    {
+        if (!ctx.ChoiceDomains.TryGetValue(fieldName, out var fieldDomain))
+            return;
+
+        if (!ctx.ArgChoiceDomains.TryGetValue((eventName, argName), out var argDomain))
+            return;
+
+        // PRE0087: Check for values in arg domain that aren't in field domain
+        foreach (var argValue in argDomain)
+        {
+            if (!fieldDomain.Any(v => string.Equals(v, argValue, StringComparison.Ordinal)))
+            {
+                ctx.Diagnostics.Add(
+                    Diagnostics.Create(DiagnosticCode.ChoiceArgOutsideFieldSet, span,
+                        argValue, fieldName));
+                return; // One diagnostic per assignment is sufficient
+            }
+        }
+
+        // PRE0089: Check ordering — arg values that are all in the field domain
+        // must appear in the same relative order as the field's declaration
+        if (argDomain.Length >= 2)
+        {
+            var fieldIndices = new List<int>(argDomain.Length);
+            foreach (var argValue in argDomain)
+            {
+                int idx = -1;
+                for (int i = 0; i < fieldDomain.Length; i++)
+                {
+                    if (string.Equals(fieldDomain[i], argValue, StringComparison.Ordinal))
+                    {
+                        idx = i;
+                        break;
+                    }
+                }
+                if (idx >= 0)
+                    fieldIndices.Add(idx);
+            }
+
+            // If we have at least 2 values mapped to field positions, check monotonicity
+            if (fieldIndices.Count >= 2)
+            {
+                for (int i = 1; i < fieldIndices.Count; i++)
+                {
+                    if (fieldIndices[i] < fieldIndices[i - 1])
+                    {
+                        ctx.Diagnostics.Add(
+                            Diagnostics.Create(DiagnosticCode.ChoiceRankConflict, span, fieldName));
+                        return;
+                    }
+                }
+            }
+        }
     }
 
     /// <summary>

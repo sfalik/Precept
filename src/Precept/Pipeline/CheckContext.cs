@@ -130,6 +130,22 @@ internal sealed class CheckContext
     /// <summary>Event-argument reference sites recorded at resolution time for LS semantic tokens.</summary>
     public List<ArgReference> ArgReferences { get; } = [];
 
+    // ── Choice domain tracking ───────────────────────────────────────────
+
+    /// <summary>
+    /// Maps field names to their declared choice domain values (in declaration order).
+    /// Populated during <see cref="TypeChecker.PopulateFields"/> for fields with
+    /// <see cref="ChoiceTypeReference"/>. Used by choice literal/arg validation
+    /// (PRE0086, PRE0087, PRE0089).
+    /// </summary>
+    public Dictionary<string, ImmutableArray<string>> ChoiceDomains { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Maps (eventName, argName) to declared choice domain values for event args.
+    /// Used by PRE0087/PRE0089 validation when an arg is assigned to a choice field.
+    /// </summary>
+    public Dictionary<(string EventName, string ArgName), ImmutableArray<string>> ArgChoiceDomains { get; } = new();
+
     // ── CI tracking ──────────────────────────────────────────────────────
 
     /// <summary>

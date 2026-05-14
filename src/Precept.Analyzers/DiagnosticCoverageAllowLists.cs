@@ -25,9 +25,7 @@ internal static class DiagnosticCoverageAllowLists
 
 
         // ── Root Cause B3 — Choice Value Validation ──────────────────────────────
-        "ChoiceLiteralNotInSet",              // B3: choice literal comparison not wired
-        "ChoiceArgOutsideFieldSet",           // B3: choice literal comparison not wired
-        "ChoiceRankConflict",                 // B3: choice ordering check not wired
+        // PRE0086, PRE0087, PRE0089 removed by Slice 2 (choice literal/arg validation wired)
 
         // ── Root Cause B4 — Collection Safety Extensions ─────────────────────────
         "KeyPresenceSafety",                  // B4: obligation generator not yet on lookup accessor
@@ -84,5 +82,11 @@ internal static class DiagnosticCoverageAllowLists
         "DenominatorUnitMismatch",
         "DurationDenominatorMismatch",
         "CompoundPeriodDenominator",
+
+        // ── Slice 2 (B3) — Tests in TypeCheckerStructuralTests.cs ───────────────
+        // Cross-project analyzer cannot detect test references in Precept.Tests.
+        "ChoiceLiteralNotInSet",
+        "ChoiceArgOutsideFieldSet",
+        "ChoiceRankConflict",
     };
 }

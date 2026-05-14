@@ -524,13 +524,13 @@ Test method names:
 
 **Files:** `src/Precept/Pipeline/TypeChecker.Expressions.cs` (modify), `test/Precept.Tests/TypeChecker/TypeCheckerStructuralTests.cs` (modify)
 
-- [ ] Add `ValidateChoiceLiteral` in `TypeChecker.Expressions.cs`
-- [ ] Wire into comparison resolution path (literal vs. choice field)
-- [ ] Wire into assignment resolution path (arg vs. choice field target)
-- [ ] Add PRE0087 arg superset check
-- [ ] Add PRE0089 rank conflict check
-- [ ] Tests: 7 tests
-- [ ] Remove 3 codes from Gate 1 allow-list
+- [x] Add `ValidateChoiceLiteral` in `TypeChecker.Expressions.cs`
+- [x] Wire into comparison resolution path (literal vs. choice field)
+- [x] Wire into assignment resolution path (arg vs. choice field target)
+- [x] Add PRE0087 arg superset check
+- [x] Add PRE0089 rank conflict check
+- [x] Tests: 7 tests
+- [x] Remove 3 codes from Gate 1 allow-list
 
 ---
 
@@ -1041,7 +1041,7 @@ Priority 0 is a blocking prerequisite: no gap-closure slice is complete until `P
 
 ### Priority 1 — Integrity Violations (Silent Wrong Behavior)
 - [x] **Slice 1:** Currency/unit arithmetic safety (PRE0070–0074) — `TypeChecker.Expressions.cs` qualifier comparison
-- [ ] **Slice 2:** Choice value validation (PRE0086–0089) — `TypeChecker.Expressions.cs` choice literal check
+- [x] **Slice 2:** Choice value validation (PRE0086–0089) — `TypeChecker.Expressions.cs` choice literal check
 - [x] **Slice 3:** ~~InitialEventMissingAssignments (PRE0094)~~ — **already wired** in `TypeChecker.Validation.FieldState.cs`; no gap-closure work needed
 - [ ] **Slice 4:** EventHandlerInStatefulPrecept (PRE0092) — trivial structural check in `ValidateStructural`
 
