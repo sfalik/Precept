@@ -28,6 +28,19 @@
 
 ## Recent Updates
 
+### 2026-05-14T17:37:50.029-04:00 — Design doc resolution pass: all 6 conditions resolved
+
+- Completed the design document resolution pass on `docs/Working/quantity-normalization-design.md`, resolving all six §5.5.6 conditions in a single edit pass.
+- **Condition 1:** SUPERSEDED markers verified on §3.6, §3.7, §7 Q2 — §0's "store both" is the single authoritative bounds-storage design.
+- **Condition 2:** Replaced "universal post-step" in §0 Q6 with expression-type-dispatched `TryGetStaticScalingFactor` pseudocode. Added constraint table showing which expression types scale vs. which are excluded. This is the critical double-normalization prevention mechanism.
+- **Condition 3:** Added `GetFieldBounds` fix to Slice 16 spec — reads `NormalizedDeclaredMin ?? DeclaredMin` with null fallback.
+- **Condition 4:** Added `TryGetStaticNumericValue` fix to Slice 16 spec — normalizes `StaticMagnitude` via `TryGetStaticScalingFactor` before returning trusted facts.
+- **Condition 5:** Decided Option (a) for `TypedEventArg` — parallel `NormalizedDeclaredMin/Max` fields, architecturally consistent with `TypedField`. Added Slice 15b spec.
+- **Condition 6:** Updated `NumericInterval.Scale` to `Scale(decimal factor)` in Revised Key Types and Slice 14. Factor conversion happens once in `TryGetStaticScalingFactor`.
+- Added §5.6 Extended Slice Details (Slices 22–26) from George's gap audit with full objective/files/approach/tests/dependencies for each.
+- Replaced George's §0.6 header with Frank's Design Resolution Summary including the condition resolution table and implementation gate clearance.
+- Key pattern: the `TryGetStaticScalingFactor` helper is the single dispatch point for all expression-type → scaling-factor decisions. This is the design's core invariant — one function, one place, no scattered switching.
+
 ### 2026-05-14T17:10:32.283-04:00 — Interpolated normalization review closed with approval conditions
 
 - Completed the exhaustive architectural review of `docs/Working/quantity-normalization-design.md` and approved the direction **with conditions**.
@@ -41,3 +54,19 @@
 - Recorded the canonical three-layer model: compiler diagnostics, ingress validation, and defense-in-depth faults linked through `[StaticallyPreventable]`.
 - Captured two durable follow-ups: ingress validation should become a deliberate surface for quantity/choice/dynamic-qualifier checks, and catalog-mediated dispatch remains the preferred alignment pattern.
 - Preserved the companion implementation-notes record so future sessions can recover enforcement reality without re-auditing the mission.
+
+### 2026-05-14T17:48:42.442-04:00 — Doc-sync slice (Slice 27) added to quantity normalization design
+
+- Audited all canonical documentation surfaces for staleness after quantity normalization (Slices 14–21).
+- **Needs updates:** `docs/language/precept-language-spec.md` (§0.6 + §5 — add unit-aware normalization to proof engine contract), `docs/compiler/proof-engine.md` (obligation record, interval source table, Strategy 6 normalization), `docs/Working/interval-proof-engine-design.md` (tracker cross-ref, interval table annotations, obligation parameter annotations), `docs/runtime/runtime-api.md` (three-layer enforcement model from §0.5 needs a canonical home), MCP DTO (`CompileProofObligationDto` gains `NormalizedDeclaredMin/Max`).
+- **Confirmed clean:** `docs/language/catalog-system.md` (catalog describes types, not comparison behavior), `README.md` (no quantity/normalization content), `docs/philosophy.md` (no scope change), `samples/` (bug fix is in compiler, samples unchanged), `docs/mcp/` (directory doesn't exist).
+- The three-layer enforcement model (compile-time / ingress / defense-in-depth) identified in §0.5 is the most significant doc gap — it's a named architectural concept without a canonical home in the published docs.
+
+## Learnings
+
+### 2026-05-14T17:51 — PRE0027 Diagnosis: No Errors Found
+- Investigated suspected PRE0027 (DuplicateArgName) errors in sample files. Result: **no PRE0027 errors exist** anywhere in the repository.
+- The actual error in `samples/Test.precept` is PRE0078 (interval overflow), which is pre-existing — the literal `6 [lb_av]` already violated `max '5 kg'` before George's edit.
+- George's modification (changing `'6 [lb_av]'` to `'{test2} [lb_av]'`) changed the proof shape from concrete-interval to unbounded-interval but did not introduce a new error category.
+- Recommendation: revert Test.precept; if interpolated-quantity test cases are needed for normalization work, create a new sample with satisfiable bounds.
+- Diagnosis written to `.squad/decisions/inbox/frank-pre0027-diagnosis.md`.
