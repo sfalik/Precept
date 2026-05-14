@@ -6,6 +6,285 @@
 
 ---
 
+# Decision Record: Exhaustive Architectural Review — Interpolated Forms & Normalization Design
+
+**Author:** Frank (Lead Architect)
+**Date:** 2026-05-14T17:08:27-04:00
+**Status:** Proposed
+**Scope:** Architectural review findings, conditions, and decisions for the quantity normalization design (§0–§0.5, Slices 14–22) with exhaustive interpolated-form coverage.
+
+---
+
+## D1: §0 supersedes §3.6, §3.7, and §7 Q2
+
+**Decision:** §0's "store both original and normalized on `TypedField`" is the approved design for bounds storage. §3.6 (overwrite DeclaredMax), §3.7 (normalize inside TryGetTypedConstantMagnitude), and §7 Q2 Option B (normalize at proof time) are superseded and must be marked as such in the design doc.
+
+**Rationale:** Three competing descriptions of the same feature in one design doc is an implementation hazard. §0 was written as the architectural reassessment — it takes precedence by design intent.
+
+---
+
+## D2: `IntervalOf` post-step must be expression-type-scoped, not universal
+
+**Decision:** The `IntervalOf` post-step scales intervals by a UCUM factor only for:
+- `TypedTypedConstant` with a static unit
+- `TypedInterpolatedTypedConstant` with `Magnitude` slot kind + static unit
+
+It does NOT scale:
+- `TypedFieldRef` or `TypedArgRef` (their intervals come from declared bounds which are already in the field/arg's unit system)
+- `TypedInterpolatedTypedConstant` with `WholeValue` slot kind (the source value already carries quantity semantics)
+
+**Rationale:** Blind universal scaling causes double normalization when the source is already a quantity-typed entity. The magnitude-to-quantity conversion (magnitude × unit) is only meaningful when the expression is constructing a NEW quantity from a raw numeric magnitude and a static unit — not when it's referencing an existing quantity value.
+
+---
+
+## D3: `GetFieldBounds` must read normalized bounds
+
+**Decision:** `GetFieldBounds` (`ProofEngine.Intervals.cs:131`) must read `TypedField.NormalizedDeclaredMin/Max` when populated, falling back to `DeclaredMin/Max` when null (for non-quantity types).
+
+**Rationale:** After Slice 15, `DeclaredMin/Max` are raw authored magnitudes. Using them for field-ref interval computation produces intervals in the author's declared unit, which would then be incorrectly scaled by the `IntervalOf` post-step if the expression is inside a typed constant. Normalized bounds ensure field-ref intervals are in base units, making all interval comparisons unit-homogeneous.
+
+---
+
+## D4: `TryGetStaticNumericValue` must normalize `StaticMagnitude`
+
+**Decision:** `ProofEngine.Composition.cs:221-223` must normalize `StaticMagnitude` by the static UCUM unit factor when extracting a concrete numeric value from `TypedInterpolatedTypedConstant`.
+
+**Rationale:** This method feeds trusted-rule facts into Strategy 6. If bounds are normalized but `StaticMagnitude` is raw, fact-comparison produces wrong results. The normalization is a single `ApplyFactor` call using `TryGetStaticUnit`.
+
+---
+
+## D5: `NumericInterval.Scale` takes `decimal`, not `UcumExactFactor`
+
+**Decision:** The `Scale` method on `NumericInterval` takes a `decimal` factor parameter.
+
+**Rationale:** Interval bounds are `decimal`. The `UcumExactFactor → decimal` conversion is done once by `TypedConstantNormalizer.ApplyFactor`. Passing `UcumExactFactor` through to `NumericInterval` couples the interval algebra to UCUM types unnecessarily. The conversion is lossless in practice (decimal has 28-29 significant digits; UCUM factors for real-world units are well within range).
+
+---
+
+## D6: Event arg bound normalization needs decision
+
+**Decision:** OPEN — requires Shane's input.
+
+If event args can carry quantity bounds (e.g., `newWeight: quantity of 'mass' max '10 [lb_av]'`), those bounds need the same normalization treatment as `TypedField` bounds. Options:
+- (A) Add `NormalizedDeclaredMin/Max` to `TypedEventArg` — parallel to `TypedField`
+- (B) Have `ExtractArgInterval` normalize on-the-fly from arg qualifier metadata
+
+Recommendation: Option (A) for consistency with the `TypedField` approach.
+
+---
+
+## D7: Overall design verdict — APPROVED WITH CONDITIONS
+
+**Decision:** The quantity normalization design is architecturally sound and may proceed to implementation once the 6 conditions in §5.5.6 are resolved. No condition is design-blocking — all are specification gaps that would otherwise require ad-hoc resolution during implementation.
+
+---
+
+# George — Interpolated Typed-Constant Gap Audit
+
+**Date:** 2026-05-14T17:06:00-04:00
+**Scope:** Exhaustive follow-up on `TypedInterpolatedTypedConstant` coverage relative to quantity-normalization Slices 19–21.
+
+## Core finding
+
+Slices 19–21 are correct for the exact quantity bug (`'{test2} [lb_av]'`) and quantity whole-value interpolation, but they are **not** exhaustive for interpolated typed constants as a whole.
+
+`TypedInterpolatedTypedConstant` currently stores only:
+- `Slots`
+- `ResultType`
+- `Span`
+- `StaticMagnitude`
+
+It does **not** retain static qualifier-bearing text (`USD`, `kg`, `USD/kg`, `USD/EUR`) and it does **not** expose qualifier identity for `WholeValue` holes. That omission creates multiple gaps beyond the interval-only quantity track.
+
+## High-priority confirmed behaviors
+
+1. **False-positive PRE0078 on bounded interpolated `set` actions**
+   - quantity: `'{src} [lb_av]'`, `'{q}'`
+   - money: `'{src} USD'`, `'{m}'`
+   - price: `'{src} USD/kg'`, `'{p}'`
+   - cause: `IntervalOfNarrowed` has no `TypedInterpolatedTypedConstant` path, so these fall to `Unbounded`.
+
+2. **False-positive PRE0114 in rules/ensures**
+   - quantity: `q > '{n} kg'`, `q > '{other}'`
+   - money: `m > '{n} USD'`, `m > '{other}'`
+   - price: `p > '{n} USD/kg'`, `p > '{other}'`
+   - cause: `ResolveQualifierFromInterpolatedConstant` only inspects slots; static text and whole-value source qualifiers resolve as `unresolved`.
+
+3. **Silent acceptance of definite qualifier mismatches in `set` / `default`**
+   - quantity in `'m'` accepts `'{n} kg'`
+   - money in `'EUR'` accepts `'{n} USD'`
+   - price in `'EUR'` of `'length'` accepts `'{n} USD/kg'`
+   - cause: `ValidateAssignmentQualifiers` has no interpolated-static-text / whole-value path.
+
+4. **Interpolated field defaults are not proof-checked**
+   - example: `field q as quantity in 'kg' max '5 kg' default '{n} kg'` with `n default 10`
+   - cause: no interval-containment obligation for defaults, and initial-state constant folding treats interpolated typed constants as unknown.
+
+5. **Interpolated event-arg defaults are entirely unwired**
+   - `TypedArg.DefaultExpression` is never resolved today.
+   - even clearly invalid defaults like `default '{"oops"} kg'` compile clean.
+
+## Medium-priority conservative cases
+
+These should remain explicit `Unbounded` / not-proved paths unless static qualifier identity becomes available:
+- `'{n} {u}'`
+- `'{n} {a}/{b}'`
+- `'{n} {c}/{u}'`
+
+Current engine still falls through to `Unbounded`; the audit recommends documenting this as intentional conservative behavior rather than leaving it as an accidental default-case fallthrough.
+
+## Proposed slices for Shane review
+
+- **22 — Capture static interpolated qualifier metadata**
+  - extend `TypedInterpolatedTypedConstant` so form matching preserves static currency/unit/from/to metadata.
+- **23 — Route interpolated qualifier metadata through qualifier consumers**
+  - update `ResolveQualifierFromInterpolatedConstant` and `ValidateAssignmentQualifiers`.
+- **24 — Extend interpolated interval extraction beyond quantity**
+  - money whole-value/magnitude paths; price whole-value/magnitude paths with denominator-aware normalization.
+- **25 — Add field-default proof coverage for interpolated typed constants**
+  - either generate default-time interval containment obligations or teach initial-state/default analysis to fold these forms.
+- **26 — Event arg default resolution (companion prerequisite)**
+  - broader than quantity normalization, but required for exhaustive interpolated-default coverage.
+
+## Recommendation
+
+Treat Slices 19–21 as **necessary but not sufficient**. If Shane wants an actually exhaustive interpolated typed-constant story, approve at least Slices 22–25, and decide whether Slice 26 stays in this track or becomes a separate arg-default design item.
+
+---
+
+# Decision Record: Diagnostic Enforcement — Compiler/Runtime Alignment Assessment
+
+**Author:** Frank (Lead Architect)
+**Date:** 2026-05-14
+**Status:** Proposed
+**Trigger:** Shane's concern that the diagnostic enforcement implementation may have compounded compiler/runtime duplication
+
+---
+
+## D1: Diagnostic enforcement did NOT compound duplication
+
+The 11-slice enforcement mission wired ~30 diagnostic codes. Classification:
+- **Category 1 (compile-time-only):** ~24 codes — structural definition checks with zero runtime counterpart. No duplication possible.
+- **Category 2 (compiler + defense-in-depth fault):** ~4 codes — ProofEngine proof obligations linked to existing `FaultCode` via `[StaticallyPreventable]`. Different operations (abstract proof discharge vs. concrete fault detection). Not duplication.
+- **Category 3 (behavioral overlap with runtime):** ~2 codes — qualifier enforcement deliberately bifurcates: static qualifiers in TypeChecker, dynamic qualifiers deferred to ProofEngine/runtime. Correct architecture.
+
+**Decision:** No remediation needed. The enforcement implementation is clean.
+
+---
+
+## D2: Three-layer enforcement model is the canonical architectural frame
+
+The project has three distinct enforcement layers:
+
+| Layer | Owner | Scope | Codes |
+|-------|-------|-------|-------|
+| **1. Compile-time** | Compiler pipeline (TypeChecker, ProofEngine) | Validates authored definition | 132 DiagnosticCodes |
+| **2. Ingress** | `TypeRuntimeMeta.ReadJson` / `TypeRuntime<T>.FromClr` | Validates submitted values at API boundary | Per-type delegates (normalize, domain check) |
+| **3. Defense-in-depth** | Evaluator `FaultCode` | Catches impossible-path bugs | 15 FaultCodes, all `[StaticallyPreventable]` |
+
+**Decision:** This three-layer model should be named, documented, and referenced in `docs/runtime/runtime-api.md` or `docs/compiler-and-runtime-design.md`. It eliminates the recurring "are we duplicating?" question by making layer boundaries explicit.
+
+---
+
+## D3: Ingress validation (Layer 2) must be designed as a coherent surface
+
+§0.4 of `quantity-normalization-design.md` designed quantity normalization for the ingress layer. Two additional ingress concerns need the same treatment:
+
+1. **Choice domain validation** — submitted choice values must be in the field's declared domain
+2. **Dynamic qualifier checking** — for fields with dynamic qualifiers, submitted args must have compatible qualifiers
+
+**Decision:** Design these as `TypeRuntimeMeta.ReadJson` / `TypeRuntime<T>.FromClr` concerns, following the quantity normalization pattern. Do NOT implement them as evaluator-side checks or as TypeChecker logic clones.
+
+---
+
+## D4: The `[StaticallyPreventable]` chain is the structural duplication guard
+
+Every `FaultCode` maps to exactly one `DiagnosticCode`. Enforced by PRECEPT0001 + PRECEPT0002 (Roslyn analyzers). This chain was in place BEFORE the enforcement mission and was not modified by it.
+
+The chain's invariant: "If the compiler emits no errors, the evaluator should never fault." Runtime faults are defense-in-depth, not re-implementations of compile-time checks.
+
+**Decision:** Preserve and rely on this chain. Any new runtime enforcement obligation should first check whether it belongs in Layer 1 (compiler), Layer 2 (ingress), or Layer 3 (fault). Do not add enforcement logic to the evaluator's opcode loop that could instead be an ingress-time validation.
+
+---
+
+## D5: Catalog-mediated dispatch (Slices 9B/9C) proactively improved alignment
+
+- Slice 9B's `TypedConstantFamilyMeta.FormatErrorCode/SemanticErrorCode` enables runtime's `ParseString` delegate to share the same catalog-driven validation dispatch.
+- Slice 9C's `ProofRequirementMeta.DiagnosticCode` unified the proof-obligation → diagnostic mapping through catalog metadata instead of hardcoded branches.
+
+**Decision:** These patterns are correct and should be the model for future enforcement wiring. Prefer catalog-mediated dispatch over direct code-identity switches in both compiler and runtime consumers.
+
+---
+
+### 2026-05-14: Implementation notes created
+**By:** Frank
+**What:** Created docs/Working/diagnostic-enforcement-implementation-notes.md — technical record of enforcement implementation outcomes
+**Why:** Companion to the plan doc; captures implementation reality, staged infrastructure details, and remaining work for future sessions
+
+---
+
+# Decision: Runtime Arg Normalization — Normalize-on-Intake
+
+**Author:** Frank (Lead Architect)
+**Date:** 2026-05-14
+**Status:** Decided
+**Trigger:** Shane's challenge to §0.3 — runtime args with quantity values cannot be pre-normalized by the Builder because their values are unknown at compile time.
+
+---
+
+## Context
+
+§0.3 of the quantity normalization design concluded that "the evaluator never normalizes" and "drift risk is structurally impossible." This was correct for compile-time literals but incomplete — it omitted runtime event args whose values arrive at Fire time in non-base units.
+
+A caller firing `SetWeight` with `newWeight = '6 [lb_av]'` would trigger a false constraint violation against a pre-normalized bound of `5.0 kg` unless the arg's magnitude is normalized before the constraint comparison executes.
+
+---
+
+## Decisions
+
+### D1: Storage Convention — Normalized Magnitudes in PreceptValue
+
+`PreceptValue` for quantity types stores the magnitude in UCUM base units (normalized). The original unit is stored alongside for egress display. This is no longer a "Phase 3 deferred decision" — it is locked now.
+
+### D2: Normalize-on-Intake at the API Boundary
+
+Normalization of runtime quantity values happens in `TypeRuntimeMeta.ReadJson` (JSON lane) and `TypeRuntime<Quantity>.FromClr` (typed lane) — at the Fire/Update/Restore boundary, before values enter the evaluator's arg slot array.
+
+### D3: Same Normalizer, No New Overload
+
+The ingress path calls `TypedConstantNormalizer.Normalize(decimal, UcumParsedUnit?)` — the identical method used by the TypeChecker. No `PreceptValue`-accepting overload is needed because ingress operates on raw extracted values before `PreceptValue` construction.
+
+### D4: Denormalize Method Required
+
+`TypedConstantNormalizer.Denormalize(decimal, UcumParsedUnit?)` must be added for egress (WriteJson, ToClr). This is the arithmetic inverse — divide by factor instead of multiply. Ships in Slice 14 alongside `Normalize`.
+
+### D5: Evaluator Identity Preserved
+
+The evaluator remains a pure plan executor. It never normalizes. The "evaluator never normalizes" invariant holds — normalization happens upstream at the ingress boundary.
+
+### D6: Slice 22 Added (Phase 3)
+
+A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.ReadJson`/`TypeRuntime<Quantity>.FromClr` call `Normalize`; `WriteJson`/`ToClr` call `Denormalize`. Depends on Slice 14 and Phase 3 Builder/Evaluator implementation.
+
+---
+
+## Rationale
+
+- **Normalize-at-compare rejected:** Anti-pattern (§0 explicitly rejected "normalize at every comparison"). Would require normalization logic in every constraint plan touching quantity fields.
+- **Normalize-at-write rejected:** Would require a new `NORMALIZE_QUANTITY` opcode (catalog change), making the evaluator participate in normalization (violates plan-executor identity).
+- **Normalize-on-intake selected:** Establishes a universal invariant — "all quantity magnitudes in PreceptValue are in base units" — making every downstream consumer (constraint plans, computed fields, inspections) correct without additional normalization.
+
+---
+
+## Consequences
+
+- §0.3's consumer table gains a fourth entry: the ingress boundary.
+- The single-implementation claim holds — `TypedConstantNormalizer` is the sole normalization logic.
+- PreceptValue internal layout for quantities must accommodate both normalized magnitude and original unit reference.
+- Slice 14 gains `Denormalize` as a companion method.
+
+---
+
 # Decision Record: Catalog Integration for Quantity Normalization
 
 **Author:** Frank (Lead Architect)

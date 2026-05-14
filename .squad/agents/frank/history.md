@@ -1,94 +1,43 @@
 ## Core Context
 
 - Owns language research, spec wording, and cross-surface architecture documentation for the Precept DSL and runtime.
-- Catalog metadata remains the language truth; runtime, tooling, and docs should derive from durable metadata rather than enum-identity switches or parallel lists.
-- Proof, qualifier, and field-state design work must stay grounded in shipped spec and evaluator/runtime surfaces, not inferred intent.
+- Catalog metadata remains the language truth; pipeline, runtime, tooling, and docs should derive from durable metadata rather than enum-identity switches or parallel lists.
+- Proof, qualifier, field-state, and normalization design work must stay grounded in shipped surfaces and verified implementation seams.
 
 ## Live Guidance
 
-- `readonly` / `editable` / guarded access modes govern the Update (patch) surface; they do not restrict event-driven `set` actions unless the spec changes.
-- Business-domain magnitude modifier legality is a catalog contract: fix drift in metadata and docs, not with checker-only special cases.
-- Required-field constructor enforcement is now an active implementation surface: D93 and D94 are real checker obligations, while stateless construction stays outside the state-entry slice.
-- Interval containment is the authoritative overflow-prevention mechanism for bounded arithmetic; obsolete `@bounds`, separate validator-phase, and runtime-fallback proposals are historical only.
-- Quantity normalization for cross-unit comparisons is currently a compile-time concern; runtime `PreceptValue` normalization is deferred until the later Phase 3 runtime track.
+- Quantity normalization now has two durable lanes: compile-time normalization for declarations and literals, runtime normalization for ingress values (`TypeRuntimeMeta.ReadJson` / `TypeRuntime<Quantity>.FromClr`). Both call the same `TypedConstantNormalizer` logic.
+- `TypedField` is the normalization handshake between analysis and execution: authored bounds stay available for display, normalized bounds feed proof/comparison surfaces, and the Builder remains the conversion boundary into `PreceptValue`.
+- `IntervalOf` scaling is expression-form scoped, not universal: scale static typed constants and interpolated magnitude + static-unit forms; do **not** scale field refs, arg refs, or interpolated whole-value holes.
+- `GetFieldBounds` and trusted-fact extraction must read normalized quantity data, and event-arg bound normalization still needs explicit parity design.
+- Compiler/runtime duplication questions should be framed through the three-layer enforcement model: compile-time diagnostics, ingress validation, and defense-in-depth runtime faults.
+
+## Durable Learnings
+
+- Any claim that work happens "only at compile time" must be stress-tested against Fire/Update/Restore ingress paths.
+- Storage conventions for business-domain values are architectural decisions; they shape evaluator invariants and cannot be deferred casually.
+- ProofEngine intervals and evaluator opcodes share source data, not a common intermediate representation.
+- `PreceptValue` bytes 8-23 are a three-way union lane (`decimal`, `long`, or reference region); quantity unit identity is not blocked by the 32-byte layout.
+- Prefer catalog-mediated dispatch and metadata-backed mappings over per-code hardcoded routing in both compiler and runtime consumers.
 
 ## Historical Summary
 
-- 2026-05-12 through 2026-05-14 concentrated Frank's work around hover contract reviews, field-state guarantees, constructor diagnostics, interval-proof design, and diagnostic-enforcement architecture.
-- The durable enforcement baseline is now: PRE0078 stays in ProofEngine Strategy 7, PRE0079 is the TypeChecker literal-bounds wire, PRE0019 is retired unless a real presence-obligation generation gap is found, and PRE0094 is already emitted in the checker.
-- Durable batch-by-batch detail now lives in `.squad/decisions.md` and `history-archive.md`; this live file keeps only the latest guidance other agents need immediately.
+- 2026-05-12 through 2026-05-14 concentrated Frank's work around hover contract reviews, field-state guarantees, constructor diagnostics, interval-proof design, quantity normalization, and diagnostic-enforcement architecture.
+- The durable enforcement baseline is: PRE0078 stays in ProofEngine Strategy 7, PRE0079 is the TypeChecker literal-bounds wire, PRE0019 is retired unless real presence-obligation generation is added, and PRE0094 is already emitted in the checker.
+- Older batch-by-batch detail now lives in `.squad/decisions.md` and `history-archive.md`; this live file keeps only the guidance and latest outcomes other agents need immediately.
 
 ## Recent Updates
 
-### 2026-05-14T01:55:05-04:00 — Catalog integration analysis for quantity normalization
+### 2026-05-14T17:10:32.283-04:00 — Interpolated normalization review closed with approval conditions
 
-- Answered Shane's 4-part question on whether UCUM normalization belongs in catalog entries (Functions/Operations/Opcodes).
-- Key verdict: **No catalog changes required.** Normalization fails the "Is this part of a complete description of Precept?" test — it's implementation infrastructure, not language surface.
-- The evaluator never normalizes at runtime; the Builder pre-bakes normalized bounds into `LOAD_LIT` opcodes via `TypedField.NormalizedDeclaredMin/Max`.
-- The correct sharing seam between ProofEngine and Evaluator is the semantic model (`TypedField`), not catalog metadata.
-- No revision to Slices 14–21 required.
-- Added §0.1 to `docs/Working/quantity-normalization-design.md`.
-- Filed decision record at `.squad/decisions/inbox/frank-catalog-normalization.md` with D1–D5.
+- Completed the exhaustive architectural review of `docs/Working/quantity-normalization-design.md` and approved the direction **with conditions**.
+- Locked the design correction that §0 supersedes the competing §3.6 / §3.7 / §7 Q2 descriptions, so the doc must carry one canonical bounds-storage story.
+- Confirmed the key follow-up requirements: expression-form-scoped `IntervalOf` scaling, normalized reads in `GetFieldBounds`, normalized `StaticMagnitude` in trusted-fact extraction, and a decision on event-arg bound parity.
+- Cross-agent note: George's exhaustive gap audit proves Slices 19-21 are necessary but not exhaustive; implementation planning must account for the wider interpolated qualifier/default surface.
 
-### 2026-05-14T01:46:51-04:00 — Deep architectural reassessment of quantity normalization design
+### 2026-05-14T17:10:32.283-04:00 — Diagnostic enforcement alignment recorded as a three-layer model
 
-- Answered Shane's 6 questions on pipeline placement, shared representations, and optimal seams.
-- Key verdicts: no shared opcodes between ProofEngine and Evaluator (share source data not execution plans); no Builder in compile pipeline; universal `IntervalOf` post-step instead of per-node normalization; `TypedField` stores both original and normalized bounds; no `QuantityValue` wrapper; normalizer stays in `Language/Numeric/`.
-- Simplified Slice 14 by dropping `NormalizedNumericValue` record — bare `decimal` return is sufficient.
-- Unified Slices 19–20 (interpolated case) with static-literal path via `TryGetStaticUnit` helper.
-- Filed decision record at `.squad/decisions/inbox/frank-architecture-reassessment.md` with D1–D7.
-- Three new open questions (Q7–Q9) for Shane on requirement shape, interval API, and TypedField width.
-
-### 2026-05-14T01:23:00-04:00 — Interpolated quantity expression analysis for normalization design
-
-- Discovered that the actual `samples/Test.precept` `NumericOverflow` fires on an **interpolated** expression (`'{test2} [lb_av]'` → `TypedInterpolatedTypedConstant`), not a static literal (`TypedTypedConstant`).
-- Traced two independent failure paths: Strategy 7 (`IntervalOfNarrowed` has no case for `TypedInterpolatedTypedConstant` → `Unbounded`) and Strategy 6 (`SatisfactionCovers` returns null for `DeclarationValue` bounds → conservative fail).
-- Confirmed the static-literal normalization fix (Slices 14–18) does NOT fix the interpolated case — these are independent problems hitting different code paths.
-- Extended `docs/Working/quantity-normalization-design.md` with §1.5 (interpolated analysis), §5.3 (Slices 19–21 for interpolated interval track), and Q5/Q6 in §7.
-- Filed decision record `.squad/decisions/inbox/frank-interpolated-quantity-analysis.md` with D1–D4.
-- Key design extension needed: `TypedInterpolatedTypedConstant` must carry a `UcumParsedUnit?` for static unit portions; `IntervalOfNarrowed` must recurse into magnitude slots; interval scaling by UCUM factor enables cross-unit proof discharge.
-
-### 2026-05-14T05:12:08Z — Quantity normalization design for cross-unit bound comparison
-
-- Authored `docs/Working/quantity-normalization-design.md` for the false-positive `NumericOverflow` path where typed-constant magnitudes are compared before UCUM scaling is applied.
-- The two compile-time defect sites are `TypeChecker.Validation.Modifiers.cs:TryExtractTypedConstantMagnitude` and `ProofEngine.Composition.cs:TryGetTypedConstantMagnitude`; both should consume one shared helper at `src/Precept/Language/Numeric/TypedConstantNormalizer.cs`.
-- Rejected the earlier `TypeMeta.NumericNormalization` DU proposal as unnecessary, confirmed the existing UCUM infrastructure is sufficient, kept money out of normalization, and deferred runtime/`PreceptValue` work to Phase 3.
-- Open questions recorded for Shane: diagnostic display format, `DeclaredMin`/`DeclaredMax` storage, scope boundary, and normalizer namespace.
-
-### 2026-05-14T04:43:00Z — Final enforcement review corrected PRE0094 inventory drift and restored PRE0019 retirement annotation
-
-- `docs/Working/diagnostic-enforcement.md` now reflects that PRE0094 already has two live emitters in `TypeChecker.Validation.FieldState.cs`, so the open gap count is 49 and the emission inventory is 84.
-- Slice 3 is recorded as already wired, the §3.7 D2 table again marks PRE0019 as retired, and the Elaine naming references plus Q1/Q2/Q10 were rechecked with no new open questions.
-
-### 2026-05-13T18:17:15Z–2026-05-14T04:00:00Z — Diagnostic enforcement decisions consolidated
-
-- Strategy 7 (`IntervalContainment`) is the approved bounded-expression design surface; obsolete validator/runtime overflow proposals are historical only.
-- Dynamic qualifier enforcement stays split by lane: the TypeChecker skips PRE0070–0074 when the qualifier is dynamic, while ProofEngine Strategy 5 remains the enforcement point.
-- PRE0079 stays a TypeChecker-only literal-bounds diagnostic with zero live emitters today; no new proof infrastructure is needed for that future wire.
-
-## Learnings
-
-- Folder README callouts should explicitly route implementers to both `catalog-system.md` § Architectural Identity and `docs/contributing/catalog-driven-checklist.md` before any pipeline work begins.
-- If a design depends on an existing diagnostic, confirm the live emitting pipeline stage instead of trusting catalog metadata or prose.
-- Gate 2 is a tripwire, not proof of behavioral correctness; every gap closure still needs positive and negative tests.
-- Gate 1 allow-list entries should stay root-cause oriented; per-code citation churn adds noise without improving enforcement.
-- Strip comment content before Gate 2 scans `DiagnosticCode.*`; it cheaply removes the doc-comment false-positive class.
-- Catalog static initialization may not reach downstream catalog statics during cctor execution; reverse references should defer through `Lazy<T>`.
-- `set` into an `omit` target-state field is the decisive field-state rule; Update access modes do not constrain Fire semantics.
-- Proof diagnostic naming should describe the state of the author's definition (condition-first), not the compiler's failed attempt.
-- When typed-constant tuples already carry UCUM scale information, prefer a shared normalization helper over inventing new metadata shapes.
-- `precept_compile` runs the full compilation pipeline including the ProofEngine — `Compiler.Compile()` calls `ProofEngine.Prove()` and returns all diagnostics. Do not claim MCP tools skip proof obligations.
-- `PreceptValue`'s bytes 8–23 union payload is three-way: `decimal`, `long`, or a **reference region** (managed pointer). Do not characterize it as decimal-only. 23 of 32 `TypeKind` members use the reference lane. Business-domain composite types like `quantity` can carry unit information via the reference region — the "no space for unit reference" claim is incorrect. The exact internal layout is a pending implementation decision per `evaluator.md`.
-- Adding ## Contents after status blocks materially improves long-form doc navigation for both humans and AI agents.
-- When a compile pipeline runs per-keystroke, the performance question is never "is this computation expensive?" (decimal math is nanoseconds) but "is it redundant?" — normalize once, store on the semantic model, let downstream consumers read pre-computed results.
-- Abstract interpretation (proof engine intervals) and concrete execution (evaluator opcodes) should never share an intermediate representation — they share source data (normalized bounds on `TypedField`), not execution plans.
-- Universal post-step patterns (compute raw interval → scale by static unit) are strictly superior to per-node-type normalization scattered across switch arms in `IntervalOfNarrowed`. The `TryGetStaticUnit` helper unifies static and interpolated typed constants.
-- "Store both original and normalized" on `TypedField` resolves the display-vs-comparison tension permanently — 2 extra `decimal?` fields per field is negligible cost for eliminating an entire class of design questions.
-- Long runtime/tooling docs need a `## Contents` section driven by live H2/H3 headings so AI navigation stays reliable.
-- Added `## Contents` sections and `> [!IMPORTANT]` non-negotiable callout boxes to the five critical architecture docs so agents hit architectural invariants before diving into body prose.
-- UCUM quantity normalization is NOT a catalog concern — it fails the "Is this part of a complete description of Precept?" test. It is implementation logic (compile-time transformation + builder literal embedding), not language surface. The correct sharing seam between ProofEngine and Evaluator is `TypedField.NormalizedDeclaredMin/Max` (semantic model), not catalog metadata.
-- The evaluator never normalizes at runtime — the Builder pre-bakes normalized bounds into `LOAD_LIT` opcodes during Pass 5 (Constraint Plan). The evaluator only executes prebuilt plans with concrete comparisons.
-- "Should X be in the catalog?" has a sharp test: would X appear in MCP `precept_language` output, LS completions, or a complete description of the language surface? If no, it's implementation infrastructure regardless of how many pipeline stages consume it.
-- `docs/contributing/catalog-driven-checklist.md` had drifted behind the live catalog system: the current inventory is 14 catalogs, not 12, and the operational checklist must name `ExpressionForms` and `Outcomes` explicitly.
-- Parser guidance must match live derivation points: precedence now derives from `Operators` plus `ExpressionForms`, outcome dispatch derives from `Outcomes.ByLeadingToken`, and member-name legality derives from `Types` accessors through `Tokens.KeywordsValidAsMemberName`.
-- The checklist should call out the current Roslyn enforcement layer, especially distributed dispatcher coverage (`[HandlesCatalogExhaustively]` / `[HandlesCatalogMember]`) and `[CatalogDU]` wildcard/completeness rules.
+- Confirmed the enforcement mission did **not** compound compiler/runtime duplication; most wired diagnostics are compile-time-only structural checks.
+- Recorded the canonical three-layer model: compiler diagnostics, ingress validation, and defense-in-depth faults linked through `[StaticallyPreventable]`.
+- Captured two durable follow-ups: ingress validation should become a deliberate surface for quantity/choice/dynamic-qualifier checks, and catalog-mediated dispatch remains the preferred alignment pattern.
+- Preserved the companion implementation-notes record so future sessions can recover enforcement reality without re-auditing the mission.
