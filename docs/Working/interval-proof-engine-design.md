@@ -17,15 +17,16 @@
 | **3** | Guard-Narrowing Integration | George | ✅ Done | — | Depends on Slice 2 |
 | **4** | Function Overload Intervals | George | ✅ Done | — | Independent after Slice 2 |
 | **5** | Hover Expression Display + Diagnostic Squiggle | Kramer | ✅ Done | `dotnet test test/Precept.LanguageServer.Tests/Precept.LanguageServer.Tests.csproj --filter "FullyQualifiedName~HoverHandlerIntervalTests\|FullyQualifiedName~HoverHandlerTests"` (70/70) | Interval field/expression + NumericOverflow squiggle hover shipped |
-| **6** | Regression + Symbol Export | Soup Nazi | ⏳ Pending | — | Final validation |
-| **7** | Catalog-Driven Obligation Generator Refactor | George | ✅ Done | ProofEngineIntervalIntegrationTests; ProofEngineTests.Slice1_ObligationCollection; Precept.Tests | Catalog-driven bounds extraction from modifier metadata (ApplicableTo + ProofSatisfactions) wired for obligation generation; Slice 2 anchors remain green. |
-| **8** | Qualified-Type Bound Semantics | George | ✅ Done | dotnet test test/Precept.Tests/Precept.Tests.csproj --filter "FullyQualifiedName~TypeCheckerModifierTests\|FullyQualifiedName~PriceExchangeRateModifierTests" (69/69); dotnet test test/Precept.Tests/Precept.Tests.csproj --filter "FullyQualifiedName~TypeChecker" (662/662) | Added metadata-driven bound qualifier requirements (money/quantity/price) and BoundsRequireQualifier type-checker enforcement with regression coverage. |
-| **9** | Typed-Constant Bound Extraction | George | ⏳ Pending | — | Depends on Slice 8 |
-| **10** | Qualifier Compatibility Checks | George | ⏳ Pending | — | Depends on Slice 8 |
+| **6** | MCP Sync Assessment + Tooling Propagation | Soup Nazi | ✅ Done | `dotnet test test/Precept.Mcp.Tests/Precept.Mcp.Tests.csproj --filter "FullyQualifiedName~CompileToolTests\|FullyQualifiedName~NewToolTests"` (38/38); `dotnet test test/Precept.Mcp.Tests/Precept.Mcp.Tests.csproj` (44/44) | `precept_compile` now projects `proofObligations` with obligation kind + `computedInterval`; `IntervalContainment` vocabulary confirmed via catalog-derived `precept_proofs` output (`precept_language` surface remains removed). |
+| **7** | Catalog-Driven Obligation Generator Refactor | George | ✅ Done | `ProofEngineIntervalIntegrationTests`; `ProofEngineTests.Slice1_ObligationCollection`; `Precept.Tests` | Catalog-driven bounds extraction from modifier metadata (`ApplicableTo` + `ProofSatisfactions`) wired for obligation generation; Slice 2 anchors remain green. |
+| **8** | Qualified-Type Bound Semantics | George | ✅ Done | `dotnet test test/Precept.Tests/Precept.Tests.csproj --filter "FullyQualifiedName~TypeCheckerModifierTests\|FullyQualifiedName~PriceExchangeRateModifierTests"` (69/69); `dotnet test test/Precept.Tests/Precept.Tests.csproj --filter "FullyQualifiedName~TypeChecker"` (662/662) | Added metadata-driven bound qualifier requirements (`money`/`quantity`/`price`) and `BoundsRequireQualifier` type-checker enforcement with regression coverage. |
+| **9** | Typed-Constant Bound Extraction | George | ✅ Done | `dotnet test test/Precept.Tests/Precept.Tests.csproj --filter "FullyQualifiedName~ProofEngineIntervalIntegrationTests\|FullyQualifiedName~Track2PhaseAModifierValidationTests\|FullyQualifiedName~TypeCheckerModifierTests"` (101/101) | Typed-constant min/max extraction now populates declared bounds for money/quantity/price and persists bound qualifier metadata for Slice 10 follow-up checks. |
+| **10** | Qualifier Compatibility Checks | George | ✅ Done | `dotnet test test/Precept.Tests/Precept.Tests.csproj --filter "FullyQualifiedName~TypeCheckerQualifierCompatibilityTests\|FullyQualifiedName~TypeCheckerModifierTests"` (11+17 pass); `dotnet test test/Precept.Tests/Precept.Tests.csproj` (5280/5280) | Added `BoundsQualifierMismatch` (PRE0134) diagnostic; per-bound qualifier compatibility check in `ValidateBoundQualifierCompatibility` enforces qualifier match when both field and typed-constant bound carry qualifiers; also enforces `BoundsRequireQualifier` when qualified field has a plain numeric bound. |
 | **11** | String/Collection Constraint Obligations | George | ⏳ Pending | — | Depends on Slice 7 |
-| **12** | Type-Family Coverage Regression Suite | Soup Nazi | ⏳ Pending | — | Depends on Slices 8–11 |
+| **12** | Presence Obligation Generation | George | ⏳ Pending | — | Depends on Slice 7; parallel with Slices 8–11 |
+| **13** | Type-Family Coverage Regression Suite | Soup Nazi | ⏳ Pending | — | Depends on Slices 8–12 |
 
-**Initiated:** 2026-05-13T19:19:55Z  
+**Initiated:** 2026-05-13T19:19:55Z
 **Updated by:** Scribe (live status updates as agents complete slices)
 
 ---
@@ -643,7 +644,10 @@ The `IntervalContainmentProofRequirement` record carries `TargetField`, `Declare
 | `test/Precept.LanguageServer.Tests/HoverHandlerIntervalTests.cs` | **Create** | Interval hover regression tests |
 | `src/Precept/Language/Diagnostics.cs` (or `DiagnosticCode.cs`) | Modify | Add `BoundsRequireQualifier`, `BoundsQualifierMismatch` codes (Slices 8, 10) |
 | `src/Precept/Pipeline/TypeChecker.Validation.Modifiers.cs` | Modify | Extend `TryGetComparableModifierValue` for typed constants (Slice 9); qualifier validation (Slices 8, 10) |
-| `test/Precept.Tests/TypeFamilyCoverageTests.cs` | **Create** | Cross-type-family constraint coverage regression (Slice 12) |
+| `test/Precept.Tests/TypeFamilyCoverageTests.cs` | **Create** | Cross-type-family constraint coverage regression (Slice 13) |
+| `src/Precept/Pipeline/ProofEngine.cs` | Modify | Extend `WalkExpression` / `WalkActions` to inject `PresenceProofRequirement` for optional field refs (Slice 12) |
+| `src/Precept/Language/FaultCode.cs` | Modify | Redirect `FaultCode.UnexpectedNull` `[StaticallyPreventable]` from PRE0019 to PRE0116 (Slice 12) |
+| `test/Precept.Tests/ProofEnginePresenceTests.cs` | **Create** | Presence obligation generation + discharge tests (Slice 12) |
 
 ### 8.2 Vertical Slices
 
@@ -663,7 +667,7 @@ The `IntervalContainmentProofRequirement` record carries `TargetField`, `Declare
 - `src/Precept/Pipeline/ProofLedger.cs` — add `ProofStrategy.IntervalContainment = 7`
 
 **Tests (new file: `ProofEngineIntervalTests.cs`):**
-- `NumericInterval_Add_PositivePositive_ReturnsSum` 
+- `NumericInterval_Add_PositivePositive_ReturnsSum`
 - `NumericInterval_Add_PositiveNegative_ReturnsCorrectBounds`
 - `NumericInterval_Subtract_SwapsMaxMin`
 - `NumericInterval_Multiply_FourCornerCases` (4 sign combinations)
@@ -699,10 +703,10 @@ The `IntervalContainmentProofRequirement` record carries `TargetField`, `Declare
 ```csharp
 private static NumericInterval IntervalOf(TypedExpression expr, SemanticIndex semantics)
     // TypedLiteral(decimal) → [value, value]
-    // TypedLiteral(integer) → [value, value]  
+    // TypedLiteral(integer) → [value, value]
     // TypedFieldRef → ExtractFieldInterval(fieldName, semantics)
     // TypedEventArgRef → ExtractArgInterval(argName, semantics)
-    // TypedBinaryOp → apply BinaryOperationMeta.IntervalTransfer(left, right) 
+    // TypedBinaryOp → apply BinaryOperationMeta.IntervalTransfer(left, right)
     //                  or Unbounded if IntervalTransfer is null
     // TypedFunctionCall → Unbounded (FunctionOverload.IntervalTransfer deferred to Slice 4)
     // TypedConditional → Union of then/else intervals
@@ -1026,7 +1030,55 @@ private static NumericInterval NarrowedIntervalOf(
 
 ---
 
-#### Slice 12 — Type-Family Coverage Regression Suite
+#### Slice 12 — Presence Obligation Generation
+
+**Objective:** Enhance `ProofEngine.WalkExpression` (and/or `WalkActions`) to inject `PresenceProofRequirement` when a `TypedFieldRef` references a field with `IsOptional == true` (checked via `SemanticIndex.FieldsByName`, where `field.Presence is DeclaredPresenceMeta.Optional`) in a value position. The existing discharge infrastructure (Strategy 2 via `DeclaredPresenceMeta.Guaranteed` + `ProofSatisfaction.Presence`, Strategy 3 via `when X is set` guard-in-path, and Strategy 5 via qualifier compatibility) plus PRE0116 `UnprovedPresenceRequirement` diagnostic emission already handle the downstream path — this slice only generates the obligations that feed into it.
+
+**Why this belongs here:** Same architectural pattern as all other obligation generation slices — teach the expression walker to generate a new class of obligations from catalog/semantic metadata, then existing discharge + diagnostic infrastructure handles the rest. Zero new diagnostic codes needed. Zero new strategies needed. Zero new ProofRequirement subtypes needed. The `PresenceProofRequirement` type, `ProofSatisfaction.Presence`, Strategy 2/3 presence arms, and PRE0116 emission are ALL already fully plumbed — they just receive zero obligations today.
+
+**Value positions (obligation triggers):**
+1. Binary operation operand (`TypedBinaryOp.Left` or `.Right`)
+2. Function argument (`TypedFunctionCall.Arguments[i]`)
+3. Set action source expression (the value being assigned)
+4. Member access receiver (`TypedMemberAccess.Object`)
+5. Rule/ensure condition (field ref in a boolean expression)
+6. Interpolation hole (`TypedHoleSegment.Expression`)
+
+**Implementation approach:**
+- In `WalkExpression`, when visiting a `TypedFieldRef`, look up the field in `SemanticIndex.FieldsByName`. If `field.Presence is DeclaredPresenceMeta.Optional`, emit a `new PresenceProofRequirement(new SelfSubject(), "Field '{fieldName}' is optional and may be absent")`.
+- The obligation context (`ObligationContext`) is already passed through the walk — no changes needed.
+- The walker already visits all value-position expression forms; the new check is a leaf-node addition at the `TypedFieldRef` case (currently a no-op in the switch).
+
+**Files:**
+- `src/Precept/Pipeline/ProofEngine.cs` — extend `WalkExpression` to add a `case TypedFieldRef fieldRef:` arm (or extend the existing default) that checks optionality and emits `PresenceProofRequirement`. Requires passing `SemanticIndex` through `WalkExpression` (it currently only receives `ObligationContext`).
+- `src/Precept/Language/FaultCode.cs` — change `[StaticallyPreventable(DiagnosticCode.NullInNonNullableContext)]` on `FaultCode.UnexpectedNull` to `[StaticallyPreventable(DiagnosticCode.UnprovedPresenceRequirement)]`. This correctly links the runtime fault to its compile-time prevention path (PRE0116, not PRE0019).
+- `test/Precept.Tests/ProofEnginePresenceTests.cs` (CREATE) — presence obligation generation tests.
+
+**Tests:**
+- `OptionalField_InSetAction_WithoutGuard_GeneratesPRE0116` — an optional field used as a value source in a `set` action without a `when X is set` guard → PRE0116 diagnostic emitted.
+- `OptionalField_InSetAction_WithWhenGuard_NoDiagnostic` — same field inside `when X is set { set Y to X }` → Strategy 3 discharges the obligation, no diagnostic.
+- `OptionalField_InBinaryOp_WithoutGuard_GeneratesPRE0116` — optional field as operand in `X + Y` without guard → PRE0116.
+- `OptionalField_InFunctionArg_WithoutGuard_GeneratesPRE0116` — optional field as function argument → PRE0116.
+- `OptionalField_InMemberAccess_WithoutGuard_GeneratesPRE0116` — optional field as `.count` receiver → PRE0116.
+- `OptionalField_InRuleCondition_WithoutGuard_GeneratesPRE0116` — optional field in `rule` condition → PRE0116.
+- `OptionalField_InInterpolationHole_WithoutGuard_GeneratesPRE0116` — optional field in `"Total: {optionalField}"` → PRE0116.
+- `RequiredField_InValuePosition_NoObligation` — non-optional field → no presence obligation generated.
+- `OptionalField_GuardedByDeclaration_Strategy2Discharges` — field with `DeclaredPresenceMeta.Guaranteed` (via `required` modifier or equivalent) → Strategy 2 discharges.
+- `FaultCode_UnexpectedNull_PointsToPRE0116` — verify `StaticallyPreventableAttribute` on `FaultCode.UnexpectedNull` now references `DiagnosticCode.UnprovedPresenceRequirement`.
+
+**Acceptance criteria:**
+- `new PresenceProofRequirement(...)` is constructed in production code for every optional field ref in a value position.
+- Guarded access (`when X is set { ... }`) produces zero PRE0116 diagnostics.
+- Unguarded access produces PRE0116.
+- `FaultCode.UnexpectedNull` `[StaticallyPreventable]` attribute references `DiagnosticCode.UnprovedPresenceRequirement`.
+
+**Completion gate:** `dotnet test` clean; at least one positive and one negative presence obligation test passing.
+
+**Dependencies:** Depends on Slice 7 (catalog-driven obligation generator refactor — already done). Independent of Slices 8–11; can run in parallel.
+
+---
+
+#### Slice 13 — Type-Family Coverage Regression Suite
 
 **Objective:** Comprehensive cross-type-family regression suite ensuring every type family's constraints are covered per the matrix in §12. This is the final validation gate for the catalog-driven obligation architecture.
 
@@ -1048,13 +1100,17 @@ private static NumericInterval NarrowedIntervalOf(
 
 **Meta-test:**
 - `AllConstrainableTypes_DeclaredConstraint_NeverSilentlyIgnored` — parameterized test iterating over every type in the `Types` catalog that has `min`/`max`/`minlength`/`maxlength`/`mincount`/`maxcount` in its `ApplicableModifiers`; verifies that a field with the constraint and a `set` action produces either an obligation or a diagnostic.
+- `OptionalField_InValuePosition_GeneratesPresenceObligation` — verifies that optional field references in value positions generate `PresenceProofRequirement` obligations.
 
 **Acceptance criteria:**
-- 100% coverage of the §12 matrix
+- 100% coverage of the §12 matrix (including presence checking row)
 - No type family has a declared constraint that produces neither an obligation nor a diagnostic
+- No optional field in a value position escapes without a presence obligation
 - All existing tests pass (full regression)
 
 **Completion gate:** `dotnet test` clean; meta-test `AllConstrainableTypes_DeclaredConstraint_NeverSilentlyIgnored` passes.
+
+**Dependencies:** Depends on Slices 8–12.
 
 ---
 
@@ -1073,17 +1129,17 @@ Slice 6 (MCP sync)
     ↓
 Slice 7 (catalog-driven obligation generator refactor)
     ↓
-Slice 8 (qualified-type bound semantics)     Slice 11 (string/collection constraints) [parallel]
-    ↓                                             ↓
-Slice 9 (typed-constant extraction)               ↓
-    ↓                                             ↓
-Slice 10 (qualifier compatibility checks)         ↓
-    ↓                                             ↓
-    └──────────────→ Slice 12 (type-family coverage regression) ←──┘
+Slice 8 (qualified-type bound semantics)     Slice 11 (string/collection constraints)  Slice 12 (presence obligations) [all parallel]
+    ↓                                             ↓                                         ↓
+Slice 9 (typed-constant extraction)               ↓                                         ↓
+    ↓                                             ↓                                         ↓
+Slice 10 (qualifier compatibility checks)         ↓                                         ↓
+    ↓                                             ↓                                         ↓
+    └──────────────→ Slice 13 (type-family coverage regression) ←──────────────────────────┘
 ```
 
 Slice 4 is independent of Slice 3 and can run in parallel once Slice 2 is complete.
-Slices 8–10 are sequential (each depends on the prior). Slice 11 is independent of Slices 8–10 and can run in parallel after Slice 7. Slice 12 depends on all of Slices 8–11.
+Slices 8–10 are sequential (each depends on the prior). Slices 11 and 12 are independent of Slices 8–10 and each other, and can run in parallel after Slice 7. Slice 13 depends on all of Slices 8–12.
 
 ### 8.4 Tooling/MCP Sync Assessment
 
@@ -1474,6 +1530,7 @@ This matrix documents the constraint-obligation coverage target across all type 
 | `exchangerate` | `min`, `max` | `IntervalContainment` | ❌ Silently skipped | Covered via catalog-driven generator (Slice 7) |
 | `string` | `minlength`, `maxlength` | `LengthContainment` (new) | ❌ No obligation generated | Covered (Slice 11) |
 | `collection` | `mincount`, `maxcount` | `CountContainment` (new) | ❌ No obligation generated | Covered (Slice 11) |
+| `optional` (any type) | `optional` modifier | `Presence` | ❌ No obligation generated (`PresenceProofRequirement` never constructed) | Covered (Slice 12) |
 | `temporal` (`date`, `time`, `datetime`, `instant`) | No `min`/`max` declared in catalog | None | ✅ No gap (no constraint declared) | No action needed |
 
 ### 12.1 Principle: No Silent Constraint Ignoring
@@ -1483,7 +1540,7 @@ If the catalog allows a constraint modifier on a type (i.e., the modifier's `App
 1. A proof obligation is generated for assignments to fields with that constraint, **or**
 2. A diagnostic is emitted explaining why the constraint cannot be enforced (e.g., `BoundsRequireQualifier`).
 
-There must be no third option where the constraint is declared, accepted by the parser and type checker, and then silently ignored by the proof engine.
+There must be no third option where the constraint is declared, accepted by the parser and type checker, and then silently ignored by the proof engine. This applies equally to presence constraints: an `optional` field referenced in a value position must generate a `PresenceProofRequirement`, or the proof engine is silently ignoring a declared constraint.
 
 ---
 
@@ -1507,3 +1564,5 @@ The strategy is **sound**: it never proves a false positive. If Strategy 7 disch
 ---
 
 *Document ready for design review. Shane sign-off required before any implementation begins. Elaine review required on §6 (hover) before Slice 5. George review required on §8 (implementation plan) before any slice begins. Soup Nazi review required on §9 (test strategy) before Slice 2 completion gate. Sections 10–12 and Slices 7–12 added 2026-05-13 to incorporate catalog-driven obligation generation, qualified-type bound semantics, and type-family coverage improvements.*
+
+

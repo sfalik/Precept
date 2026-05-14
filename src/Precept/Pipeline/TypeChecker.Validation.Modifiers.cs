@@ -168,7 +168,96 @@ internal static partial class TypeChecker
 
         ValidateBoundQualifierRequirements(modifiers, resolvedType, declaredQualifiers, ctx);
         ValidateModifierBounds(modifiers, resolvedType, declaredQualifiers, span, ctx);
+        ValidateBoundQualifierCompatibility(modifiers, resolvedType, declaredQualifiers, ctx);
     }
+
+    private static void ValidateBoundQualifierCompatibility(
+        ImmutableArray<ParsedModifier> modifiers,
+        TypeKind resolvedType,
+        ImmutableArray<DeclaredQualifierMeta> declaredQualifiers,
+        CheckContext ctx)
+    {
+        if (modifiers.IsDefaultOrEmpty || resolvedType == TypeKind.Error)
+            return;
+
+        var typeMeta = Types.GetMeta(resolvedType);
+        if (typeMeta.RequiredBoundQualifierAxes.Count == 0)
+            return;
+
+        // Only run per-bound checks when the field carries the required qualifier axes.
+        // When the field lacks the qualifier, ValidateBoundQualifierRequirements already emits
+        // BoundsRequireQualifier for the whole declaration — don't double-diagnose.
+        var fieldQualifiersByAxis = declaredQualifiers
+            .Where(q => typeMeta.RequiredBoundQualifierAxes.Contains(q.Axis))
+            .ToDictionary(q => q.Axis);
+
+        if (fieldQualifiersByAxis.Count == 0)
+            return;
+
+        var requiredPrepositions = typeMeta.QualifierShape?.Slots
+            .Where(slot => typeMeta.RequiredBoundQualifierAxes.Contains(slot.Axis))
+            .Select(slot => Tokens.GetMeta(slot.Preposition).Text ?? slot.Preposition.ToString().ToLowerInvariant())
+            .Distinct(StringComparer.Ordinal)
+            .ToArray() ?? [];
+
+        foreach (var modifier in modifiers)
+        {
+            if (modifier.Kind != ModifierKind.Min && modifier.Kind != ModifierKind.Max)
+                continue;
+
+            var boundValue = TryGetComparableModifierValue(modifier.Value, resolvedType, declaredQualifiers);
+            if (boundValue is null)
+                continue;
+
+            var boundQualifiers = boundValue.Value.Qualifiers;
+            if (boundQualifiers.IsDefaultOrEmpty)
+            {
+                // Plain numeric bound on a field that requires a qualifier — the bound must
+                // specify its qualifier so the comparison is unambiguous.
+                var modifierMeta = Modifiers.GetMeta(modifier.Kind);
+                ctx.Diagnostics.Add(Diagnostics.Create(
+                    DiagnosticCode.BoundsRequireQualifier,
+                    modifier.Span,
+                    modifierMeta.Token.Text ?? modifier.Kind.ToString().ToLowerInvariant(),
+                    typeMeta.DisplayName,
+                    FormatRequiredQualifierLabel(requiredPrepositions)));
+                continue;
+            }
+
+            // Both field and bound carry qualifiers — compare values on matching axes.
+            foreach (var boundQualifier in boundQualifiers)
+            {
+                if (!fieldQualifiersByAxis.TryGetValue(boundQualifier.Axis, out var fieldQualifier))
+                    continue;
+
+                if (!QualifierValuesMatch(fieldQualifier, boundQualifier))
+                {
+                    ctx.Diagnostics.Add(Diagnostics.Create(
+                        DiagnosticCode.BoundsQualifierMismatch,
+                        modifier.Span,
+                        GetQualifierDisplayValue(boundQualifier),
+                        GetQualifierDisplayValue(fieldQualifier)));
+                }
+            }
+        }
+    }
+
+    private static bool QualifierValuesMatch(DeclaredQualifierMeta a, DeclaredQualifierMeta b) =>
+        (a, b) switch
+        {
+            (DeclaredQualifierMeta.Currency ca, DeclaredQualifierMeta.Currency cb)
+                => string.Equals(ca.CurrencyCode, cb.CurrencyCode, StringComparison.Ordinal),
+            (DeclaredQualifierMeta.Unit ua, DeclaredQualifierMeta.Unit ub)
+                => string.Equals(ua.UnitCode, ub.UnitCode, StringComparison.Ordinal),
+            _ => true,
+        };
+
+    private static string GetQualifierDisplayValue(DeclaredQualifierMeta q) => q switch
+    {
+        DeclaredQualifierMeta.Currency c => c.CurrencyCode,
+        DeclaredQualifierMeta.Unit u => u.UnitCode,
+        _ => q.Axis.ToString(),
+    };
 
     private static void ValidateBoundQualifierRequirements(
         ImmutableArray<ParsedModifier> modifiers,

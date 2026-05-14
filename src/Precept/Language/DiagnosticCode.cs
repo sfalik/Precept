@@ -76,6 +76,8 @@ public enum DiagnosticCode
     InvalidModifierValue               =  35,
     /// <summary><c>min</c>/<c>max</c> bounds on qualified types require explicit qualifier context.</summary>
     BoundsRequireQualifier             = 133,
+    /// <summary>A bound's qualifier (e.g., <c>'100 EUR'</c>) conflicts with the field's declared qualifier (e.g., <c>in 'USD'</c>).</summary>
+    BoundsQualifierMismatch            = 134,
     DuplicateModifier                  =  36,
     RedundantModifier                  =  37,
     ComputedFieldNotWritable           =  38,
