@@ -6,6 +6,19 @@
 
 ---
 
+### 2026-05-14T04:43:00Z: Final review corrected PRE0094 inventory drift and annotated PRE0019 retirement in diagnostic enforcement
+
+**By:** Scribe
+
+**Status:** Merged from Frank's final diagnostic-enforcement review.
+
+**Merged source:** `frank-enforcement-final-review.md`.
+
+- Frank's final audit found PRE0094 was already live in two `TypeChecker.Validation.FieldState.cs` emitters; the enforcement doc's gap count was corrected 50→49 across 9 references, the emission inventory 83→84, and Slice 3 was struck as already wired rather than pending.
+- The §3.7 D2 table now explicitly marks PRE0019 as retired so the plan no longer implies active implementation work for a dead diagnostic.
+- Elaine naming references remain correct, the PRE0019/PRE0079 sections stay accurate, and Q1, Q10, and Q2 are resolved with no new open questions.
+
+---
 
 ### 2026-05-14T04:00:00Z: PRE0079 dead-code audit confirms a TypeChecker wire instead of retirement
 
@@ -1301,3 +1314,4 @@
 - Validation landed with 19 new ProofEngine tests and 193/193 proof tests passing.
 
 ---
+
