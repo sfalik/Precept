@@ -870,20 +870,20 @@ Test method names:
 
 **Files:** `src/Precept/Pipeline/TypeChecker.Validation.cs` (modify), `src/Precept/Pipeline/TypeChecker.Expressions.cs` (modify), multiple test files (modify)
 
-- [ ] Wire `ComputedFieldWithDefault` (PRE0039) + tests (positive + negative)
-- [ ] Wire `ConflictingAccessModes` (PRE0042) + tests
-- [ ] Wire `RedundantAccessMode` (PRE0043) + tests
-- [ ] Wire `ValueNotInChoiceSet` (PRE0085) + tests
-- [ ] Wire `ListLiteralOutsideDefault` (PRE0044) + tests
-- [ ] Wire `DuplicateArgName` (PRE0027) + tests
-- [ ] Wire `InvalidModifierValue` (PRE0035) + tests
-- [ ] Wire `EventArgOutOfScope` (PRE0050) + tests
-- [ ] Wire `MaxPlacesExceeded` (PRE0067) + tests
-- [ ] Wire `CollectionElementTypeMismatch` (PRE0105) + tests
-- [ ] Analyze PRE0022, PRE0048, PRE0051 before wiring (may be duplicates under different codes)
+- [x] Wire `ComputedFieldWithDefault` (PRE0039) + tests (positive + negative)
+- [x] Wire `ConflictingAccessModes` (PRE0042) + tests
+- [x] Wire `RedundantAccessMode` (PRE0043) + tests
+- [x] Wire `ValueNotInChoiceSet` (PRE0085) + tests
+- [x] Wire `ListLiteralOutsideDefault` (PRE0044) + tests
+- [x] Wire `DuplicateArgName` (PRE0027) + tests
+- [x] Wire `InvalidModifierValue` (PRE0035) + tests
+- [x] Wire `EventArgOutOfScope` (PRE0050) + tests
+- [x] Wire `MaxPlacesExceeded` (PRE0067) + tests
+- [x] Wire `CollectionElementTypeMismatch` (PRE0105) + tests
+- [x] Analyze PRE0022, PRE0048, PRE0051 before wiring (may be duplicates under different codes)
 - [ ] ~~PRE0019~~ — retired; architecturally subsumed by PRE0116 (see Q5 addendum)
 - [ ] ~~PRE0078~~ — removed from Slice 8 scope; owned by interval proof engine Strategy 7
-- [ ] Remove wired codes from Gate 1 allow-list as each is completed
+- [x] Remove wired codes from Gate 1 allow-list as each is completed
 
 ---
 

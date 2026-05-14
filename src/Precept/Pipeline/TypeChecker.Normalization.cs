@@ -189,8 +189,12 @@ internal static partial class TypeChecker
 
                 // Set event args scope for the ensure expression
                 IReadOnlyDictionary<string, TypedArg>? previousArgs = ctx.CurrentEventArgs;
+                string? previousEventName = ctx.CurrentEventName;
                 if (resolvedEvent is not null)
+                {
                     ctx.CurrentEventArgs = resolvedEvent.Args.ToFrozenDictionary(a => a.Name);
+                    ctx.CurrentEventName = resolvedEvent.Name;
+                }
 
                 try
                 {
@@ -236,6 +240,7 @@ internal static partial class TypeChecker
                 }
                 finally
                 {
+                    ctx.CurrentEventName = previousEventName;
                     ctx.CurrentEventArgs = previousArgs;
                 }
             }

@@ -56,6 +56,12 @@ internal sealed class CheckContext
     public IReadOnlyDictionary<string, TypedArg>? CurrentEventArgs { get; set; }
 
     /// <summary>
+    /// Name of the event currently being handled — set when entering a transition row.
+    /// Used by PRE0050 (EventArgOutOfScope) to detect cross-event arg references.
+    /// </summary>
+    public string? CurrentEventName { get; set; }
+
+    /// <summary>
     /// Declaration index of the field currently being resolved (0-based).
     /// Set to -1 when not inside a field expression. Used by the
     /// <see cref="FieldScopeMode.PriorFieldsOnly"/> gate.

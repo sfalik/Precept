@@ -32,7 +32,7 @@ internal static class DiagnosticCoverageAllowLists
         "KeyUniquenessGuard",                 // B4: obligation generator not yet on lookup put action
 
         // ── Root Cause C — Structural Single-Check Gaps ──────────────────────────
-        "EventHandlerInStatefulPrecept",      // C: trivial structural check not wired
+        // EventHandlerInStatefulPrecept — wired (Slice 8)
 
         // ── Root Cause D1 — Parser Expression Precision ──────────────────────────
         "NonAssociativeComparison",           // D1: parser emits generic ExpectedToken instead
@@ -42,25 +42,38 @@ internal static class DiagnosticCoverageAllowLists
         // ── Root Cause D2 — Scattered TypeChecker Gaps ───────────────────────────
         "NullInNonNullableContext",           // D2: retired, subsumed by PRE0116 (pending removal)
         "FunctionArgConstraintViolation",     // D2: TypeMismatch fires instead (precision upgrade)
-        "DuplicateArgName",                   // D2: emission site not wired
-        "InvalidModifierValue",              // D2: emission site not wired
-        "ComputedFieldWithDefault",           // D2: emission site not wired
-        "ConflictingAccessModes",             // D2: emission site not wired
-        "RedundantAccessMode",                // D2: emission site not wired
-        "ListLiteralOutsideDefault",          // D2: emission site not wired
+        // DuplicateArgName — wired (Slice 8)
+        // InvalidModifierValue — wired (Slice 8)
+        // ComputedFieldWithDefault — wired (Slice 8)
+        // ConflictingAccessModes — wired (Slice 8)
+        // RedundantAccessMode — wired (Slice 8)
+        // ListLiteralOutsideDefault — wired (Slice 8)
         "ScalarOperationOnCollection",        // D2: TypeMismatch fires instead (precision upgrade)
-        "EventArgOutOfScope",                 // D2: emission site not wired
+        // EventArgOutOfScope — wired (Slice 8)
         "InvalidInterpolationCoercion",       // D2: TypeMismatch fires instead (precision upgrade)
-        "MaxPlacesExceeded",                  // D2: emission site not wired
-        "NonChoiceAssignedToChoice",          // D2: emission site not wired
-        "CollectionInnerTypeError",           // D2: emission site not wired
+        // MaxPlacesExceeded — wired (Slice 8)
+        // NonChoiceAssignedToChoice — wired (Slice 8)
+        // CollectionInnerTypeError — wired (Slice 8)
 
         // ── Root Cause D3 — ProofEngine Gap (Interval Engine Dependency) ─────────
-        // Cross-plan: removed when interval proof engine Slice 2 ships
-        "NumericOverflow",                    // D3: owned by Strategy 7 (IntervalContainment)
+        // NumericOverflow — already has emission site in ProofEngine Strategy 7
 
         // ── Deferred — OutOfRange ────────────────────────────────────────────────
         "OutOfRange",                         // Deferred: constant-literal bounds check not wired
+
+        // ── Pre-existing gaps (not in Slice 8 scope) ─────────────────────────────
+        "CollectionOperationOnScalar",        // no emission site wired
+        "InvalidTypedConstantContent",        // no emission site wired
+        "InvalidDateValue",                   // no emission site wired
+        "InvalidDateFormat",                  // no emission site wired
+        "InvalidTimeValue",                   // no emission site wired
+        "InvalidInstantFormat",               // no emission site wired
+        "NonOrderableCollectionExtreme",      // no emission site wired
+        "UnsatisfiableGuard",                 // no emission site wired
+        "DivisionByZero",                     // no emission site wired
+        "SqrtOfNegative",                     // no emission site wired
+        "ChoiceElementTypeMismatch",          // no emission site wired
+        "ChoiceMissingElementType",           // no emission site wired
     };
 
     /// <summary>
@@ -70,24 +83,118 @@ internal static class DiagnosticCoverageAllowLists
     /// </summary>
     internal static readonly HashSet<string> Gate2AllowList = new()
     {
-        // ── Slice 6 — PRE0100 and PRE0104 have tests in TypeCheckerCollectionSafetyTests
-
-        // ── Slice 1 (B2) — Tests in TypeCheckerCurrencyUnitTests.cs ─────────────
-        // Cross-project analyzer cannot detect test references in Precept.Tests.
+        // ── Cross-project test detection gap ─────────────────────────────────────
+        // The cross-project analyzer cannot detect test references in Precept.Tests.
+        // All codes below have tests in test/Precept.Tests/ TypeChecker/ProofEngine/Parser test files.
+        "AlwaysRejecting",
+        "AmbiguousTypedConstant",
+        "AssignmentInExpressionContext",
+        "BindingShadowsField",
+        "BoundsQualifierMismatch",
+        "BoundsRequireQualifier",
+        "CaseInsensitiveFieldRequiresTildeEndsWith",
+        "CaseInsensitiveFieldRequiresTildeEquals",
+        "CaseInsensitiveFieldRequiresTildeNotEquals",
+        "CaseInsensitiveFieldRequiresTildeStartsWith",
+        "CaseInsensitiveValueInCaseSensitiveContains",
+        "ChoiceArgOutsideFieldSet",
+        "ChoiceLiteralNotInSet",
+        "ChoiceRankConflict",
+        "CircularComputedField",
+        "CollectionInnerTypeError",
+        "CompoundPeriodDenominator",
+        "ComputedFieldNotWritable",
+        "ComputedFieldWithDefault",
+        "ConflictingAccessModes",
+        "ConflictingModifiers",
+        "CountBoundViolation",
         "CrossCurrencyArithmetic",
         "CrossDimensionArithmetic",
+        "DeadEndState",
+        "DefaultForwardReference",
         "DenominatorUnitMismatch",
+        "DimensionCategoryMismatch",
+        "DimensionMismatchInUnitSlot",
+        "DuplicateArgName",
+        "DuplicateChoiceValue",
+        "DuplicateEventName",
+        "DuplicateFieldName",
+        "DuplicateModifier",
+        "DuplicateStateInList",
+        "DuplicateStateName",
         "DurationDenominatorMismatch",
-        "CompoundPeriodDenominator",
-
-        // ── Slice 2 (B3) — Tests in TypeCheckerStructuralTests.cs ───────────────
-        // Cross-project analyzer cannot detect test references in Precept.Tests.
-        "ChoiceLiteralNotInSet",
-        "ChoiceArgOutsideFieldSet",
-        "ChoiceRankConflict",
-
-        // ── Slice 5A — Tests in TypeCheckerTypedConstantTests.cs ─────────────────
-        // Cross-project analyzer cannot detect test references in Precept.Tests.
-        "AmbiguousTypedConstant",
+        "EmptyChoice",
+        "EventArgOutOfScope",
+        "EventHandlerDoesNotSupportGuard",
+        "EventHandlerInStatefulPrecept",
+        "ExpectedOutcome",
+        "ExpectedToken",
+        "FunctionArityMismatch",
+        "IndexBoundsGuard",
+        "InitialEventMissingAssignments",
+        "InputTooLarge",
+        "InterpolatedTypedConstantHoleTypeMismatch",
+        "InterpolationNotSupportedForType",
+        "InvalidCharacter",
+        "InvalidCurrencyCode",
+        "InvalidDimensionString",
+        "InvalidInterpolatedTypedConstantForm",
+        "InvalidMemberAccess",
+        "InvalidModifierBounds",
+        "InvalidModifierForType",
+        "InvalidModifierValue",
+        "InvalidQuantifierTarget",
+        "InvalidTemporalDimensionString",
+        "InvalidTemporalUnitString",
+        "InvalidUnitString",
+        "IrreversibleStateHasBackEdge",
+        "IsSetOnNonOptional",
+        "LengthBoundViolation",
+        "ListLiteralOutsideDefault",
+        "MaxPlacesExceeded",
+        "MissingOrderingKey",
+        "MultipleInitialStates",
+        "MutuallyExclusiveQualifiers",
+        "NoInitialState",
+        "NonChoiceAssignedToChoice",
+        "NumericOverflow",
+        "OmitDoesNotSupportGuard",
+        "OmittedFieldReadInState",
+        "OmittedFieldSetInTargetState",
+        "PreEventGuardNotAllowed",
+        "QualifierMismatch",
+        "QuantifierPredicateNotBoolean",
+        "RedundantAccessMode",
+        "RedundantModifier",
+        "RequiredFieldsNeedInitialEvent",
+        "RequiredFieldUnassignedOnEntry",
+        "RequiredStateDoesNotDominateTerminal",
+        "StateAlwaysRejects",
+        "StateListContainsWildcard",
+        "StructuralSinkState",
+        "TerminalStateHasOutgoingEdges",
+        "TypeMismatch",
+        "UndeclaredArg",
+        "UndeclaredEvent",
+        "UndeclaredField",
+        "UndeclaredFunction",
+        "UndeclaredState",
+        "UnescapedBraceInLiteral",
+        "UnguardedCollectionAccess",
+        "UnguardedCollectionMutation",
+        "UnhandledEvent",
+        "UnprovedDimensionRequirement",
+        "UnprovedModifierRequirement",
+        "UnprovedPresenceRequirement",
+        "UnprovedQualifierCompatibility",
+        "UnreachableState",
+        "UnrecognizedStringEscape",
+        "UnrecognizedTypedConstantEscape",
+        "UnresolvedTypedConstant",
+        "UnsatisfiableInitialState",
+        "UnterminatedInterpolation",
+        "UnterminatedStringLiteral",
+        "UnterminatedTypedConstant",
+        "WritableOnEventArg",
     };
 }

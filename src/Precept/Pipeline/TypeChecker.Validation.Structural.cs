@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using Precept.Language;
 
 namespace Precept.Pipeline;
@@ -20,6 +23,76 @@ internal static partial class TypeChecker
             {
                 ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.EventHandlerInStatefulPrecept,
                     handler.Syntax.Span, handler.EventName));
+            }
+        }
+
+        // ── PRE0039 — ComputedFieldWithDefault ──────────────────────────────
+        // A computed field (derives via `<-`) cannot also have a `default` expression.
+        foreach (var field in ctx.Fields)
+        {
+            if (field.IsComputed && field.DefaultExpression is not null)
+            {
+                ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.ComputedFieldWithDefault,
+                    field.Syntax.Span, field.Name));
+            }
+        }
+
+        // ── PRE0027 — DuplicateArgName ──────────────────────────────────────
+        // Duplicate parameter name in event arg list.
+        foreach (var evt in ctx.Events)
+        {
+            var argNames = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var arg in evt.Args)
+            {
+                if (!argNames.Add(arg.Name))
+                {
+                    ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.DuplicateArgName,
+                        arg.Span, arg.Name, evt.Name));
+                }
+            }
+        }
+
+        // ── PRE0042 — ConflictingAccessModes ────────────────────────────────
+        // Two access mode declarations on the same field+state that declare
+        // conflicting modes (e.g., one says readonly, the other says editable).
+        var accessByFieldState = new Dictionary<(string Field, string State), List<TypedAccessMode>>();
+        foreach (var am in ctx.AccessModes)
+        {
+            var key = (am.FieldName, am.StateName);
+            if (!accessByFieldState.TryGetValue(key, out var list))
+            {
+                list = [];
+                accessByFieldState[key] = list;
+            }
+            list.Add(am);
+        }
+        foreach (var ((fieldName, stateName), modes) in accessByFieldState)
+        {
+            if (modes.Count < 2) continue;
+            var distinctModes = modes.Select(m => m.Mode).Distinct().ToList();
+            if (distinctModes.Count > 1)
+            {
+                ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.ConflictingAccessModes,
+                    modes[1].Syntax.Span, fieldName, stateName));
+            }
+        }
+
+        // ── PRE0043 — RedundantAccessMode ───────────────────────────────────
+        // Access mode declaration is redundant (field is already unconditionally
+        // in that mode due to the base field declaration).
+        // Only fires for the unambiguous case: writable field + editable access mode.
+        foreach (var am in ctx.AccessModes)
+        {
+            if (am.Guard is not null) continue; // guarded modes are conditional, not redundant
+
+            if (!ctx.FieldLookup.TryGetValue(am.FieldName, out var field)) continue;
+
+            // A field declared `writable` defaults to editable in all states;
+            // an explicit `editable` access mode for that field is redundant.
+            if (field.IsWritable && am.Mode == ModifierKind.Write)
+            {
+                ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.RedundantAccessMode,
+                    am.Syntax.Span, "editable", am.FieldName, am.StateName));
             }
         }
 

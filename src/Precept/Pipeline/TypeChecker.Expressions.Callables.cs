@@ -157,6 +157,18 @@ internal static partial class TypeChecker
                         ValidateChoiceArgAgainstField(
                             argRef.ArgName, argRef.EventName, fieldName, assign.Value.Span, ctx);
                     }
+                    else if (value.ResultType != TypeKind.Choice && value.ResultType != TypeKind.Error)
+                    {
+                        // PRE0085 — NonChoiceAssignedToChoice: non-choice value assigned to choice field
+                        ctx.Diagnostics.Add(
+                            Diagnostics.Create(DiagnosticCode.NonChoiceAssignedToChoice, assign.Value.Span, fieldName));
+                    }
+                }
+
+                // PRE0067 — MaxPlacesExceeded: check decimal places in action assignment
+                if (value is not TypedErrorExpression && targetFieldMeta is not null)
+                {
+                    ValidateMaxPlaces(value, targetFieldMeta, assign.Value.Span, ctx);
                 }
 
                 return new TypedInputAction(
@@ -175,6 +187,20 @@ internal static partial class TypeChecker
                     ? fieldMeta.ElementType
                     : null;
                 var value = Resolve(colVal.Value, ctx, valueExpectedType);
+
+                // PRE0105 — CollectionInnerTypeError: element type mismatch
+                if (value is not TypedErrorExpression
+                    && valueExpectedType is not null
+                    && valueExpectedType != TypeKind.Error
+                    && !IsAssignable(value.ResultType, valueExpectedType.Value))
+                {
+                    ctx.Diagnostics.Add(
+                        Diagnostics.Create(DiagnosticCode.CollectionInnerTypeError, colVal.Value.Span,
+                            Types.GetMeta(valueExpectedType.Value).DisplayName,
+                            fieldName,
+                            Types.GetMeta(value.ResultType).DisplayName));
+                }
+
                 return new TypedInputAction(
                     colVal.Kind, fieldName, fieldType,
                     InputExpression: value,
@@ -459,6 +485,16 @@ internal static partial class TypeChecker
     /// </summary>
     private static TypedExpression ResolveListLiteral(ListLiteralExpression expr, CheckContext ctx)
     {
+        // ── PRE0044 — ListLiteralOutsideDefault ─────────────────────────────
+        // List literals can only appear in default clauses (PriorFieldsOnly scope).
+        // When we're inside a transition handler (CurrentEventName is set), it's invalid.
+        if (ctx.CurrentEventName is not null)
+        {
+            ctx.Diagnostics.Add(
+                Diagnostics.Create(DiagnosticCode.ListLiteralOutsideDefault, expr.Span));
+            return new TypedErrorExpression(expr.Span);
+        }
+
         // Empty list — can't infer element type; return Error-typed list
         if (expr.Elements.Length == 0)
             return new TypedListLiteral(TypeKind.List, TypeKind.Error, ImmutableArray<TypedExpression>.Empty, expr.Span);
@@ -669,6 +705,15 @@ internal static partial class TypeChecker
                 string.Equals(a.Name, expr.MemberName, StringComparison.Ordinal));
             if (arg is not null)
             {
+                // PRE0050 — EventArgOutOfScope: referencing an event's arg outside that event's handler
+                if (ctx.CurrentEventName is not null &&
+                    !string.Equals(ctx.CurrentEventName, ev.Name, StringComparison.Ordinal))
+                {
+                    ctx.Diagnostics.Add(
+                        Diagnostics.Create(DiagnosticCode.EventArgOutOfScope, expr.Span, ev.Name));
+                    return new TypedErrorExpression(expr.Span);
+                }
+
                 ctx.EventReferences.Add(new EventReference(ev, eventId.Span));
                 ctx.ArgReferences.Add(new ArgReference(arg, expr.MemberSpan));
                 return new TypedArgRef(arg.ResolvedType, ev.Name, arg.Name, arg.DeclaredQualifiers, expr.Span);

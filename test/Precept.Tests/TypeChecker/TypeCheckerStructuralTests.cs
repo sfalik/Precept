@@ -515,4 +515,102 @@ public class TypeCheckerStructuralTests
 
         TypeCheckerTestHelpers.CheckExpectingClean(precept);
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  Slice 8: ComputedFieldWithDefault (PRE0039)
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void ComputedField_WithDefaultExpression_EmitsComputedFieldWithDefault()
+    {
+        var precept = """
+            precept Widget
+            field Price as decimal default 10
+            field Tax as decimal default 0 <- Price * 0.1
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.ComputedFieldWithDefault);
+    }
+
+    [Fact]
+    public void ComputedField_WithoutDefault_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Price as decimal default 10
+            field Tax as decimal <- Price * 0.1
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  Slice 8: DuplicateArgName (PRE0027)
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Event_DuplicateArgName_EmitsDuplicateArgName()
+    {
+        var precept = """
+            precept Widget
+            field Name as string default "x"
+            state Open initial
+            state Done
+            event Submit(Name as string, Name as string)
+            from Open on Submit -> transition Done
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.DuplicateArgName);
+    }
+
+    [Fact]
+    public void Event_UniqueArgNames_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Name as string default "x"
+            state Open initial
+            state Done
+            event Submit(FirstName as string, LastName as string)
+            from Open on Submit -> set Name = Submit.FirstName -> transition Done
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  Slice 8: NonChoiceAssignedToChoice / ValueNotInChoiceSet (PRE0085)
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void ChoiceField_AssignNonChoiceValue_EmitsValueNotInChoiceSet()
+    {
+        var precept = """
+            precept Widget
+            field Status as choice of string("Open", "Closed") default "Open"
+            state Active initial
+            state Done
+            event Update(NewStatus as string)
+            from Active on Update -> set Status = Update.NewStatus -> transition Done
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.NonChoiceAssignedToChoice);
+    }
+
+    [Fact]
+    public void ChoiceField_AssignChoiceValue_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Status as choice of string("Open", "Closed") default "Open"
+            state Active initial
+            state Done
+            event Update(NewStatus as choice of string("Open", "Closed"))
+            from Active on Update -> set Status = Update.NewStatus -> transition Done
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
 }

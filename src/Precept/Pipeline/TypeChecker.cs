@@ -598,6 +598,9 @@ internal static partial class TypeChecker
                             defaultMod.Value.Span,
                             ctx);
                     }
+
+                    // PRE0067 — MaxPlacesExceeded: check decimal places against maxplaces
+                    ValidateMaxPlaces(resolved, typedField, defaultMod.Value.Span, ctx);
                 }
                 ctx.Fields[i] = ctx.Fields[i] with { DefaultExpression = resolved };
                 ctx.FieldLookup[typedField.Name] = ctx.Fields[i];
@@ -698,6 +701,38 @@ internal static partial class TypeChecker
         }
     }
 
+    /// <summary>
+    /// PRE0067 — MaxPlacesExceeded: check that a decimal literal value does not exceed
+    /// the maxplaces constraint on the target field.
+    /// </summary>
+    private static void ValidateMaxPlaces(
+        TypedExpression resolved,
+        TypedField field,
+        SourceSpan span,
+        CheckContext ctx)
+    {
+        if (resolved is not TypedLiteral { Value: decimal decValue }) return;
+
+        var maxplacesMod = field.Modifiers.Contains(ModifierKind.Maxplaces)
+            ? field.Syntax.GetSlot<ModifierListSlot>(ConstructSlotKind.ModifierList)?.Modifiers
+                .FirstOrDefault(m => m.Kind == ModifierKind.Maxplaces)
+            : null;
+        if (maxplacesMod?.Value is not LiteralExpression { LiteralKind: TokenKind.NumberLiteral, Text: var maxText })
+            return;
+        if (!int.TryParse(maxText, System.Globalization.CultureInfo.InvariantCulture, out var maxPlaces) || maxPlaces < 0)
+            return;
+
+        var decStr = decValue.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var dotIndex = decStr.IndexOf('.');
+        var actualPlaces = dotIndex < 0 ? 0 : decStr.Length - dotIndex - 1;
+
+        if (actualPlaces > maxPlaces)
+        {
+            ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.MaxPlacesExceeded,
+                span, actualPlaces.ToString(), field.Name, maxPlaces.ToString()));
+        }
+    }
+
     // ════════════════════════════════════════════════════════════════════════
     //  Test entry points (InternalsVisibleTo — Precept.Tests)
     // ════════════════════════════════════════════════════════════════════════
@@ -758,10 +793,13 @@ internal static partial class TypeChecker
 
         // —— Set event args scope ——
         IReadOnlyDictionary<string, TypedArg>? previousArgs = ctx.CurrentEventArgs;
+        string? previousEventName = ctx.CurrentEventName;
         if (resolvedEvent is not null)
         {
             ctx.CurrentEventArgs = resolvedEvent.Args
+                .DistinctBy(a => a.Name)
                 .ToFrozenDictionary(a => a.Name);
+            ctx.CurrentEventName = resolvedEvent.Name;
         }
 
         try
@@ -850,6 +888,7 @@ internal static partial class TypeChecker
         }
         finally
         {
+            ctx.CurrentEventName = previousEventName;
             ctx.CurrentEventArgs = previousArgs;
         }
     }
@@ -879,10 +918,13 @@ internal static partial class TypeChecker
 
         // —— Set event args scope ——
         IReadOnlyDictionary<string, TypedArg>? previousArgs = ctx.CurrentEventArgs;
+        string? previousEventName = ctx.CurrentEventName;
         if (resolvedEvent is not null)
         {
             ctx.CurrentEventArgs = resolvedEvent.Args
+                .DistinctBy(a => a.Name)
                 .ToFrozenDictionary(a => a.Name);
+            ctx.CurrentEventName = resolvedEvent.Name;
         }
 
         try
@@ -905,6 +947,7 @@ internal static partial class TypeChecker
         }
         finally
         {
+            ctx.CurrentEventName = previousEventName;
             ctx.CurrentEventArgs = previousArgs;
         }
     }

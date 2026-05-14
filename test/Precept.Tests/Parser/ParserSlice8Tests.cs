@@ -36,7 +36,7 @@ public sealed class ParserSlice8Tests
             field LastName as string writable default ""
             state Draft initial
             state Done terminal
-            in Draft modify FirstName, LastName editable
+            in Done modify FirstName, LastName readonly
             event Submit
             from Draft on Submit -> transition Done
             """);

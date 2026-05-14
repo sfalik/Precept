@@ -168,6 +168,7 @@ internal static partial class TypeChecker
 
         ValidateBoundQualifierRequirements(modifiers, resolvedType, declaredQualifiers, ctx);
         ValidateModifierBounds(modifiers, resolvedType, declaredQualifiers, span, ctx);
+        ValidateModifierValues(modifiers, ctx);
         ValidateBoundQualifierCompatibility(modifiers, resolvedType, declaredQualifiers, ctx);
     }
 
@@ -454,6 +455,83 @@ internal static partial class TypeChecker
     private readonly record struct ExtractedBoundValue(
         decimal Magnitude,
         ImmutableArray<DeclaredQualifierMeta> Qualifiers);
+
+    /// <summary>
+    /// PRE0035 — InvalidModifierValue: validate that modifiers with values carry valid values.
+    /// For example, 'maxplaces' must be a non-negative integer.
+    /// </summary>
+    private static void ValidateModifierValues(ImmutableArray<ParsedModifier> modifiers, CheckContext ctx)
+    {
+        foreach (var modifier in modifiers)
+        {
+            if (modifier.Value is null or MissingExpression) continue;
+
+            switch (modifier.Kind)
+            {
+                case ModifierKind.Maxplaces:
+                {
+                    // maxplaces must be a non-negative integer
+                    if (modifier.Value is LiteralExpression lit && lit.LiteralKind == TokenKind.NumberLiteral)
+                    {
+                        if (lit.Text.Contains('.') ||
+                            (long.TryParse(lit.Text, CultureInfo.InvariantCulture, out var val) && val < 0))
+                        {
+                            ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.InvalidModifierValue,
+                                modifier.Span, "maxplaces", "a non-negative integer"));
+                        }
+                    }
+                    else if (modifier.Value is UnaryOperationExpression { Operator: TokenKind.Minus })
+                    {
+                        ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.InvalidModifierValue,
+                            modifier.Span, "maxplaces", "a non-negative integer"));
+                    }
+                    break;
+                }
+                case ModifierKind.Maxlength:
+                case ModifierKind.Minlength:
+                {
+                    // maxlength/minlength must be a non-negative integer
+                    var modName = modifier.Kind == ModifierKind.Maxlength ? "maxlength" : "minlength";
+                    if (modifier.Value is LiteralExpression lenLit && lenLit.LiteralKind == TokenKind.NumberLiteral)
+                    {
+                        if (lenLit.Text.Contains('.') ||
+                            (long.TryParse(lenLit.Text, CultureInfo.InvariantCulture, out var lenVal) && lenVal < 0))
+                        {
+                            ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.InvalidModifierValue,
+                                modifier.Span, modName, "a non-negative integer"));
+                        }
+                    }
+                    else if (modifier.Value is UnaryOperationExpression { Operator: TokenKind.Minus })
+                    {
+                        ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.InvalidModifierValue,
+                            modifier.Span, modName, "a non-negative integer"));
+                    }
+                    break;
+                }
+                case ModifierKind.Maxcount:
+                case ModifierKind.Mincount:
+                {
+                    // maxcount/mincount must be a non-negative integer
+                    var cntName = modifier.Kind == ModifierKind.Maxcount ? "maxcount" : "mincount";
+                    if (modifier.Value is LiteralExpression cntLit && cntLit.LiteralKind == TokenKind.NumberLiteral)
+                    {
+                        if (cntLit.Text.Contains('.') ||
+                            (long.TryParse(cntLit.Text, CultureInfo.InvariantCulture, out var cntVal) && cntVal < 0))
+                        {
+                            ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.InvalidModifierValue,
+                                modifier.Span, cntName, "a non-negative integer"));
+                        }
+                    }
+                    else if (modifier.Value is UnaryOperationExpression { Operator: TokenKind.Minus })
+                    {
+                        ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.InvalidModifierValue,
+                            modifier.Span, cntName, "a non-negative integer"));
+                    }
+                    break;
+                }
+            }
+        }
+    }
 
     /// <summary>
     /// Check whether a resolved type matches any entry in a modifier's ApplicableTo array.

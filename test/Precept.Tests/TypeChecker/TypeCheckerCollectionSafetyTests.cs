@@ -102,4 +102,39 @@ public class TypeCheckerCollectionSafetyTests
             d => d.Code == nameof(DiagnosticCode.UnguardedCollectionAccess),
             because: ".at() should route to IndexBoundsGuard (PRE0100), not UnguardedCollectionAccess (PRE0063)");
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  Slice 8: CollectionInnerTypeError (PRE0105)
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Collection_AddWrongType_EmitsCollectionInnerTypeError()
+    {
+        var precept = """
+            precept Widget
+            field Tags as list of string default []
+            field Count as integer default 0
+            state Open initial
+            state Done
+            event Submit(Value as integer)
+            from Open on Submit -> add Tags Submit.Value -> transition Done
+            """;
+
+        CheckExpectingError(precept, DiagnosticCode.CollectionInnerTypeError);
+    }
+
+    [Fact]
+    public void Collection_AddCorrectType_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Tags as list of string default []
+            state Open initial
+            state Done
+            event Submit(Value as string)
+            from Open on Submit -> add Tags Submit.Value -> transition Done
+            """;
+
+        CheckExpectingClean(precept);
+    }
 }

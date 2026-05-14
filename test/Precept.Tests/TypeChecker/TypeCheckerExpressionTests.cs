@@ -1482,6 +1482,72 @@ public class TypeCheckerExpressionTests
         TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.IsSetOnNonOptional);
     }
 
+    // ════════════════════════════════════════════════════════════════════════
+    //  Slice 8: ListLiteralOutsideDefault (PRE0044)
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void ListLiteral_InTransitionAction_EmitsListLiteralOutsideDefault()
+    {
+        var precept = """
+            precept Widget
+            field Tags as list of string default []
+            state Open initial
+            state Done
+            event Submit()
+            from Open on Submit -> set Tags = ["a", "b"] -> transition Done
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.ListLiteralOutsideDefault);
+    }
+
+    [Fact]
+    public void ListLiteral_InDefaultExpression_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Tags as list of string default ["a", "b"]
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  Slice 8: EventArgOutOfScope (PRE0050)
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void EventArg_UsedInDifferentEvent_EmitsEventArgOutOfScope()
+    {
+        var precept = """
+            precept Widget
+            field Name as string default "x"
+            state Open initial
+            state Done
+            event Submit(Value as string)
+            event Close()
+            from Open on Close -> set Name = Submit.Value -> transition Done
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.EventArgOutOfScope);
+    }
+
+    [Fact]
+    public void EventArg_UsedInOwnEvent_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Name as string default "x"
+            state Open initial
+            state Done
+            event Submit(Value as string)
+            from Open on Submit -> set Name = Submit.Value -> transition Done
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
     private sealed record UnknownParsedExpression(SourceSpan Span)
         : ParsedExpression(ExpressionFormKind.Literal, Span);
 

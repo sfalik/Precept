@@ -635,4 +635,102 @@ public class TypeCheckerModifierTests
 
         TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.InvalidTypedConstantContent);
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  Slice 8: ConflictingAccessModes (PRE0042)
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void AccessMode_ConflictingModesOnSameFieldState_EmitsConflictingAccessModes()
+    {
+        var precept = """
+            precept Widget
+            field Name as string default "x"
+            state Open initial
+            state Done
+            in Open modify Name editable
+            in Open modify Name readonly
+            event Submit()
+            from Open on Submit -> transition Done
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.ConflictingAccessModes);
+    }
+
+    [Fact]
+    public void AccessMode_DifferentStates_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Name as string writable default "x"
+            state Open initial
+            state Done
+            in Done modify Name readonly
+            event Submit()
+            from Open on Submit -> transition Done
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  Slice 8: RedundantAccessMode (PRE0043)
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void AccessMode_EditableOnWritableField_EmitsRedundantAccessMode()
+    {
+        var precept = """
+            precept Widget
+            field Name as string writable default "x"
+            state Open initial
+            in Open modify Name editable
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.RedundantAccessMode);
+    }
+
+    [Fact]
+    public void AccessMode_ReadonlyOnWritableField_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Name as string writable default "x"
+            state Open initial
+            state Done
+            in Done modify Name readonly
+            event Submit()
+            from Open on Submit -> transition Done
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  Slice 8: InvalidModifierValue (PRE0035)
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Modifier_NegativeMaxPlaces_EmitsInvalidModifierValue()
+    {
+        var precept = """
+            precept Widget
+            field Price as decimal maxplaces -1 default 10
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.InvalidModifierValue);
+    }
+
+    [Fact]
+    public void Modifier_ValidMaxPlaces_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Price as decimal maxplaces 2 default 10
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
 }
