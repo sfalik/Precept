@@ -19,6 +19,12 @@
 
 ## Recent Updates
 
+### 2026-05-14T04:00:00Z — PRE0079 dead-code investigation resolved
+
+- `docs/Working/diagnostic-enforcement.md` now carries the resolved PRE0079 verdict from Frank's investigation.
+- PRE0079 stays a TypeChecker wire with zero live emitters today, distinct from PRE0078 because it covers the constant-literal-assignment case (for example, `set field to 42` where `max` is `10`).
+- No new proof infrastructure is needed: the checker can compare the literal directly against declared `min`/`max` bounds, and the decision was filed to `.squad/decisions/inbox/frank-pre0079-investigation.md`.
+
 ### 2026-05-14T00:56:58Z — Q2 resolved for dynamic qualifier enforcement
 
 - `docs/Working/diagnostic-enforcement.md` now marks Q2 as decided.
@@ -36,36 +42,10 @@
 - `docs/Working/diagnostic-enforcement.md` now treats PRE0078 `NumericOverflow` as a Strategy 7 / ProofEngine obligation failure instead of a Slice 8 TypeChecker wire.
 - The plan now records Slice 9C's dependency on interval-engine Slice 2, narrows PRE0079 to the constant-literal overflow case, and adds the cross-plan dependency table plus Q9/Q10 coordination risks.
 
-### 2026-05-13T18:17:15Z — Interval-proof design doc authored
+### 2026-05-13T18:17:15Z–2026-05-13T20:05:43Z — Interval-proof design and enforcement alignment consolidated
 
-- `docs/working/interval-proof-engine-design.md` is the authoritative design + implementation plan for Strategy 7 (`IntervalContainment`).
-- No new `@bounds` syntax: the engine reads existing `min`/`max` modifiers via `ValueModifierMeta.ProofSatisfactions`.
-- `integer` fields are exempt because `TypeKind.Integer` is BigInteger-backed and mathematically unbounded.
-- Interval proof results extend existing hover/proof vocabulary; they do not introduce new hover card families.
-
-### 2026-05-13T18:32:11Z — Test strategy revised per Soup Nazi review; strategy count corrected
-
-- B/C/D tests use a real parse helper on inline precept strings; `SemanticIndex` stubs are not an acceptable fixture.
-- The plan now partitions interval tests by layer, adds the catalog-count tripwire, and explicitly covers multi-`set` obligation collection.
-- `TryDischarge` already had six strategies before interval containment; `CompositionalConstraint` was the missing sixth item in the earlier narrative.
-- Qualifier and interval diagnostics are orthogonal and should both surface when both obligations fail on the same expression.
-
-### 2026-05-13T20:05:43Z — Diagnostic enforcement revised for interval proof engine dependency
-
-- `docs/Working/diagnostic-enforcement.md` revised in-place to account for the interval proof engine design.
-- **Key finding:** PRE0078 `NumericOverflow` is NOT a TypeChecker gap — it's a ProofEngine obligation failure diagnostic owned by Strategy 7 (IntervalContainment). Removed from Slice 8 scope; Gate 1 allow-list removal coordinated with interval engine Slice 2.
-- **Slice 9C now depends on interval engine Slice 2** — the proof obligation consistency audit must include Strategy 7.
-- **PRE0079 `OutOfRange` scope narrowed** — general expression-level bounds checking owned by interval engine; PRE0079 retains only constant-literal-assignment case.
-- **Cross-plan dependency table added** documenting per-slice coordination between interval engine and enforcement plan.
-- Two new open questions (Q9 allow-list coordination, Q10 PRE0078/PRE0079 deduplication risk) flagged for Shane.
-- **Key learning:** When a parallel implementation plan introduces a new emission path for an existing diagnostic code, the enforcement plan must acknowledge the external dependency rather than attempt to wire the same code independently. Cross-plan coordination is an ordering constraint, not an optional refinement.
-
-### 2026-05-13T19:55:10Z — Overflow prevention analysis revised to reflect interval proof engine
-
-- `docs/Working/overflow-prevention-design-analysis.md` was revised in place and marked superseded where it diverged from the approved interval-proof design.
-- Six obsolete claim categories were corrected: `@bounds` syntax, bounded-integer targeting, separate validator phase, bounded-field runtime fallback, a new diagnostic code, and the old three-wave timeline.
-- The interval proof engine now owns arithmetic result-range checking, `NumericOverflow` emission for bounded targets, modifier-derived bound extraction, guard narrowing, catalog-driven interval transfer, and hover interval display.
-- The analysis retains only durable value: problem statement, strategy comparison matrix, and historical context, with cross-references to `interval-proof-engine-design.md`.
+- Frank locked Strategy 7 (`IntervalContainment`) as the bounded-expression design surface, corrected the interval test-strategy narrative, and revised the overflow-prevention analysis to point at the approved proof-engine design rather than obsolete validator/runtime proposals.
+- The paired enforcement-plan update kept PRE0078 on the ProofEngine path, narrowed PRE0079 to constant-literal assignments, and recorded the cross-plan dependency between diagnostic enforcement Slice 9C and interval-engine Slice 2.
 
 
 ## Learnings
@@ -80,3 +60,16 @@
 - Gate 1 allow-list entries only need root-cause cluster comments; per-issue citations duplicate slice-level tracking when codes cannot slip independently from their cluster.
 - Gate 2's emission-site analyzer should stay on an explicit pipeline-centered scan set; broad all-source scans create more false-positive risk than value while the known emission paths remain stable and well-defined.
 - Strip `// ...`, `/** */`, and `/// ...` comment content before Gate 2 matches `DiagnosticCode.*`; the implementation cost is small and removes the doc-comment false-positive class up front.
+- When Gate 1 stale-entry enforcement can prove an allow-list entry is obsolete, the feature PR that introduces the new emission site should own the allow-list removal; dependent plans should also record an explicit review checkpoint so the cross-plan cleanup is verified.
+- Q10 PRE0078/PRE0079 deduplication is subsumed by Question 1: once PRE0079 owns constant-literal bounds checks in the TypeChecker and PRE0078 owns expression-result interval failures in ProofEngine Strategy 7, the pipeline boundary itself prevents double-firing without a separate gate.
+- Diagnostic name & message UX review (Elaine's audit): approved with conditions. Six of seven proposed conventions adopted as standards. `CannotVerify*` prefix rejected in favor of condition-first names (`FieldMayBeAbsent`, `ModifierNotGuaranteed`, etc.). CI enforcement family renamed to `CaseMismatch*` convention. PRE0019 rename rejected as too narrow — must cover full emission surface. `StateWithNoWayOut` rejected as too colloquial — `NonTerminalDeadEnd` adopted.
+- Proof diagnostic naming convention established: names describe the *state of the author's definition* (condition-first), not the outcome of the compiler's proof attempt. No `CannotVerify*`, `Unproved*`, or `FailedToProve*` prefixes.
+- AI-parseable message structure convention (Convention 8): Subject → Condition → Repair (em-dash separated). Constrains new and rewritten messages.
+- Convention 9: Rename PRs must update FixHint, RecoverySteps, TriggerCondition, and examples in the same commit when old vocabulary appeared in those fields.
+- `DiagnosticCode` renames are structurally safe: `nameof()` in `GetMeta()` auto-propagates to catalog; compiler catches stale test references. Manual update needed for Gate 1 allow-list and language server switches.
+- 2026-05-13T22:41:11.432-04:00 — PRE0019 emission-site audit found no live emitters in `src/Precept/`; the code is declaration/metadata-only today. Current maybe-absent failures route through `TypeMismatch` or PRE0116, so the correct future-facing rename is `ValueMayBeAbsent`, not an optional-field-specific `when` diagnostic.
+- 2026-05-14T02:53:55-04:00 — PRE0019 wiring investigation: **do not wire now.** The enforcement doc's "TypeMismatch fires today; upgrade" premise is stale — no TypeMismatch fires for presence cases. PRE0116 `UnprovedPresenceRequirement` (ProofEngine) already covers presence checking via proof obligations with guard-aware, strategy-based discharge. Wiring PRE0019 in the TypeChecker would either duplicate PRE0116 or require duplicating the ProofEngine's guard-context infrastructure (~50-100 lines). The correct prerequisite before wiring is: audit whether the operation catalog's `PresenceProofRequirement` generation has any coverage gaps. If no gap exists, PRE0019 is architecturally subsumed and should be retired, not wired. Enforcement doc corrected in place; decision filed.
+- 2026-05-13T23:05:12-04:00 — PRE0019 wire-vs-retire audit: **RETIRE.** Full audit confirmed PRE0019 is architecturally subsumed by PRE0116. Key finding: `new PresenceProofRequirement(...)` is never constructed in production code — no catalog entry (operations, functions, accessors, actions) declares one. The entire presence-proof discharge pipeline (type, satisfactions, Strategies 2/3/5, PRE0116 emission) is fully plumbed but receives zero obligations. The gap is obligation *generation*, not diagnostic codes. The fix: enhance ProofEngine's expression walker to inject `PresenceProofRequirement` when `TypedFieldRef` references an optional field, routing through existing PRE0116. PRE0019 is `DiagnosticStage.Type` — wrong stage for guard-aware checks. Decision filed to `.squad/decisions/inbox/frank-pre0019-wire-vs-retire.md`; enforcement doc updated (removed PRE0019 from deferred table, Slice 8 checklist, non-catalog-mediation table; updated Q5 with addendum).
+- 2026-05-13T23:22:05-04:00 — Comprehensive ProofEngine gap audit completed. Audited all 7 ProofRequirement subtypes, all ProofSatisfaction variants, all 7 strategies, all 13 FaultCode `[StaticallyPreventable]` attributes, and all proof-family diagnostic codes. **One critical gap:** `PresenceProofRequirement` never constructed in production — discharge pipeline fully plumbed, zero obligations feeding it. Added as Slice 12 to `docs/Working/interval-proof-engine-design.md`. **One moderate metadata gap:** `FaultCode.UnexpectedNull` → PRE0019 should be → PRE0116; fixed in Slice 12. **Two pre-tracked dead codes:** PRE0019 (retirement per frank-16), PRE0079 (diagnostic enforcement plan Slice 9C). Old Slice 12 renumbered to Slice 13. Coverage matrix updated with presence row. Test recommendation: write tests WITH Slice 12, not before — project convention writes tests in-slice, and the gap is structural not ambiguous. Decision filed to `.squad/decisions/inbox/frank-proofengine-gap-audit.md`.
+- 2026-05-13T23:29:59-04:00 — PRE0079 `OutOfRange` dead-code investigation: **WIRE via TypeChecker.** Emission-site audit confirmed zero live emitters — `DiagnosticCode.OutOfRange` exists only in enum, catalog metadata, `FaultCode` attribute, and fault metadata. Unlike PRE0019, PRE0079 is NOT architecturally subsumed: PRE0078 `NumericOverflow` (ProofEngine Strategy 7) covers expression-level bounds, but PRE0079 covers the distinct constant-literal-assignment case where the literal value is known at compile time. These are complementary diagnostics at different pipeline stages (TypeChecker vs. ProofEngine), with different recovery actions and AI dispatch keys. Pipeline ordering prevents double-firing (Q10 resolved). Implementation is straightforward: check numeric literal assignments against field `min`/`max` modifiers in the TypeChecker's action validation. Remains in enforcement doc Deferred list with confirmed annotation. Decision filed to `.squad/decisions/inbox/frank-pre0079-investigation.md`.
+- 2026-05-13T23:05:12-04:00 — Full Elaine sync: applied all approved diagnostic name and message changes from `docs/Working/diagnostic-name-message-review.md` to `docs/Working/diagnostic-enforcement.md`. Updated ~40 references across 8 sections (gap inventory tables §3.4–3.7, alternatives §5.4, Slices 4/5/6/7/8 details, deferred list, Q5 decision block). Name families updated: `*WithoutWhen` collection safety (5 codes), `CaseMismatch*` CI enforcement (5 codes), condition-first proof names (5 codes: `ModifierNotGuaranteed`, `DimensionQualifierMissing`, `QualifiersMayBeIncompatible`, `InitialStateConstraintUnsatisfied`, `FieldMayBeAbsent`), plus individual renames (`ChoiceValueOrderMismatch`, `CollectionElementTypeMismatch`, `ValueNotInChoiceSet`, `TransitionGuardMustFollowEvent`, `FunctionArgumentInvalid`, `NonTextTypeInStringInterpolation`, `UnrecognizedTypedConstant`, `NonTerminalDeadEnd`, etc.). Test method names in slice specs updated to match. PRE0019 left untouched per prior retirement decision. No surprises — mechanical sync, all references found via grep.

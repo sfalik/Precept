@@ -7,6 +7,20 @@
 ---
 
 
+### 2026-05-14T04:00:00Z: PRE0079 dead-code audit confirms a TypeChecker wire instead of retirement
+
+**By:** Scribe
+
+**Status:** Merged from Frank's PRE0079 investigation.
+
+**Merged source:** `frank-pre0079-investigation.md`.
+
+- Frank confirmed `DiagnosticCode.OutOfRange` has zero live emitters today; the code currently exists only in the enum, catalog metadata, and fault metadata surfaces.
+- PRE0079 remains distinct from PRE0078: PRE0078 `NumericOverflow` is the ProofEngine / Strategy 7 diagnostic for computed-expression interval failures, while PRE0079 is the TypeChecker-only constant-literal-assignment case such as `set Field to 42` against `max 10`.
+- The implementation is intentionally trivial and local: compare numeric literal assignments against declared `min`/`max` modifiers during TypeChecker action validation; no new proof infrastructure or extra deduplication pass is needed.
+
+---
+
 ### 2026-05-14T06:53:00Z: PRE0019 is retired in favor of proof-stage presence obligations routed through PRE0116
 
 **By:** Scribe
@@ -1287,4 +1301,3 @@
 - Validation landed with 19 new ProofEngine tests and 193/193 proof tests passing.
 
 ---
-
