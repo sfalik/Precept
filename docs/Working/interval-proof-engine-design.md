@@ -3,7 +3,7 @@
 **Author:** Frank (Lead Architect)
 **Status:** ✅ Approved — Shane sign-off complete. Implementation in progress.
 **Date:** 2026-05-13
-**Scope:** Compile-time overflow prevention for `decimal` and `number` types via interval arithmetic in the Precept proof engine
+**Scope:** Compile-time overflow prevention via interval arithmetic, catalog-driven obligation generation across all constrained type families, and qualified-type bound semantics
 **Review target:** Elaine (tooling/hover impact), George (implementation), Soup Nazi (test coverage)
 
 ---
@@ -18,6 +18,12 @@
 | **4** | Function Overload Intervals | George | ✅ Done | — | Independent after Slice 2 |
 | **5** | Hover Expression Display + Diagnostic Squiggle | Kramer | ⏳ Pending | — | Depends on Slice 2 |
 | **6** | Regression + Symbol Export | Soup Nazi | ⏳ Pending | — | Final validation |
+| **7** | Catalog-Driven Obligation Generator Refactor | George | ⏳ Pending | — | Depends on Slice 2 |
+| **8** | Qualified-Type Bound Semantics | George | ⏳ Pending | — | Depends on Slice 7 |
+| **9** | Typed-Constant Bound Extraction | George | ⏳ Pending | — | Depends on Slice 8 |
+| **10** | Qualifier Compatibility Checks | George | ⏳ Pending | — | Depends on Slice 8 |
+| **11** | String/Collection Constraint Obligations | George | ⏳ Pending | — | Depends on Slice 7 |
+| **12** | Type-Family Coverage Regression Suite | Soup Nazi | ⏳ Pending | — | Depends on Slices 8–11 |
 
 **Initiated:** 2026-05-13T19:19:55Z  
 **Updated by:** Scribe (live status updates as agents complete slices)
@@ -35,6 +41,9 @@
 7. [Philosophy Alignment](#7-philosophy-alignment)
 8. [Implementation Plan](#8-implementation-plan)
 9. [Test Strategy](#9-test-strategy)
+10. [Catalog-Driven Obligation Architecture](#10-catalog-driven-obligation-architecture)
+11. [Qualified-Type Bound Semantics](#11-qualified-type-bound-semantics)
+12. [Type-Family Coverage Matrix](#12-type-family-coverage-matrix)
 
 ---
 
@@ -632,6 +641,9 @@ The `IntervalContainmentProofRequirement` record carries `TargetField`, `Declare
 | `tools/Precept.Mcp/Tools/LanguageTool.cs` | Assess | Verify `precept_compile` interval obligation projection |
 | `test/Precept.Tests/ProofEngineIntervalTests.cs` | **Create** | All interval unit tests |
 | `test/Precept.LanguageServer.Tests/HoverHandlerIntervalTests.cs` | **Create** | Interval hover regression tests |
+| `src/Precept/Language/Diagnostics.cs` (or `DiagnosticCode.cs`) | Modify | Add `BoundsRequireQualifier`, `BoundsQualifierMismatch` codes (Slices 8, 10) |
+| `src/Precept/Pipeline/TypeChecker.Validation.Modifiers.cs` | Modify | Extend `TryGetComparableModifierValue` for typed constants (Slice 9); qualifier validation (Slices 8, 10) |
+| `test/Precept.Tests/TypeFamilyCoverageTests.cs` | **Create** | Cross-type-family constraint coverage regression (Slice 12) |
 
 ### 8.2 Vertical Slices
 
@@ -840,6 +852,212 @@ private static NumericInterval NarrowedIntervalOf(
 
 ---
 
+#### Slice 7 — Catalog-Driven Obligation Generator Refactor
+
+**Objective:** Replace hardcoded `TypeKind` checks in obligation collection with catalog-driven generation. After this slice, any field with declared constraint modifiers that carry `ProofSatisfactions` entries generates proof obligations regardless of its `TypeKind`.
+
+**Files:**
+- `src/Precept/Pipeline/ProofEngine.cs` (lines 283–298) — replace `if (type == TypeKind.Decimal || type == TypeKind.Number)` with modifier-metadata-driven collection: iterate field modifiers, check for `ProofSatisfaction.Numeric` entries, generate `IntervalContainmentProofRequirement` when found
+- `src/Precept/Language/Actions.cs` — verify `set` action's `ProofRequirements` list drives collection generically (remove any residual type-specific filtering)
+
+**Method-level specificity:**
+```csharp
+// In ProofEngine.cs obligation collection:
+// BEFORE (hardcoded):
+//   if (targetField.ResolvedType.Kind is TypeKind.Decimal or TypeKind.Number)
+//       if (min.HasValue || max.HasValue) → emit obligation
+//
+// AFTER (catalog-driven):
+//   foreach (var modifier in targetField.Modifiers)
+//       var meta = Modifiers.GetMeta(modifier);
+//       if (meta is ValueModifierMeta vmm
+//           && vmm.ProofSatisfactions.OfType<ProofSatisfaction.Numeric>().Any())
+//           → extract bounds from ProofSatisfactions → emit obligation
+```
+
+**Tests:**
+- `ObligationCollection_MoneyFieldWithBounds_GeneratesIntervalObligation`
+- `ObligationCollection_QuantityFieldWithBounds_GeneratesIntervalObligation`
+- `ObligationCollection_PriceFieldWithBounds_GeneratesIntervalObligation`
+- `ObligationCollection_ExchangeRateFieldWithBounds_GeneratesIntervalObligation`
+- `ObligationCollection_DecimalFieldWithBounds_StillGeneratesObligation` (regression)
+- `ObligationCollection_NumberFieldWithBounds_StillGeneratesObligation` (regression)
+- `ObligationCollection_IntegerField_NoObligationGenerated` (regression — BigInteger cannot overflow)
+- `ObligationCollection_FieldWithNoConstraintModifiers_NoObligation`
+
+**Acceptance criteria:**
+- Zero `TypeKind` switches remain in obligation collection path
+- All existing Slice 2 tests pass unchanged
+- New tests confirm obligation generation for `money`, `quantity`, `price`, `exchangerate`
+
+**Regression anchors:** All Slice 2 tests (`IntervalContainmentStrategyTests.cs`), all existing proof engine tests.
+
+**Completion gate:** `dotnet test test/Precept.Tests/` clean; `money`/`quantity`/`price`/`exchangerate` fields with declared `min`/`max` generate `IntervalContainmentProofRequirement`.
+
+---
+
+#### Slice 8 — Qualified-Type Bound Semantics (Required Qualifiers)
+
+**Objective:** Enforce that `min`/`max` on qualified types (`money`, `quantity`, `price`) require a matching qualifier context (`in`/`of`). Emit `BoundsRequireQualifier` diagnostic when bounds are declared without the required qualifier.
+
+**Files:**
+- `src/Precept/Language/Diagnostics.cs` (or `DiagnosticCode.cs`) — add `BoundsRequireQualifier` diagnostic code
+- `src/Precept/Pipeline/TypeChecker.Validation.Modifiers.cs` — add validation: when field type is a qualified type and `min`/`max` modifier is present, verify the field has the required qualifier modifier (`in` for money/price, `in` or `of` for quantity)
+- `src/Precept/Language/DiagnosticCatalog.cs` (or equivalent) — register diagnostic metadata
+
+**Tests:**
+- `BoundsRequireQualifier_MoneyWithoutIn_EmitsDiagnostic`
+- `BoundsRequireQualifier_MoneyWithIn_NoDiagnostic`
+- `BoundsRequireQualifier_QuantityWithoutInOrOf_EmitsDiagnostic`
+- `BoundsRequireQualifier_QuantityWithIn_NoDiagnostic`
+- `BoundsRequireQualifier_QuantityWithOf_NoDiagnostic`
+- `BoundsRequireQualifier_PriceWithoutIn_EmitsDiagnostic`
+- `BoundsRequireQualifier_PriceWithIn_NoDiagnostic`
+- `BoundsRequireQualifier_DecimalWithBoundsNoQualifier_NoDiagnostic` (regression — decimal doesn't require qualifier)
+- `BoundsRequireQualifier_ExchangeRateWithBounds_NoDiagnostic` (exchangerate qualifiers have different semantics — verify)
+
+**Acceptance criteria:**
+- `field cost as money max 100000` emits `BoundsRequireQualifier` error
+- `field cost as money in 'USD' max '100000 USD'` compiles clean
+- No false positives on `decimal`/`number` fields
+
+**Completion gate:** `dotnet test` clean; all new diagnostics fire on invalid qualifier-less bounds.
+
+---
+
+#### Slice 9 — Typed-Constant Bound Extraction
+
+**Objective:** Extend `TryGetComparableModifierValue` to extract numeric values from typed constants (e.g., `'5 kg'` → `5`, `'100 USD'` → `100`), populating `DeclaredMin`/`DeclaredMax` for interval proof obligations.
+
+**Files:**
+- `src/Precept/Pipeline/TypeChecker.Validation.Modifiers.cs` — extend `TryGetComparableModifierValue` (lines 211–226) to handle typed-constant expressions:
+  1. Detect single-quoted literal expressions
+  2. Use existing typed-constant resolution pipeline to parse
+  3. Extract numeric component as `decimal`
+  4. Store extracted qualifier for compatibility check (Slice 10)
+- `src/Precept/Pipeline/TypeChecker.cs` — ensure `DeclaredMin`/`DeclaredMax` are populated from typed-constant extraction results (lines 378–383)
+
+**Method-level specificity:**
+```csharp
+// In TryGetComparableModifierValue:
+// Existing: handles NumberLiteral, UnaryMinus+NumberLiteral
+// NEW: handle TypedConstantExpression:
+//   1. Resolve via ResolveTypedConstant(expression)
+//   2. If resolved, extract numeric component (e.g., '5 kg' → 5m)
+//   3. Return the numeric value as the comparable value
+//   4. Store qualifier ('kg') on a new ExtractedBoundQualifier field
+```
+
+**Tests:**
+- `TryGetComparableModifierValue_TypedConstantWithUnit_ExtractsNumericValue` (`'5 kg'` → `5`)
+- `TryGetComparableModifierValue_TypedConstantWithCurrency_ExtractsNumericValue` (`'100 USD'` → `100`)
+- `TryGetComparableModifierValue_TypedConstantNegative_ExtractsNegativeValue` (`'-50 USD'` → `-50`)
+- `TryGetComparableModifierValue_TypedConstantWithDecimals_ExtractsDecimalValue` (`'99.99 USD'` → `99.99`)
+- `TryGetComparableModifierValue_PlainNumberLiteral_StillWorks` (regression)
+- `TryGetComparableModifierValue_UnaryMinusNumberLiteral_StillWorks` (regression)
+- `TryGetComparableModifierValue_InvalidTypedConstant_ReturnsNull`
+- `IntervalObligation_MoneyFieldWithTypedConstantBounds_GeneratesCorrectBounds`
+- `IntervalObligation_QuantityFieldWithTypedConstantBounds_GeneratesCorrectBounds`
+
+**Acceptance criteria:**
+- `field weight as quantity in 'kg' max '5 kg'` → `DeclaredMax = 5`, interval obligation generated
+- `field cost as money in 'USD' min '0 USD' max '100000 USD'` → `DeclaredMin = 0, DeclaredMax = 100000`
+- Plain numeric bounds (`min 0 max 100`) still work (regression)
+
+**Completion gate:** `dotnet test` clean; typed-constant bounds produce non-null `DeclaredMin`/`DeclaredMax`.
+
+---
+
+#### Slice 10 — Qualifier Compatibility Checks
+
+**Objective:** Enforce that when both a field and its bound carry qualifiers, those qualifiers must be compatible. Emit `BoundsQualifierMismatch` on mismatch.
+
+**Files:**
+- `src/Precept/Language/Diagnostics.cs` (or `DiagnosticCode.cs`) — add `BoundsQualifierMismatch` diagnostic code
+- `src/Precept/Pipeline/TypeChecker.Validation.Modifiers.cs` — after typed-constant extraction (Slice 9), compare the bound's extracted qualifier against the field's declared qualifier. Emit `BoundsQualifierMismatch` if they differ.
+- `src/Precept/Language/DiagnosticCatalog.cs` (or equivalent) — register diagnostic metadata
+
+**Tests:**
+- `BoundsQualifierMismatch_FieldUSD_BoundEUR_EmitsDiagnostic`
+- `BoundsQualifierMismatch_FieldKg_BoundLb_EmitsDiagnostic`
+- `BoundsQualifierMismatch_FieldUSD_BoundUSD_NoDiagnostic`
+- `BoundsQualifierMismatch_FieldKg_BoundKg_NoDiagnostic`
+- `BoundsQualifierMismatch_DecimalFieldNoQualifier_PlainNumericBound_NoDiagnostic` (regression)
+- `BoundsQualifierMismatch_FieldHasQualifier_BoundIsPlainNumeric_EmitsBoundsRequireQualifier` (delegates to Slice 8 diagnostic)
+
+**Acceptance criteria:**
+- `field cost as money in 'USD' max '100 EUR'` emits `BoundsQualifierMismatch`
+- `field cost as money in 'USD' max '100 USD'` compiles clean
+- Qualifier comparison is case-sensitive and exact (no currency conversion)
+
+**Completion gate:** `dotnet test` clean; qualifier mismatches diagnosed.
+
+---
+
+#### Slice 11 — String/Collection Constraint Obligation Coverage
+
+**Objective:** Extend obligation generation to `string` (`minlength`/`maxlength`) and `collection` (`mincount`/`maxcount`) constraint modifiers. These use analogous but distinct obligation types (`LengthContainment`, `CountContainment`) because the proof semantics differ from numeric interval arithmetic.
+
+**Files:**
+- `src/Precept/Language/ProofRequirementKind.cs` — add `LengthContainment` and `CountContainment` (if separate obligation kinds are warranted; alternatively, generalize `IntervalContainment` to cover length/count with a discriminator)
+- `src/Precept/Language/ProofRequirement.cs` — add obligation records for length/count containment
+- `src/Precept/Pipeline/ProofEngine.cs` — extend obligation collection: when a `set` target field has `minlength`/`maxlength` or `mincount`/`maxcount` modifiers with `ProofSatisfactions`, generate the corresponding obligation
+- `src/Precept/Pipeline/ProofEngine.Intervals.cs` (or new `ProofEngine.Lengths.cs`) — length/count containment strategy
+
+**Tests:**
+- `StringField_MaxLength_SetToLongerLiteral_EmitsDiagnostic`
+- `StringField_MaxLength_SetToShorterLiteral_Proved`
+- `StringField_MinLength_SetToEmptyLiteral_EmitsDiagnostic`
+- `StringField_NoBoundsModifiers_NoObligation`
+- `CollectionField_MaxCount_AddBeyondLimit_EmitsDiagnostic` (if add semantics are provable)
+- `CollectionField_MinCount_RemoveToEmpty_EmitsDiagnostic` (if remove semantics are provable)
+- `CollectionField_NoBoundsModifiers_NoObligation`
+
+**Note:** String/collection proofs are inherently more limited than numeric interval proofs — many operations are not statically provable (e.g., concatenation length depends on runtime values). The initial coverage should handle:
+- Literal assignments where the value length/count is known at compile time
+- Leave non-literal assignments as unresolved (conservative, sound)
+
+**Acceptance criteria:**
+- Declared `maxlength`/`minlength` on a string field generates an obligation on `set` actions
+- Literal string assignments are checked against declared length bounds
+- Collection constraints generate obligations where provable
+
+**Completion gate:** `dotnet test` clean; no string/collection constraint is silently ignored.
+
+---
+
+#### Slice 12 — Type-Family Coverage Regression Suite
+
+**Objective:** Comprehensive cross-type-family regression suite ensuring every type family's constraints are covered per the matrix in §12. This is the final validation gate for the catalog-driven obligation architecture.
+
+**Files:**
+- `test/Precept.Tests/TypeFamilyCoverageTests.cs` (CREATE) — one test class with per-family test methods
+
+**Tests (one per row in the §12 coverage matrix):**
+- `DecimalField_WithBounds_GeneratesIntervalObligation`
+- `NumberField_WithBounds_GeneratesIntervalObligation`
+- `IntegerField_WithBounds_NoObligation` (BigInteger exemption)
+- `MoneyField_WithQualifiedBounds_GeneratesIntervalObligation`
+- `QuantityField_WithQualifiedBounds_GeneratesIntervalObligation`
+- `PriceField_WithQualifiedBounds_GeneratesIntervalObligation`
+- `ExchangeRateField_WithBounds_GeneratesIntervalObligation`
+- `StringField_WithLengthBounds_GeneratesLengthObligation`
+- `CollectionField_WithCountBounds_GeneratesCountObligation`
+- `TemporalField_NoBoundsDeclared_NoObligation`
+- **Negative companion per positive test** — field without bounds, same type, no obligation generated
+
+**Meta-test:**
+- `AllConstrainableTypes_DeclaredConstraint_NeverSilentlyIgnored` — parameterized test iterating over every type in the `Types` catalog that has `min`/`max`/`minlength`/`maxlength`/`mincount`/`maxcount` in its `ApplicableModifiers`; verifies that a field with the constraint and a `set` action produces either an obligation or a diagnostic.
+
+**Acceptance criteria:**
+- 100% coverage of the §12 matrix
+- No type family has a declared constraint that produces neither an obligation nor a diagnostic
+- All existing tests pass (full regression)
+
+**Completion gate:** `dotnet test` clean; meta-test `AllConstrainableTypes_DeclaredConstraint_NeverSilentlyIgnored` passes.
+
+---
+
 ### 8.3 Dependency Ordering
 
 ```
@@ -852,9 +1070,20 @@ Slice 3 (guard narrowing)     Slice 4 (number type + functions) [parallel]
 Slice 5 (hover extension — after Elaine design review)
     ↓
 Slice 6 (MCP sync)
+    ↓
+Slice 7 (catalog-driven obligation generator refactor)
+    ↓
+Slice 8 (qualified-type bound semantics)     Slice 11 (string/collection constraints) [parallel]
+    ↓                                             ↓
+Slice 9 (typed-constant extraction)               ↓
+    ↓                                             ↓
+Slice 10 (qualifier compatibility checks)         ↓
+    ↓                                             ↓
+    └──────────────→ Slice 12 (type-family coverage regression) ←──┘
 ```
 
 Slice 4 is independent of Slice 3 and can run in parallel once Slice 2 is complete.
+Slices 8–10 are sequential (each depends on the prior). Slice 11 is independent of Slices 8–10 and can run in parallel after Slice 7. Slice 12 depends on all of Slices 8–11.
 
 ### 8.4 Tooling/MCP Sync Assessment
 
@@ -1132,6 +1361,132 @@ The following existing behaviors must not change:
 
 ---
 
+## 10. Catalog-Driven Obligation Architecture
+
+> **Added:** 2026-05-13 — incorporates accepted improvements from Frank's catalog-obligation audit and bounds-qualifier audit.
+
+### 10.1 Problem Statement
+
+The initial interval proof engine (Slices 1–4) proved the concept for `decimal`/`number` fields but hardcoded obligation generation against specific `TypeKind` values. This violates Precept's catalog-driven architecture: the obligation collector switches on `TypeKind.Decimal` and `TypeKind.Number` to decide whether to emit `IntervalContainmentProofRequirement`, silently skipping `integer`, `money`, `quantity`, `price`, `exchangerate`, `string` (for `minlength`/`maxlength`), and `collection` (for `mincount`/`maxcount`).
+
+The consequence: authors can declare constraints on these types via existing `min`/`max`/`minlength`/`maxlength`/`mincount`/`maxcount` modifiers, the catalog accepts them, but the proof engine generates no obligations — the constraints are silently ignored at compile time. This is a structural integrity gap.
+
+### 10.2 Rationale
+
+Precept's non-negotiable design principle: **catalog declares behavior; pipeline consumes metadata.** The obligation generator must derive which types require interval/bounds obligations from modifier metadata (`ApplicableTypes`, `ProofSatisfactions`), not from a hardcoded type list in the engine.
+
+**Evidence anchors:**
+- `src/Precept/Language/Actions.cs` — hardcoded type filtering in interval-containment obligation generation
+- `src/Precept/Language/Modifiers.cs` — `ApplicableTypes` and `ProofSatisfactions` already declare which types support which constraint modifiers
+- `src/Precept/Pipeline/ProofEngine.Strategies.cs` — the discharge side already reads `ProofSatisfactions` broadly; the collection side must match
+
+### 10.3 Target Architecture
+
+The obligation collector must:
+
+1. For each `set` action (or computed-field expression), inspect the target field's declared modifiers.
+2. For each modifier that carries `ProofSatisfactions` with a `Numeric` entry (comparisons like `>=`, `<=`), generate an `IntervalContainmentProofRequirement` — regardless of the field's `TypeKind`.
+3. For non-numeric constraint modifiers (`minlength`, `maxlength`, `mincount`, `maxcount`), generate analogous constraint proof obligations (see §12 for coverage matrix).
+4. The `TypeKind` is irrelevant to obligation *generation*. The catalog's modifier metadata determines whether a constraint exists; the obligation generator reads that metadata.
+
+**What this eliminates:** Every `TypeKind` switch/check in the obligation collection path. The only remaining type-specific logic is in the *discharge* strategies (transfer functions differ per type), which is correct — transfer functions are declared per-operation in `Operations.cs`.
+
+### 10.4 Updated Enforcement Model
+
+| Stage | Current (hardcoded) | Target (catalog-driven) |
+|---|---|---|
+| Obligation collection | `if (type == decimal \|\| type == number)` | `if (field.Modifiers.Any(m => m.ProofSatisfactions.OfType<Numeric>().Any()))` |
+| Bound extraction | `TryGetComparableModifierValue` (numeric literals only) | Extended to handle typed constants and qualified bounds (§11) |
+| Discharge strategy | Strategy 7 reads `BinaryOperationMeta.IntervalTransfer` | Unchanged — already catalog-driven |
+| Diagnostic emission | `NumericOverflow` on unresolved | Unchanged; additional diagnostics for qualifier issues (§11.3) |
+
+### 10.5 New Diagnostics
+
+| Diagnostic name | Stage | Trigger | Severity |
+|---|---|---|---|
+| `BoundsRequireQualifier` | Type checker | `min`/`max` declared on `money`/`quantity`/`price` without required `in`/`of` qualifier | Error |
+| `BoundsQualifierMismatch` | Type checker | Bound qualifier (e.g., `'5 kg'`) conflicts with field qualifier (e.g., `in 'lb'`) | Error |
+| `UnextractableBound` | Type checker | Bound expression cannot be converted to a comparable value (transitional — to be removed as extraction improves) | Warning |
+
+---
+
+## 11. Qualified-Type Bound Semantics
+
+### 11.1 Problem Statement
+
+For qualified types (`money`, `quantity`, `price`), declaring `min`/`max` without a matching qualifier context is semantically undefined. `field test as quantity max '5 kg'` compiles without diagnostics today, but:
+
+1. `quantity` without `in`/`of` has no comparison basis — what unit is `max` measured in?
+2. Typed constants like `'5 kg'` are not extracted into comparable bound values by `TryGetComparableModifierValue`, so `DeclaredMin`/`DeclaredMax` remain `null` and no interval obligation is emitted.
+3. The bound is accepted but silently ignored — violating the principle that declared constraints must never be silently ignored.
+
+### 11.2 Required Qualifier Context
+
+| Type | Required qualifier for bounds | Example (legal) | Example (illegal) |
+|---|---|---|---|
+| `money` | `in` (currency) | `field cost as money in 'USD' min '0 USD' max '100000 USD'` | `field cost as money max 100000` |
+| `quantity` | `in` or `of` (unit) | `field weight as quantity in 'kg' max '5 kg'` | `field weight as quantity max '5 kg'` |
+| `price` | `in` (currency) | `field rate as price in 'USD' min '0 USD'` | `field rate as price min 0` |
+| `decimal` | None required | `field balance as decimal min 0 max 999999` | — |
+| `number` | None required | `field ratio as number min 0 max 1` | — |
+
+### 11.3 Typed-Constant Bound Extraction
+
+**Current gap:** `TryGetComparableModifierValue` (at `src/Precept/Pipeline/TypeChecker.Validation.Modifiers.cs:211-226`) handles only `NumberLiteral` and unary-minus number literals. Typed constants return `null`.
+
+**Target:** Extend `TryGetComparableModifierValue` to:
+
+1. Recognize typed-constant expressions (single-quoted literals like `'5 kg'`, `'100 USD'`).
+2. Parse the numeric component from the typed constant using the existing typed-constant resolution pipeline.
+3. Extract the qualifier component (unit/currency) from the typed constant.
+4. Populate `DeclaredMin`/`DeclaredMax` with the numeric value.
+5. Store the extracted qualifier for compatibility checking (§11.4).
+
+**Files affected:**
+- `src/Precept/Pipeline/TypeChecker.Validation.Modifiers.cs` — extend `TryGetComparableModifierValue`
+- `src/Precept/Pipeline/TypeChecker.cs` — `DeclaredMin`/`DeclaredMax` population path
+
+### 11.4 Qualifier Compatibility Checks
+
+When a field has a qualifier (`in 'USD'`) and a bound has a qualifier (`max '100 EUR'`), the qualifiers must be compatible:
+
+- **Match:** Field `in 'USD'`, bound `'100 USD'` → extract numeric value `100`, qualifiers match.
+- **Mismatch:** Field `in 'USD'`, bound `'100 EUR'` → emit `BoundsQualifierMismatch` diagnostic.
+- **Missing field qualifier:** Field has no `in`/`of`, bound has qualifier → emit `BoundsRequireQualifier`.
+- **Missing bound qualifier:** Field has `in 'kg'`, bound is bare numeric `5` → this is ambiguous for qualified types. Emit `BoundsRequireQualifier` (the bound must specify its unit).
+
+**Implementation location:** Type-checker validation pass, immediately after modifier extraction, before proof obligation collection.
+
+---
+
+## 12. Type-Family Coverage Matrix
+
+This matrix documents the constraint-obligation coverage target across all type families. The principle: **any declared constraint must produce a compile-time proof obligation or a diagnostic explaining why it cannot.**
+
+| Type family | Constraint modifiers | Obligation type | Current status | Target |
+|---|---|---|---|---|
+| `decimal` | `min`, `max` | `IntervalContainment` | ✅ Covered (Slices 1–2) | Maintained |
+| `number` | `min`, `max` | `IntervalContainment` (with ULP widening) | ✅ Covered (Slice 4) | Maintained |
+| `integer` | `min`, `max` | None (BigInteger cannot overflow) | ✅ Correct skip | Maintained |
+| `money` | `min`, `max` | `IntervalContainment` | ❌ Silently skipped | Covered via catalog-driven generator (Slice 7) + qualifier semantics (Slices 8–10) |
+| `quantity` | `min`, `max` | `IntervalContainment` | ❌ Silently skipped | Covered via catalog-driven generator (Slice 7) + qualifier semantics (Slices 8–10) |
+| `price` | `min`, `max` | `IntervalContainment` | ❌ Silently skipped | Covered via catalog-driven generator (Slice 7) + qualifier semantics (Slices 8–10) |
+| `exchangerate` | `min`, `max` | `IntervalContainment` | ❌ Silently skipped | Covered via catalog-driven generator (Slice 7) |
+| `string` | `minlength`, `maxlength` | `LengthContainment` (new) | ❌ No obligation generated | Covered (Slice 11) |
+| `collection` | `mincount`, `maxcount` | `CountContainment` (new) | ❌ No obligation generated | Covered (Slice 11) |
+| `temporal` (`date`, `time`, `datetime`, `instant`) | No `min`/`max` declared in catalog | None | ✅ No gap (no constraint declared) | No action needed |
+
+### 12.1 Principle: No Silent Constraint Ignoring
+
+If the catalog allows a constraint modifier on a type (i.e., the modifier's `ApplicableTypes` includes that type), then either:
+
+1. A proof obligation is generated for assignments to fields with that constraint, **or**
+2. A diagnostic is emitted explaining why the constraint cannot be enforced (e.g., `BoundsRequireQualifier`).
+
+There must be no third option where the constraint is declared, accepted by the parser and type checker, and then silently ignored by the proof engine.
+
+---
+
 ## Appendix A — Why Not `@bounds` Annotation Syntax
 
 The prior design analysis (`overflow-prevention-design-analysis.md`) proposed a new `@bounds(min, max)` annotation. This design rejects that proposal for three reasons:
@@ -1151,4 +1506,4 @@ The strategy is **sound**: it never proves a false positive. If Strategy 7 disch
 
 ---
 
-*Document ready for design review. Shane sign-off required before any implementation begins. Elaine review required on §6 (hover) before Slice 5. George review required on §8 (implementation plan) before any slice begins. Soup Nazi review required on §9 (test strategy) before Slice 2 completion gate.*
+*Document ready for design review. Shane sign-off required before any implementation begins. Elaine review required on §6 (hover) before Slice 5. George review required on §8 (implementation plan) before any slice begins. Soup Nazi review required on §9 (test strategy) before Slice 2 completion gate. Sections 10–12 and Slices 7–12 added 2026-05-13 to incorporate catalog-driven obligation generation, qualified-type bound semantics, and type-family coverage improvements.*
