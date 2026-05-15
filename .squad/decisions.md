@@ -6,6 +6,48 @@
 
 ---
 
+### 2026-05-15T18:00:00Z: Slice 25 warning closure is verified and the slice is fully closed
+
+**By:** Scribe
+
+**Status:** Merged from Frank's warning-closure verification.
+
+**Merged source:** `frank-slice-25-warnings-check.md`.
+
+- Frank verified W1, W2, and W3 are all actually closed on `spike/Precept-V2-Radical`, not just papered over.
+- The new coverage now directly exercises `FoldValue`'s static-magnitude interpolated-default path, documents and tests the forward-reference ordering limitation in `CheckInitialStateSatisfiability`, and restores the formatting break in `CollectDefaultObligations`.
+- All 8 `ProofEngineFieldDefaultTests` pass, the full suite stays at the same 9 pre-existing failures, and Slice 26 is unblocked with Slice 25 marked fully closed.
+
+---
+
+### 2026-05-15T17:30:00Z: Slice 25 approval locks the field-default proof path for interpolated typed constants
+
+**By:** Scribe
+
+**Status:** Merged from Frank's Slice 25 review.
+
+**Merged source:** `frank-slice-25-review.md`.
+
+- Frank approved the Slice 25 design split: `CollectDefaultObligations` owns interval-containment obligation generation, while `FoldValue` Part A handles ensures-time folding of interpolated defaults.
+- Cross-unit and affine behavior are locked to the canonical normalization seams (`IntervalOf`, `ApplyStaticUnitScaling`, and the same affine formula as `TypedConstantNormalizer`) rather than duplicating scaling logic inline.
+- Frank called out three non-blocking follow-ups at review time: add direct coverage for the `FoldValue` static-magnitude path, document/test forward-reference ordering sensitivity in `CheckInitialStateSatisfiability`, and clean up a small formatting artifact near `FormatViolationReason`.
+
+---
+
+### 2026-05-15T17:00:00Z: Slice 23 and Slice 24 warning closures are approved and do not block forward progress
+
+**By:** Scribe
+
+**Status:** Merged from Frank's S23/S24 warning-closure review.
+
+**Merged source:** `frank-s23s24-warnings-review.md`.
+
+- Frank approved the warning-closure tests for the Slice 23 qualifier-routing path and the Slice 24 money/price interpolated-interval paths, with the suite still holding at 5545 passing and 9 pre-existing failures.
+- The review locks the two-axis price mismatch regression through `BuildQualifiersFromStaticInterpolated → ValidateResolvedQualifiers`, confirms WholeValue money/price interpolations stay on the correct non-scaling path, and confirms the same-unit price magnitude regression stays proved without accidental inverse scaling.
+- One remaining note is explicitly non-blocking: a same-unit test comment should describe the interval as `[decimal.MinValue..3]`, not `[0..3]`.
+
+---
+
 ### 2026-05-15T16:25:03Z: Frank review warnings now gate forward progress the same way blockers do
 
 **By:** Scribe

@@ -1901,7 +1901,7 @@ For `[lb_av]`:
 | **22** | `StaticQualifier` on `InterpolatedTypedConstant` | ✅ Done | None |
 | **23** | Route `StaticQualifier` through qualifier consumers | ⬜ Not started | Needs 22 |
 | **24** | Money/price interpolated interval extraction | ⬜ Not started | Needs 19, 22 |
-| **25** | Field-default proof coverage (`FoldValue` + collector) | ⬜ Not started | Needs 19, 22, 23 |
+| **25** | Field-default proof coverage (`FoldValue` + collector) | ✅ Done | Needs 19, 22, 23 |
 | **26** | Event arg default resolution (`ResolveEventArgExpressions`) | ⬜ Not started | Needs 25, 15b |
 | **27** | Doc sync (language spec, proof-engine.md, interval design) | ⬜ Not started | Needs 16, 18 (shape freeze) |
 | **30** | Extend PRE0070/PRE0071 to comparison operators | ✅ Done | None |
@@ -1922,7 +1922,7 @@ For `[lb_av]`:
 | **45** | PRE0138 `CountDimensionBoundsAmbiguous` | ✅ Done | None |
 
 **Legend:** ✅ Done · 🔶 Partial · ⬜ Not started
-**Critical path:** 14 → ~~15/15b/16~~ → ~~17/18~~ → ~~21~~ → 23/24/25 → 26 → 27 _(15/15b/16/17/18/19/20/21 complete; remaining gate is 23/24/25 → 26 → 27)_
+**Critical path:** 14 → ~~15/15b/16~~ → ~~17/18~~ → ~~21~~ → 23/24/~~25~~ → 26 → 27 _(15/15b/16/17/18/19/20/21/25 complete; remaining gate is 23/24 → 26 → 27)_
 **Parallel-safe first wave:** 14 · 22 · 30 · 32 · 34 · 38–42 · 43 · 44 · 45 (no code dependencies)
 
 ### 5.1 Implementation Slices
@@ -3578,7 +3578,7 @@ These slices extend the normalization design to cover interpolated typed constan
 | **22** | Capture `StaticQualifier` on `InterpolatedTypedConstant` | None | ✅ |
 | **23** | Route `StaticQualifier` through qualifier consumers | Slice 22 | ⬜ |
 | **24** | Extend interpolated interval extraction to money/price | Slices 19, 22 | ✅ |
-| **25** | Field-default proof coverage for interpolated typed constants | Slices 19, 22, 23 | ⬜ |
+| **25** | Field-default proof coverage for interpolated typed constants | Slices 19, 22, 23 | ✅ |
 | **26** | Event arg default resolution (typed-constant defaults) | Slices 25, 15b | ⬜ |
 
 ---
