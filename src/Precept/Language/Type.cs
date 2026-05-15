@@ -49,6 +49,12 @@ public enum QualifierAxis
     TemporalDimension,
     /// <summary>Specific temporal unit basis for <c>period in 'days'</c> / <c>period in 'months'</c>. Distinct from <see cref="TemporalDimension"/> (category).</summary>
     TemporalUnit,
+    /// <summary>
+    /// Polymorphic <c>in</c> axis for <c>price</c>. The value may be a currency code (ISO 4217),
+    /// a UCUM unit code, or a compound <c>currency/unit</c> expression. The type checker
+    /// disambiguates by registry lookup at check time. See <see cref="DeclaredQualifierMeta.CompoundPrice"/>.
+    /// </summary>
+    PriceIn,
 }
 
 // ── QualifierShape ─────────────────────────────────────────────────────────────
@@ -63,10 +69,15 @@ public sealed record QualifierSlot(TokenKind Preposition, QualifierAxis Axis);
 /// The qualifier shape a type accepts. Lists all possible qualifier slots.
 /// When <see cref="InOfExclusive"/> is true, the <c>in</c> and <c>of</c> prepositions
 /// are mutually exclusive — a field may carry at most one. When false (e.g., <c>price</c>),
-/// both may appear on the same declaration.
+/// both may appear on the same declaration. When <see cref="OfRequiresCurrencyIn"/> is true,
+/// the <c>of</c> qualifier is valid only when <c>in</c> resolves to a currency-only value
+/// (not a unit or compound price). Used by <c>price</c>.
 /// Null on types with no qualifiers.
 /// </summary>
-public sealed record QualifierShape(IReadOnlyList<QualifierSlot> Slots, bool InOfExclusive = false);
+public sealed record QualifierShape(
+    IReadOnlyList<QualifierSlot> Slots,
+    bool InOfExclusive = false,
+    bool OfRequiresCurrencyIn = false);
 
 // ── TypeAccessor DU ────────────────────────────────────────────────────────────
 

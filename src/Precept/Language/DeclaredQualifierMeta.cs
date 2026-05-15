@@ -78,4 +78,20 @@ public abstract record DeclaredQualifierMeta(
         ProofSatisfaction[]? ProofSatisfactions = null,
         string? SourceFieldName = null)
         : DeclaredQualifierMeta(QualifierAxis.TemporalUnit, Origin, Preposition, ProofSatisfactions, SourceFieldName);
+
+    /// <summary>
+    /// Resolved from a compound <c>in 'currency/unit'</c> typed constant on a <c>price</c> field.
+    /// Carries both the currency and unit axes together from a single <c>in</c> qualifier value.
+    /// Consumers that need the currency component read <see cref="CurrencyCode"/>;
+    /// those that need the unit component read <see cref="UnitCode"/>.
+    /// </summary>
+    public sealed record CompoundPrice(
+        string CurrencyCode,
+        string UnitCode,
+        string DimensionName,
+        QualifierOrigin Origin = QualifierOrigin.Explicit,
+        TokenKind? Preposition = TokenKind.In,
+        ProofSatisfaction[]? ProofSatisfactions = null,
+        string? SourceFieldName = null)
+        : DeclaredQualifierMeta(QualifierAxis.PriceIn, Origin, Preposition, ProofSatisfactions, SourceFieldName);
 }

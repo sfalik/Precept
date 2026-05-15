@@ -60,4 +60,7 @@
 - `TryGetAssignmentSourceQualifiers` returns `ImmutableArray<DeclaredQualifierMeta>` (a multi-qualifier set). The new `BuildQualifiersFromStaticInterpolated` helper maps all static qualifier subtypes to their full qualifier arrays.
 - `IsDefaultOrEmpty` returns true for both uninitialized and empty arrays. The `_ => []` fallback in `BuildQualifiersFromStaticInterpolated` produces an empty (not default) array, so `!IsDefaultOrEmpty` correctly evaluates to false and falls through to the existing `default: return false` path.
 - Pre-existing baseline was 9 failures before this slice; it remains 9 after. All 5 new tests pass. The `"Question build FAILED"` MSBuild error is a transient file-locking issue in the incremental build cache — a second `dotnet build` call always succeeds.
+- QS-1 for price qualifiers is model-only: `QualifierAxis.PriceIn`, `QualifierShape.OfRequiresCurrencyIn`, and `DeclaredQualifierMeta.CompoundPrice` can land without changing `QS_CurrencyAndDimension` yet. Keeping the catalog slot on `Currency` until QS-2 avoids breaking existing price-field mapping before the new handler exists.
+- Existing qualifier-axis consumers already fail soft through `_`/`default` fallbacks. For QS-1, no switch-exhaustion stubs were needed in `TypeChecker`, `CompletionHandler`, `RichHoverFactory`, or MCP formatting surfaces.
+- Baseline validation for this lane remains the known 9 failing `Precept.Tests`; QS-1 preserved that count exactly (5561 passed / 9 failed / 5570 total).
 
