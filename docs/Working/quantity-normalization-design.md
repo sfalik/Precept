@@ -24,6 +24,7 @@
 4. [UCUM Scale Table](#4-ucum-scale-table)
 5. [Migration Path](#5-migration-path)
 5.6. [Extended Slice Details — Slices 22–26](#56-extended-slice-details--slices-2226)
+5.7. [Formal Implementation Slices — Slices 30–43](#57-formal-implementation-slices--slices-3043)
 6. [Risks and Tradeoffs](#6-risks-and-tradeoffs)
 7. [Open Questions for Shane](#7-open-questions-for-shane)
 
@@ -1384,7 +1385,7 @@ Both comparisons assume values are in a common unit. They are not.
 
 ### 1.3 Qualifier Compatibility Check Is Orthogonal
 
-Slice 10 of the interval design added `BoundsQualifierMismatch` (PRE0134), which checks that the qualifier axis values match (e.g., a `kg` bound against a `[lb_av]` assignment). This is a *type-level* compatibility check — it ensures the field's declared qualifier and the bound's qualifier are in the same dimensional family. It does **not** normalize magnitudes. Even if the qualifier check passes (same dimension), the magnitude comparison is still raw.
+Slice 10 of the interval design added `BoundsQualifierMismatch` (PRE0134), which checks the qualifier axis before numeric comparison (e.g., a `kg` bound against a `[lb_av]` assignment). For **physically convertible** UCUM units, "same dimension" is the right gate — normalization can then reconcile the magnitudes. The qualifier check itself does **not** normalize magnitudes. For explicit counting units (`each`, `box`, etc.), however, same `DimensionVector.None` / `count` is **not** enough to imply value convertibility. That tighter comparison-rule gap is documented in §6.7.
 
 ### 1.4 Impact Scope
 
@@ -1876,18 +1877,58 @@ For `[lb_av]`:
 
 ## 5. Migration Path
 
+## §5.0 — Implementation Progress Tracker
+
+**Last audited:** 2026-05-14 (George, full codebase scan)
+
+| Slice | Summary | Status | Blocking |
+|-------|---------|--------|----------|
+| **14** | Core normalizer (`TypedConstantNormalizer`) | ⬜ Not started | Blocks 15, 15b, 16, 19, 20 |
+| **15** | TypeChecker bounds extraction to normalizer | ⬜ Not started | Needs 14 |
+| **15b** | TypedArg normalization (`NormalizedDeclaredMin/Max`) | ⬜ Not started | Needs 14 |
+| **16** | ProofEngine magnitude extraction + `TryGetStaticScalingFactor` | ⬜ Not started | Needs 14 |
+| **17** | Test coverage (cross-unit bound overflow) | ⬜ Not started | Needs 15, 15b, 16 |
+| **18** | Display review (`IntervalContainmentProofRequirement` shape) | ⬜ Not started | Needs 15, 16 |
+| **19** | `InterpolatedTypedConstant` case in `IntervalOfNarrowed` | ⬜ Not started | Needs 14 |
+| **20** | Unit-aware interval scaling (`NumericInterval.Scale`) | ⬜ Not started | Needs 19, 16 |
+| **21** | Interpolated quantity test coverage | ⬜ Not started | Needs 19, 20 |
+| **22** | `StaticQualifier` on `TypedInterpolatedTypedConstant` | ⬜ Not started | None |
+| **23** | Route `StaticQualifier` through qualifier consumers | ⬜ Not started | Needs 22 |
+| **24** | Money/price interpolated interval extraction | ⬜ Not started | Needs 19, 22 |
+| **25** | Field-default proof coverage (`FoldValue` + collector) | ⬜ Not started | Needs 19, 22, 23 |
+| **26** | Event arg default resolution (`ResolveEventArgExpressions`) | ⬜ Not started | Needs 25, 15b |
+| **27** | Doc sync (language spec, proof-engine.md, interval design) | ⬜ Not started | Needs 16, 18 (shape freeze) |
+| **30** | Extend PRE0070/PRE0071 to comparison operators | ⬜ Not started | None |
+| **31** | PRE0137 `CrossCountingUnitOperation` | ⬜ Not started | After 30/32 |
+| **32** | `QualifierMatch.Same` in `SelectOverload` (function calls) | ⬜ Not started | None |
+| **33** | Qualifier checks on `contains` synthetic membership ops | ⬜ Not started | After 32 |
+| **34** | Affine UCUM catalog extension (`AffineOffset`) | ⬜ Not started | None |
+| **35** | Affine scalar normalization `(value + offset) × scale` | ⬜ Not started | Needs 34 |
+| **36** | Affine interval shifting (`NumericInterval.Shift`) | ⬜ Not started | Needs 35 |
+| **37** | Full affine 24-test matrix | ⬜ Not started | Needs 36 |
+| **38** | Doc: temperature in scope, only genuine nonlinear units excluded | ⬜ Not started | None |
+| **39** | Doc: exact-conversion-factor assumption | ⬜ Not started | None |
+| **40** | Doc: business units `UcumExactFactor.One` / `DimensionVector.None` | ⬜ Not started | None |
+| **41** | Doc: `dozen`/`gross` intentional exclusion | ⬜ Not started | None |
+| **42** | Doc: `each.dimension = DimensionVector.None` behavior | ⬜ Not started | None |
+| **43** | Rename `TypedInterpolatedTypedConstant` → `InterpolatedTypedConstant` | ⬜ Not started | None |
+
+**Legend:** ✅ Done · 🔶 Partial · ⬜ Not started
+**Critical path:** 14 → 15/15b/16 → 17/18/19 → 20/21/22 → 23/24/25 → 26 → 27
+**Parallel-safe first wave:** 14 · 22 · 30 · 32 · 34 · 38–42 · 43 (no code dependencies)
+
 ### 5.1 Implementation Slices
 
 These slices follow the existing interval-proof-engine-design numbering (Slices 1–13 are complete). We continue from Slice 14.
 
-| Slice | Objective | Depends On | Agent |
-|-------|-----------|------------|-------|
-| **14** | ~~`NormalizedNumericValue` +~~ `TypedConstantNormalizer` _(⚠️ `NormalizedNumericValue` dropped per §0)_ | None (new files) | George |
-| **15** | Wire TypeChecker bounds extraction to normalizer | Slice 14 | George |
-| **16** | Wire ProofEngine magnitude extraction to normalizer | Slice 14 | George |
-| **17** | Unit + integration + regression tests | Slices 15–16 | Soup Nazi |
-| **18** | Hover/diagnostic display review (ensure diagnostics show original values, not normalized) | Slices 15–16 | Kramer |
-| **27** | Doc sync — propagate normalization changes to all canonical docs | Slices 14–21 | Frank |
+| Slice | Objective | Depends On | Agent | Status |
+|-------|-----------|------------|-------|--------|
+| **14** | ~~`NormalizedNumericValue` +~~ `TypedConstantNormalizer` _(⚠️ `NormalizedNumericValue` dropped per §0)_ | None (new files) | George | ⬜ |
+| **15** | Wire TypeChecker bounds extraction to normalizer | Slice 14 | George | ⬜ |
+| **16** | Wire ProofEngine magnitude extraction to normalizer | Slice 14 | George | ⬜ |
+| **17** | Unit + integration + regression tests | Slices 15–16 | Soup Nazi | ⬜ |
+| **18** | Hover/diagnostic display review | Slices 15–16 | Kramer | ⬜ |
+| **27** | Doc sync | Slices 14–21 | Frank | ⬜ |
 
 ### 5.2 Slice Details
 
@@ -1949,12 +1990,12 @@ These slices follow the existing interval-proof-engine-design numbering (Slices 
 
 The interpolated case (`'{field} [unit]'`) is a **separate problem** from the static-literal fix. It requires adding interval analysis for `InterpolatedTypedConstant` to the ProofEngine. These slices are independent of Slices 14–18 and can be sequenced after or in parallel.
 
-| Slice | Objective | Depends On | Agent |
-|-------|-----------|------------|-------|
-| **19** | Add `InterpolatedTypedConstant` case to `IntervalOfNarrowed` | Slice 14 (normalizer) | George |
-| **20** | Unit-aware interval scaling for interpolated magnitude slots | Slice 19 + Slice 16 | George |
-| **21** | Integration tests for interpolated quantity overflow proofs | Slices 19–20 | Soup Nazi |
-| **27** | Doc sync — propagate normalization changes to all canonical docs | Slices 14–21 | Frank |
+| Slice | Objective | Depends On | Agent | Status |
+|-------|-----------|------------|-------|--------|
+| **19** | Add `InterpolatedTypedConstant` case to `IntervalOfNarrowed` | Slice 14 (normalizer) | George | ⬜ |
+| **20** | Unit-aware interval scaling for interpolated magnitude slots | Slice 19 + Slice 16 | George | ⬜ |
+| **21** | Integration tests for interpolated quantity overflow proofs | Slices 19–20 | Soup Nazi | ⬜ |
+| **27** | Doc sync — propagate normalization changes to all canonical docs | Slices 14–21 | Frank | ⬜ |
 
 **Slice 19: Interval analysis for interpolated typed constants**
 - Add a case for `InterpolatedTypedConstant` in `IntervalOfNarrowed` (ProofEngine.Intervals.cs)
@@ -2004,8 +2045,8 @@ The interpolated case (`'{field} [unit]'`) is a **separate problem** from the st
 
 **1. `docs/language/precept-language-spec.md`**
 
-- **§0.6 Proof Engine Design Contract** (line 195): Add a bullet to the proof engine contract list: "5. **Unit-aware numeric interval reasoning.** When field bounds and assignment expressions use different units within the same dimension (e.g., `max '5 kg'` with `set x = '6 [lb_av]'`), the proof engine normalizes all magnitudes to base-unit equivalents via UCUM scale factors before interval containment comparison. Normalization is applied once at the TypeChecker extraction boundary; downstream consumers read pre-normalized values." This makes the cross-unit comparison guarantee part of the language contract.
-- **§5 Proof Engine** (line 1912): Add a paragraph after the existing qualifier-oriented checks list (line 1924) noting the interval containment checks now include unit-aware normalization: "Interval containment proofs for quantity and price fields normalize all magnitudes to UCUM base units before comparison, preventing false-positive `NumericOverflow` diagnostics on cross-unit assignments (e.g., `max '5 kg'` with `set field = '6 [lb_av]'` is correctly proved safe because 6 lb ≈ 2.72 kg < 5 kg)."
+- **§0.6 Proof Engine Design Contract** (line 195): Add a bullet to the proof engine contract list: "5. **Unit-aware numeric interval reasoning.** When field bounds and assignment expressions use different **statically convertible** units within the same physical dimension (e.g., `max '5 kg'` with `set x = '6 [lb_av]'`), the proof engine normalizes magnitudes to base-unit equivalents via UCUM scale factors before interval containment comparison. Normalization is applied once at the TypeChecker extraction boundary; downstream consumers read pre-normalized values. Explicit counting-unit mismatches (`each` vs `box`) are not covered by this guarantee — they require matching qualifiers or a separate runtime conversion field (see §6.7)." This makes the cross-unit comparison guarantee part of the language contract without overstating count-unit convertibility.
+- **§5 Proof Engine** (line 1912): Add a paragraph after the existing qualifier-oriented checks list (line 1924) noting the interval containment checks now include unit-aware normalization: "Interval containment proofs for quantity and price fields normalize statically convertible magnitudes to UCUM base units before comparison, preventing false-positive `NumericOverflow` diagnostics on cross-unit assignments (e.g., `max '5 kg'` with `set field = '6 [lb_av]'` is correctly proved safe because 6 lb ≈ 2.72 kg < 5 kg). Explicit counting-unit mismatches such as `each` vs `box` are not meaningfully comparable without a separate conversion field, so they must not be proved by same-dimension fallback."
 - **§3.6 Typed constant interpolation** (line 1452): No change needed — the existing description covers the syntax and type-checking of `{expr}` inside `'...'`. Normalization is a proof concern, not a type-checking description concern. Clean.
 - **Modifier validation table** (line 1584): No change needed — `min > max` validation fires on authored values before normalization. The existing description remains correct. Clean.
 
@@ -2176,11 +2217,869 @@ Tests that assert `DeclaredMin` / `DeclaredMax` values on `TypedField` will brea
 
 The UCUM parser normalizes to base SI units (gram, meter, second, etc. — not kilogram). This means `'5 kg'` normalizes to `5000` (grams), not `5`. This is mathematically correct but may surprise developers who expect kg-centric values. The normalization target is NOT configurable — it's determined by the UCUM specification's atom definitions. Consistency across all unit expressions depends on this being deterministic.
 
+### 6.7 Cross-unit comparison enforcement — solution design
+
+**Author:** Frank (Lead Architect)
+**Date:** 2026-05-14
+**Status:** Complete design — ready for implementation
+
+---
+
+#### 6.7.1 Problem statement
+
+A guard such as `when Qty > BoxCount`, where `Qty as quantity in 'each'` and `BoxCount as quantity in 'box'`, currently **passes** the TypeChecker's qualifier compatibility checks. It should **fail**.
+
+Both `'each'` and `'box'` resolve to `DimensionVector.None` (the `count` dimension family). The binary-op qualifier proof path's only quantity check — PRE0071 (`CrossDimensionArithmetic`) — compares **dimension names**, not unit codes. Since both have dimension `"count"`, the check passes. But dimensional compatibility ≠ value convertibility: `1 box` is not comparable to `1 each` without a product-level conversion factor that the type system cannot supply.
+
+**Contrast with assignment:** `set Qty = BoxCount` is correctly **rejected** because `ValidateAssignmentQualifiers` → `ValidateResolvedQualifiers` (in `TypeChecker.Expressions.TypedConstants.cs:274`) compares the `DeclaredQualifierMeta.Unit.UnitCode` strings directly: `"each" ≠ "box"` → PRE0068 (`QualifierMismatch`). The binary-op path does not perform this per-unit-code check.
+
+#### 6.7.2 Root cause — exact code path
+
+The gap lives in `ValidateQualifierCompatibility` (`TypeChecker.Expressions.cs:955`). This method is called from `CreateResolvedBinaryOp` (line 448) for every successfully resolved binary operation. It has three check blocks:
+
+1. **PRE0070 (CrossCurrencyArithmetic):** fires when `op.Left.ResultType == TypeKind.Money && op.Right.ResultType == TypeKind.Money && opMeta.Family == OperatorFamily.Arithmetic` and the currency codes differ. **Scoped to arithmetic only.**
+
+2. **PRE0071 (CrossDimensionArithmetic):** fires when `op.Left.ResultType == TypeKind.Quantity && op.Right.ResultType == TypeKind.Quantity && opMeta.Family == OperatorFamily.Arithmetic` and the **dimension names** differ. **Scoped to arithmetic only.**
+
+3. **PRE0072–0074 (denominator checks):** scoped to `OperatorKind.Divide`.
+
+**Two distinct gaps:**
+
+| Gap | What passes | Why |
+|-----|-------------|-----|
+| **A: Comparison operators have no qualifier checks** | `kg > m`, `USD > EUR`, `each > box` as comparison/equality ops | PRE0070/PRE0071 only fire for `OperatorFamily.Arithmetic`. `OperatorFamily.Comparison` hits no check block at all. |
+| **B: Same-dimension counting units pass dimension check** | `each + box`, `each > box` | Both map to dimension `"count"` via `GetDimensionFromQualifiers` → `DeclaredQualifierMeta.Unit.DimensionName`. The dimension check passes because `"count" == "count"`. |
+
+Gap A means that even physically incompatible dimensions pass for comparisons (e.g., `Weight > Distance` where one is mass and one is length). Gap B means that counting units with the same dimension but different unit codes (each vs box vs case) pass everywhere — arithmetic AND comparison.
+
+For **physically convertible** SI units (e.g., `kg > g`, `kg + [lb_av]`), same-dimension-different-unit is **intentionally correct**: UCUM normalization provides a deterministic conversion factor, and the normalization design (this document) makes these comparisons meaningful. The gap is specific to **counting units**, where no universal conversion factor exists.
+
+#### 6.7.3 Chosen solution
+
+**Approach: Two-tier enforcement in `ValidateQualifierCompatibility`**
+
+Two changes:
+
+1. **Extend PRE0070/PRE0071 family scope to include comparison operators.** Change the family gate from `opMeta.Family == OperatorFamily.Arithmetic` to `opMeta.Family is OperatorFamily.Arithmetic or OperatorFamily.Comparison`. This ensures cross-dimension and cross-currency comparisons are rejected, matching the behavior already enforced for arithmetic.
+
+2. **Add PRE0137 (`CrossCountingUnitOperation`).** A new check after the dimension checks: when both operands are `TypeKind.Quantity`, both have dimension `"count"`, and their static unit codes differ, emit PRE0137. This applies to **all** operator families (arithmetic and comparison), since `each + box` is equally meaningless as `each > box` without a conversion factor.
+
+**Why this approach over alternatives:**
+
+- **Option A (exact qualifier string match for all dimensionless binary ops):** Over-broad — would block legitimate operations on percentage, pH, dB, and other non-count dimensionless units that happen to have different codes but are validly comparable. The fix must target counting units specifically.
+
+- **Option B (same dimension + same qualifier for counting units only):** This IS the chosen approach, framed precisely.
+
+- **Option C (require explicit normalization expression like `Qty.normalized()`):** Over-engineering. No such language construct exists. The correct fix is a type error, not a new language surface. The author should use a conversion field: `Qty > BoxCount * EachPerBox`.
+
+- **Reusing PRE0071 for counting units instead of a new code:** PRE0071 says "incompatible dimensions." For counting units, the dimensions ARE compatible (`count == count`); the incompatibility is at the unit-code level. A separate diagnostic code with a distinct message is more actionable for authors.
+
+#### 6.7.4 Implementation sketch
+
+**File: `src/Precept/Pipeline/TypeChecker.Expressions.cs`**
+
+**Change 1 — extend family scope (lines 964–996):**
+
+```csharp
+// BEFORE (PRE0070):
+if (op.Left.ResultType == TypeKind.Money && op.Right.ResultType == TypeKind.Money
+    && opMeta.Family == OperatorFamily.Arithmetic)
+
+// AFTER:
+if (op.Left.ResultType == TypeKind.Money && op.Right.ResultType == TypeKind.Money
+    && opMeta.Family is OperatorFamily.Arithmetic or OperatorFamily.Comparison)
+
+// BEFORE (PRE0071):
+if (op.Left.ResultType == TypeKind.Quantity && op.Right.ResultType == TypeKind.Quantity
+    && opMeta.Family == OperatorFamily.Arithmetic)
+
+// AFTER:
+if (op.Left.ResultType == TypeKind.Quantity && op.Right.ResultType == TypeKind.Quantity
+    && opMeta.Family is OperatorFamily.Arithmetic or OperatorFamily.Comparison)
+```
+
+**Change 2 — add PRE0137 after the PRE0071 block (new code, inserted after line 996):**
+
+```csharp
+// PRE0137: Cross-counting-unit operation — Quantity op Quantity with same 'count'
+// dimension but different unit codes (e.g., 'each' vs 'box')
+if (op.Left.ResultType == TypeKind.Quantity && op.Right.ResultType == TypeKind.Quantity
+    && opMeta.Family is OperatorFamily.Arithmetic or OperatorFamily.Comparison)
+{
+    var leftDim = GetDimensionFromQualifiers(leftQualifiers.Value);
+    var rightDim = GetDimensionFromQualifiers(rightQualifiers.Value);
+    if (leftDim == "count" && rightDim == "count")
+    {
+        var leftUnit = GetUnitCodeFromQualifiers(leftQualifiers.Value);
+        var rightUnit = GetUnitCodeFromQualifiers(rightQualifiers.Value);
+        if (leftUnit is not null && rightUnit is not null
+            && !StringComparer.OrdinalIgnoreCase.Equals(leftUnit, rightUnit))
+        {
+            ctx.Diagnostics.Add(
+                Diagnostics.Create(DiagnosticCode.CrossCountingUnitOperation, span,
+                    GetOperandName(op.Left), leftUnit,
+                    GetOperandName(op.Right), rightUnit));
+            return;
+        }
+    }
+}
+```
+
+**Note on flow:** The PRE0137 block must come **after** the PRE0071 block, not before. If the dimensions differ (e.g., `count` vs `mass`), PRE0071 fires first and returns. PRE0137 only fires when both dimensions match as `"count"` but unit codes differ.
+
+**New helper method (add near `GetDimensionFromQualifiers`, line ~1090):**
+
+```csharp
+private static string? GetUnitCodeFromQualifiers(ImmutableArray<DeclaredQualifierMeta> qualifiers)
+{
+    foreach (var q in qualifiers)
+    {
+        if (q is DeclaredQualifierMeta.Unit u) return u.UnitCode;
+    }
+    return null;
+}
+```
+
+**File: `src/Precept/Language/DiagnosticCode.cs`**
+
+Add after the business-domain section (after `InvalidDimensionString = 77`):
+
+```csharp
+/// <summary>Two counting-unit quantities with different unit codes used in a binary operation (e.g., 'each' vs 'box').</summary>
+CrossCountingUnitOperation         = 137,
+```
+
+**File: `src/Precept/Language/Diagnostics.cs`**
+
+Add a new entry in the diagnostic metadata switch:
+
+```csharp
+DiagnosticCode.CrossCountingUnitOperation => new(
+    nameof(DiagnosticCode.CrossCountingUnitOperation),
+    DiagnosticStage.Type, Severity.Error,
+    "Cannot combine '{0}' ({1}) with '{2}' ({3}) — different counting units are not interconvertible; use a conversion field",
+    DiagnosticCategory.BusinessDomain,
+    RelatedCodes: [DiagnosticCode.CrossDimensionArithmetic, DiagnosticCode.QualifierMismatch],
+    FixHint: "Multiply one operand by a conversion field (e.g., BoxCount * EachPerBox) to convert to matching units",
+    TriggerCondition: "Two quantity fields with different counting-unit qualifiers (e.g., 'each' and 'box') appear as operands of an arithmetic or comparison operator.",
+    RecoverySteps: [
+        "Declare a conversion field (e.g., EachPerBox as quantity) and multiply to convert units before the operation",
+        "Change both fields to use the same counting unit",
+    ],
+    ExampleBefore: "precept Example\nfield Qty as quantity in 'each' default '0 each'\nfield BoxCount as quantity in 'box' default '0 box'\nrule Qty > BoxCount because \"Meaningless comparison\"",
+    ExampleAfter: "precept Example\nfield Qty as quantity in 'each' default '0 each'\nfield BoxCount as quantity in 'box' default '0 box'\nfield EachPerBox as quantity in 'each/box' positive\nrule Qty > BoxCount * EachPerBox because \"Each count exceeds box capacity\""),
+```
+
+#### 6.7.5 Diagnostic
+
+| Property | Value |
+|----------|-------|
+| **Code** | PRE0137 |
+| **Name** | `CrossCountingUnitOperation` |
+| **Stage** | Type |
+| **Severity** | Error |
+| **Category** | BusinessDomain |
+| **Message** | `Cannot combine '{0}' ({1}) with '{2}' ({3}) — different counting units are not interconvertible; use a conversion field` |
+| **Fix hint** | `Multiply one operand by a conversion field (e.g., BoxCount * EachPerBox) to convert to matching units` |
+
+**Example diagnostic output:**
+
+```
+error PRE0137: Cannot combine 'Qty' (each) with 'BoxCount' (box) — different counting units are not interconvertible; use a conversion field
+  --> definition.precept:5:6
+   |
+ 5 | rule Qty > BoxCount because "More items than boxes"
+   |      ^^^^^^^^^^^^^
+```
+
+#### 6.7.6 Test strategy
+
+All tests go in `test/Precept.Tests/TypeChecker/TypeCheckerCurrencyUnitTests.cs` (the existing file for PRE0070–0074 tests).
+
+**New tests for PRE0137 (CrossCountingUnitOperation):**
+
+| # | Test name | Input | Expected |
+|---|-----------|-------|----------|
+| 1 | `QuantityFields_DifferentCountingUnits_Comparison_EmitsCrossCountingUnit` | `Qty in 'each'`, `BoxCount in 'box'`, guard `Qty > BoxCount` | PRE0137 |
+| 2 | `QuantityFields_DifferentCountingUnits_Arithmetic_EmitsCrossCountingUnit` | `Qty in 'each'`, `BoxCount in 'box'`, computed `Total <- Qty + BoxCount` | PRE0137 |
+| 3 | `QuantityFields_DifferentCountingUnits_Equality_EmitsCrossCountingUnit` | `Qty in 'each'`, `BoxCount in 'box'`, guard `Qty == BoxCount` | PRE0137 |
+| 4 | `QuantityFields_SameCountingUnit_Comparison_NoDiagnostic` | `Qty1 in 'each'`, `Qty2 in 'each'`, guard `Qty1 > Qty2` | Clean |
+| 5 | `QuantityFields_SameCountingUnit_Arithmetic_NoDiagnostic` | `Qty1 in 'each'`, `Qty2 in 'each'`, computed `Total <- Qty1 + Qty2` | Clean |
+| 6 | `QuantityFields_DifferentCountingUnits_DynamicQualifier_NoDiagnostic` | One field has interpolated qualifier `in '{UnitField}'` | Clean (deferred to ProofEngine) |
+| 7 | `QuantityFields_DifferentPackagingUnits_EmitsCrossCountingUnit` | `Boxes in 'box'`, `Pallets in 'pallet'`, guard `Boxes > Pallets` | PRE0137 |
+
+**Extended PRE0070/PRE0071 tests for comparison operator coverage:**
+
+| # | Test name | Input | Expected |
+|---|-----------|-------|----------|
+| 8 | `MoneyFields_DifferentCurrencies_Comparison_EmitsCrossCurrency` | `USD in 'USD'`, `EUR in 'EUR'`, guard `USD > EUR` | PRE0070 |
+| 9 | `QuantityFields_DifferentDimensions_Comparison_EmitsCrossDimension` | `Weight in 'kg'`, `Distance in 'm'`, guard `Weight > Distance` | PRE0071 |
+| 10 | `MoneyFields_SameCurrency_Comparison_NoDiagnostic` | `A in 'USD'`, `B in 'USD'`, guard `A > B` | Clean |
+| 11 | `QuantityFields_SameDimension_DifferentSIUnits_Comparison_NoDiagnostic` | `W1 in 'kg'`, `W2 in 'g'`, guard `W1 > W2` | Clean (normalization handles it) |
+
+#### 6.7.7 Regression safety
+
+**What must NOT break:**
+
+| Scenario | Expected behavior | Why it's safe |
+|----------|-------------------|---------------|
+| Same-unit quantity comparisons (`each > each`, `kg > kg`) | Passes — unit codes match | Same-code check trivially succeeds |
+| Same-unit quantity arithmetic (`each + each`, `kg + kg`) | Passes | Same-code check succeeds |
+| Cross-SI-unit same-dimension comparisons (`kg > g`, `kg > [lb_av]`) | Passes | Dimension is `"mass"`, not `"count"` — PRE0137 only fires when `leftDim == "count" && rightDim == "count"` |
+| Cross-SI-unit same-dimension arithmetic (`kg + g`) | Passes | Same as above |
+| Dynamic-qualifier quantity operations | Passes — `TryGetStaticQualifiers` returns null | Static check is skipped entirely; deferred to ProofEngine |
+| Money same-currency comparisons (`USD == USD`) | Passes — currency codes match | No change in behavior |
+| `samples/inventory-item.precept` | Compiles clean | Uses `of '{StockingUnit.dimension}'` (dynamic qualifiers) — static checks skipped. No direct cross-counting-unit binary operations with static qualifiers. |
+| `samples/Test.precept` | Compiles clean | Uses `'5 kg'` and `'{test2} [lb_av]'` — same dimension (mass), not counting units. |
+| All other sample files | Compile clean | No sample uses static cross-counting-unit binary operations. |
+
+#### 6.7.8 Scope assessment
+
+| Operator family | Affected by this fix? | Existing check | New check |
+|---|---|---|---|
+| **Arithmetic** (`+`, `-`) | Yes — counting units | PRE0071 (dimension-level, passes for same-dimension) | PRE0137 (unit-code-level within `"count"` dimension) |
+| **Comparison** (`>`, `<`, `>=`, `<=`, `==`, `!=`) | Yes — both gaps | None (PRE0070/PRE0071 were arithmetic-only) | PRE0070/PRE0071 extended to comparisons + PRE0137 for counting units |
+| **Division** (`/`) | No | PRE0072–0074 already cover denominator mismatches | N/A |
+| **Multiplication** (`*`) | Partially — counting units | PRE0071 (dimension-level) | PRE0137 (but `each * box` typically resolves to a compound-unit operation; verify whether `Quantity * Quantity` with same dimension exists in the operations catalog) |
+| **Logical** (`and`, `or`) | No | Operands are boolean, not quantity | N/A |
+| **Membership** (`in`, `not in`) | No | Collection operations | N/A |
+| **Presence** (`is set`, `is not set`) | No | Unary | N/A |
+
+**Arithmetic `*` and `/` edge case:** `Qty * BoxCount` where both are counting units in different codes (`each * box`) would resolve to a compound-unit result (e.g., `each·box`). This is technically dimensionally valid (it produces a compound quantity). PRE0137 as designed would fire on it because both dimensions are `"count"` and unit codes differ. This is **intentionally correct** — multiplying `each` by `box` without conversion is as semantically meaningless as adding them. The correct pattern is `Qty * EachPerBox` where `EachPerBox as quantity in 'each/box'`.
+
+#### 6.7.9 Comprehensive operation taxonomy — cross-counting-unit enforcement gaps
+
+**Author:** Frank (Lead Architect)
+**Date:** 2026-05-16
+**Trigger:** Shane's directive for exhaustive gap analysis across all operation surfaces, not just binary operators
+
+---
+
+The prior §6.7.1–6.7.8 design is correct and complete for **binary operators**. This addendum extends the analysis to **every operation category** that could combine quantities with different counting units, identifies a critical architectural gap in function call validation, and provides recovery guidance for authors.
+
+##### 6.7.9.1 Operation taxonomy
+
+Every operation surface that accepts two or more quantity-typed values is classified below. The "Gap?" column indicates whether the current TypeChecker enforces counting-unit compatibility for that surface.
+
+| Category | Operations | Verdict | Gap? | Notes |
+|----------|-----------|---------|------|-------|
+| **A. Arithmetic binary ops** (`+`, `-`) | `Qty + BoxCount` | ❌ Compile error (PRE0137) | **Gap B** — §6.7.2 | Same `count` dimension, different unit codes. Fixed by §6.7.3 Change 2. |
+| **B. Comparison binary ops** (`>`, `<`, `>=`, `<=`, `==`, `!=`) | `Qty > BoxCount` | ❌ Compile error (PRE0137) | **Gap A + B** — §6.7.2 | PRE0070/PRE0071 were arithmetic-only; PRE0137 adds counting-unit check. Fixed by §6.7.3 Changes 1+2. |
+| **C. Ordering/magnitude functions** (`min`, `max`) | `max(Qty, BoxCount)` | ❌ Compile error | **Gap C — CRITICAL** | Catalog declares `QualifierMatch.Same`; TypeChecker `SelectOverload` never reads it. See §6.7.10. |
+| **D. Clamping function** (`clamp`) | `clamp(Qty, BoxLo, BoxHi)` where units differ | ❌ Compile error | **Gap C — CRITICAL** | Same as above. `clamp` has 3 quantity args, all must share counting unit. |
+| **E. Absolute value function** (`abs`) | `abs(Qty)` | ✅ Always valid | No gap | Unary — single operand, no cross-unit comparison possible. `QualifierMatch.Same` on `abs` is vacuously satisfied. |
+| **F. Division** (`/`) | `Qty / BoxCount` | ✅ Valid — produces compound unit | No gap | PRE0072–0074 cover denominator mismatches. `each / box` → compound dimension; intentionally allowed. |
+| **G. Multiplication** (`*`) | `Qty * BoxCount` | ❌ Compile error (PRE0137) | **Gap B** — §6.7.2 | `each * box` without conversion is as meaningless as `each + box`. Compound-unit multiplication between same-dimension counting units is blocked. |
+| **H. Membership** (`in`, `not in`) | `Qty in [Qty1, Qty2, ...]` | 🔶 Partial — element types checked, qualifier NOT | **Gap D** | `in` goes through `CreateSyntheticBinaryOp` which does NOT call `ValidateQualifierCompatibility`. See §6.7.10.2. |
+| **I. Assignment** (`set`, `default`) | `set Qty = BoxCount` | ✅ Correctly rejected | No gap | `ValidateAssignmentQualifiers` → `ValidateResolvedQualifiers` compares `UnitCode` strings directly → PRE0068. |
+| **J. Ensure constraints** | `ensure Qty > BoxCount` | Depends on expression | **Inherited from A/B/C** | Ensures resolve their condition via `Resolve()`, which dispatches to binary op or function call resolution. Gaps A/B/C apply transitively. |
+| **K. Derived/computed fields** | `Total <- Qty + BoxCount` | Depends on expression | **Inherited from A/B** | Computed expressions go through binary op resolution. PRE0137 fires when implemented. |
+| **L. Event arg binding** | `on Ev set Qty = Ev.ArgInBoxes` | ✅ Correctly rejected | No gap | Arg qualifier validation uses `ValidateAssignmentQualifiers` → PRE0068. |
+| **M. Typed-constant literals** | `'5 each' + '3 box'` | Depends on expression | **Inherited from A/B** | Typed constants resolve to quantity type with static qualifiers; binary op resolution applies. |
+| **N. Interpolated expressions** | `'{Qty} + {BoxCount}'` in display | ✅ N/A | No gap | Interpolation is string-level, not arithmetic. No cross-unit operation occurs. |
+| **O. Rounding** (`round`, `truncate`, `ceiling`, `floor`) | `round(Qty, 2)` | ✅ Always valid | No gap | Second arg is integer (decimal places), not a quantity. No cross-unit comparison. |
+| **P. String functions** (`len`, `upper`, `lower`, `trim`, etc.) | N/A | ✅ N/A | No gap | Not applicable to quantity types. |
+
+**Summary of gaps:**
+
+| Gap | Surface | Root cause | Fix location |
+|-----|---------|------------|--------------|
+| **A** | Comparison binary ops have no qualifier checks at all | PRE0070/PRE0071 scoped to `OperatorFamily.Arithmetic` only | §6.7.3 Change 1 |
+| **B** | Same-dimension counting units pass dimension check | `GetDimensionFromQualifiers` returns `"count"` for both; dimension equality passes | §6.7.3 Change 2 (PRE0137) |
+| **C** | Function calls (`min`, `max`, `clamp`) have no qualifier enforcement | `SelectOverload` never reads `FunctionOverload.Match` property | §6.7.10 (new) |
+| **D** | Membership operator (`in`) skips qualifier validation | `CreateSyntheticBinaryOp` does not call `ValidateQualifierCompatibility` | §6.7.10.2 (deferred — lower priority) |
+
+#### 6.7.10 Function call qualifier enforcement gap
+
+**Status:** Critical gap — catalog metadata exists, enforcement absent
+
+##### 6.7.10.1 The gap
+
+The Functions catalog (`src/Precept/Language/Functions.cs`, lines 41–105) correctly declares `QualifierMatch.Same` on the `Quantity` and `Money` overloads of `min`, `max`, `clamp`, and `abs`:
+
+```csharp
+// From Functions.cs — min overloads (max, clamp follow same pattern)
+new(Params.MoneyMoney, TypeKind.Money,   QualifierMatch.Same, ...),
+new(Params.QtyQty,     TypeKind.Quantity, QualifierMatch.Same, ...),
+```
+
+The `FunctionOverload` record carries `QualifierMatch? Match` (from `Function.cs:23`). This is the right metadata shape — it mirrors how `BinaryOperationMeta.Match` drives qualifier disambiguation and validation for binary operators.
+
+**However, the enforcement path is completely absent.**
+
+The function call resolution pipeline is:
+
+1. `ResolveFunctionCall` (TypeChecker.Expressions.Callables.cs:550) — resolves arguments and dispatches
+2. `SelectOverload` (TypeChecker.Expressions.Callables.cs:594) — matches overload by arity + type assignability
+3. Constructs `TypedFunctionCall` (line ~660) — returns resolved expression
+
+At no point does `SelectOverload` or any downstream validator read the `overload.Match` property. The overload selection checks:
+- Arity match (`args.Length == overload.Parameters.Count`)
+- Type assignability (`IsAssignable(argType, paramType)` for each argument)
+
+It does **not** check:
+- Whether qualifier constraints (`QualifierMatch.Same`) are satisfied between arguments
+- Whether argument qualifiers are compatible at all
+
+This means `max(qty_each, qty_box)` successfully resolves to the `(Quantity, Quantity) → Quantity` overload without any qualifier validation. The catalog says "these must have the same qualifier" — the TypeChecker ignores it.
+
+**Contrast with binary operators:** Binary operations go through `CreateResolvedBinaryOp` → `ValidateQualifierCompatibility` (TypeChecker.Expressions.cs:448, 955), which reads `BinaryOperationMeta.Match` via `DisambiguateCandidates` and `MapQualifierBinding`, then performs explicit qualifier checks emitting PRE0070/PRE0071. The function call path has **no equivalent**.
+
+##### 6.7.10.2 Membership operator qualifier gap (lower priority)
+
+The `in` membership operator goes through `CreateSyntheticBinaryOp` (TypeChecker.Expressions.cs:453) which constructs a `TypedBinaryOp` **without** calling `ValidateQualifierCompatibility`. This means `Qty in [BoxCount1, BoxCount2]` — where `Qty` is in `'each'` and the list elements are in `'box'` — would not trigger any qualifier diagnostic.
+
+This is lower priority because:
+1. The `in` operator is a collection-contains check, not an arithmetic/comparison operation
+2. The list literal construction may independently enforce homogeneous qualifiers (needs verification)
+3. The practical impact is smaller — `in` with quantity lists is uncommon in real precept definitions
+
+**Recommendation:** Defer membership operator qualifier enforcement to a follow-up slice. Track as a known gap.
+
+##### 6.7.10.3 Chosen solution for function qualifier enforcement
+
+**Approach: Add `ValidateFunctionQualifierCompatibility` after overload selection**
+
+The fix mirrors the binary operator pattern: after `SelectOverload` returns a matched overload, validate qualifier constraints before constructing the `TypedFunctionCall`. The catalog metadata (`QualifierMatch.Same`) already declares the constraint — the enforcement just needs to read it.
+
+**Why reuse PRE0137 (not a new diagnostic code):** The semantic meaning is identical — "different counting units are not interconvertible." Whether the author writes `Qty > BoxCount` (operator) or `max(Qty, BoxCount)` (function), the error is the same: these quantities cannot be compared without a conversion factor. A single diagnostic code with a message template that names the function provides sufficient context.
+
+**Alternatively, if the function surface warrants a distinct message format:**
+
+- PRE0137 message for operators: `Cannot combine 'Qty' (each) with 'BoxCount' (box) — different counting units are not interconvertible`
+- PRE0137 message for functions: `Cannot pass 'Qty' (each) and 'BoxCount' (box) to 'max' — different counting units are not interconvertible`
+
+A single diagnostic code with two message templates (keyed by whether the site is an operator or function call) is cleaner than allocating a separate code for the same semantic error. The `DiagnosticCode` enum stays lean.
+
+**Implementation sketch:**
+
+**File: `src/Precept/Pipeline/TypeChecker.Expressions.Callables.cs`**
+
+After the overload is selected and before `TypedFunctionCall` construction (~line 660), add:
+
+```csharp
+// Qualifier compatibility check for functions with QualifierMatch.Same
+if (bestOverload.Match == QualifierMatch.Same && resolvedArgs.Length >= 2)
+{
+    ValidateFunctionQualifierCompatibility(funcMeta, bestOverload, resolvedArgs, expr.Span, ctx);
+}
+```
+
+**New method (in same file or in `TypeChecker.Expressions.cs`):**
+
+```csharp
+private static void ValidateFunctionQualifierCompatibility(
+    FunctionMeta func,
+    FunctionOverload overload,
+    ImmutableArray<TypedExpression> args,
+    SourceSpan span,
+    CheckContext ctx)
+{
+    // Collect static qualifiers from all quantity/money arguments
+    // Compare pairwise — all must have same unit code (for quantity) or currency code (for money)
+    // Emit PRE0070 for cross-currency, PRE0071 for cross-dimension, PRE0137 for cross-counting-unit
+    // Same logic as ValidateQualifierCompatibility but adapted for N-ary arguments
+    
+    // For clamp(value, lo, hi): all three args must share qualifiers
+    // For min/max(a, b): both args must share qualifiers
+    // For abs(x): single arg — QualifierMatch.Same is vacuously satisfied
+    
+    var firstQualifiers = TryGetStaticQualifiers(args[0]);
+    if (firstQualifiers is null) return; // Dynamic qualifier — defer to ProofEngine
+    
+    for (int i = 1; i < args.Length; i++)
+    {
+        var argQualifiers = TryGetStaticQualifiers(args[i]);
+        if (argQualifiers is null) continue; // Dynamic — skip
+        
+        // Reuse the same dimension/unit-code comparison logic from ValidateQualifierCompatibility
+        // but with function-specific diagnostic context (function name in message)
+        ValidateQualifierPair(func, firstQualifiers.Value, argQualifiers.Value, 
+            args[0], args[i], span, ctx);
+    }
+}
+```
+
+**Test additions for §6.7.6:**
+
+| # | Test name | Input | Expected |
+|---|-----------|-------|----------|
+| 12 | `MaxFunction_DifferentCountingUnits_EmitsCrossCountingUnit` | `max(Qty, BoxCount)` where `Qty in 'each'`, `BoxCount in 'box'` | PRE0137 |
+| 13 | `MinFunction_DifferentCountingUnits_EmitsCrossCountingUnit` | `min(Qty, BoxCount)` | PRE0137 |
+| 14 | `ClampFunction_DifferentCountingUnits_EmitsCrossCountingUnit` | `clamp(Qty, BoxLo, BoxHi)` where `Qty in 'each'`, bounds in `'box'` | PRE0137 |
+| 15 | `MaxFunction_SameCountingUnit_NoDiagnostic` | `max(Qty1, Qty2)` both in `'each'` | Clean |
+| 16 | `MinFunction_DifferentCurrencies_EmitsCrossCurrency` | `min(PriceUSD, PriceEUR)` | PRE0070 |
+| 17 | `MaxFunction_DifferentDimensions_EmitsCrossDimension` | `max(Weight, Distance)` | PRE0071 |
+| 18 | `ClampFunction_MixedDynamic_NoDiagnostic` | One arg has dynamic qualifier | Clean (deferred) |
+| 19 | `AbsFunction_SingleArg_NoDiagnostic` | `abs(Qty)` in any unit | Clean (unary) |
+| 20 | `MaxFunction_SameSIDifferentUnit_NoDiagnostic` | `max(WeightKg, WeightG)` both mass dimension | Clean (SI-convertible) |
+
+##### 6.7.10.4 Architectural principle: catalog declares, pipeline enforces
+
+This gap illustrates a general principle that must be enforced going forward:
+
+> **Every `QualifierMatch` constraint declared in any catalog entry must have a corresponding enforcement point in the pipeline.**
+
+The Functions catalog correctly declared `QualifierMatch.Same` — the metadata was right. The enforcement was simply never wired. The fix is mechanical: read the metadata that already exists. This validates the catalog-driven architecture: the catalog is the source of truth, and when enforcement gaps exist, the catalog tells you exactly what's missing.
+
+**Audit checklist for future catalog additions:**
+
+1. Does the catalog entry declare a `QualifierMatch` constraint?
+2. Does the corresponding pipeline stage read and enforce that constraint?
+3. Does a test verify that violating the constraint produces the expected diagnostic?
+
+If any answer is "no," the feature is incomplete.
+
+#### 6.7.11 Recovery guidance for authors
+
+When PRE0137 fires (whether from a binary operator or function call), the author has two recovery paths:
+
+**Recovery 1 — Explicit conversion field (recommended)**
+
+Declare a conversion factor and multiply:
+
+```precept
+precept InventoryCheck
+  field Qty as quantity in 'each' default '0 each'
+  field BoxCount as quantity in 'box' default '0 box'
+  field EachPerBox as quantity in 'each/box' positive
+
+  // ❌ PRE0137: Cannot combine 'Qty' (each) with 'BoxCount' (box)
+  // rule Qty > BoxCount because "each exceeds boxes"
+
+  // ✅ Convert BoxCount to 'each' first
+  rule Qty > BoxCount * EachPerBox because "each exceeds box capacity"
+end
+```
+
+**Recovery 2 — Normalize both fields to a common unit**
+
+If the precept can be redesigned, change both fields to the same counting unit:
+
+```precept
+precept InventoryCheck
+  field ItemCount as quantity in 'each' default '0 each'
+  field BoxItemCount as quantity in 'each' default '0 each'  // already in 'each'
+
+  // ✅ Same counting unit — comparison is meaningful
+  rule ItemCount > BoxItemCount because "item count exceeds box contents"
+end
+```
+
+**When neither recovery applies:** If the author genuinely needs to compare quantities in different counting units and the conversion factor is dynamic (changes per product, per order, etc.), the conversion factor should be a field in the precept that is set by an event. The type system enforces that the conversion exists — it cannot verify that the conversion value is correct, but it guarantees the operation is structurally sound.
+
+---
+
+### 6.8 Affine unit conversion support — temperature units
+
+**Author:** Frank (Lead Architect)
+**Date:** 2026-05-14
+**Status:** Complete design — ready for implementation
+**Trigger:** Shane's request to include temperature unit conversions (°C, °F) in Precept's normalization scope
+
+---
+
+#### 6.8.1 Scope
+
+**Included (affine conversions):**
+
+| Unit | UCUM Code | Conversion to K | Type |
+|------|-----------|-----------------|------|
+| Degree Celsius | `Cel` | `K = (°C + 273.15) × 1` | Affine: scale=1, pre-offset=273.15 |
+| Degree Fahrenheit | `[degF]` | `K = (°F + 459.67) × 5/9` | Affine: scale=5/9, pre-offset=459.67 |
+| Degree Réaumur | `[degRe]` | `K = (°Ré + 218.52) × 5/4` | Affine: scale=5/4, pre-offset=218.52 |
+| Degree Rankine | `[degR]` | `K = °R × 5/9` | **Linear** (already works — no offset) |
+
+**Excluded (logarithmic conversions) — with rationale:**
+
+| Unit | UCUM Code | Conversion | Why excluded |
+|------|-----------|------------|--------------|
+| Decibel | `dB`, `B[SPL]`, `B[V]`, etc. | `dB = 10 × log10(P/P_ref)` | Non-invertible over negatives; `log(a+b) ≠ log(a) + log(b)` breaks interval arithmetic; each dB variant uses a different reference level; scientific domain, not business entity modeling |
+| pH | `[pH]` | `pH = -log10[H+]` | Same log-based constraints; inverse relationship (higher pH = lower concentration) makes automated normalization error-prone; clinical/scientific domain |
+| Neper | `Np` | `Np = ln(A/A_ref)` | Natural-log variant; same arithmetic incompatibility |
+
+**Why logarithmic units remain excluded:**
+
+1. **Interval arithmetic is structurally incompatible.** The normalization design uses `NumericInterval` for static analysis — interval containment, union, intersection. These operations assume additive/multiplicative structure: `[a, b] × c = [a×c, b×c]`. Logarithmic conversions violate this: `log([a, b])` is only defined when both bounds are positive, and `log(a + b) ≠ log(a) + log(b)`. Supporting log-scale intervals would require a fundamentally different interval representation.
+
+2. **Domain mismatch.** Precept governs business entities — orders, products, shipments, inventory. Temperature appears in cold-chain logistics, HVAC, and food safety (real business use cases). dB and pH appear in scientific instruments and clinical assays — not in the business-entity lifecycle workflows that Precept targets.
+
+3. **Reference-level ambiguity.** dB is not one unit — it's a family: `dB[SPL]` (sound pressure, ref=20 μPa), `dB[V]` (voltage, ref=1 V), `dB[W]` (power, ref=1 W). Cross-variant comparison (`dB[SPL]` vs `dB[V]`) is physically meaningless. Even within one variant, the reference level is domain-context, not something the type system can safely normalize.
+
+**Treatment of excluded units:** `TryGetStaticConversionFactor` returns `null` for logarithmic units. Fields declared in dB or pH store raw magnitudes with no normalization. Cross-unit comparison between dB and another unit is blocked by the dimension check (logarithmic units have distinct dimension vectors). This is the same behavior as today — explicitly documented rather than implicitly dropped.
+
+---
+
+#### 6.8.2 Current limitation — why linear-only is insufficient
+
+The current normalization design represents conversions as a single `decimal` scaling factor. The pipeline:
+
+1. `UcumParsedUnit.Scale` → `UcumExactFactor` (rational: `BigInteger` num/denom + base-10 exponent)
+2. `TryGetStaticScalingFactor` → converts to `decimal`
+3. `rawInterval.Scale(factor)` → multiplies both interval bounds
+
+This works for all linear units: `value_base = value_declared × scale`. For affine units, the conversion is: `value_base = (value_declared + offset) × scale`. The single-factor model cannot represent the offset term.
+
+**Current behavior for temperature:** The `UcumAtomCatalog` loader encounters `isSpecial="yes"` atoms with `<function>` elements in `ucum-essence.xml`. The `GetDefinitionExpression` method extracts the function's inner `value` and `Unit` attributes, then calls `StripFunctionWrapper` which removes the function-name wrapper. For Celsius: `cel(1 K)` → stripped to `1 K` → evaluated as scale=1, dimension=Θ (temperature). For Fahrenheit: `degf(5 K/9)` → stripped to `5 K/9` → evaluated as scale=5/9, dimension=Θ.
+
+**What's lost:** The function name (`Cel`, `degF`, `degRe`) encodes the offset. By stripping the function wrapper and evaluating only the inner expression, the catalog captures the scale factor correctly but **discards the offset entirely**. The resulting `UcumAtom` for Celsius has `Scale = UcumExactFactor.One` and `Vector = DimensionVector.Temperature` — indistinguishable from Kelvin except by code.
+
+**Consequence:** `'20 Cel'` normalizes to `20 × 1 = 20` instead of the correct `(20 + 273.15) × 1 = 293.15 K`. All temperature-range comparisons involving °C or °F produce incorrect normalized magnitudes.
+
+---
+
+#### 6.8.3 Chosen approach — catalog extension with affine offset
+
+**Decision: Extend `UcumAtom` with an optional affine pre-offset.**
+
+The conversion model becomes: `base_value = (declared_value + pre_offset) × scale`
+
+Where `pre_offset = 0` for all linear units (existing behavior) and `pre_offset ≠ 0` for affine temperature units.
+
+This approach was chosen over alternatives:
+
+| Option | Description | Verdict |
+|--------|-------------|---------|
+| **A: Change `TryGetStaticScalingFactor` return type to `(decimal, decimal)`** | Minimal code change. Callers get `(scale, offset)`. | Rejected: puts conversion parameters in imperative code rather than catalog metadata. Violates single-source-of-truth. |
+| **B: Add separate `TryGetAffineConversionFactor` method** | Keep linear path, add new method for affine. | Rejected: creates two parallel methods doing similar things. Consumers must know which to call. Inconsistent with catalog-driven design. |
+| **C: Extend catalog entries with offset metadata** | `UcumAtom` gains offset field. All conversion parameters live in the catalog. Consumers read one unified shape. | **Selected.** Metadata-driven. Consistent with Precept's architectural identity. The catalog is the source of truth for unit conversion parameters. |
+
+**Why C is correct for Precept's architecture:**
+
+The catalog-system.md § Architectural Identity test asks: "Is this part of a complete description of Precept?" The offset term IS part of the unit's definition — it's intrinsic to what `Cel` means. Encoding it in the catalog entry rather than in consumer dispatch logic follows the same principle that puts type metadata, operator metadata, and construct metadata in catalogs rather than in pipeline switches.
+
+---
+
+#### 6.8.4 Catalog change — exact shape
+
+**`UcumAtom` record extension:**
+
+```csharp
+// Current:
+public sealed record UcumAtom(
+    string Code,
+    string Name,
+    DimensionVector Vector,
+    UcumExactFactor Scale,
+    bool Prefixable,
+    string? AnnotationClass,
+    string? PrintSymbol = null);
+
+// Extended:
+public sealed record UcumAtom(
+    string Code,
+    string Name,
+    DimensionVector Vector,
+    UcumExactFactor Scale,
+    bool Prefixable,
+    string? AnnotationClass,
+    string? PrintSymbol = null,
+    decimal? AffineOffset = null);  // pre-scale offset for affine units; null = linear
+```
+
+`AffineOffset` is `decimal?` rather than `UcumExactFactor?` because:
+1. The offset is only used when multiplied with `decimal` magnitudes — it never participates in rational factor composition (`Multiply`, `Divide`, `Pow`).
+2. All three UCUM temperature offsets (273.15, 459.67, 218.52) are exactly representable in `decimal`.
+3. Adding a `UcumExactFactor` offset would imply it composes algebraically with scale — it does not.
+
+**`UcumParsedUnit` record extension:**
+
+```csharp
+// Current:
+public sealed record UcumParsedUnit(
+    string SourceText,
+    string CanonicalCode,
+    DimensionVector Vector,
+    UcumExactFactor Scale,
+    string? PreferredDimensionAlias,
+    IReadOnlyList<UcumAtom> UsedAtoms,
+    IReadOnlyList<string> Annotations);
+
+// Extended:
+public sealed record UcumParsedUnit(
+    string SourceText,
+    string CanonicalCode,
+    DimensionVector Vector,
+    UcumExactFactor Scale,
+    string? PreferredDimensionAlias,
+    IReadOnlyList<UcumAtom> UsedAtoms,
+    IReadOnlyList<string> Annotations,
+    decimal? AffineOffset = null);  // propagated from single-atom affine units; null for compound/linear
+```
+
+**Propagation rule:** `AffineOffset` is set on `UcumParsedUnit` **only** when the parsed expression resolves to a single atom that has a non-null `AffineOffset`. For compound expressions (e.g., `Cel/min`, `Cel.m`), `AffineOffset` is `null` — compound uses treat the temperature as a difference (ΔT), not an absolute reading. This is UCUM-correct: `°C/min` is a rate of change measured in Kelvin-per-minute (scale only, no offset).
+
+**UCUM function-name-to-offset lookup:**
+
+```csharp
+// In UcumAtomCatalog, during GetDefinitionExpression when a <function> element is found:
+private static readonly FrozenDictionary<string, decimal> AffineOffsets =
+    new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Cel"]   = 273.15m,   // °C → K: K = (°C + 273.15) × scale
+        ["degF"]  = 459.67m,   // °F → K: K = (°F + 459.67) × scale
+        ["degRe"] = 218.52m,   // °Ré → K: K = (°Ré + 218.52) × scale
+    }.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
+```
+
+These three offsets are the complete set of UCUM-defined affine temperature functions. All other `isSpecial` functions in `ucum-essence.xml` are logarithmic (pH, dB, Np variants) and are excluded from normalization per §6.8.1.
+
+**Precision verification:** `273.15m`, `459.67m`, and `218.52m` are all exact in `decimal` representation. `218.52m = 273.15m × 4m / 5m`, which is exact. No precision loss occurs. The `decimal` type has 28-29 significant digits; these offsets use 5 significant digits. The final normalized value `(magnitude + offset) × scale` stays within `decimal` precision for any realistic temperature magnitude in Precept's business domain.
+
+**Updated `UcumAtomCatalog` loading path:**
+
+```csharp
+// In GetDefinitionExpression, when functionElement is not null:
+var functionElement = valueElement.Elements()
+    .FirstOrDefault(child => child.Name.LocalName == "function");
+if (functionElement is not null)
+{
+    var functionName = functionElement.Attribute("name")?.Value;
+    var factorText = functionElement.Attribute("value")?.Value ?? "1";
+    var unitText = functionElement.Attribute("Unit")?.Value
+                   ?? valueElement.Attribute("Unit")?.Value
+                   ?? "1";
+    var expression = CombineFactorAndUnit(factorText, unitText);
+
+    // If this function has a known affine offset, store it on the atom.
+    // Logarithmic functions (pH, dB, etc.) are NOT in AffineOffsets —
+    // they fall through with offset = null, same as linear units.
+    if (functionName is not null && AffineOffsets.TryGetValue(functionName, out var offset))
+    {
+        // Return expression + offset via a new return shape
+        // (see CreatePendingAtom changes below)
+    }
+
+    return expression; // existing linear path for unrecognized functions
+}
+```
+
+The `PendingAtom` record and `Load()` resolution loop must propagate the offset from `GetDefinitionExpression` through to the final `UcumAtom` constructor call (line 243–250). This is a mechanical wiring change — the pending atom gains an optional `decimal? AffineOffset` field, and the `new UcumAtom(...)` call at resolution time passes it through.
+
+---
+
+#### 6.8.5 Code change — normalization pipeline
+
+**Renamed method: `TryGetStaticScalingFactor` → `TryGetStaticConversionFactor`**
+
+The return type changes from `decimal?` to a new `AffineConversion?` struct:
+
+```csharp
+/// <summary>
+/// Represents a unit conversion: base_value = (declared_value + PreOffset) × Scale.
+/// For linear units, PreOffset = 0. For affine (temperature) units, PreOffset ≠ 0.
+/// </summary>
+public readonly record struct AffineConversion(decimal Scale, decimal PreOffset);
+
+private static AffineConversion? TryGetStaticConversionFactor(TypedExpression expr) => expr switch
+{
+    TypedTypedConstant { ParsedValue: ValueTuple<decimal, UcumParsedUnit?>(_, { } unit) }
+        => new AffineConversion(ApplyFactor(1m, unit.Scale), unit.AffineOffset ?? 0m),
+    TypedTypedConstant { ParsedValue: ValueTuple<decimal, object?, UcumParsedUnit?>(_, _, { } denomUnit) }
+        => new AffineConversion(ApplyFactor(1m, denomUnit.Scale.Inverse()), 0m),
+        // Price denominator: affine offset never applies (you can't have "price per °C")
+    InterpolatedTypedConstant { StaticUnit: { } unit, Slots: [{ SlotKind: Magnitude }] }
+        => new AffineConversion(ApplyFactor(1m, unit.Scale), unit.AffineOffset ?? 0m),
+    InterpolatedTypedConstant { StaticUnit: { } unit, Slots: [{ SlotKind: DenominatorUnit or NumeratorUnit }] }
+        => null,
+    _ => null
+};
+```
+
+**Updated `IntervalOf` method:**
+
+```csharp
+private static NumericInterval IntervalOf(TypedExpression expr, SemanticIndex semantics)
+{
+    var rawInterval = IntervalOfNarrowed(expr, semantics, null);
+    if (rawInterval.IsUnbounded) return rawInterval;
+
+    var conversion = TryGetStaticConversionFactor(expr);
+    if (conversion is not null)
+    {
+        var c = conversion.Value;
+        if (c.PreOffset != 0m)
+            rawInterval = rawInterval.Shift(c.PreOffset);  // (x + offset)
+        return rawInterval.Scale(c.Scale);                  // × scale
+    }
+
+    return rawInterval;
+}
+```
+
+**New `NumericInterval.Shift` method:**
+
+```csharp
+/// <summary>
+/// Returns a new interval with both bounds shifted by the given offset.
+/// Used for affine unit conversions: base = (declared + offset) × scale.
+/// </summary>
+public NumericInterval Shift(decimal offset)
+{
+    if (IsUnbounded) return this;
+    return new NumericInterval(
+        Min.HasValue ? Min.Value + offset : null,
+        Max.HasValue ? Max.Value + offset : null);
+}
+```
+
+**Property:** Affine transformations preserve ordering. If `a < b` and `scale > 0`, then `(a + offset) × scale < (b + offset) × scale`. All UCUM temperature scales have `scale > 0`. Interval containment is preserved under affine transformation.
+
+**Updated `TypedConstantNormalizer.NormalizeQuantity`:**
+
+```csharp
+public static decimal? NormalizeQuantity(decimal magnitude, UcumParsedUnit? unit)
+{
+    if (unit is null)
+        return magnitude;
+
+    var shifted = magnitude + (unit.AffineOffset ?? 0m);
+    return ApplyFactor(shifted, unit.Scale);
+}
+```
+
+This is the same normalization applied in both the TypeChecker (for `NormalizedDeclaredMin/Max`) and the ProofEngine (for typed-constant interval extraction). Both paths use the same formula: `(magnitude + offset) × scale`.
+
+**Denormalize (inverse):**
+
+```csharp
+public static decimal? DenormalizeQuantity(decimal normalizedMagnitude, UcumParsedUnit? unit)
+{
+    if (unit is null)
+        return normalizedMagnitude;
+
+    var unscaled = ApplyFactor(normalizedMagnitude, unit.Scale.Inverse());
+    return unscaled - (unit.AffineOffset ?? 0m);
+}
+```
+
+Used by diagnostic display (§7 Q1) to convert normalized bounds back to the field's declared unit.
+
+---
+
+#### 6.8.6 Interaction with qualifier comparison (frank-12's work)
+
+**frank-12's problem domain:** Cross-counting-unit comparisons (`each > box`) incorrectly passing the TypeChecker because both map to `DimensionVector.None` / dimension `"count"`.
+
+**Temperature comparison scenario:** If `TempC as quantity in 'Cel'` and `TempK as quantity in 'K'`:
+
+| Operation | Dimension check | Unit code check | Correct behavior |
+|-----------|----------------|-----------------|------------------|
+| `TempC > TempK` | Both temperature (Θ) — pass | `Cel ≠ K` — but both are SI temperature, not counting units | **Allowed. Normalization handles it.** |
+| `TempC > TempF` | Both temperature (Θ) — pass | `Cel ≠ [degF]` — but both are SI temperature | **Allowed. Normalization handles it.** |
+| `TempC + TempK` | Both temperature (Θ) — pass | Same as above | **Allowed. Addition in normalized base units is physically meaningful** (though semantically questionable — adding absolute temperatures is unusual). |
+
+**Why temperature is different from counting units:**
+
+The key distinction is that temperature units (°C, °F, K, °R, °Ré) all have **deterministic, catalog-encoded conversion factors** to a single base unit (K). The conversion is context-free — `20 °C = 293.15 K` regardless of the business domain. Counting units (`each`, `box`, `case`) have **no universal conversion** — `1 box = ? each` depends on the product being counted. This is why frank-12's PRE0137 fires for counting units but not for SI temperature units: the "same dimension" check is sufficient for SI units because normalization provides the reconciliation that counting units lack.
+
+**Cross-temperature comparison execution:**
+
+When the ProofEngine evaluates `TempC > TempK`:
+1. `IntervalOf(TempC_expr)` returns the TempC expression's interval in °C → `TryGetStaticConversionFactor` returns `AffineConversion(scale=1, preOffset=273.15)` → interval shifted and scaled to K.
+2. `IntervalOf(TempK_expr)` returns the TempK expression's interval in K → `TryGetStaticConversionFactor` returns `AffineConversion(scale=1, preOffset=0)` → interval unchanged (already in K).
+3. Comparison is in homogeneous K units. Correct.
+
+**No change to frank-12's design.** The counting-unit qualifier gap (PRE0137) operates on a different axis — it checks `DimensionVector.None` / dimension `"count"` units for per-unit-code identity. Temperature units have `DimensionVector.Temperature`, not `DimensionVector.None`, so PRE0137 never fires for them. The two designs are orthogonal and compatible.
+
+---
+
+#### 6.8.7 Test strategy
+
+**Core normalization tests (extend existing `TypedConstantNormalizerTests`):**
+
+| # | Test name | Input | Expected |
+|---|-----------|-------|----------|
+| 1 | `NormalizeQuantity_Celsius_AppliesAffineOffset` | `magnitude=20, unit=Cel` | `(20 + 273.15) × 1 = 293.15` |
+| 2 | `NormalizeQuantity_Fahrenheit_AppliesAffineScaleAndOffset` | `magnitude=68, unit=[degF]` | `(68 + 459.67) × 5/9 = 293.15` |
+| 3 | `NormalizeQuantity_Reaumur_AppliesAffineScaleAndOffset` | `magnitude=16, unit=[degRe]` | `(16 + 218.52) × 5/4 = 293.15` |
+| 4 | `NormalizeQuantity_Rankine_LinearOnly` | `magnitude=527.67, unit=[degR]` | `527.67 × 5/9 = 293.15` |
+| 5 | `NormalizeQuantity_Kelvin_IdentityScale` | `magnitude=293.15, unit=K` | `293.15` |
+| 6 | `NormalizeQuantity_CelsiusNegative_CorrectOffset` | `magnitude=-40, unit=Cel` | `(-40 + 273.15) × 1 = 233.15` |
+| 7 | `NormalizeQuantity_FahrenheitNegative_CorrectOffset` | `magnitude=-40, unit=[degF]` | `(-40 + 459.67) × 5/9 = 233.15` |
+| 8 | `DenormalizeQuantity_Celsius_Roundtrip` | normalize 20°C → denormalize → 20 | Exact roundtrip |
+| 9 | `DenormalizeQuantity_Fahrenheit_Roundtrip` | normalize 68°F → denormalize → 68 | Exact roundtrip |
+
+**Cross-temperature-unit bound comparison tests (ProofEngine integration):**
+
+| # | Test name | Input | Expected |
+|---|-----------|-------|----------|
+| 10 | `QuantityField_CelsiusBound_FahrenheitAssignment_CorrectComparison` | `max '100 Cel'`, assign `'212 [degF]'` | No overflow (both = 373.15 K) |
+| 11 | `QuantityField_CelsiusBound_FahrenheitAssignment_Overflow` | `max '100 Cel'`, assign `'213 [degF]'` | PRE0078 (213°F = 373.71 K > 373.15 K) |
+| 12 | `QuantityField_KelvinBound_CelsiusAssignment_CorrectNormalization` | `max '373.15 K'`, assign `'100 Cel'` | No overflow |
+| 13 | `QuantityField_CelsiusBound_CelsiusAssignment_AffineApplied` | `max '100 Cel'`, assign `'99 Cel'` | No overflow |
+
+**Interval shift tests (NumericInterval):**
+
+| # | Test name | Input | Expected |
+|---|-----------|-------|----------|
+| 14 | `Shift_PositiveOffset_BothBoundsShifted` | `[10, 20].Shift(273.15)` | `[283.15, 293.15]` |
+| 15 | `Shift_NegativeValues_Shifted` | `[-40, 100].Shift(273.15)` | `[233.15, 373.15]` |
+| 16 | `Shift_Unbounded_ReturnsUnbounded` | `Unbounded.Shift(273.15)` | `Unbounded` |
+| 17 | `Shift_ZeroOffset_IdentityBehavior` | `[10, 20].Shift(0)` | `[10, 20]` |
+
+**Catalog/parsing tests:**
+
+| # | Test name | Input | Expected |
+|---|-----------|-------|----------|
+| 18 | `UcumAtom_Celsius_HasAffineOffset` | `UcumAtomCatalog.All["Cel"]` | `AffineOffset = 273.15m` |
+| 19 | `UcumAtom_Fahrenheit_HasAffineOffset` | `UcumAtomCatalog.All["[degF]"]` | `AffineOffset = 459.67m` |
+| 20 | `UcumAtom_Kelvin_NoAffineOffset` | `UcumAtomCatalog.All["K"]` | `AffineOffset = null` |
+| 21 | `UcumParsedUnit_CelCompound_NoAffineOffset` | parse `"Cel/min"` | `AffineOffset = null` (compound — offset suppressed) |
+| 22 | `UcumParsedUnit_CelStandalone_HasAffineOffset` | parse `"Cel"` | `AffineOffset = 273.15m` |
+| 23 | `UcumAtom_dB_NoAffineOffset` | `UcumAtomCatalog.All["dB"]` | `AffineOffset = null` (logarithmic — excluded) |
+| 24 | `UcumAtom_pH_NoAffineOffset` | `UcumAtomCatalog.All["[pH]"]` | `AffineOffset = null` (logarithmic — excluded) |
+
+---
+
+#### 6.8.8 No regressions — what must NOT break
+
+| Scenario | Expected behavior | Why it's safe |
+|----------|-------------------|---------------|
+| All existing linear unit conversions (`kg → g`, `[lb_av] → g`, `[ft_i] → m`, etc.) | Unchanged | `AffineOffset = null` → `Shift(0)` is identity → same as current `Scale(factor)` path |
+| Kelvin quantity fields | No change in normalization | K has `Scale = One`, `AffineOffset = null` → identity |
+| Rankine quantity fields | No change in normalization | `[degR]` has `Scale = 5/9`, `AffineOffset = null` → pure linear (already correct) |
+| Price denominator normalization | Unchanged | Price path always uses `AffineOffset = 0` (you can't have "price per °C") |
+| Money normalization | Unchanged | Money has no UCUM unit — not affected |
+| Compound temperature expressions (`Cel/min`) | Linear-only (no offset) | `UcumParsedUnit.AffineOffset = null` for compound units |
+| `samples/Test.precept` and all other samples | Compile clean | No sample uses temperature units currently |
+| MCP `precept_compile` output | Unchanged for non-temperature units | Offset is only applied when `AffineOffset != null` |
+
+---
+
+#### 6.8.9 Implementation slices
+
+This work is additive to the existing slice plan. It can be implemented as a single vertical slice or split into two:
+
+**Slice 28: Affine offset in UCUM catalog and parsing**
+
+- Add `AffineOffset` to `UcumAtom` record (default `null`)
+- Add `AffineOffsets` lookup in `UcumAtomCatalog`
+- Propagate offset from `GetDefinitionExpression` → `PendingAtom` → `UcumAtom`
+- Add `AffineOffset` to `UcumParsedUnit` record (default `null`)
+- Update `UcumParser` to propagate `AffineOffset` for single-atom expressions only
+- Tests: 18–24 from §6.8.7
+- Files: `UcumAtom.cs`, `UcumAtomCatalog.cs`, `UcumParsedUnit.cs`, `UcumParser.cs`
+
+**Slice 29: Affine normalization in TypeChecker and ProofEngine**
+
+- Add `AffineConversion` record struct
+- Rename `TryGetStaticScalingFactor` → `TryGetStaticConversionFactor`, return `AffineConversion?`
+- Update `IntervalOf` to call `Shift` + `Scale`
+- Add `NumericInterval.Shift(decimal)` method
+- Update `TypedConstantNormalizer.NormalizeQuantity` and add `DenormalizeQuantity`
+- Update all call sites (TypeChecker bound extraction, ProofEngine interval extraction)
+- Tests: 1–17 from §6.8.7
+- Dependencies: Slice 28 (catalog must carry offsets before normalization can use them)
+- Files: `TypedConstantNormalizer.cs`, `ProofEngine.Intervals.cs`, `ProofEngine.Composition.cs`, `TypeChecker.Validation.Modifiers.cs`, `NumericInterval.cs`
+
 ---
 
 ## 7. Open Questions for Shane
 
 ### Q1: Diagnostic display — original vs. normalized magnitudes — **LOCKED 2026-05-14**
+
+> **STATUS: LOCKED.** Shane confirmed Option A this session (2026-05-14). This also resolves B18 — the display specification is no longer deferred.
 
 > **STATUS: LOCKED.** Shane confirmed Option A this session (2026-05-14). This also resolves B18 — the display specification is no longer deferred.
 
@@ -2656,6 +3555,14 @@ None of these conditions are design-blocking — they are specification gaps tha
 
 These slices extend the normalization design to cover interpolated typed constants beyond the core quantity case (Slices 19–21). They are **Phase 2 extended scope** — not blocking conditions for the core normalization fix, but required before any claim of exhaustive interpolated-typed-constant coverage.
 
+| Slice | Objective | Depends On | Status |
+|-------|-----------|------------|--------|
+| **22** | Capture `StaticQualifier` on `TypedInterpolatedTypedConstant` | None | ⬜ |
+| **23** | Route `StaticQualifier` through qualifier consumers | Slice 22 | ⬜ |
+| **24** | Extend interpolated interval extraction to money/price | Slices 19, 22 | ⬜ |
+| **25** | Field-default proof coverage for interpolated typed constants | Slices 19, 22, 23 | ⬜ |
+| **26** | Event arg default resolution (typed-constant defaults) | Slices 25, 15b | ⬜ |
+
 ---
 
 **Slice 22: Capture static interpolated qualifier metadata**
@@ -2771,3 +3678,190 @@ These slices extend the normalization design to cover interpolated typed constan
 - **Ordering:** Slice 26 comes after Slice 25 (needs the proof path) and after Slice 27 (doc sync). Final position: last implementation slice before Phase 3 deferred work.
 
 - **Key risk:** The `ValidateMaxPlaces` helper currently takes `TypedField`. Extract the common parameters (`DeclaredMin`, `DeclaredMax`, `ResolvedType`, `DeclaredQualifiers`, `Name`) into a new overload — do NOT introduce a shared interface type. Call the overload from both the `TypedField` and `TypedArg` sites. This is a small adapter (~10 lines), not a broad refactor.
+
+## §5.7 — Formal Implementation Slices — Slices 30–43
+
+**Author:** Frank (Lead Architect)
+**Date:** 2026-05-14T22:48:46.544-04:00
+**Source:** Shane's pending-todo formalization request, grounded in §6.7 and §6.8.
+
+The next available slice number is **30**. Slice 27 is already reserved for doc sync, and §6.8.9 already reserved Slices 28–29 as coarse affine placeholders. The slices below are the execution-ready breakdown for the 14 remaining todos. In the affine lane, Slices 34–37 supersede the coarse 28–29 split without renumbering the reserved slots.
+
+**Dependency lanes locked:**
+- Slices 30 and 32 may proceed in parallel.
+- Slice 31 is code-independent but should land after the Slice 30 / Slice 32 qualifier-policy lock so PRE0137 stays aligned across operators and functions.
+- Slice 33 rides the synthetic `contains` binary-op path (`ResolveBinaryOp` → `TryResolveCatalogBinaryWithoutOperation` → `CreateSyntheticBinaryOp`) and should land after or alongside Slice 32 once the shared qualifier policy is locked.
+- Affine lane is strictly ordered: 34 → 35 → 36 → 37.
+- Documentation slices 38–42 are standalone and may run in parallel.
+- Slice 43 is a standalone mechanical rename.
+
+| Slice | Objective | Lane | Status |
+|-------|-----------|------|--------|
+| **30** | Extend PRE0070/PRE0071 to comparison operators | Gap A | ⬜ |
+| **31** | PRE0137 `CrossCountingUnitOperation` | Gap B | ⬜ |
+| **32** | `QualifierMatch.Same` in `SelectOverload` | Gap C | ⬜ |
+| **33** | Qualifier checks on `contains` membership ops | Gap D | ⬜ |
+| **34** | Affine UCUM catalog extension | Affine | ⬜ |
+| **35** | Affine scalar normalization `(value + offset) × scale` | Affine | ⬜ |
+| **36** | Affine interval shifting (`NumericInterval.Shift`) | Affine | ⬜ |
+| **37** | Full affine 24-test matrix | Affine | ⬜ |
+| **38** | Doc: temperature scope correction | Doc | ⬜ |
+| **39** | Doc: exact-conversion-factor assumption | Doc | ⬜ |
+| **40** | Doc: business units factor/dimension | Doc | ⬜ |
+| **41** | Doc: dozen/gross exclusion | Doc | ⬜ |
+| **42** | Doc: each.dimension behavior | Doc | ⬜ |
+| **43** | Rename `TypedInterpolatedTypedConstant` | Standalone | ⬜ |
+
+---
+
+**Slice 30: Extend PRE0070/PRE0071 to comparison operators**
+
+- **Objective:** Close Gap A by extending `ValidateQualifierCompatibility` so comparison/equality operators enforce the same cross-currency and cross-dimension rules already applied to arithmetic.
+- **Files:** `src/Precept/Pipeline/TypeChecker.Expressions.cs` (`ValidateQualifierCompatibility`, comparison-family gate in the PRE0070 / PRE0071 blocks); `test/Precept.Tests/TypeChecker/TypeCheckerCurrencyUnitTests.cs`.
+- **Approach:** Change the operator-family guard from `OperatorFamily.Arithmetic` to `OperatorFamily.Arithmetic or OperatorFamily.Comparison` for the money and quantity qualifier checks only. Leave the divide-only PRE0072–PRE0074 logic untouched.
+- **Tests:** Implement §6.7.6 tests 8–11 — cross-currency comparison emits PRE0070, cross-dimension comparison emits PRE0071, same-currency comparison stays clean, same-dimension SI comparison (`kg` vs `g`) stays clean.
+- **Dependencies:** None. May run in parallel with Slice 32.
+- **Regression anchors:** `USD + EUR` / `kg + m` behavior remains unchanged; `kg > g` and `Cel > K` must stay allowed because they are same-dimension physically convertible units, not count-dimension mismatches.
+
+---
+
+**Slice 31: Add PRE0137 `CrossCountingUnitOperation`**
+
+- **Objective:** Close Gap B by rejecting operations on static count-dimension quantities with different unit codes (`each`, `box`, `case`, `pallet`, etc.) when no compile-time conversion exists.
+- **Files:** `src/Precept/Pipeline/TypeChecker.Expressions.cs` (`ValidateQualifierCompatibility`, new `GetUnitCodeFromQualifiers` helper); `src/Precept/Language/DiagnosticCode.cs`; `src/Precept/Language/Diagnostics.cs`; `test/Precept.Tests/TypeChecker/TypeCheckerCurrencyUnitTests.cs`.
+- **Approach:** After PRE0071's dimension check, add the PRE0137 block described in §6.7.3/§6.7.4. Fire only when both operands are quantities, both dimensions resolve to `count`, both unit codes are statically known, and the unit codes differ. Reuse PRE0137 for arithmetic and comparison operators.
+- **Tests:** Implement §6.7.6 tests 1–7 — comparison, arithmetic, and equality errors for mixed counting units; same-unit `each`/`each` clean; packaging-unit variants (`box` vs `pallet`) error; dynamic qualifiers remain deferred.
+- **Dependencies:** No code dependency, but sequence after Slice 30 / Slice 32 policy lock so the PRE0137 rule and wording stay aligned across operator and function surfaces.
+- **Regression anchors:** `kg > g`, `kg + [lb_av]`, and `max(temp_c, temp_k)` must remain outside PRE0137; only `DimensionVector.None` / `count` mismatches with different static unit codes should trip the diagnostic.
+
+---
+
+**Slice 32: Enforce `QualifierMatch.Same` in function overload resolution**
+
+- **Objective:** Close Gap C by wiring `SelectOverload` to read `FunctionOverload.Match` and enforce the already-declared `QualifierMatch.Same` metadata for `min`, `max`, `clamp`, and `abs` quantity/money overloads.
+- **Files:** `src/Precept/Pipeline/TypeChecker.Expressions.Callables.cs` (`ResolveFunctionCall`, `SelectOverload`, new `ValidateFunctionQualifierCompatibility` helper); `src/Precept/Language/Functions.cs` (verification only — metadata already exists, no shape change expected); `test/Precept.Tests/TypeChecker/TypeCheckerFunctionTests.cs`; `test/Precept.Tests/TypeChecker/TypeCheckerCurrencyUnitTests.cs` if shared diagnostic helpers make that cleaner.
+- **Approach:** In `SelectOverload`, enforce `QualifierMatch.Same` on both successful selection paths before constructing `TypedFunctionCall` — the direct `bestOverload` return and the `TryContextRetryOverload` retry return. Compare the resolved arguments pairwise using the same currency/dimension/count-unit rules as binary operators: PRE0070 for currencies, PRE0071 for cross-dimension quantities, PRE0137 for cross-counting-unit quantities. Treat unary `abs` as vacuously satisfied.
+- **Tests:** Implement §6.7.10.3 tests 12–20 — `max`/`min`/`clamp` mixed counting units emit PRE0137, mixed currencies emit PRE0070, mixed dimensions emit PRE0071, `abs(qty)` stays clean, same-dimension SI units stay clean, dynamic-qualifier cases remain deferred.
+- **Dependencies:** None. May run in parallel with Slice 30.
+- **Regression anchors:** Existing overload selection on arity/type must remain intact; `max(weightKg, weightG)` and `max(temp_c, temp_k)` stay valid because the qualifiers are physically reconcilable; no new diagnostic on unary `abs`.
+
+---
+
+**Slice 33: Enforce qualifier checks on `contains` synthetic membership ops**
+
+- **Objective:** Close Gap D by ensuring `contains` membership comparisons no longer bypass qualifier validation.
+- **Files:** `src/Precept/Pipeline/TypeChecker.Expressions.cs` (`ResolveBinaryOp`, `TryResolveCatalogBinaryWithoutOperation`, `CreateSyntheticBinaryOp`, or a dedicated membership-validator helper on that path); shared qualifier helper extracted in Slice 32 if adopted; `test/Precept.Tests/TypeChecker/OperatorTypingTests.cs` (existing `contains` regression anchor); `test/Precept.Tests/TypeChecker/TypeCheckerCurrencyUnitTests.cs`; `test/Precept.Tests/TypeChecker/TypeCheckerTypedConstantTests.cs` if additional literal-collection coverage fits better there.
+- **Approach:** Route `OperationKind.CollectionContains` through the same static qualifier-pair validation seam used by binary operators / functions. In the current checker this means wiring the synthetic membership path created by `ResolveBinaryOp` → `TryResolveCatalogBinaryWithoutOperation` → `CreateSyntheticBinaryOp`. Do not weaken existing collection-element type checks; add qualifier validation on top.
+- **Tests:** Add `contains` cases covering `QtyEachSet contains QtyEach` (clean), `QtyBoxSet contains QtyEach` (PRE0137), `DistanceSet contains WeightKg` (PRE0071), and dynamic-qualifier collection cases that remain deferred.
+- **Dependencies:** Slice 32 preferred / shared-seam path. Can land immediately after or alongside it.
+- **Regression anchors:** `OperatorTypingTests.cs` `contains` coverage, membership typing, and collection homogeneity behavior must remain unchanged; this slice only adds missing qualifier enforcement.
+
+---
+
+**Slice 34: Affine catalog extension and UCUM wrapper preservation**
+
+- **Objective:** Add affine temperature metadata to the UCUM catalog and stop erasing the offset encoded in UCUM function wrappers.
+- **Files:** `src/Precept/Language/Ucum/UcumAtom.cs`; `src/Precept/Language/Ucum/UcumParsedUnit.cs`; `src/Precept/Language/Ucum/UcumAtomCatalog.cs` (`CreatePendingAtom`, `GetDefinitionExpression`, `StripFunctionWrapper`, `PendingAtom`); `src/Precept/Language/Ucum/UcumParser.cs`; `test/Precept.Tests/Language/Ucum/UcumAtomCatalogTests.cs`; `test/Precept.Tests/Language/Ucum/UcumParserTests.cs`.
+- **Approach:** Add `decimal? AffineOffset` to `UcumAtom` and `UcumParsedUnit`; carry the offset through the pending-atom load path; replace/fix `StripFunctionWrapper` so the function name (`Cel`, `degF`, `degRe`) is preserved long enough to attach the correct offset; propagate offsets only for single-atom parsed units.
+- **Tests:** Implement §6.8.7 tests 18–24 — `Cel` / `[degF]` atoms carry offsets, `K` does not, standalone `Cel` propagates the offset, compound `Cel/min` suppresses it, `dB` and `[pH]` remain offset-free.
+- **Dependencies:** None. First slice in the affine lane.
+- **Regression anchors:** Linear units keep `AffineOffset = null`; `K` and `[degR]` remain linear; compound-unit parsing stays legal; logarithmic units remain explicitly excluded rather than silently treated as affine.
+
+---
+
+**Slice 35: Update scalar normalization to `(value + offset) × scale`**
+
+- **Objective:** Teach the normalizer and scalar extraction paths to use affine conversion parameters with exact `decimal` arithmetic.
+- **Files:** `src/Precept/Language/Numeric/TypedConstantNormalizer.cs` (introduced in Slice 14 if still absent; update `NormalizeQuantity`, add/confirm `DenormalizeQuantity`); `src/Precept/Pipeline/TypeChecker.Validation.Modifiers.cs` (`TryGetComparableTypedConstantValue` call path); introduce the shared affine conversion helper from §6.8.5 in the proof-time normalization seam (`src/Precept/Pipeline/ProofEngine.Intervals.cs`, then reuse it from `ProofEngine.Composition.cs` if needed) rather than treating affine support as a rename of any pre-existing helper.
+- **Approach:** Apply the affine formula exactly as designed in §6.8.5: `base = (declared + offset) × scale`. Keep offsets in `decimal`, not binary floating point. This slice introduces the shared affine conversion helper and threads it through scalar normalization call sites only; it should not yet widen interval algebra.
+- **Tests:** Implement §6.8.7 tests 1–9 — Celsius/Fahrenheit/Réaumur affine normalization, Rankine/Kelvin linear behavior, negative-temperature cases, and exact normalize→denormalize round-trips.
+- **Dependencies:** Slice 34.
+- **Regression anchors:** The no-epsilon guarantee remains intact (`273.15m`, `459.67m`, `218.52m` are exact in `decimal`); all existing linear unit conversions must keep their current results.
+
+---
+
+**Slice 36: Add affine interval shifting to ProofEngine paths**
+
+- **Objective:** Extend interval algebra and proof-time extraction so affine quantities are normalized before interval containment comparison.
+- **Files:** `src/Precept/Language/NumericInterval.cs` (`Shift(decimal offset)`); `src/Precept/Pipeline/ProofEngine.Intervals.cs` (`IntervalOf`, typed-constant interval extraction, and the shared affine conversion helper introduced in Slice 35); `src/Precept/Pipeline/ProofEngine.Composition.cs` (`TryGetStaticNumericValue` / trusted-fact path if that helper is reused there).
+- **Approach:** Add `NumericInterval.Shift(decimal)` and update `IntervalOf` to do `Shift(preOffset)` followed by `Scale(scale)` when the Slice 35 affine conversion helper returns an affine conversion. Keep the dynamic-unit guard from §0.6 / §6.8 intact — if no static conversion exists, do not fall back to raw magnitude.
+- **Tests:** Implement §6.8.7 tests 10–17 — cross-temperature bound comparisons plus direct `NumericInterval.Shift` coverage for positive, negative, unbounded, and zero-offset cases.
+- **Dependencies:** Slice 35.
+- **Regression anchors:** Unbounded intervals stay unbounded; price denominator normalization remains offset-free; `max(temp_c, temp_k)` compares in homogeneous Kelvin space; no false proofs from dynamic-unit forms.
+
+---
+
+**Slice 37: Land the full affine 24-test matrix**
+
+- **Objective:** Close the affine lane by landing the complete 24-test matrix specified in §6.8.7 / §6.8.8 as one verification pass.
+- **Files:** `test/Precept.Tests/Language/Ucum/UcumAtomCatalogTests.cs`; `test/Precept.Tests/Language/Ucum/UcumParserTests.cs`; create/extend `test/Precept.Tests/TypedConstantNormalizerTests.cs`; `test/Precept.Tests/ProofEngineIntervalIntegrationTests.cs`; `test/Precept.Tests/ProofEngineIntervalTests.cs`.
+- **Approach:** Do not invent new behavior here; this slice is the verification closure for Slices 34–36. Ensure the matrix is implemented exactly as designed: 9 scalar-normalization cases, 4 cross-temperature proof cases, 4 interval-shift cases, and 7 catalog/parsing cases.
+- **Tests:** §6.8.7 tests 1–24 in full; `dotnet test test/Precept.Tests/Precept.Tests.csproj` as the regression sweep for this lane.
+- **Dependencies:** Slice 36.
+- **Regression anchors:** §6.8.8 is the acceptance gate — linear units unchanged, Kelvin/Rankine unchanged, price/money unchanged, compound temperature expressions remain linear-only, non-temperature samples stay clean.
+
+---
+
+**Slice 38: Documentation scope correction — temperature is in, only genuinely nonlinear units are out**
+
+- **Objective:** Update documentation so the exclusion story says what is actually true after the affine design: temperature units are in scope; the remaining exclusions are genuinely nonlinear units such as dB and pH.
+- **Files:** `docs/working/quantity-normalization-design.md` (§6.8.1 scope table and exclusion rationale); `docs/language/precept-language-spec.md` where normalization/exclusion claims are summarized.
+- **Approach:** Remove any broad wording that implies all non-linear-looking units are excluded. State the precise rule: affine units with catalog-encoded `(scale, offset)` support are in scope; logarithmic/reference-level units are out.
+- **Tests:** None (documentation-only).
+- **Dependencies:** None. May run in parallel with Slices 39–42.
+- **Regression anchors:** Documentation must stay consistent with §6.8.1's included/excluded tables and must not accidentally imply PRE0137 applies to temperature units.
+
+---
+
+**Slice 39: Document the exact-conversion-factor assumption**
+
+- **Objective:** Make the no-epsilon guarantee explicit: quantity normalization depends on exact UCUM conversion factors representable in the chosen numeric forms.
+- **Files:** `docs/working/quantity-normalization-design.md` (§4.3 Precision Characteristics, §6.8.4 precision notes, §6.8.5 scalar normalization notes); `docs/compiler/proof-engine.md` if it is the canonical home for interval-arithmetic guarantees.
+- **Approach:** State that the design assumes exact UCUM factors for the supported business-domain units, with `decimal` arithmetic used specifically to avoid binary-float rounding in normalization and interval proofs.
+- **Tests:** None (documentation-only).
+- **Dependencies:** None. Parallel-safe with Slices 38, 40, 41, and 42.
+- **Regression anchors:** The wording must match the actual implementation plan: exact arithmetic guarantee for supported units, no hidden epsilon comparison policy, and no claim that unsupported/logarithmic units participate in that guarantee.
+
+---
+
+**Slice 40: Document business-unit factor-one semantics**
+
+- **Objective:** Record the intended treatment of business counting units: `each`, `box`, `case`, `pallet`, etc. normalize with `UcumExactFactor.One` and `DimensionVector.None`.
+- **Files:** `docs/working/quantity-normalization-design.md` (§6.7 problem statement / root-cause sections, any business-unit notes in §4); `docs/language/precept-language-spec.md` qualifier/dimension discussion if it currently omits this rule.
+- **Approach:** Make clear that factor-one and dimension-none are representation choices, not conversion laws. The shared `count` dimension explains why PRE0071 alone is insufficient and why PRE0137 is required.
+- **Tests:** None (documentation-only).
+- **Dependencies:** None. Parallel-safe with Slices 38, 39, 41, and 42.
+- **Regression anchors:** The wording must align with `UcumAtomCatalog` reality and with PRE0137's behavior: same-dimension does not imply interconvertible business units.
+
+---
+
+**Slice 41: Document why `dozen` / `gross` are excluded from compile-time conversion**
+
+- **Objective:** Make the architectural boundary explicit: `dozen = 12` and `gross = 144` are product data / packaging semantics, not universal UCUM conversion factors the type system should silently apply.
+- **Files:** `docs/working/quantity-normalization-design.md` (§6.7 recovery guidance / business-unit rationale); `docs/language/precept-language-spec.md` if examples or prose risk implying automatic `dozen` / `gross` conversion.
+- **Approach:** State that those labels may appear as unit codes, but compile-time reconciliation still requires an explicit conversion field when business meaning matters. Do not treat their lexical familiarity as permission to bypass PRE0137.
+- **Tests:** None (documentation-only).
+- **Dependencies:** None. Parallel-safe with Slices 38–40 and 42.
+- **Regression anchors:** Docs must not contradict Slice 31 by implying `each`, `dozen`, and `gross` are automatically interchangeable.
+
+---
+
+**Slice 42: Document `each.dimension = DimensionVector.None` and the cross-unit comparison consequence**
+
+- **Objective:** Capture the exact architectural reason the current bug exists and why PRE0137 is the correct fix: `each` and its packaging relatives live in the shared `count`/`DimensionVector.None` family.
+- **Files:** `docs/working/quantity-normalization-design.md` (§6.7.1–§6.7.3, regression-safety notes); `docs/language/precept-language-spec.md` if a canonical qualifier/dimension note is warranted.
+- **Approach:** Tie the representation fact (`DimensionVector.None`) directly to the semantic consequence: dimension checks alone cannot distinguish count-unit identity, so explicit unit-code enforcement is required for cross-unit comparison/arithmetic.
+- **Tests:** None (documentation-only).
+- **Dependencies:** None. Parallel-safe with Slices 38–41.
+- **Regression anchors:** The explanation must remain consistent with `samples/inventory-item.precept`, the dynamic-qualifier deferral rule, and the PRE0137 diagnostic narrative.
+
+---
+
+**Slice 43: Mechanical rename — `TypedInterpolatedTypedConstant` → `InterpolatedTypedConstant`**
+
+- **Objective:** Remove the doubled type name without changing behavior.
+- **Files:** `src/Precept/Pipeline/SemanticIndex.cs` (type declaration); `src/Precept/Pipeline/ProofEngine.Composition.cs`; `src/Precept/Pipeline/ProofEngine.Qualifiers.cs`; `src/Precept/Pipeline/ProofEngine.cs`; `src/Precept/Pipeline/TypeChecker.cs`; `src/Precept/Pipeline/TypeChecker.Expressions.cs`; `src/Precept/Pipeline/TypeChecker.Expressions.TypedConstants.cs`; `test/Precept.Tests/ProofEngineTypedArgQualifierTests.cs`; `test/Precept.Tests/TypeChecker/TypeCheckerTypedConstantTests.cs`; `test/Precept.LanguageServer.Tests/SemanticTokensHandlerTests.cs`.
+- **Approach:** Perform a pure symbol rename: record name, constructor calls, pattern matches, XML docs, and test references. Do not change expression shape, slots, or semantics in this slice.
+- **Tests:** Targeted coverage from `TypeCheckerTypedConstantTests`, `ProofEngineTypedArgQualifierTests`, and `SemanticTokensHandlerTests`; finish with the normal repository regression sweep (`dotnet test`).
+- **Dependencies:** None. Standalone.
+- **Regression anchors:** Public DSL syntax, diagnostics, proof behavior, and MCP output must remain unchanged; only the internal semantic type name moves.
