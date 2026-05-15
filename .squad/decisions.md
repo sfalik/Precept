@@ -6,6 +6,64 @@
 
 ---
 
+### 2026-05-15T20:40:13Z: Assignment qualifier enforcement now rejects unproved constrained axes with PRE0141
+
+**By:** Scribe
+
+**Status:** Merged from Frank's architectural ruling, George's replacement implementation, and Soup Nazi's regression matrix.
+
+**Merged sources:** `frank-price-qualifier-full-analysis.md`; `george-qualifier-enforcement-arch.md`; `soup-nazi-qualifier-enforcement-tests.md`.
+
+- Frank locked the governing rule: every qualifier axis constrained by the target must be provably compatible at compile time; unknown is only acceptable on unconstrained axes.
+- George replaced the old `TryGetAssignmentSourceQualifiers(...)` seam with axis-aware assignment resolution (`Resolved` / `Unknown` / `Absent`), introduced `PRE0141 UnprovedAssignmentQualifierCompatibility`, and kept definite mismatches on `PRE0068` / `PRE0069`.
+- The new resolver covers direct refs, typed constants, whole-value interpolation, qualifier slots, conditionals, and binary-derived results across `price`, `money`, `quantity`, and `exchangerate`.
+- Soup Nazi's 19-test matrix is now the durable assignment-enforcement surface across `set`, field default, and event-arg default lanes; George validated the change against the unchanged 9-failure branch baseline plus analyzer and language-server suites.
+
+---
+
+### 2026-05-15T20:40:13Z: Plain `price` typed constants now flow through the existing qualifier-mismatch enforcement path
+
+**By:** Scribe
+
+**Status:** Merged from Frank's gap analysis, George's set-assignment fix, and Soup Nazi's price-literal regression tests.
+
+**Merged sources:** `frank-price-qualifier-enforcement-gap.md`; `george-price-qualifier-enforcement.md`; `soup-nazi-price-qualifier-tests.md`.
+
+- Frank's diagnosis stands: the bug was an assignment-source extraction defect, not a language-shape defect, because the resolved `TypedTypedConstant` already carried the needed qualifier metadata.
+- George fixed the seam by trusting non-empty `TypedTypedConstant.DeclaredQualifiers` instead of re-deriving a money-only special case, so plain `price` literals now participate in `ValidateResolvedQualifiers(...)`.
+- The fix reuses `PRE0068 QualifierMismatch`; no new price-only diagnostic was introduced.
+- Soup Nazi's set-action and field-default anchors lock count-unit mismatch, matching control, and currency mismatch behavior for the shared assignment validation path.
+
+---
+
+### 2026-05-15T20:40:13Z: Interpolated `.unit` price sources now surface slot-backed qualifiers during assignment validation
+
+**By:** Scribe
+
+**Status:** Merged from Frank's interpolated-gap analysis and George's interpolated-slot fix.
+
+**Merged sources:** `frank-interpolated-unit-qualifier-gap.md`; `george-interpolated-unit-qualifier-fix.md`.
+
+- Frank established that `'4.17 USD/{field.unit}'` resolves as an `InterpolatedTypedConstant` with a unit slot under `TypedMemberAccess`, so the qualifier fact already existed at compile time but never reached assignment validation.
+- George added the slot-backed interpolated extraction path, preserved static currency text for mixed static/dynamic price literals, and reused the same reach-through helper shape as `ValidateUnitSlotDimensionConsistency(...)`.
+- The resulting behavior stays on the existing `PRE0068 QualifierMismatch` lane: interpolated count-unit mismatch and interpolated currency mismatch now fail, while the matching control still passes.
+
+---
+
+### 2026-05-15T20:40:13Z: `price` qualifier-shape evolution is recorded as a metadata-first proposal
+
+**By:** Scribe
+
+**Status:** Merged from Frank's qualifier-shape proposal; still awaiting owner review.
+
+**Merged source:** `frank-price-qualifier-shape-analysis.md`.
+
+- Frank recorded three model gaps in the current `price` qualifier shape: `in` cannot resolve as unit-or-currency, `in 'USD/each'` cannot fill currency and unit together, and `in`+`of` coexistence cannot be made conditional on currency-only `in`.
+- The proposal keeps the fix in metadata: add `QualifierAxis.PriceIn`, add `DeclaredQualifierMeta.CompoundPrice`, and add `QualifierShape.OfRequiresCurrencyIn` so downstream consumers derive the behavior instead of hardcoding price-specific branches.
+- The proposal is preserved as design-state only. The shipped assignment-enforcement fixes above do not depend on owner approval of this separate qualifier-shape evolution.
+
+---
+
 ### 2026-05-15T19:30:00Z: Slice 26 warnings are closed and the slice is fully approved
 
 **By:** Scribe

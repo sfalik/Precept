@@ -24,6 +24,25 @@
 
 ## Recent Updates
 
+### 2026-05-15T20:40:13Z — The qualifier enforcement regression matrix is now tied to the shipped axis-aware model
+
+- Frank's full analysis is now the canonical rule-set behind the suite: constrained qualifier axes require compile-time proof, and unproved constrained axes fail on the new assignment-stage diagnostic instead of slipping through.
+- George's architecture replacement closed the red matrix by replacing the partial-array seam with per-axis resolution and `PRE0141`, while preserving `PRE0068` / `PRE0069` for definite disagreements.
+- Scribe merged the matrix and implementation notes into `.squad/decisions.md` and recorded the batch as the durable assignment-enforcement baseline.
+
+### 2026-05-15T16:40:13.267-04:00 — Full assignment-qualifier regression matrix landed with honest 26/14 signal
+
+- Added 19 regression tests to `test/Precept.Tests/TypeChecker/TypeCheckerAssignmentQualifierTests.cs`, covering Frank's required price, money, exchangerate, and shared-surface gaps: bare-source refs, whole-value interpolation, conditional selection, unit-slot axis precision, currency-slot interpolation, plus field-default and event-arg-default call sites.
+- Used `Compiler.Compile(...)` plus direct `result.Diagnostics` assertions for every new test; the expected future diagnostic name `UnprovedAssignmentQualifierCompatibility` is pinned as a string literal so the suite compiles before George's enum member lands.
+- Focused validation run finished `40 total / 26 passed / 14 failed`; the 14 failures are the intended red cases where the current checker still compiles silent gaps clean.
+- Corrected the event-arg fixture to use `amount as money ...` syntax so the red signal stays on qualifier enforcement instead of parser noise.
+
+### 2026-05-15T15:56:59-04:00 — Price typed-constant qualifier regressions added with honest red signal
+
+- Added 4 regression tests to `test/Precept.Tests/TypeChecker/TypeCheckerAssignmentQualifierTests.cs` covering set-assignment count-unit mismatch, matching count-unit success, dimension-qualified currency mismatch, and the shared field-default seam for plain price typed constants.
+- Read Frank's bug analysis first and kept the assertions pinned to `DiagnosticCode.QualifierMismatch` / Error severity, matching the existing assignment-qualifier helper conventions in the suite.
+- `dotnet test test\Precept.Tests\ --filter "TypeCheckerAssignmentQualifier" --no-restore` finished `15 passed / 3 failed / 18 total`; the three red cases are the intended regression pressure awaiting George's `TryGetAssignmentSourceQualifiers(...)` fix, while the matching control test already passes.
+
 ### 2026-05-12T23:50:08Z — Modifier-gap regression suite closed green after coordinator follow-up
 
 - Landed 22 regression tests across `PriceExchangeRateModifierTests.cs`, `IdentityTypeModifierTests.cs`, and `MoneyQuantityModifierRegressionTests.cs`, covering price/exchangerate legality, business-magnitude `maxplaces`, and identity-type redundancy behavior.

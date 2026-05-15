@@ -19,6 +19,12 @@
 
 ## Recent Updates
 
+### 2026-05-15T20:40:13Z — Assignment qualifier architecture closeout is recorded with Frank's rule and Soup Nazi's matrix
+
+- Frank's decision is now canonical: assignment qualifier enforcement is per-axis proof, `PRE0068` / `PRE0069` stay for definite mismatches, and `PRE0141` is the assignment-stage signal for required-axis uncertainty.
+- Soup Nazi's expanded `TypeCheckerAssignmentQualifierTests` matrix is the durable regression guard for the new resolver across price, money, quantity, and exchangerate assignment surfaces.
+- Scribe merged the batch into `.squad/decisions.md`, cleared the inbox, and wrote the orchestration/session records for downstream consumers.
+
 ### 2026-05-15T14:55:25Z — Wave 2 follow-ups and the Slice N/M repair lane closed
 
 - `01f255ab` locked regression coverage around the authored-vs-normalized bound split for both `TypedField` and `TypedArg`, and guarded `NormalizePrice` against affine-offset denominator units.
@@ -64,3 +70,26 @@
 - Existing qualifier-axis consumers already fail soft through `_`/`default` fallbacks. For QS-1, no switch-exhaustion stubs were needed in `TypeChecker`, `CompletionHandler`, `RichHoverFactory`, or MCP formatting surfaces.
 - Baseline validation for this lane remains the known 9 failing `Precept.Tests`; QS-1 preserved that count exactly (5561 passed / 9 failed / 5570 total).
 
+### 2026-05-15T19:56:59Z — Price typed-constant qualifier enforcement fixed
+
+- `TryGetAssignmentSourceQualifiers(...)` now trusts non-empty `TypedTypedConstant.DeclaredQualifiers` instead of re-deriving a money-only special case, so plain resolved `price` literals participate in assignment qualifier validation.
+- Added regression coverage for price typed-constant set assignments covering count-unit mismatch, count-unit match, currency mismatch, plus a shared-seam field-default mismatch anchor.
+- `dotnet build src/Precept/Precept.csproj` succeeded; focused `TypeCheckerAssignmentQualifierTests` passed 18/18.
+- Full `dotnet test test/Precept.Tests/` stayed on the same branch baseline failure count while absorbing the new coverage: before 5594 passed / 9 failed / 5603 total, after 5598 passed / 9 failed / 5607 total.
+
+### 2026-05-15T20:06:56Z — Interpolated unit-slot price qualifier enforcement fixed
+
+- `TryGetAssignmentSourceQualifiers(...)` now has a slot-backed interpolated path for `InterpolatedTypedConstant` price forms with `StaticQualifier = null`, so `.unit` member access holes can surface their underlying `DeclaredQualifierMeta.Unit` during assignment validation.
+- `InterpolatedTypedConstant` now retains concatenated static text, letting mixed static/dynamic price forms like `'4.17 USD/{qty.unit}'` preserve their static currency while the slot contributes the denominator unit.
+- `ValidateUnitSlotDimensionConsistency(...)` now reuses the same helper that reaches through `TypedMemberAccess -> TypedFieldRef|TypedArgRef`, keeping the unit-slot structural seam single-sourced.
+- Added regression coverage for interpolated count-unit mismatch, interpolated count-unit match, and interpolated currency mismatch; focused `TypeCheckerAssignmentQualifierTests` now pass 21/21.
+- Full `dotnet test test/Precept.Tests/ --no-restore` remains on the same known branch baseline: 5601 passed / 9 failed / 5610 total.
+
+### 2026-05-15T21:40:00Z — Assignment qualifier enforcement moved to the new axis-aware architecture
+
+- Added `PRE0141 UnprovedAssignmentQualifierCompatibility` as the type-stage assignment companion to proof-stage `PRE0114`, and documented the split in `docs/compiler/diagnostic-system.md`.
+- Replaced the old assignment-source bool/partial-array seam with `QualifierResolutionKind` (`Resolved` / `Unknown` / `Absent`) plus a dedicated per-axis resolver in `TypeChecker.Expressions.AssignmentQualifiers.cs`.
+- The new assignment path now handles direct refs, typed constants, whole-value interpolation, qualifier slots, conditionals, and binary result policies, and it recovers raw-text qualifier facts for bare `money`, `price`, and `exchangerate` typed constants when resolved metadata is absent.
+- Suppressed redundant assignment-time uncertainty on definite non-cancelling compound-unit multiplication so `CrossDimensionArithmetic` remains the primary error instead of piling on `PRE0141`.
+- Updated stale regression expectations around the new architecture (`InterpolatedTypedConstant_SourceNoDimension_EmitsUnprovedAssignmentQualifierCompatibility`, `SetAction_NonCancellingCompoundUnitMultiplication_EmitsCrossDimensionArithmetic`) and synced analyzer/language-server tests that depended on old clean-compilation snippets.
+- Validation closed green everywhere except the known branch baseline: `TypeCheckerAssignmentQualifierTests` 44/44, `Precept.Analyzers.Tests` 291/291, `Precept.LanguageServer.Tests` 305/305, `Precept.Tests` back to 5630 passed / 9 failed / 5639 total, and full-repo `dotnet test` at 6270 passed / 9 failed / 6279 total.

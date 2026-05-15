@@ -35,6 +35,20 @@
 
 ## Recent Updates
 
+### 2026-05-15T20:40:13Z — Price qualifier enforcement architecture is now durably closed as shipped work
+
+- George landed the axis-aware assignment resolver with `PRE0141`, matching Frank's rule that constrained qualifier axes must be provably compatible at compile time and that unknown is never silent success on a constrained axis.
+- Soup Nazi's 19-test matrix is now the durable regression surface across `set`, field-default, and event-arg-default lanes, and Scribe merged the full batch into `.squad/decisions.md` plus the orchestration/session logs.
+- The separate `PriceIn` / `CompoundPrice` qualifier-shape proposal remains recorded as proposal-state only; it is not a prerequisite for the shipped enforcement repair.
+
+### 2026-05-15T20:25:45-04:00 — Full price qualifier enforcement model locked
+
+- Wrote the governing analysis in `docs/Working/frank-price-qualifier-full-analysis.md` and recorded the decision in `.squad/decisions/inbox/frank-price-qualifier-full-analysis.md`.
+- Durable ruling: assignment qualifier enforcement is **axis-by-axis proof**, not best-effort extraction. If the target constrains a qualifier axis and the source expression cannot prove compatibility on that axis, the assignment must be rejected at compile time.
+- `PRE0068` remains the diagnostic for **definite mismatch** only. Unknown-source-to-constrained-target cases need a new assignment-specific unproved-qualifier diagnostic; overloading `PRE0068` would be semantically wrong.
+- Verified silent gaps extend well beyond the bare `price` unit-slot repro: bare qualified-type refs, whole-value interpolation, conditional selection, currency-slot interpolation, and exchange-rate from/to-slot interpolation all currently bypass assignment enforcement in representative cases.
+- Architectural directive to George: replace the boolean/partial-array `TryGetAssignmentSourceQualifiers(...)` seam with shared per-axis qualifier resolution (`Resolved` / `Unknown` / `Absent`) and close the model across `price`, `money`, `quantity`, and `exchangerate` — not another one-off patch.
+
 ### 2026-05-15T14:55:25Z — Tracker sync and the Wave 2 / Slice N/M review loop are durably closed
 
 - §5.0 tracker rows 15, 15b, 16, 19, 20, 31, 33, 35, 36, and 37 are recorded as ✅ against commit `f1215192`, and the bounds-validation documentation lane is now numbered as Slices 44 and 45.
