@@ -131,12 +131,20 @@ public sealed record ModifierRequirement(
 /// assigned to a decimal/number field must fit within the field's declared
 /// bounds (if any). Used to prevent compile-time-provable numeric overflow
 /// on field assignment operations (set, add, etc.).
+///
+/// <see cref="DeclaredMin"/>/<see cref="DeclaredMax"/> carry the normalized (UCUM base-unit)
+/// bounds used by the proof engine for interval math.
+/// <see cref="AuthoredMin"/>/<see cref="AuthoredMax"/> carry the raw authored values as written
+/// by the user (e.g. 5 for <c>min '5 kg'</c>) and are used exclusively for diagnostic display.
+/// For non-quantity fields the two pairs are identical.
 /// </summary>
 public sealed record IntervalContainmentProofRequirement(
     ProofSubject Subject,
     string TargetField,
     decimal? DeclaredMin,
     decimal? DeclaredMax,
+    decimal? AuthoredMin,
+    decimal? AuthoredMax,
     string Description
 ) : ProofRequirement(ProofRequirementKind.IntervalContainment, Description);
 

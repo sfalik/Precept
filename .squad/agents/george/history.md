@@ -29,3 +29,15 @@
 
 - When a suppression hands off to a more specific diagnostic, re-run every dependent lane before closing the fix: unit-qualified, count-dimension, non-count dimension, and unqualified quantity cases each exercise a different downstream rule.
 - Warning follow-ups should first verify whether the intended invariant is already present in shipped code and only missing regression locks.
+- `IntervalContainmentProofRequirement.DeclaredMin/Max` carry **normalized** (proof-math) bounds — they are not authored values despite the name. Always add a parallel authored pair for display. Never use proof-math bounds in diagnostic messages.
+- When adding fields to a proof requirement record, update every direct constructor call site in tests — grep for `new IntervalContainmentProofRequirement` before shipping.
+- The WholeValue double-normalization guard in `ApplyStaticUnitScaling` is implicit: it relies on `HasSingleMagnitudeSlot` excluding `WholeValue`. Document this so future changes to that helper don't silently corrupt interval math.
+
+### 2026-05-15T15:35:00Z — Slice 18: Display contract implemented
+
+- `IntervalContainmentProofRequirement` gains `AuthoredMin`/`AuthoredMax` — raw authored values from `TypedField.DeclaredMin/Max`, used for diagnostic display only.
+- Existing `DeclaredMin`/`DeclaredMax` on the requirement retain their normalized proof-math semantics unchanged.
+- `NumericOverflow` diagnostic now uses `AuthoredMin ?? DeclaredMin` for the bound display string — humans see their authored values, not UCUM base-unit numbers.
+- `CompileProofObligationDto` gains `NormalizedDeclaredMin`/`NormalizedDeclaredMax`; `DeclaredMin`/`DeclaredMax` now project authored values so MCP consumers get display-ready bounds by default.
+- WholeValue double-normalization risk noted and written to `.squad/decisions/inbox/george-s18-wholeval-doublenorm.md` for Soup Nazi's Slice 17 test pass.
+- 9 pre-existing branch failures unchanged; 44 MCP tests fully green; 5524 Precept.Tests pass.

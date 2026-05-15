@@ -45,6 +45,8 @@ public static class CompileTool
             obligation.Requirement.Description,
             obligation.ComputedInterval?.ToString(),
             intervalRequirement?.TargetField,
+            intervalRequirement?.AuthoredMin ?? intervalRequirement?.DeclaredMin,
+            intervalRequirement?.AuthoredMax ?? intervalRequirement?.DeclaredMax,
             intervalRequirement?.DeclaredMin,
             intervalRequirement?.DeclaredMax);
     }

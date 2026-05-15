@@ -23,4 +23,6 @@ public sealed record CompileProofObligationDto(
     string? ComputedInterval,
     string? TargetField,
     decimal? DeclaredMin,
-    decimal? DeclaredMax);
+    decimal? DeclaredMax,
+    decimal? NormalizedDeclaredMin,
+    decimal? NormalizedDeclaredMax);

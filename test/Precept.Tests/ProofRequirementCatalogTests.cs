@@ -200,6 +200,8 @@ public class ProofRequirementCatalogTests
             TargetField: "balance",
             DeclaredMin: 0m,
             DeclaredMax: 999_999m,
+            AuthoredMin: 0m,
+            AuthoredMax: 999_999m,
             Description: "balance must stay within [0 .. 999 999]");
         req.Kind.Should().Be(ProofRequirementKind.IntervalContainment);
     }

@@ -87,6 +87,15 @@ public class TypeCheckerQuantityNormalizationTests
     [Fact]
     public void QuantityBound_CrossDimensionAssignment_IsBlockedByDimensionCheck()
     {
+        // NOTE: This test is intentionally RED pending two implementation gaps:
+        // 1. '3 m' is rejected as InvalidTypedConstantContent because bare 'm' is not recognized
+        //    UCUM notation for a quantity — the DSL requires bracketed form '[m]' for non-SI units
+        //    but 'm' (metres) is also apparently unparsed in the current UCUM validator.
+        // 2. Even with valid UCUM syntax, ValidateAssignmentQualifiers early-returns for
+        //    TypedTypedConstant { ResultType: Quantity }, bypassing the DimensionCategoryMismatch
+        //    check entirely. That early return needs to be removed and a dimension guard added
+        //    before this test can go green.
+        // This is contract pressure — leave it red until the dimension-check assignment path lands.
         var result = CompileAssignment(
             targetDeclaration: "field weight as quantity of 'mass' max '5 kg' default '0 kg'",
             assignment: "'3 m'",
@@ -97,6 +106,20 @@ public class TypeCheckerQuantityNormalizationTests
             because: "a length literal assigned to a mass field should fail qualifier compatibility before normalization logic matters");
         NumericOverflowDiagnostics(result)
             .Should().BeEmpty(because: "cross-dimension rejection should not be reported as a normalization overflow");
+    }
+
+    [Fact]
+    public void PriceBound_CrossUnitDenominatorNormalization_WithinBound_DoesNotEmitNumericOverflow()
+    {
+        // 3 USD/lb_av ≈ 6.61 USD/kg, which is below the 10 USD/kg max.
+        // Denominator normalization must convert [lb_av → kg] before comparing.
+        var result = CompileAssignment(
+            targetDeclaration: "field unitPrice as price in 'USD' of 'mass' max '10 USD/kg' default '0 USD/kg'",
+            assignment: "'3 USD/[lb_av]'",
+            targetField: "unitPrice");
+
+        NumericOverflowDiagnostics(result)
+            .Should().BeEmpty(because: "3 USD/lb ≈ 6.61 USD/kg, which is below the 10 USD/kg max after normalization");
     }
 
     [Fact]
@@ -116,6 +139,28 @@ public class TypeCheckerQuantityNormalizationTests
             .Should().ContainSingle()
             .Which.Disposition.Should().Be(ProofDisposition.Proved,
                 because: "WholeValue interpolation should extract the source field interval directly, without double-normalizing it");
+    }
+
+    [Fact]
+    public void QuantityBound_WholeValueInterpolation_SourceExceedsMax_EmitsNumericOverflow()
+    {
+        // qtyField max '8 kg' → its interval is [0..8] in base units.
+        // weight max '5 kg' → bound is [0..5] in base units.
+        // [0..8] ⊄ [0..5], so the interval-containment obligation must be Unresolved → NumericOverflow.
+        //
+        // NOTE (§5.5.2 double-normalization risk): The WholeValue path extracts the source field's
+        // interval which is ALREADY in base units. ApplyStaticUnitScaling must not re-scale it.
+        // Both bounds use 'kg' (the SI base for mass) so scale = 1.0 here — if this test turns red
+        // due to double-normalization on a non-base-unit variant, that is Slice 19's problem.
+        var result = CompileAssignment(
+            targetDeclaration: "field weight as quantity of 'mass' max '5 kg' default '0 kg'",
+            assignment: "'{qtyField}'",
+            targetField: "weight",
+            "field qtyField as quantity of 'mass' max '8 kg' default '1 kg'");
+
+        result.Diagnostics.Should().Contain(
+            d => d.Code == nameof(DiagnosticCode.NumericOverflow),
+            because: "qtyField can carry up to 8 kg which exceeds the 5 kg max on weight");
     }
 
     private static Compilation CompileAssignment(string targetDeclaration, string assignment, string targetField, params string[] extraDeclarations)

@@ -240,11 +240,14 @@ public static class Actions
         var (min, max) = ProofEngine.GetFieldBounds(targetField);
         if (min.HasValue || max.HasValue)
         {
+            var authoredMin = targetField.DeclaredMin;
+            var authoredMax = targetField.DeclaredMax;
             var intervalReq = new IntervalContainmentProofRequirement(
                 new SelfSubject(),
                 inputAction.FieldName,
                 min, max,
-                $"Interval containment: {inputAction.FieldName} must stay within declared bounds [{min?.ToString() ?? "−∞"} .. {max?.ToString() ?? "+∞"}]");
+                authoredMin, authoredMax,
+                $"Interval containment: {inputAction.FieldName} must stay within declared bounds [{(authoredMin ?? min)?.ToString() ?? "−∞"} .. {(authoredMax ?? max)?.ToString() ?? "+∞"}]");
 
             obligations.Add(new ProofObligation(
                 intervalReq,

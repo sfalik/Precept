@@ -78,9 +78,11 @@ public static partial class ProofEngine
                 var computedStr = obligation.ComputedInterval.HasValue
                     ? $" (computed: {obligation.ComputedInterval.Value})"
                     : string.Empty;
+                var displayMin = intervalReq.AuthoredMin ?? intervalReq.DeclaredMin;
+                var displayMax = intervalReq.AuthoredMax ?? intervalReq.DeclaredMax;
                 return Diagnostics.Create(DiagnosticCode.NumericOverflow, obligation.Site.Span,
                     intervalReq.TargetField,
-                    $"[{intervalReq.DeclaredMin?.ToString() ?? "−∞"} .. {intervalReq.DeclaredMax?.ToString() ?? "+∞"}]{computedStr}");
+                    $"[{displayMin?.ToString() ?? "−∞"} .. {displayMax?.ToString() ?? "+∞"}]{computedStr}");
             }
 
             case LengthContainmentProofRequirement lengthReq:
