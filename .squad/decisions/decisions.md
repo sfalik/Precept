@@ -19018,4 +19018,261 @@ All blocking findings from the previous review have been resolved. §5.7 now poi
 
 ---
 
+### 2026-05-15T11:37:42: User directive
+**By:** Shane (via Copilot)
+**What:** Frank reviews after every slice, not just at batch boundaries. Each individual slice must clear Frank's review before work proceeds to the next slice or downstream dependencies.
+**Why:** User request — captured for team memory
 
+# Frank — Slice 17 Review: Cross-Unit Normalization Test Coverage
+
+**Date:** 2026-05-15T11:37:42-04:00
+**Author:** Frank
+**Slice:** 17
+**Verdict:** APPROVED
+
+---
+
+## Summary
+
+Slice 17 delivers 9 tests covering all 7 bullets in the §5.2 design spec. The test harness is clean, assertions are precise, the intentionally-red cross-dimension test is correctly documented as pre-existing branch debt, and the WholeValue tests exercise the interval-containment path at the correct abstraction boundary for this slice.
+
+---
+
+## Findings
+
+### Blockers: None
+
+---
+
+### Good Observations
+
+**G1:** The `CompileAssignment` helper (line 166) is well-factored — it accepts `params string[] extraDeclarations` cleanly composing multi-field precepts without repeating boilerplate. Reusable across future normalization slices.
+
+**G2:** Test 4b (price no-overflow, line 112) and Test 4 (price overflow, line 62) together form a proper boundary pair. Both exercise denominator normalization (`[lb_av] → kg`) and assert opposite outcomes. This is the gold standard for normalization coverage.
+
+**G3:** The WholeValue overflow test (line 145) includes an explicit §5.5.2 double-normalization comment explaining why the scale=1.0 boundary is acceptable for Slice 17 and deferring the non-base-unit variant to Slice 19. Good scope discipline.
+
+**G4:** Test 6 (cross-dimension, line 88) does not silently xfail — it asserts the *correct* diagnostic (`DimensionCategoryMismatch`) and will fail loudly until the implementation gap is closed. This is contract pressure done right.
+
+**G5:** Proof obligation assertions (lines 28–32, 137–141) verify not just absence of overflow but positive proof disposition, catching regressions where the proof silently becomes `Unresolved` without emitting a diagnostic.
+
+---
+
+### Warnings
+
+**W1:** The WholeValue double-normalization tests (Tests 7 and 8, lines 126 and 145) both use `kg` for source and target — meaning scale factor is 1.0 in both. A true double-normalization bug (applying scale twice) would only manifest when source field uses a non-base unit (e.g., `field qtyField as quantity of 'mass' max '6 [lb_av]'`). The comment at line 152–154 correctly defers this to Slice 19, but when Slice 19 lands, a cross-unit WholeValue test MUST be added. **Track as Slice 19 obligation, not Slice 17 blocker.**
+
+**W2:** The intentionally-red Test 6 documents two root causes (UCUM parsing of bare `m`, and early-return in `ValidateAssignmentQualifiers`). These should be filed as tracked debt items so they don't get lost between slices. Consider adding them to the §5.0 tracker or a dedicated gap-tracking section.
+
+---
+
+## Design Doc Coverage Assessment
+
+| §5.2 Spec Bullet | Test | Status |
+|---|---|---|
+| Regression: 6 lb < 5 kg → no overflow | `QuantityBound_CrossUnitWithinMax_DoesNotEmitNumericOverflow` | ✅ Green |
+| Positive: 12 lb > 5 kg → overflow | `QuantityBound_CrossUnitExceedsMax_EmitsNumericOverflow` | ✅ Green |
+| Same-unit: 6 kg > 5 kg → overflow | `QuantityBound_SameUnitExceedsMax_StillEmitsNumericOverflow` | ✅ Green |
+| Price: normalized comparison (overflow) | `PriceBound_CrossUnitDenominatorNormalization_EmitsNumericOverflow` | ✅ Green |
+| Price: normalized comparison (no-overflow) | `PriceBound_CrossUnitDenominatorNormalization_WithinBound_DoesNotEmitNumericOverflow` | ✅ Green |
+| Money: 200 USD > 100 USD → overflow | `MoneyBound_Overflow_DoesNotDependOnUnitNormalization` | ✅ Green |
+| Cross-dimension: 3 m → mass field | `QuantityBound_CrossDimensionAssignment_IsBlockedByDimensionCheck` | 🔴 Intentional (documented debt) |
+| WholeValue no-overflow: 3 kg < 5 kg | `QuantityBound_WholeValueInterpolation_UsesSourceQuantityIntervalWithoutDoubleNormalization` | ✅ Green |
+| WholeValue overflow: 8 kg > 5 kg | `QuantityBound_WholeValueInterpolation_SourceExceedsMax_EmitsNumericOverflow` | ✅ Green |
+
+All 9 spec points have corresponding test methods. Coverage is complete for Slice 17's scope.
+
+---
+
+## Cross-Dimension Gap Assessment (Test 6)
+
+**Not a blocker for Slice 17.** The gap is pre-existing: `InvalidTypedConstantContent` fires before the normalization pipeline ever runs. This is a UCUM parsing / qualifier-validation ordering issue, not a normalization regression. The test correctly:
+1. Asserts the intended behavior (contract pressure)
+2. Documents both root causes with actionable detail
+3. Does not mask the failure with `[Fact(Skip = ...)]`
+
+The gap predates this slice and is orthogonal to the normalization work delivered here.
+
+# Slice 18 — Display Contract Implementation Review
+
+**By:** Frank  
+**Date:** 2026-05-15T11:37:42-04:00  
+**Commits reviewed:** 9c98d37b + 45b9dba2  
+**Verdict:** APPROVED
+
+---
+
+## Findings
+
+### Good Observations
+
+**G1:** Record shape is clean. `IntervalContainmentProofRequirement` at `ProofRequirement.cs:141` has well-placed XML docs explaining the normalized-vs-authored split. The `DeclaredMin/Max` (normalized, proof math) and `AuthoredMin/Max` (display) naming is unambiguous at the definition site.
+
+**G2:** `HasSingleMagnitudeSlot` (line 316) is a robust positive-assertion guard — it checks `SlotKind == InterpolationSlotKind.Magnitude`, meaning any future slot kinds also won't accidentally trigger scaling. WholeValue forms correctly bypass unit scaling while still having their intervals extracted at line 40.
+
+**G3:** Diagnostic fallback at `ProofEngine.Diagnostics.cs:81-82` (`AuthoredMin ?? DeclaredMin`) degrades gracefully for non-quantity fields where both pairs are identical, while correctly preferring authored values for quantity fields.
+
+**G4:** MCP DTO projection in `CompileTool.cs:48-51` correctly maps `DeclaredMin/Max` to the user-facing (authored) values and `NormalizedDeclaredMin/Max` to the proof-math values. The DTO naming is consumer-friendly: AI tools see `DeclaredMin` (what the user wrote) and can optionally inspect `NormalizedDeclaredMin` (base-unit equivalent).
+
+**G5:** Construction site in `Actions.cs:243-249` correctly sources `authoredMin/Max` from `targetField.DeclaredMin/Max` (the raw declaration value) and `min/max` from `GetFieldBounds()` (which reads `NormalizedDeclaredMin ?? DeclaredMin` at line 257-258). The two data sources are genuinely distinct for quantity fields with unit scaling.
+
+### Warnings (Non-Blocking)
+
+**W1:** MCP test at `CompileToolTests.cs:105-106` asserts only `DeclaredMin/Max` on what appears to be a non-quantity field (integer bounds 0..100). No test asserts `NormalizedDeclaredMin/Max` on a cross-unit quantity case. This is already tracked as a Slice 19 obligation per `history.md` — acceptable as-is, but the gap exists.
+
+**W2:** §5.2(b) hover/preview display ("shows `ComputedInterval` with unit labels derived from the target field's declared qualifier") is not addressed in this slice. The required data is now structurally available (both values present on the requirement record), so this is correctly deferred. Track explicitly if not already numbered.
+
+---
+
+## Design Doc Compliance
+
+| §5.2 Requirement | Status |
+|---|---|
+| (a) Diagnostics show authored values for user-facing messages | ✅ Satisfied |
+| (b) Hover/preview shows ComputedInterval with unit labels | ⚠️ Explicitly deferred (data available) |
+| (c) MCP DTO projects both raw and normalized | ✅ Satisfied |
+
+---
+
+## Summary
+
+The display contract is correctly implemented. Authored values flow from `TypedField.DeclaredMin/Max` through the requirement record to diagnostic messages and MCP DTOs. Normalized values from `GetFieldBounds()` remain the proof-engine truth. The WholeValue scaling guard is architecturally sound. No blockers.
+
+# George — Slice 18 Display Contract Decision
+
+**By:** George  
+**Date:** 2026-05-15T15:35:00Z  
+**Status:** Implementation complete, tests green
+
+---
+
+## What Was Found
+
+### IntervalContainmentProofRequirement — carried only normalized bounds
+
+`IntervalContainmentProofRequirement.DeclaredMin/Max` were populated from `GetFieldBounds()`, which returns `NormalizedDeclaredMin ?? DeclaredMin` — the proof-math value. For quantity fields with cross-unit bounds (e.g., `field weight as quantity in 'kg' min '5 g'`), this meant `DeclaredMin = 0.005` (normalized to kg), not `5` (the authored value in grams).
+
+The `NumericOverflow` diagnostic message in `ProofEngine.Diagnostics.cs` used these normalized values directly, producing confusing output like `[0.005 .. 2]` instead of the user-authored `[5 g .. 2000 g]`.
+
+### CompileProofObligationDto — single set of bounds
+
+`CompileProofObligationDto.DeclaredMin/Max` mirrored the requirement's normalized bounds. MCP consumers had no way to distinguish authored from normalized values.
+
+---
+
+## What Was Changed
+
+### 1. `ProofRequirement.cs` — Added `AuthoredMin`/`AuthoredMax` to `IntervalContainmentProofRequirement`
+
+Added two new fields alongside the existing normalized `DeclaredMin`/`DeclaredMax`:
+- `DeclaredMin`/`DeclaredMax` — normalized (UCUM base-unit) values, used for interval math in `TryIntervalContainmentProof`. Semantics unchanged.
+- `AuthoredMin`/`AuthoredMax` — raw authored values from `TypedField.DeclaredMin/Max`, used exclusively for diagnostic display.
+
+For non-quantity fields (no unit normalization), both pairs are identical.
+
+### 2. `Actions.cs` — `GenerateIntervalContainmentObligations` populates both pairs
+
+`(min, max)` from `GetFieldBounds()` continue to be the normalized proof bounds. Added:
+```csharp
+var authoredMin = targetField.DeclaredMin;
+var authoredMax = targetField.DeclaredMax;
+```
+These are passed as `AuthoredMin`/`AuthoredMax` on the requirement.
+
+The Description string was also updated to show authored bounds for human readability.
+
+### 3. `ProofEngine.Diagnostics.cs` — NumericOverflow uses authored bounds
+
+```csharp
+var displayMin = intervalReq.AuthoredMin ?? intervalReq.DeclaredMin;
+var displayMax = intervalReq.AuthoredMax ?? intervalReq.DeclaredMax;
+```
+
+Fallback to normalized if authored is null (covers programmatically-constructed obligations in tests).
+
+### 4. `CompileToolDtos.cs` — Added `NormalizedDeclaredMin`/`NormalizedDeclaredMax`
+
+The existing `DeclaredMin`/`DeclaredMax` on the DTO now carry the authored values (for display). The new `NormalizedDeclaredMin`/`NormalizedDeclaredMax` expose the normalized proof-math values. MCP consumers who need precise interval math can use the normalized pair.
+
+### 5. `CompileTool.cs` — `MapProofObligation` projects both pairs
+
+- `DeclaredMin/Max` ← `AuthoredMin/Max ?? DeclaredMin/Max` (authored, for display)
+- `NormalizedDeclaredMin/Max` ← `DeclaredMin/Max` from the requirement (normalized)
+
+---
+
+## Test Results
+
+- `Precept.Tests`: 5524 passed, 9 failed (all 9 pre-existing branch failures, none introduced by Slice 18)
+- `Precept.Mcp.Tests`: 44 passed, 0 failed
+- `ProofRequirementCatalogTests` updated: added `AuthoredMin`/`AuthoredMax` to the direct constructor call
+
+---
+
+## Acceptance Criteria Status
+
+- ✅ `NumericOverflow` diagnostic uses authored values for human-readable output
+- ✅ `IntervalContainmentProofRequirement` carries both authored and normalized bounds
+- ✅ `CompileProofObligationDto` exposes both sets to MCP consumers
+- ✅ All existing tests still pass (no new regressions)
+
+# George — Slice 18 WholeValue Double-Normalization Risk Note
+
+**By:** George  
+**Date:** 2026-05-15T15:35:00Z  
+**For:** Soup Nazi (test coverage request)
+
+---
+
+## Summary
+
+While reviewing `ProofEngine.Intervals.cs` for the §5.5.2 WholeValue double-normalization risk, I found that the current code **does not double-normalize**, but the guard is implicit and brittle.
+
+---
+
+## The Risk Path
+
+In `IntervalOfNarrowed`, a WholeValue slot recurses into the slot expression:
+
+```csharp
+case InterpolatedTypedConstant interpolated:
+{
+    if (interpolated.Slots.Length == 1)
+    {
+        var slot = interpolated.Slots[0];
+        if (slot.SlotKind is InterpolationSlotKind.Magnitude or InterpolationSlotKind.WholeValue)
+            return IntervalOfNarrowed(slot.Expression, semantics, narrowed);
+    }
+    return NumericInterval.Unbounded;
+}
+```
+
+For a `WholeValue` slot whose inner expression is a `TypedFieldRef`, `ExtractFieldInterval` returns the source field's **already-normalized** interval. Then in `IntervalOf`, `ApplyStaticUnitScaling` is called on the outer `InterpolatedTypedConstant`.
+
+**Why it doesn't double-normalize now:** `ApplyStaticUnitScaling` only fires when `HasSingleMagnitudeSlot(interpolated)` is true — and `HasSingleMagnitudeSlot` checks for `InterpolationSlotKind.Magnitude` specifically, excluding `WholeValue`. So the second scaling is skipped.
+
+---
+
+## The Brittle Assumption
+
+The guard relies on `HasSingleMagnitudeSlot` excluding WholeValue. If someone ever extends `HasSingleMagnitudeSlot` to include WholeValue (e.g., to support static-unit WholeValue scaling), double normalization will silently corrupt quantity interval containment checks.
+
+Additionally: for a WholeValue slot whose inner expression is a `TypedTypedConstant` literal (e.g., a constant like `'5 kg'` arriving as a WholeValue form), `TryExtractTypedConstantMagnitudeRaw` returns the raw magnitude (5), and `ApplyStaticUnitScaling` skips scaling (WholeValue guard). The resulting interval Point(5) would be compared against the target field's normalized bound (e.g., 0.005 for `min '5 g'` on a kg field), producing a false positive overflow. This path may not be reachable in valid DSL today, but it is structurally reachable.
+
+---
+
+## Requested Test Coverage (Slice 17)
+
+Please add the following tests when writing Slice 17 tests:
+
+1. **WholeValue interval passes unchanged** — `field a max '5 kg'`, `field b max '8 kg'`, assignment `set a = '{b}'`. Source field b interval [0..8 kg normalized] should be compared against a's bound [0..5 kg normalized]. No double-normalization should occur. Currently this test exists in `TypeCheckerQuantityNormalizationTests.QuantityBound_WholeValueInterpolation_UsesSourceQuantityIntervalWithoutDoubleNormalization` but only covers the green path.
+
+2. **WholeValue overflow detected** — same setup but b's max exceeds a's max — obligation should be Unresolved → NumericOverflow. A version of this test was added in the working branch but depends on the WholeValue form being correctly parsed.
+
+3. **Regression anchor for `HasSingleMagnitudeSlot` exclusion** — a direct unit test asserting `HasSingleMagnitudeSlot` returns false for a WholeValue slot, so that any future expansion would require a deliberate choice.
+
+---
+
+## No Code Change Required Now
+
+The double-normalization is not currently materialized. The guard is working. No fix is needed in Slice 18. This note records the structural risk so Slice 17 test coverage can lock the invariant explicitly.

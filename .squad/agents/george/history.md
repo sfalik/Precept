@@ -41,3 +41,9 @@
 - `CompileProofObligationDto` gains `NormalizedDeclaredMin`/`NormalizedDeclaredMax`; `DeclaredMin`/`DeclaredMax` now project authored values so MCP consumers get display-ready bounds by default.
 - WholeValue double-normalization risk noted and written to `.squad/decisions/inbox/george-s18-wholeval-doublenorm.md` for Soup Nazi's Slice 17 test pass.
 - 9 pre-existing branch failures unchanged; 44 MCP tests fully green; 5524 Precept.Tests pass.
+
+### 2026-05-15T15:37:42Z — Slice 18 display contract approved
+
+- The authored-vs-normalized bound split is now explicit: IntervalContainmentProofRequirement carries AuthoredMin/AuthoredMax for display while DeclaredMin/DeclaredMax remain normalized proof-math values.
+- NumericOverflow now renders authored bounds, and MCP compile output adds NormalizedDeclaredMin/NormalizedDeclaredMax while keeping authored DeclaredMin/DeclaredMax consumer-facing by default.
+- Frank approved commits 9c98d37b and 45b9dba2; remaining follow-ups are Slice 19 MCP cross-unit coverage and the deferred §5.2(b) hover/preview presentation work.

@@ -45,3 +45,13 @@
 
 - Suppression fixes must be reviewed against every downstream diagnostic that depends on the suppression, especially when one path intentionally hands off to a more specific diagnostic.
 - Tracker and documentation passes should assign stable slice IDs as soon as standalone fixes appear so later reviews and closeout logs can cite one durable name.
+- WholeValue interval tests using same-unit (scale=1.0) for both source and target cannot detect double-normalization bugs. Cross-unit WholeValue tests are mandatory when Slice 19 lands — track as Slice 19 obligation.
+- Intentionally-red tests that assert the *correct* expected behavior (not `Skip`) are superior contract pressure — they fail loudly on regression AND on fix, ensuring the fix is noticed and the test transitions to green deliberately.
+- Display contract pattern: when a record carries both "math values" and "display values," the construction site must source them from genuinely distinct paths (e.g., `GetFieldBounds()` for normalized, `field.DeclaredMin` for authored). A fallback operator (`AuthoredMin ?? DeclaredMin`) at rendering sites ensures graceful degradation for non-quantity cases.
+- `HasSingleMagnitudeSlot`-style positive guards are more robust than negative exclusion lists — new slot kinds automatically fail the check rather than needing maintenance.
+
+### 2026-05-15T15:37:42Z — Slice 17 and Slice 18 reviews recorded approved
+
+- Slice 17 review approved the 9-test normalization matrix and preserved the intentionally-red cross-dimension case as honest contract pressure.
+- Slice 18 review approved the authored/normalized display contract split across proof requirements, diagnostics, and MCP projection.
+- Durable warnings to keep live: Slice 19 still needs a cross-unit WholeValue regression plus MCP normalized-bound coverage, and the Test 6 cross-dimension root causes should stay tracked as debt until implementation closes them.

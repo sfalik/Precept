@@ -51,3 +51,16 @@
 - `dotnet build test\\Precept.Tests\\Precept.Tests.csproj` passed, and the targeted 31-test run finished `19 passed / 12 failed`.
 - The red cases are correctly pinned to still-missing implementation seams: affine metadata/offset behavior, raw-magnitude compare paths, interpolated interval extraction plus static-unit scaling, denominator normalization for cross-unit price comparisons, and the intended cross-dimension diagnostic.
 - Keep the failures red until the implementation lands; they are contract pressure, not suite noise.
+
+### 2026-05-15T11:31:17Z — Slice 17 normalization test coverage completed
+
+- Added 2 missing Slice 17 tests: `PriceBound_CrossUnitDenominatorNormalization_WithinBound_DoesNotEmitNumericOverflow` (test 4b: 3 USD/lb ≈ 6.61 USD/kg < 10 USD/kg → no overflow) and `QuantityBound_WholeValueInterpolation_SourceExceedsMax_EmitsNumericOverflow` (test 8: qtyField max '8 kg' assigned to weight max '5 kg' → [0..8] ⊄ [0..5] → NumericOverflow).
+- Both new tests pass immediately; WholeValue interval extraction via the `InterpolationSlotKind.WholeValue` branch in `ProofEngine.Intervals.cs` works correctly when the source field uses the SI base unit (kg). Double-normalization risk (§5.5.2) is dormant for kg-to-kg because scale = 1.0 — Slice 19 must add a non-base-unit WholeValue test to expose any actual double-scaling bug.
+- Test 6 (`QuantityBound_CrossDimensionAssignment_IsBlockedByDimensionCheck`) remains intentionally red: (a) bare `m` is not recognized UCUM notation in the current quantity parser, producing `InvalidTypedConstantContent` before the dimension check fires; (b) `ValidateAssignmentQualifiers` early-returns for any `TypedTypedConstant { ResultType: Quantity }`, bypassing `DimensionCategoryMismatch` entirely. Both gaps must be fixed before this test can go green.
+- Final suite: 9 failures (unchanged baseline) / 5526 passed (+2) / 5535 total. Commit: `9c98d37b`.
+
+### 2026-05-15T15:37:42Z — Slice 17 cross-unit normalization tests approved
+
+- Added the last two Slice 17 tests: price denominator no-overflow (test 4b) and WholeValue overflow (test 8), closing the planned 9-test matrix.
+- Final branch totals moved to 5526 passing (+2) with 9 pre-existing failures; the cross-dimension test remains intentional debt pressure, not a new regression.
+- Frank approved the slice and carried two obligations forward: add a true cross-unit WholeValue regression in Slice 19 and track the Test 6 root causes as explicit debt.
