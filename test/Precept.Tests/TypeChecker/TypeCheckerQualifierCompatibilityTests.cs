@@ -125,6 +125,22 @@ public class TypeCheckerQualifierCompatibilityTests
         diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.BoundsRequireQualifier));
     }
 
+    [Fact]
+    public void BoundsQualifierMismatch_QuantityFieldWithCountDimension_BoundIsPlainNumeric_EmitsCountDimensionBoundsAmbiguous()
+    {
+        var precept = """
+            precept Widget
+            field Stock as quantity of 'count' max 4
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.CountDimensionBoundsAmbiguous);
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check(precept);
+        diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.CountDimensionBoundsAmbiguous));
+        diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.BoundsRequireQualifier));
+        diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.TypeMismatch));
+    }
+
     // ════════════════════════════════════════════════════════════════════════
     //  Regression: unqualified decimal field with plain numeric bound → clean
     // ════════════════════════════════════════════════════════════════════════

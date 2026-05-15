@@ -213,6 +213,14 @@ internal static partial class TypeChecker
             var boundQualifiers = boundValue.Value.Qualifiers;
             if (boundQualifiers.IsDefaultOrEmpty)
             {
+                if (ShouldEmitCountDimensionBoundsAmbiguous(modifier.Value, resolvedType, declaredQualifiers))
+                {
+                    ctx.Diagnostics.Add(Diagnostics.Create(
+                        DiagnosticCode.CountDimensionBoundsAmbiguous,
+                        modifier.Span));
+                    continue;
+                }
+
                 if (ShouldAllowUnitQualifiedQuantityBareNumericBound(modifier.Value, resolvedType, declaredQualifiers))
                     continue;
 
@@ -254,6 +262,34 @@ internal static partial class TypeChecker
         && expression is not null
         && IsBareNumericBoundLiteral(expression)
         && declaredQualifiers.Any(q => q is DeclaredQualifierMeta.Unit);
+
+    private static bool ShouldEmitCountDimensionBoundsAmbiguous(
+        ParsedExpression? expression,
+        TypeKind resolvedType,
+        ImmutableArray<DeclaredQualifierMeta> declaredQualifiers)
+    {
+        if (resolvedType != TypeKind.Quantity || expression is null || !IsBareNumericBoundLiteral(expression))
+            return false;
+
+        if (declaredQualifiers.Any(q => q is DeclaredQualifierMeta.Unit))
+            return false;
+
+        foreach (var dimension in declaredQualifiers.OfType<DeclaredQualifierMeta.Dimension>())
+        {
+            if (IsCountDimension(dimension.DimensionName))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsCountDimension(string dimensionName)
+    {
+        if (DimensionCatalog.All.TryGetValue(dimensionName, out var alias))
+            return alias.Vector.Equals(DimensionVector.None);
+
+        return string.Equals(dimensionName, "count", StringComparison.OrdinalIgnoreCase);
+    }
 
     private static bool IsBareNumericBoundLiteral(ParsedExpression expression) => expression switch
     {

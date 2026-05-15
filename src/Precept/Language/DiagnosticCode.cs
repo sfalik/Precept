@@ -161,6 +161,8 @@ public enum DiagnosticCode
     CountBoundViolation                = 136,
     /// <summary>A binary/function operation combines business counting units that share dimension family but not unit identity.</summary>
     CrossCountingUnitOperation         = 137,
+    /// <summary>Bounds on count-dimension quantity fields are ambiguous without an explicit counting unit.</summary>
+    CountDimensionBoundsAmbiguous      = 138,
 
     // ── Graph ────────────────────────────────────────────
     UnreachableState                   =  80,

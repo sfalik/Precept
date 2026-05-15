@@ -107,6 +107,7 @@ internal static class DiagnosticCoverageAllowLists
         "ComputedFieldWithDefault",
         "ConflictingAccessModes",
         "ConflictingModifiers",
+        "CountDimensionBoundsAmbiguous",
         "CountBoundViolation",
         "CrossCountingUnitOperation",
         "CrossCurrencyArithmetic",
