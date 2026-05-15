@@ -715,7 +715,8 @@ internal static partial class TypeChecker
         ImmutableArray<DeclaredQualifierMeta> qualifiers) =>
         targetType == TypeKind.Quantity
         && IsBareNumericLiteral(expression)
-        && qualifiers.Any(q => q is DeclaredQualifierMeta.Unit);
+        && (qualifiers.Any(q => q is DeclaredQualifierMeta.Unit)
+            || qualifiers.OfType<DeclaredQualifierMeta.Dimension>().Any(q => IsCountDimension(q.DimensionName)));
 
     private static bool IsBareNumericLiteral(ParsedExpression expression) => expression switch
     {
