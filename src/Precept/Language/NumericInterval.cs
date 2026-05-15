@@ -108,6 +108,12 @@ public readonly struct NumericInterval
         return new(Math.Min(scaledMin, scaledMax), Math.Max(scaledMin, scaledMax));
     }
 
+    public NumericInterval Shift(decimal offset)
+    {
+        if (IsUnbounded) return Unbounded;
+        return new(SentinelAdd(Min, offset), SentinelAdd(Max, offset));
+    }
+
     public bool Contains(NumericInterval other)
     {
         if (other.IsEmpty) return true;

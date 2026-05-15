@@ -290,12 +290,15 @@ public static partial class ProofEngine
         if (staticUnit is null)
             return interval;
 
-        var scale = TypedConstantNormalizer.TryGetStaticScalingFactor(staticUnit);
-        if (!scale.HasValue)
+        if (!TypedConstantNormalizer.TryGetStaticAffineParams(staticUnit, out var scale, out var offset))
             return interval;
 
-        var factor = expr.ResultType == TypeKind.Price ? 1m / scale.Value : scale.Value;
-        return interval.Scale(factor);
+        if (expr.ResultType == TypeKind.Price)
+            return interval.Scale(1m / scale);
+
+        return offset.HasValue
+            ? interval.Shift(offset.Value).Scale(scale)
+            : interval.Scale(scale);
     }
 
     private static bool HasSingleMagnitudeSlot(InterpolatedTypedConstant interpolated)
