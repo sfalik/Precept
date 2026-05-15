@@ -142,7 +142,7 @@ internal static class DiagnosticCoverageAllowLists
         "InvalidDimensionString",
         "InvalidInterpolatedTypedConstantForm",
         "InvalidPriceQualifier",
-    "InvalidQualifierCoexistence",
+        "InvalidQualifierCoexistence",
         "InvalidMemberAccess",
         "InvalidModifierBounds",
         "InvalidModifierForType",
