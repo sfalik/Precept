@@ -152,6 +152,20 @@
 
 ---
 
+### 2026-05-15T02:26:33Z: Cross-counting-unit binary operations now have a concrete enforcement plan
+
+**By:** Scribe
+
+**Status:** Merged from Frank's solution design; duplicate gap note folded into the existing 2026-05-15T01:52:56Z gap record.
+
+**Merged sources:** `frank-cross-unit-comparison-solution.md`; `frank-cross-unit-comparison-gap.md` (deduplicated).
+
+- `ValidateQualifierCompatibility` must enforce qualifier checks for `OperatorFamily.Comparison` as well as arithmetic, closing the current PRE0070/PRE0071 hole for cross-currency and cross-dimension comparisons.
+- Add **PRE0137 `CrossCountingUnitOperation`** for static quantity binary operations where both qualifiers sit in the `"count"` dimension but their explicit unit codes differ (`each` vs `box`, `case`, `pallet`, etc.).
+- Preserve the current same-dimension allowance for physically convertible UCUM units (`kg`, `g`, `[lb_av]`); the stricter rule is specific to business counting units where no universal factor exists.
+- `docs/working/quantity-normalization-design.md` §6.7 is now the durable design surface for the gap and its implementation-ready fix.
+
+---
 # Decision Record: Exhaustive Architectural Review— Interpolated Forms & Normalization Design
 
 **Author:** Frank (Lead Architect)
@@ -1915,3 +1929,4 @@ Shane identified a real clarity gap, not a real type gap. The design's TYPES wer
 - `docs/Working/quantity-normalization-design.md` — §0 Revised Key Types (clarification added), §0.1 Q2 (rewritten), §0.2 (new section)
 - No type changes to Slices 14–21
 - No changes to `TypedField`, `IntervalContainmentProofRequirement`, or Builder design
+

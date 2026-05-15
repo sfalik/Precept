@@ -40,6 +40,13 @@
 
 ## Recent Updates
 
+### 2026-05-15T02:26:33Z — Cross-unit comparison solution batch recorded
+
+- Pre-check measured `.squad/decisions.md` at 114221 bytes with 2 inbox files; the ≥50 KB hard gate ran first and found 0 entries older than the 7-day cutoff (`2026-05-08T02:26:33Z`), so `decisions-archive.md` stayed unchanged.
+- Deduplicated the overlapping counting-unit gap note against the existing 2026-05-15T01:52:56Z record, merged Frank's implementation-ready solution into one new canonical decision, deleted both processed inbox files, and wrote the Frank orchestration plus session logs.
+- Summarized `.squad/agents/frank/history.md` into durable guidance, archived the displaced detail to `history-archive.md`, and propagated the new batch state into Frank/Scribe history.
+- Health report: `decisions.md` 114221B -> 115385B; inbox processed = 2 (2 -> 0); history files summarized = 1 (`.squad/agents/frank/history.md`).
+
 ### 2026-05-15T01:52:56Z — Counting-unit analysis batch recorded
 
 - Pre-check measured `.squad/decisions.md` at 112910 bytes with 1 inbox file; the hard-gate 7-day archive pass ran first and found 0 eligible decision entries older than `2026-05-08T01:52:56Z`.
@@ -161,3 +168,4 @@
 - Merged 12 unique inbox note(s), deleted the processed inbox files, wrote `.squad/orchestration-log/2026-05-12T18-59-32Z-frank.md` and the brief comma-list spike session log.
 
 - Health report: `decisions.md` 1148937B -> 1032577B; `decisions-archive.md` 1760379B -> 1760379B; inbox processed = 12; history files summarized = 1 (.squad/agents/elaine/history.md).
+
