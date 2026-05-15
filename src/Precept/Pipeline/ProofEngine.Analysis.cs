@@ -161,6 +161,12 @@ public static partial class ProofEngine
         DeclaredQualifierMeta right) =>
         QualifiersSymbolicallyEqual(left, right);
 
+    /// <summary>Exposes <see cref="TryProjectCompoundPrice"/> for unit testing.</summary>
+    internal static DeclaredQualifierMeta? TryProjectCompoundPriceForTest(
+        DeclaredQualifierMeta qualifier,
+        QualifierAxis axis) =>
+        TryProjectCompoundPrice(qualifier, axis);
+
     /// <summary>
     /// Returns the first implied qualifier matching <paramref name="axis"/> for <paramref name="type"/>.
     /// Tests Slice 11B's Duration implied-qualifier path without requiring proof pipeline setup.

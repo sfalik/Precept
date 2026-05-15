@@ -5264,4 +5264,118 @@ public class ProofEngineTests
                     because: "no guard means strategy 3 cannot fire");
         }
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  QS-5 — CompoundPrice Axis Routing in ProofEngine
+    // ════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Tests for QS-5: CompoundPrice axis routing via TryProjectCompoundPrice,
+    /// QualifiersAreCompatible, and ExtractComparableValue.
+    /// </summary>
+    public class QS5_CompoundPriceAxisRouting
+    {
+        [Fact]
+        public void CompoundPrice_ProjectsOnCurrencyAxis()
+        {
+            var compound = new DeclaredQualifierMeta.CompoundPrice("USD", "kg", "mass");
+
+            var projected = ProofEngine.TryProjectCompoundPriceForTest(compound, QualifierAxis.Currency);
+
+            projected.Should().BeOfType<DeclaredQualifierMeta.Currency>()
+                .Which.CurrencyCode.Should().Be("USD");
+        }
+
+        [Fact]
+        public void CompoundPrice_ProjectsOnUnitAxis()
+        {
+            var compound = new DeclaredQualifierMeta.CompoundPrice("USD", "kg", "mass");
+
+            var projected = ProofEngine.TryProjectCompoundPriceForTest(compound, QualifierAxis.Unit);
+
+            projected.Should().BeOfType<DeclaredQualifierMeta.Unit>()
+                .Which.UnitCode.Should().Be("kg");
+        }
+
+        [Fact]
+        public void CompoundPrice_ProjectsOnDimensionAxis()
+        {
+            var compound = new DeclaredQualifierMeta.CompoundPrice("USD", "kg", "mass");
+
+            var projected = ProofEngine.TryProjectCompoundPriceForTest(compound, QualifierAxis.Dimension);
+
+            projected.Should().BeOfType<DeclaredQualifierMeta.Dimension>()
+                .Which.DimensionName.Should().Be("mass");
+        }
+
+        [Fact]
+        public void CompoundPrice_EmptyDimension_ReturnsNullOnDimensionAxis()
+        {
+            var compound = new DeclaredQualifierMeta.CompoundPrice("USD", "each", "");
+
+            var projected = ProofEngine.TryProjectCompoundPriceForTest(compound, QualifierAxis.Dimension);
+
+            projected.Should().BeNull(because: "empty DimensionName cannot produce a Dimension qualifier");
+        }
+
+        [Fact]
+        public void CompoundPrice_NonCompoundQualifier_ReturnsNull()
+        {
+            var currency = new DeclaredQualifierMeta.Currency("USD");
+
+            var projected = ProofEngine.TryProjectCompoundPriceForTest(currency, QualifierAxis.Currency);
+
+            projected.Should().BeNull(because: "only CompoundPrice qualifiers are projected");
+        }
+
+        [Fact]
+        public void CompoundPrice_SameCurrencyAndUnit_AreCompatible()
+        {
+            var left = new DeclaredQualifierMeta.CompoundPrice("USD", "kg", "mass");
+            var right = new DeclaredQualifierMeta.CompoundPrice("USD", "kg", "mass");
+
+            ProofEngine.QualifiersAreCompatibleForTest(left, right, QualifierAxis.PriceIn)
+                .Should().BeTrue(because: "same CurrencyCode and UnitCode must be compatible");
+        }
+
+        [Fact]
+        public void CompoundPrice_DifferentCurrency_AreIncompatible()
+        {
+            var left = new DeclaredQualifierMeta.CompoundPrice("USD", "kg", "mass");
+            var right = new DeclaredQualifierMeta.CompoundPrice("EUR", "kg", "mass");
+
+            ProofEngine.QualifiersAreCompatibleForTest(left, right, QualifierAxis.PriceIn)
+                .Should().BeFalse(because: "different CurrencyCode means incompatible");
+        }
+
+        [Fact]
+        public void CompoundPrice_DifferentUnit_AreIncompatible()
+        {
+            var left = new DeclaredQualifierMeta.CompoundPrice("USD", "kg", "mass");
+            var right = new DeclaredQualifierMeta.CompoundPrice("USD", "lb", "mass");
+
+            ProofEngine.QualifiersAreCompatibleForTest(left, right, QualifierAxis.PriceIn)
+                .Should().BeFalse(because: "different UnitCode means incompatible");
+        }
+
+        [Fact]
+        public void CompoundPrice_VsCurrency_AreIncompatible()
+        {
+            var compound = new DeclaredQualifierMeta.CompoundPrice("USD", "kg", "mass");
+            var currency = new DeclaredQualifierMeta.Currency("USD");
+
+            ProofEngine.QualifiersAreCompatibleForTest(compound, currency, QualifierAxis.Currency)
+                .Should().BeFalse(because: "cross-subtype CompoundPrice vs Currency must not be compatible");
+        }
+
+        [Fact]
+        public void CompoundPrice_ExtractComparableValue_ReturnsCurrencySlashUnit()
+        {
+            var compound = new DeclaredQualifierMeta.CompoundPrice("USD", "kg", "mass");
+
+            var value = ProofEngine.ExtractComparableValueForTest(compound);
+
+            value.Should().Be("USD/kg");
+        }
+    }
 }

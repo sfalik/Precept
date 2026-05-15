@@ -564,6 +564,7 @@ public static partial class ProofEngine
                 PeriodDimension.Any => "any",
                 _ => temporalDimension.Value.ToString()
             },
+            DeclaredQualifierMeta.CompoundPrice compound => $"{compound.CurrencyCode}/{compound.UnitCode}",
             _ => null
         };
 

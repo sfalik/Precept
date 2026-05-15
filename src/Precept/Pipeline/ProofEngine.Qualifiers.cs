@@ -96,6 +96,15 @@ public static partial class ProofEngine
             }
         }
 
+        // CompoundPrice compatibility: two CompoundPrice qualifiers are compatible if
+        // both CurrencyCode and UnitCode match. CompoundPrice vs any other subtype is incompatible.
+        if (leftQualifier is DeclaredQualifierMeta.CompoundPrice leftCompound
+            && rightQualifier is DeclaredQualifierMeta.CompoundPrice rightCompound)
+        {
+            return string.Equals(leftCompound.CurrencyCode, rightCompound.CurrencyCode, StringComparison.Ordinal)
+                && string.Equals(leftCompound.UnitCode, rightCompound.UnitCode, StringComparison.Ordinal);
+        }
+
         return false;
     }
 
@@ -123,6 +132,7 @@ public static partial class ProofEngine
             DeclaredQualifierMeta.Unit { UnitCode: var value } => value,
             DeclaredQualifierMeta.Dimension { DimensionName: var value } => value,
             DeclaredQualifierMeta.TemporalUnit { UnitName: var value } => value,
+            DeclaredQualifierMeta.CompoundPrice { CurrencyCode: var value } => value,
             _ => null,
         };
 
@@ -155,6 +165,7 @@ public static partial class ProofEngine
             PeriodDimension.Time => "time",
             _                    => null,   // PeriodDimension.Any cannot satisfy chain comparisons
         },
+        DeclaredQualifierMeta.CompoundPrice cp => $"{cp.CurrencyCode}/{cp.UnitCode}",
         _                                      => null,
     };
 
@@ -187,6 +198,13 @@ public static partial class ProofEngine
                         return qual;
                 }
             }
+
+            // PriceIn fallback: project CompoundPrice onto Currency/Unit/Dimension axes
+            foreach (var qual in argQualifiers)
+            {
+                var projected = TryProjectCompoundPrice(qual, axis);
+                if (projected is not null) return projected;
+            }
         }
 
         if (resolved is TypedTypedConstant { DeclaredQualifiers: { } tcQualifiers })
@@ -213,6 +231,13 @@ public static partial class ProofEngine
                     if (qual.Axis == QualifierAxis.TemporalDimension)
                         return qual;
                 }
+            }
+
+            // PriceIn fallback: project CompoundPrice onto Currency/Unit/Dimension axes
+            foreach (var qual in tcQualifiers)
+            {
+                var projected = TryProjectCompoundPrice(qual, axis);
+                if (projected is not null) return projected;
             }
         }
 
@@ -295,6 +320,13 @@ public static partial class ProofEngine
             }
         }
 
+        // PriceIn fallback: project CompoundPrice onto Currency/Unit/Dimension axes
+        foreach (var qual in field.DeclaredQualifiers)
+        {
+            var projected = TryProjectCompoundPrice(qual, axis);
+            if (projected is not null) return projected;
+        }
+
         // Implied qualifiers: check type-level metadata after declared qualifiers are exhausted
         // (e.g., duration carries implied TemporalDimension(Time, Baseline))
         var typeMeta = Types.GetMeta(field.ResolvedType);
@@ -325,6 +357,12 @@ public static partial class ProofEngine
                 if (axis == QualifierAxis.Dimension)
                     foreach (var q in argQuals)
                         if (q.Axis == QualifierAxis.TemporalDimension) return q;
+                // PriceIn fallback: project CompoundPrice onto Currency/Unit/Dimension axes
+                foreach (var q in argQuals)
+                {
+                    var projected = TryProjectCompoundPrice(q, axis);
+                    if (projected is not null) return projected;
+                }
                 return null;
 
             case TypedTypedConstant { DeclaredQualifiers: { IsDefaultOrEmpty: false } tcQuals }:
@@ -336,6 +374,12 @@ public static partial class ProofEngine
                 if (axis == QualifierAxis.Dimension)
                     foreach (var q in tcQuals)
                         if (q.Axis == QualifierAxis.TemporalDimension) return q;
+                // PriceIn fallback: project CompoundPrice onto Currency/Unit/Dimension axes
+                foreach (var q in tcQuals)
+                {
+                    var projected = TryProjectCompoundPrice(q, axis);
+                    if (projected is not null) return projected;
+                }
                 return null;
 
             case TypedFieldRef fieldRef:
@@ -653,7 +697,40 @@ public static partial class ProofEngine
         foreach (var q in typeMeta.ImpliedQualifiers)
             if (q.Axis == axis) return q;
 
+        // PriceIn fallback: CompoundPrice carries Currency, Unit, and Dimension components
+        foreach (var q in field.DeclaredQualifiers)
+        {
+            var projected = TryProjectCompoundPrice(q, axis);
+            if (projected is not null) return projected;
+        }
+
         return null;
+    }
+
+    /// <summary>
+    /// Projects a <see cref="DeclaredQualifierMeta.CompoundPrice"/> onto a target axis.
+    /// Returns the currency, unit, or dimension component as the appropriate subtype,
+    /// or <c>null</c> if the qualifier is not a CompoundPrice or the axis is not applicable.
+    /// </summary>
+    private static DeclaredQualifierMeta? TryProjectCompoundPrice(DeclaredQualifierMeta qualifier, QualifierAxis axis)
+    {
+        if (qualifier is not DeclaredQualifierMeta.CompoundPrice compound)
+            return null;
+
+        return axis switch
+        {
+            QualifierAxis.Currency => new DeclaredQualifierMeta.Currency(
+                compound.CurrencyCode, compound.Origin, compound.Preposition,
+                compound.ProofSatisfactions, compound.SourceFieldName),
+            QualifierAxis.Unit => new DeclaredQualifierMeta.Unit(
+                compound.UnitCode, compound.DimensionName, compound.Origin, compound.Preposition,
+                compound.ProofSatisfactions, compound.SourceFieldName),
+            QualifierAxis.Dimension when !string.IsNullOrEmpty(compound.DimensionName) =>
+                new DeclaredQualifierMeta.Dimension(
+                    compound.DimensionName, compound.Origin, compound.Preposition,
+                    compound.ProofSatisfactions, compound.SourceFieldName),
+            _ => null,
+        };
     }
 }
 
