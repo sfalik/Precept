@@ -74,15 +74,20 @@ public class Slice11B_TemporalPriceDenominatorTests
     }
 
     [Fact]
-    public void Quantity_Of_Time_Emits_InvalidDimensionString()
+    public void Quantity_Of_Time_CompilesClean_And_Stores_Physical_Dimension()
     {
-        // Temporal dimension names remain invalid on quantity — the type guard keeps
-        // temporal acceptance scoped to price only.
-        TypeCheckerTestHelpers.CheckExpectingError("""
+        var index = TypeCheckerTestHelpers.CheckExpectingClean("""
             precept Widget
             field Qty as quantity of 'time'
             state Open initial
-            """, DiagnosticCode.InvalidDimensionString);
+            """);
+
+        var field = index.FieldsByName["Qty"];
+        var physical = field.DeclaredQualifiers
+            .OfType<DeclaredQualifierMeta.Dimension>()
+            .ToList();
+        physical.Should().ContainSingle(because: "quantity of 'time' should now resolve through the physical dimension catalog");
+        physical[0].DimensionName.Should().Be("time");
     }
 
     // ════════════════════════════════════════════════════════════════════════

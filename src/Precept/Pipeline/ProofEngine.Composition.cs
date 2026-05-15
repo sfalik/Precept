@@ -234,6 +234,12 @@ public static partial class ProofEngine
                                           or InterpolationSlotKind.NumeratorUnit
                                           or InterpolationSlotKind.DenominatorUnit))
                     {
+                        if (magnitude == 0m)
+                        {
+                            value = 0m;
+                            return true;
+                        }
+
                         value = default;
                         return false;
                     }

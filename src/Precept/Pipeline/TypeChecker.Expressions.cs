@@ -939,6 +939,10 @@ internal static partial class TypeChecker
         {
             if (q.SourceFieldName is not null)
                 return null;
+            if (q is DeclaredQualifierMeta.Unit u && (u.UnitCode.Contains('{') || u.DimensionName.Contains('{')))
+                return null;
+            if (q is DeclaredQualifierMeta.Dimension d && d.DimensionName.Contains('{'))
+                return null;
         }
 
         return qs;
@@ -952,6 +956,13 @@ internal static partial class TypeChecker
         TypedFieldRef fr => fr.FieldName,
         TypedArgRef ar => ar.ArgName,
         _ => Types.GetMeta(expr.ResultType).DisplayName,
+    };
+
+    private static bool ShouldSkipPairwiseQualifierChecks(TypedBinaryOp op) => op.ResultQualifier switch
+    {
+        CompoundUnitCancellationRequired => ResolveCompoundCancellationAxis(op, QualifierAxis.Dimension).Kind == QualifierResolutionKind.Resolved,
+        CompoundDimensionElevationRequired => ResolveCompoundElevationAxis(op, QualifierAxis.Dimension).Kind == QualifierResolutionKind.Resolved,
+        _ => false,
     };
 
     /// <summary>
@@ -980,6 +991,14 @@ internal static partial class TypeChecker
             opMeta.Family is OperatorFamily.Arithmetic or OperatorFamily.Comparison
             || op.ResolvedOp == OperationKind.CollectionContains;
         if (!enforcePairwiseQualifierChecks)
+            return;
+
+        if (ShouldSkipPairwiseQualifierChecks(op))
+            return;
+
+        if (ctx.CurrentFieldIndex < 0
+            && op.ResultQualifier is SameQualifierRequired
+            && op.ProofRequirements.OfType<QualifierCompatibilityProofRequirement>().Any())
             return;
 
         // PRE0070: Cross-currency arithmetic — Money + Money with different currencies

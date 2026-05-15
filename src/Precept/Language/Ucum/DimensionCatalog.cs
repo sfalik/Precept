@@ -10,6 +10,7 @@ public static class DimensionCatalog
     [
         new("length", new DimensionVector(1, 0, 0, 0, 0, 0, 0), "Length"),
         new("mass", new DimensionVector(0, 1, 0, 0, 0, 0, 0), "Mass"),
+        new("time", new DimensionVector(0, 0, 1, 0, 0, 0, 0), "Time"),
         new("temperature", new DimensionVector(0, 0, 0, 0, 1, 0, 0), "Temperature"),
         new("volume", new DimensionVector(3, 0, 0, 0, 0, 0, 0), "Volume"),
         new("area", new DimensionVector(2, 0, 0, 0, 0, 0, 0), "Area"),
