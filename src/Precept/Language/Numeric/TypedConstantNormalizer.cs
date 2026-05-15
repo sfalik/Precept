@@ -1,3 +1,4 @@
+using System;
 using System.Globalization;
 using System.Linq;
 
@@ -6,7 +7,11 @@ namespace Precept.Language;
 public static class TypedConstantNormalizer
 {
     public static decimal NormalizeQuantity(decimal magnitude, UcumParsedUnit? unit) =>
-        unit is null ? magnitude : ApplyFactor(magnitude, unit.Scale);
+        unit is null
+            ? magnitude
+            : TryGetStaticAffineParams(unit, out var scale, out var offset)
+                ? AffineToBase(magnitude, scale, offset)
+                : magnitude;
 
     public static decimal NormalizePrice(decimal magnitude, UcumParsedUnit? denominatorUnit)
     {
@@ -22,8 +27,10 @@ public static class TypedConstantNormalizer
         if (unit is null)
             return normalizedMagnitude;
 
-        var factor = FactorToDecimal(unit.Scale);
-        return normalizedMagnitude / factor;
+        if (!TryGetStaticAffineParams(unit, out var scale, out var offset))
+            return normalizedMagnitude;
+
+        return AffineFromBase(normalizedMagnitude, scale, offset);
     }
 
     public static decimal ApplyFactor(decimal magnitude, UcumExactFactor factor) =>
@@ -44,6 +51,28 @@ public static class TypedConstantNormalizer
 
         return FactorToDecimal(unit.Scale);
     }
+
+    public static bool TryGetStaticAffineParams(UcumParsedUnit? unit, out decimal scale, out decimal? offset)
+    {
+        if (unit is null
+            || unit.SourceText.Contains('{', StringComparison.Ordinal)
+            || unit.CanonicalCode.Contains('{', StringComparison.Ordinal))
+        {
+            scale = default;
+            offset = default;
+            return false;
+        }
+
+        scale = FactorToDecimal(unit.Scale);
+        offset = unit.AffineOffset;
+        return true;
+    }
+
+    private static decimal AffineToBase(decimal value, decimal scale, decimal? offset) =>
+        offset.HasValue ? (value + offset.Value) * scale : value * scale;
+
+    private static decimal AffineFromBase(decimal value, decimal scale, decimal? offset) =>
+        offset.HasValue ? value / scale - offset.Value : value / scale;
 
     private static decimal FactorToDecimal(UcumExactFactor factor)
     {
