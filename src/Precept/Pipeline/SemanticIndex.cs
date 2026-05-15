@@ -66,6 +66,7 @@ public sealed record TypedFunctionCall(
     TypeKind ResultType,
     FunctionKind ResolvedFunction,
     ImmutableArray<TypedExpression> Arguments,
+    ImmutableArray<DeclaredQualifierMeta>? ResultQualifiers,
     ImmutableArray<ProofRequirement> ProofRequirements,
     SourceSpan Span
 ) : TypedExpression(ResultType, Span);

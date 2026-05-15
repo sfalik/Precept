@@ -368,38 +368,13 @@ public static partial class ProofEngine
         switch (expr)
         {
             case TypedArgRef { DeclaredQualifiers: { IsDefaultOrEmpty: false } argQuals }:
-                foreach (var q in argQuals)
-                    if (q.Axis == axis) return q;
-                if (axis == QualifierAxis.Unit)
-                    foreach (var q in argQuals)
-                        if (q.Axis == QualifierAxis.Dimension) return q;
-                if (axis == QualifierAxis.Dimension)
-                    foreach (var q in argQuals)
-                        if (q.Axis == QualifierAxis.TemporalDimension) return q;
-                // PriceIn fallback: project CompoundPrice onto Currency/Unit/Dimension axes
-                foreach (var q in argQuals)
-                {
-                    var projected = TryProjectCompoundPrice(q, axis);
-                    if (projected is not null) return projected;
-                }
-                return null;
+                return ResolveQualifierFromDeclaredQualifiers(argQuals, axis);
 
             case TypedTypedConstant { DeclaredQualifiers: { IsDefaultOrEmpty: false } tcQuals }:
-                foreach (var q in tcQuals)
-                    if (q.Axis == axis) return q;
-                if (axis == QualifierAxis.Unit)
-                    foreach (var q in tcQuals)
-                        if (q.Axis == QualifierAxis.Dimension) return q;
-                if (axis == QualifierAxis.Dimension)
-                    foreach (var q in tcQuals)
-                        if (q.Axis == QualifierAxis.TemporalDimension) return q;
-                // PriceIn fallback: project CompoundPrice onto Currency/Unit/Dimension axes
-                foreach (var q in tcQuals)
-                {
-                    var projected = TryProjectCompoundPrice(q, axis);
-                    if (projected is not null) return projected;
-                }
-                return null;
+                return ResolveQualifierFromDeclaredQualifiers(tcQuals, axis);
+
+            case TypedFunctionCall { ResultQualifiers: { IsDefaultOrEmpty: false } resultQualifiers }:
+                return ResolveQualifierFromDeclaredQualifiers(resultQualifiers, axis);
 
             case TypedFieldRef fieldRef:
                 return ResolveFieldQualifier(fieldRef.FieldName, axis, semantics);
@@ -450,6 +425,44 @@ public static partial class ProofEngine
             default:
                 return null;
         }
+    }
+
+    private static DeclaredQualifierMeta? ResolveQualifierFromDeclaredQualifiers(
+        ImmutableArray<DeclaredQualifierMeta> qualifiers,
+        QualifierAxis axis)
+    {
+        foreach (var qualifier in qualifiers)
+        {
+            if (qualifier.Axis == axis)
+                return qualifier;
+        }
+
+        if (axis == QualifierAxis.Unit)
+        {
+            foreach (var qualifier in qualifiers)
+            {
+                if (qualifier.Axis == QualifierAxis.Dimension)
+                    return qualifier;
+            }
+        }
+
+        if (axis == QualifierAxis.Dimension)
+        {
+            foreach (var qualifier in qualifiers)
+            {
+                if (qualifier.Axis == QualifierAxis.TemporalDimension)
+                    return qualifier;
+            }
+        }
+
+        foreach (var qualifier in qualifiers)
+        {
+            var projected = TryProjectCompoundPrice(qualifier, axis);
+            if (projected is not null)
+                return projected;
+        }
+
+        return null;
     }
 
     private static DeclaredQualifierMeta? TranslateCurrencyAxis(DeclaredQualifierMeta? qualifier)
@@ -612,16 +625,12 @@ public static partial class ProofEngine
             : ResolveQualifierFromExpression(binOp.Right, axis, semantics);
 
         var compoundValue = ExtractCompoundValue(leftQualifier) ?? ExtractCompoundValue(rightQualifier);
-        if (compoundValue is null)
+        if (compoundValue is null
+            || !QualifierUnitHelpers.TrySplitCompoundUnit(compoundValue, out var numerator, out _)
+            || !TryDeriveCompoundNumeratorDimension(numerator, out var numeratorDimension))
+        {
             return null;
-
-        var slashIndex = compoundValue.IndexOf('/');
-        if (slashIndex < 0)
-            return null;
-
-        var numerator = compoundValue[..slashIndex].Trim();
-        if (!TryDeriveCompoundNumeratorDimension(numerator, out var numeratorDimension))
-            return null;
+        }
 
         return axis switch
         {
@@ -641,16 +650,12 @@ public static partial class ProofEngine
             : ResolveQualifierFromExpression(binOp.Right, axis, semantics);
 
         var compoundValue = ExtractCompoundValue(rightQualifier);
-        if (compoundValue is null)
+        if (compoundValue is null
+            || !QualifierUnitHelpers.TrySplitCompoundUnit(compoundValue, out var numerator, out _)
+            || !TryDeriveCompoundNumeratorDimension(numerator, out var numeratorDimension))
+        {
             return null;
-
-        var slashIndex = compoundValue.IndexOf('/');
-        if (slashIndex < 0)
-            return null;
-
-        var numerator = compoundValue[..slashIndex].Trim();
-        if (!TryDeriveCompoundNumeratorDimension(numerator, out var numeratorDimension))
-            return null;
+        }
 
         return axis switch
         {
@@ -667,32 +672,8 @@ public static partial class ProofEngine
         _ => null,
     };
 
-    private static bool TryDeriveCompoundNumeratorDimension(string unitCode, out string dimensionName)
-    {
-        if (UnitDimensionHelper.CountQualifierUnitCodes.Contains(unitCode))
-        {
-            dimensionName = "count";
-            return true;
-        }
-
-        if (unitCode.StartsWith("{", StringComparison.Ordinal)
-            && unitCode.EndsWith("}", StringComparison.Ordinal)
-            && unitCode.IndexOf('/') < 0)
-        {
-            dimensionName = $"{unitCode[..^1]}.dimension}}";
-            return true;
-        }
-
-        var result = UcumParser.Parse(unitCode);
-        if (result.IsValid)
-        {
-            dimensionName = UnitDimensionHelper.DeriveUnitDimensionName(result.Unit!);
-            return !string.IsNullOrWhiteSpace(dimensionName);
-        }
-
-        dimensionName = string.Empty;
-        return false;
-    }
+    private static bool TryDeriveCompoundNumeratorDimension(string unitCode, out string dimensionName) =>
+        QualifierUnitHelpers.TryDeriveUnitDimensionName(unitCode, out dimensionName);
 
     /// <summary>Look up a field's qualifier on a specific axis (with standard fallbacks).</summary>
     private static DeclaredQualifierMeta? ResolveFieldQualifier(

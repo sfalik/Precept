@@ -926,6 +926,7 @@ internal static partial class TypeChecker
             TypedArgRef ar => ar.DeclaredQualifiers,
             TypedLiteral lit => lit.DeclaredQualifiers,
             TypedTypedConstant tc => tc.DeclaredQualifiers,
+            TypedFunctionCall fn => fn.ResultQualifiers,
             TypedListLiteral { Elements: var elements } when elements.Length > 0 => TryGetStaticQualifiers(elements[0]),
             _ => null,
         };

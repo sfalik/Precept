@@ -19,6 +19,8 @@ internal sealed class DocumentState
 
     public IReadOnlyDictionary<DiagnosticKey, SuggestionInfo>? Suggestions => Volatile.Read(ref _snapshot).Suggestions;
 
+    public string SourceText => Volatile.Read(ref _snapshot).SourceText;
+
     public int Version => Volatile.Read(ref _snapshot).Version;
 
     /// <summary>Atomically replaces the current compilation with a new one.</summary>
@@ -27,7 +29,24 @@ internal sealed class DocumentState
         while (true)
         {
             var current = Volatile.Read(ref _snapshot);
-            var updated = new Snapshot(current.Version + 1, compilation, suggestions);
+            var updated = new Snapshot(current.Version + 1, compilation, suggestions, current.SourceText);
+
+            if (ReferenceEquals(Interlocked.CompareExchange(ref _snapshot, updated, current), current))
+            {
+                return;
+            }
+        }
+    }
+
+    public void Update(
+        Compilation compilation,
+        IReadOnlyDictionary<DiagnosticKey, SuggestionInfo> suggestions,
+        string sourceText)
+    {
+        while (true)
+        {
+            var current = Volatile.Read(ref _snapshot);
+            var updated = new Snapshot(current.Version + 1, compilation, suggestions, sourceText);
 
             if (ReferenceEquals(Interlocked.CompareExchange(ref _snapshot, updated, current), current))
             {
@@ -38,6 +57,9 @@ internal sealed class DocumentState
 
     public void Update(Compilation compilation) =>
         Update(compilation, EmptySuggestions);
+
+    public void Update(Compilation compilation, string sourceText) =>
+        Update(compilation, EmptySuggestions, sourceText);
 
     public bool TryUpdate(
         int version,
@@ -52,7 +74,29 @@ internal sealed class DocumentState
                 return false;
             }
 
-            var updated = new Snapshot(version, compilation, suggestions);
+            var updated = new Snapshot(version, compilation, suggestions, current.SourceText);
+            if (ReferenceEquals(Interlocked.CompareExchange(ref _snapshot, updated, current), current))
+            {
+                return true;
+            }
+        }
+    }
+
+    public bool TryUpdate(
+        int version,
+        Compilation compilation,
+        IReadOnlyDictionary<DiagnosticKey, SuggestionInfo> suggestions,
+        string sourceText)
+    {
+        while (true)
+        {
+            var current = Volatile.Read(ref _snapshot);
+            if (version <= current.Version)
+            {
+                return false;
+            }
+
+            var updated = new Snapshot(version, compilation, suggestions, sourceText);
             if (ReferenceEquals(Interlocked.CompareExchange(ref _snapshot, updated, current), current))
             {
                 return true;
@@ -63,8 +107,9 @@ internal sealed class DocumentState
     private sealed record Snapshot(
         int Version,
         Compilation? Current,
-        IReadOnlyDictionary<DiagnosticKey, SuggestionInfo> Suggestions)
+        IReadOnlyDictionary<DiagnosticKey, SuggestionInfo> Suggestions,
+        string SourceText)
     {
-        public static Snapshot Empty { get; } = new(0, null, EmptySuggestions);
+        public static Snapshot Empty { get; } = new(0, null, EmptySuggestions, string.Empty);
     }
 }

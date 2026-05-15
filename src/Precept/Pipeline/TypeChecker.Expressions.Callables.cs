@@ -694,12 +694,32 @@ internal static partial class TypeChecker
         CheckContext ctx)
     {
         ValidateFunctionQualifierCompatibility(overload, args, span, ctx);
+        var resultQualifiers = ResolveFunctionResultQualifiers(overload, args);
         return new TypedFunctionCall(
             overload.ReturnType,
             kind,
             args,
+            resultQualifiers,
             overload.ProofRequirements.ToImmutableArray(),
             span);
+    }
+
+    private static ImmutableArray<DeclaredQualifierMeta>? ResolveFunctionResultQualifiers(
+        FunctionOverload overload,
+        ImmutableArray<TypedExpression> args)
+    {
+        if (overload.Match != QualifierMatch.Same || args.IsDefaultOrEmpty)
+            return null;
+
+        var builder = ImmutableArray.CreateBuilder<DeclaredQualifierMeta>();
+        foreach (var axis in GetApplicableAssignmentQualifierAxes(overload.ReturnType))
+        {
+            var resolution = ResolveAssignmentQualifierAxis(args[0], axis);
+            if (resolution is { Kind: QualifierResolutionKind.Resolved, Qualifier: not null })
+                builder.Add(resolution.Qualifier);
+        }
+
+        return builder.Count > 0 ? builder.ToImmutable() : null;
     }
 
     private static void ValidateFunctionQualifierCompatibility(

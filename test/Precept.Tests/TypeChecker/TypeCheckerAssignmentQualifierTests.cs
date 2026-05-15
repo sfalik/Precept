@@ -746,6 +746,136 @@ public class TypeCheckerAssignmentQualifierTests
         AssertContainsUnprovedAssignmentQualifier(result);
     }
 
+    // Quantity expression-lane enforcement was deferred in Frank §5.2, but the shared resolver already
+    // closes these gaps. Keep the coverage here so regressions reopen loudly.
+    [Fact]
+    public void QuantityBareSource_ToConstrainedDimensionTarget_EmitsPRE0141()
+    {
+        var result = CompileSetAssignment(
+            targetDeclaration: "field target as quantity of 'mass' default '1 kg'",
+            assignment: "source",
+            "field source as quantity default '1 kg'");
+
+        result.Diagnostics.Should().ContainSingle(d => d.Code == DiagnosticCode.UnprovedAssignmentQualifierCompatibility.ToString());
+    }
+
+    [Fact]
+    public void QuantityBareSource_ToConstrainedUnitTarget_EmitsPRE0141()
+    {
+        var result = CompileSetAssignment(
+            targetDeclaration: "field target as quantity in 'kg' default '1 kg'",
+            assignment: "source",
+            "field source as quantity default '1 kg'");
+
+        result.Diagnostics.Should().ContainSingle(d => d.Code == DiagnosticCode.UnprovedAssignmentQualifierCompatibility.ToString());
+    }
+
+    [Fact]
+    public void QuantityWholeValueInterpolationBareSource_ToConstrainedDimensionTarget_EmitsPRE0141()
+    {
+        var result = CompileSetAssignment(
+            targetDeclaration: "field target as quantity of 'mass' default '1 kg'",
+            assignment: "'{source}'",
+            "field source as quantity default '1 kg'");
+
+        result.Diagnostics.Should().ContainSingle(d => d.Code == DiagnosticCode.UnprovedAssignmentQualifierCompatibility.ToString());
+    }
+
+    [Fact]
+    public void QuantityUnitSlotFromBareSource_ToConstrainedDimensionTarget_EmitsPRE0141()
+    {
+        var result = CompileSetAssignment(
+            targetDeclaration: "field target as quantity of 'mass' default '1 kg'",
+            assignment: "'{n} {source.unit}'",
+            "field source as quantity default '1 kg'",
+            "field n as integer default 1");
+
+        result.Diagnostics.Should().ContainSingle(d => d.Code == DiagnosticCode.UnprovedAssignmentQualifierCompatibility.ToString());
+    }
+
+    [Fact]
+    public void QuantityUnitSlotFromMassSource_ToConstrainedDimensionTarget_NoDiagnostic()
+    {
+        var result = CompileSetAssignment(
+            targetDeclaration: "field target as quantity of 'mass' default '1 kg'",
+            assignment: "'{n} {source.unit}'",
+            "field source as quantity of 'mass' default '1 kg'",
+            "field n as integer default 1");
+
+        AssertNoAssignmentQualifierDiagnostics(result);
+    }
+
+    [Fact]
+    public void QuantityBinaryAdditionOfBareSources_ToConstrainedDimensionTarget_EmitsPRE0141()
+    {
+        var result = CompileSetAssignment(
+            targetDeclaration: "field target as quantity of 'mass' default '1 kg'",
+            assignment: "left + right",
+            "field left as quantity default '1 kg'",
+            "field right as quantity default '2 kg'");
+
+        result.Diagnostics.Should().ContainSingle(d => d.Code == DiagnosticCode.UnprovedAssignmentQualifierCompatibility.ToString());
+    }
+
+    [Fact]
+    public void QuantityConditionalBareBranches_ToConstrainedDimensionTarget_EmitsPRE0141()
+    {
+        var result = CompileSetAssignment(
+            targetDeclaration: "field target as quantity of 'mass' default '1 kg'",
+            assignment: "if flag then left else right",
+            "field left as quantity default '1 kg'",
+            "field right as quantity default '2 kg'",
+            "field flag as boolean default true");
+
+        result.Diagnostics
+            .Where(d => d.Code == DiagnosticCode.UnprovedAssignmentQualifierCompatibility.ToString())
+            .Should().HaveCount(2);
+    }
+
+    [Fact]
+    public void QuantityMassSource_ToConstrainedDimensionTarget_NoDiagnostic()
+    {
+        var result = CompileSetAssignment(
+            targetDeclaration: "field target as quantity of 'mass' default '1 kg'",
+            assignment: "source",
+            "field source as quantity of 'mass' default '1 kg'");
+
+        AssertNoAssignmentQualifierDiagnostics(result);
+    }
+
+    [Fact]
+    public void MoneyRoundFunctionCallQualifierMismatch_EmitsQualifierMismatch()
+    {
+        var result = CompileSetAssignment(
+            targetDeclaration: "field target as money in 'USD' default '1 USD'",
+            assignment: "round(source, 2)",
+            "field source as money in 'EUR' default '1 EUR'");
+
+        AssertContainsQualifierMismatch(result);
+    }
+
+    [Fact]
+    public void QuantityRoundFunctionCallBareSource_ToConstrainedDimensionTarget_EmitsPRE0141()
+    {
+        var result = CompileSetAssignment(
+            targetDeclaration: "field target as quantity of 'mass' default '1 kg'",
+            assignment: "round(source, 2)",
+            "field source as quantity default '1 kg'");
+
+        AssertContainsUnprovedAssignmentQualifier(result);
+    }
+
+    [Fact]
+    public void QuantityRoundFunctionCallDimensionOnlySource_ToConstrainedUnitTarget_EmitsPRE0141()
+    {
+        var result = CompileSetAssignment(
+            targetDeclaration: "field target as quantity in '[lb_av]' default '1 [lb_av]'",
+            assignment: "round(source, 2)",
+            "field source as quantity of 'mass' default '1 kg'");
+
+        AssertContainsUnprovedAssignmentQualifier(result);
+    }
+
     private static void AssertContainsQualifierMismatch(Compilation result)
     {
         result.Diagnostics.Should().Contain(d => d.Code == DiagnosticCode.QualifierMismatch.ToString());

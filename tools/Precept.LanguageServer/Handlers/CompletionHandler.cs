@@ -56,13 +56,15 @@ internal sealed class CompletionHandler : ICompletionHandler
 
         return Task.FromResult(GetCompletions(
             state.Current,
+            state.SourceText,
             request.Position,
             request.Context?.TriggerCharacter));
     }
 
-    private static CompletionList GetCompletions(Compilation compilation, Position position, string? triggerCharacter)
+    private static CompletionList GetCompletions(Compilation compilation, string sourceText, Position position, string? triggerCharacter)
     {
         var context = SlotContextResolver.GetCursorContext(compilation, position);
+        var lineText = GetLineText(sourceText, position.Line);
 
         // A single quote always opens a typed constant — never show keyword completions.
         // If type inference succeeds, show typed constant values; otherwise return empty.
@@ -145,7 +147,7 @@ internal sealed class CompletionHandler : ICompletionHandler
 
         return context switch
         {
-            SlotContext.TopLevel => CreateCompletionList(GetTopLevelItems()),
+            SlotContext.TopLevel => CreateCompletionList(GetTopLevelItems(lineText, position.Character)),
             SlotContext.AfterKeyword => CreateCompletionList(Enumerable.Empty<CompletionItem>()),
             SlotContext.AfterValueName => CreateCompletionList(GetTypeAnnotationItems()),
             SlotContext.InTypePosition => CreateCompletionList(GetTypeItems()),
@@ -169,10 +171,146 @@ internal sealed class CompletionHandler : ICompletionHandler
             return new CompletionList([], true);
         }
 
-        return CreateCompletionList(GetModifierItems(compilation, position, construct.Meta.ModifierDomain));
+        var domain = GetModifierDomain(compilation, position, construct);
+        return CreateCompletionList(GetModifierPositionItems(compilation, position, construct, domain));
     }
 
-    private static IEnumerable<CompletionItem> GetTopLevelItems() =>
+    private static IEnumerable<CompletionItem> GetModifierPositionItems(
+        Compilation compilation,
+        Position position,
+        ParsedConstruct construct,
+        ModifierDomain domain)
+    {
+        var items = GetModifierItems(compilation, position, domain);
+
+        if (ShouldOfferDeclarationQualifierItems(compilation, position, construct, domain))
+        {
+            items = items.Concat(GetDeclarationQualifierItems(compilation, position));
+        }
+
+        if (construct.Meta.Kind == ConstructKind.FieldDeclaration)
+        {
+            items = items.Concat(GetComputedFieldItem());
+        }
+
+        return DistinctByLabel(items);
+    }
+
+    private static IEnumerable<CompletionItem> GetDeclarationQualifierItems(Compilation compilation, Position position)
+    {
+        if (!TryGetCurrentDeclarationType(compilation, position, out var declaredType))
+        {
+            return [];
+        }
+
+        var qualifierShape = Types.GetMeta(declaredType).QualifierShape;
+        if (qualifierShape is null)
+        {
+            return [];
+        }
+
+        return qualifierShape.Slots.Select(slot =>
+        {
+            var meta = Tokens.GetMeta(slot.Preposition);
+            return CreateItem(
+                label: meta.Text ?? slot.Preposition.ToString().ToLowerInvariant(),
+                detail: meta.Description,
+                kind: CompletionItemKind.Keyword,
+                sortGroup: CompletionSortGroup.Keyword,
+                documentation: meta.Description,
+                insertText: $"{meta.Text} ");
+        });
+    }
+
+    private static bool ShouldOfferDeclarationQualifierItems(
+        Compilation compilation,
+        Position position,
+        ParsedConstruct construct,
+        ModifierDomain domain)
+    {
+        if (construct.Meta.Kind is not (ConstructKind.FieldDeclaration or ConstructKind.EventDeclaration)
+            || !TryGetCurrentDeclarationType(compilation, position, out var declaredType)
+            || Types.GetMeta(declaredType).QualifierShape is null)
+        {
+            return false;
+        }
+
+        if (!GetAlreadyAppliedModifierKinds(compilation.Tokens.Tokens, position, domain).IsEmpty
+            || HasDeclarationQualifierBeforeCursor(compilation.Tokens.Tokens, position))
+        {
+            return false;
+        }
+
+        var tokenIndex = FindTokenAtOrBeforeCursor(compilation.Tokens.Tokens, position);
+        if (tokenIndex < 0)
+        {
+            return false;
+        }
+
+        tokenIndex = AdjustTokenIndexForBoundary(compilation.Tokens.Tokens, tokenIndex, position);
+        tokenIndex = FindPreviousSignificantToken(compilation.Tokens.Tokens, tokenIndex);
+        if (tokenIndex < 0)
+        {
+            return false;
+        }
+
+        return Tokens.GetMeta(compilation.Tokens.Tokens[tokenIndex].Kind).Categories.Contains(TokenCategory.Type);
+    }
+
+    private static bool HasDeclarationQualifierBeforeCursor(ImmutableArray<Token> tokens, Position position)
+    {
+        var tokenIndex = FindTokenAtOrBeforeCursor(tokens, position);
+        if (tokenIndex < 0)
+        {
+            return false;
+        }
+
+        tokenIndex = AdjustTokenIndexForBoundary(tokens, tokenIndex, position);
+        tokenIndex = FindPreviousSignificantToken(tokens, tokenIndex);
+        if (tokenIndex < 0)
+        {
+            return false;
+        }
+
+        var cursorLine = position.Line + 1;
+        for (var index = tokenIndex; index >= 0; index--)
+        {
+            var token = tokens[index];
+            if (token.Span.StartLine < cursorLine)
+            {
+                break;
+            }
+
+            if (token.Kind == TokenKind.As)
+            {
+                return false;
+            }
+
+            if (token.Kind is TokenKind.In or TokenKind.Of or TokenKind.To)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static IEnumerable<CompletionItem> GetComputedFieldItem()
+    {
+        yield return CreateItem(
+            label: "<- ",
+            detail: "Define a computed field expression",
+            kind: CompletionItemKind.Operator,
+            sortGroup: CompletionSortGroup.Keyword,
+            insertText: "<- ");
+    }
+
+    private static IEnumerable<CompletionItem> GetTopLevelItems(string lineText, int character) =>
+        IsAtLineStart(lineText, character)
+            ? GetTopLevelItemsCore()
+            : Enumerable.Empty<CompletionItem>();
+
+    private static IEnumerable<CompletionItem> GetTopLevelItemsCore() =>
         Constructs.All
             .Where(meta => meta.AllowedIn.Length == 0)
             .Select(meta => CreateItem(
@@ -183,6 +321,39 @@ internal sealed class CompletionHandler : ICompletionHandler
                 documentation: meta.Description,
                 usageExample: meta.UsageExample,
                 snippetTemplate: meta.SnippetTemplate));
+
+    private static string GetLineText(string sourceText, int zeroBasedLine)
+    {
+        if (zeroBasedLine < 0 || string.IsNullOrEmpty(sourceText))
+        {
+            return string.Empty;
+        }
+
+        var normalized = sourceText.Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace('\r', '\n');
+        var lines = normalized.Split('\n');
+        return zeroBasedLine < lines.Length ? lines[zeroBasedLine] : string.Empty;
+    }
+
+    private static bool IsAtLineStart(string lineText, int character)
+    {
+        var prefixLength = Math.Clamp(character, 0, lineText.Length);
+        return character == 0 || lineText[..prefixLength].Trim().Length == 0;
+    }
+
+    private static ModifierDomain GetModifierDomain(
+        Compilation compilation,
+        Position position,
+        ParsedConstruct construct)
+    {
+        if (construct.Meta.Kind == ConstructKind.EventDeclaration
+            && TryGetCurrentEventArg(compilation, position, out _))
+        {
+            return ModifierDomain.Field;
+        }
+
+        return construct.Meta.ModifierDomain;
+    }
 
     private static IEnumerable<CompletionItem> GetTypeAnnotationItems()
     {
@@ -307,10 +478,34 @@ internal sealed class CompletionHandler : ICompletionHandler
                     documentation: meta.Description))
             : Enumerable.Empty<CompletionItem>();
 
+        var operatorItems = GetExpressionOperatorItems();
+
         return eventArgItems
             .Concat(fieldItems)
             .Concat(functionItems)
+            .Concat(operatorItems)
             .Concat(booleanLiteralItems);
+    }
+
+    private static IEnumerable<CompletionItem> GetExpressionOperatorItems() =>
+        DistinctByLabel(Operators.All.Select(CreateOperatorItem));
+
+    private static CompletionItem CreateOperatorItem(OperatorMeta meta)
+    {
+        var label = meta switch
+        {
+            SingleTokenOp single => single.Token.Text ?? meta.Kind.ToString().ToLowerInvariant(),
+            MultiTokenOp multi => string.Join(" ", multi.Tokens.Select(token => token.Text ?? token.Kind.ToString().ToLowerInvariant())),
+            _ => meta.Kind.ToString().ToLowerInvariant(),
+        };
+
+        return CreateItem(
+            label: label,
+            detail: meta.Description,
+            kind: CompletionItemKind.Operator,
+            sortGroup: CompletionSortGroup.Keyword,
+            documentation: meta.HoverDescription ?? meta.Description,
+            usageExample: meta.UsageExample);
     }
 
     private static IEnumerable<CompletionItem> GetTypedConstantItems(

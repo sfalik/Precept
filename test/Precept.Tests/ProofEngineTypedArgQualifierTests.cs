@@ -220,5 +220,20 @@ public class ProofEngineTypedArgQualifierTests
         compilation.HasErrors.Should().BeFalse();
         compilation.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnprovedQualifierCompatibility));
     }
+
+    [Fact]
+    public void SymbolicMoneyRoundFunctionCall_Rule_DoesNotEmit_PRE0114()
+    {
+        var compilation = Compiler.Compile("""
+            precept Widget
+            field CatalogCurrency as currency default 'USD'
+            field Limit as money in '{CatalogCurrency}' default '10.00 {CatalogCurrency}'
+            field Balance as money in '{CatalogCurrency}' default '5.12 {CatalogCurrency}'
+            rule Limit >= round(Balance, 2) because "rounded balance keeps the symbolic currency"
+            """);
+
+        compilation.HasErrors.Should().BeFalse();
+        compilation.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnprovedQualifierCompatibility));
+    }
 }
 

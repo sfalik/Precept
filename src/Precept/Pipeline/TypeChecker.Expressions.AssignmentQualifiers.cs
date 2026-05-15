@@ -133,6 +133,9 @@ internal static partial class TypeChecker
             case InterpolatedTypedConstant interpolated:
                 return ResolveInterpolatedQualifierAxis(interpolated, axis);
 
+            case TypedFunctionCall functionCall:
+                return ResolveFunctionCallQualifierAxis(functionCall, axis);
+
             case TypedUnaryOp unary:
                 return ResolveAssignmentQualifierAxis(unary.Operand, axis);
 
@@ -159,7 +162,29 @@ internal static partial class TypeChecker
             }
         }
 
+        foreach (var impliedQualifier in Types.GetMeta(resultType).ImpliedQualifiers)
+        {
+            if (ProjectQualifierForAxis(impliedQualifier, axis) is { } projected)
+                return new(axis, QualifierResolutionKind.Resolved, projected);
+        }
+
         return IsAssignmentQualifierAxisApplicable(resultType, axis)
+            ? new(axis, QualifierResolutionKind.Unknown, null)
+            : new(axis, QualifierResolutionKind.Absent, null);
+    }
+
+    private static ResolvedQualifierAxis ResolveFunctionCallQualifierAxis(TypedFunctionCall functionCall, QualifierAxis axis)
+    {
+        if (functionCall.ResultQualifiers is { } resultQualifiers && !resultQualifiers.IsDefaultOrEmpty)
+        {
+            foreach (var qualifier in resultQualifiers)
+            {
+                if (ProjectQualifierForAxis(qualifier, axis) is { } projected)
+                    return new(axis, QualifierResolutionKind.Resolved, projected);
+            }
+        }
+
+        return IsAssignmentQualifierAxisApplicable(functionCall.ResultType, axis)
             ? new(axis, QualifierResolutionKind.Unknown, null)
             : new(axis, QualifierResolutionKind.Absent, null);
     }
@@ -296,7 +321,9 @@ internal static partial class TypeChecker
         {
             TypedFieldRef fieldRef => ResolveDirectQualifierAxis(fieldRef.ResultType, fieldRef.DeclaredQualifiers, axis),
             TypedArgRef argRef => ResolveDirectQualifierAxis(argRef.ResultType, argRef.DeclaredQualifiers, axis),
-            _ => new(axis, QualifierResolutionKind.Absent, null),
+            _ => IsAssignmentQualifierAxisApplicable(source.ResultType, axis)
+                ? new(axis, QualifierResolutionKind.Unknown, null)
+                : new(axis, QualifierResolutionKind.Absent, null),
         };
     }
 
@@ -605,14 +632,17 @@ internal static partial class TypeChecker
         return !string.IsNullOrWhiteSpace(value);
     }
 
-    private static bool IsAssignmentQualifierAxisApplicable(TypeKind resultType, QualifierAxis axis) => (resultType, axis) switch
+    private static ImmutableArray<QualifierAxis> GetApplicableAssignmentQualifierAxes(TypeKind resultType) => resultType switch
     {
-        (TypeKind.Money, QualifierAxis.Currency) => true,
-        (TypeKind.Quantity, QualifierAxis.Unit or QualifierAxis.Dimension) => true,
-        (TypeKind.Price, QualifierAxis.Currency or QualifierAxis.Unit or QualifierAxis.Dimension) => true,
-        (TypeKind.ExchangeRate, QualifierAxis.FromCurrency or QualifierAxis.ToCurrency) => true,
-        _ => false,
+        TypeKind.Money => [QualifierAxis.Currency],
+        TypeKind.Quantity => [QualifierAxis.Unit, QualifierAxis.Dimension],
+        TypeKind.Price => [QualifierAxis.Currency, QualifierAxis.Unit, QualifierAxis.Dimension],
+        TypeKind.ExchangeRate => [QualifierAxis.FromCurrency, QualifierAxis.ToCurrency],
+        _ => [],
     };
+
+    private static bool IsAssignmentQualifierAxisApplicable(TypeKind resultType, QualifierAxis axis) =>
+        GetApplicableAssignmentQualifierAxes(resultType).Contains(axis);
 
     private static bool SlotAccessorCanResolveAxis(QualifierAxis returnsQualifier, QualifierAxis targetAxis) =>
         returnsQualifier == targetAxis

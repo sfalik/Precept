@@ -41,6 +41,31 @@ public class CompletionHandlerTests
     }
 
     [Fact]
+    public async Task Completions_TopLevel_WithWhitespaceOnlyPrefix_IncludesConstructKeywords()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept LoanApplication
+                ¦
+            """);
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        labels.Should().Contain(["field", "state", "event", "rule", "from", "in", "on"]);
+    }
+
+    [Fact]
+    public async Task Completions_AfterAs_SuppressesTopLevelKeywords()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept LoanApplication
+            field Amount as ¦
+            """);
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        labels.Should().Contain(["string", "number", "money"]);
+        labels.Should().NotContain(["precept", "field", "state", "event", "from", "rule"]);
+    }
+
+    [Fact]
     public async Task Completions_NoDocument_ReturnsIncomplete()
     {
         var handler = new CompletionHandler(new DocumentStore());
@@ -88,6 +113,7 @@ public class CompletionHandlerTests
 
         completions.IsIncomplete.Should().BeFalse();
         labels.Should().Contain(["Draft", "UnderReview", "Approved"]);
+        labels.Should().NotContain(["precept", "field", "state", "event", "from", "rule"]);
     }
 
     [Theory]
@@ -143,7 +169,7 @@ public class CompletionHandlerTests
 
         completions.IsIncomplete.Should().BeFalse();
         expected.Should().BeEquivalentTo(["default", "optional", "writable"]);
-        labels.Should().BeEquivalentTo(expected);
+        labels.Should().BeEquivalentTo(expected.Concat(["<- "]));
         labels.Should().NotContain(["max", "maxplaces", "min", "nonnegative", "nonzero", "positive"]);
     }
 
@@ -165,6 +191,7 @@ public class CompletionHandlerTests
 
         completions.IsIncomplete.Should().BeFalse();
         labels.Should().Contain(["Submit", "Approve"]);
+        labels.Should().NotContain(["precept", "field", "state", "event", "from", "rule"]);
     }
 
     [Fact]
@@ -179,6 +206,33 @@ public class CompletionHandlerTests
 
         completions.IsIncomplete.Should().BeFalse();
         labels.Should().BeEquivalentTo(["as"]);
+    }
+
+    [Fact]
+    public async Task Completions_FieldDeclarationAfterType_OffersQualifiersModifiersAndComputedArrow()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept Inventory
+            field Weight as quantity ¦
+            """, " ");
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        labels.Should().Contain(["in", "of", "default", "min", "max", "<- "]);
+        labels.Should().NotContain(["precept", "field", "state", "event", "from", "rule"]);
+    }
+
+    [Fact]
+    public async Task Completions_EventArgumentAfterType_OffersQualifiersAndValueModifiers()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept Inventory
+            event Measure(Weight as quantity ¦)
+            """, " ");
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        labels.Should().Contain(["in", "of", "default", "min", "max"]);
+        labels.Should().NotContain("<- ");
+        labels.Should().NotContain(["precept", "field", "state", "event", "from", "rule"]);
     }
 
     [Fact]
@@ -204,6 +258,23 @@ public class CompletionHandlerTests
 
         completions.IsIncomplete.Should().BeFalse();
         labels.Should().BeEquivalentTo(expected);
+    }
+
+    [Fact]
+    public async Task Completions_TransitionOutcomeTarget_IncludesDeclaredStatesWithoutTopLevelKeywords()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept BuildingAccessBadgeRequest
+            state Approved initial
+            state Issued terminal
+            event PrintBadge
+            from Approved on PrintBadge
+                -> transition ¦
+            """, " ");
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        labels.Should().Contain(["Approved", "Issued"]);
+        labels.Should().NotContain(["precept", "field", "state", "event", "from", "rule"]);
     }
 
     [Theory]
@@ -362,7 +433,7 @@ public class CompletionHandlerTests
     }
 
     [Fact]
-    public async Task Completions_Expression_IncludeFieldsArgsAndFunctions()
+    public async Task Completions_Expression_IncludeFieldsArgsFunctionsAndOperators()
     {
         var completions = await GetCompletionsAsync("""
             precept UtilityOutageReport
@@ -383,8 +454,23 @@ public class CompletionHandlerTests
             .ToArray();
 
         completions.IsIncomplete.Should().BeFalse();
-        labels.Should().Contain(["AssignedCrew", "DispatchRound", "Verified", "CrewName", "Priority", "true", "false"]);
+        labels.Should().Contain(["AssignedCrew", "DispatchRound", "Verified", "CrewName", "Priority", "true", "false", "and", "==", "is set"]);
+        labels.Should().NotContain(["precept", "field", "state", "event", "from", "rule"]);
         labels.Where(functionNames.Contains).Should().BeEquivalentTo(functionNames);
+    }
+
+    [Fact]
+    public async Task Completions_ValuedModifierExpression_UsesExpressionItems()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept Pricing
+            field Baseline as integer default 5
+            field Total as integer min ¦
+            """, " ");
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        labels.Should().Contain(["Baseline", "abs", ">=", "and"]);
+        labels.Should().NotContain(["precept", "field", "state", "event", "from", "rule"]);
     }
 
     [Fact]
@@ -1565,7 +1651,7 @@ public class CompletionHandlerTests
     {
         var store = new DocumentStore();
         var uri = DocumentUri.FromFileSystemPath(@"C:\completion-test.precept");
-        store.GetOrAdd(uri).Update(Precept.Compiler.Compile(source));
+        store.GetOrAdd(uri).Update(Precept.Compiler.Compile(source), source);
 
         var handler = new CompletionHandler(store);
         var request = new CompletionParams

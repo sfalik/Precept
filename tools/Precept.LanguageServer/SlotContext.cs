@@ -18,6 +18,9 @@ internal enum SlotContext
     InEventTarget,
     InFieldTarget,
     InActionVerb,
+    AfterStateTarget,
+    AfterEventTarget,
+    AfterNo,
     InExpression,
     InArgDefault,
     InSetAssignment,
@@ -65,6 +68,11 @@ internal static class SlotContextResolver
             return SlotContext.InEventTarget;
         }
 
+        if (token.Kind == Precept.Language.TokenKind.Transition)
+        {
+            return SlotContext.InStateTarget;
+        }
+
         if (token.Kind is Precept.Language.TokenKind.In or Precept.Language.TokenKind.From or Precept.Language.TokenKind.To
             && HasSlotContext(compilation, token, Precept.Language.ConstructSlotKind.StateTarget))
         {
@@ -83,7 +91,7 @@ internal static class SlotContextResolver
         }
 
         if (meta.Categories.Contains(Precept.Language.TokenCategory.Type)
-            && construct?.Meta.ModifierDomain == Precept.Language.ModifierDomain.Field)
+            && construct?.Meta.Kind is Precept.Language.ConstructKind.FieldDeclaration or Precept.Language.ConstructKind.EventDeclaration)
         {
             return SlotContext.InModifierPosition;
         }
@@ -338,6 +346,38 @@ internal static class SlotContextResolver
             : null;
     }
 
+    internal static bool IsTransitionOutcomeTargetPosition(Compilation compilation, Position position) =>
+        TryGetCurrentTriggerToken(compilation, position, out var token)
+        && token.Kind == Precept.Language.TokenKind.Transition;
+
+    internal static bool IsAccessFieldTargetPosition(Compilation compilation, Position position) =>
+        TryGetCurrentTriggerToken(compilation, position, out var token)
+        && token.Kind is Precept.Language.TokenKind.Modify or Precept.Language.TokenKind.Omit;
+
+    internal static bool TryGetCompletedStateTargetLeadingToken(
+        Compilation compilation,
+        Position position,
+        out Precept.Language.TokenKind leadingToken)
+    {
+        var tokens = compilation.Tokens.Tokens;
+        var tokenIndex = FindTokenAtOrBeforeCursor(tokens, position);
+        if (tokenIndex < 0)
+        {
+            leadingToken = default;
+            return false;
+        }
+
+        tokenIndex = AdjustTokenIndexForBoundary(tokens, tokenIndex, position);
+        tokenIndex = FindPreviousSignificantToken(tokens, tokenIndex);
+        if (tokenIndex < 0)
+        {
+            leadingToken = default;
+            return false;
+        }
+
+        return TryGetCompletedStateTargetLeadingToken(tokens, tokenIndex, position, out leadingToken);
+    }
+
     private static bool HasSlotContext(
         Compilation compilation,
         Precept.Language.Token token,
@@ -370,6 +410,24 @@ internal static class SlotContextResolver
             return true;
         }
 
+        if (TryGetCompletedStateTargetLeadingToken(tokens, tokenIndex, position, out _))
+        {
+            context = SlotContext.AfterStateTarget;
+            return true;
+        }
+
+        if (IsCompletedTransitionRowEventTarget(tokens, tokenIndex, token, position, construct))
+        {
+            context = SlotContext.AfterEventTarget;
+            return true;
+        }
+
+        if (IsAfterNoOutcomeKeyword(tokens, tokenIndex, token, position, construct))
+        {
+            context = SlotContext.AfterNo;
+            return true;
+        }
+
         if (IsStateDeclarationNameToken(tokens, tokenIndex, token, construct)
             || IsEventDeclarationNameToken(tokens, tokenIndex, token, construct))
         {
@@ -383,15 +441,15 @@ internal static class SlotContextResolver
             return true;
         }
 
-        if (IsExpressionContext(token, position, construct))
-        {
-            context = SlotContext.InExpression;
-            return true;
-        }
-
         if (IsEventArgumentDefaultContext(token, construct))
         {
             context = SlotContext.InArgDefault;
+            return true;
+        }
+
+        if (IsExpressionContext(token, position, construct))
+        {
+            context = SlotContext.InExpression;
             return true;
         }
 
@@ -403,6 +461,114 @@ internal static class SlotContextResolver
 
         context = default;
         return false;
+    }
+
+    private static bool TryGetCurrentTriggerToken(
+        Compilation compilation,
+        Position position,
+        out Precept.Language.Token token)
+    {
+        var tokens = compilation.Tokens.Tokens;
+        var tokenIndex = FindTokenAtOrBeforeCursor(tokens, position);
+        if (tokenIndex < 0)
+        {
+            token = default;
+            return false;
+        }
+
+        tokenIndex = AdjustTokenIndexForBoundary(tokens, tokenIndex, position);
+        tokenIndex = FindPreviousSignificantToken(tokens, tokenIndex);
+        if (tokenIndex < 0)
+        {
+            token = default;
+            return false;
+        }
+
+        token = tokens[tokenIndex];
+        return true;
+    }
+
+    private static bool TryGetCompletedStateTargetLeadingToken(
+        ImmutableArray<Precept.Language.Token> tokens,
+        int tokenIndex,
+        Position position,
+        out Precept.Language.TokenKind leadingToken)
+    {
+        leadingToken = default;
+        if (tokenIndex < 0 || Contains(tokens[tokenIndex].Span, position))
+        {
+            return false;
+        }
+
+        var currentIndex = tokenIndex;
+        while (currentIndex >= 0)
+        {
+            if (tokens[currentIndex].Kind is not (Precept.Language.TokenKind.Identifier or Precept.Language.TokenKind.Any))
+            {
+                return false;
+            }
+
+            var previousIndex = FindPreviousSignificantToken(tokens, currentIndex - 1);
+            if (previousIndex < 0)
+            {
+                return false;
+            }
+
+            var previousKind = tokens[previousIndex].Kind;
+            if (previousKind is Precept.Language.TokenKind.In or Precept.Language.TokenKind.From or Precept.Language.TokenKind.To)
+            {
+                leadingToken = previousKind;
+                return true;
+            }
+
+            if (previousKind != Precept.Language.TokenKind.Comma)
+            {
+                return false;
+            }
+
+            currentIndex = FindPreviousSignificantToken(tokens, previousIndex - 1);
+        }
+
+        return false;
+    }
+
+    private static bool IsCompletedTransitionRowEventTarget(
+        ImmutableArray<Precept.Language.Token> tokens,
+        int tokenIndex,
+        Precept.Language.Token token,
+        Position position,
+        Precept.Pipeline.ParsedConstruct? construct)
+    {
+        if (token.Kind != Precept.Language.TokenKind.Identifier
+            || Contains(token.Span, position)
+            || !ConstructHasSlot(construct, Precept.Language.ConstructSlotKind.EventTarget)
+            || !ConstructHasSlot(construct, Precept.Language.ConstructSlotKind.Outcome))
+        {
+            return false;
+        }
+
+        var previousTokenIndex = FindPreviousSignificantToken(tokens, tokenIndex - 1);
+        return previousTokenIndex >= 0
+            && tokens[previousTokenIndex].Kind == Precept.Language.TokenKind.On;
+    }
+
+    private static bool IsAfterNoOutcomeKeyword(
+        ImmutableArray<Precept.Language.Token> tokens,
+        int tokenIndex,
+        Precept.Language.Token token,
+        Position position,
+        Precept.Pipeline.ParsedConstruct? construct)
+    {
+        if (token.Kind != Precept.Language.TokenKind.No
+            || Contains(token.Span, position)
+            || !ConstructHasSlot(construct, Precept.Language.ConstructSlotKind.Outcome))
+        {
+            return false;
+        }
+
+        var previousTokenIndex = FindPreviousSignificantToken(tokens, tokenIndex - 1);
+        return previousTokenIndex >= 0
+            && tokens[previousTokenIndex].Kind == Precept.Language.TokenKind.Arrow;
     }
 
     private static bool IsTypeAnnotationKeywordContext(
@@ -621,7 +787,7 @@ internal static class SlotContextResolver
             return false;
         }
 
-        if (IsFieldModifierDefaultContext(token, construct))
+        if (IsValuedModifierExpressionContext(token, construct))
         {
             return true;
         }
@@ -667,13 +833,13 @@ internal static class SlotContextResolver
             && ConstructHasSlot(construct, Precept.Language.ConstructSlotKind.ArgumentList);
     }
 
-    private static bool IsFieldModifierDefaultContext(
+    private static bool IsValuedModifierExpressionContext(
         Precept.Language.Token token,
         Precept.Pipeline.ParsedConstruct? construct)
     {
-        return IsDefaultModifierToken(token.Kind)
-            && construct?.Meta.Kind == Precept.Language.ConstructKind.FieldDeclaration
-            && ConstructHasSlot(construct, Precept.Language.ConstructSlotKind.ModifierList);
+        return Precept.Language.Modifiers.ByValueToken.TryGetValue(token.Kind, out var modifierMeta)
+            && modifierMeta.HasValue
+            && construct?.Meta.Kind is Precept.Language.ConstructKind.FieldDeclaration or Precept.Language.ConstructKind.EventDeclaration;
     }
 
     private static bool IsTypePositionContext(

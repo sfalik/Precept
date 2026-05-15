@@ -65,12 +65,12 @@ internal sealed class TextDocumentSyncHandler : TextDocumentSyncHandlerBase
         var state = _store.GetOrAdd(uri);
         if (version is null)
         {
-            state.Update(compilation, suggestions);
+            state.Update(compilation, suggestions, text);
             PublishDiagnostics(uri, enrichedDiagnostics);
             return;
         }
 
-        if (state.TryUpdate(version.Value, compilation, suggestions))
+        if (state.TryUpdate(version.Value, compilation, suggestions, text))
         {
             PublishDiagnostics(uri, enrichedDiagnostics);
         }
