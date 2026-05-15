@@ -1912,11 +1912,11 @@ For `[lb_av]`:
 | **35** | Affine scalar normalization `(value + offset) × scale` | ⬜ Not started | Needs 34 |
 | **36** | Affine interval shifting (`NumericInterval.Shift`) | ⬜ Not started | Needs 35 |
 | **37** | Full affine 24-test matrix | ⬜ Not started | Needs 36 |
-| **38** | Doc: temperature in scope, only genuine nonlinear units excluded | ⬜ Not started | None |
-| **39** | Doc: exact-conversion-factor assumption | ⬜ Not started | None |
-| **40** | Doc: business units `UcumExactFactor.One` / `DimensionVector.None` | ⬜ Not started | None |
-| **41** | Doc: `dozen`/`gross` intentional exclusion | ⬜ Not started | None |
-| **42** | Doc: `each.dimension = DimensionVector.None` behavior | ⬜ Not started | None |
+| **38** | Doc: temperature in scope, only genuine nonlinear units excluded | ✅ Done | None |
+| **39** | Doc: exact-conversion-factor assumption | ✅ Done | None |
+| **40** | Doc: business units `UcumExactFactor.One` / `DimensionVector.None` | ✅ Done | None |
+| **41** | Doc: `dozen`/`gross` intentional exclusion | ✅ Done | None |
+| **42** | Doc: `each.dimension = DimensionVector.None` behavior | ✅ Done | None |
 | **43** | Rename `TypedInterpolatedTypedConstant` → `InterpolatedTypedConstant` | ⬜ Not started | None |
 
 **Legend:** ✅ Done · 🔶 Partial · ⬜ Not started
@@ -3721,11 +3721,11 @@ The next available slice number is **30**. Slice 27 is already reserved for doc 
 | **35** | Affine scalar normalization `(value + offset) × scale` | Affine | ⬜ |
 | **36** | Affine interval shifting (`NumericInterval.Shift`) | Affine | ⬜ |
 | **37** | Full affine 24-test matrix | Affine | ⬜ |
-| **38** | Doc: temperature scope correction | Doc | ⬜ |
-| **39** | Doc: exact-conversion-factor assumption | Doc | ⬜ |
-| **40** | Doc: business units factor/dimension | Doc | ⬜ |
-| **41** | Doc: dozen/gross exclusion | Doc | ⬜ |
-| **42** | Doc: each.dimension behavior | Doc | ⬜ |
+| **38** | Doc: temperature scope correction | Doc | ✅ |
+| **39** | Doc: exact-conversion-factor assumption | Doc | ✅ |
+| **40** | Doc: business units factor/dimension | Doc | ✅ |
+| **41** | Doc: dozen/gross exclusion | Doc | ✅ |
+| **42** | Doc: each.dimension behavior | Doc | ✅ |
 | **43** | Rename `TypedInterpolatedTypedConstant` | Standalone | ⬜ |
 
 ---
