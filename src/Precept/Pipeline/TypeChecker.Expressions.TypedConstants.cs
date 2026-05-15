@@ -103,6 +103,10 @@ internal static partial class TypeChecker
                 qualifiers = [];
                 return true;
 
+            case InterpolatedTypedConstant { StaticQualifier: { } staticQual }:
+                qualifiers = BuildQualifiersFromStaticInterpolated(staticQual);
+                return !qualifiers.IsDefaultOrEmpty;
+
             default:
                 qualifiers = default;
                 return false;
@@ -123,6 +127,30 @@ internal static partial class TypeChecker
         qualifiers = default;
         return false;
     }
+
+    /// <summary>
+    /// Converts a compile-time-resolved <see cref="StaticInterpolatedQualifier"/> into the
+    /// <see cref="DeclaredQualifierMeta"/> array used by assignment qualifier validation.
+    /// WholeValue slots never produce a StaticQualifier (see ResolveStaticQualifier), so this
+    /// method will never be called for WholeValue-bearing interpolated constants.
+    /// </summary>
+    private static ImmutableArray<DeclaredQualifierMeta> BuildQualifiersFromStaticInterpolated(
+        StaticInterpolatedQualifier staticQual) =>
+        staticQual switch
+        {
+            StaticCurrencyQualifier { CurrencyCode: var code } =>
+                [new DeclaredQualifierMeta.Currency(code)],
+            StaticUnitQualifier { Unit: var unit } =>
+                [new DeclaredQualifierMeta.Unit(unit.CanonicalCode, UnitDimensionHelper.DeriveUnitDimensionName(unit))],
+            StaticCurrencyAndUnitQualifier { CurrencyCode: var code, Unit: var unit } =>
+                [
+                    new DeclaredQualifierMeta.Currency(code),
+                    new DeclaredQualifierMeta.Unit(unit.CanonicalCode, UnitDimensionHelper.DeriveUnitDimensionName(unit)),
+                ],
+            StaticFromToCurrenciesQualifier { FromCode: var from, ToCode: var to } =>
+                [new DeclaredQualifierMeta.FromCurrency(from), new DeclaredQualifierMeta.ToCurrency(to)],
+            _ => [],
+        };
 
     private static bool TryDeriveCompoundElevationQualifiers(
         TypedBinaryOp binary,

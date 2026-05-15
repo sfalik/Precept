@@ -183,5 +183,42 @@ public class ProofEngineTypedArgQualifierTests
             d.Code == nameof(DiagnosticCode.DivisionByZero)
             && (d.Span.StartLine == 214 || d.Span.StartLine == 220 || d.Span.StartLine == 225));
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  Slice 23 — Static qualifier routing: proof-engine PRE0114 suppression
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void StaticUnitInterpolated_Rule_DoesNotEmit_PRE0114()
+    {
+        // '{Min} kg' is InterpolatedTypedConstant with StaticQualifier = StaticUnitQualifier(kg).
+        // ProofEngine should resolve the unit qualifier from StaticQualifier, not from slots,
+        // so it discharges the qualifier-compatibility obligation without PRE0114.
+        var compilation = Compiler.Compile("""
+            precept Widget
+            field Min as decimal default '0'
+            field Qty as quantity in 'kg' default '0 kg' writable
+            rule Qty > '{Min} kg' because "positive"
+            """);
+
+        compilation.HasErrors.Should().BeFalse();
+        compilation.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnprovedQualifierCompatibility));
+    }
+
+    [Fact]
+    public void StaticCurrencyInterpolated_Rule_DoesNotEmit_PRE0114()
+    {
+        // '{n} USD' has StaticQualifier = StaticCurrencyQualifier(USD).
+        // ProofEngine should resolve the currency qualifier from StaticQualifier and discharge the proof.
+        var compilation = Compiler.Compile("""
+            precept Widget
+            field MinAmount as decimal default '0'
+            field Balance as money in 'USD' default '0.00 USD' writable
+            rule Balance > '{MinAmount} USD' because "positive"
+            """);
+
+        compilation.HasErrors.Should().BeFalse();
+        compilation.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnprovedQualifierCompatibility));
+    }
 }
 

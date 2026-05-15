@@ -406,6 +406,36 @@ public static partial class ProofEngine
     private static DeclaredQualifierMeta? ResolveQualifierFromInterpolatedConstant(
         InterpolatedTypedConstant itc, QualifierAxis axis)
     {
+        // If StaticQualifier was resolved at type-check time, trust it directly.
+        // ResolveStaticQualifier only sets a value when no dynamic slot covers the same axis,
+        // so early-returning here can never shadow a runtime-field-sourced qualifier.
+        if (itc.StaticQualifier is { } staticQual)
+        {
+            var resolved = (staticQual, axis) switch
+            {
+                (StaticCurrencyQualifier { CurrencyCode: var code }, QualifierAxis.Currency) =>
+                    (DeclaredQualifierMeta?)new DeclaredQualifierMeta.Currency(code),
+                (StaticUnitQualifier { Unit: var unit }, QualifierAxis.Unit) =>
+                    new DeclaredQualifierMeta.Unit(unit.CanonicalCode, UnitDimensionHelper.DeriveUnitDimensionName(unit)),
+                (StaticUnitQualifier { Unit: var unit }, QualifierAxis.Dimension) =>
+                    new DeclaredQualifierMeta.Dimension(UnitDimensionHelper.DeriveUnitDimensionName(unit)),
+                (StaticCurrencyAndUnitQualifier { CurrencyCode: var code }, QualifierAxis.Currency) =>
+                    new DeclaredQualifierMeta.Currency(code),
+                (StaticCurrencyAndUnitQualifier { Unit: var unit }, QualifierAxis.Unit) =>
+                    new DeclaredQualifierMeta.Unit(unit.CanonicalCode, UnitDimensionHelper.DeriveUnitDimensionName(unit)),
+                (StaticCurrencyAndUnitQualifier { Unit: var unit }, QualifierAxis.Dimension) =>
+                    new DeclaredQualifierMeta.Dimension(UnitDimensionHelper.DeriveUnitDimensionName(unit)),
+                (StaticFromToCurrenciesQualifier { FromCode: var fromCode }, QualifierAxis.FromCurrency) =>
+                    new DeclaredQualifierMeta.FromCurrency(fromCode),
+                (StaticFromToCurrenciesQualifier { ToCode: var toCode }, QualifierAxis.ToCurrency) =>
+                    new DeclaredQualifierMeta.ToCurrency(toCode),
+                _ => null,
+            };
+            if (resolved is not null)
+                return resolved;
+            // StaticQualifier exists but doesn't cover this axis — fall through to slot logic.
+        }
+
         InterpolationSlotKind? targetSlot = axis switch
         {
             QualifierAxis.Currency => InterpolationSlotKind.Currency,

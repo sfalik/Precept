@@ -210,23 +210,80 @@ public class TypeCheckerAssignmentQualifierTests
         TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.DimensionCategoryMismatch);
     }
 
+    // ════════════════════════════════════════════════════════════════════════
+    //  Slice 23 — Static qualifier routing: assignment validation
+    // ════════════════════════════════════════════════════════════════════════
+
     [Fact]
-    public void SetBareField_FromEurPlusEur_NoObligation()
+    public void SetQuantityField_FromStaticUnitInterpolated_Matching_NoDiagnostic()
     {
-        // Target has no qualifiers → ValidateAssignmentQualifiers is never called
+        // '{n} kg' is InterpolatedTypedConstant with StaticQualifier = StaticUnitQualifier(kg).
+        // When target is 'in kg', qualifiers match — no PRE0134.
         var precept = """
-            precept Invoice
-            field bareField as money
-            field a as money in 'EUR'
-            field b as money in 'EUR'
+            precept Widget
+            field Qty as quantity in 'kg' default '0 kg' writable
             state Open initial
             state Closed
-            event Calc
-            from Open on Calc
-                -> set bareField = a + b
+            event Update(n as decimal)
+            from Open on Update
+                -> set Qty = '{n} kg'
                 -> transition Closed
             """;
 
         TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void SetQuantityField_FromStaticUnitInterpolated_Mismatch_QualifierMismatch()
+    {
+        // '{n} g' has StaticQualifier = StaticUnitQualifier(g), target is 'in kg' → PRE0134.
+        var precept = """
+            precept Widget
+            field Qty as quantity in 'kg' default '0 kg' writable
+            state Open initial
+            state Closed
+            event Update(n as decimal)
+            from Open on Update
+                -> set Qty = '{n} g'
+                -> transition Closed
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.QualifierMismatch);
+    }
+
+    [Fact]
+    public void SetMoneyField_FromStaticCurrencyInterpolated_Matching_NoDiagnostic()
+    {
+        // '{n} USD' has StaticQualifier = StaticCurrencyQualifier(USD), target is 'in USD' → clean.
+        var precept = """
+            precept Widget
+            field Total as money in 'USD' default '0.00 USD' writable
+            state Open initial
+            state Closed
+            event Update(n as decimal)
+            from Open on Update
+                -> set Total = '{n} USD'
+                -> transition Closed
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void SetMoneyField_FromStaticCurrencyInterpolated_Mismatch_QualifierMismatch()
+    {
+        // '{n} EUR' has StaticQualifier = StaticCurrencyQualifier(EUR), target is 'in USD' → PRE0134.
+        var precept = """
+            precept Widget
+            field Total as money in 'USD' default '0.00 USD' writable
+            state Open initial
+            state Closed
+            event Update(n as decimal)
+            from Open on Update
+                -> set Total = '{n} EUR'
+                -> transition Closed
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.QualifierMismatch);
     }
 }
