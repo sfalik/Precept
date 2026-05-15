@@ -2235,7 +2235,7 @@ The UCUM parser normalizes to base SI units (gram, meter, second, etc. — not k
 
 A guard such as `when Qty > BoxCount`, where `Qty as quantity in 'each'` and `BoxCount as quantity in 'box'`, currently **passes** the TypeChecker's qualifier compatibility checks. It should **fail**.
 
-Both `'each'` and `'box'` resolve to `DimensionVector.None` (the `count` dimension family) and both carry `UcumExactFactor.One`. That encoding is intentional: it classifies them as count quantities, but it does **not** declare `1 each = 1 box`. The binary-op qualifier proof path's only quantity check — PRE0071 (`CrossDimensionArithmetic`) — compares **dimension names**, not unit codes. Since both have dimension `"count"`, the check passes. But dimensional compatibility ≠ value convertibility: `1 box` is not comparable to `1 each` without a product-level conversion factor that the type system cannot supply.
+Both `'each'` and `'box'` resolve to `DimensionVector.None` (the `count` dimension family) and both carry `UcumExactFactor.One`. That encoding is intentional: it classifies them as count quantities, but it does **not** declare `1 each = 1 box`. In other words, `each.dimension = DimensionVector.None` is the representation fact that creates the current bug: the binary-op qualifier proof path's only quantity check — PRE0071 (`CrossDimensionArithmetic`) — compares **dimension names**, not unit codes. Since both have dimension `"count"`, the check passes. But dimensional compatibility ≠ value convertibility: `1 box` is not comparable to `1 each` without a product-level conversion factor that the type system cannot supply.
 
 **Contrast with assignment:** `set Qty = BoxCount` is correctly **rejected** because `ValidateAssignmentQualifiers` → `ValidateResolvedQualifiers` (in `TypeChecker.Expressions.TypedConstants.cs:274`) compares the `DeclaredQualifierMeta.Unit.UnitCode` strings directly: `"each" ≠ "box"` → PRE0068 (`QualifierMismatch`). The binary-op path does not perform this per-unit-code check.
 
@@ -2269,6 +2269,8 @@ Two changes:
 1. **Extend PRE0070/PRE0071 family scope to include comparison operators.** Change the family gate from `opMeta.Family == OperatorFamily.Arithmetic` to `opMeta.Family is OperatorFamily.Arithmetic or OperatorFamily.Comparison`. This ensures cross-dimension and cross-currency comparisons are rejected, matching the behavior already enforced for arithmetic.
 
 2. **Add PRE0137 (`CrossCountingUnitOperation`).** A new check after the dimension checks: when both operands are `TypeKind.Quantity`, both have dimension `"count"`, and their static unit codes differ, emit PRE0137. This applies to **all** operator families (arithmetic and comparison), since `each + box` is equally meaningless as `each > box` without a conversion factor. PRE0137 exists precisely because PRE0071 sees only the shared `DimensionVector.None` / factor-one representation and therefore cannot distinguish business counting-unit identity on its own.
+
+This is the correct architectural fix. The representation does **not** need to change: `each.dimension = DimensionVector.None` is accurate for the count family, and `samples/inventory-item.precept` is the canonical proof that the shared count-dimension model is useful. What was missing is the second rule layer: within that shared dimension, explicit business unit codes must still match unless an authored conversion field bridges them.
 
 **Why this approach over alternatives:**
 
@@ -2435,7 +2437,7 @@ All tests go in `test/Precept.Tests/TypeChecker/TypeCheckerCurrencyUnitTests.cs`
 | Cross-SI-unit same-dimension arithmetic (`kg + g`) | Passes | Same as above |
 | Dynamic-qualifier quantity operations | Passes — `TryGetStaticQualifiers` returns null | Static check is skipped entirely; deferred to ProofEngine |
 | Money same-currency comparisons (`USD == USD`) | Passes — currency codes match | No change in behavior |
-| `samples/inventory-item.precept` | Compiles clean | Uses `of '{StockingUnit.dimension}'` (dynamic qualifiers) — static checks skipped. No direct cross-counting-unit binary operations with static qualifiers. |
+| `samples/inventory-item.precept` | Compiles clean | Canonical count-dimension sample. Uses `of '{StockingUnit.dimension}'` (dynamic qualifiers) so the shared `DimensionVector.None` family remains valid, while no direct static cross-counting-unit binary operation triggers PRE0137. |
 | `samples/Test.precept` | Compiles clean | Uses `'5 kg'` and `'{test2} [lb_av]'` — same dimension (mass), not counting units. |
 | All other sample files | Compile clean | No sample uses static cross-counting-unit binary operations. |
 
