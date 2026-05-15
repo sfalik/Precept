@@ -125,7 +125,7 @@ public class DiagnosticPublishIntegrationTests
                 Version = 1,
                 Text = """
                     precept Order
-                    field Quantity as number
+                    field Quantity as number optional
                     state Draft initial terminal
                     """,
             },
@@ -155,7 +155,7 @@ public class DiagnosticPublishIntegrationTests
             version: 2,
             """
             precept Order
-            field Quantity as number
+            field Quantity as number optional
             state Draft initial terminal
             """));
 
@@ -168,7 +168,7 @@ public class DiagnosticPublishIntegrationTests
             version: 4,
             """
             precept Order
-            field Quantity as number
+            field Quantity as number optional
             state Draft initial terminal
             """));
 

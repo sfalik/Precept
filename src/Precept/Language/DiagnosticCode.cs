@@ -173,6 +173,11 @@ public enum DiagnosticCode
     /// A <c>price in '...'</c> value is not a recognized currency code, UCUM unit, or compound form.
     /// </summary>
     InvalidPriceQualifier              = 140,
+    /// <summary>
+    /// An assignment to a qualified field cannot prove the source satisfies one required qualifier axis.
+    /// Distinct from <see cref="UnprovedQualifierCompatibility"/>, which is proof-stage and operand-pair based.
+    /// </summary>
+    UnprovedAssignmentQualifierCompatibility = 141,
 
     // ── Graph ────────────────────────────────────────────
     UnreachableState                   =  80,

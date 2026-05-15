@@ -1252,7 +1252,7 @@ public class TypeCheckerExpressionTests
     }
 
     [Fact]
-    public void SetAction_NonCancellingCompoundUnitMultiplication_EmitsDimensionMismatch()
+    public void SetAction_NonCancellingCompoundUnitMultiplication_EmitsCrossDimensionArithmetic()
     {
         var precept = """
             precept Widget
@@ -1266,11 +1266,13 @@ public class TypeCheckerExpressionTests
             """;
 
         var (_, diagnostics) = TypeCheckerTestHelpers.Check(precept);
-
-        diagnostics
+        var errorCodes = diagnostics
             .Where(d => d.Severity == Severity.Error)
             .Select(d => d.Code)
-            .Should().Contain(nameof(DiagnosticCode.DimensionCategoryMismatch));
+            .ToList();
+
+        errorCodes.Should().Contain(nameof(DiagnosticCode.CrossDimensionArithmetic));
+        errorCodes.Should().NotContain(nameof(DiagnosticCode.UnprovedAssignmentQualifierCompatibility));
     }
 
     // ════════════════════════════════════════════════════════════════════════

@@ -134,7 +134,7 @@ public sealed class SemanticTokensHandlerTests
     {
         var compilation = Compiler.Compile("""
             precept Sample
-            field Name as string
+            field Name as string optional
             state Draft initial
             """);
         var field = compilation.Semantics.Fields.Single();
@@ -398,7 +398,7 @@ public sealed class SemanticTokensHandlerTests
     [Fact]
     public void Pass2_StateName_EmitsPreceptState()
     {
-        var compilation = Compiler.Compile("precept Sample\nfield Name as string\nstate Draft initial");
+        var compilation = Compiler.Compile("precept Sample\nfield Name as string optional\nstate Draft initial");
         var expected = SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.State).CustomType;
 
         compilation.HasErrors.Should().BeFalse();
@@ -412,7 +412,7 @@ public sealed class SemanticTokensHandlerTests
     {
         var compilation = Compiler.Compile("""
             precept Sample
-            field Name as string
+            field Name as string optional
             state Draft initial
             event Submit
             """);
@@ -427,7 +427,7 @@ public sealed class SemanticTokensHandlerTests
     [Fact]
     public void Pass2_FieldName_EmitsPreceptFieldName()
     {
-        var compilation = Compiler.Compile("precept Sample\nfield Name as string\nstate Draft initial");
+        var compilation = Compiler.Compile("precept Sample\nfield Name as string optional\nstate Draft initial");
         var expected = SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.FieldName).CustomType;
 
         compilation.HasErrors.Should().BeFalse();

@@ -157,7 +157,7 @@ namespace Pipeline
         var source = @"
 namespace Precept.Language
 {
-    public enum DiagnosticCode { NumericOverflow }
+    public enum DiagnosticCode { OutOfRange }
 
     public static class Diagnostics
     {
@@ -173,7 +173,7 @@ namespace Pipeline
     {
         public void Check()
         {
-            Diagnostics.Create(DiagnosticCode.NumericOverflow, null);
+            Diagnostics.Create(DiagnosticCode.OutOfRange, null);
         }
     }
 }
@@ -181,7 +181,7 @@ namespace Pipeline
         var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<Precept0027DiagnosticEmissionCoverage>(source);
         var stale = diagnostics.Where(d => d.Id == Precept0027DiagnosticEmissionCoverage.DiagnosticId_StaleAllowList).ToList();
         stale.Should().ContainSingle();
-        stale[0].GetMessage().Should().Contain("NumericOverflow");
+        stale[0].GetMessage().Should().Contain("OutOfRange");
     }
 
     // ════════════════════════════════════════════════════════════════════════════
@@ -195,7 +195,7 @@ namespace Pipeline
         var source = @"
 namespace Precept.Language
 {
-    public enum DiagnosticCode { NumericOverflow }
+    public enum DiagnosticCode { OutOfRange }
 
     public static class Diagnostics
     {
@@ -209,7 +209,7 @@ namespace Pipeline
 
     public class Stub
     {
-        // No emission of NumericOverflow anywhere.
+        // No emission of OutOfRange anywhere.
     }
 }
 ";

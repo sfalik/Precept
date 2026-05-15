@@ -138,7 +138,8 @@ public sealed record InterpolatedTypedConstant(
     TypeKind ResultType,
     SourceSpan Span,
     decimal? StaticMagnitude = null,
-    StaticInterpolatedQualifier? StaticQualifier = null
+    StaticInterpolatedQualifier? StaticQualifier = null,
+    string? StaticText = null
 ) : TypedExpression(ResultType, Span);
 
 public abstract record StaticInterpolatedQualifier;

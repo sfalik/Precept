@@ -11,178 +11,6 @@ internal static partial class TypeChecker
     //  Expression resolution — Slice 3: Functions, Accessors, Interpolated Strings
     // ════════════════════════════════════════════════════════════════════════
 
-    private static void ValidateAssignmentQualifiers(
-        TypedExpression value,
-        string fieldName,
-        ImmutableArray<DeclaredQualifierMeta> targetQualifiers,
-        SourceSpan valueSpan,
-        CheckContext ctx)
-    {
-        if (targetQualifiers.IsDefaultOrEmpty || value is TypedErrorExpression)
-            return;
-
-        if (value is TypedTypedConstant { ResultType: TypeKind.Quantity })
-            return;
-
-        if (TryGetAssignmentSourceQualifiers(value, out var sourceQualifiers))
-        {
-            ValidateResolvedQualifiers(sourceQualifiers, fieldName, targetQualifiers, valueSpan, ctx);
-            return;
-        }
-
-        if (value is TypedBinaryOp binary)
-        {
-            ValidateAssignmentQualifiers(binary.Left, fieldName, targetQualifiers, valueSpan, ctx);
-            ValidateAssignmentQualifiers(binary.Right, fieldName, targetQualifiers, valueSpan, ctx);
-            return;
-        }
-
-        if (value is TypedUnaryOp unary)
-        {
-            ValidateAssignmentQualifiers(unary.Operand, fieldName, targetQualifiers, valueSpan, ctx);
-        }
-    }
-
-    private static bool TryGetAssignmentSourceQualifiers(
-        TypedExpression value,
-        out ImmutableArray<DeclaredQualifierMeta> qualifiers)
-    {
-        switch (value)
-        {
-            case TypedFieldRef { DeclaredQualifiers: { } fieldQualifiers } when !fieldQualifiers.IsDefaultOrEmpty:
-                qualifiers = fieldQualifiers;
-                return true;
-
-            case TypedArgRef { DeclaredQualifiers: { } argQualifiers } when !argQualifiers.IsDefaultOrEmpty:
-                qualifiers = argQualifiers;
-                return true;
-
-            case TypedTypedConstant
-            {
-                ResultType: TypeKind.Money,
-                ParsedValue: ValueTuple<decimal, object?> (_, CurrencyEntry currency)
-            }:
-                qualifiers = [new DeclaredQualifierMeta.Currency(currency.AlphaCode)];
-                return true;
-
-            case TypedBinaryOp { ResultQualifier: CompoundUnitCancellationRequired } binary
-                when TryDeriveCompoundUnitCancellationQualifier(binary, out qualifiers):
-                return true;
-
-            case TypedBinaryOp { ResultQualifier: CurrencyConversionRequired } binary:
-                // Result currency is the ToCurrency of the exchangerate operand.
-                // If the rate has no declared qualifiers (generic exchangerate arg),
-                // the conversion target is unknown at compile time — return true with empty
-                // qualifiers so the recursive fallback does not incorrectly validate the
-                // money operand's source currency against the assignment target.
-                var rateOperand = binary.Left.ResultType == TypeKind.ExchangeRate
-                    ? binary.Left : binary.Right;
-                if (TryGetAssignmentSourceQualifiers(rateOperand, out var rateQuals))
-                {
-                    foreach (var q in rateQuals)
-                    {
-                        if (q is DeclaredQualifierMeta.ToCurrency { CurrencyCode: var toCurr })
-                        {
-                            qualifiers = [new DeclaredQualifierMeta.Currency(toCurr)];
-                            return true;
-                        }
-                    }
-                }
-                // Rate has no ToCurrency qualifier — suppress mismatch.
-                qualifiers = [];
-                return true;
-
-            case TypedBinaryOp { ResultQualifier: CompoundDimensionElevationRequired } elevBinary:
-                // Result is price: currency from price (left), unit elevation from compound-quantity numerator (right).
-                if (TryDeriveCompoundElevationQualifiers(elevBinary, out var elevQualifiers))
-                {
-                    qualifiers = elevQualifiers;
-                    return true;
-                }
-                // Cannot resolve qualifiers -- suppress false mismatch.
-                qualifiers = [];
-                return true;
-
-            case InterpolatedTypedConstant { StaticQualifier: { } staticQual }:
-                qualifiers = BuildQualifiersFromStaticInterpolated(staticQual);
-                return !qualifiers.IsDefaultOrEmpty;
-
-            default:
-                qualifiers = default;
-                return false;
-        }
-    }
-
-    private static bool TryDeriveCompoundUnitCancellationQualifier(
-        TypedBinaryOp binary,
-        out ImmutableArray<DeclaredQualifierMeta> qualifiers)
-    {
-        if (TryMatchCompoundUnitCancellation(binary.Left, binary.Right, out var resultUnit)
-            || TryMatchCompoundUnitCancellation(binary.Right, binary.Left, out resultUnit))
-        {
-            qualifiers = [resultUnit];
-            return true;
-        }
-
-        qualifiers = default;
-        return false;
-    }
-
-    /// <summary>
-    /// Converts a compile-time-resolved <see cref="StaticInterpolatedQualifier"/> into the
-    /// <see cref="DeclaredQualifierMeta"/> array used by assignment qualifier validation.
-    /// WholeValue slots never produce a StaticQualifier (see ResolveStaticQualifier), so this
-    /// method will never be called for WholeValue-bearing interpolated constants.
-    /// </summary>
-    private static ImmutableArray<DeclaredQualifierMeta> BuildQualifiersFromStaticInterpolated(
-        StaticInterpolatedQualifier staticQual) =>
-        staticQual switch
-        {
-            StaticCurrencyQualifier { CurrencyCode: var code } =>
-                [new DeclaredQualifierMeta.Currency(code)],
-            StaticUnitQualifier { Unit: var unit } =>
-                [new DeclaredQualifierMeta.Unit(unit.CanonicalCode, UnitDimensionHelper.DeriveUnitDimensionName(unit))],
-            StaticCurrencyAndUnitQualifier { CurrencyCode: var code, Unit: var unit } =>
-                [
-                    new DeclaredQualifierMeta.Currency(code),
-                    new DeclaredQualifierMeta.Unit(unit.CanonicalCode, UnitDimensionHelper.DeriveUnitDimensionName(unit)),
-                ],
-            StaticFromToCurrenciesQualifier { FromCode: var from, ToCode: var to } =>
-                [new DeclaredQualifierMeta.FromCurrency(from), new DeclaredQualifierMeta.ToCurrency(to)],
-            _ => [],
-        };
-
-    private static bool TryDeriveCompoundElevationQualifiers(
-        TypedBinaryOp binary,
-        out ImmutableArray<DeclaredQualifierMeta> qualifiers)
-    {
-        // Currency inherits from price (left operand)
-        if (!TryGetAssignmentSourceQualifiers(binary.Left, out var priceQuals))
-        {
-            qualifiers = default;
-            return false;
-        }
-
-        var currency = priceQuals.OfType<DeclaredQualifierMeta.Currency>().FirstOrDefault();
-
-        // Elevation unit: numerator of compound-quantity (right operand)
-        if (!TryGetCompoundUnit(binary.Right, out var compoundUnit)
-            || !TrySplitCompoundUnit(compoundUnit.UnitCode, out var numeratorUnit, out _)
-            || !TryDeriveUnitDimensionName(numeratorUnit, out var numeratorDimension))
-        {
-            qualifiers = default;
-            return false;
-        }
-
-        var resultUnit = new DeclaredQualifierMeta.Unit(
-            numeratorUnit, numeratorDimension, QualifierOrigin.Derived);
-
-        qualifiers = currency is not null
-            ? [currency, resultUnit]
-            : [resultUnit];
-        return true;
-    }
-
     private static bool TryMatchCompoundUnitCancellation(
         TypedExpression standaloneQuantity,
         TypedExpression compoundQuantity,
@@ -210,22 +38,14 @@ internal static partial class TypeChecker
 
     private static bool TryGetQuantityDimensionName(TypedExpression value, out string dimensionName)
     {
-        if (TryGetAssignmentSourceQualifiers(value, out var qualifiers))
+        var resolution = ResolveAssignmentQualifierAxis(value, QualifierAxis.Dimension);
+        if (resolution.Kind == QualifierResolutionKind.Resolved
+            && resolution.Qualifier is not null
+            && TryGetQualifierText(resolution.Qualifier, QualifierAxis.Dimension, out var resolvedDimension)
+            && !string.IsNullOrWhiteSpace(resolvedDimension))
         {
-            var resolvedDimension = qualifiers
-                .OfType<DeclaredQualifierMeta.Dimension>()
-                .Select(q => q.DimensionName)
-                .FirstOrDefault()
-                ?? qualifiers
-                    .OfType<DeclaredQualifierMeta.Unit>()
-                    .Select(q => q.DimensionName)
-                    .FirstOrDefault();
-
-            if (!string.IsNullOrWhiteSpace(resolvedDimension))
-            {
-                dimensionName = resolvedDimension;
-                return true;
-            }
+            dimensionName = resolvedDimension;
+            return true;
         }
 
         dimensionName = string.Empty;
@@ -236,21 +56,22 @@ internal static partial class TypeChecker
     {
         compoundUnit = null!;
 
-        if (!TryGetAssignmentSourceQualifiers(value, out var qualifiers))
-            return false;
-
-        var unit = qualifiers.OfType<DeclaredQualifierMeta.Unit>().FirstOrDefault();
-        if (unit is not null && unit.UnitCode.IndexOf('/') > 0)
+        var unitResolution = ResolveAssignmentQualifierAxis(value, QualifierAxis.Unit);
+        if (unitResolution.Kind == QualifierResolutionKind.Resolved
+            && unitResolution.Qualifier is DeclaredQualifierMeta.Unit unit
+            && unit.UnitCode.IndexOf('/') > 0)
         {
             compoundUnit = unit;
             return true;
         }
 
-        // Also accept compound-dimension qualifiers (e.g. 'of "each/case"' → Dimension("each/case"))
-        var dim = qualifiers.OfType<DeclaredQualifierMeta.Dimension>().FirstOrDefault();
-        if (dim is not null && dim.DimensionName.IndexOf('/') > 0)
+        var dimensionResolution = ResolveAssignmentQualifierAxis(value, QualifierAxis.Dimension);
+        if (dimensionResolution.Kind == QualifierResolutionKind.Resolved
+            && dimensionResolution.Qualifier is not null
+            && TryGetQualifierText(dimensionResolution.Qualifier, QualifierAxis.Dimension, out var dimensionName)
+            && dimensionName.IndexOf('/') > 0)
         {
-            compoundUnit = new DeclaredQualifierMeta.Unit(dim.DimensionName, dim.DimensionName, dim.Origin);
+            compoundUnit = new DeclaredQualifierMeta.Unit(dimensionName, dimensionName, QualifierOrigin.Derived);
             return true;
         }
 
@@ -297,133 +118,6 @@ internal static partial class TypeChecker
 
         dimensionName = string.Empty;
         return false;
-    }
-
-    private static void ValidateResolvedQualifiers(
-        ImmutableArray<DeclaredQualifierMeta> qualifiers,
-        string fieldName,
-        ImmutableArray<DeclaredQualifierMeta> targetQualifiers,
-        SourceSpan valueSpan,
-        CheckContext ctx)
-    {
-        if (qualifiers.IsDefaultOrEmpty)
-            return;
-
-        foreach (var targetQualifier in targetQualifiers)
-        {
-            switch (targetQualifier)
-            {
-                case DeclaredQualifierMeta.Dimension { DimensionName: var targetDimension }:
-                {
-                    string? sourceDimension = qualifiers
-                        .OfType<DeclaredQualifierMeta.Dimension>()
-                        .Select(q => q.DimensionName)
-                        .FirstOrDefault()
-                        ?? qualifiers
-                            .OfType<DeclaredQualifierMeta.Unit>()
-                            .Select(q => q.DimensionName)
-                            .FirstOrDefault();
-
-                    if (sourceDimension is not null
-                        && !string.Equals(sourceDimension, targetDimension, StringComparison.OrdinalIgnoreCase))
-                    {
-                        ctx.Diagnostics.Add(
-                            Diagnostics.Create(
-                                DiagnosticCode.DimensionCategoryMismatch,
-                                valueSpan,
-                                sourceDimension,
-                                targetDimension,
-                                fieldName));
-                    }
-
-                    break;
-                }
-
-                case DeclaredQualifierMeta.Unit { UnitCode: var targetUnit }:
-                {
-                    var sourceUnit = qualifiers
-                        .OfType<DeclaredQualifierMeta.Unit>()
-                        .Select(q => q.UnitCode)
-                        .FirstOrDefault();
-
-                    if (sourceUnit is not null
-                        && !string.Equals(sourceUnit, targetUnit, StringComparison.OrdinalIgnoreCase))
-                    {
-                        ctx.Diagnostics.Add(
-                            Diagnostics.Create(
-                                DiagnosticCode.QualifierMismatch,
-                                valueSpan,
-                                targetUnit,
-                                fieldName));
-                    }
-
-                    break;
-                }
-
-                case DeclaredQualifierMeta.Currency { CurrencyCode: var targetCurrency }:
-                {
-                    var sourceCurrency = qualifiers
-                        .OfType<DeclaredQualifierMeta.Currency>()
-                        .Select(q => q.CurrencyCode)
-                        .FirstOrDefault();
-
-                    if (sourceCurrency is not null
-                        && !string.Equals(sourceCurrency, targetCurrency, StringComparison.OrdinalIgnoreCase))
-                    {
-                        ctx.Diagnostics.Add(
-                            Diagnostics.Create(
-                                DiagnosticCode.QualifierMismatch,
-                                valueSpan,
-                                targetCurrency,
-                                fieldName));
-                    }
-
-                    break;
-                }
-
-                case DeclaredQualifierMeta.FromCurrency { CurrencyCode: var targetFromCurrency }:
-                {
-                    var sourceFromCurrency = qualifiers
-                        .OfType<DeclaredQualifierMeta.FromCurrency>()
-                        .Select(q => q.CurrencyCode)
-                        .FirstOrDefault();
-
-                    if (sourceFromCurrency is not null
-                        && !string.Equals(sourceFromCurrency, targetFromCurrency, StringComparison.OrdinalIgnoreCase))
-                    {
-                        ctx.Diagnostics.Add(
-                            Diagnostics.Create(
-                                DiagnosticCode.QualifierMismatch,
-                                valueSpan,
-                                targetFromCurrency,
-                                fieldName));
-                    }
-
-                    break;
-                }
-
-                case DeclaredQualifierMeta.ToCurrency { CurrencyCode: var targetToCurrency }:
-                {
-                    var sourceToCurrency = qualifiers
-                        .OfType<DeclaredQualifierMeta.ToCurrency>()
-                        .Select(q => q.CurrencyCode)
-                        .FirstOrDefault();
-
-                    if (sourceToCurrency is not null
-                        && !string.Equals(sourceToCurrency, targetToCurrency, StringComparison.OrdinalIgnoreCase))
-                    {
-                        ctx.Diagnostics.Add(
-                            Diagnostics.Create(
-                                DiagnosticCode.QualifierMismatch,
-                                valueSpan,
-                                targetToCurrency,
-                                fieldName));
-                    }
-
-                    break;
-                }
-            }
-        }
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -903,8 +597,10 @@ internal static partial class TypeChecker
         if (hasError)
             return new TypedErrorExpression(expr.Span);
 
+        var typedSlotsArray = typedSlots.ToImmutable();
+
         // Step 9: Dimension-unit consistency for unit-slot holes
-        foreach (var slot in typedSlots)
+        foreach (var slot in typedSlotsArray)
         {
             if (slot.SlotKind != InterpolationSlotKind.Unit) continue;
             if (slot.Expression.ResultType != TypeKind.UnitOfMeasure) continue;
@@ -913,11 +609,12 @@ internal static partial class TypeChecker
         }
 
         return new InterpolatedTypedConstant(
-            typedSlots.ToImmutable(),
+            typedSlotsArray,
             targetType,
             expr.Span,
             TryExtractStaticMagnitude(segments),
-            ResolveStaticQualifier(segments, typedSlots.ToImmutable(), targetType));
+            ResolveStaticQualifier(segments, typedSlotsArray, targetType),
+            string.Concat(segments.OfType<TextSegment>().Select(segment => segment.Text)));
     }
 
     private static decimal? TryExtractStaticMagnitude(ImmutableArray<InterpolationSegment> segments)
@@ -1040,6 +737,34 @@ internal static partial class TypeChecker
         return true;
     }
 
+    private static bool TryExtractInterpolatedPriceCurrency(string? staticText, out string currencyCode)
+    {
+        currencyCode = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(staticText))
+            return false;
+
+        var trimmed = staticText.Trim();
+        var slashIndex = trimmed.IndexOf('/');
+        if (slashIndex <= 0)
+            return false;
+
+        var beforeSlash = trimmed[..slashIndex].Trim();
+        if (beforeSlash.Length == 0)
+            return false;
+
+        var parts = beforeSlash.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (parts.Length == 0)
+            return false;
+
+        var currency = parts[^1];
+        if (!IsCurrencyCode(currency))
+            return false;
+
+        currencyCode = currency.ToUpperInvariant();
+        return true;
+    }
+
     private static bool TryExtractFromToCurrencies(string text, out string fromCode, out string toCode)
     {
         fromCode = string.Empty;
@@ -1071,52 +796,31 @@ internal static partial class TypeChecker
         SourceSpan span,
         CheckContext ctx)
     {
-        if (holeExpr is not TypedMemberAccess
-            {
-                ResolvedAccessor: FixedReturnAccessor { ReturnsQualifier: QualifierAxis.Unit }
-            } memberAccess)
+        var sourceDimension = ResolveSlotSourceQualifierAxis(holeExpr, QualifierAxis.Dimension, out var sourceName);
+        if (sourceDimension.Kind != QualifierResolutionKind.Resolved
+            || sourceDimension.Qualifier is null
+            || !TryGetQualifierText(sourceDimension.Qualifier, QualifierAxis.Dimension, out var sourceDimensionName)
+            || targetQualifiers is not { } tq
+            || tq.IsDefaultOrEmpty)
         {
             return;
         }
 
-        ImmutableArray<DeclaredQualifierMeta>? sourceQualifiers;
-        string sourceName;
+        var expandedTargetQualifiers = ExpandAssignmentTargetQualifiers(tq);
+        var targetDimension = expandedTargetQualifiers
+            .Select(q => ProjectQualifierForAxis(q, QualifierAxis.Dimension))
+            .OfType<DeclaredQualifierMeta.Dimension>()
+            .Select(q => q.DimensionName)
+            .FirstOrDefault();
 
-        if (memberAccess.Object is TypedFieldRef { DeclaredQualifiers: { } fq, FieldName: var fn })
-        {
-            sourceQualifiers = fq;
-            sourceName = fn;
-        }
-        else if (memberAccess.Object is TypedArgRef { DeclaredQualifiers: { } aq })
-        {
-            sourceQualifiers = aq;
-            sourceName = "(arg)";
-        }
-        else
-        {
-            return;
-        }
-
-        string? sourceDimension = sourceQualifiers.Value
-            .OfType<DeclaredQualifierMeta.Dimension>().Select(q => q.DimensionName).FirstOrDefault()
-            ?? sourceQualifiers.Value
-            .OfType<DeclaredQualifierMeta.Unit>().Select(q => q.DimensionName).FirstOrDefault();
-
-        if (sourceDimension is null || targetQualifiers is not { } tq || tq.IsDefaultOrEmpty)
+        if (targetDimension is null)
             return;
 
-        string? targetDimension = tq
-            .OfType<DeclaredQualifierMeta.Dimension>().Select(q => q.DimensionName).FirstOrDefault()
-            ?? tq
-            .OfType<DeclaredQualifierMeta.Unit>().Select(q => q.DimensionName).FirstOrDefault();
-
-        if (targetDimension is null) return;
-
-        if (!string.Equals(sourceDimension, targetDimension, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(sourceDimensionName, targetDimension, StringComparison.OrdinalIgnoreCase))
         {
             ctx.Diagnostics.Add(
                 Diagnostics.Create(DiagnosticCode.DimensionMismatchInUnitSlot, span,
-                    sourceName, sourceDimension, targetDimension));
+                    sourceName, sourceDimensionName, targetDimension));
         }
     }
 

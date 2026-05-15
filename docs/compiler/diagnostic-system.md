@@ -173,6 +173,8 @@ Three levels. No `Hidden` (unlike Roslyn) — Precept's diagnostic surface is sm
 
 ## DiagnosticCode Registry
 
+`PRE0141 UnprovedAssignmentQualifierCompatibility` is the assignment-time companion to proof-stage `PRE0114 UnprovedQualifierCompatibility`. Use `PRE0141` when the type checker cannot prove a required assignment qualifier axis; keep `PRE0114` for operand-pair proof obligations and keep `PRE0068` / `PRE0069` for definite mismatches.
+
 ```csharp
 public enum DiagnosticCode
 {

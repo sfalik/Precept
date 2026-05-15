@@ -167,8 +167,8 @@ public class DiagnosticProjectorTests
 
     private const string ValidSource = """
         precept OrderItem
-        field Quantity as number
-        field Price as number
+        field Quantity as number optional
+        field Price as number optional
         state Pending initial terminal
         """;
 

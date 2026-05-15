@@ -1203,10 +1203,10 @@ public class TypeCheckerTypedConstantTests
     }
 
     [Fact]
-    public void InterpolatedTypedConstant_SourceNoDimension_ConservativeAccept()
+    public void InterpolatedTypedConstant_SourceNoDimension_EmitsUnprovedAssignmentQualifierCompatibility()
     {
-        // '1 {f1.unit}' where f1 is quantity (no dimension), target is quantity of 'mass' → no error
-        var (index, diagnostics) = TypeCheckerTestHelpers.Check("""
+        // '1 {f1.unit}' where f1 is quantity (no dimension), target is quantity of 'mass' → assignment must now prove the dimension axis.
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check("""
             precept Test
             field target as quantity of 'mass'
             field f1 as quantity
@@ -1215,7 +1215,7 @@ public class TypeCheckerTypedConstantTests
                 -> set target = '1 {f1.unit}'
             """);
 
-        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.UnprovedAssignmentQualifierCompatibility));
     }
 
     [Fact]
