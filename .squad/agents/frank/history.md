@@ -77,3 +77,7 @@
 - **Logarithmic units (dB, pH) excluded:** interval arithmetic incompatibility, domain mismatch, reference-level ambiguity.
 - **Orthogonal to frank-12:** PRE0137 targets counting units (`DimensionVector.None`); temperature has `DimensionVector.Temperature`.
 - Decision record: `.squad/decisions/inbox/frank-affine-conversion-design.md`.
+
+## Learnings
+
+- 2026-05-14T22:48:46.544-04:00 — Added formal implementation slices 30–43 to `docs/working/quantity-normalization-design.md`, covering the four qualifier gaps, the four-slice affine lane, five pre-implementation documentation slices, and the standalone `TypedInterpolatedTypedConstant` → `InterpolatedTypedConstant` rename.
