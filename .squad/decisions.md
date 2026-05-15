@@ -6,6 +6,49 @@
 
 ---
 
+### 2026-05-15T01:05:58Z: Quantity normalization review findings accepted, ordered, and narrowed to implementation-safe scope
+
+**By:** Scribe
+
+**Status:** Merged from George's technical review and Frank's disposition pass.
+
+**Merged sources:** `george-normalization-design-review.md`; `frank-normalization-george-review.md`.
+
+- George's design review approved the normalization plan with conditions: Slice 16's blast radius extends through obligation generation, proof diagnostics, MCP projection, and proof tests; duplicate Slice 22 numbering and the missing display contract were the main planning hazards.
+- Frank accepted every technical finding, corrected the concrete code targets (`TypedArg`, `PopulateEvents`), moved runtime-ingress work out of the active implementation track, and locked the implementation ordering around the review's safety constraints.
+- B16's dynamic-unit rule is canonical: `TryGetStaticNumericValue` must refuse raw `StaticMagnitude` facts when no static scaling factor exists, and interval-containment proof success never suppresses independent PRE0116 presence obligations.
+- Slice 26's track membership and B18's full display contract were left to explicit follow-up decisions; both are now resolved by separate canonical entries below.
+---
+
+### 2026-05-15T01:05:58Z: Q1 locked the quantity-overflow display contract and fully resolved B18
+
+**By:** Scribe
+
+**Status:** Merged from Frank's Q1 lock note.
+
+**Merged source:** `frank-q1-display-contract-locked.md`.
+
+- `NumericOverflow` and related interval-containment displays must show the computed interval de-normalized into the field's declared unit, e.g. `[−∞ .. 5 kg] (computed: [6 [lb_av] .. 6 [lb_av]])`.
+- `IntervalContainmentProofRequirement` must carry the field's declared qualifier so the diagnostic renderer can de-normalize before presenting overflow evidence.
+- This closes the last ambiguity behind B18: the design now specifies the display contract completely enough for Slice 18 implementation, diagnostic rendering, and downstream hover/MCP alignment.
+- Frank wrote the lock directly into `docs/Working/quantity-normalization-design.md`; that document update is staged with this Scribe pass.
+---
+
+### 2026-05-15T01:05:58Z: Slice 26 stays inside the quantity-normalization track
+
+**By:** Scribe
+
+**Status:** Merged from Frank's reinclusion decision.
+
+**Merged source:** `frank-slice26-reinclusion.md`.
+
+- Shane's direction keeps event-arg default resolution in-track instead of deferring it to a separate issue, closing the asymmetry where field defaults would normalize and prove correctly but arg defaults would stay ignored.
+- The active implementation shape is tight: add `ResolveEventArgExpressions`, populate `TypedArg.DefaultExpression`, route arg defaults through the same assignability and interval-containment machinery, and reuse Slice 15b's normalized arg bounds.
+- The one notable adapter is `ValidateMaxPlaces`, which needs a minor `TypedArg`-compatible path; this is mechanical scope, not a design blocker.
+- General/dynamic default expressions remain conservative: typed-constant defaults are the primary supported proof shape, while interpolated defaults can degrade to unbounded when static scaling facts are unavailable.
+
+---
+
 ### 2026-05-15T00:08:25Z: Typed-constant interpolation holes require PRE0116 proof-stage presence checks
 
 **By:** Scribe

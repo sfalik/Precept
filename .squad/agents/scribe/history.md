@@ -40,6 +40,14 @@
 
 ## Recent Updates
 
+### 2026-05-15T01:05:58Z — Q1 lock batch recorded
+
+- Pre-check: `.squad/decisions.md` measured 109615 bytes with 4 inbox file(s); the 7-day archive hard gate ran first and found 0 eligible active entries older than `2026-05-08T01:05:58Z`.
+- Merged 4 inbox notes into 3 canonical decisions, deleted the processed inbox files, wrote `.squad/orchestration-log/2026-05-15T01-05-58Z-frank.md`, and recorded `.squad/log/2026-05-15T01-05-58Z-q1-locked.md`.
+- Durable outcomes: George's normalization review is captured with Frank's accepted dispositions, Q1 fully locks the de-normalized display contract that resolves B18, and Slice 26 stays inside the quantity-normalization track.
+- Health report: `decisions.md` 109615 B -> 112910 B; inbox processed = 4 (4 -> 0); history files summarized = 0.
+
+
 ### 2026-05-14T22:00:00Z — Quantity normalization resolution batch recorded
 
 - Pre-check: `decisions.md` at 102255 bytes (> 51200 B gate); inbox had 3 files. All decisions.md entries dated 2026-05-11 or later — no entries older than 7 days, archive pass found 0 eligible entries.
