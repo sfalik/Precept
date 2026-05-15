@@ -7,4 +7,5 @@ public sealed record UcumAtom(
     UcumExactFactor Scale,
     bool Prefixable,
     string? AnnotationClass,
-    string? PrintSymbol = null);
+    string? PrintSymbol = null,
+    decimal? AffineOffset = null);

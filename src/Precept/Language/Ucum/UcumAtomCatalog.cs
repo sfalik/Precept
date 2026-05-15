@@ -1,4 +1,5 @@
 using System.Collections.Frozen;
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
 using System.Text.RegularExpressions;
@@ -247,7 +248,8 @@ public static class UcumAtomCatalog
                     evaluation.Scale,
                     candidate.Prefixable,
                     null,
-                    candidate.PrintSymbol);
+                    candidate.PrintSymbol,
+                    candidate.AffineOffset);
                 pending.RemoveAt(index);
                 progress = true;
             }
@@ -283,7 +285,9 @@ public static class UcumAtomCatalog
                 result.Unit.Vector,
                 result.Unit.Scale,
                 false,
-                null);
+                null,
+                null,
+                result.Unit.AffineOffset);
         }
 
         throw new InvalidOperationException($"Tier 1 UCUM code '{code}' was not found in UcumAtomCatalog.All and could not be derived via parsing.");
@@ -373,32 +377,54 @@ public static class UcumAtomCatalog
         else
             printSymbol = printSymbol.Trim();
 
-        var expression = GetDefinitionExpression(element, code);
-        return expression is null ? null : new PendingAtom(code, name, expression, prefixable, printSymbol);
+        var expression = GetDefinitionExpression(element, code, out var functionNames);
+        if (expression is null)
+            return null;
+
+        var affineOffset = ResolveAffineOffset(code, functionNames);
+        return new PendingAtom(code, name, expression, prefixable, printSymbol, affineOffset);
     }
 
-    private static string? GetDefinitionExpression(XElement element, string code)
+    private static string? GetDefinitionExpression(XElement element, string code, out ImmutableArray<string> functionNames)
     {
+        var functionNameBuilder = ImmutableArray.CreateBuilder<string>();
+
         if (code is "m" or "s" or "kg" or "A" or "K" or "mol" or "cd" or "g" or "C" or "rad")
+        {
+            functionNames = ImmutableArray<string>.Empty;
             return null;
+        }
 
         var valueElement = element.Elements().FirstOrDefault(child => child.Name.LocalName == "value");
         if (valueElement is null)
+        {
+            functionNames = ImmutableArray<string>.Empty;
             return null;
+        }
 
         var functionElement = valueElement.Elements().FirstOrDefault(child => child.Name.LocalName == "function");
         if (functionElement is not null)
         {
+            var wrapperName = functionElement.Attribute("name")?.Value;
+            if (!string.IsNullOrWhiteSpace(wrapperName))
+                functionNameBuilder.Add(wrapperName.Trim());
+
             var factorText = functionElement.Attribute("value")?.Value ?? "1";
             var unitText = functionElement.Attribute("Unit")?.Value
                            ?? valueElement.Attribute("Unit")?.Value
                            ?? "1";
-            return CombineFactorAndUnit(factorText, unitText);
+            var expression = CombineFactorAndUnit(factorText, unitText);
+            _ = StripFunctionWrapper(unitText, functionNameBuilder);
+            functionNames = functionNameBuilder.ToImmutable();
+            return expression;
         }
 
         var valueText = valueElement.Attribute("value")?.Value ?? "1";
         var unitExpression = valueElement.Attribute("Unit")?.Value ?? "1";
-        return CombineFactorAndUnit(valueText, unitExpression);
+        var combined = CombineFactorAndUnit(valueText, unitExpression);
+        _ = StripFunctionWrapper(unitExpression, functionNameBuilder);
+        functionNames = functionNameBuilder.ToImmutable();
+        return combined;
     }
 
     private static string CombineFactorAndUnit(string factorText, string unitText)
@@ -422,7 +448,7 @@ public static class UcumAtomCatalog
     {
         try
         {
-            var normalized = StripFunctionWrapper(expression);
+            var normalized = StripFunctionWrapper(expression, null);
             if (normalized.StartsWith("/", StringComparison.Ordinal))
                 normalized = $"1{normalized}";
 
@@ -437,22 +463,29 @@ public static class UcumAtomCatalog
         }
     }
 
-    private static string StripFunctionWrapper(string expression)
+    private static string StripFunctionWrapper(string expression, ImmutableArray<string>.Builder? functionNames)
     {
         var current = expression.Trim();
 
-        while (TryExtractWrappedExpression(current, out var inner))
+        while (TryExtractWrappedExpression(current, out var functionName, out var inner))
+        {
+            if (functionNames is not null && !string.IsNullOrWhiteSpace(functionName))
+                functionNames.Add(functionName);
             current = inner.Trim();
+        }
 
         return current;
     }
 
-    private static bool TryExtractWrappedExpression(string text, out string inner)
+    private static bool TryExtractWrappedExpression(string text, out string functionName, out string inner)
     {
+        functionName = string.Empty;
         inner = string.Empty;
         var openParen = text.IndexOf('(');
         if (openParen <= 0 || text[^1] != ')')
             return false;
+
+        functionName = text[..openParen].Trim();
 
         var depth = 0;
         for (var index = 0; index < text.Length; index++)
@@ -473,6 +506,29 @@ public static class UcumAtomCatalog
         return true;
     }
 
+    private static decimal? ResolveAffineOffset(string code, ImmutableArray<string> functionNames)
+    {
+        if (string.Equals(code, "Cel", StringComparison.OrdinalIgnoreCase)
+            || functionNames.Any(name => string.Equals(name, "Cel", StringComparison.OrdinalIgnoreCase)))
+        {
+            return 273.15m;
+        }
+
+        if (string.Equals(code, "[degF]", StringComparison.OrdinalIgnoreCase)
+            || functionNames.Any(name => string.Equals(name, "degF", StringComparison.OrdinalIgnoreCase)))
+        {
+            return 459.67m;
+        }
+
+        if (string.Equals(code, "[degRe]", StringComparison.OrdinalIgnoreCase)
+            || functionNames.Any(name => string.Equals(name, "degRe", StringComparison.OrdinalIgnoreCase)))
+        {
+            return 218.52m;
+        }
+
+        return null;
+    }
+
     private readonly record struct UnitEvaluation(DimensionVector Vector, UcumExactFactor Scale)
     {
         public UnitEvaluation Multiply(UnitEvaluation other) =>
@@ -485,7 +541,13 @@ public static class UcumAtomCatalog
             new(Vector.Pow(exponent), Scale.Pow(exponent));
     }
 
-    private sealed record PendingAtom(string Code, string Name, string Expression, bool Prefixable, string? PrintSymbol = null);
+    private sealed record PendingAtom(
+        string Code,
+        string Name,
+        string Expression,
+        bool Prefixable,
+        string? PrintSymbol = null,
+        decimal? AffineOffset = null);
 
     private sealed partial class MiniExpressionEvaluator
     {

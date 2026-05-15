@@ -34,6 +34,7 @@ public static class UcumParser
             reduced.CanonicalCode,
             reduced.Vector,
             reduced.Scale,
+            reduced.AffineOffset,
             alias?.Name,
             reduced.UsedAtoms.Where(atom => atom.Code != "1").DistinctBy(atom => atom.Code).ToArray(),
             reduced.Annotations.ToArray());
@@ -173,10 +174,11 @@ public static class UcumParser
 
     private static ReducedUnit Reduce(UcumExpression expression) => expression switch
     {
-        UcumAtomNode atom => new(atom.Atom.Vector, atom.Atom.Scale, atom.Atom.Code, [atom.Atom], []),
+        UcumAtomNode atom => new(atom.Atom.Vector, atom.Atom.Scale, atom.Atom.AffineOffset, atom.Atom.Code, [atom.Atom], []),
         UcumPrefixedAtomNode prefixed => new(
             prefixed.Atom.Vector,
             prefixed.Prefix.Factor.Multiply(prefixed.Atom.Scale),
+            prefixed.Atom.AffineOffset,
             $"{prefixed.Prefix.Code}{prefixed.Atom.Code}",
             [prefixed.Atom],
             []),
@@ -191,6 +193,7 @@ public static class UcumParser
     private static ReducedUnit CombineProduct(ReducedUnit left, ReducedUnit right) => new(
         left.Vector.Multiply(right.Vector),
         left.Scale.Multiply(right.Scale),
+        null,
         $"{left.CanonicalCode}.{right.CanonicalCode}",
         [.. left.UsedAtoms, .. right.UsedAtoms],
         [.. left.Annotations, .. right.Annotations]);
@@ -204,6 +207,7 @@ public static class UcumParser
         return new ReducedUnit(
             left.Vector.Divide(right.Vector),
             left.Scale.Divide(right.Scale),
+            null,
             $"{left.CanonicalCode}/{denominatorCode}",
             [.. left.UsedAtoms, .. right.UsedAtoms],
             [.. left.Annotations, .. right.Annotations]);
@@ -212,6 +216,7 @@ public static class UcumParser
     private static ReducedUnit ApplyExponent(ReducedUnit inner, int exponent) => new(
         inner.Vector.Pow(exponent),
         inner.Scale.Pow(exponent),
+        exponent == 1 ? inner.AffineOffset : null,
         $"{inner.CanonicalCode}^{exponent}",
         inner.UsedAtoms,
         inner.Annotations);
@@ -219,6 +224,7 @@ public static class UcumParser
     private static ReducedUnit WrapGroup(ReducedUnit inner) => new(
         inner.Vector,
         inner.Scale,
+        inner.AffineOffset,
         $"({inner.CanonicalCode})",
         inner.UsedAtoms,
         inner.Annotations);
@@ -226,6 +232,7 @@ public static class UcumParser
     private static ReducedUnit AddAnnotation(ReducedUnit inner, string annotation) => new(
         inner.Vector,
         inner.Scale,
+        inner.AffineOffset,
         inner.CanonicalCode,
         inner.UsedAtoms,
         [.. inner.Annotations, annotation]);
@@ -233,6 +240,7 @@ public static class UcumParser
     private sealed record ReducedUnit(
         DimensionVector Vector,
         UcumExactFactor Scale,
+        decimal? AffineOffset,
         string CanonicalCode,
         IReadOnlyList<UcumAtom> UsedAtoms,
         IReadOnlyList<string> Annotations);
