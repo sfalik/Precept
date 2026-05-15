@@ -19,6 +19,9 @@
 - ProofEngine intervals and evaluator opcodes share source data, not a common intermediate representation.
 - `PreceptValue` bytes 8-23 are a three-way union lane (`decimal`, `long`, or reference region); quantity unit identity is not blocked by the 32-byte layout.
 - Prefer catalog-mediated dispatch and metadata-backed mappings over per-code hardcoded routing in both compiler and runtime consumers.
+- Dynamic-unit interpolated forms MUST produce `Unbounded`/not-proved — never fall back to raw `StaticMagnitude` against normalized bounds. This is the "false proof" prevention invariant.
+- When a design says "universal post-step," verify it actually means "expression-type-dispatched post-step" — the dispatch table is the contract, not the word "universal."
+- Slices that depend on unimplemented runtime infrastructure (stubs) should be explicitly numbered out of the implementation sequence and marked "not implementation-ready" to prevent ordering confusion.
 
 ## Historical Summary
 
@@ -27,6 +30,14 @@
 - Older batch-by-batch detail now lives in `.squad/decisions.md` and `history-archive.md`; this live file keeps only the guidance and latest outcomes other agents need immediately.
 
 ## Recent Updates
+
+### 2026-05-15T01:37:41Z — External normalization research merged
+
+- Frank-7 validated the quantity-normalization design against F#, Rust/uom, JSR-385, FHIR/UCUM, Modelica, and decimal interval-arithmetic practice; the architecture stays sound, with only medium-priority documentation follow-ups around nonlinear-unit exclusion and exact-decimal conversion assumptions.
+- Frank-8 confirmed business units (each, box, package, related count units) already normalize correctly by construction via factor-1 UCUM atoms and shared count dimension semantics; no code-path change is needed.
+- Scribe merged both research records into .squad/decisions/decisions.md, deleted the inbox notes, and logged the combined batch in the orchestration/session records.
+
+
 
 ### 2026-05-14T17:37:50.029-04:00 — Design doc resolution pass: all 6 conditions resolved
 
@@ -75,4 +86,31 @@
 - The actual error in `samples/Test.precept` is PRE0078 (interval overflow), which is pre-existing — the literal `6 [lb_av]` already violated `max '5 kg'` before George's edit.
 - George's modification (changing `'6 [lb_av]'` to `'{test2} [lb_av]'`) changed the proof shape from concrete-interval to unbounded-interval but did not introduce a new error category.
 - Recommendation: revert Test.precept; if interpolated-quantity test cases are needed for normalization work, create a new sample with satisfiable bounds.
+
+### 2026-05-14T20:47 — Event-arg default gap is bounded, not broad
+- George's B26 finding ("broader than normalization") is technically correct but practically overstated. The parser and name-binder already capture `default` modifiers on event args via `DeclaredArg.ParsedModifiers`. The `TypedArg.DefaultExpression` slot exists. The only missing piece is a `ResolveEventArgExpressions` pass (~40 lines) calling the same `Resolve()` infrastructure used for fields.
+- The "Slice 2+" comment at TypeChecker.cs:527 confirms this was always a planned addition, not a design gap.
+- When evaluating "is this too broad?" claims, check whether the parser/binder layers already captured the raw data — if they did, the checker gap is mechanical, not architectural.
 - Diagnosis written to `.squad/decisions/inbox/frank-pre0027-diagnosis.md`.
+
+### 2026-05-14T20:35:04.819-04:00 — George's technical review disposition: all findings accepted
+
+- Reviewed George's per-slice technical review of `docs/Working/quantity-normalization-design.md` (APPROVED WITH CONDITIONS verdict).
+- **Zero rejections.** All 15 findings accepted or accepted-with-modification.
+- Key decisions locked:
+  - B16's dynamic-unit fallback prohibition is the highest-value safety constraint — `TryGetStaticNumericValue` must return `false` for dynamic-unit forms, never raw `StaticMagnitude`.
+  - B22's duplicate Slice 22 resolved: runtime ingress moved to Phase 3 deferred; static qualifier capture keeps the Slice 22 number.
+  - B25's path chosen: stronger FoldValue as primary + dedicated default-obligation collector as secondary (NOT DynamicObligationGenerator).
+  - B26 extracted to separate issue — event-arg defaults are a compiler feature gap, not normalization scope.
+  - B19: Slices 19 and 22 remain separate (not folded) — different problems, compose rather than merge.
+- Factual correction applied throughout: `TypedEventArg` → `TypedArg` (the actual type name in `SemanticIndex.cs`).
+- Ordering locked: `14 → 15+15b → 16 → 17 → 18 → 19 → 20 → 21 → 22 → 23 → 24 → 25 → 27 → 26`.
+- Decision record written to `.squad/decisions/inbox/frank-normalization-george-review.md`.
+
+### 2026-05-14T20:47:51-04:00 — Slice 26 reinstated in-track (Shane direction)
+
+- Shane directed Slice 26 (event-arg default resolution) back into the quantity normalization track.
+- Source analysis confirmed George's concern was valid (the plumbing IS missing) but the scope is bounded: `DeclaredArg.ParsedModifiers` already carries `default` modifiers from the parser, `TypedArg.DefaultExpression` slot exists, the `Resolve()` call is available. Only a ~40-line `ResolveEventArgExpressions` pass is needed.
+- Scoped to typed-constant defaults for quantity/money/price args — NOT general expression defaults.
+- Updated §0.7 disposition table, ordering (now `25 → 27 → 26`), and risk item 5.
+- Decision record written to `.squad/decisions/inbox/frank-slice26-reinclusion.md`.
