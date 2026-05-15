@@ -462,3 +462,11 @@ Archived updates moved from `history.md` during Scribe summarization.
 
 - Slice 21 validation: targeted rename/navigation capability coverage (`RenameHandlerTests`, `ServerCapabilityTests`, definition/references/highlights) passed 18/18 via `dotnet test test\Precept.LanguageServer.Tests\Precept.LanguageServer.Tests.csproj --no-restore --filter "FullyQualifiedName~RenameHandlerTests|FullyQualifiedName~ServerCapabilityTests|FullyQualifiedName~ReferencesHandlerTests|FullyQualifiedName~DocumentHighlightHandlerTests|FullyQualifiedName~DefinitionHandlerTests"`.
 
+---
+
+## Archive Batch — 2026-05-15T22:18:38Z
+
+### 2026-05-15 — Earlier hover and cleanup detail summarized out of history.md
+
+- Archived the older hover-specific and cleanup updates (line-break fix, B1/B2/B3/B4 closeout, state-card V7 pass, and the 2026-05-13 cleanup note).
+- The live file now keeps only the durable completion-routing guidance and the latest completion-provider closeout.

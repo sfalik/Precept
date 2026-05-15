@@ -8927,80 +8927,6 @@ This branch is ready to merge to main.
 
 The parser suite is green, but it is **not** comprehensive enough to support type-checker development safely. The biggest holes are the full type-reference surface, full action syntax surface, wildcard/shorthand routing (`from any`, `modify all`, `omit all`), event-arg richness, interpolation, and specific parser diagnostic-code assertions. Right now, too many tests stop at “a slot exists” or “the parser did not crash.” That is not enough. No soup for unanchored parser behavior.
 
-# TypeChecker B1/B2/B3 Blockers — Fixed
-
-**By:** George (Runtime Dev)
-
-**Date:** 2026-05-08T07:00:00-04:00
-
-**Status:** Complete — all three R3 blockers resolved, tests green
-
-**Context:** Frank's R3 final gate review (`.squad/decisions/inbox/frank-r3-final-review.md`) identified three blockers preventing GraphAnalyzer from proceeding.
-
----
-
-## Changes
-
-## B3: MissingExpression D26 gap (5 LOC)
-
-`ResolveMissing()` now emits a lightweight `DiagnosticCode.TypeMismatch` diagnostic with args `("expression", "missing")` before returning `TypedErrorExpression`. This closes the D26 self-containment invariant — every error path through Resolve() now records a TC-level diagnostic.
-
-No new DiagnosticCode was added (per Frank's approval gate). TypeMismatch is the closest existing Error-severity TC code.
-
-## B1: Field expression resolution (~100 LOC)
-
-`ResolveFieldExpressions()` resolves default and computed expressions on `TypedField` entries:
-
-- Default expressions from `ParsedModifier` with `Kind == ModifierKind.Default`
-
-- Computed expressions from `ComputeExpressionSlot` on the field's `Syntax`
-
-- `ComputedFieldDep` extraction via recursive `CollectFieldRefs()` tree walker
-
-- `FieldScopeMode.PriorFieldsOnly` enforces forward-reference prohibition
-
-- Qualifier binding left as null (no parser-level qualifier slot on field constructs yet)
-
-- Event arg defaults left as null (DeclaredArg carries only ModifierKind, not values)
-
-## B2: Construct normalization (~200 LOC)
-
-Four new normalization methods following the established `manifest.ByKind` + Resolve + accumulate pattern:
-
-- `PopulateEnsures()` — StateEnsure (in/to/from → ConstraintKind) and EventEnsure (on → EventPrecondition)
-
-- `PopulateAccessModes()` — state/field reference resolution, Editable→Write / Readonly→Read mapping, optional guard
-
-- `PopulateStateHooks()` — state reference, leading token → AnchorScope, action chain via ResolveAction()
-
-- `PopulateEditDeclarations()` — D24 placeholder using ConstructKind.OmitDeclaration, field targets recorded
-
-## Supporting changes
-
-- `ParsedConstruct.LeadingTokenKind` — added `TokenKind?` to the positional record (2 parser sites updated) for anchor scope determination
-
-- Doc updates W3 (§1 status), W4 (§4 LOC estimate → ~2700), W5 (§13 preamble → COMPLETED)
-
-- 17 tests updated to match new diagnostic emission and populated accumulators
-
----
-
-## Validation
-
-- Build: 0 errors, 0 warnings
-
-- Tests: 3342 Precept.Tests + 263 Precept.Analyzers.Tests — all passing
-
-- D26 assert: no fires on any test or sample file
-
-## Open Items
-
-- **Qualifier binding** on TypedField — needs parser-level qualifier slot on field constructs (future work)
-
-- **Event arg default expressions** — DeclaredArg only carries ModifierKind array, not values (future work)
-
-- **DiagnosticCode.TypeMismatch reuse** for MissingExpression — Frank may want a dedicated code in the future
-
 # PE-G2 Analysis — ProofDischarge + FieldModifierMeta.ProofDischarges
 
 **Date:** 2026-05-08T21:29:51.919-04:00
@@ -18969,6 +18895,7 @@ The existing design had the technical solutions in §6.7 and §6.8, but not a si
 
 VERDICT: APPROVED
 All blocking findings from the previous review have been resolved. §5.7 now points at the real code surfaces (`src/Precept/Language/DiagnosticCode.cs`, `src/Precept/Language/Diagnostics.cs`, `src/Precept/Language/Functions.cs`, `src/Precept/Language/Ucum/UcumAtomCatalog.cs`), Slice 32 correctly names both `SelectOverload` success paths, and Slice 33 now uses Precept’s actual `contains` operator via `ResolveBinaryOp` → `TryResolveCatalogBinaryWithoutOperation` → `CreateSyntheticBinaryOp`. Spot-checks against source confirmed `ValidateQualifierCompatibility`, `ResolveFunctionCall`, `SelectOverload`, `CreatePendingAtom`, `StripFunctionWrapper`, `TypedInterpolatedTypedConstant`, and PRE0137 as the next free ordinal after `CountBoundViolation = 136`. I did not find remaining stale file or method references inside the revised §5.7 slice list.
+
 # George — Slice N + Slice M Notes
 
 ## Summary of changes made
@@ -18994,7 +18921,6 @@ All blocking findings from the previous review have been resolved. §5.7 now poi
   - `dotnet test test\Precept.Tests\Precept.Tests.csproj --no-build --filter "FullyQualifiedName~TypeCheckerQualifierCompatibilityTests"` => **Passed**
   - Summary: total 11, failed 0, succeeded 11, skipped 0
 
-
 ---
 
 # George Wave 2b Notes
@@ -19014,7 +18940,6 @@ All blocking findings from the previous review have been resolved. §5.7 now poi
 - `dotnet build src\Precept\Precept.csproj`: **Succeeded**
 - `dotnet test test\Precept.Tests\Precept.Tests.csproj`: **Failed** (Failed: 9, Passed: 5513, Skipped: 0, Total: 5522)
 - Affine-focused validation: `TypedConstantNormalizerTests` + `ProofEngineIntervalTests` + Celsius/Fahrenheit interval integration check are passing.
-
 
 ---
 
@@ -19276,3 +19201,618 @@ Please add the following tests when writing Slice 17 tests:
 ## No Code Change Required Now
 
 The double-normalization is not currently materialized. The guard is working. No fix is needed in Slice 18. This note records the structural risk so Slice 17 test coverage can lock the invariant explicitly.
+
+# Decision: Completion Position Specification Authored
+
+**By:** Frank
+**Date:** 2026-05-15T18:04:26.860-04:00
+**Status:** Authored — Kramer to audit and align implementation
+
+## Summary
+
+Authored a comprehensive Completion Position Specification covering every syntactic position in a `.precept` source file. The specification defines exactly what completions should appear (and what must be suppressed) at each cursor position, grounded in the grammar rules from the language spec and the catalog metadata from `src/Precept/Language/`.
+
+## Key Rulings
+
+### Top-Level Keyword Suppression Rule (Primary concern)
+
+Top-level construct keywords (`precept`, `field`, `state`, `event`, `rule`, `from`, `to`, `in`, `on`) MUST be offered **only** when:
+
+1. `SlotContext.TopLevel` is the resolved context, AND
+2. The cursor position is at the beginning of a line (after optional whitespace), OR the line is empty/comment-only up to the cursor.
+
+Top-level keywords MUST be **explicitly suppressed** in all other `SlotContext` values — they must never appear in `InExpression`, `InTypePosition`, `InModifierPosition`, `InStateTarget`, `InEventTarget`, `InFieldTarget`, `InActionVerb`, `InArgDefault`, `InSetAssignment`, or `AfterKeyword`.
+
+The current implementation already routes through `SlotContext.TopLevel` → `GetTopLevelItems()`, but `GetCursorContext` can fall through to `TopLevel` as a default when it can't classify the position — this is the leak that causes top-level keywords to appear in unexpected positions. The fix is: when the fallback fires and the cursor is mid-construct, return `AfterKeyword` (no completions) instead of `TopLevel`.
+
+### Expression Context Completions
+
+Expression positions (`InExpression`) offer: field names, event argument names (scoped to current event), built-in function names, boolean literals (`true`/`false` — suppressed when target type is known non-boolean), and member access items after `.`. They must **never** include construct keywords, type keywords, modifier keywords, or action verbs.
+
+### Modifier Completions Are Type-Aware
+
+Field modifier completions are already filtered by resolved type and already-applied modifiers in the implementation. This is correct and must be preserved.
+
+## Artifact Location
+
+The full specification is delivered as Frank's response in this session. Kramer should use it as the audit checklist against `CompletionHandler.cs` and `SlotContextResolver.cs`.
+
+# Uninitialized Field Read in Initial Event Actions
+
+**Author:** Frank (Lead/Architect)  
+**Date:** 2026-05-15T18:09:43-04:00  
+**Severity:** Genuine diagnostic gap — compiler silent on provably incorrect code  
+**Trigger:** Shane's report on `samples/Test.precept`
+
+---
+
+## Reproduction
+
+```precept
+precept Test
+
+field count as integer
+
+event Increment initial
+
+on Increment
+    -> set count = count + 1
+```
+
+**Result:** Zero diagnostics. The compiler accepts this without complaint.
+
+**Problem:** `count` has no `default`. On the first firing of `Increment` (the initial event), the expression `count + 1` reads `count` before it has ever been assigned a value. The read is provably against an undefined value.
+
+---
+
+## What the Compiler Does Today
+
+### D93 (PRE0093 — `RequiredFieldsNeedInitialEvent`)
+
+Checks whether required fields exist but no initial event is declared. **Does not fire** because `Increment` IS declared as `initial`. Correct behavior — D93 is not the issue.
+
+### D94 (PRE0094 — `InitialEventMissingAssignments`)
+
+Checks whether the initial event assigns all required fields. **Does not fire** for TWO independent reasons:
+
+1. **Stateless precept early return (line 323-324 of `TypeChecker.Validation.FieldState.cs`):** `ValidateConstructionGuarantees` returns immediately when `ctx.States.Count == 0` after confirming an initial event exists. This means stateless precepts receive **zero** per-field construction validation from D94. The method only checks stateful precepts with initial states and transition rows from those states.
+
+2. **Even if D94 ran, it would not catch this bug.** D94 checks whether the initial event HAS a `set` action targeting the required field (`IsSetAction(action.Kind) && action.FieldName == field.Name`). It does — `set count = count + 1` targets `count`. D94 sees this as "field is assigned" and moves on. D94 never inspects the RHS expression.
+
+### D130 (PRE0130 — `OmittedFieldReadInState`)
+
+Checks for reads of omitted fields. Not applicable — `count` is not omitted, it's uninitialized.
+
+### Any "uninitialized read" diagnostic
+
+**Does not exist.** There is no diagnostic code, no check method, and no TypeChecker logic anywhere in the codebase that detects reads of fields that have no prior value. Searched: `DiagnosticCode.cs`, `TypeChecker.cs`, `TypeChecker.Validation.FieldState.cs`, all pipeline files. Zero matches for uninitialized/use-before-assign patterns.
+
+---
+
+## Two Distinct Gaps
+
+### Gap 1: D94 stateless precept blind spot
+
+`ValidateConstructionGuarantees` at line 323 returns early for stateless precepts. This is an overshoot — a stateless precept with required fields and an initial event still needs construction validation. The method should verify that the initial event's `on` handler assigns all required fields, regardless of whether states exist.
+
+**Fix location:** `TypeChecker.Validation.FieldState.cs`, `ValidateConstructionGuarantees()`, line 323-324. When `ctx.States.Count == 0`, instead of returning, find transition rows for the initial event (they will have `FromState = null` in stateless precepts) and check those rows for missing assignments.
+
+### Gap 2: Self-referential initial assignment (the actual bug Shane found)
+
+Even with Gap 1 fixed, D94 would still not catch `set count = count + 1`. The field IS being assigned — it's just that the assignment expression reads the field before it has a value.
+
+This is a distinct diagnostic: **"Field read in its own initial assignment before it has a value."**
+
+The precise condition:
+- The event is `initial`
+- The field has no `default` value (i.e., `IsRequiredFieldWithoutImplicitValue` returns true)
+- A `set` action targets the field
+- The `set` action's RHS expression contains a `TypedFieldRef` to the SAME field being assigned
+- No PRIOR `set` action in the same action list has already assigned the field
+
+This is the pattern: `set X = f(X)` where X has no prior value. It's always wrong on the initial event for a field with no default.
+
+---
+
+## Diagnostic Code Recommendation
+
+**New code: `UninitializedFieldReadInInitialAssignment`** (next available slot: **142**)
+
+- **Stage:** Type (lifecycle validation), same section as D93/D94
+- **Severity:** Error
+- **Category:** Structure
+- **Message:** `"Field '{0}' is read in its own initial assignment but has no default value — its value is undefined on first firing of initial event '{1}'"`
+- **Span:** The `TypedFieldRef` span within the RHS expression (points at the exact read site)
+
+This should NOT overload D94. D94 means "the initial event doesn't assign the field at all." This new diagnostic means "the initial event assigns the field but the assignment reads the field's own undefined value." These are semantically distinct conditions.
+
+---
+
+## Proposed Fix Location
+
+**File:** `TypeChecker.Validation.FieldState.cs`
+
+**Method:** New method `ValidateInitialAssignmentSelfReads(CheckContext ctx)` — called AFTER `ValidateConstructionGuarantees` in the pipeline.
+
+**Algorithm:**
+1. Find the initial event.
+2. Find all transition rows for the initial event (stateful: rows from initial states; stateless: rows with `FromState == null`).
+3. For each row, for each `set` action:
+   a. If the target field has no default AND no prior `set` in the action list has assigned it:
+   b. Walk the RHS expression with `CollectFieldRefsFromExpression`.
+   c. If any `TypedFieldRef` references the target field → emit D142.
+
+**General case coverage:** This naturally extends beyond `set X = X + N` to:
+- `set X = X * factor` (accumulator pattern)
+- `set X = max(X, Y)` (min/max with self)
+- `set X = if X > 0 then X else Y` (conditional self-read)
+- Any expression containing a reference to the assigned field when the field has no prior value
+
+---
+
+## Gap 1 Fix (D94 Stateless)
+
+**File:** `TypeChecker.Validation.FieldState.cs`, method `ValidateConstructionGuarantees`
+
+Replace line 323-324:
+```csharp
+if (ctx.States.Count == 0)
+    return;
+```
+
+With logic that finds transition rows for the initial event with `FromState == null` and checks them for missing required field assignments, using the same per-row check at line 349-367.
+
+---
+
+## Priority Assessment
+
+**Gap 2 (self-referential read) is the higher priority.** It's a provable correctness violation — the compiler silently accepts code that will read undefined data. This is exactly the class of bug Precept's core guarantee ("prevention, not recovery") is supposed to eliminate.
+
+**Gap 1 (D94 stateless)** is also real but narrower — it only manifests when a stateless precept has required fields without defaults AND the initial event doesn't assign them. The test file happens to hit Gap 1 too, but the more insidious problem is Gap 2.
+
+---
+
+## Decision
+
+Both gaps require implementation. D142 (`UninitializedFieldReadInInitialAssignment`) is the new diagnostic. D94's stateless early-return is a separate fix in `ValidateConstructionGuarantees`. Both belong in `TypeChecker.Validation.FieldState.cs`.
+
+# Decision: Qualifier Deferred Items Scoped
+
+**Date:** 2026-05-15T18:09:58-04:00  
+**By:** Frank  
+**Status:** Locked — implementation-ready
+
+## What
+
+Scoped three items deferred from the PRE0141 qualifier enforcement work. Each now has a concrete implementation spec in `docs/Working/frank-qualifier-deferred-scoping.md`.
+
+## Decisions
+
+### Item 1: ProofEngine.Qualifiers.cs Unification — PARTIAL ALIGNMENT
+
+Full unification of `ResolveAssignmentQualifierAxis` (TypeChecker) and `ResolveQualifierFromExpression` (ProofEngine) is premature. The two subsystems serve different contracts: assignment needs tri-state diagnostics, proof needs binary-operand comparison with symbolic equality. Forcing a shared entry point would require either threading `SemanticIndex` through the TypeChecker path (unnecessary complexity) or stripping implied-qualifier support from the ProofEngine path (correctness regression).
+
+**Required now:**
+1. Add implied-qualifier lookup to `ResolveDirectQualifierAxis` in the TypeChecker path (parity with ProofEngine lines 350–356).
+2. Extract UCUM-aware compound-unit splitting into `UnitDimensionHelper` so both paths use the same structural logic instead of the ProofEngine's string-based fallback.
+
+**Not now:** Unifying the resolver signatures or merging the entry points.
+
+### Item 2: Quantity Type Gaps — FULL, ONE SURGICAL FIX
+
+The quantity gap is narrower than expected. Of the five gap categories (A–E):
+- **A (bare refs):** Already handled by PRE0141. Bare quantity ref into constrained target emits PRE0141.
+- **B (whole-value interpolation):** Already handled. WholeValue slot delegates to `ResolveAssignmentQualifierAxis`.
+- **C (unit slots):** **ONE GAP.** `ResolveSlotSourceQualifierAxis` returns `Absent` instead of `Unknown` when a bare-but-type-applicable source feeds a unit/dimension slot. Fix: check `IsAssignmentQualifierAxisApplicable` before returning `Absent`.
+- **D (binary results):** Already handled. `QualifiedOperandInherited` correctly propagates `Unknown` for bare operands.
+- **E (conditionals):** Already handled. Branch validation recurses correctly.
+
+Diagnostic code: PRE0141 (existing). No quantity-specific diagnostic needed. `QuantityValidator` is unaffected — it covers only the literal lane.
+
+### Item 3: Function-Call Qualifier Preservation — FULL
+
+Two mechanical changes:
+1. Add `ResultQualifiers` to `TypedFunctionCall` record. Populate from first argument's qualifiers when `overload.Match == QualifierMatch.Same`.
+2. Add `TypedFunctionCall` case arms to both `ResolveAssignmentQualifierAxis` (TypeChecker) and `ResolveQualifierFromExpression` (ProofEngine).
+
+No new catalog metadata needed. `FunctionOverload.Match` already carries the qualifier-preservation intent. The five qualifying functions are: `abs`, `min`, `max`, `clamp`, `round(v, places)` — exclusively their `Money` and `Quantity` overloads.
+
+## Implementation Order
+
+Items are independent — can be parallelized. Recommended priority: Item 3 (highest impact, most expression forms affected), Item 2 (one fix), Item 1 (latent risk, lowest priority).
+
+## Governing Document
+
+`docs/Working/frank-qualifier-deferred-scoping.md`
+
+# Decision: Qualifier Enforcement Architectural Review — APPROVED
+
+**Date:** 2026-05-15T18:02:40-04:00
+**Author:** Frank
+**Status:** APPROVED
+**Scope:** Assignment qualifier enforcement model — axis-aware resolver, PRE0141, regression matrix
+
+## Context
+
+The assignment qualifier enforcement model was structurally incomplete. My analysis in `docs/Working/frank-price-qualifier-full-analysis.md` identified that the boolean/partial-array seam (`TryGetAssignmentSourceQualifiers` / `TryBuildQualifiersFromInterpolatedSlots`) could not distinguish Resolved from Unknown from Absent, causing unknown-source-to-constrained-target assignments to silently compile clean.
+
+George replaced the entire seam with an axis-aware resolver (`QualifierResolutionKind.Resolved / Unknown / Absent`). Soup Nazi wrote the 19-test regression matrix covering the § 6 gap catalog.
+
+## Verdict
+
+**APPROVED.** No blocking findings.
+
+## Findings
+
+### G1: Axis-aware resolver matches spec exactly
+The `ResolvedQualifierAxis` record with `QualifierResolutionKind` enum (`Resolved`, `Unknown`, `Absent`) matches § 4.2 of the analysis precisely. The tri-state model is correctly threaded through all expression forms: `TypedFieldRef`, `TypedArgRef`, `TypedTypedConstant`, `InterpolatedTypedConstant`, `TypedUnaryOp`, `TypedBinaryOp`, and `TypedConditional`.
+
+### G2: Unknown-vs-Absent distinction correctly implemented
+`ResolveDirectQualifierAxis` returns `Unknown` when the source type *could* carry the axis but doesn't declare it (bare money → currency unknown), and `Absent` when the axis is inapplicable to the source type. `IsAssignmentQualifierAxisApplicable` is the gate — correct per spec.
+
+### G3: Empty-array-means-success behavior eliminated
+The old `TryGetAssignmentSourceQualifiers` and `TryBuildQualifiersFromInterpolatedSlots` methods are completely gone. No `bool + ImmutableArray<DeclaredQualifierMeta>` return pattern survives in the assignment qualifier path.
+
+### G4: PRE0141 diagnostic correctly designed
+- Type stage (not proof) ✓
+- Error severity ✓
+- Message shape matches spec: `Cannot prove the value's '{0}' qualifier satisfies field '{1}'` ✓
+- Related codes: `QualifierMismatch`, `UnprovedQualifierCompatibility` ✓
+- Distinct from PRE0068 (definite mismatch) and PRE0114 (proof-stage) ✓
+- Documented in `docs/compiler/diagnostic-system.md` ✓
+- Present in MCP `precept_diagnostic` output ✓
+
+### G5: All source forms from § 1.2 covered
+- Direct field/arg refs (Forms 1-2): handled via `ResolveDirectQualifierAxis` ✓
+- Plain typed constants (Form 3): `ResolveTypedConstantQualifierAxis` with raw-text fallback ✓
+- Static interpolated (Form 4): `TryResolveStaticInterpolatedAxis` ✓
+- WholeValue holes (Form 5): `ResolveInterpolatedQualifierAxis` transparently delegates to inner expression ✓
+- Unit slots (Forms 6-8): `ResolveInterpolatedSlotAxis` → `ResolveSlotSourceQualifierAxis` ✓
+- Currency slots (Form 9): handled via `InterpolationSlotKind.Currency` dispatch ✓
+- Exchange-rate from/to slots (Form 10): `FromCurrency`/`ToCurrency` dispatch ✓
+- Unary wrappers (Form 11): transparent recursion ✓
+- Binary expressions (Forms 12-14): `ResolveBinaryQualifierAxis` with per-ResultQualifier dispatch ✓
+- Conditional (Form 15): branch-by-branch validation ✓
+
+### G6: Binary transformed-result paths no longer suppress enforcement
+`ResolveCurrencyConversionAxis`, `ResolveCompoundElevationAxis`, and `ResolveCompoundCancellationAxis` all correctly return `Unknown` when the derived result qualifier cannot be resolved — never `Absent` with silent success.
+
+### G7: Test matrix covers the § 6 gap catalog comprehensively
+44 tests total: 25 pre-existing + 19 new from Soup Nazi. Coverage includes:
+- Bare price/money/exchangerate field refs → PRE0141 ✓
+- WholeValue interpolation mismatch → PRE0068 ✓
+- WholeValue interpolation match → clean ✓
+- Conditional mismatched/matching branches ✓
+- Dimension-only source vs exact-unit target → PRE0141 ✓
+- Bare quantity unit slot vs dimension target → PRE0141 ✓
+- Currency-slot interpolation mismatch/match ✓
+- Bare money arg → PRE0141 ✓
+- Shared surfaces: set action, field default, event-arg default, computed field ✓
+- Currency conversion with bare rate → PRE0141 ✓
+- Compound cancellation with bare factor → PRE0141 ✓
+
+### G8: ValidateUnitSlotDimensionConsistency correctly integrated
+The existing PRE0124 structural diagnostic was refactored to use the new shared resolver (`ResolveSlotSourceQualifierAxis`, `ExpandAssignmentTargetQualifiers`) rather than maintaining a parallel resolution path.
+
+### G9: No dead code from old model
+`TryGetAssignmentSourceQualifiers`, `TryBuildQualifiersFromInterpolatedSlots`, `TryGetUnitSlotSourceQualifiers`, and the old `ValidateResolvedQualifiers` are all removed. No stubs remain.
+
+### G10: MCP sync confirmed
+`precept_diagnostic PRE0141` returns the complete diagnostic entry with stage, severity, message, trigger condition, recovery steps, and examples. The diagnostics catalog serialization is metadata-driven — no manual MCP tool update was needed.
+
+## Non-Blocking Follow-Ups
+
+- W1: `docs/language/precept-language-spec.md` does not reference PRE0141, but diagnostics are not cataloged in that document (verified: PRE0068/PRE0114/PRE0069 are also absent). No action needed unless the spec gains a diagnostics appendix.
+- W2: Function-call qualifier preservation (`abs(x)`, `round(x, 2)`, `min/max/clamp`) is not yet wired through the assignment resolver (Forms 16 in § 1.2). The `default` arm returns `Absent`, which is conservative-correct for unconstrained targets but not diagnostic-producing for constrained targets. This was explicitly deferred as Priority 4-5 scope in § 6.
+- W3: Priority 4 (type-checker / proof-engine qualifier-resolution unification) is unstarted. The two subsystems still have parallel resolvers. Not blocking for this change but remains architectural debt.
+
+# Decision: George closed the deferred qualifier fixes
+
+**Date:** 2026-05-15T22:27:03Z  
+**By:** George  
+**Status:** COMPLETED
+
+## Context
+
+Frank's deferred-qualifier follow-up left three implementation items: implied-qualifier parity in the assignment resolver, the quantity slot `Unknown`/`Absent` seam, and function-call qualifier preservation for `QualifierMatch.Same` overloads.
+
+## Decisions
+
+### 1. Same-match function calls now carry qualifier results
+- `TypedFunctionCall` now has nullable `ResultQualifiers`.
+- The type checker populates it from the first argument's **resolved** qualifier axes for `QualifierMatch.Same` overloads, preserving partial knowledge when only some axes are known.
+- Assignment validation reads those qualifiers directly; when the array is null or an applicable axis is still missing, it now reports `PRE0141` instead of treating the function result as qualifier-absent.
+- The proof engine now reads the same `ResultQualifiers`, so symbolic money/quantity function calls stop losing qualifier identity during proof checks.
+
+### 2. TypeChecker direct resolution now honors implied qualifiers
+- `ResolveDirectQualifierAxis(...)` now consults `Types.GetMeta(resultType).ImpliedQualifiers` after declared qualifiers are exhausted.
+- This restores parity with the proof path's field-level implied-qualifier handling without forcing the two resolvers into one contract.
+
+### 3. Compound unit splitting is now shared
+- Added `QualifierUnitHelpers` for compound-unit splitting and numerator-dimension derivation.
+- `TypeChecker.Expressions.TypedConstants`, `TypeChecker.Expressions.AssignmentQualifiers`, and `ProofEngine.Qualifiers` now share the same UCUM-aware split/dimension helper instead of maintaining independent string-split logic.
+
+### 4. Quantity slot fallback is now explicit
+- `ResolveSlotSourceQualifierAxis(...)` now returns `Unknown` when a slot source's type can carry the requested axis even if the source is not a direct field/arg ref.
+- The existing quantity slot regression matrix was already green; this makes the intended `Unknown` contract explicit instead of accidental.
+
+## Validation
+
+- `dotnet test test\Precept.Tests\ --filter FullyQualifiedName~TypeCheckerAssignmentQualifierTests --no-restore` → **55 passed / 0 failed**
+- `dotnet test test\Precept.Tests\ --filter FullyQualifiedName~ProofEngineTypedArgQualifierTests --no-restore` → **11 passed / 1 failed** (`CompoundUnitPositivityProof_ClearsDivisionByZero`, pre-existing branch baseline)
+- `dotnet test test\Precept.Tests\ --no-restore` → **5642 passed / 9 failed / 5651 total** (same known branch-baseline 9 failures)
+
+## Surprises
+
+- Soup Nazi's quantity slot tests were already green before this pass; the fix there was mostly about making the fallback explicit and future-proof.
+- Preserving **partial** qualifier knowledge on function results matters: dimension-only quantity inputs should keep their known dimension while still leaving exact-unit checks unresolved.
+
+# Decision: Kramer Completion Audit
+
+**By:** Kramer
+**Date:** 2026-05-15T18:04:26.860-04:00
+**Status:** Implemented
+
+## Summary
+
+Audited `tools/Precept.LanguageServer` completion routing against the language spec, catalog metadata, sample `.precept` files, and the existing language-server completion suite. The main shipped problem was confirmed: top-level construct keywords were leaking whenever `SlotContextResolver` fell back to `TopLevel`, even when the cursor was mid-line inside another construct.
+
+## Fixes Shipped
+
+1. **Top-level keyword suppression now respects line start.**
+   - Stored raw document text in `DocumentState` and threaded it into `CompletionHandler`.
+   - Added a line-prefix guard so top-level construct completions only appear when the current line prefix is empty or whitespace-only.
+
+2. **Transition outcome target completions now route correctly.**
+   - `transition` now resolves to `SlotContext.InStateTarget`, so `-> transition ...` offers declared states instead of leaking top-level constructs.
+
+3. **Post-type declaration completions are broader and more accurate.**
+   - Field declarations now offer qualifier prepositions plus computed-field `<-` alongside applicable modifiers.
+   - Event argument declarations now offer qualifier prepositions and value modifiers instead of event-level modifiers.
+
+4. **Valued modifiers now enter expression completions.**
+   - `default`, `min`, `max`, `minlength`, `maxlength`, `mincount`, `maxcount`, and `maxplaces` route into expression completion instead of staying in modifier completion.
+
+5. **Expression completions now include operator vocabulary.**
+   - Added operator completions derived from the `Operators` catalog so guards and computed expressions offer boolean/comparison/presence/membership/arithmetic operators in addition to fields, args, functions, and boolean literals.
+
+## Audit Notes
+
+- `after as` was already correctly routed to type completions; the missing protection was suppression of fallback top-level keywords.
+- `after on` already routed to event targets; coverage was strengthened with negative assertions against top-level noise.
+- `after field/event type` had a real gap: the provider used construct-level modifier domains only, which meant event args were not getting value-modifier completions.
+- The completion item layer is correctly catalog-driven (`Constructs`, `Types`, `Modifiers`, `Actions`, `Functions`, `Operators`); the audit findings were mostly context-routing and positional-gating defects.
+
+## Deferred Gaps
+
+None were deferred in this pass. The gaps found during implementation were straightforward enough to ship without a separate design ruling.
+
+## Validation
+
+- `dotnet build tools\Precept.LanguageServer\Precept.LanguageServer.csproj --artifacts-path temp\dev-language-server`
+- `dotnet test test\Precept.LanguageServer.Tests\ --filter CompletionHandlerTests`
+- `dotnet test test\Precept.LanguageServer.Tests\`
+
+# Kramer completion pass 2
+
+Date: 2026-05-15T18:18:38.540-04:00
+
+## Summary
+- Added completion routing for post-state-target verbs, post-transition-row event-target verbs, and the `no -> transition` continuation.
+- Added wildcard-aware target completions: `any` for `in`/`from`/`to`, `all` for `modify`/`omit`, while suppressing those wildcards in `transition` and action field-target positions.
+- Extended `->` completions with outcome vocabulary from `Outcomes.All` and expanded expression vocabulary with catalog-sourced logical, membership, conditional, and quantifier keywords.
+
+## Validation
+- `dotnet build tools\Precept.LanguageServer\Precept.LanguageServer.csproj --artifacts-path temp/dev-language-server --nologo`
+- `dotnet test test\Precept.LanguageServer.Tests\ --nologo`
+- Result: 319/319 tests passing.
+
+# Decision: Quantity qualifier gap test sweep — already green
+
+**Date:** 2026-05-15T18:09:58.927-04:00
+**Author:** Soup Nazi
+**Status:** COMPLETED
+**Scope:** `TypeCheckerAssignmentQualifierTests` quantity expression-lane coverage from Frank §5.2
+
+## Context
+
+The assignment was to write failing quantity qualifier gap tests analogous to the price/money/exchangerate PRE0141 matrix: bare refs, whole-value interpolation, unit-slot interpolation, binary result paths, and conditionals.
+
+Before touching the suite, I checked Frank's analysis in `docs/Working/frank-price-qualifier-full-analysis.md` §5.2, the current assignment qualifier tests, quantity sample syntax, `DiagnosticCode`, and the live compiler behavior.
+
+## Verdict
+
+I added the coverage, but the expected red signal is already gone.
+
+The shared assignment-qualifier resolver now enforces the quantity expression lane correctly, so honest tests for these cases are **green**, not red.
+
+## Findings
+
+### G1: Bare quantity refs are already blocked on constrained targets
+- `quantity -> quantity of 'mass'` emits `PRE0141`
+- `quantity -> quantity in 'kg'` emits `PRE0141`
+
+### G2: Whole-value interpolation already preserves the source qualifier gap
+- `set target = '{source}'` from bare `quantity` into `quantity of 'mass'` emits `PRE0141`
+
+### G3: Unit-slot behavior is already axis-aware
+- `'{n} {source.unit}'` from bare `quantity` into `quantity of 'mass'` emits `PRE0141`
+- The matching control with `source as quantity of 'mass'` stays clean
+
+### G4: Binary and conditional paths are already enforced
+- `left + right` from two bare quantities into `quantity of 'mass'` emits `PRE0141`
+- That binary case also still emits `PRE0114`, so the assignment-stage test only pins the `PRE0141` presence
+- `if flag then left else right` emits two `PRE0141` diagnostics — one per bare branch
+
+### G5: Added test inventory
+Added 8 tests to `test/Precept.Tests/TypeChecker/TypeCheckerAssignmentQualifierTests.cs`:
+1. bare source -> constrained dimension target
+2. bare source -> constrained unit target
+3. whole-value interpolation
+4. bare unit-slot interpolation
+5. matching mass unit-slot pass case
+6. binary addition path
+7. conditional path
+8. matching direct mass pass case
+
+## Validation
+
+- Targeted run: `dotnet test test\Precept.Tests\ --filter "FullyQualifiedName~TypeCheckerAssignmentQualifier" --no-restore`
+- Result after adding the tests: **52 passed / 0 failed**
+
+I also ran the full `test\Precept.Tests` project. It still has **9 unrelated baseline failures** in existing proof/quantity tests, so no new regression was introduced by this change.
+
+# Broader Construction Guarantee Audit
+
+**Author:** Frank (Lead/Architect)
+**Date:** 2026-05-15T18:36:25-04:00
+**Scope:** Field initialization / construction guarantee story beyond the known D94-stateless and D142 gaps
+
+---
+
+## Additional Bugs Confirmed
+
+### Bug 1: Wildcard `FromState` rows excluded from stateful construction chains
+
+**File:** `src/Precept/Pipeline/TypeChecker.Validation.FieldState.cs`
+**Method:** `GetInitialConstructionActionChains` (lines 424-437)
+**Severity:** Silent acceptance of missing construction assignments
+
+**Condition:** A stateful precept where the initial event uses a wildcard `from any` row instead of explicit `from <initial-state>` rows. The wildcard row's `FromState` is `null` (per `NormalizeTransitionRow` line 983). The stateful branch of `GetInitialConstructionActionChains` only matches rows where `row.FromState is { } fromState && initialStateNames.Contains(fromState)` — this explicitly excludes null (wildcard) rows.
+
+**Result:** `GetInitialConstructionActionChains` returns empty → `initialActionChains.IsDefaultOrEmpty` → D94 fires with "initial event missing assignments" even though the precept DOES have a valid wildcard row that would assign all required fields at runtime. This is a false positive that forces authors to duplicate their wildcard row per initial state. Worse, if the author adds the explicit rows to silence D94, the wildcard still fires at runtime for non-initial states — creating redundant execution paths.
+
+**Wait — is it also a false negative?** If the wildcard row does NOT assign all required fields, D94 would never catch it because the wildcard row is invisible to the check. So yes: it's both a false positive (complains when wildcard covers it) AND a false negative (doesn't validate wildcard row assignments).
+
+**Reproduction:**
+```precept
+field count integer
+
+state pending initial
+state active
+
+event create initial
+  from any on create -> set count = 0, transition active
+```
+Expected: clean compile (wildcard covers initial state construction). Actual: D94 fires.
+
+**Fix location:** `GetInitialConstructionActionChains`, stateful branch. Include wildcard rows (`row.FromState is null`) as valid construction chains for ALL initial states. Each wildcard row should be treated as applying to every initial state.
+
+**Proposed diagnostic change:** No new diagnostic needed. D94's existing logic just needs to see the wildcard rows.
+
+---
+
+### Bug 2: D132 lacks self-referential RHS validation (materialization context)
+
+**File:** `src/Precept/Pipeline/TypeChecker.Validation.FieldState.cs`
+**Method:** `ValidateFieldStateGuarantees`, D132 block (lines 263-300)
+**Severity:** Silent acceptance of uninitialized reads
+
+**Condition:** A transition that materializes a required field (omitted in from-state, present in target-state). D132 checks that the field IS assigned via `row.Actions.Any(action => IsSetAction(action.Kind) && string.Equals(action.FieldName, field.Name, ...))`. It never inspects the RHS expression. If the set action reads the field itself (`set count = count + 1`), the assignment "exists" but reads an undefined value.
+
+**This is the exact D142 pattern but in a transition-materialization context.** D142 only covers initial event assignments. The D132 path has no analogous RHS check.
+
+**Reproduction:**
+```precept
+field count integer
+
+state pending initial
+state active
+
+omit count in pending
+
+event activate
+  from pending on activate -> set count = count + 1, transition active
+```
+Expected: diagnostic on `count + 1` (count is undefined — it's omitted in pending). Actual: passes D132 because count IS being set.
+
+**Proposed diagnostic:** D143 `UninitializedFieldReadInMaterialization` — "Field '{0}' is read on the right-hand side of its own materialization assignment in transition from '{1}' to '{2}'; it has no value in state '{1}'"
+
+**Fix location:** After the `if (!hasSet)` D132 emission (line 288), add an `else` branch that collects field refs from the set action's `InputExpression` and checks for self-references to the materializing field.
+
+---
+
+### Bug 3: D142 `ValidateInitialAssignmentSelfReads` ignores `SecondaryExpression`
+
+**File:** `src/Precept/Pipeline/TypeChecker.Validation.FieldState.cs`
+**Method:** `ValidateInitialAssignmentSelfReads` (line 380)
+**Severity:** Silent acceptance of uninitialized reads in secondary expressions
+
+**Condition:** An initial event action with a secondary expression role (e.g., `set items = value at index`). Line 380 only calls `CollectFieldRefsFromExpression(inputAction.InputExpression, fieldRefs)`. It does NOT check `inputAction.SecondaryExpression`. Compare with `ValidateFieldStateGuarantees` (line 187) which correctly checks BOTH.
+
+**Fix location:** Line 380 — add `CollectFieldRefsFromExpression(inputAction.SecondaryExpression, fieldRefs)` after the `InputExpression` collection, mirroring the pattern at line 187.
+
+---
+
+### Bug 4: D142 doesn't catch cross-field uninitialized reads in initial event
+
+**File:** `src/Precept/Pipeline/TypeChecker.Validation.FieldState.cs`
+**Method:** `ValidateInitialAssignmentSelfReads` (lines 382-384)
+**Severity:** Silent acceptance of reading another required field before it's assigned
+
+**Condition:** In an initial event action chain, `set x = y` where both `x` and `y` are required fields without defaults, and `y` hasn't been set in any prior action in the chain. The D142 check only looks for self-referential reads (`fieldRef.FieldName == fieldName`). It doesn't check whether ANOTHER required field being read has been assigned yet.
+
+**Reproduction:**
+```precept
+field x integer
+field y integer
+
+event create initial
+  from initial -> set x = y, set y = 1
+```
+Expected: diagnostic on `y` in `set x = y` — `y` has no value yet. Actual: no diagnostic. D142 only fires if x reads x.
+
+**Proposed diagnostic:** D144 `UninitializedCrossFieldReadInInitialAssignment` — "Field '{0}' is read in the initial event '{1}' before it has been assigned a value"
+
+**Fix location:** In the `foreach (var fieldRef in fieldRefs)` loop, also check whether `fieldRef.FieldName` refers to a different required field that is NOT in `priorAssignments` and has no implicit value. Emit D144 for such cross-references.
+
+---
+
+## Clean (Verified Correct)
+
+- Multiple initial states already validate construction chains independently once matching rows are found.
+- `IsRequiredFieldWithoutImplicitValue` correctly excludes optional, defaulted, computed, and collection fields.
+- The omit-in-all-initial-states optimization is correct: a field only skips construction if every initial state omits it.
+- D130 wildcard row handling is already conservative-correct.
+- No other `ctx.States.Count == 0` early-return anti-pattern was found in the sibling validation files.
+
+# Decision: Deferred Qualifier Fixes Code Review
+
+**By:** Frank  
+**Date:** 2026-05-15T18:34:40-04:00  
+**Commit:** `85974302`  
+**Verdict:** APPROVED
+
+## Verdict: APPROVED
+
+### Findings
+
+G1: [GOOD] ImpliedQualifiers parity is placed correctly — between declared-qualifier check and Unknown/Absent fallback in `ResolveDirectQualifierAxis`. No double-resolution risk. Both TypeChecker and ProofEngine now see implied qualifiers (e.g., duration's `TemporalDimension(Time)`).
+
+G2: [GOOD] UCUM helper extraction is clean. `QualifierUnitHelpers.cs` is a proper shared helper, not a wrapper-of-wrappers. TypeChecker delegates via thin stubs (preserving call-site compatibility), ProofEngine calls directly in the compound-cancellation path. Edge cases (empty string, multiple slashes, slash at position 0) handled correctly.
+
+G3: [GOOD] ProofEngine consolidation via `ResolveQualifierFromDeclaredQualifiers` eliminates three copies of the axis-fallback loop (exact match → Unit→Dimension fallback → Dimension→TemporalDimension fallback → CompoundPrice projection). DRY improvement with zero behavioral change.
+
+G4: [GOOD] Function-call qualifier preservation uses `ResolveAssignmentQualifierAxis(args[0], axis)` rather than the spec's suggested `TryGetStaticQualifiers`. This is strictly better — handles nested function calls, binary expressions, and conditionals as first args. The eagerness of `ResultQualifiers` population at `CreateTypedFunctionCall` time prevents recursion.
+
+G5: [GOOD] `ResolveFunctionCallQualifierAxis` correctly falls back to Unknown (not Absent) on applicable axes when `ResultQualifiers` is null or empty. This is the spec requirement.
+
+G6: [GOOD] ProofEngine arm for `TypedFunctionCall` uses the consolidated `ResolveQualifierFromDeclaredQualifiers` — consistent with the existing `TypedArgRef` and `TypedTypedConstant` patterns. Pattern guard `{ IsDefaultOrEmpty: false }` correctly avoids null/empty cases.
+
+G7: [GOOD] `GetApplicableAssignmentQualifierAxes` refactoring — converting `IsAssignmentQualifierAxisApplicable` to call a shared array-returning method — enables `ResolveFunctionResultQualifiers` to iterate over all relevant axes. Clean extraction.
+
+N1: [NON-BLOCKING] Early-return in `ResolveSlotSourceQualifierAxis` still returns `Absent` unconditionally in one defensive path. Spec prescribed an applicability check there too. Not blocking because no test scenario exercises the uncovered path with a wrong observable result.
+
+N2: [NON-BLOCKING] LS changes (~400 lines across `DocumentState.cs`, `SlotContext.cs`, `CompletionHandler.cs`, `TextDocumentSyncHandler.cs`) are completely out of scope for the qualifier deferred fixes. They are independently correct and well-tested (319 LS tests pass), but should have been a separate commit for bisection hygiene.
+
+N3: [NON-BLOCKING] Missing direct test coverage for implied-qualifier parity and compound-cancellation consistency through the shared helper.
+
+N4: [NON-BLOCKING] Missing test coverage for multi-arg qualifier preservation (`min`/`max`) and `round(money, places)` preservation. The implementation is generic over all `QualifierMatch.Same` functions, so this is coverage density, not correctness risk.
+
+### Pre-existing failures
+
+7 `TypeCheckerAssignmentQualifierTests` failures plus 1 `ProofEngineTypedArgQualifierTests` failure were confirmed pre-existing at `002e65ae`. They are not regressions from George's commit.
+
+### Scope Note
+
+The LS changes (N2) are approved because they are independently correct, well-tested, and don't touch qualifier enforcement code. However, George is reminded: **one commit, one concern.** Completion handler improvements deserve their own commit message and their own review surface. Don't bundle unrelated work.

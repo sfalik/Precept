@@ -2321,3 +2321,11 @@ Pattern: When a doc has a code block and a prose "pending" note about the same f
 - Test 9 cross-unit WholeValue anchor is acceptable for Slice 21 scope; the tighter `max '1 kg'` variant that would actually detect double-normalization is correctly deferred as future obligation.
 - Durable learning: happy-path anchors and regression detectors are distinct test categories — a test that passes regardless of bug presence is an anchor, not a guard. Both are valuable but must not be confused.
 
+---
+
+## Archive Batch — 2026-05-15T22:18:38Z
+
+### 2026-05-15 — Earlier same-day review detail summarized out of history.md
+
+- Compressed the live file by archiving detailed same-day notes for Slice 23/24 approvals, modifier comma assessment, QS-1 model review, qualifier deferred scoping, and the full PRE0141 approval pass.
+- Durable outcomes remain in `.squad/decisions.md`; keep `history.md` focused on live guidance, the uninitialized-initial-read gap, and the completion-spec closeout.
