@@ -888,7 +888,8 @@ internal static partial class TypeChecker
             typedSlots.ToImmutable(),
             targetType,
             expr.Span,
-            TryExtractStaticMagnitude(segments));
+            TryExtractStaticMagnitude(segments),
+            ResolveStaticQualifier(segments, typedSlots.ToImmutable(), targetType));
     }
 
     private static decimal? TryExtractStaticMagnitude(ImmutableArray<InterpolationSegment> segments)
@@ -916,6 +917,120 @@ internal static partial class TypeChecker
         }
 
         return null;
+    }
+
+    private static StaticInterpolatedQualifier? ResolveStaticQualifier(
+        ImmutableArray<InterpolationSegment> segments,
+        ImmutableArray<TypedInterpolationSlot> typedSlots,
+        TypeKind targetType)
+    {
+        if (typedSlots.Any(slot => slot.SlotKind == InterpolationSlotKind.WholeValue))
+            return null;
+
+        var hasCurrencySlot = typedSlots.Any(slot => slot.SlotKind == InterpolationSlotKind.Currency);
+        var hasUnitSlot = typedSlots.Any(slot => slot.SlotKind is InterpolationSlotKind.Unit or InterpolationSlotKind.NumeratorUnit or InterpolationSlotKind.DenominatorUnit);
+        var hasFromSlot = typedSlots.Any(slot => slot.SlotKind == InterpolationSlotKind.FromCurrency);
+        var hasToSlot = typedSlots.Any(slot => slot.SlotKind == InterpolationSlotKind.ToCurrency);
+        var staticText = string.Concat(segments.OfType<TextSegment>().Select(segment => segment.Text)).Trim();
+
+        return targetType switch
+        {
+            TypeKind.Money when !hasCurrencySlot && TryExtractCurrency(staticText, out var currencyCode) =>
+                new StaticCurrencyQualifier(currencyCode),
+
+            TypeKind.Quantity when !hasUnitSlot && TryExtractUnit(staticText, out var unit) =>
+                new StaticUnitQualifier(unit),
+
+            TypeKind.Price when !hasCurrencySlot && !hasUnitSlot
+                             && TryExtractCurrencyAndUnit(staticText, out var priceCurrency, out var priceUnit) =>
+                new StaticCurrencyAndUnitQualifier(priceCurrency, priceUnit),
+
+            TypeKind.Price when !hasCurrencySlot && TryExtractCurrencyAndUnit(staticText, out var staticCurrency, out _) =>
+                new StaticCurrencyQualifier(staticCurrency),
+
+            TypeKind.Price when !hasUnitSlot && TryExtractCurrencyAndUnit(staticText, out _, out var staticUnit) =>
+                new StaticUnitQualifier(staticUnit),
+
+            TypeKind.ExchangeRate when !hasFromSlot && !hasToSlot
+                                    && TryExtractFromToCurrencies(staticText, out var fromCode, out var toCode) =>
+                new StaticFromToCurrenciesQualifier(fromCode, toCode),
+
+            _ => null,
+        };
+    }
+
+    private static bool TryExtractCurrency(string text, out string currencyCode)
+    {
+        currencyCode = string.Empty;
+        var token = text.Trim();
+        if (token.Contains('/'))
+            token = token[..token.IndexOf('/')];
+
+        if (!IsCurrencyCode(token))
+            return false;
+
+        currencyCode = token.ToUpperInvariant();
+        return true;
+    }
+
+    private static bool TryExtractUnit(string text, out UcumParsedUnit unit)
+    {
+        unit = null!;
+        var token = text.Trim();
+        if (token.Length == 0)
+            return false;
+
+        var result = UcumParser.Parse(token);
+        if (!result.IsValid || result.Unit is null)
+            return false;
+
+        unit = result.Unit;
+        return true;
+    }
+
+    private static bool TryExtractCurrencyAndUnit(string text, out string currencyCode, out UcumParsedUnit unit)
+    {
+        currencyCode = string.Empty;
+        unit = null!;
+
+        var trimmed = text.Trim();
+        var slashIndex = trimmed.IndexOf('/');
+        if (slashIndex <= 0 || slashIndex == trimmed.Length - 1)
+            return false;
+
+        var currency = trimmed[..slashIndex].Trim();
+        var unitCode = trimmed[(slashIndex + 1)..].Trim();
+        if (!IsCurrencyCode(currency))
+            return false;
+
+        var parsed = UcumParser.Parse(unitCode);
+        if (!parsed.IsValid || parsed.Unit is null)
+            return false;
+
+        currencyCode = currency.ToUpperInvariant();
+        unit = parsed.Unit;
+        return true;
+    }
+
+    private static bool TryExtractFromToCurrencies(string text, out string fromCode, out string toCode)
+    {
+        fromCode = string.Empty;
+        toCode = string.Empty;
+
+        var trimmed = text.Trim();
+        var slashIndex = trimmed.IndexOf('/');
+        if (slashIndex <= 0 || slashIndex == trimmed.Length - 1)
+            return false;
+
+        var from = trimmed[..slashIndex].Trim();
+        var to = trimmed[(slashIndex + 1)..].Trim();
+
+        if (!IsCurrencyCode(from) || !IsCurrencyCode(to))
+            return false;
+
+        fromCode = from.ToUpperInvariant();
+        toCode = to.ToUpperInvariant();
+        return true;
     }
 
     /// <summary>

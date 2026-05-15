@@ -137,8 +137,15 @@ public sealed record InterpolatedTypedConstant(
     ImmutableArray<TypedInterpolationSlot> Slots,
     TypeKind ResultType,
     SourceSpan Span,
-    decimal? StaticMagnitude = null
+    decimal? StaticMagnitude = null,
+    StaticInterpolatedQualifier? StaticQualifier = null
 ) : TypedExpression(ResultType, Span);
+
+public abstract record StaticInterpolatedQualifier;
+public sealed record StaticCurrencyQualifier(string CurrencyCode) : StaticInterpolatedQualifier;
+public sealed record StaticUnitQualifier(UcumParsedUnit Unit) : StaticInterpolatedQualifier;
+public sealed record StaticCurrencyAndUnitQualifier(string CurrencyCode, UcumParsedUnit Unit) : StaticInterpolatedQualifier;
+public sealed record StaticFromToCurrenciesQualifier(string FromCode, string ToCode) : StaticInterpolatedQualifier;
 
 /// <summary>A resolved hole expression with its assigned slot identity.</summary>
 public sealed record TypedInterpolationSlot(
