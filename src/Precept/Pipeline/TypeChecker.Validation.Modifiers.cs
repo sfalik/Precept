@@ -260,7 +260,7 @@ internal static partial class TypeChecker
         ImmutableArray<DeclaredQualifierMeta> declaredQualifiers) =>
         resolvedType == TypeKind.Quantity
         && expression is not null
-        && IsBareNumericBoundLiteral(expression)
+        && IsBareNumericLiteral(expression)
         && declaredQualifiers.Any(q => q is DeclaredQualifierMeta.Unit);
 
     private static bool ShouldEmitCountDimensionBoundsAmbiguous(
@@ -268,7 +268,7 @@ internal static partial class TypeChecker
         TypeKind resolvedType,
         ImmutableArray<DeclaredQualifierMeta> declaredQualifiers)
     {
-        if (resolvedType != TypeKind.Quantity || expression is null || !IsBareNumericBoundLiteral(expression))
+        if (resolvedType != TypeKind.Quantity || expression is null || !IsBareNumericLiteral(expression))
             return false;
 
         if (declaredQualifiers.Any(q => q is DeclaredQualifierMeta.Unit))
@@ -290,17 +290,6 @@ internal static partial class TypeChecker
 
         return string.Equals(dimensionName, "count", StringComparison.OrdinalIgnoreCase);
     }
-
-    private static bool IsBareNumericBoundLiteral(ParsedExpression expression) => expression switch
-    {
-        LiteralExpression { LiteralKind: TokenKind.NumberLiteral } => true,
-        UnaryOperationExpression
-        {
-            Operator: TokenKind.Minus,
-            Operand: LiteralExpression { LiteralKind: TokenKind.NumberLiteral }
-        } => true,
-        _ => false,
-    };
 
     private static bool QualifierValuesMatch(DeclaredQualifierMeta a, DeclaredQualifierMeta b) =>
         (a, b) switch
@@ -426,7 +415,7 @@ internal static partial class TypeChecker
 
             var lowerValue = TryGetComparableModifierValue(modifier.Value, resolvedType, declaredQualifiers);
             var upperValue = TryGetComparableModifierValue(counterpart.Value, resolvedType, declaredQualifiers);
-            if (lowerValue is null || upperValue is null || lowerValue.Value.Magnitude <= upperValue.Value.Magnitude)
+            if (lowerValue is null || upperValue is null || lowerValue.Value.NormalizedMagnitude <= upperValue.Value.NormalizedMagnitude)
                 continue;
 
             var counterpartMeta = (ValueModifierMeta)Modifiers.GetMeta(meta.BoundCounterpart.Value);
@@ -435,9 +424,9 @@ internal static partial class TypeChecker
                     DiagnosticCode.InvalidModifierBounds,
                     span,
                     meta.Token.Text ?? modifier.Kind.ToString(),
-                    lowerValue.Value.Magnitude.ToString(CultureInfo.InvariantCulture),
+                    lowerValue.Value.DeclaredMagnitude.ToString(CultureInfo.InvariantCulture),
                     counterpartMeta.Token.Text ?? counterpart.Kind.ToString(),
-                    upperValue.Value.Magnitude.ToString(CultureInfo.InvariantCulture)));
+                    upperValue.Value.DeclaredMagnitude.ToString(CultureInfo.InvariantCulture)));
         }
     }
 
@@ -454,7 +443,7 @@ internal static partial class TypeChecker
     {
         LiteralExpression { LiteralKind: TokenKind.NumberLiteral, Text: var text }
             when decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out var value)
-            => new(value, ImmutableArray<DeclaredQualifierMeta>.Empty),
+            => new(value, value, ImmutableArray<DeclaredQualifierMeta>.Empty),
         LiteralExpression { LiteralKind: TokenKind.TypedConstant, Text: var text }
             => TryGetComparableTypedConstantValue(text, expectedType, declaredQualifiers),
         UnaryOperationExpression
@@ -463,7 +452,7 @@ internal static partial class TypeChecker
             Operand: LiteralExpression { LiteralKind: TokenKind.NumberLiteral, Text: var text }
         }
             when decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out var value)
-            => new(-value, ImmutableArray<DeclaredQualifierMeta>.Empty),
+            => new(-value, -value, ImmutableArray<DeclaredQualifierMeta>.Empty),
         _ => null,
     };
 
@@ -486,18 +475,19 @@ internal static partial class TypeChecker
         if (!parseResult.IsValid || !TryExtractTypedConstantMagnitude(parseResult.Value, out var magnitude))
             return null;
 
-        magnitude = expectedType switch
+        var declaredMagnitude = magnitude;
+        var normalizedMagnitude = expectedType switch
         {
             TypeKind.Quantity when parseResult.Value is ValueTuple<decimal, UcumParsedUnit?> (_, var unit) =>
-                TypedConstantNormalizer.NormalizeQuantity(magnitude, unit),
+                TypedConstantNormalizer.NormalizeQuantity(declaredMagnitude, unit),
             TypeKind.Price when parseResult.Value is ValueTuple<decimal, object?, UcumParsedUnit?> (_, _, var denominatorUnit) =>
-                TypedConstantNormalizer.NormalizePrice(magnitude, denominatorUnit),
-            _ => magnitude,
+                TypedConstantNormalizer.NormalizePrice(declaredMagnitude, denominatorUnit),
+            _ => declaredMagnitude,
         };
 
         var qualifiers = ExtractQualifiersFromParsedValue(expectedType, parseResult.Value)
             ?? ImmutableArray<DeclaredQualifierMeta>.Empty;
-        return new ExtractedBoundValue(magnitude, qualifiers);
+        return new ExtractedBoundValue(declaredMagnitude, normalizedMagnitude, qualifiers);
     }
 
     private static bool TryExtractTypedConstantMagnitude(object? parsedValue, out decimal magnitude)
@@ -521,7 +511,8 @@ internal static partial class TypeChecker
     }
 
     private readonly record struct ExtractedBoundValue(
-        decimal Magnitude,
+        decimal DeclaredMagnitude,
+        decimal NormalizedMagnitude,
         ImmutableArray<DeclaredQualifierMeta> Qualifiers);
 
     /// <summary>

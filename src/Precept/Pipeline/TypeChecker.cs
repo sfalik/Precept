@@ -395,16 +395,16 @@ internal static partial class TypeChecker
                 DeclaredQualifiers: declaredQualifiers,
                 NameSpan: declared.NameSpan,
                 Syntax: declared.Syntax,
-                DeclaredMin: declaredMinBound?.Magnitude,
-                DeclaredMax: declaredMaxBound?.Magnitude,
-                NormalizedDeclaredMin: declaredMinBound?.Magnitude,
-                NormalizedDeclaredMax: declaredMaxBound?.Magnitude,
+                DeclaredMin: declaredMinBound?.DeclaredMagnitude,
+                DeclaredMax: declaredMaxBound?.DeclaredMagnitude,
+                NormalizedDeclaredMin: declaredMinBound?.NormalizedMagnitude,
+                NormalizedDeclaredMax: declaredMaxBound?.NormalizedMagnitude,
                 DeclaredMinBoundQualifiers: declaredMinBound?.Qualifiers ?? ImmutableArray<DeclaredQualifierMeta>.Empty,
                 DeclaredMaxBoundQualifiers: declaredMaxBound?.Qualifiers ?? ImmutableArray<DeclaredQualifierMeta>.Empty,
-                DeclaredMinLength: declaredMinLengthBound?.Magnitude is { } mnL ? (int)mnL : null,
-                DeclaredMaxLength: declaredMaxLengthBound?.Magnitude is { } mxL ? (int)mxL : null,
-                DeclaredMinCount: declaredMinCountBound?.Magnitude is { } mnC ? (int)mnC : null,
-                DeclaredMaxCount: declaredMaxCountBound?.Magnitude is { } mxC ? (int)mxC : null);
+                DeclaredMinLength: declaredMinLengthBound?.DeclaredMagnitude is { } mnL ? (int)mnL : null,
+                DeclaredMaxLength: declaredMaxLengthBound?.DeclaredMagnitude is { } mxL ? (int)mxL : null,
+                DeclaredMinCount: declaredMinCountBound?.DeclaredMagnitude is { } mnC ? (int)mnC : null,
+                DeclaredMaxCount: declaredMaxCountBound?.DeclaredMagnitude is { } mxC ? (int)mxC : null);
 
             ctx.Fields.Add(typedField);
             ctx.FieldLookup[declared.Name] = typedField;
@@ -533,10 +533,10 @@ internal static partial class TypeChecker
                         : new DeclaredPresenceMeta.Guaranteed(),
                     DeclaredQualifiers: declaredQualifiers,
                     Span: arg.NameSpan,
-                    DeclaredMin: declaredMinBound?.Magnitude,
-                    DeclaredMax: declaredMaxBound?.Magnitude,
-                    NormalizedDeclaredMin: declaredMinBound?.Magnitude,
-                    NormalizedDeclaredMax: declaredMaxBound?.Magnitude,
+                    DeclaredMin: declaredMinBound?.DeclaredMagnitude,
+                    DeclaredMax: declaredMaxBound?.DeclaredMagnitude,
+                    NormalizedDeclaredMin: declaredMinBound?.NormalizedMagnitude,
+                    NormalizedDeclaredMax: declaredMaxBound?.NormalizedMagnitude,
                     DeclaredMinBoundQualifiers: declaredMinBound?.Qualifiers ?? ImmutableArray<DeclaredQualifierMeta>.Empty,
                     DeclaredMaxBoundQualifiers: declaredMaxBound?.Qualifiers ?? ImmutableArray<DeclaredQualifierMeta>.Empty));
 
@@ -619,7 +619,7 @@ internal static partial class TypeChecker
             {
                 var resolved = Resolve(minMod.Value, ctx, typedField.ResolvedType, typedField.DeclaredQualifiers);
                 var allowBareNumericQuantityBound =
-                    AllowsBareNumericQuantityBound(minMod.Value, typedField.ResolvedType);
+                    AllowsBareNumericQuantityBound(minMod.Value, typedField.ResolvedType, typedField.DeclaredQualifiers);
                 if (resolved is not TypedErrorExpression && typedField.ResolvedType != TypeKind.Error)
                 {
                     if (!allowBareNumericQuantityBound && !IsAssignable(resolved.ResultType, typedField.ResolvedType))
@@ -650,7 +650,7 @@ internal static partial class TypeChecker
             {
                 var resolved = Resolve(maxMod.Value, ctx, typedField.ResolvedType, typedField.DeclaredQualifiers);
                 var allowBareNumericQuantityBound =
-                    AllowsBareNumericQuantityBound(maxMod.Value, typedField.ResolvedType);
+                    AllowsBareNumericQuantityBound(maxMod.Value, typedField.ResolvedType, typedField.DeclaredQualifiers);
                 if (resolved is not TypedErrorExpression && typedField.ResolvedType != TypeKind.Error)
                 {
                     if (!allowBareNumericQuantityBound && !IsAssignable(resolved.ResultType, typedField.ResolvedType))
@@ -709,8 +709,13 @@ internal static partial class TypeChecker
         }
     }
 
-    private static bool AllowsBareNumericQuantityBound(ParsedExpression expression, TypeKind targetType) =>
-        targetType == TypeKind.Quantity && IsBareNumericLiteral(expression);
+    private static bool AllowsBareNumericQuantityBound(
+        ParsedExpression expression,
+        TypeKind targetType,
+        ImmutableArray<DeclaredQualifierMeta> qualifiers) =>
+        targetType == TypeKind.Quantity
+        && IsBareNumericLiteral(expression)
+        && qualifiers.Any(q => q is DeclaredQualifierMeta.Unit);
 
     private static bool IsBareNumericLiteral(ParsedExpression expression) => expression switch
     {

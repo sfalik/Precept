@@ -186,4 +186,36 @@ public class TypeCheckerQualifierCompatibilityTests
 
         TypeCheckerTestHelpers.CheckExpectingClean(precept);
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  Negative: bare numeric bound on non-unit-qualified quantity — PRE0018
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void BareNumericBound_DimensionOnlyQuantityField_EmitsTypeMismatch()
+    {
+        // quantity of 'mass' has only a Dimension qualifier, not a Unit qualifier.
+        // A bare integer bound must emit PRE0018 (TypeMismatch) — the bare-int suppression
+        // introduced in Slice N must NOT apply to dimension-only fields.
+        var precept = """
+            precept Widget
+            field Weight as quantity of 'mass' max 5
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.TypeMismatch);
+    }
+
+    [Fact]
+    public void BareNumericBound_UnqualifiedQuantityField_EmitsTypeMismatch()
+    {
+        // Fully unqualified quantity field with bare integer bound must also emit PRE0018.
+        var precept = """
+            precept Widget
+            field Weight as quantity max 5
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.TypeMismatch);
+    }
 }
