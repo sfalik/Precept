@@ -24,7 +24,7 @@
 4. [UCUM Scale Table](#4-ucum-scale-table)
 5. [Migration Path](#5-migration-path)
 5.6. [Extended Slice Details — Slices 22–26](#56-extended-slice-details--slices-2226)
-5.7. [Formal Implementation Slices — Slices 30–43](#57-formal-implementation-slices--slices-3043)
+5.7. [Formal Implementation Slices — Slices 30–45](#57-formal-implementation-slices--slices-3045)
 6. [Risks and Tradeoffs](#6-risks-and-tradeoffs)
 7. [Open Questions for Shane](#7-open-questions-for-shane)
 
@@ -1918,10 +1918,12 @@ For `[lb_av]`:
 | **41** | Doc: `dozen`/`gross` intentional exclusion | ✅ Done | None |
 | **42** | Doc: `each.dimension = DimensionVector.None` behavior | ✅ Done | None |
 | **43** | Rename `TypedInterpolatedTypedConstant` → `InterpolatedTypedConstant` | ✅ Done | None |
+| **44** | Bare-integer bound promotion for unit-qualified quantity fields | ✅ Done | None |
+| **45** | PRE0138 `CountDimensionBoundsAmbiguous` | ✅ Done | None |
 
 **Legend:** ✅ Done · 🔶 Partial · ⬜ Not started
 **Critical path:** 14 → 15/15b/16 → 17/18/19 → 20/21/22 → 23/24/25 → 26 → 27
-**Parallel-safe first wave:** 14 · 22 · 30 · 32 · 34 · 38–42 · 43 (no code dependencies)
+**Parallel-safe first wave:** 14 · 22 · 30 · 32 · 34 · 38–42 · 43 · 44 · 45 (no code dependencies)
 
 ### 5.1 Implementation Slices
 
@@ -3695,7 +3697,7 @@ These slices extend the normalization design to cover interpolated typed constan
 
 - **Key risk:** The `ValidateMaxPlaces` helper currently takes `TypedField`. Extract the common parameters (`DeclaredMin`, `DeclaredMax`, `ResolvedType`, `DeclaredQualifiers`, `Name`) into a new overload — do NOT introduce a shared interface type. Call the overload from both the `TypedField` and `TypedArg` sites. This is a small adapter (~10 lines), not a broad refactor.
 
-## §5.7 — Formal Implementation Slices — Slices 30–43
+## §5.7 — Formal Implementation Slices — Slices 30–45
 
 **Author:** Frank (Lead Architect)
 **Date:** 2026-05-14T22:48:46.544-04:00
@@ -3710,6 +3712,7 @@ The next available slice number is **30**. Slice 27 is already reserved for doc 
 - Affine lane is strictly ordered: 34 → 35 → 36 → 37.
 - Documentation slices 38–42 are standalone and may run in parallel.
 - Slice 43 is a standalone mechanical rename.
+- Slices 44 and 45 are standalone bounds-validation fixes with no dependencies on other slices.
 
 | Slice | Objective | Lane | Status |
 |-------|-----------|------|--------|
@@ -3727,8 +3730,10 @@ The next available slice number is **30**. Slice 27 is already reserved for doc 
 | **41** | Doc: dozen/gross exclusion | Doc | ✅ |
 | **42** | Doc: each.dimension behavior | Doc | ✅ |
 | **43** | Rename `TypedInterpolatedTypedConstant` → `InterpolatedTypedConstant` | Standalone | ✅ |
+| **44** | Bare-integer bound promotion for unit-qualified quantity fields | Bounds | ✅ |
+| **45** | PRE0138 `CountDimensionBoundsAmbiguous` | Bounds | ✅ |
 
-**Status note:** Slice 31 is intentionally marked partial: PRE0137 is wired for same-match function-call enforcement via Slice 32, while the binary-operator path remains wave-2 work.
+**Status note:** Slice 31 is intentionally marked partial: PRE0137 is wired for same-match function-call enforcement via Slice 32, while the binary-operator path remains wave-2 work. Slices 44–45 close two false-positive / insufficient-diagnostic bugs in bounds validation for unit-qualified and count-dimension fields.
 
 ---
 
@@ -3883,3 +3888,31 @@ The next available slice number is **30**. Slice 27 is already reserved for doc 
 - **Tests:** Targeted coverage from `TypeCheckerTypedConstantTests`, `ProofEngineTypedArgQualifierTests`, and `SemanticTokensHandlerTests`; finish with the normal repository regression sweep (`dotnet test`).
 - **Dependencies:** None. Standalone.
 - **Regression anchors:** Public DSL syntax, diagnostics, proof behavior, and MCP output must remain unchanged; only the internal semantic type name moves.
+
+---
+
+**Slice 44: Bare-integer bound promotion for unit-qualified quantity fields**
+
+- **Objective:** Eliminate two false-positive diagnostics (PRE0018 and PRE0133) that fired on `quantity in 'box' max 4` — a bare-integer bound on a field with an explicit unit qualifier. The field's `in 'unit'` clause makes the bound's unit unambiguous; requiring a redundant qualifier on the literal is noise, not safety.
+- **Root cause:** Two independent check sites rejected the declaration:
+  1. `TypeChecker.cs` — `IsAssignable(Integer, Quantity)` failed because the general assignability check has no knowledge of the field's unit context. A bare integer is not structurally a quantity, so the type-mismatch gate fires.
+  2. `TypeChecker.Validation.Modifiers.cs` — `ValidateBoundQualifierCompatibility` checks that a bound carries the same qualifier as the field. A bare numeric has empty qualifiers, triggering PRE0133 even though the field's own `in 'box'` makes the target unit unambiguous.
+- **Files:** `src/Precept/Pipeline/TypeChecker.cs` (IsAssignable suppression for int/decimal → quantity when explicit Unit qualifier present); `src/Precept/Pipeline/TypeChecker.Validation.Modifiers.cs` (`ValidateBoundQualifierCompatibility` early-exit path); `test/Precept.Tests/TypeChecker/TypeCheckerQualifierCompatibilityTests.cs`.
+- **Approach:** Early-exit in `ValidateBoundQualifierCompatibility` when the field has an explicit Unit qualifier and the bound is a bare numeric — this is safer than synthesizing a qualifier onto the bound, which would require the normalizer to fabricate metadata the author never wrote. The IsAssignable check in `TypeChecker.cs` is suppressed under the same condition: field carries explicit Unit qualifier AND bound value is integer or decimal.
+- **Tests:** Verify `quantity in 'box' max 4` produces zero diagnostics; verify `quantity in 'box' max 4.5` (decimal) also passes; verify that unqualified fields (`quantity max 4` without `in` clause) still emit PRE0133 as before; verify cross-unit scenarios remain enforced.
+- **Dependencies:** None. Standalone.
+- **Regression anchors:** Unqualified quantity fields must still require qualified bounds; `quantity of 'count' max 4` must still fire a diagnostic (addressed separately by Slice 45 with PRE0138); cross-unit comparison enforcement (PRE0137) is unaffected.
+- **Status:** ✅ Done (commit ff43d56a).
+
+---
+
+**Slice 45: PRE0138 `CountDimensionBoundsAmbiguous`**
+
+- **Objective:** Replace the generic PRE0133 (`BoundsRequireQualifier`) with a count-specific diagnostic when a bare-integer bound appears on a field qualified only by dimension (`of 'count'`). Count-dimension units (`each`, `box`, `case`, `pallet`) share `DimensionVector.None` and are NOT mutually convertible — a bare integer bound on a count-dimension-only field is genuinely ambiguous, not merely syntactically incomplete. The author needs an actionable message guiding them to use `in 'box'` instead of `of 'count'`.
+- **Rationale:** Generic PRE0133 says "bounds require a qualifier" — which is true but unhelpful when the author already wrote `of 'count'`. The real problem is that the dimension-only qualifier resolves to `DimensionVector.None`, which is shared across all counting units. No single canonical unit exists to infer. The diagnostic must explain *why* the dimension qualifier is insufficient and guide the author toward explicit unit selection.
+- **Files:** `src/Precept/Language/DiagnosticCode.cs` (`CountDimensionBoundsAmbiguous = 138`); `src/Precept/Language/Diagnostics.cs` (message: "Bounds on count-dimension fields require an explicit unit qualifier ('in box', 'in each') because counting units are not mutually convertible. Use 'in <unit>' instead of 'of count'."); `src/Precept/Pipeline/TypeChecker.Validation.Modifiers.cs` (emit PRE0138 instead of PRE0133 when field has dimension-only qualifier resolving to `DimensionVector.None`); `test/Precept.Tests/TypeChecker/TypeCheckerQualifierCompatibilityTests.cs`.
+- **Approach:** In `ValidateBoundQualifierCompatibility`, detect the specific case: bound is bare numeric, field qualifier is dimension-only, and resolved dimension is `DimensionVector.None`. Emit PRE0138 instead of PRE0133 with an actionable message that names concrete alternatives. The guard fires strictly *before* the Slice 44 early-exit — Slice 44 only applies when the field has an explicit Unit qualifier (e.g., `in 'box'`), while Slice 45 applies when the qualifier is dimension-only (e.g., `of 'count'`).
+- **Tests:** Verify `quantity of 'count' max 4` emits PRE0138 (not PRE0133); verify `quantity in 'box' max 4` does NOT emit PRE0138 (handled by Slice 44); verify `quantity of 'mass' max 4` still emits PRE0133 (non-count dimensions remain on the generic path); verify the diagnostic message contains actionable unit suggestions; 11/11 tests passing as committed.
+- **Dependencies:** None. Standalone (orthogonal to Slice 44 — different qualifier-resolution paths).
+- **Regression anchors:** PRE0133 must still fire for non-count dimension-only fields; Slice 44's early-exit for explicit-unit fields must remain unaffected; PRE0137 cross-unit enforcement is orthogonal and unaffected.
+- **Status:** ✅ Done (commit 04c16211).
