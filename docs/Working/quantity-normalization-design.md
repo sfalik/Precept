@@ -1899,11 +1899,11 @@ For `[lb_av]`:
 | **20** | Unit-aware interval scaling (`NumericInterval.Scale`) | ✅ Done | Needs 19, 16 |
 | **21** | Interpolated quantity test coverage | ✅ Done | Needs 19, 20 |
 | **22** | `StaticQualifier` on `InterpolatedTypedConstant` | ✅ Done | None |
-| **23** | Route `StaticQualifier` through qualifier consumers | ⬜ Not started | Needs 22 |
-| **24** | Money/price interpolated interval extraction | ⬜ Not started | Needs 19, 22 |
+| **23** | Route `StaticQualifier` through qualifier consumers | ✅ Done | Needs 22 |
+| **24** | Money/price interpolated interval extraction | ✅ Done | Needs 19, 22 |
 | **25** | Field-default proof coverage (`FoldValue` + collector) | ✅ Done | Needs 19, 22, 23 |
 | **26** | Event arg default resolution (`ResolveEventArgExpressions`) | ✅ Done | Needs 25, 15b |
-| **27** | Doc sync (language spec, proof-engine.md, interval design) | ⬜ Not started | Needs 16, 18 (shape freeze) |
+| **27** | Doc sync (language spec, proof-engine.md, interval design) | ✅ Done | Needs 16, 18 (shape freeze) |
 | **30** | Extend PRE0070/PRE0071 to comparison operators | ✅ Done | None |
 | **31** | PRE0137 `CrossCountingUnitOperation` | ✅ Done | None |
 | **32** | `QualifierMatch.Same` in `SelectOverload` (function calls) | ✅ Done | None |
@@ -1922,7 +1922,7 @@ For `[lb_av]`:
 | **45** | PRE0138 `CountDimensionBoundsAmbiguous` | ✅ Done | None |
 
 **Legend:** ✅ Done · 🔶 Partial · ⬜ Not started
-**Critical path:** 14 → ~~15/15b/16~~ → ~~17/18~~ → ~~21~~ → 23/24/~~25~~ → 26 → 27 _(15/15b/16/17/18/19/20/21/25 complete; remaining gate is 23/24 → 26 → 27)_
+**Critical path:** 14 → ~~15/15b/16~~ → ~~17/18~~ → ~~21~~ → ~~23/24/25~~ → ~~26~~ → ~~27~~ _(Wave 3 complete: Slices 23–27 are all done)_
 **Parallel-safe first wave:** 14 · 22 · 30 · 32 · 34 · 38–42 · 43 · 44 · 45 (no code dependencies)
 
 ### 5.1 Implementation Slices
@@ -1936,7 +1936,7 @@ These slices follow the existing interval-proof-engine-design numbering (Slices 
 | **16** | Wire ProofEngine magnitude extraction to normalizer | Slice 14 | George | ✅ |
 | **17** | Unit + integration + regression tests | Slices 15–16 | Soup Nazi | ✅ |
 | **18** | Hover/diagnostic display review | Slices 15–16 | Kramer | ✅ |
-| **27** | Doc sync | Slices 14–21 | Frank | ⬜ |
+| **27** | Doc sync | Slices 14–21 | Frank | ✅ |
 
 ### 5.2 Slice Details
 
@@ -2003,7 +2003,7 @@ The interpolated case (`'{field} [unit]'`) is a **separate problem** from the st
 | **19** | Add `InterpolatedTypedConstant` case to `IntervalOfNarrowed` | Slice 14 (normalizer) | George | ✅ |
 | **20** | Unit-aware interval scaling for interpolated magnitude slots | Slice 19 + Slice 16 | George | ✅ |
 | **21** | Integration tests for interpolated quantity overflow proofs | Slices 19–20 | Soup Nazi | ✅ |
-| **27** | Doc sync — propagate normalization changes to all canonical docs | Slices 14–21 | Frank | ⬜ |
+| **27** | Doc sync — propagate normalization changes to all canonical docs | Slices 14–21 | Frank | ✅ |
 
 **Slice 19: Interval analysis for interpolated typed constants**
 - Add a case for `InterpolatedTypedConstant` in `IntervalOfNarrowed` (ProofEngine.Intervals.cs)
@@ -3576,7 +3576,7 @@ These slices extend the normalization design to cover interpolated typed constan
 | Slice | Objective | Depends On | Status |
 |-------|-----------|------------|--------|
 | **22** | Capture `StaticQualifier` on `InterpolatedTypedConstant` | None | ✅ |
-| **23** | Route `StaticQualifier` through qualifier consumers | Slice 22 | ⬜ |
+| **23** | Route `StaticQualifier` through qualifier consumers | Slice 22 | ✅ |
 | **24** | Extend interpolated interval extraction to money/price | Slices 19, 22 | ✅ |
 | **25** | Field-default proof coverage for interpolated typed constants | Slices 19, 22, 23 | ✅ |
 | **26** | Event arg default resolution (typed-constant defaults) | Slices 25, 15b | ✅ |
