@@ -670,6 +670,8 @@ Type qualifiers narrow the value domain of the field — they are part of the ty
 
 For business counting units, the dimension-family view and the unit-identity view are deliberately different. Units such as `each`, `box`, `case`, and `pallet` all report the shared count dimension (`DimensionVector.None`) and normalize with factor one, but that representation only says "these are count quantities." It does **not** mean the codes are interchangeable or silently convertible.
 
+This applies equally to familiar bundle words such as `dozen` and `gross`: lexical familiarity does not grant an implicit compile-time conversion. If business meaning depends on how many `each` values are in one `dozen` or `gross`, authors must model that relationship explicitly with a conversion field rather than relying on silent unit reconciliation.
+
 The lexer uses a mode stack to handle nested interpolation in string and typed-constant literals. This ensures `{expr}` inside a literal correctly lexes the expression tokens and then returns to the literal context.
 
 **Modes:**

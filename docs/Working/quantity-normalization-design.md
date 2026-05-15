@@ -2672,6 +2672,8 @@ precept InventoryCheck
 end
 ```
 
+**Important non-exception — `dozen` and `gross`:** Lexically familiar counting bundles do **not** bypass PRE0137. Even if UCUM or domain catalogs expose `dozen` or `gross` as unit codes, compile-time reconciliation still requires an explicit conversion field when business meaning matters. Precept treats these as packaging/product-data semantics, not as universal conversion laws the type system may silently apply across all products. `Qty in 'each'` compared with `PackedQty in 'dozen'` must still be written as `PackedQty * EachPerDozen`, not as an implicit compiler conversion.
+
 **When neither recovery applies:** If the author genuinely needs to compare quantities in different counting units and the conversion factor is dynamic (changes per product, per order, etc.), the conversion factor should be a field in the precept that is set by an event. The type system enforces that the conversion exists — it cannot verify that the conversion value is correct, but it guarantees the operation is structurally sound.
 
 ---
