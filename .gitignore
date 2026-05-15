@@ -43,3 +43,5 @@ tools/Precept.VsCode/server/
 
 # Private keys — never commit
 *.pem
+
+*.lscache
