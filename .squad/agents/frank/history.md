@@ -62,6 +62,12 @@
 - **Confirmed clean:** `docs/language/catalog-system.md` (catalog describes types, not comparison behavior), `README.md` (no quantity/normalization content), `docs/philosophy.md` (no scope change), `samples/` (bug fix is in compiler, samples unchanged), `docs/mcp/` (directory doesn't exist).
 - The three-layer enforcement model (compile-time / ingress / defense-in-depth) identified in §0.5 is the most significant doc gap — it's a named architectural concept without a canonical home in the published docs.
 
+### 2026-05-15T00:08:25Z — Typed-constant null-guard decision locked to the proof layer
+
+- Locked the `samples/Test.precept` null-guard gap to PRE0116 via ProofEngine presence obligations rather than a new TypeChecker error.
+- Recommended reverting `samples/Test.precept` to its clean literal form and keeping interpolation coverage in a dedicated sample if needed.
+- George's adjacent implementation fix (commit `ae19510f`) now lands on the exact traversal gap Frank identified: `TypedInterpolatedTypedConstant` holes must be walked like other optional value reads.
+
 ## Learnings
 
 ### 2026-05-14T17:51 — PRE0027 Diagnosis: No Errors Found

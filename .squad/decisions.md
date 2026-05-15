@@ -6,6 +6,37 @@
 
 ---
 
+### 2026-05-15T00:08:25Z: Typed-constant interpolation holes require PRE0116 proof-stage presence checks
+
+**By:** Scribe
+
+**Status:** Merged from Frank's null-guard decision.
+
+**Merged source:** `frank-test-precept-null-guard.md`.
+
+- Frank locked the `samples/Test.precept` null-guard gap to **PRE0116 `UnprovedPresenceRequirement`** in the ProofEngine presence-proof path, not a new TypeChecker special case and not PRE0019.
+- The missing traversal case is `TypedInterpolatedTypedConstant`: typed-constant interpolation holes must behave like other value-position optional reads and generate presence obligations unless guards prove presence.
+- Recommended repository action: revert `samples/Test.precept` to the clean literal form and keep any interpolation coverage in a dedicated sample file instead of overloading the fixture.
+- Implementation scope is adjacent to, but separate from, quantity-normalization Slices 14–21.
+
+---
+
+### 2026-05-15T00:08:25Z: Slice P1 landed typed-constant hole presence-proof traversal in `ProofEngine.WalkExpression`
+
+**By:** Scribe
+
+**Status:** Merged from George's Slice P1 implementation.
+
+**Merged source:** `george-p1-presence-proof.md`.
+
+- George added the `TypedInterpolatedTypedConstant` traversal case in `src/Precept/Pipeline/ProofEngine.cs`, iterating slot expressions so optional field reads inside typed-constant holes now participate in presence-proof generation.
+- `WalkExpression` now carries `includeOptionalArgRefs` for typed-constant holes, and guard extraction understands `TypedArgRef` presence checks so guarded optional arg reads discharge correctly without widening unrelated surfaces.
+- Added four focused proof-engine presence tests covering unguarded integer/quantity holes, guarded optional holes, and non-optional holes.
+- Validation summary from George: focused `ProofEnginePresenceTests` passed, `samples/Test.precept` now reports `UnprovedPresenceRequirement` on line 14, and `dotnet build src/Precept/Precept.csproj` passed cleanly.
+- Implementation landed in commit `ae19510f`.
+
+---
+
 ### 2026-05-14T22:00:00Z: Quantity normalization §5.5.6 conditions fully resolved — implementation gate cleared
 
 **By:** Scribe

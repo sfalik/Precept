@@ -44,6 +44,12 @@
 - Frank independently approved the normalization design with conditions and identified the same high-risk areas George's audit hit from the code side: `IntervalOf` scoping, normalized-field bound reads, normalized `StaticMagnitude`, and missing event-arg bound parity.
 - Treat the combined George + Frank result as the current architectural baseline before any implementation slices are started.
 
+### 2026-05-15T00:08:25Z — Slice P1 landed typed-constant hole presence-proof traversal
+
+- `ProofEngine.WalkExpression` now traverses `TypedInterpolatedTypedConstant` slot expressions and can emit presence obligations for optional arg refs only in that hole context.
+- Focused presence tests passed, and `samples/Test.precept` now reports PRE0116 on line 14 instead of compiling cleanly through the gap.
+- Landed as commit `ae19510f`, aligned with Frank's architectural decision that this is a separate presence-proof repair rather than part of quantity-normalization Slices 14–21.
+
 ## Learnings
 
 - Typed interpolated typed-constant holes were bypassing presence-proof generation entirely; the fix is to recurse `TypedInterpolatedTypedConstant.Slots` through `WalkExpression` so optional field reads inside holes emit PRE0116 unless a guard proves presence. Verified with new proof-engine tests and with `samples/Test.precept`, which now reports `UnprovedPresenceRequirement` on line 14.
