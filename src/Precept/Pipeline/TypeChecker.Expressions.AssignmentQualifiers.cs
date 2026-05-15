@@ -314,7 +314,20 @@ internal static partial class TypeChecker
             }
             || !SlotAccessorCanResolveAxis(returnsQualifier, axis))
         {
-            return new(axis, QualifierResolutionKind.Absent, null);
+            var holeType = holeExpression switch
+            {
+                TypedMemberAccess memberAccess => memberAccess.Object switch
+                {
+                    TypedFieldRef fieldRef => fieldRef.ResultType,
+                    TypedArgRef argRef => argRef.ResultType,
+                    _ => holeExpression.ResultType,
+                },
+                _ => holeExpression.ResultType,
+            };
+
+            return IsAssignmentQualifierAxisApplicable(holeType, axis)
+                ? new(axis, QualifierResolutionKind.Unknown, null)
+                : new(axis, QualifierResolutionKind.Absent, null);
         }
 
         return source switch

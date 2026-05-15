@@ -19,6 +19,12 @@
 
 ## Recent Updates
 
+### 2026-05-15T22:51:51Z — Slot-hole qualifier fallback now preserves Unknown when applicable
+
+- `ResolveSlotSourceQualifierAxis(...)` no longer hard-returns `Absent` from the early slot-hole bailout when the hole expression's type can carry the requested axis; it now returns `Unknown` for that correctness seam.
+- The fix stays surgical inside `TypeChecker.Expressions.AssignmentQualifiers.cs` and matches Frank's deferred-scoping Item 2 contract for unresolved qualifier-bearing slot expressions.
+- Focused assignment coverage remains green at 55/55, and full `dotnet test test/Precept.Tests/ --no-restore --nologo --verbosity minimal --tl:off` stayed on the branch's known 9-failure baseline (5655 passed / 9 failed / 5664 total).
+
 ### 2026-05-15T22:27:03Z — Deferred qualifier fixes closed across TypeChecker and ProofEngine
 
 - `TypedFunctionCall` now carries nullable `ResultQualifiers`, populated from the first argument's resolved qualifier axes for `QualifierMatch.Same` overloads; assignment validation and proof resolution both consume the new surface.
