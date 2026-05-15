@@ -618,9 +618,11 @@ internal static partial class TypeChecker
             if (minMod?.Value is not null and not MissingExpression)
             {
                 var resolved = Resolve(minMod.Value, ctx, typedField.ResolvedType, typedField.DeclaredQualifiers);
+                var allowBareNumericQuantityBound =
+                    AllowsBareNumericQuantityBound(minMod.Value, typedField.ResolvedType);
                 if (resolved is not TypedErrorExpression && typedField.ResolvedType != TypeKind.Error)
                 {
-                    if (!IsAssignable(resolved.ResultType, typedField.ResolvedType))
+                    if (!allowBareNumericQuantityBound && !IsAssignable(resolved.ResultType, typedField.ResolvedType))
                     {
                         ctx.Diagnostics.Add(
                             Diagnostics.Create(
@@ -629,7 +631,7 @@ internal static partial class TypeChecker
                                 Types.GetMeta(typedField.ResolvedType).DisplayName,
                                 Types.GetMeta(resolved.ResultType).DisplayName));
                     }
-                    else if (!typedField.DeclaredQualifiers.IsDefaultOrEmpty)
+                    else if (!allowBareNumericQuantityBound && !typedField.DeclaredQualifiers.IsDefaultOrEmpty)
                     {
                         ValidateAssignmentQualifiers(
                             resolved,
@@ -647,9 +649,11 @@ internal static partial class TypeChecker
             if (maxMod?.Value is not null and not MissingExpression)
             {
                 var resolved = Resolve(maxMod.Value, ctx, typedField.ResolvedType, typedField.DeclaredQualifiers);
+                var allowBareNumericQuantityBound =
+                    AllowsBareNumericQuantityBound(maxMod.Value, typedField.ResolvedType);
                 if (resolved is not TypedErrorExpression && typedField.ResolvedType != TypeKind.Error)
                 {
-                    if (!IsAssignable(resolved.ResultType, typedField.ResolvedType))
+                    if (!allowBareNumericQuantityBound && !IsAssignable(resolved.ResultType, typedField.ResolvedType))
                     {
                         ctx.Diagnostics.Add(
                             Diagnostics.Create(
@@ -658,7 +662,7 @@ internal static partial class TypeChecker
                                 Types.GetMeta(typedField.ResolvedType).DisplayName,
                                 Types.GetMeta(resolved.ResultType).DisplayName));
                     }
-                    else if (!typedField.DeclaredQualifiers.IsDefaultOrEmpty)
+                    else if (!allowBareNumericQuantityBound && !typedField.DeclaredQualifiers.IsDefaultOrEmpty)
                     {
                         ValidateAssignmentQualifiers(
                             resolved,
@@ -704,6 +708,20 @@ internal static partial class TypeChecker
             }
         }
     }
+
+    private static bool AllowsBareNumericQuantityBound(ParsedExpression expression, TypeKind targetType) =>
+        targetType == TypeKind.Quantity && IsBareNumericLiteral(expression);
+
+    private static bool IsBareNumericLiteral(ParsedExpression expression) => expression switch
+    {
+        LiteralExpression { LiteralKind: TokenKind.NumberLiteral } => true,
+        UnaryOperationExpression
+        {
+            Operator: TokenKind.Minus,
+            Operand: LiteralExpression { LiteralKind: TokenKind.NumberLiteral }
+        } => true,
+        _ => false,
+    };
 
     /// <summary>
     /// PRE0067 — MaxPlacesExceeded: check that a decimal literal value does not exceed

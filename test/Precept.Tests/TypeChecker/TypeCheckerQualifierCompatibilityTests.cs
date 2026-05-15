@@ -8,8 +8,7 @@ namespace Precept.Tests.TypeChecker;
 /// Slice 10 — Qualifier Compatibility Checks.
 /// Enforces that when both a field and its bound carry qualifiers, those qualifiers must match.
 /// Emits <see cref="DiagnosticCode.BoundsQualifierMismatch"/> on mismatch.
-/// Also enforces <see cref="DiagnosticCode.BoundsRequireQualifier"/> when a qualified field
-/// has a plain numeric bound (the bound must specify its qualifier too).
+/// Also enforces <see cref="DiagnosticCode.BoundsRequireQualifier"/> for ambiguous plain numeric bounds.
 /// </summary>
 public class TypeCheckerQualifierCompatibilityTests
 {
@@ -96,7 +95,7 @@ public class TypeCheckerQualifierCompatibilityTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Plain numeric bound on qualified field → BoundsRequireQualifier
+    //  Plain numeric bound behavior on qualified fields
     // ════════════════════════════════════════════════════════════════════════
 
     [Fact]
@@ -113,7 +112,7 @@ public class TypeCheckerQualifierCompatibilityTests
     }
 
     [Fact]
-    public void BoundsQualifierMismatch_QuantityFieldHasQualifier_BoundIsPlainNumeric_EmitsBoundsRequireQualifier()
+    public void BoundsQualifierMismatch_QuantityFieldHasUnitQualifier_BoundIsPlainNumeric_NoDiagnostic()
     {
         var precept = """
             precept Widget
@@ -121,7 +120,9 @@ public class TypeCheckerQualifierCompatibilityTests
             state Open initial
             """;
 
-        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.BoundsRequireQualifier);
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check(precept);
+        diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.TypeMismatch));
+        diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.BoundsRequireQualifier));
     }
 
     // ════════════════════════════════════════════════════════════════════════

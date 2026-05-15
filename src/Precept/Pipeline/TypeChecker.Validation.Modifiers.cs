@@ -213,6 +213,9 @@ internal static partial class TypeChecker
             var boundQualifiers = boundValue.Value.Qualifiers;
             if (boundQualifiers.IsDefaultOrEmpty)
             {
+                if (ShouldAllowUnitQualifiedQuantityBareNumericBound(modifier.Value, resolvedType, declaredQualifiers))
+                    continue;
+
                 // Plain numeric bound on a field that requires a qualifier — the bound must
                 // specify its qualifier so the comparison is unambiguous.
                 var modifierMeta = Modifiers.GetMeta(modifier.Kind);
@@ -242,6 +245,26 @@ internal static partial class TypeChecker
             }
         }
     }
+
+    private static bool ShouldAllowUnitQualifiedQuantityBareNumericBound(
+        ParsedExpression? expression,
+        TypeKind resolvedType,
+        ImmutableArray<DeclaredQualifierMeta> declaredQualifiers) =>
+        resolvedType == TypeKind.Quantity
+        && expression is not null
+        && IsBareNumericBoundLiteral(expression)
+        && declaredQualifiers.Any(q => q is DeclaredQualifierMeta.Unit);
+
+    private static bool IsBareNumericBoundLiteral(ParsedExpression expression) => expression switch
+    {
+        LiteralExpression { LiteralKind: TokenKind.NumberLiteral } => true,
+        UnaryOperationExpression
+        {
+            Operator: TokenKind.Minus,
+            Operand: LiteralExpression { LiteralKind: TokenKind.NumberLiteral }
+        } => true,
+        _ => false,
+    };
 
     private static bool QualifierValuesMatch(DeclaredQualifierMeta a, DeclaredQualifierMeta b) =>
         (a, b) switch
