@@ -668,6 +668,8 @@ The `(` disambiguates: constraint keywords are never followed by `(`, function c
 
 Type qualifiers narrow the value domain of the field — they are part of the type annotation, not a declaration modifier. `in '<unit>'` pins to a specific unit or currency. `of '<family>'` constrains to a dimension or component family. A field may use `in` or `of`, never both — with one exception: `price` allows `in` (currency-only) combined with `of` (denominator dimension), because price has two independent axes. For `price`, `of 'time'` and `of 'date'` are valid temporal denominator qualifiers on that same axis; the proof engine uses them to validate `price * period` and `price * duration` cancellation. When `in` specifies a compound `'currency/unit'` value, `of` is rejected. The preceding token (always a type keyword or collection keyword) makes the type-qualifier role unambiguous at LL(1).
 
+For business counting units, the dimension-family view and the unit-identity view are deliberately different. Units such as `each`, `box`, `case`, and `pallet` all report the shared count dimension (`DimensionVector.None`) and normalize with factor one, but that representation only says "these are count quantities." It does **not** mean the codes are interchangeable or silently convertible.
+
 The lexer uses a mode stack to handle nested interpolation in string and typed-constant literals. This ensures `{expr}` inside a literal correctly lexes the expression tokens and then returns to the literal context.
 
 **Modes:**
@@ -1342,7 +1344,7 @@ Event args are accessed via dotted notation: `EventName.ArgName`. The type check
 | `exchangerate` | `*` | `money` | `money` | Currency conversion. Commutative. |
 | `exchangerate` | `*` `/` | `decimal` | `exchangerate` | Commutative for `*`. |
 
-**Business-domain comparison:** `money`, `quantity`, `price` support all comparison operators. `money` requires matching currency. `quantity` and `price` require qualifier compatibility on the relevant axis: physically convertible UCUM units may compare after normalization, while explicit counting units inside the shared `count` dimension still require matching unit identity unless the author supplies an explicit conversion field. `exchangerate`, `currency`, `unitofmeasure`, `dimension` support only `==`/`!=` — ordering operators are type errors.
+**Business-domain comparison:** `money`, `quantity`, `price` support all comparison operators. `money` requires matching currency. `quantity` and `price` require qualifier compatibility on the relevant axis: physically convertible UCUM units may compare after normalization, while explicit counting units inside the shared `count` dimension still require matching unit identity unless the author supplies an explicit conversion field. This stricter count-dimension rule is surfaced by PRE0137: dimension compatibility alone is insufficient when multiple business unit codes intentionally share `DimensionVector.None`. `exchangerate`, `currency`, `unitofmeasure`, `dimension` support only `==`/`!=` — ordering operators are type errors.
 
 For quantity normalization, affine UCUM units with catalog-encoded `(scale, offset)` metadata are in scope, including temperature units such as `Cel`, `[degF]`, and `[degRe]`. The exclusion boundary is not "anything non-linear-looking"; it is specifically logarithmic/reference-level units such as `dB` and `[pH]`, which do not reduce to a stable affine conversion law for compile-time normalization.
 

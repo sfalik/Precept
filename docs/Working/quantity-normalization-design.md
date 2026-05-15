@@ -1867,6 +1867,8 @@ For `[lb_av]`:
 - No prefix
 - Result: `Scale = UcumExactFactor(45359237, 100000000, 0)` → 0.45359237
 
+**Business counting-unit representation:** business units such as `each`, `box`, `case`, and `pallet` deliberately normalize as `UcumExactFactor.One` with `DimensionVector.None`. That is a representation choice meaning "these values live in the count dimension family"; it is **not** a conversion law saying those units are interchangeable. The shared factor-one / dimension-none encoding is exactly why PRE0071 (dimension compatibility) is insufficient by itself and why PRE0137 must additionally enforce static unit-code identity inside the count dimension.
+
 ### 4.3 Precision Characteristics
 
 `UcumExactFactor` uses `BigInteger` numerator/denominator — exact rational arithmetic with no precision loss during composition. The lossy step is `ApplyFactor` where we multiply a `decimal` magnitude by the factor. `decimal` has 28-29 significant digits — far exceeding the precision needs of any real-world quantity in Precept's domain (financial and business quantities).
@@ -2233,7 +2235,7 @@ The UCUM parser normalizes to base SI units (gram, meter, second, etc. — not k
 
 A guard such as `when Qty > BoxCount`, where `Qty as quantity in 'each'` and `BoxCount as quantity in 'box'`, currently **passes** the TypeChecker's qualifier compatibility checks. It should **fail**.
 
-Both `'each'` and `'box'` resolve to `DimensionVector.None` (the `count` dimension family). The binary-op qualifier proof path's only quantity check — PRE0071 (`CrossDimensionArithmetic`) — compares **dimension names**, not unit codes. Since both have dimension `"count"`, the check passes. But dimensional compatibility ≠ value convertibility: `1 box` is not comparable to `1 each` without a product-level conversion factor that the type system cannot supply.
+Both `'each'` and `'box'` resolve to `DimensionVector.None` (the `count` dimension family) and both carry `UcumExactFactor.One`. That encoding is intentional: it classifies them as count quantities, but it does **not** declare `1 each = 1 box`. The binary-op qualifier proof path's only quantity check — PRE0071 (`CrossDimensionArithmetic`) — compares **dimension names**, not unit codes. Since both have dimension `"count"`, the check passes. But dimensional compatibility ≠ value convertibility: `1 box` is not comparable to `1 each` without a product-level conversion factor that the type system cannot supply.
 
 **Contrast with assignment:** `set Qty = BoxCount` is correctly **rejected** because `ValidateAssignmentQualifiers` → `ValidateResolvedQualifiers` (in `TypeChecker.Expressions.TypedConstants.cs:274`) compares the `DeclaredQualifierMeta.Unit.UnitCode` strings directly: `"each" ≠ "box"` → PRE0068 (`QualifierMismatch`). The binary-op path does not perform this per-unit-code check.
 
@@ -2252,7 +2254,7 @@ The gap lives in `ValidateQualifierCompatibility` (`TypeChecker.Expressions.cs:9
 | Gap | What passes | Why |
 |-----|-------------|-----|
 | **A: Comparison operators have no qualifier checks** | `kg > m`, `USD > EUR`, `each > box` as comparison/equality ops | PRE0070/PRE0071 only fire for `OperatorFamily.Arithmetic`. `OperatorFamily.Comparison` hits no check block at all. |
-| **B: Same-dimension counting units pass dimension check** | `each + box`, `each > box` | Both map to dimension `"count"` via `GetDimensionFromQualifiers` → `DeclaredQualifierMeta.Unit.DimensionName`. The dimension check passes because `"count" == "count"`. |
+| **B: Same-dimension counting units pass dimension check** | `each + box`, `each > box` | Both map to dimension `"count"` via `GetDimensionFromQualifiers` → `DeclaredQualifierMeta.Unit.DimensionName`, and both normalize with factor one. The dimension check passes because `"count" == "count"`, even though factor-one here is only a representation choice, not an interchangeability proof. |
 
 Gap A means that even physically incompatible dimensions pass for comparisons (e.g., `Weight > Distance` where one is mass and one is length). Gap B means that counting units with the same dimension but different unit codes (each vs box vs case) pass everywhere — arithmetic AND comparison.
 
@@ -2266,7 +2268,7 @@ Two changes:
 
 1. **Extend PRE0070/PRE0071 family scope to include comparison operators.** Change the family gate from `opMeta.Family == OperatorFamily.Arithmetic` to `opMeta.Family is OperatorFamily.Arithmetic or OperatorFamily.Comparison`. This ensures cross-dimension and cross-currency comparisons are rejected, matching the behavior already enforced for arithmetic.
 
-2. **Add PRE0137 (`CrossCountingUnitOperation`).** A new check after the dimension checks: when both operands are `TypeKind.Quantity`, both have dimension `"count"`, and their static unit codes differ, emit PRE0137. This applies to **all** operator families (arithmetic and comparison), since `each + box` is equally meaningless as `each > box` without a conversion factor.
+2. **Add PRE0137 (`CrossCountingUnitOperation`).** A new check after the dimension checks: when both operands are `TypeKind.Quantity`, both have dimension `"count"`, and their static unit codes differ, emit PRE0137. This applies to **all** operator families (arithmetic and comparison), since `each + box` is equally meaningless as `each > box` without a conversion factor. PRE0137 exists precisely because PRE0071 sees only the shared `DimensionVector.None` / factor-one representation and therefore cannot distinguish business counting-unit identity on its own.
 
 **Why this approach over alternatives:**
 
