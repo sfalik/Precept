@@ -90,3 +90,8 @@
 
 - 2026-05-14T22:48:46.544-04:00 — Added formal implementation slices 30–43 to `docs/working/quantity-normalization-design.md`, covering the four qualifier gaps, the four-slice affine lane, five pre-implementation documentation slices, and the standalone `TypedInterpolatedTypedConstant` → `InterpolatedTypedConstant` rename.
 - 2026-05-14T23:06:08.162-04:00 — George's §5.7 blockers required hard correction of the actual code seams: the diagnostic surfaces are `src/Precept/Language/DiagnosticCode.cs` and `src/Precept/Language/Diagnostics.cs`, the functions catalog is `src/Precept/Language/Functions.cs`, and the membership seam is `src/Precept/Pipeline/TypeChecker.Expressions.cs` via `ResolveBinaryOp` → `TryResolveCatalogBinaryWithoutOperation` → `CreateSyntheticBinaryOp` for `contains` (not `in` / `not in`). There is no existing `TypeChecker.TryGetStaticScalingFactor()` helper in the current codebase; affine helper wording must use introduce/new-helper language instead.
+
+### 2026-05-15T03:13:42Z — Frank’s §5.7 revisions cleared the review gate
+
+- Frank’s revised §5.7 plan is now the durable baseline: stale catalog/diagnostic/function references were corrected to the real `src/Precept/Language/...` surfaces, Slice 32 names both successful `SelectOverload` return paths, and Slice 33 now targets `contains` through the synthetic membership path.
+- George’s re-review approved the revised slice list with no remaining stale path or method references, and PRE0137 remains the next free diagnostic ordinal after `CountBoundViolation = 136`.

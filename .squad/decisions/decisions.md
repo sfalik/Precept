@@ -704,15 +704,12 @@ field OutstandingBalance as number default 0 nonnegative
 state Active initial
 state PaidOff terminal
 
-
 # Structural invariant: the entity's own field relationship while Active.
-
 
 # Checked after every transition and operation that lands in Active.
 in Active ensure OutstandingBalance <= Principal because "Outstanding balance cannot exceed principal"
 
 event MakePayment(PaymentAmount as number)
-
 
 # Input validation guard: rejects the event before any mutation if input is invalid.
 on MakePayment ensure MakePayment.PaymentAmount > 0 because "Payment amount must be positive"
@@ -2289,7 +2286,6 @@ The working tree contains **three distinct bodies of work** from two crashed age
 
 ```bash
 git grep -n "SemanticSubjects" src/Precept/Pipeline/
-
 
 # (no matches)
 ```
@@ -4115,7 +4111,6 @@ All field/arg declarations with `in '...'` or `of '...'` qualifiers containing i
 
 ```precept
 
-
 # These all fail at the parser level — never reach type checker
 
 field StockingUnitsPerPurchaseUnit as quantity in '{StockingUnit}/{PurchaseUnit}'
@@ -4396,53 +4391,39 @@ Original description: "Interpolated typed constants in quantity/price qualifiers
 
 ```precept
 
-
 # THIS FILE DOES NOT COMPILE — it expresses the intended design.
-
 
 # Pending compiler issues (spike/Precept-V2-Radical):
 
 #
 
-
 #   ROOT CAUSE 1 (Parser): Interpolated typed constants in field/arg qualifier
-
 
 #          positions (`in '...'`, `of '...'`) are rejected by the parser — it only
 
-
 #          accepts static typed constants. Affects all compound-unit fields and
-
 
 #          dimension-qualified fields/args.
 
 #
 
-
 #   ROOT CAUSE 2 (TypeChecker): Missing compound-unit interpolation patterns for
 
-
 #          forms like `'0 {Unit}/{Unit}'`. Affects rules/ensures that bound-check
-
 
 #          compound-unit quantities.
 
 #
 
-
 #   BUG-A (PRE0114): Event arg qualifiers not propagated into expressions —
-
 
 #          cannot be verified until RC-1 ships.
 
 #
 
-
 #   SAMPLE ISSUES: Line 137/145 use `is set` on non-optional field; Line 140/147
 
-
 #          have money/price type mismatch; Lines 223/229/234 have unguarded
-
 
 #          division by zero.
 
@@ -18786,3 +18767,11 @@ Replaced the incorrect statement with an accurate description: precept_compile r
 ## Rationale
 
 The existing design had the technical solutions in §6.7 and §6.8, but not a single implementation-ready slice set for Shane's remaining todos. The document now carries explicit files, methods, tests, dependencies, and regression anchors for every pending item, which clears the planning ambiguity without reopening the underlying architectural decisions.
+
+# George review — §5.7 revised slices approved
+
+**Author:** George
+**Date:** 2026-05-15T03:14:06Z
+
+VERDICT: APPROVED
+All blocking findings from the previous review have been resolved. §5.7 now points at the real code surfaces (`src/Precept/Language/DiagnosticCode.cs`, `src/Precept/Language/Diagnostics.cs`, `src/Precept/Language/Functions.cs`, `src/Precept/Language/Ucum/UcumAtomCatalog.cs`), Slice 32 correctly names both `SelectOverload` success paths, and Slice 33 now uses Precept’s actual `contains` operator via `ResolveBinaryOp` → `TryResolveCatalogBinaryWithoutOperation` → `CreateSyntheticBinaryOp`. Spot-checks against source confirmed `ValidateQualifierCompatibility`, `ResolveFunctionCall`, `SelectOverload`, `CreatePendingAtom`, `StripFunctionWrapper`, `TypedInterpolatedTypedConstant`, and PRE0137 as the next free ordinal after `CountBoundViolation = 136`. I did not find remaining stale file or method references inside the revised §5.7 slice list.

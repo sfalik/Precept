@@ -60,3 +60,21 @@
 - Frank's comprehensive cross-counting-unit audit found the remaining critical checker hole is not another binary-op branch; it is function-call resolution.
 - `TypeChecker.Expressions.Callables.cs` resolves `min`/`max`/`clamp`/`abs` overloads without ever enforcing `FunctionOverload.Match`, so `QualifierMatch.Same` metadata is currently dead for function calls.
 - Implementation direction is locked in the design doc: add `ValidateFunctionQualifierCompatibility` immediately after `SelectOverload`, reuse PRE0137 for explicit cross-counting-unit mismatches, and leave `in` membership as a separate deferred follow-up.
+
+### 2026-05-14T22:57:25.658-04:00 — §5.7 slice review found stale paths and the wrong membership surface
+
+- Blocked the §5.7 execution plan as written: the repo does **not** have `src/Precept/Catalog/...`, `DiagnosticCatalog.cs`, `FunctionsCatalog.cs`, or `TypeChecker.TryGetStaticScalingFactor()` today. The real current surfaces are `src/Precept/Language/Ucum/UcumAtomCatalog.cs`, `src/Precept/Language/Diagnostics.cs`, and `src/Precept/Language/Functions.cs`; any affine helper still needs to be introduced.
+- Confirmed Gap C's real seam is still `TypeChecker.Expressions.Callables.cs` `SelectOverload`, but the qualifier check must guard both `TypedFunctionCall` return paths there (direct winner and context-retry winner).
+- Confirmed Gap D is **not** an `in` / `not in` path in the current DSL. Membership is `contains`, and the checker route is `ResolveBinaryOp` → `TryResolveCatalogBinaryWithoutOperation` → `CreateSyntheticBinaryOp`. `OperatorTypingTests.cs` is the current regression anchor for that surface.
+- Verified PRE0137 is available: `DiagnosticCode.CountBoundViolation = 136` is the current high watermark, so 137 is the next free ordinal.
+- Found missed regression surfaces for slices 30–33: `test/Precept.Tests/ProofEngineTests.cs` PartB Slice7/9 still assume old proof-only behavior, and `test/Precept.Tests/TypeChecker/OperatorTypingTests.cs` already covers `contains` typing.
+
+### 2026-05-14T23:11:17.096-04:00 — §5.7 re-review approved after Frank’s corrections
+
+- Re-reviewed the revised §5.7 slice plan and cleared the original blockers: stale catalog/diagnostic/function references were corrected to the real `src/Precept/Language/...` surfaces, and the membership slice now targets `contains` through `ResolveBinaryOp` → `TryResolveCatalogBinaryWithoutOperation` → `CreateSyntheticBinaryOp`.
+- Spot-checks against source confirmed `ValidateQualifierCompatibility`, `ResolveFunctionCall`, `SelectOverload`, `CreatePendingAtom`, `StripFunctionWrapper`, and the current `TypedInterpolatedTypedConstant` semantic node; PRE0137 remains free because `DiagnosticCode.CountBoundViolation = 136` is still the high watermark.
+
+### 2026-05-15T03:13:42Z — George approved the revised §5.7 slice plan
+
+- George’s re-review cleared the earlier §5.7 blockers: the slice list now points at the real `src/Precept/Language/...` seams, covers both successful `SelectOverload` returns, and moves the membership work to Precept’s actual `contains` operator path.
+- Scribe merged George’s approval note into `.squad/decisions/decisions.md`, cleared the inbox file, and recorded the approval as the current architectural baseline for slices 30–43.
