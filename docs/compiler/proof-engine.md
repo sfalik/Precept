@@ -460,7 +460,7 @@ The type checker stamps these requirements onto `TypedExpression` and `TypedActi
 
 ### ProofRequirement Catalog DU
 
-The `ProofRequirement` discriminated union has five subtypes (one per `ProofRequirementKind`):
+The `ProofRequirement` discriminated union has subtypes for every `ProofRequirementKind` (five original kinds plus interval/length/count/key containment added by Slices 1–26):
 
 ```csharp
 // Abstract base — discriminated union
@@ -513,7 +513,25 @@ public sealed record QualifierCompatibilityProofRequirement(
 // dual-subject requirement kind — requires a dedicated strategy that compares
 // two subjects' qualifier bindings. Depends on qualifier resolution in the
 // TypeChecker.
+
+// 7. Interval containment (set-action result must fit within field bounds)
+public sealed record IntervalContainmentProofRequirement(
+    ProofSubject Subject,       // the RHS expression being assigned
+    string       TargetField,   // the target field name
+    decimal?     DeclaredMin,   // UCUM base-unit normalized lower bound; null if absent
+    decimal?     DeclaredMax,   // UCUM base-unit normalized upper bound; null if absent
+    decimal?     AuthoredMin,   // raw authored magnitude (for diagnostic display only)
+    decimal?     AuthoredMax,   // raw authored magnitude (for diagnostic display only)
+    string       Description
+) : ProofRequirement(ProofRequirementKind.IntervalContainment, Description);
+// Discharged by Strategy 7 (IntervalContainment). For quantity and price fields,
+// DeclaredMin/DeclaredMax carry UCUM-normalized base-unit magnitudes computed by
+// the TypeChecker at extraction time. AuthoredMin/AuthoredMax preserve the raw
+// values as written by the author (e.g. 5 for `min '5 kg'`) and are used only
+// for diagnostic display. For non-quantity fields the two pairs are identical.
 ```
+
+> **Normalization boundary.** For `quantity` and `price` fields, the TypeChecker normalizes `min`/`max` modifier magnitudes to UCUM base units when it extracts `IntervalContainmentProofRequirement`. Downstream consumers — Strategy 7, `TypedFieldRef` interval extraction, and the MCP `precept_compile` tool — read the pre-normalized `DeclaredMin`/`DeclaredMax` values. Raw authored magnitudes are preserved on `TypedField.DeclaredMin/Max` and `IntervalContainmentProofRequirement.AuthoredMin/Max` for diagnostic display only. Explicit counting-unit mismatches (e.g. `each` vs `box`) are not normalized — they must match qualifiers or use a separate runtime conversion field.
 
 #### ProofSubject
 

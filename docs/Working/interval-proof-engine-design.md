@@ -26,6 +26,8 @@
 | **12** | Presence Obligation Generation | George | ✅ Done | `dotnet test test/Precept.Tests/Precept.Tests.csproj --filter "FullyQualifiedName~ProofEnginePresenceTests"` (13/13) | Depends on Slice 7; parallel with Slices 8–11 |
 | **13** | Type-Family Coverage Regression Suite | Soup Nazi | ✅ Done | `dotnet test test/Precept.Tests/Precept.Tests.csproj --filter "FullyQualifiedName~TypeFamilyCoverageTests"` (28/28) | Per-family positive + negative companion tests for all §12 matrix rows; two meta-tests (`AllConstrainableTypes_DeclaredConstraint_NeverSilentlyIgnored`, `OptionalField_InValuePosition_GeneratesPresenceObligation`); catalog-driven coverage verified |
 
+> **Extension note:** Slices 14–26 (unit-aware quantity normalization) extend the interval proof strategy. See `docs/Working/quantity-normalization-design.md`.
+
 **Initiated:** 2026-05-13T19:19:55Z
 **Updated by:** Scribe (live status updates as agents complete slices)
 
@@ -89,9 +91,10 @@ The proof engine traverses a typed expression tree bottom-up, computing an inter
 | Expression kind | Interval computation |
 |---|---|
 | `TypedLiteral` (numeric) | `[value, value]` — point interval |
-| `TypedFieldRef` (with declared bounds) | `[field.Min, field.Max]` |
+| `TypedFieldRef` (with declared bounds) | `[field.NormalizedDeclaredMin ?? field.DeclaredMin, field.NormalizedDeclaredMax ?? field.DeclaredMax]` — reads UCUM-normalized bounds for quantity/price; raw bounds for other types |
 | `TypedFieldRef` (no declared bounds) | `Unbounded` |
-| `TypedEventArgRef` (with declared bounds) | `[arg.Min, arg.Max]` |
+| `TypedTypedConstant` (quantity/price) | Magnitude normalized to UCUM base units via `TryGetStaticScalingFactor`; point interval `[normalized, normalized]` |
+| `TypedEventArgRef` (with declared bounds) | `[arg.NormalizedDeclaredMin ?? arg.DeclaredMin, arg.NormalizedDeclaredMax ?? arg.DeclaredMax]` |
 | `TypedEventArgRef` (no declared bounds) | `Unbounded` |
 | `TypedBinaryOp` | Transfer function from `BinaryOperationMeta.IntervalTransfer` |
 | `TypedFunctionCall` | Transfer function from `FunctionOverload.IntervalTransfer` (null = unbounded) |
@@ -112,6 +115,8 @@ An `IntervalContainmentProofRequirement` is generated for every `set` assignment
 **Proof disposition:**
 - `Proved` — computed interval is contained in bounds.
 - `Unresolved` — computed interval exceeds bounds OR contains unbounded (the result potentially overflows). Emits `NumericOverflow` diagnostic with `Severity.Error`, message identifying which bound is violated and the computed interval.
+
+> **Normalization note:** For `quantity` and `price` fields, `DeclaredMin`/`DeclaredMax` in the obligation record carry UCUM-normalized base-unit magnitudes (normalized by the TypeChecker at extraction time). Raw authored magnitudes are preserved on `TypedField.DeclaredMin/Max` and `IntervalContainmentProofRequirement.AuthoredMin/Max` for diagnostic display. For non-quantity fields the two pairs are identical. See `quantity-normalization-design.md` §0/§3.
 
 ---
 
@@ -159,11 +164,15 @@ The ProofEngine pipeline, with new components bolded:
 public sealed record IntervalContainmentProofRequirement(
     ProofSubject  Subject,        // the RHS expression being assigned
     string        TargetField,    // the target field name
-    decimal?      DeclaredMin,    // from target's min modifier, null if absent
-    decimal?      DeclaredMax,    // from target's max modifier, null if absent
+    decimal?      DeclaredMin,    // UCUM base-unit normalized lower bound; null if absent
+    decimal?      DeclaredMax,    // UCUM base-unit normalized upper bound; null if absent
+    decimal?      AuthoredMin,    // raw authored magnitude (diagnostic display only)
+    decimal?      AuthoredMax,    // raw authored magnitude (diagnostic display only)
     string        Description
 ) : ProofRequirement(ProofRequirementKind.IntervalContainment, Description);
 ```
+
+> **Normalization boundary (Slices 15b/26):** For `quantity` and `price` fields, `DeclaredMin`/`DeclaredMax` carry UCUM-normalized base-unit magnitudes extracted by the TypeChecker. `AuthoredMin`/`AuthoredMax` preserve the raw authored values for diagnostic display. `TypedArg` now also carries `NormalizedDeclaredMin`/`NormalizedDeclaredMax` (same convention). For non-quantity fields all four values are identical.
 
 The bounds (`DeclaredMin`, `DeclaredMax`) are extracted from the target field's `ValueModifierMeta.ProofSatisfactions` at collection time. Specifically: walk the target field's modifiers; for any `ValueModifierMeta` whose `ProofSatisfactions` include a `ProofSatisfaction.Numeric` with `Comparison = GreaterThanOrEqual`, use that bound as `DeclaredMin`. For `LessThanOrEqual`, use as `DeclaredMax`.
 

@@ -608,6 +608,16 @@ public sealed class FiredArgs
 
 **Survey grounding:** XState's `transition()` / `getNextSnapshot()` pair — same code path, different output. CEL's `ExhaustiveEval` — same `Interpretable` tree, different evaluation mode. K8s dry-run — same controller logic, different commit behavior.
 
+### Three-Layer Enforcement Model
+
+Precept enforces field constraints across three layers:
+
+1. **Compile-time diagnostics** — 132 diagnostic codes catch invalid configurations statically. The proof engine resolves interval-containment obligations and emits `NumericOverflow` for values that demonstrably exceed declared bounds. Unit-aware normalization (UCUM scale factors) prevents false positives on cross-unit assignments.
+
+2. **Ingress validation** — `TypeRuntimeMeta` / `TypeRuntime` validate values at runtime ingress (event firing, field assignment) against declared qualifiers and bounds. This catches cases the proof engine cannot prove statically.
+
+3. **Defense-in-depth evaluator faults** — 15 `[StaticallyPreventable]` fault codes fire at evaluation time for expressions the proof engine should have caught. These represent defense-in-depth, not the primary enforcement path.
+
 ### Thread Safety
 
 - `Precept` is immutable after construction. Safe to share across threads and entity instances.

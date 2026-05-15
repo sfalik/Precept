@@ -204,14 +204,15 @@ The proof layer must be able to support the language's proof-bearing claims. Tha
 2. **Relational reasoning** over numeric expressions involving multiple fields.
 3. **Divisor safety.** Two-tier: proven-zero divisors are hard errors; divisors with no compile-time nonzero proof are obligation diagnostics requiring the author to supply a constraint (e.g., `nonzero`, `positive`, a rule, or a guard).
 4. **Non-negative proof obligations** such as `sqrt` inputs and `pow(integer, integer)` exponents. The compiler requires a provable non-negative path — via `nonnegative` constraint, a rule, an ensure, or a guard — before accepting the expression.
-5. **Assignment range impossibility.** An assignment expression provably outside the target field's constraint range is a compile-time error.
-6. **Contradictory rule detection.** When two rules' ranges are provably incompatible — no value can satisfy both simultaneously — the compiler reports the contradiction.
-7. **Vacuous rule detection.** When a rule is provably always true given field constraints, the compiler reports it as tautological.
-8. **Dead guard detection.** A guard provably always false means the row or block can never execute.
-9. **Tautological guard detection.** A guard provably always true means the `when` clause has no effect.
-10. **Compile-time rule enforcement against defaults.** Rules and initial-state ensures are checked against default field values at compile time. A definition where default values violate a declared rule is rejected before any instance exists.
-11. **Sharpening of reachability and routing diagnostics** from proven-dead guards.
-12. **Structured proof attribution** suitable for hover, diagnostics, and agent consumption — every proven range carries the constraints and rules that contributed to it.
+5. **Unit-aware numeric interval reasoning.** When field bounds and assignment expressions use different **statically convertible** units within the same physical dimension (e.g., `max '5 kg'` with `set x = '6 [lb_av]'`), the proof engine normalizes magnitudes to base-unit equivalents via UCUM scale factors before interval containment comparison. Normalization is applied once at the TypeChecker extraction boundary; downstream consumers read pre-normalized values. Explicit counting-unit mismatches (`each` vs `box`) are not covered by this guarantee — they require matching qualifiers or a separate runtime conversion field (see §6.7).
+6. **Assignment range impossibility.** An assignment expression provably outside the target field's constraint range is a compile-time error.
+7. **Contradictory rule detection.** When two rules' ranges are provably incompatible — no value can satisfy both simultaneously — the compiler reports the contradiction.
+8. **Vacuous rule detection.** When a rule is provably always true given field constraints, the compiler reports it as tautological.
+9. **Dead guard detection.** A guard provably always false means the row or block can never execute.
+10. **Tautological guard detection.** A guard provably always true means the `when` clause has no effect.
+11. **Compile-time rule enforcement against defaults.** Rules and initial-state ensures are checked against default field values at compile time. A definition where default values violate a declared rule is rejected before any instance exists.
+12. **Sharpening of reachability and routing diagnostics** from proven-dead guards.
+13. **Structured proof attribution** suitable for hover, diagnostics, and agent consumption — every proven range carries the constraints and rules that contributed to it.
 
 #### Proof philosophy
 
@@ -1929,7 +1930,9 @@ The implemented qualifier-oriented checks include:
 - unit, dimension, and temporal-dimension compatibility
 - declaration-based facts carried by qualifiers, modifiers, and presence metadata
 
-An unprovable obligation is not treated as "probably fine." It remains unresolved, surfaces a compile-time diagnostic, and requires the author to add the missing qualifier, modifier, default, guard, or other proof-bearing fact.
+Interval containment proofs for quantity and price fields normalize statically convertible magnitudes to UCUM base units before comparison, preventing false-positive `NumericOverflow` diagnostics on cross-unit assignments (e.g., `max '5 kg'` with `set field = '6 [lb_av]'` is correctly proved safe because 6 lb ≈ 2.72 kg < 5 kg). Explicit counting-unit mismatches such as `each` vs `box` are not meaningfully comparable without a separate conversion field, so they must not be proved by same-dimension fallback.
+
+An unprovable obligation is not treated as "probably fine."It remains unresolved, surfaces a compile-time diagnostic, and requires the author to add the missing qualifier, modifier, default, guard, or other proof-bearing fact.
 
 ---
 
