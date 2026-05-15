@@ -471,3 +471,113 @@ The chain's invariant: "If the compiler emits no errors, the evaluator should ne
 ---
 
 ---
+
+
+### 2026-05-15: Count/unit bound gap investigation
+**By:** Frank (investigation)
+**Requested by:** Shane
+**Summary:** The type checker emits spurious PRE0018+PRE0133 on `quantity in 'unit' max <integer>` even though the proof engine already correctly infers the field's unit for that bound (test4 proves clean at `[3..3] ⊆ [−∞..4]`). Separately, `quantity of 'count' max <integer>` deserves a count-specific diagnostic because the dimension-only qualifier is ambiguous for bounds—counting units are not mutually convertible.
+
+---
+
+**Finding 1 — `quantity in 'unit' max <integer>` should be CLEAN:**
+
+Root cause is two independent check sites that don't account for unit inheritance from the field declaration:
+
+1. **PRE0018 (TypeMismatch)** — `TypeChecker.cs:649-659`. The max modifier value `4` resolves as `TypeKind.Integer` via `Resolve()`. `IsAssignable(Integer, Quantity)` returns false → emits "Expected a quantity value here, but got 'integer'". The checker has no promotion path that says "bare integer on a quantity field with explicit `in 'unit'` qualifier → treat as quantity in that unit."
+
+2. **PRE0133 (BoundsRequireQualifier)** — `TypeChecker.Validation.Modifiers.cs:209-225`. `TryGetComparableModifierValue` returns `ExtractedBoundValue(4, Empty)` for a NumberLiteral (line 397-398 unconditionally returns empty qualifiers). `ValidateBoundQualifierCompatibility` then sees the bound has no qualifiers on a field that requires them → fires PRE0133.
+
+**The proof engine already handles this correctly.** The compile output shows `test4` (quantity in 'box' max 4) with `declaredMax: 4` and `computedInterval: [3..3]` → disposition: **Proved**. The proof engine's `ExtractFieldInterval` path reads the declared max as a bare numeric magnitude and the field's unit qualifier provides dimensional context. The type checker is behind the proof engine here.
+
+**Verdict:** This is a BUG. `quantity in 'unit' max <integer>` is semantically valid — the integer bound inherits the unit from the field's `in` qualifier. Both PRE0018 and PRE0133 are false positives in this case.
+
+---
+
+**Finding 2 — `quantity of 'count'` diagnostic:**
+
+There is NO existing count-specific diagnostic for "dimension-only qualifier on a count field with bounds." The relevant codes are:
+- PRE0133 (`BoundsRequireQualifier`) — generic, fires for any missing qualifier; doesn't explain the count-dimension ambiguity
+- PRE0137 (`CrossCountingUnitOperation`) — for binary/function operations combining different counting units; NOT for declaration-level qualification gaps
+
+**Why `of 'count' max 4` is genuinely ambiguous:** The `of 'dimension'` qualifier constrains the dimension family but does NOT pin a specific unit. For physically convertible dimensions (mass, length), this is fine because any unit in the dimension can be normalized via UCUM factors. For the **count dimension**, units (each, box, case, pallet) share `DimensionVector.None` but have factor-1 atoms with NO conversion relationship. A bare integer bound on `of 'count'` is ambiguous: 4 of WHAT? The comparison is meaningless without a unit code.
+
+**Needed:** A new diagnostic or a specialization of PRE0133's message path that fires ONLY when:
+- Field type is `quantity`
+- Qualifier is dimension-only (`of 'count'` → `DeclaredQualifierMeta.Dimension` with `DimensionName == "count"`)
+- Bound modifier (min/max) is present
+
+Suggested code: **PRE0138** `CountDimensionBoundsAmbiguous`
+Message: "Bounds on count-dimension fields require an explicit unit qualifier ('in box', 'in each') because counting units are not mutually convertible."
+Severity: Error
+
+---
+
+**Existing coverage:**
+
+- **Slice 15** (TypeChecker bounds extraction / `NormalizedDeclaredMin/Max`): Addresses how normalized bounds are stored on `TypedField` for proof consumption. Does NOT address suppression of PRE0018/PRE0133 for bare-integer bounds with `in 'unit'` fields.
+- **Slices 30-34** (qualifier gap enforcement for operators/functions): Cover PRE0137 at expression evaluation time, not at declaration time.
+- **No existing slice** covers either of these two cases.
+
+---
+
+**Proposed fix — NEW slice (pre-normalization, can land independently):**
+
+**Slice N: Bare-integer bound promotion for unit-qualified quantity fields**
+
+Scope:
+1. `TypeChecker.cs` ~line 620/649 (min/max bound resolution): When `resolvedType == TypeKind.Quantity` and `typedField.DeclaredQualifiers` contains a `DeclaredQualifierMeta.Unit`, suppress the `IsAssignable` check for integer→quantity. The bare integer is valid because the unit is inherited.
+2. `TypeChecker.Validation.Modifiers.cs` `TryGetComparableModifierValue` (line 396-398): When the field carries a `Unit` qualifier and the expression is a `NumberLiteral`, synthesize the field's unit qualifier onto the `ExtractedBoundValue` instead of returning `Empty`. This prevents PRE0133 from firing.
+3. Alternatively, `ValidateBoundQualifierCompatibility` (line 214-225): Skip the `BoundsRequireQualifier` emission when the field has an explicit `Unit` qualifier and the bound is a bare numeric — the unit is unambiguous by inheritance.
+
+**Slice M: Count-dimension bounds ambiguity diagnostic (PRE0138)**
+
+Scope:
+1. `DiagnosticCode.cs`: Add `CountDimensionBoundsAmbiguous = 138`
+2. `Diagnostics.cs`: Template: "Bounds on count-dimension fields require an explicit unit qualifier ('in box', 'in each') because counting units are not mutually convertible."
+3. `TypeChecker.Validation.Modifiers.cs` `ValidateBoundQualifierRequirements` (or a new validation pass): When field has `DeclaredQualifierMeta.Dimension` with dimension name resolving to the count family (`DimensionVector.None`), AND has min/max bounds, emit PRE0138 instead of (or in addition to) PRE0133. PRE0138 gives the author actionable guidance: change `of 'count'` to `in 'box'` (or whatever specific unit).
+
+---
+
+**New diagnostic needed:** Yes.
+- **Code:** PRE0138 `CountDimensionBoundsAmbiguous`
+- **Fires when:** A quantity field is declared with a count-dimension-only qualifier (`of 'count'`) and has min/max bounds. The dimension qualifier doesn't pin a unit, and counting units are not convertible, making the bound comparison ambiguous.
+- **Message:** "Bounds on count-dimension fields require an explicit unit qualifier ('in box', 'in each') because counting units are not mutually convertible. Use 'in <unit>' instead of 'of count'."
+- **Recovery:** Change `quantity of 'count' max 4` → `quantity in 'box' max 4` (or whatever the intended unit is).
+
+
+---
+
+# George Wave 2A Gaps / Follow-ups
+
+Timestamp: 2026-05-15T07:59:53.548-04:00
+Slug: normalization-and-qualifiers
+
+## Open gaps observed while implementing slices
+
+- Affine temperature normalization remains incomplete in TypedConstantNormalizer.NormalizeQuantity; existing red tests in TypedConstantNormalizerTests and ProofEngineIntervalIntegrationTests still show Celsius/Fahrenheit comparison drift.
+- NumericInterval.Shift(decimal) slice tests remain red in baseline and are outside this wave's scope.
+- Membership qualifier enforcement currently focuses on static qualifiers; dynamic qualifier forms are intentionally deferred.
+
+
+---
+
+# George Wave 2A Notes
+
+Timestamp: 2026-05-15T07:59:53.548-04:00
+Branch: spike/Precept-V2-Radical
+
+## Decisions captured
+
+1. Store normalized numeric bounds at type-check extraction time for both fields and args; keep raw DeclaredMin/DeclaredMax populated in parallel to avoid breaking existing consumers while enabling normalized-first reads via NormalizedDeclaredMin/NormalizedDeclaredMax.
+2. In proof interval computation, apply static-unit scaling only for raw-magnitude expression forms (TypedTypedConstant, InterpolatedTypedConstant with a single Magnitude slot and static unit qualifier).
+3. Dynamic-unit interpolated forms ('{n} {u}', '10 USD/{u}') do not produce trusted static numeric facts; TryGetStaticNumericValue now declines these to avoid false proofs.
+4. contains synthetic operations now run through the binary qualifier compatibility seam so PRE0137/PRE0071 behavior matches arithmetic/comparison qualifier checks where static qualifiers are known.
+
+## Validation snapshot
+
+- dotnet build src/Precept/Precept.csproj succeeded.
+- dotnet test test/Precept.Tests/Precept.Tests.csproj --no-build remains red at baseline count (24 failing tests), with pre-existing affine/shift-related failures still present.
+
+
+---
