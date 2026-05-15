@@ -217,60 +217,71 @@ public static partial class ProofEngine
     }
 
     // Slice 12: SemanticIndex is threaded through WalkExpression so that optional field
-    // refs in value positions can generate PresenceProofRequirement obligations.
-    private static void WalkExpression(TypedExpression expr, ObligationContext ctx, List<ProofObligation> obligations, SemanticIndex semantics)
+    // refs in value positions can generate PresenceProofRequirement obligations, including
+    // interpolated typed-constant holes.
+    private static void WalkExpression(
+        TypedExpression expr,
+        ObligationContext ctx,
+        List<ProofObligation> obligations,
+        SemanticIndex semantics,
+        bool includeOptionalArgRefs = false)
     {
         switch (expr)
         {
             case TypedFieldRef fieldRef:
                 // Slice 12 — Presence Obligation Generation:
                 // Every reference to an optional field in a value position generates a
-                // PresenceProofRequirement.  Strategy 2 (Guaranteed presence) and Strategy 3
+                // PresenceProofRequirement. Strategy 2 (Guaranteed presence) and Strategy 3
                 // (when X is set guard-in-path) discharge these obligations; unresolved
                 // obligations emit PRE0116 (UnprovedPresenceRequirement).
                 if (semantics.FieldsByName.TryGetValue(fieldRef.FieldName, out var referencedField)
                     && referencedField.Presence is DeclaredPresenceMeta.Optional)
                 {
-                    var presenceReq = new PresenceProofRequirement(
-                        new SelfSubject(),
-                        $"Field '{fieldRef.FieldName}' is optional and may be absent");
-                    obligations.Add(new ProofObligation(presenceReq, fieldRef, ctx, ProofDisposition.Unresolved, null, null));
+                    AddPresenceObligation("Field", fieldRef.FieldName, fieldRef, ctx, obligations);
+                }
+                break;
+
+            case TypedArgRef argRef when includeOptionalArgRefs:
+                if (TryGetArg(argRef, semantics, out var referencedArg)
+                    && referencedArg.Presence is DeclaredPresenceMeta.Optional)
+                {
+                    AddPresenceObligation("Argument", argRef.ArgName, argRef, ctx, obligations);
                 }
                 break;
 
             case TypedBinaryOp bin:
                 foreach (var req in bin.ProofRequirements)
                     obligations.Add(new ProofObligation(req, bin, ctx, ProofDisposition.Unresolved, null, null));
-                WalkExpression(bin.Left, ctx, obligations, semantics);
-                WalkExpression(bin.Right, ctx, obligations, semantics);
+                WalkExpression(bin.Left, ctx, obligations, semantics, includeOptionalArgRefs);
+                WalkExpression(bin.Right, ctx, obligations, semantics, includeOptionalArgRefs);
                 break;
 
             case TypedFunctionCall call:
                 foreach (var req in call.ProofRequirements)
                     obligations.Add(new ProofObligation(req, call, ctx, ProofDisposition.Unresolved, null, null));
                 foreach (var arg in call.Arguments)
-                    WalkExpression(arg, ctx, obligations, semantics);
+                    WalkExpression(arg, ctx, obligations, semantics, includeOptionalArgRefs);
                 break;
 
             case TypedMemberAccess ma:
                 foreach (var req in ma.ProofRequirements)
                     obligations.Add(new ProofObligation(req, ma, ctx, ProofDisposition.Unresolved, null, null));
-                WalkExpression(ma.Object, ctx, obligations, semantics);
+                WalkExpression(ma.Object, ctx, obligations, semantics, includeOptionalArgRefs);
                 break;
 
             case TypedUnaryOp un:
-                WalkExpression(un.Operand, ctx, obligations, semantics);
+                WalkExpression(un.Operand, ctx, obligations, semantics, includeOptionalArgRefs);
                 break;
 
             case TypedConditional cond:
-                WalkExpression(cond.Condition, ctx, obligations, semantics);
-                WalkExpression(cond.ThenBranch, ctx, obligations, semantics);
-                WalkExpression(cond.ElseBranch, ctx, obligations, semantics);
+                WalkExpression(cond.Condition, ctx, obligations, semantics, includeOptionalArgRefs);
+                WalkExpression(cond.ThenBranch, ctx, obligations, semantics, includeOptionalArgRefs);
+                WalkExpression(cond.ElseBranch, ctx, obligations, semantics, includeOptionalArgRefs);
                 break;
 
             case TypedQuantifier quant:
-                WalkExpression(quant.Collection, ctx, obligations, semantics);
-                WalkExpression(quant.Predicate, ctx, obligations, semantics);
+                WalkExpression(quant.Collection, ctx, obligations, semantics, includeOptionalArgRefs);
+                WalkExpression(quant.Predicate, ctx, obligations, semantics, includeOptionalArgRefs);
                 break;
 
             case TypedPostfixOp:
@@ -284,15 +295,51 @@ public static partial class ProofEngine
                 foreach (var seg in interp.Segments)
                 {
                     if (seg is TypedHoleSegment hole)
-                        WalkExpression(hole.Expression, ctx, obligations, semantics);
+                        WalkExpression(hole.Expression, ctx, obligations, semantics, includeOptionalArgRefs);
                 }
+                break;
+
+            case TypedInterpolatedTypedConstant typedConstant:
+                foreach (var slot in typedConstant.Slots)
+                    WalkExpression(slot.Expression, ctx, obligations, semantics, includeOptionalArgRefs: true);
                 break;
 
             case TypedListLiteral list:
                 foreach (var elem in list.Elements)
-                    WalkExpression(elem, ctx, obligations, semantics);
+                    WalkExpression(elem, ctx, obligations, semantics, includeOptionalArgRefs);
                 break;
         }
+    }
+
+    private static void AddPresenceObligation(
+        string subjectKind,
+        string subjectName,
+        TypedExpression site,
+        ObligationContext ctx,
+        List<ProofObligation> obligations)
+    {
+        var presenceReq = new PresenceProofRequirement(
+            new SelfSubject(),
+            $"{subjectKind} '{subjectName}' is optional and may be absent");
+        obligations.Add(new ProofObligation(presenceReq, site, ctx, ProofDisposition.Unresolved, null, null));
+    }
+
+    private static bool TryGetArg(TypedArgRef argRef, SemanticIndex semantics, out TypedArg arg)
+    {
+        arg = null!;
+        if (!semantics.EventsByName.TryGetValue(argRef.EventName, out var referencedEvent))
+            return false;
+
+        foreach (var candidate in referencedEvent.Args)
+        {
+            if (string.Equals(candidate.Name, argRef.ArgName, StringComparison.Ordinal))
+            {
+                arg = candidate;
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>
@@ -379,6 +426,7 @@ public static partial class ProofEngine
             {
                 TypedMemberAccess access => access.Object,
                 TypedFieldRef fieldRef => fieldRef,
+                TypedArgRef argRef => argRef,
                 _ => null
             },
             _ => null

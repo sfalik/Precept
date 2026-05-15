@@ -186,6 +186,88 @@ from Draft on Complete -> set Message = ""Note: {Note}"" -> transition Done";
             "optional field in an interpolation hole without guard must emit UnprovedPresenceRequirement");
     }
 
+    [Fact]
+    public void OptionalField_InTypedConstantMagnitudeHole_WithoutGuard_GeneratesPRE0116()
+    {
+        const string precept = @"
+precept PresenceTest
+field Source as integer optional
+field Target as quantity in 'kg'
+state Draft initial
+state Done terminal
+event Complete
+from Draft on Complete -> set Target = '{Source} kg' -> transition Done";
+
+        var result = Compiler.Compile(precept);
+
+        result.Diagnostics.Should().Contain(
+            d => d.Code == DiagnosticCode.UnprovedPresenceRequirement.ToString(),
+            "optional integer field in a typed-constant magnitude hole without guard must emit UnprovedPresenceRequirement");
+    }
+
+    [Fact]
+    public void OptionalField_InTypedConstantWholeValueHole_WithoutGuard_GeneratesPRE0116()
+    {
+        const string precept = @"
+precept PresenceTest
+field SourceQty as quantity in 'kg' optional
+field TargetQty as quantity in 'kg'
+state Draft initial
+state Done terminal
+event Complete
+from Draft on Complete -> set TargetQty = '{SourceQty}' -> transition Done";
+
+        var result = Compiler.Compile(precept);
+
+        result.Diagnostics.Should().Contain(
+            d => d.Code == DiagnosticCode.UnprovedPresenceRequirement.ToString(),
+            "optional quantity field in a typed-constant whole-value hole without guard must emit UnprovedPresenceRequirement");
+    }
+
+    [Fact]
+    public void OptionalField_InTypedConstantHole_WithIsSetGuard_DischargesPresenceObligation()
+    {
+        const string precept = @"
+precept PresenceTest
+field Source as integer optional
+field Target as quantity in 'kg'
+state Draft initial
+state Done terminal
+event Complete
+from Draft on Complete when Source is set -> set Target = '{Source} kg' -> transition Done
+from Draft on Complete -> no transition";
+
+        var result = Compiler.Compile(precept);
+
+        result.Diagnostics.Should().NotContain(
+            d => d.Code == DiagnosticCode.UnprovedPresenceRequirement.ToString(),
+            "a `when Source is set` guard must discharge the presence obligation for a typed-constant hole");
+
+        result.Proof.Obligations
+            .Where(o => o.Requirement is PresenceProofRequirement)
+            .Should().Contain(o => o.Disposition == ProofDisposition.Proved,
+                "the typed-constant hole should still generate a presence obligation that the guard proves");
+    }
+
+    [Fact]
+    public void RequiredField_InTypedConstantHole_GeneratesNoPresenceObligation()
+    {
+        const string precept = @"
+precept PresenceTest
+field Source as integer
+field Target as quantity in 'kg'
+state Draft initial
+state Done terminal
+event Complete
+from Draft on Complete -> set Target = '{Source} kg' -> transition Done";
+
+        var result = Compiler.Compile(precept);
+
+        result.Diagnostics.Should().NotContain(
+            d => d.Code == DiagnosticCode.UnprovedPresenceRequirement.ToString(),
+            "required fields used in typed-constant holes must not emit UnprovedPresenceRequirement");
+    }
+
     // ════════════════════════════════════════════════════════════════════════
     //  Guarded access — obligation discharged, no PRE0116
     // ════════════════════════════════════════════════════════════════════════

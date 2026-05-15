@@ -417,6 +417,11 @@ public static partial class ProofEngine
                 builder.Add(new GuardConstraint(postField.FieldName, OperatorKind.NotEquals, null, true));
                 break;
 
+            case TypedPostfixOp post when !post.IsNegated && post.Operand is TypedArgRef postArg:
+                // event arg is set
+                builder.Add(new GuardConstraint(postArg.ArgName, OperatorKind.NotEquals, null, true));
+                break;
+
             case TypedUnaryOp { ResolvedOp: var uop } un when Operations.GetMeta(uop).Op == OperatorKind.Not:
                 // not (X op Y) — attempt negation of simple comparisons
                 if (un.Operand is TypedBinaryOp innerBin)
