@@ -161,7 +161,10 @@ public class TypedConstantNormalizerTests
     [Fact]
     public void UcumAtom_dB_NoAffineOffset()
     {
-        GetAffineOffset(UcumAtomCatalog.All["dB"]).Should().BeNull();
+        var parsed = UcumParser.Parse("dB");
+
+        parsed.IsValid.Should().BeTrue();
+        GetAffineOffset(parsed.Unit!).Should().BeNull();
     }
 
     [Fact]

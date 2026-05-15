@@ -68,11 +68,20 @@ public static class TypedConstantNormalizer
         return true;
     }
 
-    private static decimal AffineToBase(decimal value, decimal scale, decimal? offset) =>
-        offset.HasValue ? (value + offset.Value) * scale : value * scale;
+    private static decimal AffineToBase(decimal value, decimal scale, decimal? offset)
+    {
+        var normalized = offset.HasValue ? (value + offset.Value) * scale : value * scale;
+        return NormalizeResult(normalized);
+    }
 
-    private static decimal AffineFromBase(decimal value, decimal scale, decimal? offset) =>
-        offset.HasValue ? value / scale - offset.Value : value / scale;
+    private static decimal AffineFromBase(decimal value, decimal scale, decimal? offset)
+    {
+        var denormalized = offset.HasValue ? value / scale - offset.Value : value / scale;
+        return NormalizeResult(denormalized);
+    }
+
+    private static decimal NormalizeResult(decimal value) =>
+        decimal.Round(value, 24, MidpointRounding.ToEven);
 
     private static decimal FactorToDecimal(UcumExactFactor factor)
     {
