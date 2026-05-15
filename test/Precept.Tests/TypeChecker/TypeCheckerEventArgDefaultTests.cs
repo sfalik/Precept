@@ -188,4 +188,25 @@ public class TypeCheckerEventArgDefaultTests
             .Should().Contain(DiagnosticCode.TypeMismatch.ToString(),
                 because: "integer literal 5 is not assignable to a quantity arg");
     }
+
+    // ── Test 8: money arg currency mismatch on default → QualifierMismatch ───────────
+
+    [Fact]
+    public void EventArgDefault_QualifierMismatch_EmitsDiagnostic()
+    {
+        // Arg declared as money in 'USD' but default is '50 EUR' → QualifierMismatch.
+        const string precept = """
+            precept ArgDefaultCurrencyMismatch
+            event Load(cost: money in 'USD' default '50 EUR')
+            state Active initial
+            """;
+
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check(precept);
+
+        diagnostics
+            .Where(d => d.Severity == Severity.Error)
+            .Select(d => d.Code)
+            .Should().Contain(DiagnosticCode.QualifierMismatch.ToString(),
+                because: "default '50 EUR' does not match the declared currency qualifier 'USD'");
+    }
 }
