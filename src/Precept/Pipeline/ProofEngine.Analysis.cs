@@ -60,6 +60,16 @@ public static partial class ProofEngine
         {
             if (field.DefaultExpression is TypedLiteral lit)
                 defaults[field.Name] = lit.Value;
+            else if (field.DefaultExpression is InterpolatedTypedConstant)
+            {
+                // Part A: Try to fold interpolated defaults using already-accumulated defaults.
+                // This enables ensures evaluation to reason about fields with foldable interpolated defaults.
+                var folded = FoldValue(field.DefaultExpression, defaults, unfoldable);
+                if (!ReferenceEquals(folded, UnknownSentinel))
+                    defaults[field.Name] = folded;
+                else
+                    unfoldable.Add(field.Name);
+            }
             else if (field.DefaultExpression is not null || field.IsComputed)
                 unfoldable.Add(field.Name);
             else if (field.IsOptional)
@@ -224,6 +234,43 @@ public static partial class ProofEngine
                 return post.IsNegated ? !isSet : isSet;
             }
 
+            case InterpolatedTypedConstant interpolated:
+            {
+                // Part A — fully-static: StaticMagnitude extracted by the TypeChecker from a literal in the magnitude slot.
+                if (interpolated.StaticMagnitude.HasValue)
+                {
+                    var mag = interpolated.StaticMagnitude.Value;
+                    switch (interpolated.StaticQualifier)
+                    {
+                        case StaticUnitQualifier { Unit: var unit }:
+                            if (TypedConstantNormalizer.TryGetStaticAffineParams(unit, out var scale, out var offset))
+                                return offset.HasValue ? (mag + offset.Value) * scale : mag * scale;
+                            break;
+                        case StaticCurrencyQualifier:
+                        case null:
+                            return mag; // currency or dimensionless — magnitude as-is
+                    }
+                }
+
+                // Single-slot magnitude from a foldable source (e.g., field ref with an explicit literal default).
+                if (interpolated.Slots.Length == 1
+                    && interpolated.Slots[0].SlotKind is InterpolationSlotKind.Magnitude or InterpolationSlotKind.WholeValue)
+                {
+                    var slotFolded = FoldValue(interpolated.Slots[0].Expression, defaults, unfoldable);
+                    if (!ReferenceEquals(slotFolded, UnknownSentinel) && slotFolded is decimal slotMagnitude)
+                    {
+                        if (interpolated.StaticQualifier is StaticUnitQualifier { Unit: var slotUnit })
+                        {
+                            if (TypedConstantNormalizer.TryGetStaticAffineParams(slotUnit, out var s, out var o))
+                                return o.HasValue ? (slotMagnitude + o.Value) * s : slotMagnitude * s;
+                        }
+                        return slotMagnitude;
+                    }
+                }
+
+                return UnknownSentinel;
+            }
+
             default:
                 return UnknownSentinel;
         }
@@ -289,8 +336,55 @@ public static partial class ProofEngine
         return UnknownSentinel;
     }
 
-    private static string FormatViolationReason(TypedEnsure ensure, Dictionary<string, object?> defaults)
+    // ════════════════════════════════════════════════════════════════════════════
+    //  Part B — Default obligation collector (Slice 25)
+    // ════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Generates interval-containment proof obligations for fields whose
+    /// <see cref="TypedField.DefaultExpression"/> is an <see cref="InterpolatedTypedConstant"/>
+    /// and whose declared bounds are non-empty. Only emits obligations where
+    /// <see cref="IntervalOf"/> returns a bounded (non-<see cref="NumericInterval.Unbounded"/>) result,
+    /// so Unit-slot and multi-slot interpolated defaults are safely skipped.
+    /// </summary>
+    internal static void CollectDefaultObligations(SemanticIndex semantics, List<ProofObligation> obligations)
     {
+        foreach (var field in semantics.Fields)
+        {
+            if (field.DefaultExpression is not InterpolatedTypedConstant || field.IsComputed)
+                continue;
+
+            var (min, max) = GetFieldBounds(field);
+            if (!min.HasValue && !max.HasValue)
+                continue;
+
+            // Use the full IntervalOf path (includes ApplyStaticUnitScaling) so unit conversion is applied.
+            var interval = IntervalOf(field.DefaultExpression, semantics);
+            if (interval.IsUnbounded)
+                continue;
+
+            var authoredMin = field.DeclaredMin;
+            var authoredMax = field.DeclaredMax;
+            var minStr = (authoredMin ?? min)?.ToString() ?? "−∞";
+            var maxStr = (authoredMax ?? max)?.ToString() ?? "+∞";
+            var intervalReq = new IntervalContainmentProofRequirement(
+                new SelfSubject(),
+                field.Name,
+                min, max,
+                authoredMin, authoredMax,
+                $"Interval containment: default of '{field.Name}' must be within declared bounds [{minStr} .. {maxStr}]");
+
+            obligations.Add(new ProofObligation(
+                intervalReq,
+                field.DefaultExpression,
+                new FieldDefaultContext(field),
+                ProofDisposition.Unresolved,
+                null,
+                null));
+        }
+    }
+
+    private static string FormatViolationReason(TypedEnsure ensure, Dictionary<string, object?> defaults)    {
         var fields = new List<string>();
         CollectFieldRefs(ensure.Condition, fields);
         if (fields.Count == 0)

@@ -244,6 +244,7 @@ public static partial class ProofEngine
             _ => "here"
         },
         FieldExpressionContext fec => $"in the computed expression for field '{fec.Field.Name}'",
+        FieldDefaultContext fdc => $"in the default value of field '{fdc.Field.Name}'",
         _ => "here"
     };
 

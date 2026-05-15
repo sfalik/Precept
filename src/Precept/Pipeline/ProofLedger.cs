@@ -27,6 +27,7 @@ public sealed record ConstraintContext(ConstraintIdentity Constraint) : Obligati
 public sealed record StateHookContext(TypedStateHook Hook) : ObligationContext;
 public sealed record EventHandlerContext(TypedEventHandler Handler) : ObligationContext;
 public sealed record FieldExpressionContext(TypedField Field) : ObligationContext;
+public sealed record FieldDefaultContext(TypedField Field) : ObligationContext;
 
 public enum ProofDisposition
 {
