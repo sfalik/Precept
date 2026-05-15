@@ -29941,4 +29941,3538 @@ George — 2025-07-20
 ### 2026-05-12T23:47: User directive
 **By:** Shane (via Copilot)
 **What:** We are on a spike branch. No new branches. No PRs. All work stays on the current branch.
-**Why:** User request — captured for team memory
+**Why:** User request — captured for team memory
+
+# Message-position catalog metadata closed
+
+**Date:** 2026-05-08
+
+**Sources:** `.squad/decisions/inbox/george-is-message-position.md`, `.squad/decisions/inbox/kramer-grammar-gen-message-position.md`
+
+**Status:** Implemented and validated
+
+## Summary
+
+`IsMessagePosition` is now first-class catalog metadata on both `TokenMeta` and `FunctionMeta`, and the grammar generator now derives message-string gold patterns from that metadata instead of hardcoding `because` / `reject`.
+
+## Decisions
+
+1. Message-position awareness belongs in catalog metadata, not parser or grammar-generator keyword lists.
+
+2. `TokenKind.Because` and `TokenKind.Reject` are the only current token entries that opt into `IsMessagePosition`.
+
+3. `FunctionMeta` carries the same flag now so future built-ins with trailing user-facing message strings can participate without new generator hardcoding.
+
+4. The grammar generator must read `Tokens.All.Where(m => m.IsMessagePosition)` and `Functions.All.Where(f => f.IsMessagePosition)` when building `messageStrings` patterns.
+
+## Validation
+
+- George added the metadata fields plus token flags; build and tests passed; commits `105a42a7` and `315b00c9`.
+
+- Kramer wired the generator, removed the stale TODO, regenerated `precept.tmLanguage.json`, and verified a zero-diff output; commit `7f3842fd`.
+
+# ProofEngine Design Decisions — PE-G1, PE-G2, PE-G3
+
+**Date:** 2026-05-08
+
+**Author:** Frank
+
+**Resolves:** PE-G1 (three unhandled obligation kinds), PE-G2 (ProofDischarges catalog prereq), PE-G3 (ProofLedger divergence)
+
+**Status:** DECISIONS MADE — pending Shane sign-off before spec update or implementation
+
+## Summary
+
+Deep source analysis of the five `ProofRequirementKind` values, the Operations catalog's actual usage, the TypeChecker's resolution pipeline, and the existing SemanticIndex contract reveals that all three blocking gaps are resolvable without new proof strategies. The three "unhandled" requirement kinds (Dimension, Modifier, QualifierCompatibility) are all field-declaration-attribute checks — they belong in an expanded Strategy 2 that reads qualifier bindings alongside modifiers. The `ProofDischarge` catalog prerequisite is well-scoped: 6 of 15 `FieldModifierMeta` entries carry concrete discharges. The `ProofLedger` output type needs ~6 new record types but the spec's shape is sound — the only revisions are `ConstraintIdentity` field-name corrections to match the source-of-truth `SemanticIndex.cs` definitions.
+
+---
+
+## PE-G1a: DimensionProofRequirement
+
+**Obligation:** "The period operand must have the required time dimension (Date or Time) for the arithmetic operation to be semantically valid."
+
+**Source:** `ProofRequirement.cs` lines 81–85. `DimensionProofRequirement(ProofSubject Subject, PeriodDimension RequiredDimension, string Description)`. The `PeriodDimension` enum has three values: `Any`, `Date`, `Time`.
+
+**Catalog usage:** `Operations.cs` lines 248, 257, 275, 284 — four temporal arithmetic entries:
+
+- `DatePlusPeriod` / `DateMinusPeriod` → require `PeriodDimension.Date`
+
+- `TimePlusPeriod` / `TimeMinusPeriod` → require `PeriodDimension.Time`
+
+**TypeChecker analysis:** The TypeChecker resolves qualifier bindings on field declarations (`TypedField.Qualifier`) and operation results (`TypedBinaryOp.ResultQualifier`). Period fields accept qualifiers on the `TemporalDimension` axis (`period of 'date'`, `period of 'time'`) and the `TemporalUnit` axis (`period in 'days'`). The qualifier binding is resolved at type-checking time and available in `TypedField.Qualifier`. The TypeChecker does NOT validate the dimension constraint itself — it stamps the `DimensionProofRequirement` from the `BinaryOperationMeta` catalog entry and defers to the proof engine. Grep for `Dimension`, `PeriodDimension`, `QualifierAxis` in `TypeChecker.cs` and `TypeChecker.Expressions.cs` returned no validation logic for this constraint. **Confirmed: the TypeChecker does not pre-discharge this.**
+
+**Decision: B) Discharged by Strategy 2 (Declaration Attribute Proof), extended to read qualifier bindings.**
+
+**Rationale:** The period field's qualifier binding on the `TemporalDimension` axis is a compile-time-known declaration attribute, structurally identical to a modifier. When the proof subject resolves to a field with `TypeKind.Period`, Strategy 2 reads `TypedField.Qualifier` and checks whether a qualifier on `QualifierAxis.TemporalDimension` maps to the required `PeriodDimension`:
+
+- Qualifier value `"date"` → satisfies `PeriodDimension.Date`
+
+- Qualifier value `"time"` → satisfies `PeriodDimension.Time`
+
+- `PeriodDimension.Any` → always satisfied (any temporal dimension)
+
+- No qualifier on `TemporalDimension` axis → obligation **unresolved** (period without dimension is ambiguous)
+
+**Alternatives rejected:**
+
+- _New Strategy 5_: Unnecessary — this is a field-declaration attribute check, exactly what Strategy 2 does. Adding a strategy for one requirement kind when the existing strategy can be extended is overengineering.
+
+- _Pre-discharge by TypeChecker_: Would violate the catalog-driven architecture. The type checker stamps requirements, the proof engine discharges them. The type checker's job is operation selection and requirement attachment, not requirement evaluation.
+
+**Tradeoff accepted:** Strategy 2 becomes slightly more complex — it dispatches on requirement kind (Numeric → ProofDischarge lookup, Dimension → qualifier binding check). This is a single `switch` arm, not a separate strategy.
+
+**Spec update required:** `proof-engine.md` §7 Strategy 2 pseudocode: add a `DimensionProofRequirement` branch to `TryModifierProof` that reads the subject field's qualifier binding on `QualifierAxis.TemporalDimension` and compares against `RequiredDimension`. Add to the Strategy 2 coverage table.
+
+---
+
+## PE-G1b: ModifierRequirement
+
+**Obligation:** "The field operand must declare the required modifier (e.g., `ordered`) for the operation to be valid."
+
+**Source:** `ProofRequirement.cs` lines 112–116. `ModifierRequirement(ProofSubject Subject, ModifierKind Required, string Description)`.
+
+**Catalog usage:** `Operations.cs` lines 760, 768, 776, 784 — four choice ordinal comparison entries (`ChoiceLessThan`, `ChoiceGreaterThan`, `ChoiceLessThanOrEqual`, `ChoiceGreaterThanOrEqual`) all declare `ModifierRequirement(PChoice, ModifierKind.Ordered, ...)`. Both operands share the same `PChoice` parameter reference, so the requirement applies to all matching operand positions.
+
+**TypeChecker analysis:** The TypeChecker resolves choice operations via the Operations catalog and stamps the `ModifierRequirement` on the `TypedBinaryOp`. It does NOT check whether the field has the `ordered` modifier itself — that's deferred to the proof engine. Grep for `ModifierRequirement`, `CheckModifier`, `modifier.*check` in `TypeChecker.cs` returned no hits. **Confirmed: the TypeChecker does not pre-discharge this.**
+
+**Decision: B) Discharged by Strategy 2 (Declaration Attribute Proof), via direct modifier presence check.**
+
+**Rationale:** This is the simplest possible Strategy 2 case. The proof subject resolves to a field. Strategy 2 checks `field.Modifiers.Contains(requirement.Required)`. If the field has the `ordered` modifier, the obligation is discharged. If not, unresolved — emit diagnostic.
+
+This is distinct from the `ProofDischarge` lookup path. `ProofDischarge` entries map modifiers → numeric/presence requirements they discharge (e.g., `positive` discharges `> 0`). `ModifierRequirement` is the inverse: it asserts that a specific modifier must be present on the field. Strategy 2 handles both paths:
+
+1. **ProofDischarge path** (for `NumericProofRequirement`, `PresenceProofRequirement`): "Does any modifier on this field carry a `ProofDischarge` that covers this requirement?"
+
+2. **Modifier presence path** (for `ModifierRequirement`): "Does this field have the required modifier?"
+
+**Alternatives rejected:**
+
+- _Pre-discharge by TypeChecker_: Same rationale as PE-G1a — type checker stamps requirements, proof engine discharges them.
+
+- _Always a type error (Option C)_: Wrong — `ordered` is an optional modifier on choice fields. Not having it isn't a type error; it's a proof failure for ordinal operations specifically.
+
+**Tradeoff accepted:** None significant. This is a trivial addition to Strategy 2.
+
+**Spec update required:** `proof-engine.md` §7 Strategy 2 pseudocode: add a `ModifierRequirement` branch that checks `field.Modifiers.Contains(requirement.Required)`. Add to the Strategy 2 coverage table.
+
+---
+
+## PE-G1c: QualifierCompatibilityProofRequirement
+
+**Obligation:** "Two operands in a binary operation must have matching qualifier values on the specified axis (e.g., both `quantity in 'kg'` or both `money in 'USD'`)."
+
+**Source:** `ProofRequirement.cs` lines 96–101. `QualifierCompatibilityProofRequirement(ProofSubject LeftSubject, ProofSubject RightSubject, QualifierAxis Axis, string Description)`. This is the only dual-subject requirement kind.
+
+**Catalog usage:** Extensively used in `Operations.cs`:
+
+- **Quantity arithmetic** (lines 475, 484, 921–966): `QualifierAxis.Unit` — operands must have the same unit qualifier
+
+- **Price arithmetic** (lines 557–570, 977–1023): Both `QualifierAxis.Unit` AND `QualifierAxis.Currency` — operands must match on both axes
+
+- **Money arithmetic**: `QualifierAxis.Currency` (via `QualifierMatch.Same` entries)
+
+**TypeChecker analysis:** The TypeChecker handles qualifier disambiguation at operation resolution time (`TypeChecker.Expressions.cs` lines 560–591). For multi-candidate operations, it defaults to `QualifierMatch.Same` — the structurally safe assumption. It maps this to `SameQualifierRequired` on `TypedBinaryOp.ResultQualifier` and explicitly comments: "ProofEngine will verify qualifier compatibility at deeper analysis" (line 573). **Confirmed: the TypeChecker defers qualifier verification to the proof engine.**
+
+**Decision: B) Discharged by Strategy 2 (Declaration Attribute Proof), extended to read qualifier bindings on both operand fields.**
+
+**Rationale:** Both operands' qualifier bindings are compile-time-known declaration attributes. The proof engine:
+
+1. Resolves both subjects (`LeftSubject`, `RightSubject`) to their respective fields
+
+2. Reads the qualifier binding on the specified `QualifierAxis` from each `TypedField.Qualifier`
+
+3. If both fields have explicit qualifiers on that axis AND the values match → discharged
+
+4. If either field lacks a qualifier on that axis → **unresolved** (cannot prove compatibility without declared qualifiers)
+
+5. If both have qualifiers but they differ → **unresolved** (type-incompatible operation)
+
+**Alternatives rejected:**
+
+- _New Strategy 5 (Qualifier Strategy)_: Unnecessary — this is a field-declaration attribute comparison. Strategy 2 already reads field declarations. Adding the qualifier binding read is architecturally consistent with its existing responsibility.
+
+- _Always a type error_: Wrong — the type checker intentionally defers this to the proof engine. Making it a type error would duplicate logic and violate the catalog-driven obligation model.
+
+- _Runtime-only check_: Wrong — qualifier values are declaration-time constants (string literals in `in 'USD'`, `in 'kg'`). They're always statically knowable. Deferring to runtime would miss a guaranteed-provable obligation.
+
+**Tradeoff accepted:** Strategy 2 now handles two structural patterns — single-subject (modifiers, qualifier, dimension) and dual-subject (qualifier compatibility). The implementation must check for `QualifierCompatibilityProofRequirement` specifically and resolve both subjects. This is a single additional branch, not a general multi-subject framework.
+
+**Spec update required:** `proof-engine.md` §7 Strategy 2 pseudocode: add a `QualifierCompatibilityProofRequirement` branch that resolves both subjects, reads their qualifier bindings on the specified axis, and compares values. Add to the Strategy 2 coverage table. Update Strategy 2's name from "Modifier Proof" to "Declaration Attribute Proof" to reflect its expanded scope.
+
+---
+
+## PE-G2: ProofDischarge Catalog Design
+
+## 1. ProofDischarge Record Type
+
+```csharp
+
+/// <summary>
+
+/// Declares a proof obligation that a field modifier statically discharges.
+
+/// Read by Strategy 2 of the proof engine — no per-modifier switch needed.
+
+/// </summary>
+
+public sealed record ProofDischarge(
+
+    ProofRequirementKind RequirementKind,  // which obligation kind this discharges
+
+    OperatorKind? Comparison,              // for Numeric: the comparison operator
+
+    decimal? Threshold                     // for Numeric: the threshold value
+
+                                           //   null = read from modifier's HasValue parameter
+
+);
+
+```
+
+**Design rationale:** The `Threshold` field is nullable. For fixed-value modifiers (`positive`, `nonnegative`, `nonzero`, `notempty`), the threshold is a literal. For parameterized modifiers (`min(N)`, `max(N)`, `mincount(N)`, `maxcount(N)`), the threshold is `null`, signaling the proof engine to read the value from the field declaration's modifier parameter at proof time. This keeps the catalog entry declarative while supporting parameterized constraints.
+
+## 2. FieldModifierMeta Update
+
+Add `ProofDischarges` property to the existing `FieldModifierMeta` record in `Modifier.cs`:
+
+```csharp
+
+public sealed record FieldModifierMeta(
+
+    ModifierKind Kind,
+
+    TokenMeta Token,
+
+    string Description,
+
+    ModifierCategory Category,
+
+    TypeTarget[] ApplicableTo,
+
+    bool HasValue = false,
+
+    ModifierKind[] Subsumes = default!,
+
+    ProofDischarge[] ProofDischarges = default!,  // ← NEW
+
+    string? HoverDescription = null,
+
+    string? UsageExample = null,
+
+    string? SnippetTemplate = null,
+
+    ModifierKind[]? MutuallyExclusiveWith = null)
+
+    : ModifierMeta(Kind, Token, Description, Category, MutuallyExclusiveWith)
+
+{
+
+    public ModifierKind[] Subsumes { get; init; } = Subsumes ?? [];
+
+    public ProofDischarge[] ProofDischarges { get; init; } = ProofDischarges ?? [];
+
+}
+
+```
+
+## 3. Modifier Entries Requiring ProofDischarges
+
+| Modifier | `ProofDischarges` value | Rationale |
+
+|---|---|---|
+
+| `positive` | `[ProofDischarge(Numeric, GreaterThan, 0)]` | Field > 0 — subsumes `!= 0` and `>= 0` via `DischargeCovers` subsumption logic |
+
+| `nonnegative` | `[ProofDischarge(Numeric, GreaterThanOrEqual, 0)]` | Field ≥ 0 |
+
+| `nonzero` | `[ProofDischarge(Numeric, NotEquals, 0)]` | Field ≠ 0 |
+
+| `notempty` | `[ProofDischarge(Numeric, GreaterThan, 0)]` | Collection count > 0 or string length > 0 |
+
+| `min(N)` | `[ProofDischarge(Numeric, GreaterThanOrEqual, null)]` | Field ≥ N where N is modifier parameter |
+
+| `max(N)` | `[ProofDischarge(Numeric, LessThanOrEqual, null)]` | Field ≤ N where N is modifier parameter |
+
+| `minlength(N)` | `[ProofDischarge(Numeric, GreaterThanOrEqual, null)]` | String length ≥ N |
+
+| `maxlength(N)` | `[ProofDischarge(Numeric, LessThanOrEqual, null)]` | String length ≤ N |
+
+| `mincount(N)` | `[ProofDischarge(Numeric, GreaterThanOrEqual, null)]` | Collection count ≥ N |
+
+| `maxcount(N)` | `[ProofDischarge(Numeric, LessThanOrEqual, null)]` | Collection count ≤ N |
+
+**Modifiers with NO ProofDischarges (empty array):**
+
+| Modifier | Why empty |
+
+|---|---|
+
+| `optional` | Does not *discharge* a proof obligation — its absence is what guarantees presence. Strategy 2 handles presence via the non-optional check, not via ProofDischarge. |
+
+| `ordered` | Handled by the modifier-presence path of Strategy 2 (for `ModifierRequirement`), not via ProofDischarge entries. |
+
+| `default(expr)` | Provides initial value — does not establish a runtime bound. |
+
+| `maxplaces(N)` | No current proof obligation targets decimal-place constraints. |
+
+| `writable` | Access control, not a value constraint. |
+
+## 4. File Location
+
+**New file: `src/Precept/Language/ProofDischarge.cs`.**
+
+**Rationale:** `ProofDischarge` is a first-class catalog type shared between the modifier catalog (`Modifiers.cs`) and the proof engine (`ProofEngine.cs`). It belongs in `Language/` because it's catalog metadata, not pipeline logic. It gets its own file because it's a distinct record type with its own semantic purpose — nesting it inside `Modifier.cs` would bury it among the modifier DU hierarchy. This mirrors the pattern of `ProofRequirement.cs` (catalog metadata type) having its own file.
+
+## 5. Catalog Architecture Compliance
+
+Verified against `docs/language/catalog-system.md`:
+
+- **ProofDischarges is catalog metadata.** It declares what a modifier *means* for the proof system. The proof engine reads it — it does not compute it. This is exactly the metadata-driven architecture: domain knowledge lives in the catalog, pipeline stages are generic readers.
+
+- **No per-modifier switch in the proof engine.** Strategy 2 iterates `field.Modifiers`, reads `Modifiers.GetMeta(kind).ProofDischarges`, and calls `DischargeCovers`. No `ModifierKind.Positive => ...` switches anywhere in `ProofEngine.cs`.
+
+- **Subsumption is a generic algorithm.** `DischargeCovers` performs comparison-operator subsumption (e.g., `> 0` covers `!= 0`). This logic is proof-engine-internal, not per-modifier — it works for any `ProofDischarge` entry regardless of which modifier declares it.
+
+---
+
+## PE-G3: ProofLedger Output Type
+
+## New Record Types Needed
+
+The spec's §5 Output defines 8 types. Current source has only `ProofLedger(ImmutableArray<Diagnostic> Diagnostics)`. The following types must be added:
+
+## 1. `ProofObligation` — `Pipeline/ProofLedger.cs`
+
+```csharp
+
+public sealed record ProofObligation(
+
+    ProofRequirement Requirement,
+
+    TypedExpression Site,
+
+    ProofDisposition Disposition,
+
+    ProofStrategy? Strategy,
+
+    DiagnosticCode? EmittedDiagnostic
+
+);
+
+```
+
+Dependencies: `ProofRequirement` (Language), `TypedExpression` (Pipeline/SemanticIndex.cs), `DiagnosticCode` (Language)
+
+## 2. `ProofDisposition` enum — `Pipeline/ProofLedger.cs`
+
+```csharp
+
+public enum ProofDisposition { Proved, Unresolved }
+
+```
+
+## 3. `ProofStrategy` enum — `Pipeline/ProofLedger.cs`
+
+```csharp
+
+public enum ProofStrategy
+
+{
+
+    Literal,
+
+    DeclarationAttribute,  // renamed from "Modifier" — covers modifiers, qualifiers, dimensions
+
+    GuardInPath,
+
+    FlowNarrowing
+
+}
+
+```
+
+**Note:** Renamed from `Modifier` to `DeclarationAttribute` per PE-G1 decisions. The spec should be updated accordingly.
+
+## 4. `FaultSiteLink` — `Pipeline/ProofLedger.cs`
+
+```csharp
+
+public sealed record FaultSiteLink(
+
+    ProofObligation Obligation,
+
+    FaultCode FaultCode,
+
+    DiagnosticCode DiagnosticCode,
+
+    SourceSpan Site
+
+);
+
+```
+
+Dependencies: `FaultCode` (Language)
+
+## 5. `ConstraintInfluenceEntry` — `Pipeline/ProofLedger.cs`
+
+```csharp
+
+public sealed record ConstraintInfluenceEntry(
+
+    ConstraintIdentity Constraint,
+
+    ImmutableArray<string> ReferencedFields,
+
+    ImmutableArray<EventArgReference> ReferencedArgs
+
+);
+
+public sealed record EventArgReference(string EventName, string ArgName);
+
+```
+
+Dependencies: `ConstraintIdentity` (Pipeline/SemanticIndex.cs — shared type, already exists)
+
+## 6. `InitialStateSatisfiabilityResult` — `Pipeline/ProofLedger.cs`
+
+```csharp
+
+public sealed record InitialStateSatisfiabilityResult(
+
+    string StateName,
+
+    bool IsSatisfiable,
+
+    ImmutableArray<UnsatisfiedConstraint> Violations
+
+);
+
+public sealed record UnsatisfiedConstraint(
+
+    ConstraintIdentity Constraint,
+
+    string Reason
+
+);
+
+```
+
+## 7. Updated `ProofLedger` — `Pipeline/ProofLedger.cs`
+
+```csharp
+
+public sealed record ProofLedger(
+
+    ImmutableArray<ProofObligation> Obligations,
+
+    ImmutableArray<FaultSiteLink> FaultSiteLinks,
+
+    ImmutableArray<ConstraintInfluenceEntry> ConstraintInfluence,
+
+    ImmutableArray<InitialStateSatisfiabilityResult> InitialStateResults,
+
+    ImmutableArray<Diagnostic> Diagnostics
+
+);
+
+```
+
+## Decision: Match the spec — the shape is sound
+
+**Rationale:** The spec was written after the catalog architecture was established and correctly reflects what the Precept Builder needs from the proof engine:
+
+- `Obligations` — complete audit trail (which obligations exist and how they were resolved)
+
+- `FaultSiteLinks` — consumed by Precept Builder Pass 4 for `FaultSiteAnnotation` planting
+
+- `ConstraintInfluence` — consumed by Precept Builder for `ConstraintInfluenceMap`
+
+- `InitialStateResults` — consumed by diagnostics (unsatisfiable initial state is a compile-time error)
+
+- `Diagnostics` — merged into the final diagnostic stream
+
+None of these fields are overengineered. Each has a concrete downstream consumer documented in the spec.
+
+**One revision:** The `ConstraintIdentity` subtypes in the spec differ from the source. The **source is correct** (it's the implemented, tested shape). The spec must be updated:
+
+| Spec shape | Source shape | Verdict |
+
+|---|---|---|
+
+| `RuleIdentity(string RuleName, int Index)` | `RuleIdentity(int RuleIndex)` | **Source wins** — Precept rules are anonymous (no `RuleName`). The spec's `RuleName` field doesn't exist in the DSL surface. |
+
+| `EnsureIdentity(ConstraintKind, string? AnchorState, string? AnchorEvent, int Index)` | `EnsureIdentity(ConstraintKind, string? AnchorName, int EnsureIndex)` | **Source wins** — `AnchorName` collapses state/event discrimination. The `ConstraintKind` already indicates whether the anchor is a state or event. |
+
+## File organization
+
+All new types go in `Pipeline/ProofLedger.cs` alongside the `ProofLedger` record. This follows the existing pattern: `SemanticIndex.cs` contains both the index record and all its constituent types (`TypedField`, `TypedState`, `TypedTransitionRow`, etc.). Putting `ProofObligation`, `FaultSiteLink`, etc. in `ProofLedger.cs` keeps the proof engine's output contract in one file.
+
+Exception: `ProofDischarge` goes in `Language/ProofDischarge.cs` (catalog metadata, not pipeline output).
+
+---
+
+## Significant Gaps — Terse Verdicts
+
+## SIG-1: Missing `AllTypedExpressions` API on `SemanticIndex`
+
+**Verdict: SPEC UPDATE NEEDED**
+
+The spec's Pass 1 pseudocode (line 967) iterates `semantics.AllTypedExpressions` — this property does not exist on `SemanticIndex`. The implementer must define a traversal method that walks all expression-bearing records (`TransitionRows` → actions/guards, `Rules` → conditions, `Ensures` → conditions, `ComputedDeps` → computed expressions, `StateHooks` → actions). This is an **implementer responsibility** — the traversal is mechanical and the implementer knows the SemanticIndex shape. The spec should note this as a "to be implemented" API rather than assuming it exists.
+
+## SIG-2: `ConstraintIdentity` shape mismatch
+
+**Verdict: SPEC UPDATE NEEDED**
+
+Covered in PE-G3 above. The spec's `ConstraintIdentity` subtypes have fields that don't exist in the source (`RuleName`, separate `AnchorState`/`AnchorEvent`). The spec must be updated to match the source shapes: `RuleIdentity(int RuleIndex)` and `EnsureIdentity(ConstraintKind Kind, string? AnchorName, int EnsureIndex)`.
+
+## SIG-3: Unspecified `FindEnclosingTransitionRow` helper
+
+**Verdict: ACCEPT AS-IS**
+
+This is a straightforward lookup: given a `TypedExpression`, find which `TypedTransitionRow` contains it. The implementer walks `SemanticIndex.TransitionRows` and checks whether any row's guard or action chain contains the expression (by reference identity or span containment). No design decision needed — it's a utility function, not an architectural concern. The spec correctly identifies it as a helper without over-specifying implementation.
+
+## SIG-4: Unspecified `ResolveSubject` helper
+
+**Verdict: ACCEPT AS-IS**
+
+`ResolveSubject` maps a `ProofSubject` to a concrete `TypedExpression` node. For `ParamSubject(ParameterMeta)`, it matches the parameter by object identity against the expression's operands. For `SelfSubject`, it returns the receiver expression. Implementation is mechanical — the spec correctly leaves it to the implementer.
+
+## SIG-5: Underspecified initial-state satisfiability
+
+**Verdict: DESIGN DECISION REQUIRED — deferred**
+
+The spec says to check whether initial-state constraints are satisfiable given default field values. This requires evaluating default expressions against constraint expressions — essentially a mini-evaluator at compile time. The spec's description (lines 866–883) is correct in intent but implementation is blocked pending the type checker's expression resolution engine being fully operational (as the spec itself notes on line 883). **Owner: spec author + implementer, post-TypeChecker completion.**
+
+## SIG-6: Collection-empty obligation ownership ambiguity
+
+**Verdict: ACCEPT AS-IS**
+
+Collection non-empty obligations are declared in catalog metadata (`TypeAccessor.ProofRequirements`, `ActionMeta.ProofRequirements`). The type checker stamps them on `TypedMemberAccess` and `TypedAction` nodes. The proof engine discharges them via Strategy 1 (literal), Strategy 2 (`notempty` modifier), or Strategy 3 (`count > 0` guard). There is no ownership ambiguity — the catalog declares, the type checker stamps, the proof engine discharges. The spec's §7 "Collection Non-Empty Proof" section (lines 886–899) correctly describes the flow. No change needed.
+
+## SIG-7: Guard decomposition rules
+
+**Verdict: SPEC UPDATE NEEDED**
+
+The spec's Strategy 3 pseudocode references `ExtractGuardConstraints(row.Guard)` but does not define the decomposition rules for complex guard expressions. The spec should specify:
+
+1. **Supported connectives:** `and` decomposes into individual constraints (each arm of `A and B` is a separate constraint). `or` does NOT decompose (cannot prove either arm independently).
+
+2. **Supported atomic forms:** `field OP literal`, `count(collection) > 0`, `collection.count > 0`, `field is set`, `field is not set`.
+
+3. **Unsupported forms:** Function calls (other than `count`), nested expressions, field-vs-field comparisons (those are Strategy 4).
+
+**Owner: spec author.** These rules define the proof engine's guard recognition language. They should be specified in the spec before implementation.
+
+---
+
+## Required Spec Updates (in order)
+
+1. **§7 Strategy 2 — Rename and expand scope.** Rename from "Modifier Proof" to "Declaration Attribute Proof." Add three new branches to `TryModifierProof` (renamed to `TryDeclarationAttributeProof`):
+
+   - `ModifierRequirement` → direct `field.Modifiers.Contains(requirement.Required)` check
+
+   - `DimensionProofRequirement` → read `TypedField.Qualifier` on `QualifierAxis.TemporalDimension`, compare to `RequiredDimension`
+
+   - `QualifierCompatibilityProofRequirement` → resolve both subjects, read qualifier bindings on specified axis, compare values
+
+2. **§7 Strategy 2 — Update coverage table.** Add rows for Dimension, Modifier, and QualifierCompatibility requirement kinds.
+
+3. **§7 Strategy 2 — Update `ProofDischarge` pseudocode.** Show `DischargeCovers` handling nullable `Threshold` (reads from modifier parameter for `HasValue` modifiers).
+
+4. **§5 Output — Fix `ConstraintIdentity` shapes.** Replace `RuleIdentity(string RuleName, int Index)` with `RuleIdentity(int RuleIndex)`. Replace `EnsureIdentity(ConstraintKind, string? AnchorState, string? AnchorEvent, int Index)` with `EnsureIdentity(ConstraintKind, string? AnchorName, int EnsureIndex)`.
+
+5. **§5 Output — Update `ProofStrategy` enum.** Rename `Modifier` to `DeclarationAttribute`.
+
+6. **§7 Strategy 3 — Add guard decomposition rules.** Specify `and` connective decomposition, `or` non-decomposition, supported atomic guard forms.
+
+7. **§9 — Add `AllTypedExpressions` note.** Document that `SemanticIndex` requires a traversal method/property to enumerate all typed expressions across all declaration kinds.
+
+8. **§7 initial-state satisfiability — Add blocking dependency note.** Explicitly state that implementation is blocked pending TypeChecker expression evaluation capability.
+
+---
+
+## Required Catalog Changes (in order)
+
+1. **Add `ProofDischarge.cs`** — new file in `src/Precept/Language/` containing the `ProofDischarge` record type.
+
+2. **Update `FieldModifierMeta` in `Modifier.cs`** — add `ProofDischarge[] ProofDischarges = default!` parameter after `Subsumes`, with `ProofDischarges` property initialization `= ProofDischarges ?? []`.
+
+3. **Update `Modifiers.cs` entries** — populate `ProofDischarges` on 10 modifier entries:
+
+   - `Nonnegative`: `ProofDischarges: [new(ProofRequirementKind.Numeric, OperatorKind.GreaterThanOrEqual, 0)]`
+
+   - `Positive`: `ProofDischarges: [new(ProofRequirementKind.Numeric, OperatorKind.GreaterThan, 0)]`
+
+   - `Nonzero`: `ProofDischarges: [new(ProofRequirementKind.Numeric, OperatorKind.NotEquals, 0)]`
+
+   - `Notempty`: `ProofDischarges: [new(ProofRequirementKind.Numeric, OperatorKind.GreaterThan, 0)]`
+
+   - `Min`: `ProofDischarges: [new(ProofRequirementKind.Numeric, OperatorKind.GreaterThanOrEqual, null)]`
+
+   - `Max`: `ProofDischarges: [new(ProofRequirementKind.Numeric, OperatorKind.LessThanOrEqual, null)]`
+
+   - `Minlength`: `ProofDischarges: [new(ProofRequirementKind.Numeric, OperatorKind.GreaterThanOrEqual, null)]`
+
+   - `Maxlength`: `ProofDischarges: [new(ProofRequirementKind.Numeric, OperatorKind.LessThanOrEqual, null)]`
+
+   - `Mincount`: `ProofDischarges: [new(ProofRequirementKind.Numeric, OperatorKind.GreaterThanOrEqual, null)]`
+
+   - `Maxcount`: `ProofDischarges: [new(ProofRequirementKind.Numeric, OperatorKind.LessThanOrEqual, null)]`
+
+4. **Update `ProofLedger.cs`** — replace stub with full output contract (ProofObligation, ProofDisposition, ProofStrategy, FaultSiteLink, ConstraintInfluenceEntry, EventArgReference, InitialStateSatisfiabilityResult, UnsatisfiedConstraint).
+
+---
+
+## Shane Sign-Off Required On
+
+- **Strategy 2 rename to "Declaration Attribute Proof"**: This broadens Strategy 2's scope from modifier-only to all field declaration attributes (modifiers, qualifiers, dimensions). The alternative is keeping the name "Modifier Proof" and adding separate subroutines for qualifier/dimension checks under the same strategy. The rename is more honest but changes the spec vocabulary. Shane should confirm the rename is acceptable.
+
+- **`PeriodDimension.Any` behavior**: When a period field has no `TemporalDimension` qualifier, should the Dimension obligation be unresolved (forcing authors to always qualify their period fields for temporal arithmetic), or should unqualified periods be treated as `PeriodDimension.Any` (accepting any dimension)? Current decision: **unresolved** — the author must declare `period of 'date'` or `period of 'time'` for temporal arithmetic to be proven safe. This is the conservative choice but may be annoying for simple precepts.
+
+- **SIG-5 initial-state satisfiability deferral**: This is marked as blocked pending TypeChecker expression evaluation. Should it be deferred entirely from the proof engine's initial implementation scope, or should a minimal version (literals-only default values against simple comparison constraints) be included in the first implementation?
+
+# Shane Sign-Off — ProofEngine Design Decisions
+
+**Date:** 2026-05-08
+
+**Source:** Direct conversation with Shane
+
+## Decision 1 — Strategy 2 Rename: APPROVED ✅
+
+**Approved:** Rename Strategy 2 from "Modifier Proof" to "Declaration Attribute Proof."
+
+Strategy 2's expanded scope (modifiers, qualifier bindings, and temporal dimension qualifiers) makes the rename accurate. The old name "Modifier Proof" was too narrow given the PE-G1 expansion.
+
+## Decision 2 — Unqualified Period Behavior: Permissive ✅
+
+**Approved:** Treat unqualified periods as `PeriodDimension.Any` — accept any dimension.
+
+When a `period` field has no `TemporalDimension` qualifier (no `period of 'date'` or `period of 'time'`), the `DimensionProofRequirement` is considered **satisfied** rather than unresolved. This is the permissive choice — authors are not forced to qualify period fields for temporal arithmetic to be proven safe.
+
+## Decision 3 — Initial-State Satisfiability: PENDING FRANK DEEP DIVE ⏸
+
+Shane raised the question: "why not just use the evaluator?" instead of a mini-evaluator at compile time.
+
+Frank has been tasked with a deep dive on this architectural question. Key questions:
+
+1. Does the evaluator depend on compiled Compiler-stage output, or can it operate on SemanticIndex?
+
+2. Can evaluation logic be shared between ProofEngine (compile-time) and Evaluator (runtime)?
+
+3. What are the architectural implications of using the evaluator for initial-state satisfiability?
+
+4. What is the recommended design?
+
+**Status:** Blocked on Frank deep dive. No implementation decision authorized yet.
+
+# Precept TextMate Grammar — Authoritative Specification
+
+**Date:** 2026-05-08
+
+**Author:** Frank
+
+**Status:** DRAFT — pending review
+
+**Source material reviewed:**
+
+- `design/system/semantic-visual-system-manifest.md` — primary visual system design
+
+- `design/system/semantic-visual-system-notes.md` — supplementary notes
+
+- `design/system/README.md` — design system ownership
+
+- `design/brand/brand-decisions.md` — brand palette and typography locked direction
+
+- `design/brand/philosophy.md` — redirects to `docs/philosophy.md`
+
+- `src/Precept/Language/Tokens.cs` (515 lines) — complete token catalog with TextMateScope assignments
+
+- `src/Precept/Language/TokenKind.cs` (205 lines) — 139 token kinds
+
+- `src/Precept/Language/Types.cs` — type catalog (37.4 KB)
+
+- `src/Precept/Language/TypeKind.cs` — 32 type kinds
+
+- `src/Precept/Language/Modifiers.cs` (260 lines) — 29 modifier kinds across 5 DU subtypes
+
+- `src/Precept/Language/ModifierKind.cs` — modifier enum
+
+- `src/Precept/Language/Actions.cs` (222 lines) — 15 action kinds
+
+- `src/Precept/Language/ActionKind.cs` — action enum
+
+- `src/Precept/Language/Operators.cs` (206 lines) — 21 operator kinds
+
+- `src/Precept/Language/OperatorKind.cs` — operator enum
+
+- `src/Precept/Language/Constructs.cs` (199 lines) — 12 construct kinds
+
+- `src/Precept/Language/Functions.cs` — 21 built-in function kinds
+
+- `src/Precept/Language/FunctionKind.cs` — function enum
+
+- `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json` (457 lines) — hand-authored grammar
+
+- `tools/Precept.GrammarGen/Program.cs` (537 lines) — grammar generator scaffold
+
+- `docs/tooling/extension.md` — extension architecture
+
+- All 28 `.precept` sample files in `samples/`
+
+---
+
+## Executive Summary
+
+The hand-authored `precept.tmLanguage.json` is **severely incomplete and stale**. It covers roughly 40% of the current language surface, uses at least 3 retired keywords (`nullable`, `invariant`, `assert`), a retired syntax form (`event Name with Arg` instead of parenthesized args), and classifies tokens into only 4 flat keyword groups that collapse the 14 semantic categories the catalog defines. The grammar generator (`GrammarGen/Program.cs`) correctly derives keyword alternation patterns from catalog metadata but carries the same 2 stale structural patterns (`with`-syntax events, `assert` keyword) and omits 8 construct-level patterns and the gold-colored message-string pattern that the visual system design requires. This spec defines the complete grammar that the generator must produce to replace the hand-authored file at parity-or-better.
+
+---
+
+## 1. Design System → TextMate Scope Mapping
+
+The brand decisions (`brand-decisions.md`) lock 8 authoring-time color families plus comments. TextMate scopes must enable theme rules to target each family independently. The catalog (`Tokens.cs`) already assigns a `TextMateScope` to every token. This table maps visual system roles to catalog scopes and notes misalignments.
+
+| # | Design Role | Brand Color | Typography | Catalog TextMateScope(s) | Notes |
+
+|---|-------------|------------|------------|--------------------------|-------|
+
+| 1 | Structure · Semantic | `#4338CA` | **bold** | `keyword.declaration.precept` | Declaration/behavioral keywords: `precept`, `field`, `state`, `event`, `rule`, `ensure`, `as`, `default`, `optional`, `writable`, `because`, `initial`, `ascending`, `descending` |
+
+| 2 | Structure · Grammar | `#6366F1` | normal | `keyword.control.precept` | Prepositions and control flow: `in`, `to`, `from`, `on`, `of`, `into`, `when`, `if`, `then`, `else`, `by`, `at`, `for` |
+
+| 3 | Structure · Grammar (actions) | `#6366F1` | normal | `keyword.other.action.precept` | Action verbs: `add`, `remove`, `enqueue`, `dequeue`, `push`, `pop`, `clear`, `append`, `insert`, `put` |
+
+| 4 | Structure · Grammar (outcomes) | `#6366F1` | normal | `keyword.other.outcome.precept` | Outcome keywords: `transition`, `no`, `reject` |
+
+| 5 | Structure · Grammar (access) | `#6366F1` | normal | `keyword.other.access-mode.precept` | Access mode: `modify`, `readonly`, `editable`, `omit` |
+
+| 6 | Structure · Grammar (quantifiers) | `#6366F1` | normal | `keyword.other.quantifier.precept` | Quantifiers: `all`, `any`, `each` |
+
+| 7 | Structure · Grammar (constraints) | `#6366F1` | normal | `keyword.other.constraint.precept` | Field constraints: `nonnegative`, `positive`, `nonzero`, `notempty`, `min`, `max`, `minlength`, `maxlength`, `mincount`, `maxcount`, `maxplaces`, `ordered` |
+
+| 8 | Structure · Grammar (operators) | `#6366F1` | normal | `keyword.operator.precept`, `keyword.operator.arrow.precept` | Symbol operators (`==`, `!=`, `~=`, `!~`, `>=`, `<=`, `>`, `<`, `=`, `+`, `-`, `*`, `/`, `%`) and arrows (`->`, `<-`) |
+
+| 9 | Structure · Grammar (logical) | `#6366F1` | normal | `keyword.operator.logical.precept` | Keyword operators: `and`, `or`, `not` |
+
+| 10 | Structure · Grammar (membership) | `#6366F1` | normal | `keyword.operator.membership.precept` | Membership: `contains`, `is` |
+
+| 11 | States | `#A898F5` | normal (italic if constrained — semantic tokens only) | `entity.name.type.state.precept` | State names in declarations, `from`/`in`/`to` targets, `transition` targets |
+
+| 12 | Events | `#30B8E8` | normal (italic if constrained — semantic tokens only) | `entity.name.function.event.precept` | Event names in declarations, `on` targets, dot-access prefix |
+
+| 13 | Data · Names | `#B0BEC5` | normal (italic if guarded — semantic tokens only) | `variable.other.field.precept`, `variable.parameter.precept`, `variable.other.property.precept` | Field names, event argument names, property accessors after dot |
+
+| 14 | Data · Types | `#9AA8B5` | normal | `storage.type.precept` | All type keywords. Also `storage.modifier.state.precept` for state modifiers (separate from types but same visual family in brand) |
+
+| 15 | Data · Values | `#84929F` | normal | `constant.numeric.precept`, `constant.language.boolean.precept`, `string.quoted.double.precept`, `string.quoted.single.precept` | Literals: numbers, booleans, strings, typed constants |
+
+| 16 | Rules · Messages | `#FBBF24` | normal | `string.quoted.double.message.precept` | **ONLY** in `because "msg"` and `reject "msg"` positions. Must be distinguished from regular `string.quoted.double.precept` |
+
+| 17 | Comments | `#9096A6` | *italic* | `comment.line.number-sign.precept` | `#` line comments |
+
+| 18 | State modifiers | (brand: same as types) | normal | `storage.modifier.state.precept` | `terminal`, `required`, `irreversible`, `success`, `warning`, `error` |
+
+| 19 | Precept name | (brand: identity) | normal | `entity.name.precept.message.precept` | The precept name after `precept` keyword |
+
+| 20 | Punctuation | `#6366F1` | normal | `punctuation.precept`, `punctuation.separator.comma.precept`, `punctuation.accessor.precept` | `.`, `,`, `(`, `)`, `[`, `]` |
+
+| 21 | Member names | (brand: data names) | normal | `keyword.other.precept` | Special member accessors: `countof`, `peekby` |
+
+## Brand-to-Catalog Misalignment Notes
+
+The brand decisions doc (`brand-decisions.md`) lists specific keywords under "Structure · Semantic" that the catalog assigns to different scope categories:
+
+| Keyword | Brand says | Catalog scope | Resolution |
+
+|---------|-----------|--------------|------------|
+
+| `from`, `on`, `in`, `to` | Structure · Semantic (bold) | `keyword.control.precept` | **Catalog wins.** These are prepositions/control flow. Theme can still bold them if desired. |
+
+| `set` | Structure · Semantic (bold) | `storage.type.precept` (dual-use: action AND type) | **Catalog wins.** `set` is context-dependent — TextMate can't distinguish action vs type usage. Semantic tokens handle this. |
+
+| `transition`, `reject`, `no` | Structure · Semantic (bold) | `keyword.other.outcome.precept` | **Catalog wins.** Dedicated outcome scope enables finer theme control. |
+
+| `when` | Structure · Semantic (bold) | `keyword.control.precept` | **Catalog wins.** Control flow keyword. |
+
+| `write` | Structure · Semantic (bold) | RETIRED (B4 2026-04-28) | **Remove from brand doc.** Replaced by `writable` field modifier. |
+
+| `nullable` | Structure · Grammar | RETIRED | **Remove from brand doc.** Replaced by `optional`. |
+
+**Action:** Brand doc keyword lists need a sync pass to match catalog reality. This is a brand-doc defect, not a grammar defect.
+
+---
+
+## 2. Language Surface Inventory
+
+Complete enumeration of every token/construct type from the catalog, with canonical TextMateScope.
+
+## 2.1 Keywords — Declaration (`keyword.declaration.precept`)
+
+| Token | Text | Source |
+
+|-------|------|--------|
+
+| Precept | `precept` | TokenKind.Precept (=1) |
+
+| Field | `field` | TokenKind.Field (=2) |
+
+| State | `state` | TokenKind.State (=3) |
+
+| Event | `event` | TokenKind.Event (=4) |
+
+| Rule | `rule` | TokenKind.Rule (=5) |
+
+| Ensure | `ensure` | TokenKind.Ensure (=6) |
+
+| As | `as` | TokenKind.As (=7) |
+
+| Default | `default` | TokenKind.Default (=8) |
+
+| Optional | `optional` | TokenKind.Optional (=9) |
+
+| Writable | `writable` | TokenKind.Writable (=10) |
+
+| Because | `because` | TokenKind.Because (=11) |
+
+| Initial | `initial` | TokenKind.Initial (=12) |
+
+| Ascending | `ascending` | TokenKind.Ascending (=130) |
+
+| Descending | `descending` | TokenKind.Descending (=131) |
+
+## 2.2 Keywords — Prepositions/Control (`keyword.control.precept`)
+
+| Token | Text | Source |
+
+|-------|------|--------|
+
+| In | `in` | TokenKind.In (=13) |
+
+| To | `to` | TokenKind.To (=14) |
+
+| From | `from` | TokenKind.From (=15) |
+
+| On | `on` | TokenKind.On (=16) |
+
+| Of | `of` | TokenKind.Of (=17) |
+
+| Into | `into` | TokenKind.Into (=18) |
+
+| When | `when` | TokenKind.When (=19) |
+
+| If | `if` | TokenKind.If (=20) |
+
+| Then | `then` | TokenKind.Then (=21) |
+
+| Else | `else` | TokenKind.Else (=22) |
+
+| By | `by` | TokenKind.By (=128) |
+
+| At | `at` | TokenKind.At (=129) |
+
+| For | `for` | TokenKind.For (=136) |
+
+## 2.3 Keywords — Actions (`keyword.other.action.precept`)
+
+| Token | Text | Source |
+
+|-------|------|--------|
+
+| Add | `add` | TokenKind.Add (=24) |
+
+| Remove | `remove` | TokenKind.Remove (=25) |
+
+| Enqueue | `enqueue` | TokenKind.Enqueue (=26) |
+
+| Dequeue | `dequeue` | TokenKind.Dequeue (=27) |
+
+| Push | `push` | TokenKind.Push (=28) |
+
+| Pop | `pop` | TokenKind.Pop (=29) |
+
+| Clear | `clear` | TokenKind.Clear (=30) |
+
+| Append | `append` | TokenKind.Append (=132) |
+
+| Insert | `insert` | TokenKind.Insert (=133) |
+
+| Put | `put` | TokenKind.Put (=134) |
+
+**Note:** `set` (TokenKind.Set =23) is dual-use (action AND collection type). Catalog assigns `storage.type.precept`. Appears in both action chains and type positions.
+
+## 2.4 Keywords — Outcomes (`keyword.other.outcome.precept`)
+
+| Token | Text | Source |
+
+|-------|------|--------|
+
+| Transition | `transition` | TokenKind.Transition (=31) |
+
+| No | `no` | TokenKind.No (=32) |
+
+| Reject | `reject` | TokenKind.Reject (=33) |
+
+## 2.5 Keywords — Access Modes (`keyword.other.access-mode.precept`)
+
+| Token | Text | Source |
+
+|-------|------|--------|
+
+| Modify | `modify` | TokenKind.Modify (=34) |
+
+| Readonly | `readonly` | TokenKind.Readonly (=35) |
+
+| Editable | `editable` | TokenKind.Editable (=36) |
+
+| Omit | `omit` | TokenKind.Omit (=37) |
+
+## 2.6 Keywords — Logical Operators (`keyword.operator.logical.precept`)
+
+| Token | Text | Source |
+
+|-------|------|--------|
+
+| And | `and` | TokenKind.And (=38) |
+
+| Or | `or` | TokenKind.Or (=39) |
+
+| Not | `not` | TokenKind.Not (=40) |
+
+## 2.7 Keywords — Membership (`keyword.operator.membership.precept`)
+
+| Token | Text | Source |
+
+|-------|------|--------|
+
+| Contains | `contains` | TokenKind.Contains (=41) |
+
+| Is | `is` | TokenKind.Is (=42) |
+
+## 2.8 Keywords — Quantifiers (`keyword.other.quantifier.precept`)
+
+| Token | Text | Source |
+
+|-------|------|--------|
+
+| All | `all` | TokenKind.All (=43) |
+
+| Any | `any` | TokenKind.Any (=44) |
+
+| Each | `each` | TokenKind.Each (=135) |
+
+## 2.9 Keywords — State Modifiers (`storage.modifier.state.precept`)
+
+| Token | Text | Source |
+
+|-------|------|--------|
+
+| Terminal | `terminal` | TokenKind.Terminal (=45) |
+
+| Required | `required` | TokenKind.Required (=46) |
+
+| Irreversible | `irreversible` | TokenKind.Irreversible (=47) |
+
+| Success | `success` | TokenKind.Success (=48) |
+
+| Warning | `warning` | TokenKind.Warning (=49) |
+
+| Error | `error` | TokenKind.Error (=50) |
+
+## 2.10 Keywords — Constraints (`keyword.other.constraint.precept`)
+
+| Token | Text | Source |
+
+|-------|------|--------|
+
+| Nonnegative | `nonnegative` | TokenKind.Nonnegative (=51) |
+
+| Positive | `positive` | TokenKind.Positive (=52) |
+
+| Nonzero | `nonzero` | TokenKind.Nonzero (=53) |
+
+| Notempty | `notempty` | TokenKind.Notempty (=54) |
+
+| Min | `min` | TokenKind.Min (=55) |
+
+| Max | `max` | TokenKind.Max (=56) |
+
+| Minlength | `minlength` | TokenKind.Minlength (=57) |
+
+| Maxlength | `maxlength` | TokenKind.Maxlength (=58) |
+
+| Mincount | `mincount` | TokenKind.Mincount (=59) |
+
+| Maxcount | `maxcount` | TokenKind.Maxcount (=60) |
+
+| Maxplaces | `maxplaces` | TokenKind.Maxplaces (=61) |
+
+| Ordered | `ordered` | TokenKind.Ordered (=62) |
+
+## 2.11 Keywords — Type Names (`storage.type.precept`)
+
+| Token | Text | Family | Source |
+
+|-------|------|--------|--------|
+
+| StringType | `string` | Scalar | TokenKind.StringType (=63) |
+
+| BooleanType | `boolean` | Scalar | TokenKind.BooleanType (=64) |
+
+| IntegerType | `integer` | Scalar | TokenKind.IntegerType (=65) |
+
+| DecimalType | `decimal` | Scalar | TokenKind.DecimalType (=66) |
+
+| NumberType | `number` | Scalar | TokenKind.NumberType (=67) |
+
+| ChoiceType | `choice` | Scalar | TokenKind.ChoiceType (=68) |
+
+| Set | `set` | Collection | TokenKind.Set (=23) — dual-use |
+
+| QueueType | `queue` | Collection | TokenKind.QueueType (=70) |
+
+| StackType | `stack` | Collection | TokenKind.StackType (=71) |
+
+| BagType | `bag` | Collection | TokenKind.BagType (=124) |
+
+| ListType | `list` | Collection | TokenKind.ListType (=125) |
+
+| LogType | `log` | Collection | TokenKind.LogType (=126) |
+
+| LookupType | `lookup` | Collection | TokenKind.LookupType (=127) |
+
+| DateType | `date` | Temporal | TokenKind.DateType (=72) |
+
+| TimeType | `time` | Temporal | TokenKind.TimeType (=73) |
+
+| InstantType | `instant` | Temporal | TokenKind.InstantType (=74) |
+
+| DurationType | `duration` | Temporal | TokenKind.DurationType (=75) |
+
+| PeriodType | `period` | Temporal | TokenKind.PeriodType (=76) |
+
+| TimezoneType | `timezone` | Temporal | TokenKind.TimezoneType (=77) |
+
+| ZonedDateTimeType | `zoneddatetime` | Temporal | TokenKind.ZonedDateTimeType (=78) |
+
+| DateTimeType | `datetime` | Temporal | TokenKind.DateTimeType (=79) |
+
+| MoneyType | `money` | Business | TokenKind.MoneyType (=80) |
+
+| CurrencyType | `currency` | Business | TokenKind.CurrencyType (=81) |
+
+| QuantityType | `quantity` | Business | TokenKind.QuantityType (=82) |
+
+| UnitOfMeasureType | `unitofmeasure` | Business | TokenKind.UnitOfMeasureType (=83) |
+
+| DimensionType | `dimension` | Business | TokenKind.DimensionType (=84) |
+
+| PriceType | `price` | Business | TokenKind.PriceType (=85) |
+
+| ExchangeRateType | `exchangerate` | Business | TokenKind.ExchangeRateType (=86) |
+
+## 2.12 Literals
+
+| Token | Scope | Description |
+
+|-------|-------|-------------|
+
+| True (`true`) | `constant.language.boolean.precept` | Boolean literal |
+
+| False (`false`) | `constant.language.boolean.precept` | Boolean literal |
+
+| NumberLiteral | `constant.numeric.precept` | Integer and decimal numbers |
+
+| StringLiteral | `string.quoted.double.precept` | Double-quoted strings |
+
+| TypedConstant | `string.quoted.single.precept` | Single-quoted typed constants (`'USD'`, `'kg'`) |
+
+**Note:** `null` is NOT a keyword in the token catalog. The hand-authored grammar includes it in `booleanNull` — this is stale. Precept uses `is set`/`is not set` for presence, not `null`.
+
+## 2.13 Symbol Operators (`keyword.operator.precept`)
+
+| Token | Text | Description |
+
+|-------|------|-------------|
+
+| DoubleEquals | `==` | Equality |
+
+| NotEquals | `!=` | Inequality |
+
+| CaseInsensitiveEquals | `~=` | Case-insensitive equals |
+
+| CaseInsensitiveNotEquals | `!~` | Case-insensitive not-equals |
+
+| Tilde | `~` | CI collection inner-type prefix |
+
+| GreaterThanOrEqual | `>=` | Comparison |
+
+| LessThanOrEqual | `<=` | Comparison |
+
+| GreaterThan | `>` | Comparison |
+
+| LessThan | `<` | Comparison |
+
+| Assign | `=` | Assignment |
+
+| Plus | `+` | Addition |
+
+| Minus | `-` | Subtraction/negation |
+
+| Star | `*` | Multiplication |
+
+| Slash | `/` | Division |
+
+| Percent | `%` | Modulo |
+
+## 2.14 Arrow Operators (`keyword.operator.arrow.precept`)
+
+| Token | Text | Description |
+
+|-------|------|-------------|
+
+| Arrow | `->` | Action chain / outcome separator |
+
+| BackArrow | `<-` | Computed field derivation |
+
+## 2.15 Punctuation (`punctuation.precept`)
+
+| Token | Text | Description |
+
+|-------|------|-------------|
+
+| Dot | `.` | Member access |
+
+| Comma | `,` | List separator |
+
+| LeftParen | `(` | Open paren |
+
+| RightParen | `)` | Close paren |
+
+| LeftBracket | `[` | Open bracket |
+
+| RightBracket | `]` | Close bracket |
+
+## 2.16 Member-Name Tokens (`keyword.other.precept`)
+
+| Token | Text | Description |
+
+|-------|------|-------------|
+
+| Countof | `countof` | Bag element count accessor |
+
+| Peekby | `peekby` | Priority queue ordering-key peek |
+
+## 2.17 Built-in Functions (21 total — not keywords, scoped as identifiers)
+
+Functions are parsed as identifier + `(` + arguments + `)`. They are NOT lexer keywords. In TextMate, they match as generic identifiers unless a function-call pattern highlights them. The grammar SHOULD have a pattern for known function names followed by `(`.
+
+| Function | Name |
+
+|----------|------|
+
+| Min | `min` |
+
+| Max | `max` |
+
+| Abs | `abs` |
+
+| Clamp | `clamp` |
+
+| Floor | `floor` |
+
+| Ceil | `ceil` |
+
+| Truncate | `truncate` |
+
+| Round | `round` |
+
+| Approximate | `approximate` |
+
+| Pow | `pow` |
+
+| Sqrt | `sqrt` |
+
+| Trim | `trim` |
+
+| StartsWith | `startsWith` |
+
+| EndsWith | `endsWith` |
+
+| ToLower | `toLower` |
+
+| ToUpper | `toUpper` |
+
+| Left | `left` |
+
+| Right | `right` |
+
+| Mid | `mid` |
+
+| Now | `now` |
+
+| ~startsWith | `~startsWith` (CI variant) |
+
+| ~endsWith | `~endsWith` (CI variant) |
+
+## 2.18 Constructs (12 — from `Constructs.cs`)
+
+| # | ConstructKind | Leading Token(s) | Disambiguation | Example |
+
+|---|---------------|-------------------|----------------|---------|
+
+| 1 | PreceptHeader | `precept` | — | `precept LoanApplication` |
+
+| 2 | FieldDeclaration | `field` | — | `field amount as money nonnegative` |
+
+| 3 | StateDeclaration | `state` | — | `state Draft initial, Submitted, Approved terminal success` |
+
+| 4 | EventDeclaration | `event` | — | `event Submit(approver as string)` |
+
+| 5 | RuleDeclaration | `rule` | — | `rule amount > 0 because "..."` |
+
+| 6 | TransitionRow | `from` + `on` | Disambiguated by `on` | `from Draft on Submit -> ... -> transition Submitted` |
+
+| 7 | StateEnsure | `in`/`to`/`from` + `ensure` | Disambiguated by `ensure` | `in Approved ensure amount > 0 because "..."` |
+
+| 8 | AccessMode | `in` + `modify` | Disambiguated by `modify` | `in Draft modify Amount editable` |
+
+| 9 | OmitDeclaration | `in` + `omit` | Disambiguated by `omit` | `in Draft omit InternalNotes` |
+
+| 10 | StateAction | `to`/`from` + `->` | Disambiguated by `->` | `to Confirmed -> set PaymentReceived = true` |
+
+| 11 | EventEnsure | `on` + `ensure` | Disambiguated by `ensure` | `on Submit ensure Amount > 0 because "..."` |
+
+| 12 | EventHandler | `on` + `->` | Disambiguated by `->` | `on UpdateName -> set name = newName` |
+
+---
+
+## 3. Hand-Authored Grammar Audit
+
+## 3.1 Coverage Gap Table
+
+| # | Language Construct / Token | In Hand Grammar? | Scope Assignment | Gap / Issue |
+
+|---|---------------------------|:---:|------------------|-------------|
+
+| G1 | `rule` keyword | ❌ NO | — | Missing. `invariant` exists at L276 but `rule` replaced it. |
+
+| G2 | `ensure` keyword | ❌ NO | — | Missing entirely. Used in StateEnsure, EventEnsure constructs. |
+
+| G3 | `optional` keyword | ❌ NO | — | Missing. L366 has stale `nullable` instead. |
+
+| G4 | `writable` keyword | ❌ NO | — | Missing. New field modifier (B4). |
+
+| G5 | `modify` keyword | ❌ NO | — | Missing. Access mode construct (B4). |
+
+| G6 | `readonly` keyword | ❌ NO | — | Missing. Access mode adjective (B4). |
+
+| G7 | `editable` keyword | ❌ NO | — | Missing. Access mode adjective (B4). |
+
+| G8 | `omit` keyword (construct) | ❌ NO | — | Missing. Omit declaration construct. |
+
+| G9 | State modifiers: `terminal`, `required`, `irreversible`, `success`, `warning`, `error` | ❌ NO | — | Only `initial` handled in state declaration (L101). 6 modifiers missing. |
+
+| G10 | Type keywords: `integer`, `decimal`, `choice` | ❌ NO | — | L373-377 only has `string\|number\|boolean\|set\|queue\|stack`. |
+
+| G11 | Temporal types (8): `date` through `datetime` | ❌ NO | — | All 8 temporal types missing. |
+
+| G12 | Business-domain types (7): `money` through `exchangerate` | ❌ NO | — | All 7 business types missing. |
+
+| G13 | Collection types: `bag`, `list`, `log`, `lookup` | ❌ NO | — | Missing from type keywords and collection field pattern. |
+
+| G14 | Constraint keywords (12): `nonnegative` through `ordered` | ❌ NO | — | None present in grammar. |
+
+| G15 | Access mode keywords | ❌ NO | — | `modify`, `readonly`, `editable` missing. |
+
+| G16 | Quantifier `each` | ❌ NO | — | Missing. |
+
+| G17 | Prepositions `by`, `at`, `for` | ❌ NO | — | Missing. |
+
+| G18 | Control `then` | ❌ NO | — | Missing from L358 (has `if`/`else` but not `then`). |
+
+| G19 | Action keywords: `append`, `insert`, `put` | ❌ NO | — | Missing from L381-385. |
+
+| G20 | Operators: `~=`, `!~`, `~` | ❌ NO | — | Case-insensitive operators missing from L413-429. |
+
+| G21 | Typed constants (`'...'`) | ❌ NO | — | No single-quoted string pattern. |
+
+| G22 | Parenthesized event args | ❌ NO | — | `event Name(Arg as type)` syntax not matched. Grammar uses retired `with` syntax (L148-188). |
+
+| G23 | RuleDeclaration construct | ❌ NO | — | No pattern for `rule Expr because "msg"`. |
+
+| G24 | StateEnsure construct | ❌ NO | — | No pattern for `in/to/from State ensure Expr because "msg"`. |
+
+| G25 | EventEnsure construct | ❌ NO | — | No pattern for `on Event ensure Expr because "msg"`. |
+
+| G26 | AccessMode construct | ❌ NO | — | No pattern for `in State modify Field editable`. |
+
+| G27 | OmitDeclaration construct | ❌ NO | — | No pattern for `in State omit Field`. |
+
+| G28 | StateAction construct | ❌ NO | — | No pattern for `to/from State -> action chain`. |
+
+| G29 | EventHandler construct | ❌ NO | — | No pattern for `on Event -> action chain`. |
+
+| G30 | Computed field syntax | ❌ NO | — | `field X as type <- expr` not specifically highlighted. `<-` is in `arrowOperator` but no construct pattern. |
+
+| G31 | Function calls | ❌ NO | — | `min(...)`, `round(...)` etc. — no function-name highlighting. |
+
+| G32 | Parentheses/brackets | Partial | `punctuation.precept` | Parentheses exist in code but no explicit grammar pattern matches `(` or `)`. |
+
+| G33 | Choice type with options | ❌ NO | — | `choice of string("a","b","c")` not matched. |
+
+| G34 | Ascending/descending | ❌ NO | — | Sort order modifiers missing. |
+
+| G35 | `is set` / `is not set` operators | ❌ NO | — | Multi-token presence operators not highlighted. |
+
+## 3.2 Stale / Incorrect Patterns
+
+| # | Pattern | Line | Issue |
+
+|---|---------|------|-------|
+
+| S1 | `declarationKeywords` → `nullable` | L366 | STALE. Should be `optional`. `nullable` is not in TokenKind. |
+
+| S2 | `declarationKeywords` → `invariant` | L366 | STALE. Should be `rule`. `invariant` is not in TokenKind. |
+
+| S3 | `declarationKeywords` → `with` | L366 | STALE. `with` is not in TokenKind. Retired event-arg syntax. |
+
+| S4 | `declarationKeywords` → `assert` | L366 | STALE. Should be `ensure`. `assert` is not in TokenKind. |
+
+| S5 | `booleanNull` → `null` | L436 | STALE. `null` is not a keyword in the token catalog. Precept uses `is set`/`is not set`. |
+
+| S6 | `eventWithArgsDeclaration` | L146-188 | STALE. Uses `event Name with Arg as type` syntax. Current syntax is `event Name(Arg as type)`. |
+
+| S7 | `invariantStatement` | L276-286 | STALE. Uses `invariant` keyword. Should be `rule`. |
+
+| S8 | `assertStatement` | L288-300 | STALE. Uses `on EventName assert`. Should be `on EventName ensure`. |
+
+| S9 | `controlKeywords` mix | L356-361 | INCORRECT. Mixes declaration keywords (`precept`, `state`, `event`) with control flow (`if`, `when`). Should use catalog-derived scope groups. |
+
+| S10 | `actionKeywords` mix | L380-385 | INCORRECT. Mixes actions (`set`, `add`), prepositions (`into`), membership (`contains`), and logical operators (`and`, `or`, `not`) into one scope. |
+
+## 3.3 Scope Assignment Errors
+
+| # | Token | Grammar Scope | Catalog Scope | Visual System Role |
+
+|---|-------|--------------|---------------|--------------------|
+
+| E1 | `precept` | `keyword.control.precept` (L359) | `keyword.declaration.precept` | Structure · Semantic |
+
+| E2 | `state` | `keyword.control.precept` (L359) | `keyword.declaration.precept` | Structure · Semantic |
+
+| E3 | `event` | `keyword.control.precept` (L359) | `keyword.declaration.precept` | Structure · Semantic |
+
+| E4 | `field` | `keyword.other.precept` (L366) | `keyword.declaration.precept` | Structure · Semantic |
+
+| E5 | `as` | `keyword.other.precept` (L366) | `keyword.declaration.precept` | Structure · Semantic |
+
+| E6 | `because` | `keyword.other.precept` (L366) | `keyword.declaration.precept` | Structure · Semantic |
+
+| E7 | `default` | `keyword.other.precept` (L366) | `keyword.declaration.precept` | Structure · Semantic |
+
+| E8 | `and`, `or`, `not` | `keyword.other.precept` (L383) | `keyword.operator.logical.precept` | Logical operators |
+
+| E9 | `contains` | `keyword.other.precept` (L383) | `keyword.operator.membership.precept` | Membership |
+
+| E10 | `into` | `keyword.other.precept` (L383) | `keyword.control.precept` | Preposition |
+
+| E11 | `all`, `any` | `keyword.control.precept` (L359) | `keyword.other.quantifier.precept` | Quantifier |
+
+| E12 | `of` | `keyword.control.precept` (L359) | `keyword.control.precept` | ✓ Correct |
+
+| E13 | `set` (action) | `keyword.other.precept` (L383) | `storage.type.precept` | Dual-use |
+
+| E14 | `transition` | `keyword.other.precept` (L394) | `keyword.other.outcome.precept` | Outcome |
+
+| E15 | `reject` | `keyword.other.precept` (L394/L68) | `keyword.other.outcome.precept` | Outcome |
+
+| E16 | `edit` | `keyword.other.precept` (L367) | Not a TokenKind! | `edit` appears in root-edit pattern but is not in the token catalog. The construct is `RuleDeclaration`, not `edit`. Actually, `edit` is used for `rootEditDeclaration` — but the TokenKind enum doesn't have an Edit token. Checking... `edit` may be a stale surface concept. The Constructs catalog does not have a root-level `edit` construct. This needs verification. |
+
+**Note on E16:** Looking at the Constructs catalog, there is no `edit` construct. The `OmitDeclaration` and `AccessMode` constructs handle field access. The `rootEditDeclaration` pattern in the hand-authored grammar (`edit all | edit Field1, Field2`) may be stale — I need to verify whether root-level `edit` still exists. Looking at the sample files: `customer-profile.precept` uses `writable` modifier on fields, not `edit`. `fee-schedule.precept` uses `writable`. No sample uses `edit all`. This pattern appears stale. **However**, the `rootEditDeclaration` pattern is in both the hand-authored grammar AND the generator, so it may still be valid for backward compatibility. Needs owner clarification.
+
+---
+
+## 4. Generator Audit
+
+## 4.1 Generator Strengths
+
+1. **Catalog-driven keyword emission** (L38-77): Reads `Tokens.All`, groups by `TextMateScope`, emits one alternation pattern per scope. This correctly picks up all 139 tokens. ✓
+
+2. **Typed constants** (L134-146): Handles single-quoted `'...'` strings. Hand-authored grammar doesn't. ✓
+
+3. **Collection member access** (L453-470): Includes `countof` and `peekby`. ✓
+
+## 4.2 Generator Gap Table
+
+| # | Language Construct / Feature | Generator Pattern? | Correct Scope? | Gap |
+
+|---|-----------------------------|----|----|----|
+
+| GG1 | Message strings (`because "msg"`, `reject "msg"`) | ❌ NO | — | **Critical.** Visual system reserves gold for message payloads. Without this, all strings get `string.quoted.double.precept` — no visual interrupt for rules. |
+
+| GG2 | Parenthesized event args `event Name(Arg as type)` | ❌ NO | — | Generator's `eventWithArgsDeclaration` (L218-258) uses stale `with` syntax. |
+
+| GG3 | State modifiers beyond `initial` | ❌ NO | — | `stateDeclaration` (L180-215) only matches `initial`. Missing: `terminal`, `required`, `irreversible`, `success`, `warning`, `error`. These ARE emitted as catalog keywords under `storage.modifier.state.precept`, but the structural pattern doesn't recognize them in state declaration context. |
+
+| GG4 | RuleDeclaration construct | ❌ NO | — | No `rule Expr because "msg"` pattern. |
+
+| GG5 | StateEnsure constructs | ❌ NO | — | No `in/to/from State ensure Expr because "msg"` pattern. |
+
+| GG6 | EventEnsure construct | ❌ NO | — | No `on Event ensure Expr because "msg"` pattern. |
+
+| GG7 | AccessMode construct | ❌ NO | — | No `in State modify Field editable/readonly` pattern. |
+
+| GG8 | OmitDeclaration construct | ❌ NO | — | No `in State omit Field` pattern. |
+
+| GG9 | StateAction construct | ❌ NO | — | No `to/from State -> action chain` pattern. |
+
+| GG10 | EventHandler construct | ❌ NO | — | No `on Event -> action chain` (stateless). |
+
+| GG11 | Computed field declaration | ❌ NO | — | No `field X as type <- expr` structural pattern. |
+
+| GG12 | Function call highlighting | ❌ NO | — | `min(...)`, `round(...)` etc. not highlighted as function names. |
+
+| GG13 | Choice type with options | ❌ NO | — | `choice of string("a","b","c")` not matched. |
+
+| GG14 | `assertStatement` uses stale `assert` | ✅ Present | ❌ Wrong keyword | L416-432: Uses `assert` instead of `ensure`. |
+
+| GG15 | `no transition` compound keyword | ❌ NO | — | Two-word outcome not specially highlighted. The individual words are catalog-derived, but the compound meaning is lost. |
+
+| GG16 | `is set` / `is not set` operators | ❌ NO | — | Multi-token presence operators. |
+
+| GG17 | `ScopeToRepositoryKey` naming | — | — | Appends "Keywords" to scope, producing confusing repo keys like `keyword.declaration.preceptKeywords`. Should use descriptive names (e.g., `declarationKeywords`). |
+
+| GG18 | `eventWithArgsDeclaration` broken `$ref` | ❌ Broken | — | L244: Uses `["$ref"] = "#/repository/storage.type.precept"` — TextMate doesn't support `$ref`. Should be `["include"] = "#storage.type.preceptKeywords"`. |
+
+| GG19 | `fieldCollectionDeclaration` scope error | — | ❌ Wrong | L296: Uses `keyword.declaration.precept` for `field` keyword but the repo key in catalog patterns uses the same scope. Creates conflict with `keyword.declaration.preceptKeywords` repo entry — both claim `keyword.declaration.precept`. |
+
+| GG20 | Missing punctuation patterns | ❌ NO | — | No explicit patterns for `(`, `)`, `[`, `]`. Catalog assigns them `punctuation.precept`. |
+
+---
+
+## 5. Authoritative Grammar Specification
+
+## Spec Section 1: Scope Vocabulary
+
+Every TextMate scope used in the Precept grammar, with semantic meaning and visual system role.
+
+| # | TextMate Scope | Semantic Meaning | Visual System Role | Brand Color |
+
+|---|---------------|------------------|-------------------|-------------|
+
+| S1 | `comment.line.number-sign.precept` | Line comment starting with `#` | Comments | `#9096A6` italic |
+
+| S2 | `keyword.declaration.precept` | Declaration and behavioral keywords | Structure · Semantic | `#4338CA` **bold** |
+
+| S3 | `keyword.control.precept` | Prepositions and control flow | Structure · Grammar | `#6366F1` normal |
+
+| S4 | `keyword.other.action.precept` | Action verbs in action chains | Structure · Grammar | `#6366F1` normal |
+
+| S5 | `keyword.other.outcome.precept` | Transition, rejection, no-transition outcomes | Structure · Grammar | `#6366F1` normal |
+
+| S6 | `keyword.other.access-mode.precept` | Access mode declarations | Structure · Grammar | `#6366F1` normal |
+
+| S7 | `keyword.other.quantifier.precept` | Universal/existential quantifiers | Structure · Grammar | `#6366F1` normal |
+
+| S8 | `keyword.other.constraint.precept` | Field constraint modifiers | Structure · Grammar | `#6366F1` normal |
+
+| S9 | `keyword.operator.logical.precept` | `and`, `or`, `not` | Structure · Grammar | `#6366F1` normal |
+
+| S10 | `keyword.operator.membership.precept` | `contains`, `is` | Structure · Grammar | `#6366F1` normal |
+
+| S11 | `keyword.operator.precept` | Symbol operators (`==`, `!=`, `+`, `-`, etc.) | Structure · Grammar | `#6366F1` normal |
+
+| S12 | `keyword.operator.arrow.precept` | `->` and `<-` arrows | Structure · Grammar | `#6366F1` normal |
+
+| S13 | `storage.type.precept` | Type keywords (all scalar, temporal, business, collection types) | Data · Types | `#9AA8B5` normal |
+
+| S14 | `storage.modifier.state.precept` | State lifecycle modifiers | Data · Types | `#9AA8B5` normal |
+
+| S15 | `entity.name.type.state.precept` | State names | States | `#A898F5` normal |
+
+| S16 | `entity.name.function.event.precept` | Event names | Events | `#30B8E8` normal |
+
+| S17 | `entity.name.precept.message.precept` | Precept name (in header) | Identity | `#A898F5` normal |
+
+| S18 | `variable.other.field.precept` | Field names | Data · Names | `#B0BEC5` normal |
+
+| S19 | `variable.parameter.precept` | Event argument names (in declarations) | Data · Names | `#B0BEC5` normal |
+
+| S20 | `variable.other.property.precept` | Property accessor after dot | Data · Names | `#B0BEC5` normal |
+
+| S21 | `variable.other.precept` | Catch-all identifier reference | Data · Names | `#B0BEC5` normal |
+
+| S22 | `constant.numeric.precept` | Number literals | Data · Values | `#84929F` normal |
+
+| S23 | `constant.language.boolean.precept` | `true`, `false` | Data · Values | `#84929F` normal |
+
+| S24 | `string.quoted.double.precept` | Double-quoted strings (non-message) | Data · Values | `#84929F` normal |
+
+| S25 | `string.quoted.double.message.precept` | Message strings in `because`/`reject` | Rules · Messages | `#FBBF24` normal |
+
+| S26 | `string.quoted.single.precept` | Single-quoted typed constants | Data · Values | `#84929F` normal |
+
+| S27 | `constant.character.escape.precept` | Escape sequences in strings | Data · Values | `#84929F` normal |
+
+| S28 | `punctuation.precept` | `.`, `,`, `(`, `)`, `[`, `]` | Structure · Grammar | `#6366F1` normal |
+
+| S29 | `punctuation.separator.comma.precept` | Comma separator (in lists) | Structure · Grammar | `#6366F1` normal |
+
+| S30 | `punctuation.accessor.precept` | Dot accessor (in member access) | Structure · Grammar | `#6366F1` normal |
+
+| S31 | `keyword.other.precept` | Special member names (`countof`, `peekby`) | Data · Names | `#B0BEC5` normal |
+
+| S32 | `support.function.precept` | Built-in function names | Data · Names | `#B0BEC5` normal |
+
+| S33 | `meta.declaration.precept.precept` | Precept header construct (meta) | — | — |
+
+| S34 | `meta.declaration.state.precept` | State declaration construct (meta) | — | — |
+
+| S35 | `meta.declaration.event.precept` | Event declaration construct (meta) | — | — |
+
+| S36 | `meta.field-declaration.precept` | Field declaration construct (meta) | — | — |
+
+| S37 | `meta.transition.header.precept` | Transition row header (meta) | — | — |
+
+| S38 | `meta.ensure.state.precept` | State ensure construct (meta) | — | — |
+
+| S39 | `meta.ensure.event.precept` | Event ensure construct (meta) | — | — |
+
+| S40 | `meta.access-mode.precept` | Access mode construct (meta) | — | — |
+
+| S41 | `meta.omit.precept` | Omit declaration construct (meta) | — | — |
+
+| S42 | `meta.action.state.precept` | State action construct (meta) | — | — |
+
+| S43 | `meta.handler.event.precept` | Event handler construct (meta) | — | — |
+
+| S44 | `meta.rule.precept` | Rule declaration construct (meta) | — | — |
+
+| S45 | `meta.message.precept` | Message string context (meta) | — | — |
+
+| S46 | `meta.computed-field.precept` | Computed field declaration (meta) | — | — |
+
+| S47 | `meta.transition.target.precept` | Transition target (meta) | — | — |
+
+| S48 | `meta.event-arg-ref.precept` | Event.arg dot access (meta) | — | — |
+
+| S49 | `meta.collection-member.precept` | Collection.property access (meta) | — | — |
+
+## Spec Section 2: Repository Patterns (Complete Enumeration)
+
+## 2.1 Comment
+
+- **Key:** `comment`
+
+- **Type:** `match`
+
+**Scope:** `comment.line.number-sign.precept`
+
+- **Regex:** `#.*$`
+
+- **Covers:** Line comments
+
+## 2.2 Message Strings
+
+- **Key:** `messageStrings`
+
+- **Type:** `match` (two patterns)
+
+**Scope:** captures `keyword.declaration.precept` for keyword, `string.quoted.double.message.precept` for message
+
+- **Regex pattern 1:** `\b(because)(\s+)("(?:\\.|[^"\\])*")`
+
+- **Regex pattern 2:** `\b(reject)(\s+)("(?:\\.|[^"\\])*")`
+
+- **Covers:** Gold message payload in `because "..."` and `reject "..."` positions
+
+- **Priority:** MUST precede generic `strings` pattern to prevent message strings from being consumed as regular strings
+
+- **Visual system:** This is the **only** pattern that produces `string.quoted.double.message.precept` — the gold visual interrupt
+
+## 2.3 Strings
+
+- **Key:** `strings`
+
+- **Type:** `begin/end`
+
+**Scope:** `string.quoted.double.precept`
+
+- **Begin:** `"`   End: `"`
+
+- **Inner pattern:** `constant.character.escape.precept` for `\\.`
+
+- **Covers:** All non-message double-quoted strings
+
+## 2.4 Typed Constants
+
+- **Key:** `typedConstants`
+
+- **Type:** `begin/end`
+
+**Scope:** `string.quoted.single.precept`
+
+- **Begin:** `'`   End: `'`
+
+- **Covers:** Single-quoted typed constants (`'USD'`, `'kg'`, `'2026-01-15'`)
+
+## 2.5 Precept Header
+
+- **Key:** `preceptHeader`
+
+- **Type:** `match`
+
+**Scope:** `meta.declaration.precept.precept`
+
+- **Regex:** `^(\s*)(precept)(\s+)([A-Za-z_][A-Za-z0-9_]*)`
+
+- **Captures:** `2` → `keyword.declaration.precept`, `4` → `entity.name.precept.message.precept`
+
+- **Covers:** `precept LoanApplication`
+
+## 2.6 State Declaration
+
+- **Key:** `stateDeclaration`
+
+- **Type:** `match`
+
+**Scope:** `meta.declaration.state.precept`
+
+- **Regex:** `^(\s*)(state)(\s+)(.*)`
+
+- **Captures:** `2` → `keyword.declaration.precept`, `4` → sub-patterns:
+
+  - State modifiers from catalog: `\b(initial|terminal|required|irreversible|success|warning|error)\b` → `storage.modifier.state.precept` (for `terminal`/`required`/`irreversible`/`success`/`warning`/`error`) and `keyword.declaration.precept` (for `initial`)
+
+  - State names: `\b[A-Za-z_][A-Za-z0-9_]*\b` → `entity.name.type.state.precept`
+
+  - Comma: `,` → `punctuation.separator.comma.precept`
+
+- **Covers:** `state Draft initial, Submitted, Approved terminal success`
+
+- **Critical change from current:** Must recognize ALL 7 state modifiers, not just `initial`
+
+## 2.7 Event Declaration (Parenthesized Args)
+
+- **Key:** `eventDeclaration`
+
+- **Type:** `match`
+
+**Scope:** `meta.declaration.event.precept`
+
+- **Regex:** `^(\s*)(event)(\s+)((?:[A-Za-z_][A-Za-z0-9_]*\s*,\s*)*[A-Za-z_][A-Za-z0-9_]*)(\s*\(.*)?`
+
+- **Captures:**
+
+  - `2` → `keyword.declaration.precept`
+
+  - `4` → sub-patterns for event names (`entity.name.function.event.precept`) and commas
+
+  - `5` → sub-patterns for parenthesized args:
+
+    - `initial` keyword → `keyword.declaration.precept`
+
+    - Argument name before `as`: `\b([A-Za-z_][A-Za-z0-9_]*)(?=\s+as\b)` → `variable.parameter.precept`
+
+    - `as` keyword → `keyword.declaration.precept`
+
+    - Type keywords → include `#typeKeywords`
+
+    - Constraint keywords → include `#constraintKeywords`
+
+    - Default values → include `#numbers`, `#strings`, `#booleanLiterals`
+
+    - Commas → `punctuation.separator.comma.precept`
+
+    - Parentheses → `punctuation.precept`
+
+- **Covers:** `event Submit(Applicant as string notempty, Amount as number)`
+
+- **Critical change:** Replaces stale `eventWithArgsDeclaration` (used `with` syntax)
+
+## 2.8 Field Declaration (Scalar)
+
+- **Key:** `fieldScalarDeclaration`
+
+- **Type:** `match`
+
+**Scope:** `meta.field-declaration.precept`
+
+- **Regex:** `^(\s*)(field)(\s+)((?:[A-Za-z_][A-Za-z0-9_]*\s*,\s*)*[A-Za-z_][A-Za-z0-9_]*)(\s+)(as)(\s+)(string|number|integer|decimal|boolean|choice|date|time|instant|duration|period|timezone|zoneddatetime|datetime|money|currency|quantity|unitofmeasure|dimension|price|exchangerate)(.*)`
+
+- **Captures:**
+
+  - `2` → `keyword.declaration.precept`
+
+  - `4` → field names (`variable.other.field.precept`) + commas
+
+  - `6` → `keyword.declaration.precept`
+
+  - `8` → `storage.type.precept`
+
+  - `9` → sub-patterns: constraint keywords, `optional`, `writable`, `default`, numbers, strings, typed constants, `<-` for computed
+
+- **Covers:** All scalar field declarations including temporal and business-domain types
+
+- **Note:** Type name list MUST be derived from the catalog (`Tokens.All` where category is `Type` and text is not null)
+
+## 2.9 Field Declaration (Collection)
+
+- **Key:** `fieldCollectionDeclaration`
+
+- **Type:** `match`
+
+**Scope:** `meta.field-declaration.precept`
+
+- **Regex:** `^(\s*)(field)(\s+)((?:[A-Za-z_][A-Za-z0-9_]*\s*,\s*)*[A-Za-z_][A-Za-z0-9_]*)(\s+)(as)(\s+)(set|queue|stack|bag|list|log|lookup)(\s+)(of)(\s+)(~?(?:string|number|integer|decimal|boolean))(.*)`
+
+- **Captures:**
+
+  - `2` → `keyword.declaration.precept`
+
+  - `4` → field names + commas
+
+  - `6` → `keyword.declaration.precept`
+
+  - `8` → `storage.type.precept` (collection type)
+
+  - `10` → `keyword.control.precept` (`of`)
+
+  - `12` → `storage.type.precept` (inner type, with optional `~` prefix)
+
+  - `13` → sub-patterns for constraint keywords, modifiers
+
+- **Covers:** `field Tags as set of string`, `field Items as bag of ~string`
+
+## 2.10 Computed Field Declaration
+
+- **Key:** `computedFieldDeclaration`
+
+- **Type:** `match`
+
+**Scope:** `meta.computed-field.precept`
+
+- **Regex:** `^(\s*)(field)(\s+)([A-Za-z_][A-Za-z0-9_]*)(\s+)(as)(\s+)(string|number|integer|decimal|boolean|..types..)(\s+.*)?(<-)(\s+.*)`
+
+- **Note:** This is hard to capture in a single regex because the `<-` can appear after optional modifiers. Recommend a separate pattern that matches `<-` preceded by field context, or handle via the existing field declaration patterns plus the arrow operator pattern.
+
+- **Alternative approach:** The `<-` operator is already in the catalog. The constraint keywords and type keywords are already catalog-derived. A computed field declaration is just a field declaration that happens to contain `<-`. The structural pattern can be the same as `fieldScalarDeclaration` if the tail sub-patterns include the `<-` operator and expression patterns.
+
+## 2.11 Root Edit Declaration
+
+- **Key:** `rootEditDeclaration`
+
+- **Type:** `match`
+
+**Scope:** `meta.declaration.edit.root.precept`
+
+**Status:** **NEEDS VERIFICATION.** The `edit` keyword is not in the `TokenKind` enum. No sample file uses root-level `edit`. This pattern may be stale. If confirmed stale, remove. If still valid, add `edit` to TokenKind.
+
+## 2.12 Transition Row Header
+
+- **Key:** `fromOnHeader`
+
+- **Type:** `match`
+
+**Scope:** `meta.transition.header.precept`
+
+- **Regex:** `^(\s*)(from)(\s+)(any|[A-Za-z_][A-Za-z0-9_]*(?:\s*,\s*[A-Za-z_][A-Za-z0-9_]*)*)(\s+)(on)(\s+)([A-Za-z_][A-Za-z0-9_]*)`
+
+- **Captures:**
+
+  - `2` → `keyword.control.precept` (`from`)
+
+  - `4` → `entity.name.type.state.precept` (source state(s)) — `any` should get `keyword.other.quantifier.precept`
+
+  - `6` → `keyword.control.precept` (`on`)
+
+  - `8` → `entity.name.function.event.precept` (event name)
+
+- **Covers:** `from Draft on Submit`, `from any on Cancel`
+
+- **Note:** `any` in state position should get quantifier scope, not state scope. Needs sub-pattern.
+
+## 2.13 State Ensure
+
+- **Key:** `stateEnsure`
+
+- **Type:** `match`
+
+**Scope:** `meta.ensure.state.precept`
+
+- **Regex:** `^(\s*)(in|to|from)(\s+)(any|[A-Za-z_][A-Za-z0-9_]*)(\s+)(ensure)\b`
+
+- **Captures:**
+
+  - `2` → `keyword.control.precept` (anchor preposition)
+
+  - `4` → `entity.name.type.state.precept` (state name) — `any` → `keyword.other.quantifier.precept`
+
+  - `6` → `keyword.declaration.precept` (`ensure`)
+
+- **Covers:** `in Approved ensure amount > 0 because "..."`
+
+## 2.14 Event Ensure
+
+- **Key:** `eventEnsure`
+
+- **Type:** `match`
+
+**Scope:** `meta.ensure.event.precept`
+
+- **Regex:** `^(\s*)(on)(\s+)([A-Za-z_][A-Za-z0-9_]*)(\s+)(ensure)\b`
+
+- **Captures:**
+
+  - `2` → `keyword.control.precept` (`on`)
+
+  - `4` → `entity.name.function.event.precept` (event name)
+
+  - `6` → `keyword.declaration.precept` (`ensure`)
+
+- **Covers:** `on Submit ensure Amount > 0 because "..."`
+
+## 2.15 Access Mode
+
+- **Key:** `accessMode`
+
+- **Type:** `match`
+
+**Scope:** `meta.access-mode.precept`
+
+- **Regex:** `^(\s*)(in)(\s+)(any|[A-Za-z_][A-Za-z0-9_]*)(\s+)(modify)(\s+)((?:[A-Za-z_][A-Za-z0-9_]*\s*,\s*)*[A-Za-z_][A-Za-z0-9_]*|all)(\s+)(editable|readonly)`
+
+- **Captures:**
+
+  - `2` → `keyword.control.precept`
+
+  - `4` → `entity.name.type.state.precept` (state name)
+
+  - `6` → `keyword.other.access-mode.precept` (`modify`)
+
+  - `8` → `variable.other.field.precept` (field names) or `keyword.other.quantifier.precept` (`all`)
+
+  - `10` → `keyword.other.access-mode.precept` (`editable`/`readonly`)
+
+- **Covers:** `in Draft modify Amount editable`, `in UnderReview modify AdjusterName editable when not FraudFlag`
+
+## 2.16 Omit Declaration
+
+- **Key:** `omitDeclaration`
+
+- **Type:** `match`
+
+**Scope:** `meta.omit.precept`
+
+- **Regex:** `^(\s*)(in)(\s+)(any|[A-Za-z_][A-Za-z0-9_]*)(\s+)(omit)(\s+)([A-Za-z_][A-Za-z0-9_]*)`
+
+- **Captures:**
+
+  - `2` → `keyword.control.precept`
+
+  - `4` → `entity.name.type.state.precept`
+
+  - `6` → `keyword.other.access-mode.precept` (`omit`)
+
+  - `8` → `variable.other.field.precept`
+
+- **Covers:** `in Draft omit InternalNotes`
+
+## 2.17 State Action
+
+- **Key:** `stateAction`
+
+- **Type:** `match`
+
+**Scope:** `meta.action.state.precept`
+
+- **Regex:** `^(\s*)(to|from)(\s+)(any|[A-Za-z_][A-Za-z0-9_]*)(\s+)(->)`
+
+- **Captures:**
+
+  - `2` → `keyword.control.precept` (anchor preposition)
+
+  - `4` → `entity.name.type.state.precept` (state name)
+
+  - `6` → `keyword.operator.arrow.precept` (`->`)
+
+- **Covers:** `to Confirmed -> set PaymentReceived = true`
+
+- **Note:** Must precede `stateEnsure` in pattern order since both start with `to`/`from`. Disambiguated by `->` vs `ensure`.
+
+## 2.18 Event Handler
+
+- **Key:** `eventHandler`
+
+- **Type:** `match`
+
+**Scope:** `meta.handler.event.precept`
+
+- **Regex:** `^(\s*)(on)(\s+)([A-Za-z_][A-Za-z0-9_]*)(\s+)(->)`
+
+- **Captures:**
+
+  - `2` → `keyword.control.precept` (`on`)
+
+  - `4` → `entity.name.function.event.precept` (event name)
+
+  - `6` → `keyword.operator.arrow.precept` (`->`)
+
+- **Covers:** `on UpdateName -> set name = newName` (stateless precepts)
+
+- **Note:** Must precede `eventEnsure` in pattern order since both start with `on`.
+
+## 2.19 Rule Declaration
+
+- **Key:** `ruleDeclaration`
+
+- **Type:** `match`
+
+**Scope:** `meta.rule.precept`
+
+- **Regex:** `^(\s*)(rule)\b`
+
+- **Captures:** `2` → `keyword.declaration.precept`
+
+- **Covers:** `rule amount > 0 because "..."`
+
+- **Note:** Only needs to capture the `rule` keyword. The rest of the line is handled by included patterns (operators, identifiers, message strings, etc.)
+
+## 2.20 Transition Target
+
+- **Key:** `transitionTarget`
+
+- **Type:** `match`
+
+**Scope:** `meta.transition.target.precept`
+
+- **Regex:** `\b(transition)(\s+)([A-Za-z_][A-Za-z0-9_]*)`
+
+- **Captures:**
+
+  - `1` → `keyword.other.outcome.precept`
+
+  - `3` → `entity.name.type.state.precept`
+
+- **Covers:** `transition Approved`
+
+## 2.21 No Transition
+
+- **Key:** `noTransition`
+
+- **Type:** `match`
+
+**Scope:** (captures only)
+
+- **Regex:** `\b(no)(\s+)(transition)\b`
+
+- **Captures:**
+
+  - `1` → `keyword.other.outcome.precept`
+
+  - `3` → `keyword.other.outcome.precept`
+
+- **Covers:** `no transition`
+
+## 2.22 Event Arg Reference (Dot Access)
+
+- **Key:** `eventArgReference`
+
+- **Type:** `match`
+
+**Scope:** `meta.event-arg-ref.precept`
+
+- **Regex:** `\b([A-Za-z_][A-Za-z0-9_]*)(\.)([A-Za-z_][A-Za-z0-9_]*)`
+
+- **Captures:**
+
+  - `1` → `entity.name.function.event.precept` (event name)
+
+  - `2` → `punctuation.accessor.precept`
+
+  - `3` → `variable.other.property.precept` (arg/property name)
+
+- **Covers:** `Submit.Amount`, `Approve.Note`
+
+- **Note:** This pattern is ambiguous — it also matches `Collection.count`. The `collectionMemberAccess` pattern must precede this one.
+
+## 2.23 Collection Member Access
+
+- **Key:** `collectionMemberAccess`
+
+- **Type:** `match`
+
+- **Regex:** `\b([A-Za-z_][A-Za-z0-9_]*)(\.)(\bcount|countof|min|max|peek|peekby\b)`
+
+- **Captures:**
+
+  - `1` → `variable.other.field.precept` (collection field name)
+
+  - `2` → `punctuation.accessor.precept`
+
+  - `3` → `variable.other.property.precept` (member name)
+
+- **Covers:** `MissingDocuments.count`, `Queue.peek`
+
+- **Priority:** Must precede `eventArgReference` to prevent `Collection.count` from being highlighted as event.arg.
+
+## 2.24 Function Calls
+
+- **Key:** `functionCalls`
+
+- **Type:** `match`
+
+**Scope:** (captures only)
+
+- **Regex:** `\b(min|max|abs|clamp|floor|ceil|truncate|round|approximate|pow|sqrt|trim|startsWith|endsWith|toLower|toUpper|left|right|mid|now)(\s*\()`
+
+- **Captures:**
+
+  - `1` → `support.function.precept`
+
+  - `2` → `punctuation.precept`
+
+- **Covers:** `min(x, y)`, `round(amount, 2)`, `trim(name)`, `now()`
+
+- **Note:** Function name list MUST be derived from `Functions.All` (via the function catalog). CI variants `~startsWith` and `~endsWith` need a separate pattern: `(~)(startsWith|endsWith)(\s*\()`.
+
+## 2.25 Catalog-Derived Keyword Groups
+
+These are generated automatically by reading `Tokens.All`, grouping by `TextMateScope`, and emitting one alternation pattern per scope. The generator already does this (L38-77 of `Program.cs`).
+
+**Repository keys** (use descriptive names, not scope-suffixed):
+
+| Key | Scope | Tokens |
+
+|-----|-------|--------|
+
+| `declarationKeywords` | `keyword.declaration.precept` | `as`, `ascending`, `because`, `default`, `descending`, `ensure`, `event`, `field`, `initial`, `optional`, `precept`, `rule`, `state`, `writable` |
+
+| `controlKeywords` | `keyword.control.precept` | `at`, `by`, `else`, `for`, `from`, `if`, `in`, `into`, `of`, `on`, `then`, `to`, `when` |
+
+| `actionKeywords` | `keyword.other.action.precept` | `add`, `append`, `clear`, `dequeue`, `enqueue`, `insert`, `pop`, `push`, `put`, `remove` |
+
+| `outcomeKeywords` | `keyword.other.outcome.precept` | `no`, `reject`, `transition` |
+
+| `accessModeKeywords` | `keyword.other.access-mode.precept` | `editable`, `modify`, `omit`, `readonly` |
+
+| `logicalOperators` | `keyword.operator.logical.precept` | `and`, `not`, `or` |
+
+| `membershipOperators` | `keyword.operator.membership.precept` | `contains`, `is` |
+
+| `quantifierKeywords` | `keyword.other.quantifier.precept` | `all`, `any`, `each` |
+
+| `stateModifiers` | `storage.modifier.state.precept` | `error`, `irreversible`, `required`, `success`, `terminal`, `warning` |
+
+| `constraintKeywords` | `keyword.other.constraint.precept` | `max`, `maxcount`, `maxlength`, `maxplaces`, `min`, `mincount`, `minlength`, `nonnegative`, `nonzero`, `notempty`, `ordered`, `positive` |
+
+| `typeKeywords` | `storage.type.precept` | `bag`, `boolean`, `choice`, `currency`, `date`, `datetime`, `decimal`, `dimension`, `duration`, `exchangerate`, `instant`, `integer`, `list`, `log`, `lookup`, `money`, `number`, `period`, `price`, `quantity`, `queue`, `set`, `stack`, `string`, `time`, `timezone`, `unitofmeasure`, `zoneddatetime` |
+
+| `booleanLiterals` | `constant.language.boolean.precept` | `false`, `true` |
+
+| `symbolOperators` | `keyword.operator.precept` | `!=`, `!~`, `%`, `*`, `+`, `-`, `/`, `<`, `<=`, `==`, `>`, `>=`, `=`, `~`, `~=` |
+
+| `arrowOperators` | `keyword.operator.arrow.precept` | `->`, `<-` |
+
+| `memberNameKeywords` | `keyword.other.precept` | `countof`, `peekby` |
+
+## 2.26 Numbers
+
+- **Key:** `numbers`
+
+- **Type:** `match`
+
+**Scope:** `constant.numeric.precept`
+
+- **Regex:** `\b\d+(?:\.\d+)?\b`
+
+## 2.27 Punctuation
+
+- **Key:** `punctuation`
+
+- **Type:** `match`
+
+**Scope:** `punctuation.precept`
+
+- **Regex:** `[()[\].,]` (individual captures for finer scoping optional)
+
+## 2.28 Identifier Reference (Catch-All)
+
+- **Key:** `identifierReference`
+
+- **Type:** `match`
+
+**Scope:** `variable.other.precept`
+
+- **Regex:** `\b[A-Za-z_][A-Za-z0-9_]*\b`
+
+- **Priority:** LAST in pattern order. This is the catch-all.
+
+## Spec Section 3: Top-Level Pattern Ordering
+
+Ordered from most-specific to least-specific to prevent false matches.
+
+```json
+
+{
+
+  "patterns": [
+
+    { "include": "#comment" },
+
+    { "include": "#messageStrings" },
+
+    { "include": "#strings" },
+
+    { "include": "#typedConstants" },
+
+    { "include": "#preceptHeader" },
+
+    { "include": "#stateDeclaration" },
+
+    { "include": "#eventDeclaration" },
+
+    { "include": "#fieldCollectionDeclaration" },
+
+    { "include": "#fieldScalarDeclaration" },
+
+    { "include": "#ruleDeclaration" },
+
+    { "include": "#stateAction" },
+
+    { "include": "#stateEnsure" },
+
+    { "include": "#eventHandler" },
+
+    { "include": "#eventEnsure" },
+
+    { "include": "#accessMode" },
+
+    { "include": "#omitDeclaration" },
+
+    { "include": "#fromOnHeader" },
+
+    { "include": "#noTransition" },
+
+    { "include": "#transitionTarget" },
+
+    { "include": "#functionCalls" },
+
+    { "include": "#collectionMemberAccess" },
+
+    { "include": "#eventArgReference" },
+
+    { "include": "#arrowOperators" },
+
+    { "include": "#symbolOperators" },
+
+    { "include": "#logicalOperators" },
+
+    { "include": "#membershipOperators" },
+
+    { "include": "#stateModifiers" },
+
+    { "include": "#constraintKeywords" },
+
+    { "include": "#typeKeywords" },
+
+    { "include": "#declarationKeywords" },
+
+    { "include": "#controlKeywords" },
+
+    { "include": "#actionKeywords" },
+
+    { "include": "#outcomeKeywords" },
+
+    { "include": "#accessModeKeywords" },
+
+    { "include": "#quantifierKeywords" },
+
+    { "include": "#memberNameKeywords" },
+
+    { "include": "#booleanLiterals" },
+
+    { "include": "#numbers" },
+
+    { "include": "#punctuation" },
+
+    { "include": "#identifierReference" }
+
+  ]
+
+}
+
+```
+
+**Ordering rationale:**
+
+1. Comments first — `#` to end of line must be captured before anything else
+
+2. Message strings before regular strings — `because "msg"` must get gold scope before `"msg"` gets consumed as a regular string
+
+3. Typed constants — `'USD'` before identifiers
+
+4. Construct-level patterns (most-specific) — declaration headers capture entire lines with contextual scoping
+
+5. `stateAction` before `stateEnsure` — both start with `to`/`from`, disambiguated by `->` vs `ensure`
+
+6. `eventHandler` before `eventEnsure` — both start with `on`, disambiguated by `->` vs `ensure`
+
+7. `noTransition` before `transitionTarget` — `no transition` is a compound keyword
+
+8. Dot-access patterns — `collectionMemberAccess` before `eventArgReference` to prevent `F.count` → event scope
+
+9. `functionCalls` — before identifierReference catch-all
+
+10. Operator patterns — arrows first (longest match), then symbol, then keyword operators
+
+11. Keyword groups from catalog (most-specific scope to least-specific)
+
+12. Literals and numbers
+
+13. Catch-all identifier last
+
+---
+
+## 6. Coverage Gaps (Current Grammar)
+
+## Gaps in the hand-authored grammar (35 items from audit section 3.1, G1–G35)
+
+See Section 3.1 above for the complete gap table. Summary of critical gaps:
+
+1. **35 missing language constructs/tokens** (G1–G35)
+
+2. **10 stale/incorrect patterns** (S1–S10) — 3 retired keywords, 2 retired syntax forms, 5 scope misassignments
+
+3. **16 scope assignment errors** (E1–E16) — tokens assigned to wrong semantic category
+
+## Gaps in the grammar generator (20 items from audit section 4.2, GG1–GG20)
+
+See Section 4.2 above. Summary of critical gaps:
+
+1. **GG1: Missing message strings** — most critical for visual system compliance
+
+2. **GG2: Stale event arg syntax** — uses `with` instead of parenthesized args
+
+3. **GG3-GG13: 11 missing construct patterns** — rules, ensures, access modes, state actions, handlers, computed fields, function calls
+
+4. **GG14: Stale `assert` keyword** — should be `ensure`
+
+5. **GG17: Bad repo key naming** — confusing scope-suffixed names
+
+6. **GG18: Broken `$ref`** — TextMate doesn't support JSON `$ref`
+
+---
+
+## 7. Generator Completion Requirements
+
+Numbered list keyed to spec entries above.
+
+## Must-Fix (blocks parity with hand-authored grammar + visual system compliance)
+
+1. **Add `messageStrings` pattern (Spec §2.2).** This is the single most important pattern for visual system compliance. Without it, message payloads are indistinguishable from regular strings — destroying the gold visual interrupt that the brand mandates. Emit TWO match patterns: one for `because "..."`, one for `reject "..."`. Captures must assign `keyword.declaration.precept` to the keyword and `string.quoted.double.message.precept` to the string.
+
+2. **Replace `eventWithArgsDeclaration` with parenthesized-arg syntax (Spec §2.7).** Current pattern (L218-258) matches `event Name with Arg as type`. Replace with pattern matching `event Name(Arg as type, ...)`. Remove the `with` keyword from the structural pattern.
+
+3. **Expand `stateDeclaration` to recognize all 7 state modifiers (Spec §2.6).** Current pattern (L180-215) only matches `initial`. Add sub-patterns for `terminal`, `required`, `irreversible`, `success`, `warning`, `error` with scope `storage.modifier.state.precept`.
+
+4. **Replace `assertStatement` with `eventEnsure` and `stateEnsure` (Spec §2.13-2.14).** Current pattern (L416-432) uses stale `assert`. Replace with two patterns: `on Event ensure Expr` and `in/to/from State ensure Expr`.
+
+5. **Add `ruleDeclaration` pattern (Spec §2.19).** Match `rule` keyword at line start.
+
+6. **Add `accessMode` pattern (Spec §2.15).** Match `in State modify Field editable/readonly`.
+
+7. **Add `omitDeclaration` pattern (Spec §2.16).** Match `in State omit Field`.
+
+8. **Add `stateAction` pattern (Spec §2.17).** Match `to/from State -> action chain`.
+
+9. **Add `eventHandler` pattern (Spec §2.18).** Match `on Event -> action chain`.
+
+10. **Add `noTransition` pattern (Spec §2.21).** Match `no transition` as a compound keyword.
+
+11. **Add `functionCalls` pattern (Spec §2.24).** Match known function names followed by `(`. Derive function name list from `Functions.All` catalog.
+
+12. **Fix `ScopeToRepositoryKey` naming (Spec §2.25).** Replace scope-suffixed keys with descriptive names. Current: `keyword.declaration.preceptKeywords`. Proposed: `declarationKeywords`.
+
+13. **Fix broken `$ref` in `eventWithArgsDeclaration` (GG18).** L244 uses `["$ref"]` which TextMate doesn't support. Replace with `["include"]`.
+
+14. **Expand `fieldScalarDeclaration` type list (Spec §2.8).** Current pattern (L322) lists `string|number|integer|decimal|boolean|choice`. Must include all 27 type keywords from catalog. Derive from `Tokens.All` where category is `Type`.
+
+15. **Expand `fieldCollectionDeclaration` to include all collection types (Spec §2.9).** Current pattern (L293) includes `set|queue|stack|bag|list|log|lookup` ✓. Inner type list needs expansion to include `integer`, `decimal`.
+
+16. **Update top-level pattern ordering (Spec §3).** Current ordering (L491-524) must be restructured per spec. `messageStrings` must come before `strings`. New construct patterns must be inserted at correct priority.
+
+## Should-Fix (improves correctness and visual system alignment)
+
+17. **Add `any` quantifier sub-pattern in state position.** In `fromOnHeader`, `stateEnsure`, `accessMode`, etc., `any` should get `keyword.other.quantifier.precept`, not `entity.name.type.state.precept`.
+
+18. **Add `punctuation` patterns for parentheses and brackets (Spec §2.27).** Explicit patterns for `(`, `)`, `[`, `]` with `punctuation.precept`.
+
+19. **Verify `rootEditDeclaration` validity (Spec §2.11).** If `edit` is not in `TokenKind` and no sample uses it, remove. If still valid, add to catalog first.
+
+20. **Add `computedFieldDeclaration` context (Spec §2.10).** At minimum, the `<-` operator pattern is sufficient. Consider whether a dedicated structural pattern is needed.
+
+21. **Handle `choice of string("a","b","c")` syntax.** The parenthesized choice options need string highlighting within the type declaration. Currently the strings would be captured by the generic `strings` pattern, which is acceptable.
+
+## Won't-Fix in Grammar (semantic tokens only)
+
+22. **Italic for constrained states/events.** TextMate cannot apply `fontStyle: italic` based on semantic context (whether a state participates in `ensure` rules). This requires the semantic token provider, which already exists in the language server.
+
+23. **Context-dependent `set` scoping.** `set` as action verb vs collection type. TextMate can't disambiguate. Semantic tokens handle this.
+
+24. **`null` removal.** `null` is not a keyword. The hand-authored grammar has it but the generator doesn't. No action needed — the generator is correct.
+
+---
+
+## Appendix A: Brand Doc Sync Items
+
+The following items in `design/brand/brand-decisions.md` need updating to match catalog reality:
+
+1. Replace `nullable` with `optional` in the Structure · Grammar keyword list
+
+2. Remove `write` from the Structure · Semantic keyword list (retired B4)
+
+3. Add `rule` to Structure · Semantic keyword list
+
+4. Add `ensure` to Structure · Semantic keyword list
+
+5. Add `writable` to Structure · Semantic keyword list (or Grammar — decision needed)
+
+6. Add `optional` to Structure · Semantic keyword list (or Grammar — decision needed)
+
+7. The brand doc's 2-tier keyword split (Semantic vs Grammar) doesn't map 1:1 to the catalog's 14-category scope model. Consider updating the brand doc to reference catalog categories or accept that the theme mediates between the two.
+
+## Appendix B: Theme Configuration Requirements
+
+For the visual system to work as designed, the VS Code theme must include rules mapping scopes to colors and styles:
+
+```json
+
+{
+
+  "editor.tokenColorCustomizations": {
+
+    "textMateRules": [
+
+      { "scope": "keyword.declaration.precept", "settings": { "foreground": "#4338CA", "fontStyle": "bold" } },
+
+      { "scope": "keyword.control.precept", "settings": { "foreground": "#6366F1" } },
+
+      { "scope": "keyword.other.action.precept", "settings": { "foreground": "#6366F1" } },
+
+      { "scope": "keyword.other.outcome.precept", "settings": { "foreground": "#6366F1" } },
+
+      { "scope": "keyword.other.access-mode.precept", "settings": { "foreground": "#6366F1" } },
+
+      { "scope": "keyword.other.quantifier.precept", "settings": { "foreground": "#6366F1" } },
+
+      { "scope": "keyword.other.constraint.precept", "settings": { "foreground": "#6366F1" } },
+
+      { "scope": "keyword.operator.logical.precept", "settings": { "foreground": "#6366F1" } },
+
+      { "scope": "keyword.operator.membership.precept", "settings": { "foreground": "#6366F1" } },
+
+      { "scope": "keyword.operator.precept", "settings": { "foreground": "#6366F1" } },
+
+      { "scope": "keyword.operator.arrow.precept", "settings": { "foreground": "#6366F1" } },
+
+      { "scope": "keyword.other.precept", "settings": { "foreground": "#B0BEC5" } },
+
+      { "scope": "storage.type.precept", "settings": { "foreground": "#9AA8B5" } },
+
+      { "scope": "storage.modifier.state.precept", "settings": { "foreground": "#9AA8B5" } },
+
+      { "scope": "entity.name.type.state.precept", "settings": { "foreground": "#A898F5" } },
+
+      { "scope": "entity.name.function.event.precept", "settings": { "foreground": "#30B8E8" } },
+
+      { "scope": "entity.name.precept.message.precept", "settings": { "foreground": "#A898F5" } },
+
+      { "scope": "variable.other.field.precept", "settings": { "foreground": "#B0BEC5" } },
+
+      { "scope": "variable.parameter.precept", "settings": { "foreground": "#B0BEC5" } },
+
+      { "scope": "variable.other.property.precept", "settings": { "foreground": "#B0BEC5" } },
+
+      { "scope": "variable.other.precept", "settings": { "foreground": "#B0BEC5" } },
+
+      { "scope": "support.function.precept", "settings": { "foreground": "#B0BEC5" } },
+
+      { "scope": "constant.numeric.precept", "settings": { "foreground": "#84929F" } },
+
+      { "scope": "constant.language.boolean.precept", "settings": { "foreground": "#84929F" } },
+
+      { "scope": "string.quoted.double.precept", "settings": { "foreground": "#84929F" } },
+
+      { "scope": "string.quoted.double.message.precept", "settings": { "foreground": "#FBBF24" } },
+
+      { "scope": "string.quoted.single.precept", "settings": { "foreground": "#84929F" } },
+
+      { "scope": "comment.line.number-sign.precept", "settings": { "foreground": "#9096A6", "fontStyle": "italic" } },
+
+      { "scope": "punctuation.precept", "settings": { "foreground": "#6366F1" } },
+
+      { "scope": "punctuation.separator.comma.precept", "settings": { "foreground": "#6366F1" } },
+
+      { "scope": "punctuation.accessor.precept", "settings": { "foreground": "#6366F1" } }
+
+    ]
+
+  }
+
+}
+
+```
+
+## Appendix C: Catalog-Driven Generation Principle
+
+The grammar generator MUST derive all keyword lists, type names, function names, operator symbols, and constraint keywords from the catalog source of truth (`Tokens.All`, `Functions.All`, etc.). No hardcoded token sets in the generator. If a new keyword is added to the catalog, the generator's output must automatically include it without manual changes.
+
+The generator's current approach (L38-77) is architecturally correct for catalog-derived keyword patterns. The structural patterns (construct-level) are hand-written in the generator but MUST reference catalog-derived keyword lists where they enumerate token alternatives (e.g., type names in field declarations, state modifier names in state declarations).
+
+---
+
+*End of specification.*
+
+# ProofEngine Spec — Pre-Implementation Gap Analysis
+
+**Date:** 2026-05-08
+
+**Author:** Frank
+
+**Commit reviewed:** `79c340357aee4e54520a539dca8208bc734e3606`
+
+**Verdict:** NOT READY
+
+**Spec files reviewed:**
+
+- `docs/compiler/proof-engine.md` (983 lines — primary spec)
+
+- `docs/compiler/graph-analyzer.md`
+
+- `docs/compiler/type-checker.md`
+
+- `docs/compiler/diagnostic-system.md`
+
+**Source files reviewed:**
+
+- `src/Precept/Pipeline/ProofEngine.cs` (stub)
+
+- `src/Precept/Pipeline/ProofLedger.cs` (stub)
+
+- `src/Precept/Pipeline/StateGraph.cs`
+
+- `src/Precept/Pipeline/GraphAnalyzer.cs`
+
+- `src/Precept/Pipeline/SemanticIndex.cs`
+
+- `src/Precept/Pipeline/Compilation.cs`
+
+- `src/Precept/Compiler.cs`
+
+- `src/Precept/Language/ProofRequirement.cs`
+
+- `src/Precept/Language/ProofRequirementKind.cs`
+
+- `src/Precept/Language/ProofRequirements.cs`
+
+- `src/Precept/Language/DiagnosticCode.cs`
+
+- `src/Precept/Language/Diagnostics.cs`
+
+- `src/Precept/Language/FaultCode.cs`
+
+- `src/Precept/Language/Faults.cs`
+
+- `src/Precept/Language/Modifier.cs`
+
+- `src/Precept/Language/Modifiers.cs`
+
+- `src/Precept/Runtime/Descriptors.cs`
+
+---
+
+## Executive Summary
+
+The ProofEngine spec is architecturally strong — the two-pass design, four-strategy discharge model, proof/fault chain, and catalog-driven obligation instantiation are well-conceived. However, the spec has **three blocking gaps** and **seven significant gaps** that prevent implementation from starting cleanly. The most critical issue: the spec defines five `ProofRequirementKind` values but only describes discharge strategies for two of them (Numeric and Presence). `DimensionProofRequirement`, `ModifierRequirement`, and `QualifierCompatibilityProofRequirement` are defined in the DU but have zero strategy coverage — an implementer would have to invent discharge logic from scratch. Additionally, the `FieldModifierMeta.ProofDischarges` property the spec declares as "canonical" (CC#5 resolved) does not exist in the source code, and the output type `ProofLedger` described in the spec is materially different from the stub in source.
+
+---
+
+## Gap Inventory
+
+## [BLOCKING] Gaps
+
+---
+
+**PE-G1: Three of five ProofRequirementKind values have no discharge strategy**
+
+- **Severity:** BLOCKING
+
+- **Location:** `proof-engine.md` §7 "Four Proof Strategies" (lines 412–766)
+
+- **Description:** The spec defines five `ProofRequirementKind` subtypes in §6 (lines 348–389): `Numeric`, `Presence`, `Dimension`, `Modifier`, and `QualifierCompatibility`. The four strategies (Literal, Modifier, GuardInPath, FlowNarrowing) only describe discharge predicates for `NumericProofRequirement` and `PresenceProofRequirement`. The remaining three kinds are completely absent:
+
+  - **`DimensionProofRequirement`** — "period operand must have required time dimension." No strategy says how this is proven. Is it a static type check (always provable by the type checker)? Does it need a new strategy?
+
+  - **`ModifierRequirement`** — "field must declare required modifier (e.g. `ordered`)." No strategy covers this. Logically Strategy 2 (Modifier Proof) should handle it, but the Strategy 2 pseudocode (lines 536–569) only reads `FieldModifierMeta.ProofDischarges`, not `ModifierRequirement.Required` directly. The mapping is unspecified.
+
+  - **`QualifierCompatibilityProofRequirement`** — "two operands must share a qualifier value on the specified axis." This is a dual-subject requirement. None of the four strategies handle dual-subject obligations. The spec provides no guidance on how to discharge this — is it always resolvable from type-checker qualifier propagation? Does it require a fifth strategy?
+
+- **Why it matters:** An implementer would have to guess how to handle 3 of 5 obligation kinds. Two implementers would write different code. This is the definition of a blocking ambiguity.
+
+- **Suggested resolution:** For each of the three unhandled kinds, the spec must state:
+
+  1. Which strategy discharges it (existing or new), OR
+
+  2. That it is always discharged by the type checker and never reaches the proof engine as an unresolved obligation, OR
+
+  3. That it is always `Unresolved` and produces a diagnostic (defensive backstop).
+
+  Likely answers based on code analysis:
+
+  - `DimensionProofRequirement`: Likely always resolvable by type-checker period-dimension inference. If so, state that it reaches the proof engine pre-discharged, or that it is a type error (not a proof obligation) and should never appear.
+
+  - `ModifierRequirement`: Likely checked by seeing if the field has `ModifierKind.Required` in its `Modifiers` array. Add this to Strategy 2 pseudocode.
+
+  - `QualifierCompatibilityProofRequirement`: Likely checked by the type checker's `QualifierBinding` propagation. If so, state the handoff.
+
+---
+
+**PE-G2: `FieldModifierMeta.ProofDischarges` does not exist in source code**
+
+- **Severity:** BLOCKING
+
+- **Location:** `proof-engine.md` §7 Strategy 2, lines 505–572, especially the CC#5 resolution box at line 571
+
+- **Description:** The spec declares at line 571: "✅ Resolved (CC#5) — `FieldModifierMeta.ProofDischarges` is now canonical" and references `ProofDischarge[]` on `FieldModifierMeta`. The actual `FieldModifierMeta` record in `src/Precept/Language/Modifier.cs` (lines 105–121) has **no** `ProofDischarges` property. The `ProofDischarge` record type does not exist anywhere in the source code. `grep` for `ProofDischarge` across all of `src/Precept/Language/` returns zero matches.
+
+  The Strategy 2 pseudocode depends entirely on `meta.ProofDischarges` for its discharge logic (line 551: `foreach (var discharge in meta.ProofDischarges)`). Without this property, Strategy 2 cannot be implemented as specified.
+
+- **Why it matters:** Strategy 2 is the second most common discharge strategy. It covers `positive`, `nonnegative`, `nonzero`, `notempty`, `min(N)`, `max(N)`. Without the catalog property, the implementer must either:
+
+  (a) Add the property to the catalog first (design + implementation work), or
+
+  (b) Hardcode per-modifier logic in the proof engine (violating catalog-driven architecture).
+
+  Both are design decisions that must be made before coding starts.
+
+- **Suggested resolution:** Add the `ProofDischarges` property to `FieldModifierMeta` and the `ProofDischarge` record type before implementation begins. This is a catalog prerequisite, not part of the proof engine implementation itself.
+
+---
+
+**PE-G3: Output type `ProofLedger` in spec diverges materially from source stub**
+
+- **Severity:** BLOCKING
+
+- **Location:** `proof-engine.md` §5 "Output", lines 172–287
+
+- **Description:** The spec defines `ProofLedger` with five fields:
+
+  ```csharp
+
+  ProofLedger(
+
+      ImmutableArray<ProofObligation> Obligations,
+
+      ImmutableArray<FaultSiteLink> FaultSiteLinks,
+
+      ImmutableArray<ConstraintInfluenceEntry> ConstraintInfluence,
+
+      ImmutableArray<InitialStateSatisfiabilityResult> InitialStateResults,
+
+      ImmutableArray<Diagnostic> Diagnostics
+
+  )
+
+  ```
+
+  The source stub at `src/Precept/Pipeline/ProofLedger.cs` defines:
+
+  ```csharp
+
+  ProofLedger(ImmutableArray<Diagnostic> Diagnostics)
+
+  ```
+
+  The following types referenced by the spec's `ProofLedger` do **not exist** anywhere in the source:
+
+  - `ProofObligation`
+
+  - `ProofDisposition` (enum)
+
+  - `ProofStrategy` (enum)
+
+  - `FaultSiteLink`
+
+  - `ConstraintInfluenceEntry`
+
+  - `EventArgReference`
+
+  - `InitialStateSatisfiabilityResult`
+
+  - `UnsatisfiedConstraint`
+
+  - `FaultSiteAnnotation`
+
+  The `Compilation` record in `Compilation.cs` consumes `ProofLedger` but only reads `Diagnostics` — it has no field for `FaultSiteLinks` or `ConstraintInfluence`.
+
+- **Why it matters:** The implementer must create ~10 new record types and expand the ProofLedger shape before any meaningful work begins. The spec needs to be explicit about whether these types are created as part of the ProofEngine implementation or as a prerequisite.
+
+- **Suggested resolution:** State that Slice 0 of the implementation plan is "shape declarations" — creating all the output types in `ProofLedger.cs` and `SemanticIndex.cs` with empty-default construction, updating the `Compilation` record, and verifying the build stays green. This matches the pattern from TypeChecker (Slice 0 shape) and GraphAnalyzer.
+
+---
+
+## [SIGNIFICANT] Gaps
+
+---
+
+**PE-G4: `SemanticIndex.AllTypedExpressions` does not exist**
+
+- **Severity:** SIGNIFICANT
+
+- **Location:** `proof-engine.md` §9 "Failure Modes", line 968
+
+- **Description:** The spec's Pass 1 pseudocode (line 968) references `semantics.AllTypedExpressions`:
+
+  ```csharp
+
+  foreach (var expr in semantics.AllTypedExpressions)
+
+  ```
+
+  No such property exists on `SemanticIndex`. The `SemanticIndex` record exposes `TransitionRows`, `Rules`, `Ensures`, `StateHooks`, `EventHandlers` — but no aggregated expression enumeration surface.
+
+- **Why it matters:** The implementer needs to know exactly which `SemanticIndex` members to walk to collect all proof-relevant expressions. Walking `TransitionRows[].Actions[].ProofRequirements` is obvious, but what about guard expressions? Constraint conditions? Computed field expressions? State hook actions? The spec doesn't enumerate the walk targets.
+
+- **Suggested resolution:** Replace `AllTypedExpressions` with an explicit list of walk targets:
+
+  - `TransitionRows` → `Actions[].ProofRequirements` and `Guard` expressions
+
+  - `Rules` → `Condition` expressions
+
+  - `Ensures` → `Condition` expressions
+
+  - `StateHooks` → `Actions[].ProofRequirements`
+
+  - `EventHandlers` → `Actions[].ProofRequirements`
+
+  - Computed fields → `ComputedExpression` (if proof-relevant)
+
+  Or add the `AllTypedExpressions` helper to `SemanticIndex` as a prerequisite.
+
+---
+
+**PE-G5: `ConstraintIdentity` shapes in spec differ from implementation**
+
+- **Severity:** SIGNIFICANT
+
+- **Location:** `proof-engine.md` §5, lines 263–267
+
+- **Description:** The spec defines:
+
+  ```csharp
+
+  public sealed record RuleIdentity(string RuleName, int Index) : ConstraintIdentity;
+
+  public sealed record EnsureIdentity(ConstraintKind Kind, string? AnchorState, string? AnchorEvent, int Index) : ConstraintIdentity;
+
+  ```
+
+  The actual implementation in `SemanticIndex.cs` (lines 401–404) defines:
+
+  ```csharp
+
+  public sealed record RuleIdentity(int RuleIndex) : ConstraintIdentity;
+
+  public sealed record EnsureIdentity(ConstraintKind Kind, string? AnchorName, int EnsureIndex) : ConstraintIdentity;
+
+  ```
+
+  Differences:
+
+  1. `RuleIdentity`: spec has `(string RuleName, int Index)`, source has `(int RuleIndex)` — no `RuleName` field.
+
+  2. `EnsureIdentity`: spec has `(ConstraintKind, string? AnchorState, string? AnchorEvent, int Index)`, source has `(ConstraintKind, string? AnchorName, int EnsureIndex)` — spec separates state/event anchors into two nullable fields; source uses a single `AnchorName`.
+
+- **Why it matters:** The `ConstraintInfluenceEntry` output uses `ConstraintIdentity`. If the implementer follows the spec shapes, they'll create types that conflict with existing ones. If they follow the source shapes, the spec's `EventArgReference` resolution logic may not work as described.
+
+- **Suggested resolution:** Update the spec to match the existing source shapes. The implementation is canonical — it was created during TypeChecker implementation and has tests.
+
+---
+
+**PE-G6: `FindEnclosingTransitionRow` is not specified**
+
+- **Severity:** SIGNIFICANT
+
+- **Location:** `proof-engine.md` §7 Strategy 3, line 625; Strategy 4, line 722
+
+- **Description:** Both Strategy 3 and Strategy 4 call `FindEnclosingTransitionRow(obligation.Site, semantics)` to find the transition row that encloses the proof obligation's expression site. The spec never defines this function. The proof engine must know: given a `TypedExpression`, how do you find which `TypedTransitionRow` contains it?
+
+  This is non-trivial because:
+
+  1. `TypedExpression` nodes don't carry parent pointers or transition-row back-references.
+
+  2. The proof engine would need to either build an expression→row index in Pass 1, or walk `TransitionRows[].Actions` looking for expression identity matches.
+
+  3. Obligations on expressions in `TypedRule`, `TypedEnsure`, `TypedStateHook`, or `TypedEventHandler` have no enclosing transition row — what do Strategies 3/4 return for those?
+
+- **Why it matters:** This is critical path logic for the two guard-based strategies. The spec's pseudocode uses it as a black box, but its implementation drives the data structure design of Pass 1.
+
+- **Suggested resolution:** Specify that Pass 1 builds an `obligation → enclosing context` index. Define the context as a discriminated union: `TransitionRowContext(TypedTransitionRow)`, `ConstraintContext(TypedRule | TypedEnsure)`, `HookContext(TypedStateHook)`, `HandlerContext(TypedEventHandler)`. Strategies 3/4 only fire for `TransitionRowContext`. All other contexts return `false`.
+
+---
+
+**PE-G7: `ResolveSubject` is not specified**
+
+- **Severity:** SIGNIFICANT
+
+- **Location:** `proof-engine.md` §7 Strategy 1, line 445; Strategy 2, line 539
+
+- **Description:** Strategy 1 calls `ResolveSubject(numeric.Subject, obligation.Site)` and Strategy 2 calls `GetFieldName(obligation.Requirement.Subject, obligation.Site)`. Neither is defined. Given the `ProofSubject` DU:
+
+  - `ParamSubject(ParameterMeta Parameter)` — how do you resolve a parameter to a concrete expression node from the obligation site? The `ParameterMeta` has object identity, but how does one locate the corresponding argument expression in a `TypedFunctionCall` or operand in a `TypedBinaryOp`?
+
+  - `SelfSubject(TypeAccessor? Accessor)` — how does one resolve "self" to the receiver expression in a `TypedMemberAccess`?
+
+  The spec says `ParamSubject` "must be reference-equal to one of the `ParameterMeta` instances in the containing overload's `Parameters` list" (ProofRequirement.cs, line 16), which gives identity, but the resolution logic from identity to expression is missing.
+
+- **Why it matters:** Subject resolution is the first step in every strategy. Without it being specified, the implementer must infer the mapping from `ParameterMeta` identity to `TypedExpression` arguments — a non-trivial piece of logic.
+
+- **Suggested resolution:** Add a `ResolveSubject` pseudocode section that handles both `ParamSubject` and `SelfSubject`:
+
+  - `ParamSubject`: For `TypedFunctionCall`, match `Parameter` identity against `ResolvedFunction`'s overload `Parameters` list to find the positional index, then return `Arguments[index]`. For `TypedBinaryOp`, match against `ResolvedOp`'s operation metadata parameters.
+
+  - `SelfSubject`: For `TypedMemberAccess`, return `Object`. For `TypedAction`, return the field reference expression (requires knowing the field from `FieldName`).
+
+---
+
+**PE-G8: Initial-state satisfiability check is underspecified**
+
+- **Severity:** SIGNIFICANT
+
+- **Location:** `proof-engine.md` §7 "Initial-State Satisfiability", lines 863–883
+
+- **Description:** The spec says: "For each constraint condition, check whether default field values satisfy it." This is vague. Specifically:
+
+  1. What does "check" mean? Evaluate the constraint expression with default values? Symbolically analyze it? The spec doesn't say.
+
+  2. How are "default field values" determined? Fields with `default` expressions have typed defaults in `TypedField.DefaultExpression`. Fields without defaults — what is their default? `0` for numeric? `""` for string? `null` for optional? The spec doesn't define the default value model.
+
+  3. What about fields that are set by the initial event? The initial event's `set` actions provide values at instantiation. Does satisfiability account for initial event args, or only declared defaults?
+
+  4. The spec says to check `ensure in Draft: ...`. But the `ConstraintKind.StateResident` anchor means "while in state", not "at entry". Is entry a special case of residency? Does entry use `ConstraintKind.StateEntry` anchors instead?
+
+  5. Computed fields (`IsComputed = true`) have `ComputedExpression` not `DefaultExpression`. Are computed field values available for satisfiability?
+
+- **Why it matters:** This check is one of the three output surfaces of the proof engine (alongside obligation discharge and constraint influence). Without clear semantics, the implementer must make design decisions that should be in the spec.
+
+- **Suggested resolution:** Define the satisfiability algorithm explicitly:
+
+  - State which fields are relevant (all fields? only fields referenced by initial-scope constraints?)
+
+  - Define the "default value" for each type kind when no `default` is declared
+
+  - State whether initial event arguments are considered (probably not — they're runtime values)
+
+  - Define which constraint scopes are checked (`in`, `to`, both?)
+
+---
+
+**PE-G9: No diagnostic code for collection-empty proof failures**
+
+- **Severity:** SIGNIFICANT
+
+- **Location:** `proof-engine.md` §7 "Collection Non-Empty Proof", lines 885–899; `DiagnosticCode.cs`
+
+- **Description:** The spec describes collection non-empty obligations (first, last, peek, dequeue, pop) but the only proof-stage diagnostic codes are:
+
+  - 82: `UnsatisfiableGuard` (Warning)
+
+  - 83: `DivisionByZero` (Error)
+
+  - 84: `SqrtOfNegative` (Error)
+
+  There is no proof-stage diagnostic for "collection may be empty when `first()` is called." The type-checker stage has `UnguardedCollectionAccess` (63) and `UnguardedCollectionMutation` (64), but these are `DiagnosticStage.Type` — they fire during type checking, not proof. If the proof engine is supposed to handle collection non-empty proof discharge, it needs its own diagnostic code for the "unresolved" case. Or alternatively, collection safety is fully handled by the type checker and the proof engine should NOT create obligations for them.
+
+  The `FaultCode` enum has `CollectionEmptyOnAccess = 9` with `[StaticallyPreventable(DiagnosticCode.UnguardedCollectionAccess)]` — linking to the type-checker code, not a proof code.
+
+- **Why it matters:** The spec says the proof engine handles collection non-empty obligations, but there's no diagnostic to emit if the obligation is unresolved. Either the spec is wrong (collection safety is the type checker's job entirely) or diagnostic codes are missing.
+
+- **Suggested resolution:** Clarify which pipeline stage owns collection non-empty safety:
+
+  - If the type checker already emits `UnguardedCollectionAccess`/`UnguardedCollectionMutation` for all cases, the proof engine should NOT create duplicate obligations. Remove collection non-empty from the proof engine spec.
+
+  - If the proof engine handles the richer case (modifier proof + guard proof), add a proof-stage diagnostic code for unresolved collection obligations.
+
+---
+
+**PE-G10: `ExtractGuardConstraints` is not specified**
+
+- **Severity:** SIGNIFICANT
+
+- **Location:** `proof-engine.md` §7 Strategy 3, line 631
+
+- **Description:** Strategy 3 calls `ExtractGuardConstraints(row.Guard)` to decompose a `TypedExpression` guard into simple constraint forms. The spec lists supported patterns (line 599–608) but doesn't specify:
+
+  1. What happens with compound guards? `when A > 0 and B > 0` — are both constraints extracted? What about `or`?
+
+  2. What happens with negation? `when not (A == 0)` — is this recognized as `A != 0`?
+
+  3. What about nested function calls in guards? `when count(Items) > 0 and len(Name) > 3` — is `len(Name) > 3` a valid constraint form?
+
+  4. Does the proof engine look inside `TypedConditional` (if/then/else) for guard constraints?
+
+- **Why it matters:** The guard pattern language directly determines Strategy 3's power. Without clarity on compound/negated guards, the implementer must choose a scope that may be too narrow or too broad.
+
+- **Suggested resolution:** Specify that `ExtractGuardConstraints`:
+
+  - Decomposes `and` conjunctions recursively — each leaf becomes a separate constraint
+
+  - Does NOT decompose `or` disjunctions — the proof engine cannot use a disjunct because either branch might be false
+
+  - Handles simple negation by inverting the comparison operator
+
+  - Ignores complex expressions (nested conditionals, quantifiers) — they are not constraint forms
+
+---
+
+## [ADVISORY] Gaps
+
+---
+
+**PE-G11: Spec references `Compilation` but doesn't address the Precept Builder gap**
+
+- **Severity:** ADVISORY
+
+- **Location:** `proof-engine.md` §8 "Downstream Consumers", lines 930–937
+
+- **Description:** The spec references "Precept Builder" as a consumer of `FaultSiteLinks` and `ConstraintInfluence`, and references `precept-builder.md §Pass 4` (line 218, 236, 250). No `precept-builder.md` file exists in `docs/compiler/`. The consumer contract for `ProofLedger` is described in the proof engine spec but has no counterpart in any builder spec.
+
+- **Why it matters:** The proof engine's output shape is driven by what the builder consumes. Without a builder spec, the output shape is hypothetical — it could change when the builder is designed. Implementation risk is moderate: the proof engine can be built to the spec, but the builder may require changes.
+
+- **Suggested resolution:** Accept this gap for now — the builder is a future stage. Add a note in the proof engine spec: "Builder contract is forward-looking; output shape may evolve when `precept-builder.md` is authored."
+
+---
+
+**PE-G12: No specification of diagnostic message formatting for proof obligations**
+
+- **Severity:** ADVISORY
+
+- **Location:** `proof-engine.md` §9 "Failure Modes", line 981
+
+- **Description:** The pseudocode calls `CreateDiagnostic(obligation)` but doesn't specify how the diagnostic message template parameters `{0}`, `{1}` are populated. The existing diagnostic entries in `Diagnostics.cs` have:
+
+  - `DivisionByZero`: `"Division by zero: '{0}' can be zero when {1}"` — what is `{0}` (field name? expression text?) and `{1}` (state name? guard absence?)?
+
+  - `SqrtOfNegative`: `"sqrt() requires a non-negative value, but '{0}' can be negative when {1}"` — same question.
+
+  - `UnsatisfiableGuard`: `"The condition '{0}' on event '{1}' can never be true when {2}"` — three params.
+
+- **Why it matters:** Without knowing what fills the template parameters, test authors can't assert diagnostic messages. This is a testability gap.
+
+- **Suggested resolution:** Add a message-formatting table: for each diagnostic code, specify what each `{N}` parameter is (field name, expression text, state name, constraint description).
+
+---
+
+**PE-G13: Error propagation from upstream stages is unspecified**
+
+- **Severity:** ADVISORY
+
+- **Location:** `proof-engine.md` §3 "Responsibilities and Boundaries"
+
+- **Description:** The spec doesn't say whether the proof engine should short-circuit if the `SemanticIndex` or `StateGraph` already contain errors. Looking at the existing pipeline in `Compiler.cs`, every stage runs unconditionally — the proof engine receives its inputs regardless of upstream errors. But:
+
+  1. If the `SemanticIndex` contains `TypedErrorExpression` nodes, can the proof engine encounter them during obligation instantiation? If so, what does it do?
+
+  2. If the `StateGraph` has structural violation diagnostics (unreachable states), does the proof engine suppress obligations for those states? (The spec addresses this via `ReachabilityFact`, but doesn't address the case where the _graph analyzer itself_ emitted errors.)
+
+- **Why it matters:** Without clarity, the implementer might crash on `TypedErrorExpression` nodes.
+
+- **Suggested resolution:** Add: "Proof obligations are not instantiated for expression trees containing `TypedErrorExpression` — those trees already have type-checker diagnostics and no valid proof subject."
+
+---
+
+**PE-G14: `GuardRelationImpliesObligation` in Strategy 4 is a pattern-match black box**
+
+- **Severity:** ADVISORY
+
+- **Location:** `proof-engine.md` §7 Strategy 4, lines 758–766
+
+- **Description:** The function `GuardRelationImpliesObligation` is described as "a simple pattern match on (guard.Op, expression.Op, requirement.Comparison) triples — not a solver" and provides three example triples. But the complete triple set is not enumerated. The spec gives examples but not an exhaustive table.
+
+- **Why it matters:** An implementer would need to enumerate all valid triples. Given the bounded operator set, this is a finite list — but it's work the spec should contain.
+
+- **Suggested resolution:** Add an exhaustive table of (guard.Op, expr.Op, requirement) → discharge triples. Given Precept's bounded operator set, this is likely ~10-15 entries.
+
+---
+
+**PE-G15: No specification of whether proof engine runs for stateless precepts**
+
+- **Severity:** ADVISORY
+
+- **Location:** `proof-engine.md` — absent from §3 and §9
+
+- **Description:** The graph analyzer has explicit stateless-precept handling (emitting vacuous `TerminalCompletenessFact` and `DeadEndStateFact`). The proof engine spec doesn't address stateless precepts. Stateless precepts have `EventHandlers` instead of `TransitionRows` and no state machine. Questions:
+
+  1. Do event handlers in stateless precepts carry proof requirements? (Yes — their `TypedAction` nodes can have `ProofRequirements`.)
+
+  2. Do Strategies 3/4 (guard-based) apply to event handlers? (Event handlers don't have guards — `TypedEventHandler` has no `Guard` field.)
+
+  3. Are there any proof obligations specific to stateless precepts?
+
+- **Why it matters:** If the implementer ignores stateless precepts, proof obligations on event handler actions would be silently missed.
+
+- **Suggested resolution:** Add a subsection: "For stateless precepts, the proof engine walks `EventHandlers[].Actions[]` for obligations. Strategies 1 (Literal) and 2 (Modifier) apply. Strategies 3/4 do not apply (event handlers have no guards). All unresolved obligations produce diagnostics as normal."
+
+---
+
+**PE-G16: Spec's `ProofObligation.Site` identity matching is underspecified**
+
+- **Severity:** ADVISORY
+
+- **Location:** `proof-engine.md` §5, line 217 (CC#6 resolved box)
+
+- **Description:** CC#6 says the builder "matches against `ProofLedger.FaultSiteLinks` by `ProofObligation.Site` identity." But `TypedExpression` is a record — C# record equality is structural, not referential. The spec doesn't say whether `Site` matching uses reference equality or structural equality. For records, structural equality means two independently-created `TypedBinaryOp` nodes with identical fields would match — which could cause false positives.
+
+- **Why it matters:** If the builder or proof engine relies on reference identity, the implementer must ensure the same `TypedExpression` object instance is used in both the `ProofObligation` and the builder's walk. If structural equality is fine, no action needed.
+
+- **Suggested resolution:** Clarify that `ProofObligation.Site` uses the same object reference passed through from `SemanticIndex` — no copies. Reference identity is preserved because the proof engine reads the same `TypedExpression` nodes the builder later visits.
+
+---
+
+## [DOC-ONLY] Gaps
+
+---
+
+**PE-G17: Spec shows `OperatorKind` in code samples but source uses different names**
+
+- **Severity:** DOC-ONLY
+
+- **Location:** `proof-engine.md` §7, line 454
+
+- **Description:** The Strategy 1 pseudocode uses `OperatorKind.NotEquals`, `OperatorKind.GreaterThan`, etc. Need to verify these match the actual `OperatorKind` enum values in source. Minor naming discrepancies between spec pseudocode and source enum members would cause confusion during implementation.
+
+- **Suggested resolution:** Cross-reference with `src/Precept/Language/OperatorKind.cs` and update spec pseudocode to use actual enum member names.
+
+---
+
+**PE-G18: Spec says "accumulate diagnostics without abandoning" but doesn't cite the principle by name**
+
+- **Severity:** DOC-ONLY
+
+- **Location:** `proof-engine.md` §9, line 945
+
+- **Description:** The spec references Precept's error accumulation principle but doesn't cite the canonical name or doc location. Other pipeline stage docs reference `diagnostic-system.md §Error Accumulation`.
+
+- **Suggested resolution:** Add cross-reference to `diagnostic-system.md`.
+
+---
+
+## Cross-Stage Seam Issues
+
+## GraphAnalyzer → ProofEngine
+
+1. **ReachabilityFact emission is per-state.** The GraphAnalyzer emits one `ReachabilityFact` per state (line 186 of GraphAnalyzer.cs). The spec's consumption table (line 907) says "suppress proof obligations on transitions originating from unreachable states." This is correct — the proof engine can look up `ReachabilityFact.IsReachable` for a transition's `FromState`. **No gap.**
+
+2. **EventCoverageFact consumption is vague.** The spec says the proof engine "uses coverage gaps to reason about guard completeness: in states where an event is handled, are the guards sufficient?" (line 909). This is hand-wavy. What does "guard completeness" mean for the proof engine? Is the proof engine checking that guards on transition rows cover all possible field value ranges? That's a significantly harder problem than the spec's other strategies suggest. **Overlaps with PE-G1 (underspecified algorithm).** The EventCoverageFact consumption should be clarified — likely it's just a structural record, not an active proof check.
+
+3. **DominancePathFact:** The spec says "if `DominatedTerminals` is empty, records a structural violation in the proof ledger." But the GraphAnalyzer already emits `RequiredStateDoesNotDominateTerminal` (111) for this case. The proof engine recording it again is redundant. **Clarify whether the proof engine adds to the structural record or merely records the fact for downstream consumption without additional diagnostics.**
+
+## ProofEngine → Runtime (via Precept Builder)
+
+4. **No `precept-builder.md` exists.** The spec references it in three CC#6 resolution boxes (lines 218, 236, 250). The downstream contract is hypothetical. **Covered by PE-G11.**
+
+5. **`FaultSiteAnnotation` is described in the spec but does not exist in source.** The source has `FaultSiteDescriptor` in `Runtime/Descriptors.cs` with a different shape: `FaultSiteDescriptor(FaultCode, DiagnosticCode PreventedBy, int SourceLine)`. The spec's `FaultSiteAnnotation` has `(FaultCode Code, DiagnosticCode PreventedBy, SourceSpan Site)` — `SourceSpan` vs `int SourceLine`. These may be different types (builder-time vs runtime), but the relationship is unspecified.
+
+---
+
+## Catalog Compliance Issues
+
+1. **PE-G2 is the primary catalog violation.** `FieldModifierMeta.ProofDischarges` is described as catalog metadata but doesn't exist. The spec correctly identifies this as catalog-driven (Strategy 2 reads `meta.ProofDischarges` from the catalog), but the catalog hasn't been updated. **BLOCKING.**
+
+2. **The four strategies themselves are generic machinery, not catalog-driven.** The strategies are predicate functions that pattern-match on requirement types and expression types. This is correct — strategies are algorithms, not per-member metadata. The obligation _source_ is catalog-driven (ProofRequirements on catalog entries), the _discharge_ is algorithmic. **No violation.**
+
+3. **`ProofRequirementMeta` catalog is correctly implemented.** The `ProofRequirements.cs` catalog with `GetMeta()` switch and `All` enumeration matches the catalog pattern. **No issue.**
+
+---
+
+## Diagnostic Catalog Status
+
+| Code | Name | Stage | Severity | Registered in `DiagnosticCode.cs` | Registered in `Diagnostics.cs` | `PreventsFault` | Status |
+
+|------|------|-------|----------|------------------------------------|-------------------------------|-----------------|--------|
+
+| 82 | `UnsatisfiableGuard` | Proof | Warning | ✅ | ✅ | — | Complete |
+
+| 83 | `DivisionByZero` | Proof | Error | ✅ | ✅ | `FaultCode.DivisionByZero` | Complete |
+
+| 84 | `SqrtOfNegative` | Proof | Error | ✅ | ✅ | `FaultCode.SqrtOfNegative` | Complete |
+
+**Three proof-stage diagnostics exist and are fully registered.** `RelatedCodes` cross-link all three. `FixHint` values are present.
+
+**Missing diagnostic gap:** Collection non-empty proof failures have no proof-stage diagnostic code (PE-G9). Depending on resolution of PE-G9, additional codes may be needed.
+
+**Missing diagnostic gap:** `DimensionProofRequirement`, `ModifierRequirement`, and `QualifierCompatibilityProofRequirement` failures have no diagnostic codes. Depending on resolution of PE-G1, additional codes may be needed.
+
+---
+
+## Spec Readiness Verdict
+
+**NOT READY** — three BLOCKING gaps prevent implementation from starting.
+
+## Blockers (must resolve before any implementation work):
+
+1. **PE-G1:** Three of five `ProofRequirementKind` values have no discharge strategy. The implementer cannot write discharge logic for `Dimension`, `Modifier`, or `QualifierCompatibility` obligations without spec guidance.
+
+2. **PE-G2:** `FieldModifierMeta.ProofDischarges` does not exist in source. Strategy 2 cannot be implemented as specified.
+
+3. **PE-G3:** Output type `ProofLedger` and ~10 supporting record types don't exist. Shape declarations must be created before coding begins.
+
+## Conditions (must resolve before implementation is complete, but won't block starting if blockers are cleared):
+
+4. **PE-G4:** `AllTypedExpressions` doesn't exist — Pass 1 walk targets must be enumerated.
+
+5. **PE-G5:** `ConstraintIdentity` shapes must match source, not spec.
+
+6. **PE-G6:** `FindEnclosingTransitionRow` must be specified.
+
+7. **PE-G7:** `ResolveSubject` must be specified.
+
+8. **PE-G8:** Initial-state satisfiability needs a concrete algorithm.
+
+9. **PE-G9:** Collection non-empty proof ownership must be decided (type checker vs proof engine).
+
+10. **PE-G10:** Guard decomposition rules must be specified.
+
+---
+
+## Recommended Pre-Implementation Actions
+
+1. **Resolve PE-G1** — For each of `Dimension`, `Modifier`, `QualifierCompatibility`: state which strategy handles it, or state that the type checker resolves it before proof. This is a design decision, not an implementation detail.
+
+2. **Implement PE-G2** — Add `ProofDischarge` record and `ProofDischarges` property to `FieldModifierMeta`. Populate entries for `positive`, `nonnegative`, `nonzero`, `notempty`, `min(N)`, `max(N)`. This is a catalog prerequisite.
+
+3. **Update spec for PE-G3** — Add a "Slice 0: Shape declarations" section listing all new types to create. The implementer should create these in a build-green commit before any logic.
+
+4. **Resolve PE-G9** — Decide collection-empty ownership. This affects diagnostic code allocation and obligation walk scope.
+
+5. **Update spec for PE-G5** — Align `ConstraintIdentity` shapes with source implementation.
+
+6. **Add `FindEnclosingTransitionRow` spec (PE-G6)** and **`ResolveSubject` spec (PE-G7)** — These are the two most complex helper functions. Providing pseudocode prevents design divergence during implementation.
+
+7. **Specify initial-state satisfiability algorithm (PE-G8)** — Define the default value model and which constraint scopes are checked.
+
+8. **Add compound guard decomposition rules (PE-G10)** — Specify `and`/`or`/`not` handling.
+
+9. **Add stateless precept handling section (PE-G15)** — Small but prevents a class of missed-obligation bugs.
+
+## 2026-05-08T22:46:03: User directive
+
+**By:** Shane (via Copilot)
+
+**What:** After Frank finishes G4-G18 and the design is approved, route G1 and G2 prework to George. Prework = shape/type definitions and catalog metadata only (e.g., ProofSatisfaction DU, DeclaredPresence, DeclaredQualifierMeta, Modifiers rows). Engine work (Parser qualifier clauses, TypeChecker qualifier resolution, ProofEngine Strategy 2 & 5) waits until after prework lands.
+
+**Why:** User directive — G1/G2 prework is in the same category as G3 (structural definitions, not engine logic). Prework can proceed immediately after design is finalized; engine implementation is a separate phase.
+
+# PE-G1 Detailed Analysis — Frank
+
+**Date:** 2026-05-08
+
+**Author:** Frank (Lead/Architect)
+
+**Status:** Ready for design decision
+
+## Summary
+
+All three unhandled `ProofRequirementKind` values are **live** — they have real obligation-generating callers in `Operations.cs`, they are stamped onto `TypedBinaryOp` nodes by the TypeChecker's expression resolver, and the TypeChecker does **not** enforce any of them independently. Each reaches the proof engine as an open obligation. None is dead code. None is pre-discharged.
+
+---
+
+## DimensionProofRequirement
+
+**Determination: B — Strategy 2 (Declaration Attribute Proof) handles this.**
+
+## Rationale
+
+**Callers (4 sites in `Operations.cs`):**
+
+- `DatePlusPeriod` (line 248): `DimensionProofRequirement(PPeriod, PeriodDimension.Date, ...)`
+
+- `DateMinusPeriod` (line 257): `DimensionProofRequirement(PPeriod, PeriodDimension.Date, ...)`
+
+- `TimePlusPeriod` (line 275): `DimensionProofRequirement(PPeriod, PeriodDimension.Time, ...)`
+
+- `TimeMinusPeriod` (line 284): `DimensionProofRequirement(PPeriod, PeriodDimension.Time, ...)`
+
+All four attach the requirement to binary operations where one operand is a `period` type. The requirement says: "this period operand must have the correct time dimension (date-level for date arithmetic, time-level for time arithmetic)."
+
+**TypeChecker behavior:** The TypeChecker (`TypeChecker.Expressions.cs` lines 479–519) resolves binary operations by type matching via `TryResolveBinaryWithWidening`. It resolves `Date + Period → DatePlusPeriod` purely on type structure, stamps `result.ProofRequirements` onto the `TypedBinaryOp` (line 504), and does NOT validate period dimensions. The `Qualifier` field on `TypedField` is even set to `null` with a `// Slice 2+` comment (TypeChecker.cs line 121), confirming qualifier resolution is future work.
+
+**Why Strategy 2:** Strategy 2 was renamed to "Declaration Attribute Proof" (per Shane's lock decision 2026-05-08T05:15:57Z). It reads declaration-site attributes of the subject field. Period dimension is determined by the field's type qualifier — a declaration attribute. The predicate is:
+
+1. Resolve the proof subject to an expression node.
+
+2. Determine the expression's period dimension:
+
+   - **Field reference:** Read the field's resolved qualifier on the `TemporalDimension` axis (once qualifier resolution ships). Map to `PeriodDimension`.
+
+   - **Literal period:** Extract dimension from the literal's temporal unit (e.g., `3 days` → Date, `2 hours` → Time).
+
+   - **Unqualified/unknown:** Treat as `PeriodDimension.Any` (per Shane's locked decision on permissive unqualified periods).
+
+3. Discharge condition: `resolvedDimension == PeriodDimension.Any || resolvedDimension == requirement.RequiredDimension`.
+
+**Why not Strategy 1:** Strategy 1 (Literal Proof) is explicitly scoped to `NumericProofRequirement` only (spec §7.1, line 436: "Gate: only numeric requirements are literal-provable"). The literal-period case fits naturally into Strategy 2's expanded scope — the literal IS the declaration in that context.
+
+**Why not a new strategy:** The dimension check reads a declaration-site attribute (the period's qualifier/dimension). This is exactly what Strategy 2 does — read field declaration metadata to discharge an obligation. No new strategy machinery is needed.
+
+## Concrete answer for the spec
+
+Add to `proof-engine.md` §7, Strategy 2 pseudocode, a new arm:
+
+```
+
+// DimensionProofRequirement: check if subject's period dimension satisfies the requirement
+
+if (obligation.Requirement is DimensionProofRequirement dimReq)
+
+{
+
+    var dimension = ResolvePeriodDimension(subject, semantics);
+
+    // PeriodDimension.Any always satisfies (permissive unqualified periods — locked decision)
+
+    return dimension == PeriodDimension.Any || dimension == dimReq.RequiredDimension;
+
+}
+
+```
+
+Add to §6 `DimensionProofRequirement` description: "Discharged by Strategy 2 (Declaration Attribute Proof). The strategy reads the subject's resolved period dimension — from field qualifier metadata for field references, from literal temporal unit for literal periods. Unqualified periods resolve to `PeriodDimension.Any`, which permissively satisfies any dimension requirement."
+
+---
+
+## ModifierRequirement
+
+**Determination: B — Strategy 2 (Declaration Attribute Proof) handles this.**
+
+## Rationale
+
+**Callers (4 sites in `Operations.cs`):**
+
+- `ChoiceLessThanChoice` (line 760): `ModifierRequirement(PChoice, ModifierKind.Ordered, ...)`
+
+- `ChoiceGreaterThanChoice` (line 768): same
+
+- `ChoiceLessThanOrEqualChoice` (line 776): same
+
+- `ChoiceGreaterThanOrEqualChoice` (line 784): same
+
+All four attach the requirement to ordinal comparison operations on `choice` fields. The requirement says: "the choice field must declare the `ordered` modifier to permit ordinal comparison."
+
+**TypeChecker behavior:** The TypeChecker resolves `Choice < Choice → ChoiceLessThanChoice` by type matching. It stamps the `ModifierRequirement` onto the `TypedBinaryOp` (line 504). It does NOT check whether the choice field has the `ordered` modifier — the modifiers are resolved on `TypedField` (TypeChecker.cs lines 99–117) but never cross-referenced against operation requirements.
+
+**Why Strategy 2:** This is the purest case of a declaration attribute check. The predicate is:
+
+1. Resolve the proof subject to a field name.
+
+2. Look up the field's `Modifiers` array from `SemanticIndex.FieldsByName`.
+
+3. Discharge condition: `field.Modifiers.Contains(requirement.Required)` OR `field.ImpliedModifiers.Contains(requirement.Required)`.
+
+This is simpler than the `ProofDischarges` lookup path. The `ProofDischarges` mechanism maps modifiers → requirements they discharge (modifier "positive" discharges numeric requirement "> 0"). `ModifierRequirement` is the inverse — it asks "does the field have modifier X?" This is a direct membership check, not a discharge-table lookup.
+
+**Both arms coexist in Strategy 2.** The `ProofDischarges` path handles: "modifier presence implies numeric/presence bound" (e.g., `positive` → `> 0`). The `ModifierRequirement` path handles: "field must have this modifier" (e.g., `ordered` for choice comparison). Same strategy, two predicate shapes.
+
+## Concrete answer for the spec
+
+Add to `proof-engine.md` §7, Strategy 2 pseudocode, a new arm:
+
+```
+
+// ModifierRequirement: check if subject field declares the required modifier
+
+if (obligation.Requirement is ModifierRequirement modReq)
+
+{
+
+    var fieldName = GetFieldName(modReq.Subject, obligation.Site);
+
+    if (fieldName is null) return false;
+
+    if (!semantics.FieldsByName.TryGetValue(fieldName, out var field)) return false;
+
+    // Direct modifier check — does the field's declaration include the required modifier?
+
+    return field.Modifiers.Contains(modReq.Required)
+
+        || field.ImpliedModifiers.Contains(modReq.Required);
+
+}
+
+```
+
+Add to §6 `ModifierRequirement` description: "Discharged by Strategy 2 (Declaration Attribute Proof). The strategy resolves the subject to a field and checks whether the field's declared or implied modifiers include `requirement.Required`. This is a direct membership check — it does not use the `ProofDischarges` table."
+
+---
+
+## QualifierCompatibilityProofRequirement
+
+**Determination: C — A new strategy (Strategy 5: Qualifier Compatibility Proof) is required.**
+
+## Rationale
+
+**Callers (24+ sites in `Operations.cs`):**
+
+- Quantity arithmetic (lines 475, 484, 921–966): `QualifierAxis.Unit` — operands must share unit qualifier
+
+- Price arithmetic (lines 557–559, 568–570, 977–1034): `QualifierAxis.Unit` AND `QualifierAxis.Currency` — operands must share both unit and currency qualifiers
+
+All use `new ParamSubject(PQuantity)` or `new ParamSubject(PPrice)` for BOTH `LeftSubject` and `RightSubject` — same parameter reference. At the use site, these map to two different field expressions (e.g., `FieldA + FieldB` where both are quantity fields). The proof engine must verify that the two concrete field expressions share the same qualifier value on the specified axis.
+
+**TypeChecker behavior:** The TypeChecker disambiguates binary operation candidates using `QualifierMatch.Same` as the default assumption (TypeChecker.Expressions.cs line 576). The comment at line 573 explicitly says: "ProofEngine will verify qualifier compatibility at deeper analysis." The TypeChecker defers this check to the proof engine by design.
+
+**Why none of the four existing strategies work:**
+
+1. **Strategy 1 (Literal Proof):** Operates on a single subject's literal value. Does not handle dual subjects. Does not read qualifier metadata.
+
+2. **Strategy 2 (Declaration Attribute Proof):** Operates on a single subject's field declaration. `QualifierCompatibilityProofRequirement` is the ONLY dual-subject requirement kind — it has `LeftSubject` and `RightSubject`, not a single `Subject`. Strategy 2's predicate shape (resolve one subject → read its attributes → compare against requirement threshold) cannot express "compare two subjects against each other."
+
+3. **Strategy 3 (Guard-in-Path):** Guards don't establish qualifier relationships. A `when` clause says things like `when Quantity > 0`, not `when FieldA.unit == FieldB.unit`.
+
+4. **Strategy 4 (Flow Narrowing):** Same limitation as Strategy 3 — handles relational constraints between field values, not qualifier compatibility.
+
+**Strategy 5: Qualifier Compatibility Proof**
+
+Shape:
+
+```
+
+// Strategy 5: Qualifier Compatibility Proof — Discharge Predicate
+
+// Input: ProofObligation with QualifierCompatibilityProofRequirement
+
+// Reads: Both subjects' resolved qualifier bindings from SemanticIndex
+
+// Scope: Dual-subject obligations where two operands must share a qualifier value
+
+bool TryQualifierCompatibilityProof(ProofObligation obligation, SemanticIndex semantics)
+
+{
+
+    if (obligation.Requirement is not QualifierCompatibilityProofRequirement qcReq)
+
+        return false;
+
+    // 1. Resolve both subjects to their qualifier bindings
+
+    var leftQualifier = ResolveQualifierOnAxis(qcReq.LeftSubject, qcReq.Axis, obligation.Site, semantics);
+
+    var rightQualifier = ResolveQualifierOnAxis(qcReq.RightSubject, qcReq.Axis, obligation.Site, semantics);
+
+    // 2. If either qualifier is unresolved (unqualified field), cannot prove — Unresolved
+
+    if (leftQualifier is null || rightQualifier is null)
+
+        return false;
+
+    // 3. Compare: both must have the same qualifier value on the specified axis
+
+    return leftQualifier == rightQualifier;
+
+}
+
+```
+
+**Inputs required:**
+
+- `QualifierCompatibilityProofRequirement.LeftSubject` and `RightSubject` — both `ProofSubject` instances
+
+- `QualifierCompatibilityProofRequirement.Axis` — the `QualifierAxis` to compare on (Unit, Currency, etc.)
+
+- Resolved qualifier bindings from `SemanticIndex` — requires qualifier resolution to be implemented (currently `Qualifier: null` in TypeChecker, Slice 2+ dependency)
+
+**Dependency:** Strategy 5 depends on qualifier resolution shipping in the TypeChecker. Until then, all `QualifierCompatibilityProofRequirement` obligations will be `Unresolved` — which is correct defensive behavior. The proof engine should still instantiate the obligations; it just can't discharge them yet.
+
+## Concrete answer for the spec
+
+Add new §7.5 to `proof-engine.md`:
+
+> **Strategy 5: Qualifier Compatibility Proof**
+
+>
+
+> **When it applies:** The obligation is a `QualifierCompatibilityProofRequirement` — the only dual-subject requirement kind.
+
+>
+
+> **How it works:** Resolve both subjects to their qualifier bindings on the specified `QualifierAxis`. If both resolve to the same qualifier value, discharge. If either is unqualified or the values differ, the obligation remains `Unresolved`.
+
+>
+
+> **Examples:**
+
+> - `quantity of 'kg' + quantity of 'kg'` → both Unit qualifiers match → discharged
+
+> - `quantity of 'kg' + quantity of 'miles'` → Unit qualifiers differ → Unresolved → diagnostic
+
+> - `quantity + quantity` (unqualified) → cannot prove → Unresolved → diagnostic
+
+>
+
+> **Dependency:** Requires qualifier resolution in the TypeChecker (currently Slice 2+ future work). Until qualifier resolution ships, all `QualifierCompatibilityProofRequirement` obligations produce `Unresolved` — the correct conservative behavior.
+
+Add to §6 `QualifierCompatibilityProofRequirement` description: "Discharged by Strategy 5 (Qualifier Compatibility Proof) — the only strategy that handles dual-subject obligations. Compares both subjects' resolved qualifier bindings on the specified `QualifierAxis`. Requires qualifier resolution to be operational."
+
+---
+
+## Spec update instructions
+
+## §6 — ProofRequirementKind subtypes (lines 348–389)
+
+After each subtype's existing description, add the discharge strategy reference:
+
+1. **Line ~374 (DimensionProofRequirement):** Add: "Discharged by Strategy 2 (Declaration Attribute Proof). Reads the subject's resolved period dimension — from field qualifier for field references, from literal temporal unit for literals. `PeriodDimension.Any` permissively satisfies any dimension requirement."
+
+2. **Line ~381 (ModifierRequirement):** Add: "Discharged by Strategy 2 (Declaration Attribute Proof). Checks direct modifier membership: `field.Modifiers.Contains(requirement.Required)`. Does not use the `ProofDischarges` table — this is a presence check, not a discharge mapping."
+
+3. **Line ~389 (QualifierCompatibilityProofRequirement):** Add: "Discharged by Strategy 5 (Qualifier Compatibility Proof). The only dual-subject requirement kind — requires a dedicated strategy that compares two subjects' qualifier bindings. Depends on qualifier resolution in the TypeChecker."
+
+## §7 — Strategy 2 pseudocode (lines 536–569)
+
+Expand the `TryModifierProof` function to include the two new arms (DimensionProofRequirement and ModifierRequirement) in addition to the existing ProofDischarges loop. Rename if desired to `TryDeclarationAttributeProof` to match the locked rename.
+
+## §7 — New Strategy 5 section (after Strategy 4, line ~767)
+
+Add the full Strategy 5: Qualifier Compatibility Proof section as specified above.
+
+## §7 header (line 410)
+
+Update "Four Proof Strategies" → "Five Proof Strategies" in the section title.
+
+---
+
+## Catalog implications
+
+## No new catalog changes required for ModifierRequirement or DimensionProofRequirement
+
+- `ModifierRequirement` reads existing `TypedField.Modifiers` and `TypedField.ImpliedModifiers`. No new metadata needed.
+
+- `DimensionProofRequirement` reads the field's resolved qualifier (future Slice 2+ work) and literal temporal units. No new catalog property needed — it reads existing type metadata.
+
+## QualifierCompatibilityProofRequirement depends on qualifier resolution
+
+- The `QualifierAxis` enum already exists in `Type.cs` (line 39).
+
+- The `QualifierSlot` and `QualifierShape` types already exist in `Type.cs` and `Types.cs`.
+
+- What's missing: `TypedField.Qualifier` is currently `null` (TypeChecker.cs line 121). Qualifier resolution must ship before Strategy 5 can discharge obligations. Until then, all qualifier compatibility obligations are correctly `Unresolved`.
+
+## PE-G2 (ProofDischarges) is still a prerequisite for Strategy 2's existing NumericProofRequirement path
+
+The `FieldModifierMeta.ProofDischarges` property (PE-G2) is needed for the "modifier discharges numeric/presence bound" arm of Strategy 2. The two new arms (DimensionProofRequirement, ModifierRequirement) do NOT depend on `ProofDischarges` — they use different predicate shapes. PE-G2 remains a blocking prerequisite only for Strategy 2's original `ProofDischarges` path.
+
+---
+
+## Decision summary for Shane
+
+| Requirement Kind | Determination | Strategy | Blocking dependency? |
+
+|---|---|---|---|
+
+| `DimensionProofRequirement` | **B** — existing strategy handles it | Strategy 2 (Declaration Attribute Proof) | No (literal path works now; field path needs qualifier resolution) |
+
+| `ModifierRequirement` | **B** — existing strategy handles it | Strategy 2 (Declaration Attribute Proof) | No (reads existing `TypedField.Modifiers`) |
+
+| `QualifierCompatibilityProofRequirement` | **C** — new strategy required | **Strategy 5** (Qualifier Compatibility Proof) | Yes — depends on qualifier resolution (Slice 2+) |
+
+Two of three are absorbed into the existing Strategy 2. One requires a fifth strategy. The spec's "Four Proof Strategies" becomes "Five Proof Strategies." The fifth strategy is the only one with a qualifier-resolution dependency — it can be stubbed during initial ProofEngine implementation and activated when qualifier resolution ships.
+
+## 2026-05-08T21:22:17Z: PE-G1 resolved — Shane sign-off
+
+**Decision:** All three PE-G1 determinations approved by Shane.
+
+**DimensionProofRequirement:** Strategy 2 (new arm)
+
+**ModifierRequirement:** Strategy 2 (new arm)
+
+**QualifierCompatibilityProofRequirement:** Strategy 5 (new strategy, stubbed until qualifier resolution)
+
+**Spec updated:** docs/compiler/proof-engine.md — five strategies, §6 discharge references, §7 pseudocode arms
+
+**Gap analysis updated:** docs/Working/frank-proof-engine-gap-analysis.md — PE-G1 marked RESOLVED
+
+# Decision: PE-G4 through PE-G18 — All ProofEngine Gaps Resolved
+
+**Date:** 2026-05-08
+
+**Author:** Frank (Lead/Architect)
+
+**Status:** LOCKED — no deferrals, no open questions
+
+**Directive:** Shane's explicit mandate — define everything now so implementation can begin
+
+---
+
+## Summary
+
+All remaining ProofEngine spec gaps (PE-G4 through PE-G18) are resolved with zero deferrals. Combined with the previously resolved PE-G1, PE-G2, and PE-G3, the entire 18-gap inventory is now closed. The ProofEngine spec is READY for implementation.
+
+## Decisions Made
+
+## PE-G4: Walk Targets (not a helper property)
+
+**Decision:** Do NOT add `AllTypedExpressions` to SemanticIndex. Use explicit walk-target enumeration in a private `CollectObligations` method.
+
+**Rationale:** Avoids coupling surface; makes walk scope explicit and auditable.
+
+## PE-G5: Source Shapes Are Canonical
+
+**Decision:** `RuleIdentity(int RuleIndex)` and `EnsureIdentity(ConstraintKind, string? AnchorName, int EnsureIndex)` are correct. Spec must match source.
+
+**Rationale:** Source was created during TypeChecker implementation with tests. Spec hypothesized shapes that create invalid representations (two nullable anchor fields when only one can be non-null).
+
+## PE-G6: ObligationContext DU Replaces FindEnclosingTransitionRow
+
+**Decision:** New `ObligationContext` DU (5 subtypes). Context attached at instantiation time (O(1)), not discovered via post-hoc search. `ProofObligation` gains `Context` field.
+
+**Rationale:** Eliminates O(N²) search; makes context explicit at the point where it's known.
+
+## PE-G7: ResolveSubject Fully Defined
+
+**Decision:** `ResolveSubject` uses reference-equality parameter lookup against `Operations.GetMeta()` / `Functions.GetOverloads()` parameter lists. `GetFieldName` extracts field name from resolved expression.
+
+**Rationale:** The reference-equality model is already established in `ProofRequirement.cs` — this is the mechanical resolution consequence.
+
+## PE-G8: Full Satisfiability Algorithm
+
+**Decision:** Bounded constant folding: find initial state → collect `StateResident` ensures → build default value environment → substitute and fold → report violations for `false` results, conservative pass for `Unknown`. Initial event args NOT considered. Guarded ensures skipped.
+
+**Rationale:** Compile-time only, no evaluator dependency. Conservative — zero false positives at the cost of potentially missing some true violations.
+
+## PE-G9: Type Checker Owns Collection Diagnostics
+
+**Decision:** The type checker owns `UnguardedCollectionAccess` (63) and `UnguardedCollectionMutation` (64). The proof engine processes collection non-empty obligations as ordinary `NumericProofRequirement(count > 0)` through standard strategies. No new proof-stage diagnostic code needed for collections.
+
+**Rationale:** The catalog already encodes collection non-empty as `NumericProofRequirement` — the proof engine processes them generically. No duplication.
+
+## PE-G10: Full Guard Decomposition Rules
+
+**Decision:** AND-conjunctions decompose recursively. OR-disjunctions do NOT decompose. Simple negation inverts comparison operators. Conditionals and quantifiers are not decomposed. Operator inversion and negation inversion tables provided.
+
+**Rationale:** AND is safe (all conjuncts true). OR is unsafe (only one guaranteed). Bounded scope prevents false proofs.
+
+## PE-G11: Builder Contract Defined
+
+**Decision:** Three consumption patterns: (1) `FaultSiteLinks` → `FaultSiteDescriptor` backstops, (2) `ConstraintInfluence` → `ConstraintInfluenceMap` runtime artifact, (3) `InitialStateResults` → compile-time gate. `ConstraintInfluenceMap` type defined.
+
+**Rationale:** Defining the contract now ensures proof engine output shapes serve real consumers, not speculation. Shane's directive: no deferrals.
+
+## PE-G12: Diagnostic Formatting Table
+
+**Decision:** Template parameters defined for all three existing proof diagnostics. Four new diagnostic codes allocated (96–99).
+
+**Rationale:** Makes diagnostic output testable.
+
+## PE-G13: Error-Tainted Obligation Suppression
+
+**Decision:** Obligations with `TypedErrorExpression` in their site or resolved subject suppress proof diagnostic emission. `ContainsErrorExpression` recursive helper defined.
+
+**Rationale:** Prevents cascading diagnostics — the type checker already reported the root cause.
+
+## PE-G14: Exhaustive Guard Relation Triple Table
+
+**Decision:** 12-entry table covering all valid `(guard.Op, expr.Op, requirement)` combinations. Strategy 4 limited to subtraction only. Division explicitly excluded.
+
+**Rationale:** Subtraction with field-to-field guards covers the realistic use case. Division requires sign knowledge beyond bounded flow narrowing.
+
+## PE-G15: Stateless Precept Handling
+
+**Decision:** Proof engine runs for ALL precepts. Strategies 1, 2, 5 apply to stateless precepts. Strategies 3, 4 do not (no guards). Initial-state satisfiability skipped. No special-casing needed.
+
+**Rationale:** Division by zero in an event handler action is just as dangerous as in a transition row action.
+
+## PE-G16: Reference Identity for Site Matching
+
+**Decision:** `ProofObligation.Site` uses reference equality via `ReferenceEqualityComparer.Instance`. Proof engine must NOT copy expression nodes.
+
+**Rationale:** Structural equality would create false positives for identical-but-distinct expressions in different contexts.
+
+## PE-G17: Operator Names Verified
+
+**Decision:** All `OperatorKind` names in spec pseudocode match source exactly. No correction needed.
+
+## PE-G18: Diagnostic System Cross-Reference
+
+**Decision:** Add cross-references to `diagnostic-system.md` and `Compiler.cs` in proof engine spec §9.
+
+## New Types Introduced
+
+| Type | File | Purpose |
+
+|---|---|---|
+
+| `ObligationContext` (abstract) | `ProofLedger.cs` | DU base for obligation context |
+
+| `TransitionRowContext` | `ProofLedger.cs` | Obligation in a transition row |
+
+| `ConstraintContext` | `ProofLedger.cs` | Obligation in a rule/ensure condition |
+
+| `StateHookContext` | `ProofLedger.cs` | Obligation in a state hook |
+
+| `EventHandlerContext` | `ProofLedger.cs` | Obligation in an event handler |
+
+| `FieldExpressionContext` | `ProofLedger.cs` | Obligation in a field expression |
+
+## New Diagnostic Codes
+
+| Code | Name | Stage | Severity |
+
+|---|---|---|---|
+
+| 96 | `UnprovedModifierRequirement` | Proof | Error |
+
+| 97 | `UnprovedDimensionRequirement` | Proof | Error |
+
+| 98 | `UnprovedQualifierCompatibility` | Proof | Error |
+
+| 99 | `UnsatisfiableInitialState` | Proof | Error |
+
+## Spec Corrections Required
+
+14 corrections to `docs/compiler/proof-engine.md` — detailed in `frank-pe-g4-to-g18-resolution.md`.
+
+## REQUIRES SHANE INPUT
+
+None. All gaps resolved within existing architectural boundaries. No product surface or philosophy changes.
+
+## Full Resolution Document
+
+`docs/Working/inbox/frank-pe-g4-to-g18-resolution.md`
+
+## 2026-05-08: ProofEngine implementation plan complete — ready for Shane review
+
+**By:** Frank (Lead/Architect)
+
+**Artifact:** `docs/Working/frank-pe-implementation-plan.md`
+
+**What:** Definitive implementation plan for the ProofEngine feature. Two phases (8 prework slices + 13 engine slices), ~134 named tests, method-level specificity throughout.
+
+**Key findings during planning:**
+
+- Diagnostic codes 96–99 (referenced in spec for proof-stage codes) are already allocated to CI enforcement and collection safety codes. Plan allocates 112–115 instead. Spec correction included as Prework Slice P8.
+
+- ProofLedger.cs already has the full G3 shape (ProofObligation, FaultSiteLink, etc.) but is missing ObligationContext — added in Prework Slice P6.
+
+- ProofSatisfaction DU, DeclaredPresenceMeta, and DeclaredQualifierMeta do not exist in source yet — created in Prework Slices P1–P3.
+
+- FieldModifierMeta has no ProofSatisfactions property — added in Prework Slice P4 with all 10 modifier entries populated.
+
+- TypedField and TypedArg lack Presence and DeclaredQualifiers properties — added in Prework Slice P5 (high-touch: every construction site must be updated).
+
+**Phase 1 (Prework):** 8 slices creating structural shapes, catalog metadata, and diagnostic codes. ~37 tests. No behavioral changes — build stays green.
+
+**Phase 2 (Engine):** 13 slices implementing the full two-pass engine with all 5 strategies, error suppression, diagnostics, constraint influence, initial-state satisfiability, forwarding fact consumption, and stateless precept handling. ~97 tests.
+
+**Estimated total:** ~134 new tests across `ProofEngineTests.cs`, `ProofLedgerTests.cs`, `ProofRequirementTests.cs`, `ModifiersTests.cs`, and `DiagnosticsTests.cs`.
+
+**Ready for:** George to execute once Shane approves.

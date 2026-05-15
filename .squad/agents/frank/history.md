@@ -35,6 +35,14 @@
 
 ## Recent Updates
 
+### 2026-05-15T02:57:25Z — George blocked §5.7 implementation slices
+
+- George reviewed `docs/working/quantity-normalization-design.md` §5.7 and marked the current slice plan BLOCKED for revision.
+- Slice 33 must target `contains` on the synthetic membership path (`ResolveBinaryOp` → `TryResolveCatalogBinaryWithoutOperation` → `CreateSyntheticBinaryOp`), not `in` / `not in`.
+- Slice 32 must cover both successful returns inside `SelectOverload`, and slices 35–36 need "introduce" wording because the currently named normalizer/helper seams do not exist yet.
+- Current canonical file seams called out by George: `src/Precept/Language/Ucum/UcumAtomCatalog.cs`, `src/Precept/Language/Diagnostics.cs`, and `src/Precept/Language/Functions.cs`.
+- PRE0137 remains the correct next diagnostic ordinal; regression anchors should call out `test/Precept.Tests/ProofEngineTests.cs` and `test/Precept.Tests/TypeChecker/OperatorTypingTests.cs`.
+- George also noted that `dotnet test test/Precept.Tests/Precept.Tests.csproj --no-restore` is already red by 7 baseline failures.
 ### 2026-05-15T02:32:44Z — Affine unit conversion design for temperature units
 
 - Designed `docs/working/quantity-normalization-design.md` §6.8 to support affine temperature normalization for `Cel`, `[degF]`, and `[degRe]` with `base = (value + offset) × scale`.
@@ -81,3 +89,4 @@
 ## Learnings
 
 - 2026-05-14T22:48:46.544-04:00 — Added formal implementation slices 30–43 to `docs/working/quantity-normalization-design.md`, covering the four qualifier gaps, the four-slice affine lane, five pre-implementation documentation slices, and the standalone `TypedInterpolatedTypedConstant` → `InterpolatedTypedConstant` rename.
+- 2026-05-14T23:06:08.162-04:00 — George's §5.7 blockers required hard correction of the actual code seams: the diagnostic surfaces are `src/Precept/Language/DiagnosticCode.cs` and `src/Precept/Language/Diagnostics.cs`, the functions catalog is `src/Precept/Language/Functions.cs`, and the membership seam is `src/Precept/Pipeline/TypeChecker.Expressions.cs` via `ResolveBinaryOp` → `TryResolveCatalogBinaryWithoutOperation` → `CreateSyntheticBinaryOp` for `contains` (not `in` / `not in`). There is no existing `TypeChecker.TryGetStaticScalingFactor()` helper in the current codebase; affine helper wording must use introduce/new-helper language instead.
