@@ -6,6 +6,62 @@
 
 ---
 
+### 2026-05-15T19:30:00Z: Slice 26 warnings are closed and the slice is fully approved
+
+**By:** Scribe
+
+**Status:** Merged from Frank's warning-closure verification.
+
+**Merged source:** `frank-slice-26-warnings-check.md`.
+
+- Frank verified the arg-default diagnostic context now formats as `arg 'Event.Arg'` through `ArgDefaultContext`, closing the user-facing `"here"` fallback on overflow diagnostics.
+- The new `EventArgDefault_QualifierMismatch_EmitsDiagnostic` test exercises the live `ValidateAssignmentQualifiers` arg-default path with `money in 'USD' default '50 EUR'`.
+- Focused `TypeCheckerEventArgDefaultTests` now pass 8/8, Slice 26 is fully closed, and Slice 27 is unblocked.
+
+---
+
+### 2026-05-15T18:30:00Z: Slice 26 review approved the design but required two pre-doc-sync fixes
+
+**By:** Scribe
+
+**Status:** Merged from Frank's Slice 26 review.
+
+**Merged source:** `frank-slice-26-review.md`.
+
+- Frank approved the core Slice 26 shape: `ResolveEventArgExpressions`, arg-default obligation collection, `ValidateMaxPlaces` delegation, and the cross-unit scaling path were all structurally correct with 7 new tests green.
+- W1 required an `ArgDefaultContext` formatter branch so arg-default overflow diagnostics stop falling back to `"here"` instead of naming the owning event arg.
+- W2 required direct qualifier-mismatch coverage on the arg-default `ValidateAssignmentQualifiers` path; the standing 9-suite failures remained explicitly pre-existing and non-blocking once the warnings were closed.
+
+---
+
+### 2026-05-15T18:01:02Z: Mandatory commas between field modifiers are rejected
+
+**By:** Scribe
+
+**Status:** Merged from Frank's feasibility assessment.
+
+**Merged source:** `frank-modifier-comma-assessment.md`.
+
+- No parser ambiguity or current readability cliff justifies punctuation here: modifier keywords are self-delimiting and no sample in the corpus exceeds four modifiers on one field.
+- Commas already carry list semantics elsewhere in the DSL, so reusing them between modifiers would blur an existing structural cue instead of clarifying the grammar.
+- If modifier readability ever degrades, the preferred intervention is formatter-enforced line breaking rather than grammar-level comma requirements.
+
+---
+
+### 2026-05-15T11:37:42Z: Slice 21 interpolated quantity proof coverage is fully green
+
+**By:** Scribe
+
+**Status:** Merged from Soup Nazi's coverage report.
+
+**Merged source:** `soup-nazi-s21-coverage.md`.
+
+- All 10 tests in `TypeCheckerInterpolatedQuantityTests` pass against the unchanged 9-failure branch baseline, covering magnitude-slot scaling, WholeValue recursion, conservative dynamic-unit and dynamic-price fallback, and money magnitude handling.
+- The report explicitly confirms `HasSingleMagnitudeSlot` prevents double-normalization on WholeValue paths, while noting the current happy-path bound is not itself a dedicated false-safety detector.
+- Recommended future hardening is a tighter-bound regression if that guard ever changes; no new regressions were introduced in the current slice coverage pass.
+
+---
+
 ### 2026-05-15T18:00:00Z: Slice 25 warning closure is verified and the slice is fully closed
 
 **By:** Scribe

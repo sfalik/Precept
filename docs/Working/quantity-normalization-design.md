@@ -1902,7 +1902,7 @@ For `[lb_av]`:
 | **23** | Route `StaticQualifier` through qualifier consumers | ⬜ Not started | Needs 22 |
 | **24** | Money/price interpolated interval extraction | ⬜ Not started | Needs 19, 22 |
 | **25** | Field-default proof coverage (`FoldValue` + collector) | ✅ Done | Needs 19, 22, 23 |
-| **26** | Event arg default resolution (`ResolveEventArgExpressions`) | ⬜ Not started | Needs 25, 15b |
+| **26** | Event arg default resolution (`ResolveEventArgExpressions`) | ✅ Done | Needs 25, 15b |
 | **27** | Doc sync (language spec, proof-engine.md, interval design) | ⬜ Not started | Needs 16, 18 (shape freeze) |
 | **30** | Extend PRE0070/PRE0071 to comparison operators | ✅ Done | None |
 | **31** | PRE0137 `CrossCountingUnitOperation` | ✅ Done | None |
@@ -3579,7 +3579,7 @@ These slices extend the normalization design to cover interpolated typed constan
 | **23** | Route `StaticQualifier` through qualifier consumers | Slice 22 | ⬜ |
 | **24** | Extend interpolated interval extraction to money/price | Slices 19, 22 | ✅ |
 | **25** | Field-default proof coverage for interpolated typed constants | Slices 19, 22, 23 | ✅ |
-| **26** | Event arg default resolution (typed-constant defaults) | Slices 25, 15b | ⬜ |
+| **26** | Event arg default resolution (typed-constant defaults) | Slices 25, 15b | ✅ |
 
 ---
 
