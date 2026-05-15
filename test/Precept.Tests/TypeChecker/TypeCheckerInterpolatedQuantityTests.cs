@@ -313,8 +313,8 @@ public class TypeCheckerInterpolatedQuantityTests
     public void InterpolatedPrice_SameUnit_MagnitudeWithinMax_DoesNotEmitNumericOverflow()
     {
         // '{n} USD/kg': single Magnitude slot; StaticQualifier = StaticCurrencyAndUnitQualifier(USD, kg).
-        // IntervalOfNarrowed recurses on n → [0..3].
-        // ApplyStaticUnitScaling: kg is the denominator unit; scale_kg = 1 → interval.Scale(1/1) = [0..3].
+        // IntervalOfNarrowed recurses on n → [MinValue..3] (n has no explicit min, only max 3).
+        // ApplyStaticUnitScaling: kg is the denominator unit; scale_kg = 1 → interval.Scale(1/1) = [MinValue..3].
         // No inverse scaling amplification for same-unit case. Target max '10 USD/kg' → 3 ≤ 10 → Proved.
         // This is the same-unit regression anchor: ensures the Slice 24 price path does NOT
         // accidentally apply inverse scaling when the assignment unit already matches the field unit.
