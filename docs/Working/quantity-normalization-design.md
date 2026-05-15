@@ -2681,6 +2681,8 @@ end
 
 #### 6.8.1 Scope
 
+**Rule:** Supported compile-time quantity normalization includes every UCUM unit whose conversion can be expressed as a catalog-encoded affine transform `base = (value + offset) × scale`. Temperature is therefore **in scope**. The remaining exclusions are units whose meaning depends on logarithmic/reference-level semantics rather than an affine `(scale, offset)` pair.
+
 **Included (affine conversions):**
 
 | Unit | UCUM Code | Conversion to K | Type |
@@ -2690,7 +2692,7 @@ end
 | Degree Réaumur | `[degRe]` | `K = (°Ré + 218.52) × 5/4` | Affine: scale=5/4, pre-offset=218.52 |
 | Degree Rankine | `[degR]` | `K = °R × 5/9` | **Linear** (already works — no offset) |
 
-**Excluded (logarithmic conversions) — with rationale:**
+**Excluded (logarithmic/reference-level conversions only) — with rationale:**
 
 | Unit | UCUM Code | Conversion | Why excluded |
 |------|-----------|------------|--------------|
@@ -2698,15 +2700,15 @@ end
 | pH | `[pH]` | `pH = -log10[H+]` | Same log-based constraints; inverse relationship (higher pH = lower concentration) makes automated normalization error-prone; clinical/scientific domain |
 | Neper | `Np` | `Np = ln(A/A_ref)` | Natural-log variant; same arithmetic incompatibility |
 
-**Why logarithmic units remain excluded:**
+**Why only logarithmic/reference-level units remain excluded:**
 
 1. **Interval arithmetic is structurally incompatible.** The normalization design uses `NumericInterval` for static analysis — interval containment, union, intersection. These operations assume additive/multiplicative structure: `[a, b] × c = [a×c, b×c]`. Logarithmic conversions violate this: `log([a, b])` is only defined when both bounds are positive, and `log(a + b) ≠ log(a) + log(b)`. Supporting log-scale intervals would require a fundamentally different interval representation.
 
-2. **Domain mismatch.** Precept governs business entities — orders, products, shipments, inventory. Temperature appears in cold-chain logistics, HVAC, and food safety (real business use cases). dB and pH appear in scientific instruments and clinical assays — not in the business-entity lifecycle workflows that Precept targets.
+2. **Domain mismatch.** Precept governs business entities — orders, products, shipments, inventory. Temperature appears in cold-chain logistics, HVAC, and food safety (real business use cases), so affine temperature units are in scope. dB and pH appear in scientific instruments and clinical assays — not in the business-entity lifecycle workflows that Precept targets.
 
 3. **Reference-level ambiguity.** dB is not one unit — it's a family: `dB[SPL]` (sound pressure, ref=20 μPa), `dB[V]` (voltage, ref=1 V), `dB[W]` (power, ref=1 W). Cross-variant comparison (`dB[SPL]` vs `dB[V]`) is physically meaningless. Even within one variant, the reference level is domain-context, not something the type system can safely normalize.
 
-**Treatment of excluded units:** `TryGetStaticConversionFactor` returns `null` for logarithmic units. Fields declared in dB or pH store raw magnitudes with no normalization. Cross-unit comparison between dB and another unit is blocked by the dimension check (logarithmic units have distinct dimension vectors). This is the same behavior as today — explicitly documented rather than implicitly dropped.
+**Treatment of excluded units:** `TryGetStaticConversionFactor` returns `null` for logarithmic/reference-level units. Fields declared in dB or pH store raw magnitudes with no normalization. Cross-unit comparison between dB and another unit is blocked by the dimension check (logarithmic units have distinct dimension vectors). This is the same behavior as today — explicitly documented rather than implicitly dropped.
 
 ---
 

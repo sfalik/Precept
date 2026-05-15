@@ -1342,7 +1342,9 @@ Event args are accessed via dotted notation: `EventName.ArgName`. The type check
 | `exchangerate` | `*` | `money` | `money` | Currency conversion. Commutative. |
 | `exchangerate` | `*` `/` | `decimal` | `exchangerate` | Commutative for `*`. |
 
-**Business-domain comparison:** `money`, `quantity`, `price` support all comparison operators (same currency/dimension/unit required). `exchangerate`, `currency`, `unitofmeasure`, `dimension` support only `==`/`!=` — ordering operators are type errors.
+**Business-domain comparison:** `money`, `quantity`, `price` support all comparison operators. `money` requires matching currency. `quantity` and `price` require qualifier compatibility on the relevant axis: physically convertible UCUM units may compare after normalization, while explicit counting units inside the shared `count` dimension still require matching unit identity unless the author supplies an explicit conversion field. `exchangerate`, `currency`, `unitofmeasure`, `dimension` support only `==`/`!=` — ordering operators are type errors.
+
+For quantity normalization, affine UCUM units with catalog-encoded `(scale, offset)` metadata are in scope, including temperature units such as `Cel`, `[degF]`, and `[degRe]`. The exclusion boundary is not "anything non-linear-looking"; it is specifically logarithmic/reference-level units such as `dB` and `[pH]`, which do not reduce to a stable affine conversion law for compile-time normalization.
 
 #### Unary operators
 
