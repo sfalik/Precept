@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using Precept.Language;
@@ -294,11 +295,22 @@ public static partial class ProofEngine
             return interval;
 
         if (expr.ResultType == TypeKind.Price)
-            return interval.Scale(1m / scale);
+            return TrimIntervalPrecision(interval.Scale(1m / scale));
 
-        return offset.HasValue
+        var scaled = offset.HasValue
             ? interval.Shift(offset.Value).Scale(scale)
             : interval.Scale(scale);
+        return TrimIntervalPrecision(scaled);
+    }
+
+    private static NumericInterval TrimIntervalPrecision(NumericInterval interval)
+    {
+        if (interval.IsUnbounded)
+            return interval;
+
+        return new NumericInterval(
+            decimal.Round(interval.Min, 24, MidpointRounding.ToEven),
+            decimal.Round(interval.Max, 24, MidpointRounding.ToEven));
     }
 
     private static bool HasSingleMagnitudeSlot(InterpolatedTypedConstant interpolated)
