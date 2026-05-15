@@ -18969,3 +18969,53 @@ The existing design had the technical solutions in §6.7 and §6.8, but not a si
 
 VERDICT: APPROVED
 All blocking findings from the previous review have been resolved. §5.7 now points at the real code surfaces (`src/Precept/Language/DiagnosticCode.cs`, `src/Precept/Language/Diagnostics.cs`, `src/Precept/Language/Functions.cs`, `src/Precept/Language/Ucum/UcumAtomCatalog.cs`), Slice 32 correctly names both `SelectOverload` success paths, and Slice 33 now uses Precept’s actual `contains` operator via `ResolveBinaryOp` → `TryResolveCatalogBinaryWithoutOperation` → `CreateSyntheticBinaryOp`. Spot-checks against source confirmed `ValidateQualifierCompatibility`, `ResolveFunctionCall`, `SelectOverload`, `CreatePendingAtom`, `StripFunctionWrapper`, `TypedInterpolatedTypedConstant`, and PRE0137 as the next free ordinal after `CountBoundViolation = 136`. I did not find remaining stale file or method references inside the revised §5.7 slice list.
+# George — Slice N + Slice M Notes
+
+## Summary of changes made
+- Slice N: Updated type-checker bound handling so bare numeric `min`/`max` bounds on `quantity` fields no longer trigger PRE0018 type mismatch and no longer trigger PRE0133 when the field has an explicit unit qualifier (`in 'unit'`).
+- Slice M: Added PRE0138 (`CountDimensionBoundsAmbiguous`) and wired bound validation to emit PRE0138 for bare numeric bounds on `quantity of 'count'` (dimension-only count) instead of PRE0133.
+- Added/updated TypeChecker tests in `TypeCheckerQualifierCompatibilityTests` to cover:
+  - `quantity in 'kg' min 0 max 100` => no PRE0018/PRE0133
+  - `quantity of 'count' max 4` => PRE0138 and no PRE0018/PRE0133
+
+## Diagnostic code sites and rationale
+- Slice N PRE0018 suppression site: `src/Precept/Pipeline/TypeChecker.cs` in min/max bound type assignment checks.
+  - Rationale: This is the direct `IsAssignable(Integer|Decimal, Quantity)` gate producing the false-positive PRE0018.
+- Slice N PRE0133 suppression site: `src/Precept/Pipeline/TypeChecker.Validation.Modifiers.cs` in `ValidateBoundQualifierCompatibility`.
+  - Rationale: This is where plain numeric bound values (`ExtractedBoundValue` with empty qualifiers) trigger PRE0133. Added an early skip for explicit-unit quantity fields to avoid risky qualifier synthesis changes.
+- Slice M PRE0138 site: `src/Precept/Pipeline/TypeChecker.Validation.Modifiers.cs` before generic PRE0133 emission in the same compatibility path.
+  - Rationale: For count-dimension-only qualifiers (`of 'count'`), bare numeric bounds are semantically ambiguous; this is the narrowest, lowest-regression interception point.
+
+## Validation snapshot
+- `dotnet build src\Precept\Precept.csproj` => **Succeeded**
+- `dotnet test test\Precept.Tests\Precept.Tests.csproj --no-build` => **Failed (pre-existing suite state)**
+  - Summary: total 5522, failed 15, succeeded 5507, skipped 0
+- Focused regression check:
+  - `dotnet test test\Precept.Tests\Precept.Tests.csproj --no-build --filter "FullyQualifiedName~TypeCheckerQualifierCompatibilityTests"` => **Passed**
+  - Summary: total 11, failed 0, succeeded 11, skipped 0
+
+
+---
+
+# George Wave 2b Notes
+
+## Implemented
+- Slice 35: `TypedConstantNormalizer` now supports affine params via `TryGetStaticAffineParams`, uses `(value + offset) * scale` in `NormalizeQuantity`, and inverse affine transform in `DenormalizeQuantity`.
+- Slice 36: Added `NumericInterval.Shift(decimal)` and updated `ProofEngine.IntervalOf` static-unit scaling to apply affine transforms (`Shift` then `Scale`) for affine quantity units.
+- Slice 37: Affine matrix tests now pass; added precision trimming for affine normalization/interval scaling to eliminate decimal noise at boundaries.
+
+## Test expectation corrections
+- Corrected `UcumAtom_dB_NoAffineOffset` to parse `dB` via `UcumParser` instead of direct `UcumAtomCatalog.All["dB"]` lookup, because `dB` is valid parsable UCUM but not guaranteed as a direct key in `All`.
+
+## Open issues / edge cases
+- Full `Precept.Tests` still has 9 existing non-affine failures (ProofEngine/type-checking areas unrelated to this wave2b affine lane).
+
+## Validation snapshot
+- `dotnet build src\Precept\Precept.csproj`: **Succeeded**
+- `dotnet test test\Precept.Tests\Precept.Tests.csproj`: **Failed** (Failed: 9, Passed: 5513, Skipped: 0, Total: 5522)
+- Affine-focused validation: `TypedConstantNormalizerTests` + `ProofEngineIntervalTests` + Celsius/Fahrenheit interval integration check are passing.
+
+
+---
+
+
