@@ -163,6 +163,12 @@ public enum DiagnosticCode
     CrossCountingUnitOperation         = 137,
     /// <summary>Bounds on count-dimension quantity fields are ambiguous without an explicit counting unit.</summary>
     CountDimensionBoundsAmbiguous      = 138,
+    /// <summary>
+    /// The <c>of</c> qualifier is only valid when the <c>in</c> slot resolves to a currency code.
+    /// When <c>in</c> resolves to a unit or compound price, <c>of</c> is not permitted because
+    /// the unit already carries dimension information.
+    /// </summary>
+    InvalidQualifierCoexistence        = 139,
 
     // ── Graph ────────────────────────────────────────────
     UnreachableState                   =  80,

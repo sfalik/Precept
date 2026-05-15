@@ -141,6 +141,26 @@ internal static partial class TypeChecker
             if (meta is not null)
                 builder.Add(meta);
         }
+
+        // Enforce OfRequiresCurrencyIn: when the shape says 'of' is only valid with a currency 'in',
+        // reject 'of' if 'in' resolved to a unit or compound price.
+        if (qualified.InnerType is SimpleTypeReference shapeInner &&
+            shapeInner.Type.QualifierShape is { OfRequiresCurrencyIn: true })
+        {
+            bool hasOf = qualified.Qualifiers.Any(q => q.Preposition == TokenKind.Of);
+            var inMeta = builder.FirstOrDefault(m => m.Preposition == TokenKind.In);
+            if (hasOf && inMeta is not null && inMeta is not DeclaredQualifierMeta.Currency)
+            {
+                var inValue = inMeta switch
+                {
+                    DeclaredQualifierMeta.Unit u => u.UnitCode,
+                    DeclaredQualifierMeta.CompoundPrice cp => $"{cp.CurrencyCode}/{cp.UnitCode}",
+                    _ => "?",
+                };
+                ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.InvalidQualifierCoexistence, qualified.Span, inValue));
+            }
+        }
+
         return builder.ToImmutable();
     }
 
@@ -161,6 +181,7 @@ internal static partial class TypeChecker
         QualifierAxis.ToCurrency        => MapToCurrencyQualifier(qualifier.Value, qualifier.ValueSpan, ctx),
         QualifierAxis.TemporalDimension => MapTemporalDimensionQualifier(qualifier.Value, qualifier.ValueSpan, ctx),
         QualifierAxis.TemporalUnit      => MapTemporalUnitQualifier(qualifier.Value, qualifier.ValueSpan, ctx),
+        QualifierAxis.PriceIn           => MapPriceInQualifier(qualifier.Value, qualifier.ValueSpan, ctx),
         _                               => null,
     };
 
@@ -174,6 +195,7 @@ internal static partial class TypeChecker
             QualifierAxis.Unit => TypeKind.UnitOfMeasure,
             QualifierAxis.Dimension => TypeKind.Dimension,
             QualifierAxis.Timezone => TypeKind.Timezone,
+            QualifierAxis.PriceIn => TypeKind.Currency, // interpolated PriceIn: resolve as Currency at runtime
             _ => (TypeKind?)null,
         };
 
@@ -193,6 +215,7 @@ internal static partial class TypeChecker
             QualifierAxis.Dimension         => new DeclaredQualifierMeta.Dimension(template, SourceFieldName: sourceFieldName),
             QualifierAxis.FromCurrency      => new DeclaredQualifierMeta.FromCurrency(template, SourceFieldName: sourceFieldName),
             QualifierAxis.ToCurrency        => new DeclaredQualifierMeta.ToCurrency(template, SourceFieldName: sourceFieldName),
+            QualifierAxis.PriceIn           => new DeclaredQualifierMeta.Currency(template, SourceFieldName: sourceFieldName),
             _                               => null,
         };
     }
@@ -333,6 +356,61 @@ internal static partial class TypeChecker
         }
         var dimension = entry.IsCalendarBased ? PeriodDimension.Date : PeriodDimension.Time;
         return new DeclaredQualifierMeta.TemporalUnit(value, dimension);
+    }
+
+    /// <summary>
+    /// Resolves a polymorphic <c>in</c> value on a <c>price</c> field. The value may be a currency
+    /// code, a <c>currency/unit</c> compound expression, or a bare unit code.
+    /// </summary>
+    private static DeclaredQualifierMeta? MapPriceInQualifier(string value, SourceSpan valueSpan, CheckContext ctx)
+    {
+        // 1. Compound form: "USD/kg"
+        var slashIndex = value.IndexOf('/');
+        if (slashIndex > 0 && slashIndex < value.Length - 1)
+        {
+            var currencyPart = value[..slashIndex];
+            var unitPart = value[(slashIndex + 1)..];
+
+            if (!CurrencyCatalog.All.ContainsKey(currencyPart))
+                ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.InvalidCurrencyCode, valueSpan, currencyPart));
+
+            string dimensionName;
+            if (UnitDimensionHelper.CountQualifierUnitCodes.Contains(unitPart))
+            {
+                dimensionName = "count";
+            }
+            else
+            {
+                var result = UcumParser.Parse(unitPart);
+                if (!result.IsValid)
+                {
+                    ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.InvalidUnitString, valueSpan, unitPart));
+                    dimensionName = "";
+                }
+                else
+                {
+                    dimensionName = UnitDimensionHelper.DeriveUnitDimensionName(result.Unit!);
+                }
+            }
+
+            return new DeclaredQualifierMeta.CompoundPrice(currencyPart, unitPart, dimensionName);
+        }
+
+        // 2. Currency-only: "USD"
+        if (CurrencyCatalog.All.ContainsKey(value))
+            return new DeclaredQualifierMeta.Currency(value);
+
+        // 3. Unit-only: "kg"
+        if (UnitDimensionHelper.CountQualifierUnitCodes.Contains(value))
+            return new DeclaredQualifierMeta.Unit(value, "count");
+
+        var unitResult = UcumParser.Parse(value);
+        if (unitResult.IsValid)
+            return new DeclaredQualifierMeta.Unit(value, UnitDimensionHelper.DeriveUnitDimensionName(unitResult.Unit!));
+
+        // Unrecognized — emit invalid currency code (the original axis expectation)
+        ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.InvalidCurrencyCode, valueSpan, value));
+        return null;
     }
 
     /// <summary>

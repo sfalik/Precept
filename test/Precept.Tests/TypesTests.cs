@@ -185,8 +185,9 @@ public class TypesTests
         var meta = Types.GetMeta(TypeKind.Price);
         meta.QualifierShape.Should().NotBeNull();
         meta.QualifierShape!.InOfExclusive.Should().BeFalse();
+        meta.QualifierShape.OfRequiresCurrencyIn.Should().BeTrue();
         meta.QualifierShape.Slots.Should().HaveCount(2);
-        meta.QualifierShape.Slots[0].Should().Be(new QualifierSlot(TokenKind.In, QualifierAxis.Currency));
+        meta.QualifierShape.Slots[0].Should().Be(new QualifierSlot(TokenKind.In, QualifierAxis.PriceIn));
         meta.QualifierShape.Slots[1].Should().Be(new QualifierSlot(TokenKind.Of, QualifierAxis.Dimension));
     }
 

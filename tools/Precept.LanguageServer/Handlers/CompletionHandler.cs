@@ -982,6 +982,9 @@ internal sealed class CompletionHandler : ICompletionHandler
             case QualifierAxis.Timezone:
                 expectedType = TypeKind.Timezone;
                 return true;
+            case QualifierAxis.PriceIn:
+                expectedType = TypeKind.Currency;
+                return true;
             default:
                 expectedType = default;
                 return false;

@@ -39,9 +39,9 @@ public static class Types
 
     private static readonly QualifierShape QS_CurrencyAndDimension = new(
     [
-        new(TokenKind.In, QualifierAxis.Currency),
+        new(TokenKind.In, QualifierAxis.PriceIn),
         new(TokenKind.Of, QualifierAxis.Dimension),
-    ], InOfExclusive: false);
+    ], InOfExclusive: false, OfRequiresCurrencyIn: true);
 
     private static readonly QualifierShape QS_ExchangeRate = new(
     [
@@ -581,7 +581,7 @@ public static class Types
             "Price: monetary amount per unit",
             TypeCategory.BusinessDomain,
             QualifierShape: QS_CurrencyAndDimension,
-            RequiredBoundQualifierAxes: [QualifierAxis.Currency],
+            RequiredBoundQualifierAxes: [QualifierAxis.Currency, QualifierAxis.Unit, QualifierAxis.PriceIn],
             Traits: TypeTrait.Orderable | TypeTrait.EqualityComparable,
             Accessors:
             [

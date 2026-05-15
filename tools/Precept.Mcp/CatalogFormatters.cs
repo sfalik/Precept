@@ -809,7 +809,8 @@ internal static class CatalogFormatters
 
     private static string RenderQualifierShape(QualifierShape shape)
         => JoinOrNone(shape.Slots.Select(slot => $"{RenderToken(slot.Preposition)} `{slot.Axis}`"))
-            + (shape.InOfExclusive ? "; `in`/`of` are mutually exclusive" : string.Empty);
+            + (shape.InOfExclusive ? "; `in`/`of` are mutually exclusive" : string.Empty)
+            + (shape.OfRequiresCurrencyIn ? "; `of` requires `in` to resolve to a currency" : string.Empty);
 
     private static string RenderAccessor(TypeAccessor accessor)
         => accessor switch
@@ -968,6 +969,7 @@ internal static class CatalogFormatters
         DeclaredQualifierMeta.FromCurrency fromCurrency => WrapCode($"FromCurrency:{fromCurrency.CurrencyCode}"),
         DeclaredQualifierMeta.ToCurrency toCurrency => WrapCode($"ToCurrency:{toCurrency.CurrencyCode}"),
         DeclaredQualifierMeta.Timezone timezone => WrapCode($"Timezone:{timezone.TimezoneId}"),
+        DeclaredQualifierMeta.CompoundPrice compound => WrapCode($"CompoundPrice:{compound.CurrencyCode}/{compound.UnitCode} ({compound.DimensionName})"),
         _ => WrapCode(qualifier.Axis.ToString()),
     };
 

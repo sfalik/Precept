@@ -1950,6 +1950,7 @@ internal static class RichHoverFactory
         DeclaredQualifierMeta.Timezone timezone => timezone.TimezoneId,
         DeclaredQualifierMeta.TemporalDimension dimension => dimension.Value.ToString().ToLowerInvariant(),
         DeclaredQualifierMeta.TemporalUnit unit => unit.UnitName,
+        DeclaredQualifierMeta.CompoundPrice compound => $"{compound.CurrencyCode}/{compound.UnitCode}",
         _ => string.Empty,
     };
 
@@ -2021,7 +2022,7 @@ internal static class RichHoverFactory
 
     private static string GetQualifierAnnotationLabel(QualifierAxis axis) => axis switch
     {
-        QualifierAxis.Currency or QualifierAxis.Unit or QualifierAxis.FromCurrency or QualifierAxis.Timezone or QualifierAxis.TemporalUnit => "`in ...`",
+        QualifierAxis.Currency or QualifierAxis.Unit or QualifierAxis.FromCurrency or QualifierAxis.Timezone or QualifierAxis.TemporalUnit or QualifierAxis.PriceIn => "`in ...`",
         QualifierAxis.Dimension or QualifierAxis.TemporalDimension => "`of ...`",
         QualifierAxis.ToCurrency => "`to ...`",
         _ => "qualifier",
@@ -2050,12 +2051,14 @@ internal static class RichHoverFactory
     private static string GetQualifierAxisName(QualifierHoverInfo info) => info.ResolvedQualifier switch
     {
         DeclaredQualifierMeta.TemporalDimension or DeclaredQualifierMeta.TemporalUnit => GetQualifierAxisName(info.ResolvedQualifier.Axis),
+        DeclaredQualifierMeta.CompoundPrice => "compound price",
         _ => GetQualifierAxisName(info.Axis),
     };
 
     private static string GetQualifierChecksText(QualifierHoverInfo info) => info.ResolvedQualifier switch
     {
         DeclaredQualifierMeta.TemporalDimension or DeclaredQualifierMeta.TemporalUnit => GetQualifierChecksText(info.ResolvedQualifier.Axis),
+        DeclaredQualifierMeta.CompoundPrice => "checks currency, unit, or compound price qualifier",
         _ => GetQualifierChecksText(info.Axis),
     };
 
@@ -2710,6 +2713,7 @@ internal static class RichHoverFactory
         QualifierAxis.Timezone => "timezone",
         QualifierAxis.TemporalDimension => "temporal dimension",
         QualifierAxis.TemporalUnit => "temporal unit",
+        QualifierAxis.PriceIn => "currency, unit, or compound",
         _ => "qualifier",
     };
 
@@ -2723,6 +2727,7 @@ internal static class RichHoverFactory
         QualifierAxis.Timezone => "Timezone",
         QualifierAxis.TemporalDimension => "Temporal dimension",
         QualifierAxis.TemporalUnit => "Temporal unit",
+        QualifierAxis.PriceIn => "Currency, Unit, or Compound",
         _ => "Qualifier",
     };
 
@@ -2734,6 +2739,7 @@ internal static class RichHoverFactory
         QualifierAxis.FromCurrency or QualifierAxis.ToCurrency => "currency-conversion expressions keep source/target currencies aligned",
         QualifierAxis.Timezone => "temporal values keep timezone-sensitive operations aligned",
         QualifierAxis.TemporalDimension or QualifierAxis.TemporalUnit => "temporal arithmetic stays category-compatible",
+        QualifierAxis.PriceIn => "checks currency, unit, or compound price qualifier",
         _ => "assignments and comparisons stay compatible",
     };
 
@@ -2745,6 +2751,7 @@ internal static class RichHoverFactory
         QualifierAxis.Timezone => "Mixed timezones aren't allowed",
         QualifierAxis.TemporalDimension => "Mixed temporal dimensions aren't allowed",
         QualifierAxis.TemporalUnit => "Mixed temporal units aren't allowed",
+        QualifierAxis.PriceIn => "qualifier mismatch (currency, unit, or compound)",
         _ => "Incompatible qualifiers aren't allowed",
     };
 
