@@ -1,0 +1,3 @@
+# Session Log — quantity-normalization-first-wave
+
+At 2026-05-15T03:43:11Z, Scribe measured `.squad/decisions.md` at 118641 bytes with 4 inbox files, applied the hard archive gate for files above 51200 bytes using the 7-day cutoff (archived 0 entries because no decision records in the live ledger were older than the cutoff), merged 3 inbox notes into the ledger, deduplicated 1 duplicate branch-directive note, deleted all 4 processed inbox files, wrote orchestration logs for george-6, frank-15, and soup-nazi, updated the three affected agent histories, re-checked history sizes (summarized: none), and finished with `.squad/decisions.md` at 121769 bytes.

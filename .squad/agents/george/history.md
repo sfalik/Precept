@@ -110,3 +110,10 @@ Key fact: Several methods that the slices will modify already exist as pre-exist
 - Scribe merged George's slice-audit note into `.squad/decisions/decisions.md` and cleared `.squad/decisions/inbox/george-slice-audit.md`.
 - Durable baseline: slices 14–27 in `docs/Working/quantity-normalization-design.md` remain **NOT_STARTED** across `src/Precept/` and `test/Precept.Tests/`.
 - Scribe wrote the orchestration/session logs for the slice-audit + doc-tracker batch so later agents can treat George's audit as the canonical pre-implementation status check.
+
+### 2026-05-15T03:43:11Z — First-wave slices 43/14/34/22/30/32 landed on the spike branch
+
+- `spike/Precept-V2-Radical` now carries the first implementation wave for quantity normalization: Slices 43, 14, 34, 22, 30, and 32 are committed, with per-slice `dotnet build src/Precept/Precept.csproj` runs clean.
+- The shipped surface is broader than the slice labels alone: `InterpolatedTypedConstant` rename propagation reached runtime, tests, and language-server code, while the branch also gained `TypedConstantNormalizer`, `NumericInterval.Scale(decimal)`, UCUM `AffineOffset`, and static interpolated qualifier metadata.
+- Comparison operators now share qualifier-enforcement strictness with arithmetic, and `QualifierMatch.Same` is finally enforced in `SelectOverload`; because `min`/`max` parse as constraint keywords on this branch, `clamp` and `abs` are the durable regression anchors for that function-call path.
+- PRE0137 is now wired through the function-call same-match path as part of Slice 32.

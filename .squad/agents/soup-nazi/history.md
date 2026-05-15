@@ -44,3 +44,10 @@
 
 - Revised the expected test inventory from ~43 to ~74 and flagged the top blockers: broadcast identity contract, diagnostic exhaustiveness traps, and the lack of event-handler validation coverage.
 - Logged the open design questions that must close before affected tests should be written.
+
+### 2026-05-15T03:43:11Z — Quantity-normalization skeleton batch committed with honest 19/12 signal
+
+- Commit `58e498fa` added slice 17, 21, and 37 skeleton coverage across type-checker, proof, numeric-interval, and language-normalizer surfaces.
+- `dotnet build test\\Precept.Tests\\Precept.Tests.csproj` passed, and the targeted 31-test run finished `19 passed / 12 failed`.
+- The red cases are correctly pinned to still-missing implementation seams: affine metadata/offset behavior, raw-magnitude compare paths, interpolated interval extraction plus static-unit scaling, denominator normalization for cross-unit price comparisons, and the intended cross-dimension diagnostic.
+- Keep the failures red until the implementation lands; they are contract pressure, not suite noise.

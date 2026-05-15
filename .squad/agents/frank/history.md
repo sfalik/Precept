@@ -103,3 +103,9 @@
 - Scribe merged Frank's doc-tracker note into `.squad/decisions/decisions.md` and cleared `.squad/decisions/inbox/frank-doc-tracker-update.md`.
 - Durable baseline: `docs/Working/quantity-normalization-design.md` now carries §5.0 plus Status columns in §5.1/§5.3 and summary/status tables for §5.6/§5.7, all grounded in George's NOT_STARTED audit for slices 14–27.
 - Scribe wrote the orchestration/session logs for the shared slice-audit + doc-tracker batch so the design tracker and codebase audit stay linked.
+
+### 2026-05-15T03:43:11Z — Documentation annotation wave closed with one counting-unit follow-up
+
+- Slices 38–42 doc annotations are committed and remain the live spec baseline for the normalization track.
+- One durable follow-up stays open: `docs/language/business-domain-types.md:373` still says business counting units are opaque with no shared dimension, which now contradicts the shared `DimensionVector.None` + factor-one representation model.
+- Keep PRE0137 as the enforcing rule for explicit unit-code identity inside that count family; the remaining work is wording correction, not architectural reconsideration.

@@ -212,6 +212,50 @@
 
 ---
 
+### 2026-05-15T03:43:11Z: First-wave quantity-normalization implementation landed on `spike/Precept-V2-Radical`
+
+**By:** Scribe
+
+**Status:** Merged from George's first-wave implementation note.
+
+**Merged source:** `george-slice-14-43-22-30-32-34.md`.
+
+- Slices 43, 14, 34, 22, 30, and 32 are committed on `spike/Precept-V2-Radical`; per-slice `dotnet build src/Precept/Precept.csproj` passed, while full `dotnet test` still carries pre-existing branch failures outside this slice set.
+- The landed surface is broader than the original slice labels: `TypedInterpolatedTypedConstant` was renamed to `InterpolatedTypedConstant` across runtime, tests, and language-server consumers, and the branch now carries `TypedConstantNormalizer`, `NumericInterval.Scale(decimal)`, `AffineOffset` on UCUM atom/unit metadata, and static qualifier metadata on interpolated typed constants.
+- Qualifier enforcement now covers comparison operators and same-match function calls; because `min`/`max` parse as constraint keywords in this branch's grammar context, regression coverage used `clamp` and `abs` to exercise the same `SelectOverload` enforcement path.
+- PRE0137 / `CrossCountingUnitOperation` is now wired for explicit counting-unit mismatches in same-match quantity function calls as part of Slice 32.
+
+---
+
+### 2026-05-15T03:43:11Z: Business counting-unit docs still need a post-annotation correction
+
+**By:** Scribe
+
+**Status:** Merged from Frank's docs-gap note.
+
+**Merged source:** `frank-doc-gaps.md`.
+
+- Frank's Slices 38–42 documentation annotations are committed, but `docs/language/business-domain-types.md:373` still describes business counting units such as `each`, `case`, `pack`, and `dozen` as opaque with no shared dimension.
+- The durable architecture remains the opposite: business counting units intentionally share `DimensionVector.None` with factor-one representation, and PRE0137 enforces explicit unit-code identity inside that family.
+- Treat the `business-domain-types.md` wording as a follow-up docs correction outside the completed annotation batch.
+
+---
+
+### 2026-05-15T03:43:11Z: Quantity-normalization skeleton tests landed with honest red pressure
+
+**By:** Scribe
+
+**Status:** Merged from Soup Nazi's test-status note.
+
+**Merged source:** `soup-nazi-test-coverage.md`.
+
+- Commit `58e498fa` added quantity-normalization skeleton coverage for Slices 17, 21, and 37 across type-checker, proof, interval, and normalizer surfaces.
+- `dotnet build test\\Precept.Tests\\Precept.Tests.csproj` passed, and the targeted 31-test verification run finished `19 passed / 12 failed`.
+- The remaining reds are explicit contract pressure tied to unimplemented affine metadata/offset behavior, raw-magnitude compare paths, interpolated interval extraction plus static-unit scaling, denominator normalization for cross-unit price comparisons, and the intended cross-dimension diagnostic surface.
+- The green portion of the batch already locks shift coverage, same-unit anchors, cross-temperature proof anchors that match current behavior, and the money-overflow regression.
+
+---
+
 # Decision Record: Exhaustive Architectural Review— Interpolated Forms & Normalization Design
 
 **Author:** Frank (Lead Architect)
