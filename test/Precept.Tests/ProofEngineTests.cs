@@ -5389,15 +5389,15 @@ public class ProofEngineTests
         }
 
         [Fact]
-        public void CompoundPrice_ExtractQualifierSourcePath_ReturnsCurrencyCode()
+        public void CompoundPrice_ExtractQualifierSourcePath_ReturnsComposite()
         {
-            // CompoundPrice with an interpolated currency source field
+            // CompoundPrice produces a composite CurrencyCode/UnitCode source path
             var compound = new DeclaredQualifierMeta.CompoundPrice("{Currency}", "kg", "mass");
 
             var sourcePath = ProofEngine.ExtractQualifierSourcePathForTest(compound);
 
-            sourcePath.Should().Be("Currency",
-                because: "ExtractQualifierSourcePath extracts CurrencyCode (stripping braces) for CompoundPrice");
+            sourcePath.Should().Be("Currency/kg",
+                because: "ExtractQualifierSourcePath produces composite CurrencyCode/UnitCode for CompoundPrice");
         }
     }
 }

@@ -132,22 +132,37 @@ public static partial class ProofEngine
             DeclaredQualifierMeta.Unit { UnitCode: var value } => value,
             DeclaredQualifierMeta.Dimension { DimensionName: var value } => value,
             DeclaredQualifierMeta.TemporalUnit { UnitName: var value } => value,
-            // TODO: When interpolated CompoundPrice is implemented, this must extract both
-            // CurrencyCode and UnitCode as a composite source path (e.g. "CurrencyCode/UnitCode")
-            // to correctly distinguish qualifiers that share a currency but differ in unit.
-            // Safe today because no InterpolationSlotKind.PriceIn exists yet.
-            DeclaredQualifierMeta.CompoundPrice { CurrencyCode: var value } => value,
+            DeclaredQualifierMeta.CompoundPrice cp => $"{cp.CurrencyCode}/{cp.UnitCode}",
             _ => null,
         };
 
-        if (string.IsNullOrEmpty(raw)
-            || raw[0] != '{'
-            || raw[^1] != '}')
+        if (string.IsNullOrEmpty(raw))
+            return null;
+
+        // Composite path (CompoundPrice): strip each component independently.
+        var slashIndex = raw.IndexOf('/');
+        if (slashIndex >= 0)
+        {
+            var left = StripInterpolationBraces(raw[..slashIndex]);
+            var right = StripInterpolationBraces(raw[(slashIndex + 1)..]);
+            return left is not null || right is not null
+                ? $"{left ?? raw[..slashIndex]}/{right ?? raw[(slashIndex + 1)..]}"
+                : null;
+        }
+
+        return StripInterpolationBraces(raw);
+    }
+
+    private static string? StripInterpolationBraces(string? value)
+    {
+        if (string.IsNullOrEmpty(value)
+            || value[0] != '{'
+            || value[^1] != '}')
         {
             return null;
         }
 
-        var inner = raw[1..^1];
+        var inner = value[1..^1];
         var dotIndex = inner.IndexOf('.');
         return dotIndex >= 0 ? inner[..dotIndex] : inner;
     }
