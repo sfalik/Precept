@@ -1017,23 +1017,7 @@ public static class TypedConstantNormalizer
 
 ### Impact on Slices 14–21
 
-Slices 14–21 address the **compile-time** normalization bug (false-positive `NumericOverflow` diagnostic). They remain correct and unchanged. The runtime ingress normalization is a **separate concern** — it ensures runtime constraint enforcement correctness, not diagnostic accuracy.
-
-However, a new phase is needed for the runtime path:
-
-**Phase 3 — Runtime Quantity Ingress Normalization (DEFERRED)**
-
-> ⚠️ **NOT IMPLEMENTATION-READY (from George's review — B22).** `TypeRuntimeMeta`, `TypeRuntime<T>`, evaluator constraint execution, and quantity `PreceptValue` storage do not exist in code yet (`Runtime\PreceptValue.cs`, `Runtime\Evaluator.cs` are stubs). This slice ships ONLY after Phase 3 runtime surfaces exist. It is not numbered in the current implementation sequence.
-
-- Implement normalize-on-intake in `TypeRuntimeMeta.ReadJson` and `TypeRuntime<Quantity>.FromClr` for quantity types.
-- Add `TypedConstantNormalizer.Denormalize` for egress.
-- Ensure `PreceptValue` storage convention stores normalized magnitude + original unit.
-- **Dependencies:** Slice 14 (normalizer exists), Builder/Evaluator implementation (Phase 3)
-1. The storage convention (normalized magnitudes in `PreceptValue`) must be known before `PreceptValue` internal layout is finalized.
-2. `TypedConstantNormalizer.Denormalize` should be added alongside `Normalize` in Slice 14 to keep the API complete.
-3. The ingress path design (`TypeRuntimeMeta.ReadJson` calling the existing normalizer) must be documented before Phase 3 implementation begins.
-
-**Revision to Slice 14:** Add `TypedConstantNormalizer.Denormalize(decimal, UcumParsedUnit?)` alongside `Normalize`. Both methods are pure `decimal` math — `Denormalize` is `ApplyInverseFactor`. This keeps the normalizer complete for both directions even though egress won't be wired until Phase 3.
+Slices 14–21 address the **compile-time** normalization bug (false-positive `NumericOverflow` diagnostic). They remain correct and unchanged. The runtime ingress normalization is a **separate concern** — it ensures runtime constraint enforcement correctness, not diagnostic accuracy. Runtime ingress normalization will be designed when the Builder/Evaluator (`TypeRuntimeMeta`, `TypeRuntime<T>`, `PreceptValue`) are implemented.
 
 ---
 
@@ -1331,9 +1315,6 @@ Phase 1 (core normalization):
 
 Phase 2 (interpolated extension):
   19 → 20 → 21 → 22 → 23 → 24 → 25 → 27 → 26
-
-Deferred (separate issues):
-  Runtime ingress normalization (Phase 3 — blocked on evaluator/Builder implementation)
 ```
 
 ### Top Implementation Risks (from George, accepted)

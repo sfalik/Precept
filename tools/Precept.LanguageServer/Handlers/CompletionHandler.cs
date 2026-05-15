@@ -982,6 +982,8 @@ internal sealed class CompletionHandler : ICompletionHandler
             case QualifierAxis.Timezone:
                 expectedType = TypeKind.Timezone;
                 return true;
+            // TODO: PriceIn is polymorphic — should offer both currency and unit completions.
+            // Currently mapped to Currency only as a pragmatic first pass; follow-up required.
             case QualifierAxis.PriceIn:
                 expectedType = TypeKind.Currency;
                 return true;

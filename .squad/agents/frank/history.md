@@ -79,3 +79,17 @@
 - PRE0134 mismatch tests exist for unit (kg/g) and currency (USD/EUR). No price/exchangerate mismatch test — low risk warning.
 - One failing test (`CompoundUnitPositivityProof_ClearsDivisionByZero`) is pre-existing, not a regression.
 - Slice 25 (field-default proof coverage) is now unblocked. Doc tracker in §5.0 needs Slice 23 marked complete.
+
+### 2026-05-15T14:01:02Z — Modifier comma separator assessment
+
+- Assessed mandatory comma between field modifiers. Verdict: **Do not introduce.**
+- Key findings: (1) No sample field in the corpus exceeds 4 modifiers. The densest pattern is `default V nonnegative maxplaces N writable` — 4 modifiers, already keyword-anchored and unambiguous. (2) The parser (`ParseModifierList`) loops on `ValueModifierTokens.Contains(Peek().Kind)` — each modifier is keyword-led, making the sequence self-delimiting. Valued modifiers consume their expression via a boundary predicate that terminates at the next modifier keyword or construct boundary. There is zero parsing ambiguity today. (3) Comma (`TokenKind.Comma`) is already used exclusively as a list-item separator (state entries, event args, field names, choice values). Adding it as a modifier separator would overload its semantic role. (4) Philosophy principle #5 (keyword-anchored readability) explicitly states that keywords are the structural boundaries — not punctuation. Commas would contradict this grounding principle.
+- If density grows in the future (temporal types, new constraint modifiers), the right lever is formatter-enforced line breaks per modifier — a tooling concern, not a grammar concern.
+
+### 2026-05-15T18:32:00Z — QS-1 review: model additions APPROVED
+
+- QS-1 (commit `f391d197`) APPROVED: `QualifierAxis.PriceIn`, `QualifierShape.OfRequiresCurrencyIn`, and `DeclaredQualifierMeta.CompoundPrice` all match the spec in `docs/Working/frank-price-qualifier-shape-analysis.md` §3 exactly.
+- Model-only slice is architecturally clean: no behavioral wiring, no half-states. All downstream `QualifierAxis` switches (14 total across TypeChecker, ProofEngine, RichHoverFactory, CompletionHandler) have `_ =>` defaults that handle `PriceIn` gracefully.
+- `Types.cs` correctly NOT changed — `QS_CurrencyAndDimension` stays on `QualifierAxis.Currency` until QS-2 wires the handler.
+- W1–W4: RichHoverFactory has 5 axis-name/label/text switches and MCP has string interpolation that will show generic/opaque labels for `PriceIn`. All non-blocking — tracked as QS-2 obligations.
+- Durable learning: model-only slices that add enum values and DU subtypes are safe to land independently when all consumers use default/wildcard fallbacks. The exhaustion risk is only real for switches without `_ =>` arms.

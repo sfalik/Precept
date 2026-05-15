@@ -1080,6 +1080,18 @@ public static class Diagnostics
             TriggerCondition: "A static comparison or same-match function call combines quantity values in different explicit counting units (for example, each vs box).",
             RecoverySteps: ["Use the same counting unit on both operands", "Or convert quantities into a shared counting unit before the operation"]),
 
+        DiagnosticCode.InvalidPriceQualifier => new(
+            nameof(DiagnosticCode.InvalidPriceQualifier),
+            DiagnosticStage.Type, Severity.Error,
+            "'{0}' is not a valid price qualifier; expected a currency code (e.g. 'USD'), unit code (e.g. 'kg'), or compound (e.g. 'USD/kg').",
+            DiagnosticCategory.BusinessDomain,
+            RelatedCodes: [DiagnosticCode.InvalidCurrencyCode, DiagnosticCode.InvalidUnitString],
+            FixHint: "Use a valid ISO 4217 currency code, a UCUM unit code, or a compound 'currency/unit' form",
+            TriggerCondition: "A 'price in' qualifier value is not recognized as a currency code, UCUM unit, or compound currency/unit form.",
+            RecoverySteps: ["Use a recognized currency code such as 'USD', 'EUR', or 'GBP'", "Use a recognized unit code such as 'kg', 'm', or 'L'", "Use a compound form such as 'USD/kg'"],
+            ExampleBefore: "precept Example\nfield Cost as price in 'foo'",
+            ExampleAfter: "precept Example\nfield Cost as price in 'USD'"),
+
         _ => throw new ArgumentOutOfRangeException(nameof(code), code, null),
     };
 

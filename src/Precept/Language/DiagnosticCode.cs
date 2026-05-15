@@ -169,6 +169,10 @@ public enum DiagnosticCode
     /// the unit already carries dimension information.
     /// </summary>
     InvalidQualifierCoexistence        = 139,
+    /// <summary>
+    /// A <c>price in '...'</c> value is not a recognized currency code, UCUM unit, or compound form.
+    /// </summary>
+    InvalidPriceQualifier              = 140,
 
     // ── Graph ────────────────────────────────────────────
     UnreachableState                   =  80,

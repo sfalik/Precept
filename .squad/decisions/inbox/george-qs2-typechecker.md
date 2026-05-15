@@ -2,7 +2,8 @@
 
 **Author:** George  
 **Date:** 2026-05-15  
-**Commit:** `88522c02`
+**Commit:** `88522c02`  
+**Follow-up commit:** *(see below — Frank review fixes)*
 
 ## What changed and why
 
@@ -47,3 +48,28 @@ Added `PriceIn` → `TypeKind.Currency` mapping in `TryMapQualifierAxisToExpecte
 - **Interpolated PriceIn resolution**: Currently resolves as `Currency` for interpolated forms (`price in '{CatalogCurrency}'`). Compound disambiguation at runtime would need further work.
 - **`RequiredBoundQualifierAxes` expansion**: The `[Currency, Unit, PriceIn]` list is broader than before. Frank should verify this doesn't weaken bounds validation in edge cases.
 - **No ProofEngine changes**: The proof engine will see `CompoundPrice` qualifiers for the first time. The existing `_ =>` defaults should handle it gracefully, but compound price proof obligations (e.g., cross-dimension checks) may need future work.
+
+## H. Frank Review Follow-Up
+
+Frank reviewed QS-2 and returned APPROVED WITH REQUIRED CHANGES. All findings addressed in follow-up commit:
+
+### B1 — `ResolveDeclarationQualifier` PriceIn fallback
+Added PriceIn→Currency/Unit fallback in `RichHoverFactory.cs` so hover resolves correctly for `price in 'USD'` and `price in 'kg'` (not just compound forms).
+
+### B2 — Missing compound+of coexistence test
+Added `PriceIn_CompoundWithOf_EmitsInvalidQualifierCoexistence` test to `TypeCheckerPriceInQualifierTests.cs`.
+
+### W1 — `InvalidPriceQualifier` diagnostic
+Replaced the misleading `InvalidCurrencyCode` fallback in `MapPriceInQualifier` with a new `InvalidPriceQualifier` diagnostic (PRE0140) that correctly describes all valid forms (currency, unit, compound). Added to DiagnosticCode, Diagnostics catalog, and Gate 2 allow-list.
+
+### W2 — `GetQualifierAxisName` resolution-aware
+Updated the `QualifierHoverInfo` overload to show "currency" or "unit" when a PriceIn slot resolves to a specific type, instead of the generic slot description.
+
+### W3 — CompletionHandler TODO
+Added TODO comment at the `PriceIn → TypeKind.Currency` mapping acknowledging the polymorphic completion gap.
+
+### N1 — Malformed compound edge-case tests
+Added `PriceIn_TrailingSlash_EmitsDiagnostic` and `PriceIn_LeadingSlash_EmitsDiagnostic` tests.
+
+### N2 — MCP `RenderQualifierShape` PriceIn rendering
+Extracted `RenderSlotAxisLabel` helper so PriceIn slots render as `` in `currency`, `unit`, or compound `currency/unit` `` instead of opaque `` in `PriceIn` ``.

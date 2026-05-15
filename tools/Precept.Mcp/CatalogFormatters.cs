@@ -808,9 +808,15 @@ internal static class CatalogFormatters
             .Select(site => WrapCode(site.ToString()));
 
     private static string RenderQualifierShape(QualifierShape shape)
-        => JoinOrNone(shape.Slots.Select(slot => $"{RenderToken(slot.Preposition)} `{slot.Axis}`"))
+        => JoinOrNone(shape.Slots.Select(slot => $"{RenderToken(slot.Preposition)} {RenderSlotAxisLabel(slot.Axis)}"))
             + (shape.InOfExclusive ? "; `in`/`of` are mutually exclusive" : string.Empty)
             + (shape.OfRequiresCurrencyIn ? "; `of` requires `in` to resolve to a currency" : string.Empty);
+
+    private static string RenderSlotAxisLabel(QualifierAxis axis) => axis switch
+    {
+        QualifierAxis.PriceIn => "`currency`, `unit`, or compound `currency/unit`",
+        _ => $"`{axis}`",
+    };
 
     private static string RenderAccessor(TypeAccessor accessor)
         => accessor switch

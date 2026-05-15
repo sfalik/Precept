@@ -1855,6 +1855,15 @@ internal static class RichHoverFactory
             }
         }
 
+        if (axis == QualifierAxis.PriceIn)
+        {
+            foreach (var qualifier in declaredQualifiers)
+            {
+                if (qualifier.Axis is QualifierAxis.Currency or QualifierAxis.Unit)
+                    return qualifier;
+            }
+        }
+
         foreach (var qualifier in Types.GetMeta(ownerType).ImpliedQualifiers)
         {
             if (qualifier.Axis == axis)
@@ -2052,6 +2061,8 @@ internal static class RichHoverFactory
     {
         DeclaredQualifierMeta.TemporalDimension or DeclaredQualifierMeta.TemporalUnit => GetQualifierAxisName(info.ResolvedQualifier.Axis),
         DeclaredQualifierMeta.CompoundPrice => "compound price",
+        DeclaredQualifierMeta.Currency when info.Axis == QualifierAxis.PriceIn => "currency",
+        DeclaredQualifierMeta.Unit when info.Axis == QualifierAxis.PriceIn => "unit",
         _ => GetQualifierAxisName(info.Axis),
     };
 

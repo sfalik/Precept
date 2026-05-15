@@ -408,8 +408,8 @@ internal static partial class TypeChecker
         if (unitResult.IsValid)
             return new DeclaredQualifierMeta.Unit(value, UnitDimensionHelper.DeriveUnitDimensionName(unitResult.Unit!));
 
-        // Unrecognized — emit invalid currency code (the original axis expectation)
-        ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.InvalidCurrencyCode, valueSpan, value));
+        // Unrecognized — not a valid currency, unit, or compound price qualifier
+        ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.InvalidPriceQualifier, valueSpan, value));
         return null;
     }
 

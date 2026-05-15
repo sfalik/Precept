@@ -114,4 +114,49 @@ public class TypeCheckerPriceInQualifierTests
 
         TypeCheckerTestHelpers.CheckExpectingClean(precept);
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  Compound + of: price in 'USD/kg' of '...' → InvalidQualifierCoexistence
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void PriceIn_CompoundWithOf_EmitsInvalidQualifierCoexistence()
+    {
+        var precept = """
+            precept Product
+            field Cost as price in 'USD/kg' of 'mass'
+            state Open initial
+            """;
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.InvalidQualifierCoexistence);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  Malformed compounds: trailing/leading slash → InvalidPriceQualifier
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void PriceIn_TrailingSlash_EmitsDiagnostic()
+    {
+        // 'USD/' — compound guard rejects (slash at end), falls through to currency check,
+        // 'USD/' is not a valid currency code, then not a valid UCUM unit, emits InvalidPriceQualifier
+        var precept = """
+            precept Product
+            field Cost as price in 'USD/'
+            state Open initial
+            """;
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.InvalidPriceQualifier);
+    }
+
+    [Fact]
+    public void PriceIn_LeadingSlash_EmitsDiagnostic()
+    {
+        // '/kg' — compound guard rejects (slash at start), falls through, '/kg' not a currency,
+        // UCUM parse of '/kg' likely fails, emits InvalidPriceQualifier
+        var precept = """
+            precept Product
+            field Cost as price in '/kg'
+            state Open initial
+            """;
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.InvalidPriceQualifier);
+    }
 }
