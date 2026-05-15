@@ -40,6 +40,13 @@
 
 ## Recent Updates
 
+### 2026-05-15T02:32:44Z — Affine conversion design batch recorded
+
+- Pre-check measured `.squad/decisions.md` at 115385 bytes with 2 inbox files; the hard-gate 7-day archive pass ran first and found 0 eligible active entries older than `2026-05-08T02:32:44Z`.
+- Merged Frank's affine conversion design note into one canonical decision, deduplicated George's already-canonical `george-p1-presence-proof.md` inbox entry, deleted both processed inbox files, wrote `.squad/orchestration-log/2026-05-15T02-32-44Z-frank.md`, and recorded the brief affine-conversion session log.
+- Propagated the resulting temperature-normalization design update into Frank/Scribe history; no history file crossed the 15 KB summarization gate.
+- Health report: `decisions.md` 115385B -> 116539B; inbox processed = 2 (2 -> 0); history files summarized = 0.
+
 ### 2026-05-15T02:26:33Z — Cross-unit comparison solution batch recorded
 
 - Pre-check measured `.squad/decisions.md` at 114221 bytes with 2 inbox files; the ≥50 KB hard gate ran first and found 0 entries older than the 7-day cutoff (`2026-05-08T02:26:33Z`), so `decisions-archive.md` stayed unchanged.

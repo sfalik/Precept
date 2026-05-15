@@ -6,6 +6,21 @@
 
 ---
 
+### 2026-05-15T02:32:44Z: Affine quantity normalization now carries UCUM pre-offsets for temperature units
+
+**By:** Scribe
+
+**Status:** Merged from Frank's affine conversion design note.
+
+**Merged source:** `frank-affine-conversion-design.md`.
+
+- Quantity normalization now has an affine design path for temperature units: `Cel`, `[degF]`, and `[degRe]` convert with `base = (value + offset) × scale`, while linear units keep `AffineOffset = null` and preserve current behavior.
+- Root cause is explicit: `StripFunctionWrapper` preserves UCUM multiplicative factors but discards the function-name offset encoding, so `UcumAtom` / `UcumParsedUnit` must carry `AffineOffset` metadata into normalization.
+- The implementation plan upgrades `TryGetStaticScalingFactor` into affine conversion metadata, adds `NumericInterval.Shift(decimal)`, updates typed-constant normalization and proof intervals, and records 24 focused tests in `docs/working/quantity-normalization-design.md` §6.8.
+- Logarithmic units (dB, pH, Np) stay out of scope by design, and the temperature work remains orthogonal to PRE0137's counting-unit comparison rule.
+
+---
+
 ### 2026-05-15T01:05:58Z: Quantity normalization review findings accepted, ordered, and narrowed to implementation-safe scope
 
 **By:** Scribe
