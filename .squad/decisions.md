@@ -8,6 +8,49 @@
 
 ---
 
+### 2026-05-15T23:14:11Z: Qualifier enforcement closeout is now durable across N1 and N3/N4
+
+**By:** Scribe
+
+**Status:** Merged from George's N1 fix note and Soup Nazi's N3/N4 regression closeout.
+
+**Merged sources:** `george-n1-fix.md`; `soup-nazi-n3n4-tests.md`.
+
+- George closed Frank's N1 note in commit `f55e283b` by making `ResolveSlotSourceQualifierAxis(...)` return `Unknown` instead of `Absent` when an unresolved slot hole's type can carry the requested qualifier axis.
+- Soup Nazi closed N3/N4 in commit `3468dec0` with 26 regression tests across `TypeCheckerAssignmentQualifierTests` and `ProofEngineTypedArgQualifierTests`, covering the implied `duration` qualifier path, compound-cancellation helper parity, and qualifier preservation for `min`, `max`, and `round`.
+- Final closeout validation finished `dotnet test test/Precept.Tests/` at 5689 / 5699 passing with 10 unrelated pre-existing failures, and all 26 new tests passed.
+- A transient detached HEAD artifact that surfaced as a duplicate variable in `FieldState.cs` was resolved before the final verification run and is not part of the shipped baseline.
+
+---
+
+### 2026-05-15T23:14:11Z: Construction guarantee audit repairs are now the shipped D94/D142/D143/D144 baseline
+
+**By:** Scribe
+
+**Status:** Merged from George's implementation notes for the initial-event and construction follow-up fixes.
+
+**Merged sources:** `george-d142-implementation.md`; `george-construction-audit-fixes.md`.
+
+- George closed the stateless construction blind spot by making validation inspect stateless initial handlers (and null-from-state rows when present) instead of skipping the lane outright.
+- The shipped construction rules now include `PRE0142 UninitializedFieldReadInInitialAssignment`, `PRE0143 MaterializedFieldSelfReference`, and `PRE0144 UninitializedCrossFieldReadInInitialAssignment`, plus wildcard `from any` coverage accounting for required-field guarantees.
+- Focused construction and diagnostic suites passed green, while full `Precept.Tests` remained on the unrelated proof/qualifier branch baseline noted in George's reports.
+
+---
+
+### 2026-05-15T23:14:11Z: Action-chain continuation arrows now stay on the action completion lane
+
+**By:** Scribe
+
+**Status:** Merged from Kramer's completion follow-up note.
+
+**Merged source:** `kramer-action-chain-continuation.md`.
+
+- Completion routing now handles continuation `->` tokens even before the parser has extended the enclosing action-chain span onto the next line.
+- The fallback repair is intentionally narrow: a bounded backward scan over recent significant tokens classifies the site as `InActionVerb` when it finds the prior action verb and same-or-deeper-indented chain arrow.
+- Validation closed green at `320 / 320` `Precept.LanguageServer.Tests` passing after the new `Completions_ActionChainContinuationArrow_UsesActionItems` regression landed.
+
+---
+
 ### 2026-05-15T22:09:58Z: Deferred qualifier follow-up items are fully closed and the PRE0141 architecture stays approved
 
 **By:** Scribe

@@ -46,6 +46,12 @@
 
 ## Recent Updates
 
+### 2026-05-15T23:14:11Z — Deferred qualifier review remains APPROVED after N1–N4 disposition
+
+- Frank reviewed George's three deferred qualifier-fix commits, issued N1–N4 notes, and left the lane APPROVED because the architecture and shipped fixes were sound.
+- `N2` was already Shane's work and became moot; the remaining follow-up work was George's N1 slot-hole applicability fix plus Soup Nazi's N3/N4 regression coverage.
+- Subsequent commits `f55e283b` and `3468dec0` closed the outstanding notes without changing Frank's approval posture.
+
 ### 2026-05-15T22:27:03Z — Deferred qualifier follow-up landed
 
 - George closed the three deferred PRE0141 items: `TypedFunctionCall.ResultQualifiers`, implied-qualifier parity in `ResolveDirectQualifierAxis`, shared compound-unit helpers, and explicit `Unknown` fallback for qualifier-capable slot sources.

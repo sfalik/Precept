@@ -2,6 +2,8 @@
 
 **Date:** 2026-05-15T18:51:51.086-04:00
 
+- **Status:** Processed — merged into `.squad/decisions.md` on 2026-05-15T23:14:11Z.
+
 ## Decision
 
 Ship the four follow-up fixes from Frank's construction audit as one runtime slice:

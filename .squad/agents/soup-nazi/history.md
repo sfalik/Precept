@@ -24,6 +24,12 @@
 
 ## Recent Updates
 
+### 2026-05-15T23:14:11Z — N3/N4 qualifier follow-up test closure landed green in commit `3468dec0`
+
+- Added 26 regression tests across `test/Precept.Tests/TypeChecker/TypeCheckerAssignmentQualifierTests.cs` and `test/Precept.Tests/ProofEngineTypedArgQualifierTests.cs`, covering Frank's N3 implied-qualifier path, compound-cancellation helper parity, and N4 function-call qualifier preservation for `min`, `max`, and `round`.
+- Final closeout verification confirmed all 26 new tests pass; full `dotnet test test/Precept.Tests/` finished 5689 / 5699 passing with 10 unrelated pre-existing failures.
+- A pre-existing detached HEAD artifact that surfaced as a duplicate variable in `FieldState.cs` blocked an intermediate rebuild, but it was resolved before the final run and did not survive the session closeout.
+
 ### 2026-05-15T18:09:58.927-04:00 — Quantity qualifier gap sweep added coverage, but the lane is already green
 
 - Added 8 quantity expression-lane tests to `test/Precept.Tests/TypeChecker/TypeCheckerAssignmentQualifierTests.cs`: bare refs to constrained quantity targets, WholeValue interpolation, bare `.unit` interpolation, binary addition, conditional selection, plus the matching direct/unit-slot pass controls.

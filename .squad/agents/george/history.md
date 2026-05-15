@@ -19,6 +19,12 @@
 
 ## Recent Updates
 
+### 2026-05-15T23:14:11Z — Frank's N1 qualifier note is closed in commit `f55e283b`
+
+- Implemented Frank's N1 follow-up in `src/Precept/Pipeline/TypeChecker.Expressions.AssignmentQualifiers.cs`: the slot-hole early return now checks axis applicability and returns `Unknown` instead of `Absent` when the hole type can carry the requested qualifier axis.
+- Commit `f55e283b` is the durable fix point for the review note; no additional issues were left open for George on this lane.
+- Final closeout validation stayed green for the new work: all 26 new N3/N4 follow-up tests passed, and full `dotnet test test/Precept.Tests/` closed at 5689 / 5699 passing with 10 unrelated branch-baseline failures.
+
 ### 2026-05-15T22:51:51Z — Slot-hole qualifier fallback now preserves Unknown when applicable
 
 - `ResolveSlotSourceQualifierAxis(...)` no longer hard-returns `Absent` from the early slot-hole bailout when the hole expression's type can carry the requested axis; it now returns `Unknown` for that correctness seam.
