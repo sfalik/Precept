@@ -3905,3 +3905,6 @@ The next available slice number is **30**. Slice 27 is already reserved for doc 
 | Slice | Objective | Status |
 |-------|-----------|--------|
 | **QS-1** | Price qualifier model additions (QualifierAxis.PriceIn, QualifierShape.OfRequiresCurrencyIn, DeclaredQualifierMeta.CompoundPrice) | ✅ |
+| **QS-2** | TypeChecker + catalog wiring for PriceIn qualifiers | ✅ |
+| **QS-3** | Language server PriceIn wiring | ✅ (folded into QS-2) |
+| **QS-4** | MCP formatter PriceIn rendering | ✅ (folded into QS-2) |
