@@ -1,3 +1,197 @@
+# Doc Tracker Update — quantity-normalization-design.md
+
+**Author:** Frank (Lead Architect)
+**Date:** 2026-05-14T23:17:29.653-04:00
+**Triggered by:** George's full codebase audit confirming all slices 14–27 are NOT_STARTED.
+
+## Decision
+
+Added a master progress tracker (§5.0) and Status columns to all summary tables in `docs/working/quantity-normalization-design.md`.
+
+## Audit Verdict (George, 2026-05-14)
+
+All slices 14–27 are NOT_STARTED. No normalization code has been written:
+
+| Slice | Finding |
+|-------|---------|
+| 14 | `TypedConstantNormalizer.cs` does not exist |
+| 15 | No `NormalizedDeclaredMin/Max` on `TypedField`; `TryGetComparableTypedConstantValue` has no normalizer call |
+| 15b | No `NormalizedDeclaredMin/Max` on `TypedArg` |
+| 16 | `TryGetStaticScalingFactor` does not exist; raw magnitudes everywhere |
+| 17 | No cross-unit normalization tests |
+| 18 | `IntervalContainmentProofRequirement` has no normalized fields |
+| 19 | No `TypedInterpolatedTypedConstant` case in `IntervalOfNarrowed` |
+| 20 | `NumericInterval` has no `Scale(decimal)` method |
+| 21 | No interpolated quantity overflow tests |
+| 22 | `TypedInterpolatedTypedConstant` has no `StaticQualifier` field |
+| 23 | `ResolveQualifierFromInterpolatedConstant` cannot check `StaticQualifier` — it doesn't exist |
+| 24 | No `InterpolatedTypedConstant` case in `IntervalOfNarrowed` at all |
+| 25 | `FoldValue` falls through to `UnknownSentinel` for interpolated constants |
+| 26 | No `ResolveEventArgExpressions` in `TypeChecker.cs`; `DefaultExpression` hardcoded null |
+| 27 | Doc sync not done |
+
+Slices 30–43 (§5.7) are all PENDING — tracked in the SQL tracker, not yet started.
+
+## Changes Made
+
+1. **§5.0 — Master Progress Tracker** inserted at the start of §5, before §5.1. Covers all slices 14–43 with status, summary, and blocking info. Critical path and parallel-safe first wave documented.
+
+2. **§5.1 summary table** — added `Status` column. All rows marked ⬜.
+
+3. **§5.3 summary table** — added `Status` column. All rows marked ⬜.
+
+4. **§5.6 summary table** — added before slice details. Covers slices 22–26 with status.
+
+5. **§5.7 summary table** — added after dependency lanes block. Covers slices 30–43 with lane and status.
+
+## Invariant
+
+The §5.0 tracker is the canonical "what's done" view for the entire normalization implementation. Update it as slices complete. Status columns in per-section tables mirror the master tracker — keep them in sync.
+
+# George — Slice Audit 14–27 Findings
+
+**Date:** 2026-05-14T23:17:29.653-04:00  
+**Requested by:** Shane  
+**Scope:** Slices 14–27 from `docs/working/quantity-normalization-design.md` — Precept.Tests only.
+
+---
+
+## Audit Results
+
+### Slice 14 — Core normalizer: NOT_STARTED
+Evidence: `src/Precept/Language/Numeric/TypedConstantNormalizer.cs` **does not exist**. The `Language/Numeric/` subdirectory itself does not exist — only `Language/Time/` and `Language/Ucum/` are present. No `NormalizeQuantity` or `ApplyFactor` methods anywhere.
+
+---
+
+### Slice 15 — TypeChecker bounds extraction: NOT_STARTED
+Evidence:
+- `TryGetComparableTypedConstantValue` EXISTS at `TypeChecker.Validation.Modifiers.cs:411` — but calls `TryExtractTypedConstantMagnitude` which strips the tuple and returns raw magnitude with **no UCUM normalization**. No `TypedConstantNormalizer` reference.
+- `TypedField` in `SemanticIndex.cs:309–319` has `DeclaredMin`, `DeclaredMax`, `DeclaredMinBoundQualifiers`, `DeclaredMaxBoundQualifiers` — **no `NormalizedDeclaredMin` or `NormalizedDeclaredMax`**.
+
+---
+
+### Slice 15b — TypedArg normalization: NOT_STARTED
+Evidence:
+- `TypedArg` in `SemanticIndex.cs:343–358` has `DeclaredMin`, `DeclaredMax`, `DeclaredMinBoundQualifiers`, `DeclaredMaxBoundQualifiers` — **no `NormalizedDeclaredMin` or `NormalizedDeclaredMax`**.
+- `ExtractArgInterval` at `ProofEngine.Intervals.cs:114–129` reads `arg.DeclaredMin ?? decimal.MinValue` directly (line 126). No `NormalizedDeclaredMin ?? arg.DeclaredMin` fallback.
+
+---
+
+### Slice 16 — ProofEngine integration: NOT_STARTED
+Evidence:
+- `TryGetTypedConstantMagnitude` at `ProofEngine.Composition.cs:231` — handles money/quantity/price tuples but returns raw `quantity.Item1` (no UCUM scaling applied).
+- `TryExtractNumericLiteralMagnitude` at `ProofEngine.Intervals.cs:84` — recurses into `tuple[0]` without any unit normalization.
+- `GetFieldBounds` at `ProofEngine.Intervals.cs:131` — delegates to `TryResolveNumericBoundValue` which reads `DeclaredMin/Max`, not `NormalizedDeclaredMin`.
+- `TryGetStaticNumericValue` at `ProofEngine.Composition.cs:209` — returns raw `StaticMagnitude` for `TypedInterpolatedTypedConstant` with no scaling.
+- `TryGetStaticScalingFactor` — **does not exist** anywhere in the ProofEngine or elsewhere in `src/Precept/`.
+
+---
+
+### Slice 17 — Test coverage: NOT_STARTED
+Evidence: Searched `test/Precept.Tests/` for `lb_av`, `NormalizeQuantity`, `kg_to_lb`, `CrossUnit`, `max_5kg`, `cross_unit`. The only hit is `TypeCheckerQualifierCompatibilityTests.cs:79` which tests `BoundsQualifierMismatch` (cross-unit bound emits a **diagnostic**). That is a mismatch-rejection test, not a normalization-and-containment test. No tests exist for `max '5 kg'` + `set '6 [lb_av]'` normalized overflow detection.
+
+---
+
+### Slice 18 — Display review: NOT_STARTED
+Evidence: `IntervalContainmentProofRequirement` at `src/Precept/Language/ProofRequirement.cs:135` has shape:
+```csharp
+public sealed record IntervalContainmentProofRequirement(
+    ProofSubject Subject,
+    string TargetField,
+    decimal? DeclaredMin,
+    decimal? DeclaredMax,
+    string Description
+)
+```
+No `DeclaredQualifier` property, no normalized fields. Cannot carry declared unit for de-normalization in diagnostic rendering.
+
+---
+
+### Slice 19 — InterpolatedTypedConstant interval analysis: NOT_STARTED
+Evidence: `IntervalOfNarrowed` switch in `ProofEngine.Intervals.cs:23–82` has cases for `TypedLiteral`, `TypedTypedConstant`, `TypedFieldRef`, `TypedArgRef`, `TypedBinaryOp`, `TypedUnaryOp`, `TypedFunctionCall`, `TypedConditional`. **No case for `TypedInterpolatedTypedConstant`**. Falls through to `NumericInterval.Unbounded`.
+
+---
+
+### Slice 20 — Unit-aware interval scaling for interpolated constants: NOT_STARTED
+Evidence:
+- `NumericInterval` in `src/Precept/Language/NumericInterval.cs` — **no `Scale(decimal)` method** (search returned empty).
+- `TryGetStaticScalingFactor` — **does not exist** anywhere in the pipeline.
+
+---
+
+### Slice 21 — Interpolated quantity test coverage: NOT_STARTED
+Evidence: Tests for `TypedInterpolatedTypedConstant` exist in `Precept.Tests` (`InterpolatedTypedConstantTests.cs`, `ProofEngineTypedArgQualifierTests.cs`, `ProofEngineTests.cs PartE_E2_InterpolatedTypedConstantQualifierExtraction`, `InterpolatedQualifierTests.cs`) but these cover form parsing and qualifier extraction, **not** cross-unit quantity interval normalization via interpolated constants.
+
+---
+
+### Slice 22 — Static qualifier metadata on InterpolatedTypedConstant: NOT_STARTED
+Evidence:
+- `TypedInterpolatedTypedConstant` in `SemanticIndex.cs:136–141` has `Slots`, `ResultType`, `Span`, and `StaticMagnitude` — **no `StaticQualifier` property**.
+- `ResolveInterpolatedTypedConstant` EXISTS at `TypeChecker.Expressions.TypedConstants.cs:768` and populates `StaticMagnitude` via `TryExtractStaticMagnitude` — but **no `StaticQualifier` population**.
+
+---
+
+### Slice 23 — Route static qualifier through consumers: NOT_STARTED
+Evidence: `ResolveQualifierFromInterpolatedConstant` EXISTS at `ProofEngine.Qualifiers.cs:406` and is called from the qualifier resolution switch at line 347–348. However it reads from `itc.Slots` (dynamic slot expressions), not from a `StaticQualifier` property (which doesn't exist on the type). The consumer function exists but cannot check `StaticQualifier` because Slice 22 is not done.
+
+---
+
+### Slice 24 — Money/price interpolated interval extraction: NOT_STARTED
+Evidence: `IntervalOfNarrowed` has **no case for `TypedInterpolatedTypedConstant`** at all (confirmed in Slice 19). Money and price forms are therefore also not handled.
+
+---
+
+### Slice 25 — Field-default proof coverage: NOT_STARTED
+Evidence:
+- `FoldValue` in `ProofEngine.Analysis.cs:171–229` handles `TypedLiteral`, `TypedFieldRef`, `TypedBinaryOp`, `TypedUnaryOp`, `TypedConditional`, `TypedPostfixOp` — **no `TypedInterpolatedTypedConstant` case**. Falls through to `return UnknownSentinel`.
+- No default-obligation collector for non-foldable interpolated defaults visible anywhere.
+
+---
+
+### Slice 26 — Event arg default resolution: NOT_STARTED
+Evidence:
+- No `ResolveEventArgExpressions` method in `TypeChecker.cs` (searched entire file).
+- `TypedArg.DefaultExpression` is hardcoded to `null` in both `TypeChecker.cs:386` and `TypeChecker.cs:527`, both with comment `// Slice 2+`.
+
+---
+
+### Slice 27 — Doc sync: NOT_STARTED
+Evidence:
+- `docs/language/precept-language-spec.md` — **no mentions** of `NormalizedDeclaredMin`, `TypedConstantNormalizer`, or `InterpolatedTypedConstant` interval analysis.
+- `docs/compiler/proof-engine.md` — **no mentions** of any of the above.
+- All normalization references are in `docs/Working/quantity-normalization-design.md` (the planning doc), not the canonical spec or compiler docs.
+
+---
+
+## Summary
+
+### Fully done
+*None.*
+
+### Partial
+*None.* (Several methods that will be modified by the slices already exist — `TryGetComparableTypedConstantValue`, `TryGetTypedConstantMagnitude`, `GetFieldBounds`, `ExtractArgInterval`, `ResolveQualifierFromInterpolatedConstant` — but none carry the normalization logic the slices require. These are pre-existing baselines, not partial implementations.)
+
+### Not started
+**All 14 slices: 14, 15, 15b, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27**
+
+---
+
+## Critical Unblocking Chain
+
+The slices have a strict dependency chain. Nothing in 15–27 can land safely until Slice 14 exists:
+
+1. **Slice 14** (`TypedConstantNormalizer`) — prerequisite for all others
+2. **Slice 15** + **15b** — adds `NormalizedDeclaredMin/Max` to `TypedField` and `TypedArg`; depends on Slice 14
+3. **Slice 16** — wires normalizer into ProofEngine interval reads; depends on 14 + 15/15b
+4. **Slice 22** — adds `StaticQualifier` to `TypedInterpolatedTypedConstant`; prerequisite for 23–24
+5. **Slice 19** + **20** — adds interval extraction for interpolated constants; depends on 22 + `NumericInterval.Scale`
+6. **Slices 17, 21** — test coverage; depends on their respective logic slices
+7. **Slice 18** — adds `DeclaredQualifier` to `IntervalContainmentProofRequirement`; depends on 16
+8. **Slices 23, 24** — route qualifier through consumers; depends on 22
+9. **Slice 25** — field-default proof; depends on 19/20
+10. **Slice 26** — event-arg defaults; depends on 15b + 25
+11. **Slice 27** — doc sync; depends on everything
+
 # Frank — §5.7 revision note
 Date: 2026-05-14T23:06:08.162-04:00
 

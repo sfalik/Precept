@@ -52,6 +52,25 @@
 
 ## Learnings
 
+### 2026-05-14T23:17:29Z — Slices 14–27 full codebase audit: all NOT_STARTED
+
+Full audit against `src/Precept/` and `test/Precept.Tests/` confirmed **zero slices implemented**:
+
+- **Slice 14:** `TypedConstantNormalizer.cs` does not exist; the `Language/Numeric/` subdirectory does not exist.
+- **Slice 15:** `TypedField` has no `NormalizedDeclaredMin/Max`. `TryGetComparableTypedConstantValue` strips raw magnitude without UCUM scaling.
+- **Slice 15b:** `TypedArg` has no `NormalizedDeclaredMin/Max`. `ExtractArgInterval` reads `arg.DeclaredMin` directly.
+- **Slice 16:** `TryGetTypedConstantMagnitude` returns raw tuple item1. `TryGetStaticScalingFactor` does not exist. `GetFieldBounds` and `TryGetStaticNumericValue` use raw declared/static values.
+- **Slice 17:** No cross-unit normalization overflow tests. Only `lb_av` hit is `BoundsQualifierMismatch` rejection test.
+- **Slice 18:** `IntervalContainmentProofRequirement` has no `DeclaredQualifier` field.
+- **Slices 19–21:** `IntervalOfNarrowed` has no `TypedInterpolatedTypedConstant` case. `NumericInterval` has no `Scale(decimal)`.
+- **Slice 22:** `TypedInterpolatedTypedConstant` has `StaticMagnitude` but no `StaticQualifier`.
+- **Slice 23:** `ResolveQualifierFromInterpolatedConstant` exists but reads slots, not `StaticQualifier`.
+- **Slices 24–25:** No interpolated constant interval or fold coverage.
+- **Slice 26:** `TypedArg.DefaultExpression` hardcoded null; no `ResolveEventArgExpressions`.
+- **Slice 27:** No doc sync in `precept-language-spec.md` or `proof-engine.md`.
+
+Key fact: Several methods that the slices will modify already exist as pre-existing baselines (`TryGetComparableTypedConstantValue`, `GetFieldBounds`, `ExtractArgInterval`, `TryGetTypedConstantMagnitude`, `ResolveQualifierFromInterpolatedConstant`) — none carry normalization logic yet. Slice 14 is the hard prerequisite for all others.
+
 - Typed interpolated typed-constant holes were bypassing presence-proof generation entirely; the fix is to recurse `TypedInterpolatedTypedConstant.Slots` through `WalkExpression` so optional field reads inside holes emit PRE0116 unless a guard proves presence. Verified with new proof-engine tests and with `samples/Test.precept`, which now reports `UnprovedPresenceRequirement` on line 14.
 - Quantity-normalization review: the compile-time core is implementable, but the design still has implementation traps Shane should gate on — duplicate Slice 22 numbering, runtime Slice 22 depending on nonexistent `TypeRuntimeMeta`/`TypeRuntime<T>` surfaces, display drift once computed intervals become normalized, and `TryGetStaticNumericValue` becoming unsound if dynamic-unit interpolated constants fall back to raw `StaticMagnitude`. Also: the actual arg semantic type is `TypedArg`, not `TypedEventArg`, so slice specs must target the real code surface.
 
@@ -78,3 +97,9 @@
 
 - George’s re-review cleared the earlier §5.7 blockers: the slice list now points at the real `src/Precept/Language/...` seams, covers both successful `SelectOverload` returns, and moves the membership work to Precept’s actual `contains` operator path.
 - Scribe merged George’s approval note into `.squad/decisions/decisions.md`, cleared the inbox file, and recorded the approval as the current architectural baseline for slices 30–43.
+
+### 2026-05-15T03:17:29Z — Scribe recorded slice-audit baseline
+
+- Scribe merged George's slice-audit note into `.squad/decisions/decisions.md` and cleared `.squad/decisions/inbox/george-slice-audit.md`.
+- Durable baseline: slices 14–27 in `docs/Working/quantity-normalization-design.md` remain **NOT_STARTED** across `src/Precept/` and `test/Precept.Tests/`.
+- Scribe wrote the orchestration/session logs for the slice-audit + doc-tracker batch so later agents can treat George's audit as the canonical pre-implementation status check.
