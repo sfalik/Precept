@@ -167,6 +167,14 @@ public static partial class ProofEngine
         QualifierAxis axis) =>
         TryProjectCompoundPrice(qualifier, axis);
 
+    /// <summary>Exposes <see cref="FormatQualifierValue"/> for unit testing.</summary>
+    internal static string FormatQualifierValueForTest(DeclaredQualifierMeta? qualifier) =>
+        FormatQualifierValue(qualifier);
+
+    /// <summary>Exposes <see cref="ExtractQualifierSourcePath"/> for unit testing.</summary>
+    internal static string? ExtractQualifierSourcePathForTest(DeclaredQualifierMeta qualifier) =>
+        ExtractQualifierSourcePath(qualifier);
+
     /// <summary>
     /// Returns the first implied qualifier matching <paramref name="axis"/> for <paramref name="type"/>.
     /// Tests Slice 11B's Duration implied-qualifier path without requiring proof pipeline setup.

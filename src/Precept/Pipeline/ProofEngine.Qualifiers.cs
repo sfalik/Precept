@@ -132,6 +132,10 @@ public static partial class ProofEngine
             DeclaredQualifierMeta.Unit { UnitCode: var value } => value,
             DeclaredQualifierMeta.Dimension { DimensionName: var value } => value,
             DeclaredQualifierMeta.TemporalUnit { UnitName: var value } => value,
+            // TODO: When interpolated CompoundPrice is implemented, this must extract both
+            // CurrencyCode and UnitCode as a composite source path (e.g. "CurrencyCode/UnitCode")
+            // to correctly distinguish qualifiers that share a currency but differ in unit.
+            // Safe today because no InterpolationSlotKind.PriceIn exists yet.
             DeclaredQualifierMeta.CompoundPrice { CurrencyCode: var value } => value,
             _ => null,
         };
@@ -693,16 +697,17 @@ public static partial class ProofEngine
             foreach (var q in field.DeclaredQualifiers)
                 if (q.Axis == QualifierAxis.TemporalDimension) return q;
 
-        var typeMeta = Types.GetMeta(field.ResolvedType);
-        foreach (var q in typeMeta.ImpliedQualifiers)
-            if (q.Axis == axis) return q;
-
         // PriceIn fallback: CompoundPrice carries Currency, Unit, and Dimension components
+        // (checked before implied qualifiers — explicit CompoundPrice is stronger than type-level implied)
         foreach (var q in field.DeclaredQualifiers)
         {
             var projected = TryProjectCompoundPrice(q, axis);
             if (projected is not null) return projected;
         }
+
+        var typeMeta = Types.GetMeta(field.ResolvedType);
+        foreach (var q in typeMeta.ImpliedQualifiers)
+            if (q.Axis == axis) return q;
 
         return null;
     }

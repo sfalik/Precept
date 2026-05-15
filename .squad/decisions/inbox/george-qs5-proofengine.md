@@ -45,6 +45,17 @@ Returns `CurrencyCode` for symbolic path extraction (interpolated template match
 
 Diagnostic formatting: returns `"CurrencyCode/UnitCode"`.
 
+## Follow-up — Frank Review (APPROVED WITH REQUIRED CHANGES)
+
+**Reviewed by:** Frank  
+**Follow-up commit:** (see git log)
+
+Addressed all findings:
+
+- **W1 (REQUIRED):** Fixed `ResolveFieldQualifier` fallback ordering — PriceIn fallback now runs *before* implied qualifiers, matching `ResolveQualifierOnAxis` ordering.
+- **N1 (NOTE):** Added TODO comment on `ExtractQualifierSourcePath` CompoundPrice arm documenting that interpolated CompoundPrice will need composite `CurrencyCode/UnitCode` source path extraction.
+- **N2 (NOTE):** Added two new tests in `QS5_CompoundPriceAxisRouting`: `CompoundPrice_FormatQualifierValue_ReturnsCurrencySlashUnit` and `CompoundPrice_ExtractQualifierSourcePath_ReturnsCurrencyCode`. Added corresponding test entry points in `ProofEngine.Analysis.cs`.
+
 ### I. Test helper
 
 `TryProjectCompoundPriceForTest` added to `ProofEngine.Analysis.cs` for unit test access.

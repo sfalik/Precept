@@ -5377,5 +5377,27 @@ public class ProofEngineTests
 
             value.Should().Be("USD/kg");
         }
+
+        [Fact]
+        public void CompoundPrice_FormatQualifierValue_ReturnsCurrencySlashUnit()
+        {
+            var compound = new DeclaredQualifierMeta.CompoundPrice("USD", "kg", "mass");
+
+            var formatted = ProofEngine.FormatQualifierValueForTest(compound);
+
+            formatted.Should().Be("'USD/kg'");
+        }
+
+        [Fact]
+        public void CompoundPrice_ExtractQualifierSourcePath_ReturnsCurrencyCode()
+        {
+            // CompoundPrice with an interpolated currency source field
+            var compound = new DeclaredQualifierMeta.CompoundPrice("{Currency}", "kg", "mass");
+
+            var sourcePath = ProofEngine.ExtractQualifierSourcePathForTest(compound);
+
+            sourcePath.Should().Be("Currency",
+                because: "ExtractQualifierSourcePath extracts CurrencyCode (stripping braces) for CompoundPrice");
+        }
     }
 }
