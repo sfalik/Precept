@@ -1890,13 +1890,13 @@ For `[lb_av]`:
 | Slice | Summary | Status | Blocking |
 |-------|---------|--------|----------|
 | **14** | Core normalizer (`TypedConstantNormalizer`) | ✅ Done | Blocks 15, 15b, 16, 19, 20 |
-| **15** | TypeChecker bounds extraction to normalizer | ⬜ Not started | Needs 14 |
-| **15b** | TypedArg normalization (`NormalizedDeclaredMin/Max`) | ⬜ Not started | Needs 14 |
-| **16** | ProofEngine magnitude extraction + `TryGetStaticScalingFactor` | ⬜ Not started | Needs 14 |
+| **15** | TypeChecker bounds extraction to normalizer | ✅ Done | Needs 14 |
+| **15b** | TypedArg normalization (`NormalizedDeclaredMin/Max`) | ✅ Done | Needs 14 |
+| **16** | ProofEngine magnitude extraction + `TryGetStaticScalingFactor` | ✅ Done | Needs 14 |
 | **17** | Test coverage (cross-unit bound overflow) | ⬜ Not started | Needs 15, 15b, 16 |
 | **18** | Display review (`IntervalContainmentProofRequirement` shape) | ⬜ Not started | Needs 15, 16 |
-| **19** | `InterpolatedTypedConstant` case in `IntervalOfNarrowed` | ⬜ Not started | Needs 14 |
-| **20** | Unit-aware interval scaling (`NumericInterval.Scale`) | ⬜ Not started | Needs 19, 16 |
+| **19** | `InterpolatedTypedConstant` case in `IntervalOfNarrowed` | ✅ Done | Needs 14 |
+| **20** | Unit-aware interval scaling (`NumericInterval.Scale`) | ✅ Done | Needs 19, 16 |
 | **21** | Interpolated quantity test coverage | ⬜ Not started | Needs 19, 20 |
 | **22** | `StaticQualifier` on `InterpolatedTypedConstant` | ✅ Done | None |
 | **23** | Route `StaticQualifier` through qualifier consumers | ⬜ Not started | Needs 22 |
@@ -1905,13 +1905,13 @@ For `[lb_av]`:
 | **26** | Event arg default resolution (`ResolveEventArgExpressions`) | ⬜ Not started | Needs 25, 15b |
 | **27** | Doc sync (language spec, proof-engine.md, interval design) | ⬜ Not started | Needs 16, 18 (shape freeze) |
 | **30** | Extend PRE0070/PRE0071 to comparison operators | ✅ Done | None |
-| **31** | PRE0137 `CrossCountingUnitOperation` | 🔶 Partial | Binary operators pending wave 2 |
+| **31** | PRE0137 `CrossCountingUnitOperation` | ✅ Done | None |
 | **32** | `QualifierMatch.Same` in `SelectOverload` (function calls) | ✅ Done | None |
-| **33** | Qualifier checks on `contains` synthetic membership ops | ⬜ Not started | After 32 |
+| **33** | Qualifier checks on `contains` synthetic membership ops | ✅ Done | After 32 |
 | **34** | Affine UCUM catalog extension (`AffineOffset`) | ✅ Done | None |
-| **35** | Affine scalar normalization `(value + offset) × scale` | ⬜ Not started | Needs 34 |
-| **36** | Affine interval shifting (`NumericInterval.Shift`) | ⬜ Not started | Needs 35 |
-| **37** | Full affine 24-test matrix | ⬜ Not started | Needs 36 |
+| **35** | Affine scalar normalization `(value + offset) × scale` | ✅ Done | Needs 34 |
+| **36** | Affine interval shifting (`NumericInterval.Shift`) | ✅ Done | Needs 35 |
+| **37** | Full affine 24-test matrix | ✅ Done | Needs 36 |
 | **38** | Doc: temperature in scope, only genuine nonlinear units excluded | ✅ Done | None |
 | **39** | Doc: exact-conversion-factor assumption | ✅ Done | None |
 | **40** | Doc: business units `UcumExactFactor.One` / `DimensionVector.None` | ✅ Done | None |
@@ -1922,7 +1922,7 @@ For `[lb_av]`:
 | **45** | PRE0138 `CountDimensionBoundsAmbiguous` | ✅ Done | None |
 
 **Legend:** ✅ Done · 🔶 Partial · ⬜ Not started
-**Critical path:** 14 → 15/15b/16 → 17/18/19 → 20/21/22 → 23/24/25 → 26 → 27
+**Critical path:** 14 → ~~15/15b/16~~ → 17/18 → 21 → 23/24/25 → 26 → 27 _(15/15b/16/19/20 complete; remaining gate is 17/18 → 21 onward)_
 **Parallel-safe first wave:** 14 · 22 · 30 · 32 · 34 · 38–42 · 43 · 44 · 45 (no code dependencies)
 
 ### 5.1 Implementation Slices
@@ -1932,8 +1932,8 @@ These slices follow the existing interval-proof-engine-design numbering (Slices 
 | Slice | Objective | Depends On | Agent | Status |
 |-------|-----------|------------|-------|--------|
 | **14** | ~~`NormalizedNumericValue` +~~ `TypedConstantNormalizer` _(⚠️ `NormalizedNumericValue` dropped per §0)_ | None (new files) | George | ✅ |
-| **15** | Wire TypeChecker bounds extraction to normalizer | Slice 14 | George | ⬜ |
-| **16** | Wire ProofEngine magnitude extraction to normalizer | Slice 14 | George | ⬜ |
+| **15** | Wire TypeChecker bounds extraction to normalizer | Slice 14 | George | ✅ |
+| **16** | Wire ProofEngine magnitude extraction to normalizer | Slice 14 | George | ✅ |
 | **17** | Unit + integration + regression tests | Slices 15–16 | Soup Nazi | ⬜ |
 | **18** | Hover/diagnostic display review | Slices 15–16 | Kramer | ⬜ |
 | **27** | Doc sync | Slices 14–21 | Frank | ⬜ |
