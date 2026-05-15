@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Frozen;
+using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -45,6 +47,38 @@ public class ProofEngineTypedArgQualifierTests
         comparison.Right.Should().BeOfType<InterpolatedTypedConstant>();
         return (InterpolatedTypedConstant)comparison.Right;
     }
+
+    private static DeclaredQualifierMeta? ResolveExpressionQualifier(
+        TypedExpression expression,
+        QualifierAxis axis,
+        SemanticIndex semantics)
+    {
+        var method = typeof(ProofEngine).GetMethod(
+            "ResolveQualifierFromExpression",
+            BindingFlags.NonPublic | BindingFlags.Static);
+
+        method.Should().NotBeNull();
+        return (DeclaredQualifierMeta?)method!.Invoke(null, new object?[] { expression, axis, semantics });
+    }
+
+    private static TypedField CreateField(string name, TypeKind type, params DeclaredQualifierMeta[] qualifiers)
+        => new(
+            name,
+            type,
+            null,
+            null,
+            ImmutableArray<ModifierKind>.Empty,
+            ImmutableArray<ModifierKind>.Empty,
+            null,
+            null,
+            null,
+            false,
+            false,
+            true,
+            new DeclaredPresenceMeta.Guaranteed(),
+            ImmutableArray.Create(qualifiers),
+            SourceSpan.Missing,
+            null!);
 
     [Fact]
     public void CompoundUnitInterpolatedConstant_ResolvesCompoundUnitQualifier()
@@ -109,6 +143,43 @@ public class ProofEngineTypedArgQualifierTests
         compilation.HasErrors.Should().BeFalse();
         compilation.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnprovedQualifierCompatibility));
         compilation.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.DivisionByZero));
+    }
+
+    [Fact]
+    public void CompoundCancellationResolver_LengthPerTimeAndTime_ProducesLengthForProofEngine()
+    {
+        var speedField = CreateField(
+            "Speed",
+            TypeKind.Quantity,
+            new DeclaredQualifierMeta.Unit("m/s", "length/time"));
+        var elapsedField = CreateField(
+            "Elapsed",
+            TypeKind.Quantity,
+            new DeclaredQualifierMeta.Unit("s", "time"));
+        var semantics = SemanticIndex.Empty with
+        {
+            Fields = ImmutableArray.Create(speedField, elapsedField),
+            FieldsByName = new[] { speedField, elapsedField }.ToFrozenDictionary(field => field.Name),
+        };
+        var expression = new TypedBinaryOp(
+            TypeKind.Quantity,
+            OperationKind.QuantityTimesQuantity,
+            new TypedFieldRef(TypeKind.Quantity, "Speed", false, speedField.DeclaredQualifiers, SourceSpan.Missing),
+            new TypedFieldRef(TypeKind.Quantity, "Elapsed", false, elapsedField.DeclaredQualifiers, SourceSpan.Missing),
+            new CompoundUnitCancellationRequired(),
+            ImmutableArray<ProofRequirement>.Empty,
+            SourceSpan.Missing);
+
+        var unit = ResolveExpressionQualifier(expression, QualifierAxis.Unit, semantics)
+            .Should().BeOfType<DeclaredQualifierMeta.Unit>().Which;
+        unit.UnitCode.Should().Be("m");
+        unit.DimensionName.Should().Be("length");
+        unit.Origin.Should().Be(QualifierOrigin.Derived);
+
+        var dimension = ResolveExpressionQualifier(expression, QualifierAxis.Dimension, semantics)
+            .Should().BeOfType<DeclaredQualifierMeta.Dimension>().Which;
+        dimension.DimensionName.Should().Be("length");
+        dimension.Origin.Should().Be(QualifierOrigin.Derived);
     }
 
     [Fact]

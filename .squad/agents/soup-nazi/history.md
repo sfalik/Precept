@@ -103,3 +103,9 @@
 - The 8-test quantity qualifier sweep is now merged into .squad/decisions.md as confirmation that bare refs, whole-value interpolation, unit slots, binary results, and conditionals were already enforcing PRE0141 honestly.
 - George's later quantity-slot hardening now sits on top of an already-green lane rather than rescuing a still-red gap.
 
+### 2026-05-15T19:02:24.3919248-04:00 — N3/N4 follow-up tests are now pinned directly in the suite
+
+- Added direct TypeChecker coverage for the `duration` implied-qualifier path and synthetic compound-cancellation resolution, so the assignment resolver now has explicit regression anchors for `TemporalDimension(Time)` and `m/s × s -> m` / `length`.
+- Added the ProofEngine companion resolver test plus function-call qualifier preservation checks for `min`, `max`, and `round`, closing the review gap on `TypedFunctionCall.ResultQualifiers`.
+- Validation is partially blocked by existing rebuild failures in `TypeCheckerFieldStateTests.cs` (`AssertSingleD143` / `AssertNoD143` missing), but the edited files are clean in IDE diagnostics and the baseline 9-failure branch count was unchanged before this slice.
+

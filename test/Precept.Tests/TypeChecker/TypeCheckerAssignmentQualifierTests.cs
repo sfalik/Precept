@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Immutable;
 using System.Linq;
+using System.Reflection;
 using FluentAssertions;
 using Precept;
 using Precept.Language;
@@ -844,12 +846,167 @@ public class TypeCheckerAssignmentQualifierTests
     }
 
     [Fact]
+    public void DurationBareAssignment_UsesImpliedTemporalDimensionResolver_AndCompilesClean()
+    {
+        var precept = CreateSetAssignmentPrecept(
+            targetDeclaration: "field target as duration default '24 hours' writable",
+            assignment: "source",
+            "field source as duration default '72 hours'");
+
+        var compilation = Compiler.Compile(precept);
+        AssertNoAssignmentQualifierDiagnostics(compilation);
+
+        var input = GetSingleSetInputExpression(TypeCheckerTestHelpers.CheckExpectingClean(precept));
+        var resolution = ResolveAssignmentQualifierAxisForTest(input, QualifierAxis.TemporalDimension);
+
+        resolution.Kind.Should().Be(QualifierResolutionKind.Resolved);
+        var qualifier = resolution.Qualifier.Should().BeOfType<DeclaredQualifierMeta.TemporalDimension>().Which;
+        qualifier.Value.Should().Be(PeriodDimension.Time);
+        qualifier.Origin.Should().Be(QualifierOrigin.Baseline);
+    }
+
+    [Fact]
+    public void CompoundCancellationResolver_LengthPerTimeAndTime_ProducesLengthForTypeChecker()
+    {
+        var speed = new TypedFieldRef(
+            TypeKind.Quantity,
+            "Speed",
+            false,
+            ImmutableArray.Create<DeclaredQualifierMeta>(new DeclaredQualifierMeta.Unit("m/s", "length/time")),
+            SourceSpan.Missing);
+        var elapsed = new TypedFieldRef(
+            TypeKind.Quantity,
+            "Elapsed",
+            false,
+            ImmutableArray.Create<DeclaredQualifierMeta>(new DeclaredQualifierMeta.Unit("s", "time")),
+            SourceSpan.Missing);
+        var expression = new TypedBinaryOp(
+            TypeKind.Quantity,
+            OperationKind.QuantityTimesQuantity,
+            speed,
+            elapsed,
+            new CompoundUnitCancellationRequired(),
+            ImmutableArray<ProofRequirement>.Empty,
+            SourceSpan.Missing);
+
+        var unitResolution = ResolveAssignmentQualifierAxisForTest(expression, QualifierAxis.Unit);
+        unitResolution.Kind.Should().Be(QualifierResolutionKind.Resolved);
+        var unit = unitResolution.Qualifier.Should().BeOfType<DeclaredQualifierMeta.Unit>().Which;
+        unit.UnitCode.Should().Be("m");
+        unit.DimensionName.Should().Be("length");
+        unit.Origin.Should().Be(QualifierOrigin.Derived);
+
+        var dimensionResolution = ResolveAssignmentQualifierAxisForTest(expression, QualifierAxis.Dimension);
+        dimensionResolution.Kind.Should().Be(QualifierResolutionKind.Resolved);
+        var dimension = dimensionResolution.Qualifier.Should().BeOfType<DeclaredQualifierMeta.Dimension>().Which;
+        dimension.DimensionName.Should().Be("length");
+        dimension.Origin.Should().Be(QualifierOrigin.Derived);
+    }
+
+    [Fact]
+    public void MoneyMinFunctionCallMatchingCurrency_PreservesResultQualifier_AndCompilesClean()
+    {
+        var precept = CreateSetAssignmentPrecept(
+            targetDeclaration: "field target as money in 'USD' default '1 USD' writable",
+            assignment: "min(left, right)",
+            "field left as money in 'USD' default '2 USD'",
+            "field right as money in 'USD' default '1 USD'");
+
+        var compilation = Compiler.Compile(precept);
+        AssertNoAssignmentQualifierDiagnostics(compilation);
+
+        var functionCall = GetSingleSetInputExpression(TypeCheckerTestHelpers.CheckExpectingClean(precept))
+            .Should().BeOfType<TypedFunctionCall>().Which;
+        functionCall.ResultQualifiers.HasValue.Should().BeTrue();
+        functionCall.ResultQualifiers!.Value
+            .OfType<DeclaredQualifierMeta.Currency>()
+            .Should().ContainSingle()
+            .Which.CurrencyCode.Should().Be("USD");
+    }
+
+    [Fact]
+    public void MoneyMinFunctionCallMismatchedTarget_EmitsQualifierMismatch()
+    {
+        var result = CompileSetAssignment(
+            targetDeclaration: "field target as money in 'EUR' default '1 EUR'",
+            assignment: "min(left, right)",
+            "field left as money in 'USD' default '2 USD'",
+            "field right as money in 'USD' default '1 USD'");
+
+        AssertContainsQualifierMismatch(result);
+    }
+
+    [Fact]
+    public void QuantityMaxFunctionCallMatchingUnit_PreservesResultQualifier_AndCompilesClean()
+    {
+        var precept = CreateSetAssignmentPrecept(
+            targetDeclaration: "field target as quantity in 'kg' default '1 kg' writable",
+            assignment: "max(left, right)",
+            "field left as quantity in 'kg' default '2 kg'",
+            "field right as quantity in 'kg' default '1 kg'");
+
+        var compilation = Compiler.Compile(precept);
+        AssertNoAssignmentQualifierDiagnostics(compilation);
+
+        var functionCall = GetSingleSetInputExpression(TypeCheckerTestHelpers.CheckExpectingClean(precept))
+            .Should().BeOfType<TypedFunctionCall>().Which;
+        functionCall.ResultQualifiers.HasValue.Should().BeTrue();
+        functionCall.ResultQualifiers!.Value
+            .OfType<DeclaredQualifierMeta.Unit>()
+            .Should().ContainSingle()
+            .Which.UnitCode.Should().Be("kg");
+    }
+
+    [Fact]
+    public void QuantityMaxFunctionCallMismatchedTarget_EmitsQualifierMismatch()
+    {
+        var result = CompileSetAssignment(
+            targetDeclaration: "field target as quantity in '[lb_av]' default '1 [lb_av]'",
+            assignment: "max(left, right)",
+            "field left as quantity in 'kg' default '2 kg'",
+            "field right as quantity in 'kg' default '1 kg'");
+
+        AssertContainsQualifierMismatch(result);
+    }
+
+    [Fact]
+    public void MoneyRoundFunctionCallMatchingCurrency_PreservesResultQualifier_AndCompilesClean()
+    {
+        var precept = CreateSetAssignmentPrecept(
+            targetDeclaration: "field target as money in 'USD' default '1 USD' writable",
+            assignment: "round(source, 2)",
+            "field source as money in 'USD' default '1.25 USD'");
+
+        var compilation = Compiler.Compile(precept);
+        AssertNoAssignmentQualifierDiagnostics(compilation);
+
+        var functionCall = GetSingleSetInputExpression(TypeCheckerTestHelpers.CheckExpectingClean(precept))
+            .Should().BeOfType<TypedFunctionCall>().Which;
+        functionCall.ResultQualifiers.HasValue.Should().BeTrue();
+        functionCall.ResultQualifiers!.Value
+            .OfType<DeclaredQualifierMeta.Currency>()
+            .Should().ContainSingle()
+            .Which.CurrencyCode.Should().Be("USD");
+    }
+
+    [Fact]
     public void MoneyRoundFunctionCallQualifierMismatch_EmitsQualifierMismatch()
     {
         var result = CompileSetAssignment(
             targetDeclaration: "field target as money in 'USD' default '1 USD'",
             assignment: "round(source, 2)",
             "field source as money in 'EUR' default '1 EUR'");
+
+        AssertContainsQualifierMismatch(result);
+    }
+
+    [Fact]
+    public void MoneyRoundFunctionCallMismatchedTarget_EmitsQualifierMismatch()
+    {
+        var result = CompileSetAssignment(
+            targetDeclaration: "field target as money in 'EUR' default '1 EUR'",
+            assignment: "round(source, 2)",
+            "field source as money in 'USD' default '1 USD'");
 
         AssertContainsQualifierMismatch(result);
     }
@@ -898,10 +1055,16 @@ public class TypeCheckerAssignmentQualifierTests
         string targetDeclaration,
         string assignment,
         params string[] extraDeclarations)
+        => Compiler.Compile(CreateSetAssignmentPrecept(targetDeclaration, assignment, extraDeclarations));
+
+    private static string CreateSetAssignmentPrecept(
+        string targetDeclaration,
+        string assignment,
+        params string[] extraDeclarations)
     {
         var extra = string.Join(Environment.NewLine, extraDeclarations.Where(static s => !string.IsNullOrWhiteSpace(s)));
 
-        var precept = $$"""
+        return $$"""
             precept QualifierRegression
             {{extra}}
             {{targetDeclaration}}
@@ -912,8 +1075,24 @@ public class TypeCheckerAssignmentQualifierTests
                 -> set target = {{assignment}}
                 -> transition Done
             """;
+    }
 
-        return Compiler.Compile(precept);
+    private static TypedExpression GetSingleSetInputExpression(SemanticIndex index)
+    {
+        index.TransitionRows.Should().ContainSingle();
+        index.TransitionRows[0].Actions.Should().ContainSingle();
+        return index.TransitionRows[0].Actions[0]
+            .Should().BeOfType<TypedInputAction>().Which.InputExpression;
+    }
+
+    private static ResolvedQualifierAxis ResolveAssignmentQualifierAxisForTest(TypedExpression value, QualifierAxis axis)
+    {
+        var method = typeof(Precept.Pipeline.TypeChecker).GetMethod(
+            "ResolveAssignmentQualifierAxis",
+            BindingFlags.NonPublic | BindingFlags.Static);
+
+        method.Should().NotBeNull();
+        return (ResolvedQualifierAxis)method!.Invoke(null, new object?[] { value, axis })!;
     }
 
     private static Compilation CompileFieldDefault(string targetDeclaration, params string[] extraDeclarations)
