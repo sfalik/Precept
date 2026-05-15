@@ -64,6 +64,14 @@ public static partial class ProofEngine
             {
                 // Part A: Try to fold interpolated defaults using already-accumulated defaults.
                 // This enables ensures evaluation to reason about fields with foldable interpolated defaults.
+                //
+                // NOTE — ordering sensitivity: field declaration order affects foldability here.
+                // If a field referenced in a slot (e.g., '{n} kg') has not yet been accumulated into
+                // defaults at this point (because n is declared after the current field), FoldValue
+                // returns UnknownSentinel and the field is marked unfoldable. This is graceful
+                // degradation — no error, just a conservative skip of ensures obligations that
+                // depend on that field's default. CollectDefaultObligations is unaffected because
+                // it derives bounds from declared field limits (IntervalOf), not accumulated defaults.
                 var folded = FoldValue(field.DefaultExpression, defaults, unfoldable);
                 if (!ReferenceEquals(folded, UnknownSentinel))
                     defaults[field.Name] = folded;
@@ -384,7 +392,8 @@ public static partial class ProofEngine
         }
     }
 
-    private static string FormatViolationReason(TypedEnsure ensure, Dictionary<string, object?> defaults)    {
+    private static string FormatViolationReason(TypedEnsure ensure, Dictionary<string, object?> defaults)
+    {
         var fields = new List<string>();
         CollectFieldRefs(ensure.Condition, fields);
         if (fields.Count == 0)
