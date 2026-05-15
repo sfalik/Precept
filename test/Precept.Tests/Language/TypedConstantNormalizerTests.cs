@@ -1,3 +1,5 @@
+using System;
+using System.Reflection;
 using FluentAssertions;
 using Precept.Language;
 using Xunit;
@@ -60,6 +62,125 @@ public class TypedConstantNormalizerTests
         upperUnbounded.Max.Should().Be(decimal.MaxValue);
         flipped.Min.Should().Be(-10m);
         flipped.Max.Should().Be(decimal.MaxValue);
+    }
+
+    [Fact]
+    public void NormalizeQuantity_Celsius_AppliesAffineOffset()
+    {
+        TypedConstantNormalizer.NormalizeQuantity(20m, ParseUnit("Cel")).Should().Be(293.15m);
+    }
+
+    [Fact]
+    public void NormalizeQuantity_Fahrenheit_AppliesAffineScaleAndOffset()
+    {
+        TypedConstantNormalizer.NormalizeQuantity(68m, ParseUnit("[degF]")).Should().Be(293.15m);
+    }
+
+    [Fact]
+    public void NormalizeQuantity_Reaumur_AppliesAffineScaleAndOffset()
+    {
+        TypedConstantNormalizer.NormalizeQuantity(16m, ParseUnit("[degRe]")).Should().Be(293.15m);
+    }
+
+    [Fact]
+    public void NormalizeQuantity_Rankine_LinearOnly()
+    {
+        TypedConstantNormalizer.NormalizeQuantity(527.67m, ParseUnit("[degR]")).Should().Be(293.15m);
+    }
+
+    [Fact]
+    public void NormalizeQuantity_Kelvin_IdentityScale()
+    {
+        TypedConstantNormalizer.NormalizeQuantity(293.15m, ParseUnit("K")).Should().Be(293.15m);
+    }
+
+    [Fact]
+    public void NormalizeQuantity_CelsiusNegative_CorrectOffset()
+    {
+        TypedConstantNormalizer.NormalizeQuantity(-40m, ParseUnit("Cel")).Should().Be(233.15m);
+    }
+
+    [Fact]
+    public void NormalizeQuantity_FahrenheitNegative_CorrectOffset()
+    {
+        TypedConstantNormalizer.NormalizeQuantity(-40m, ParseUnit("[degF]")).Should().Be(233.15m);
+    }
+
+    [Fact]
+    public void DenormalizeQuantity_Celsius_Roundtrip()
+    {
+        var normalized = TypedConstantNormalizer.NormalizeQuantity(20m, ParseUnit("Cel"));
+
+        TypedConstantNormalizer.DenormalizeQuantity(normalized, ParseUnit("Cel")).Should().Be(20m);
+    }
+
+    [Fact]
+    public void DenormalizeQuantity_Fahrenheit_Roundtrip()
+    {
+        var normalized = TypedConstantNormalizer.NormalizeQuantity(68m, ParseUnit("[degF]"));
+
+        TypedConstantNormalizer.DenormalizeQuantity(normalized, ParseUnit("[degF]")).Should().Be(68m);
+    }
+
+    [Fact]
+    public void UcumAtom_Celsius_HasAffineOffset()
+    {
+        GetAffineOffset(UcumAtomCatalog.All["Cel"]).Should().Be(273.15m);
+    }
+
+    [Fact]
+    public void UcumAtom_Fahrenheit_HasAffineOffset()
+    {
+        GetAffineOffset(UcumAtomCatalog.All["[degF]"]).Should().Be(459.67m);
+    }
+
+    [Fact]
+    public void UcumAtom_Kelvin_NoAffineOffset()
+    {
+        GetAffineOffset(UcumAtomCatalog.All["K"]).Should().BeNull();
+    }
+
+    [Fact]
+    public void UcumParsedUnit_CelCompound_NoAffineOffset()
+    {
+        var parsed = UcumParser.Parse("Cel/min");
+
+        parsed.IsValid.Should().BeTrue();
+        GetAffineOffset(parsed.Unit!).Should().BeNull();
+    }
+
+    [Fact]
+    public void UcumParsedUnit_CelStandalone_HasAffineOffset()
+    {
+        var parsed = UcumParser.Parse("Cel");
+
+        parsed.IsValid.Should().BeTrue();
+        GetAffineOffset(parsed.Unit!).Should().Be(273.15m);
+    }
+
+    [Fact]
+    public void UcumAtom_dB_NoAffineOffset()
+    {
+        GetAffineOffset(UcumAtomCatalog.All["dB"]).Should().BeNull();
+    }
+
+    [Fact]
+    public void UcumAtom_pH_NoAffineOffset()
+    {
+        GetAffineOffset(UcumAtomCatalog.All["[pH]"]).Should().BeNull();
+    }
+
+    private static decimal? GetAffineOffset(object subject)
+    {
+        var property = subject.GetType().GetProperty("AffineOffset", BindingFlags.Public | BindingFlags.Instance);
+        property.Should().NotBeNull($"{subject.GetType().Name} must expose AffineOffset for Slice 37");
+
+        return property!.GetValue(subject) switch
+        {
+            null => null,
+            decimal value => value,
+            _ => throw new InvalidOperationException($"Unexpected AffineOffset payload type '{property.PropertyType}'.")
+        };
     }
 
     private static UcumParsedUnit ParseUnit(string text)

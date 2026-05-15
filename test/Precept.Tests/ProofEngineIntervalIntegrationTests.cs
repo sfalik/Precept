@@ -1039,4 +1039,104 @@ from Active on Update when 1 == 1
             .Should().BeGreaterThanOrEqualTo(1,
                 "interval obligations generated even when guard doesn't narrow bounds");
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  Slice 37 — affine cross-temperature proof cases
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void QuantityField_CelsiusBound_FahrenheitAssignment_CorrectComparison()
+    {
+        const string precept = """
+            precept TemperatureBounds
+            field temp as quantity of 'temperature' max '100 Cel' default '0 Cel'
+            state Draft initial
+            state Closed
+            event Apply
+            from Draft on Apply
+                -> set temp = '212 [degF]'
+                -> transition Closed
+            """;
+
+        var result = Compiler.Compile(precept);
+
+        result.Diagnostics
+            .Where(d => d.Code == nameof(DiagnosticCode.NumericOverflow))
+            .Should().BeEmpty(because: "212 °F and 100 °C normalize to the same Kelvin bound");
+        result.Proof.Obligations
+            .Where(o => o.Requirement is IntervalContainmentProofRequirement { TargetField: "temp" })
+            .Should().ContainSingle()
+            .Which.Disposition.Should().Be(ProofDisposition.Proved);
+    }
+
+    [Fact]
+    public void QuantityField_CelsiusBound_FahrenheitAssignment_Overflow()
+    {
+        const string precept = """
+            precept TemperatureBounds
+            field temp as quantity of 'temperature' max '100 Cel' default '0 Cel'
+            state Draft initial
+            state Closed
+            event Apply
+            from Draft on Apply
+                -> set temp = '213 [degF]'
+                -> transition Closed
+            """;
+
+        var result = Compiler.Compile(precept);
+
+        result.Diagnostics.Should().Contain(
+            d => d.Code == nameof(DiagnosticCode.NumericOverflow),
+            because: "213 °F normalizes above the 100 °C / 373.15 K ceiling");
+    }
+
+    [Fact]
+    public void QuantityField_KelvinBound_CelsiusAssignment_CorrectNormalization()
+    {
+        const string precept = """
+            precept TemperatureBounds
+            field temp as quantity of 'temperature' max '373.15 K' default '0 K'
+            state Draft initial
+            state Closed
+            event Apply
+            from Draft on Apply
+                -> set temp = '100 Cel'
+                -> transition Closed
+            """;
+
+        var result = Compiler.Compile(precept);
+
+        result.Diagnostics
+            .Where(d => d.Code == nameof(DiagnosticCode.NumericOverflow))
+            .Should().BeEmpty(because: "100 °C and 373.15 K normalize to the same value");
+        result.Proof.Obligations
+            .Where(o => o.Requirement is IntervalContainmentProofRequirement { TargetField: "temp" })
+            .Should().ContainSingle()
+            .Which.Disposition.Should().Be(ProofDisposition.Proved);
+    }
+
+    [Fact]
+    public void QuantityField_CelsiusBound_CelsiusAssignment_AffineApplied()
+    {
+        const string precept = """
+            precept TemperatureBounds
+            field temp as quantity of 'temperature' max '100 Cel' default '0 Cel'
+            state Draft initial
+            state Closed
+            event Apply
+            from Draft on Apply
+                -> set temp = '99 Cel'
+                -> transition Closed
+            """;
+
+        var result = Compiler.Compile(precept);
+
+        result.Diagnostics
+            .Where(d => d.Code == nameof(DiagnosticCode.NumericOverflow))
+            .Should().BeEmpty(because: "same-unit temperature comparisons still use the affine-normalized path");
+        result.Proof.Obligations
+            .Where(o => o.Requirement is IntervalContainmentProofRequirement { TargetField: "temp" })
+            .Should().ContainSingle()
+            .Which.Disposition.Should().Be(ProofDisposition.Proved);
+    }
 }

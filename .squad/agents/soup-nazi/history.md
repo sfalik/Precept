@@ -11,6 +11,8 @@
 - Span-heavy regressions should derive expected spans from compilation artifacts instead of hand-counted columns.
 - Exhaustiveness-style diagnostic fixture tests must supply enough placeholder args for the highest indexed template slot in the catalog.
 - When design behavior is still open (diagnostic multiplicity, wildcard fan-out, broadcast identity contracts), wait for the decision before locking tests.
+- Quantity-normalization coverage must separate raw typed literals, WholeValue interpolation, and interpolated magnitude-with-static-unit paths; otherwise the dangerous double-normalization and unbounded-interval branches stay invisible.
+- When implementation types are still landing, reflection-based tests are the honest way to pin the contract without turning the suite into compile errors or skipped placeholders.
 
 ## Historical Summary
 

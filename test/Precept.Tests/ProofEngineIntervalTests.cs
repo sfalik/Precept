@@ -1,3 +1,4 @@
+using System.Reflection;
 using FluentAssertions;
 using Precept.Language;
 using Precept.Pipeline;
@@ -635,5 +636,60 @@ public class ProofEngineIntervalTests
         var result = NumericInterval.Unbounded.Negate();
 
         result.IsUnbounded.Should().BeTrue();
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  Slice 37 — affine interval shift coverage
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Shift_PositiveOffset_BothBoundsShifted()
+    {
+        var shifted = InvokeShift(new NumericInterval(10m, 20m), 273.15m);
+
+        shifted.Min.Should().Be(283.15m);
+        shifted.Max.Should().Be(293.15m);
+    }
+
+    [Fact]
+    public void Shift_NegativeValues_Shifted()
+    {
+        var shifted = InvokeShift(new NumericInterval(-40m, 100m), 273.15m);
+
+        shifted.Min.Should().Be(233.15m);
+        shifted.Max.Should().Be(373.15m);
+    }
+
+    [Fact]
+    public void Shift_Unbounded_ReturnsUnbounded()
+    {
+        var shifted = InvokeShift(NumericInterval.Unbounded, 273.15m);
+
+        shifted.IsUnbounded.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Shift_ZeroOffset_IdentityBehavior()
+    {
+        var shifted = InvokeShift(new NumericInterval(10m, 20m), 0m);
+
+        shifted.Min.Should().Be(10m);
+        shifted.Max.Should().Be(20m);
+    }
+
+    private static NumericInterval InvokeShift(NumericInterval interval, decimal offset)
+    {
+        var method = typeof(NumericInterval).GetMethod(
+            name: "Shift",
+            bindingAttr: BindingFlags.Public | BindingFlags.Instance,
+            binder: null,
+            types: [typeof(decimal)],
+            modifiers: null);
+
+        method.Should().NotBeNull("Slice 37 adds NumericInterval.Shift(decimal) for affine normalization");
+
+        var result = method!.Invoke(interval, [offset]);
+        result.Should().BeOfType<NumericInterval>();
+        return (NumericInterval)result!;
     }
 }
