@@ -19816,3 +19816,836 @@ N4: [NON-BLOCKING] Missing test coverage for multi-arg qualifier preservation (`
 ### Scope Note
 
 The LS changes (N2) are approved because they are independently correct, well-tested, and don't touch qualifier enforcement code. However, George is reminded: **one commit, one concern.** Completion handler improvements deserve their own commit message and their own review surface. Don't bundle unrelated work.
+
+# Initial Event / Initial State — Design Critique
+
+**Author:** Frank (Lead/Architect)
+**Date:** 2026-05-15T19:48:03-04:00
+**Requested by:** Shane
+**Disposition:** Pre-ship critical design review
+
+---
+
+## Executive Summary
+
+Shane is right — this design has real problems. Not fatal ones, but more than cosmetic. I'm categorizing each issue as **(A) fix before ship**, **(B) smooth with docs/errors**, or **(C) actually fine**.
+
+The keyword overload is the worst offender. The hollow-then-hydrate pattern is defensible. The construction-can-transition subtlety is a feature, not a bug, but needs better visibility. The stateless/stateful mutual exclusion is too rigid. The `no transition` in stateless context is an abstraction leak.
+
+---
+
+## 1. The `initial` Keyword Overload — VERDICT: (A) Fix Before Ship
+
+### The Problem
+
+`initial` means two completely unrelated things:
+
+- On a state: "this is the lifecycle starting position" (a topological marker)
+- On an event: "this is the construction mechanism" (a behavioral trigger)
+
+These aren't even the same *category* of concept. One is a graph annotation. The other is an execution semantic. The shared keyword creates a false implication of conceptual unity where none exists.
+
+### What the User Sees
+
+```precept
+state Draft initial          # "initial" = where you start
+event Create(...) initial    # "initial" = how you get created
+```
+
+A domain author (philosophy says: business analyst, not primarily a developer) reads this and reasonably concludes these are the same concept. They're not. The state is already set BEFORE the event fires. The event doesn't "initialize to" the state — it acts on an entity already in that state. The word `initial` papers over a two-step process that the user cannot see from the surface.
+
+### Measuring Against P5 (Keyword-Anchored Readability)
+
+P5 says "Statement kind is identified by its opening keyword sequence." The principle is that keywords should make intent legible. When a single keyword means two different things on two different constructs, it actively harms readability. You have to know which construct you're looking at to know what the keyword means. That's the OPPOSITE of keyword-anchored clarity.
+
+### Proposal
+
+Split into two distinct keywords:
+
+- **`initial`** stays on states. It means "starting position." This is intuitive and correct.
+- **`constructor`** (or `creation` or `intake`) goes on events. It means "this is the construction event."
+
+```precept
+state Draft initial
+event Create(...) constructor
+```
+
+Now a reader can immediately see: one marks position, one marks behavior. The false unity is broken. The mental model is honest.
+
+### Cost of Change
+
+Low. Precept hasn't shipped. The keyword appears on events in exactly one sample file (`Test.precept`). The canonical samples (loan-application, insurance-claim, etc.) don't use initial events at all — they rely on defaults and first-transition hydration. This is a trivial grammar change, a new token, one catalog entry, and a migration of zero real user definitions.
+
+### Tradeoff
+
+We lose the symmetry of "both marked `initial`." That symmetry was always false — it implied a relationship that doesn't exist at the semantic level. Losing false symmetry is a feature.
+
+---
+
+## 2. The Hollow-Then-Hydrate Pattern — VERDICT: (C) Actually Fine
+
+### The Concern
+
+The entity exists in an intermediate invalid state (hollow, required fields unassigned) between step 1 (state set, defaults applied) and step 2 (initial event fires).
+
+### Why It's Not a Problem
+
+The atomicity guarantee (§3A.4) is not "papering over" this — it IS the resolution. The hollow version never escapes the construction boundary. It exists on a working copy that either promotes to committed state (if construction succeeds) or is discarded entirely (if it fails). No external observer can ever see the hollow intermediate.
+
+This is the same pattern as every other mutation: during a `Fire` call, the entity is on a working copy with potentially invalid intermediate states between action steps. The constraint check happens AFTER all mutations complete. Construction is not special here — it's the same contract.
+
+The hollow version is an implementation detail of construction, not an observable state. The spec is explicit: "An invalid configuration never exists, even transiently." (§3A.4). The working copy is not "existence" in the relevant sense.
+
+### Measuring Against P1 (Prevention, Not Detection)
+
+P1 says invalid configurations cannot exist. They can't. The hollow version is not a configuration that persists — it's a working copy in mid-construction. If anything, this is *more* preventive than alternatives (like requiring the user to construct-then-initialize in two visible steps).
+
+**No change needed.**
+
+---
+
+## 3. Construction Can Transition Away From Initial State — VERDICT: (C) Actually Fine, but (B) Needs Better Docs
+
+### The Concern
+
+If `from Draft on Create -> ... -> transition Active` fires at construction, the entity was in `Draft` for zero observable duration. What was the point of marking `Draft` as `initial`?
+
+### Why It's Sound
+
+The initial state serves THREE purposes even when construction transitions away:
+
+1. **Row routing.** The initial event's transition rows are selected by `from Draft on Create`. Without an initial state, there's no `from` to route against. The initial state is the dispatch context for construction.
+2. **Omit semantics.** `in Draft omit X` means X is structurally absent at construction time. This shapes what D94 requires — fields omitted in the initial state don't need assignment. The initial state determines the construction shape.
+3. **Entry ensure composition.** `to Draft ensure ...` fires as a construction intake invariant. Even if the entity immediately leaves, those entry ensures validated the intake data.
+
+The entity "passing through" the initial state is analogous to a function parameter being in scope for the function body even if it's immediately destructured. The initial state isn't "where the entity lives forever" — it's "the entry point of the lifecycle graph." You have to enter somewhere to start traversing.
+
+### The Documentation Gap
+
+The confusion here is real but pedagogical, not structural. The fix:
+
+- The language server hover for `initial` on a state should say: "The construction entry point. The entity may transition away from this state during construction if the initial event's row specifies a transition."
+- Samples should demonstrate construction-time routing explicitly (none currently do).
+- The quickstart/docs should explain initial state as "dispatch context for construction" not "where the entity starts its life."
+
+---
+
+## 4. The Stateless/Stateful Mutual Exclusion — VERDICT: (A) Fix Before Ship
+
+### The Problem
+
+In a stateful precept, `on Event -> actions` is a compile error. You MUST use `from State on Event -> ...`. The spec says mixing creates "ambiguity about execution order."
+
+But this restriction is too coarse. There's a legitimate use case:
+
+```precept
+state Draft initial
+state Active
+state Closed terminal
+
+event UpdateNotes(Text as string)   # This doesn't care about state
+event Submit
+event Close
+
+# Why can't I write this?
+on UpdateNotes -> set Notes = UpdateNotes.Text
+
+# Instead I'm forced to write:
+from any on UpdateNotes -> set Notes = UpdateNotes.Text -> no transition
+```
+
+The forced `from any on UpdateNotes -> ... -> no transition` is BOILERPLATE. It says nothing the runtime couldn't infer. The author knows the event doesn't care about state. They're forced to pretend it does.
+
+### Measuring Against the Philosophy
+
+The spec justifies the restriction: "event handlers are redundant with `from any on Event -> no transition` followed by rules." But that's backwards — the fact that you CAN express it as `from any -> no transition` doesn't mean the shorter form should be banned. The question is whether the shorter form adds ambiguity, and the answer is: it doesn't. A stateless handler in a stateful precept would mean exactly what `from any on Event -> actions -> no transition` means. There's no execution order ambiguity because the handler has no `from` clause — it can't conflict with state-specific rows for the same event (same event can't appear in both a handler AND a from-row).
+
+### Proposal
+
+Allow `on Event -> actions` in stateful precepts AS LONG AS no `from ... on <same Event>` row exists. The semantics: state-agnostic handler, always fires, no transition. If someone writes both `on Foo -> ...` and `from Active on Foo -> ...`, THAT is the compile error (ambiguous dispatch). But the handler alone is unambiguous.
+
+### Tradeoff
+
+This adds a new interaction rule (can't have both handler and from-row for same event). But it removes boilerplate and makes the language more expressive for state-agnostic operations, which are common in real precepts (look at how many `from any on X -> ... -> no transition` patterns appear in the samples).
+
+---
+
+## 5. D93/D94 Complexity — VERDICT: (B) Smooth With Better Diagnostics
+
+### The Concern
+
+The per-row construction guarantee is non-trivial to reason about. Every guarded path must independently assign all required fields. Could the language prevent incomplete paths structurally?
+
+### Why Structural Prevention Is Worse
+
+The alternative — "make incomplete construction paths structurally impossible" — would mean one of:
+- Banning guards on initial event rows (too restrictive — kills intake discrimination)
+- Requiring all rows to assign the same field set (kills conditional construction)
+- Introducing a special "construction block" syntax that enforces field coverage (adding language surface for a problem diagnostics already solve)
+
+All of these are worse than the current approach. Guarded construction routing is a legitimate feature (`Unmatched` for rejected intake is explicitly by design). The compiler proves each path complete — this is exactly P1 (prevention, not detection) applied correctly.
+
+### What Should Improve
+
+The diagnostics could be clearer:
+- D94 should enumerate WHICH row is incomplete and WHICH fields it's missing, not just "initial event doesn't assign X"
+- The error should show the guard condition of the failing row so the author can see which construction path is broken
+- A diagnostic note (not error) on the initial event declaration could summarize: "3 construction paths detected: rows at lines 12, 15, 18"
+
+**This is a tooling quality issue, not a language design issue.**
+
+---
+
+## 6. Omitted Fields and Construction Guarantee — VERDICT: (B) Needs Explicit Documentation
+
+### The Concern
+
+Fields omitted in the initial state are exempt from D94. But construction can transition away from the initial state. If the entity leaves `Draft` (where `X` is omitted) and enters `Active` (where `X` is NOT omitted), is `X` guaranteed to have a value?
+
+### The Answer
+
+YES — and it's already enforced, but by D132, not D94. The spec at §3A.3 rule 5 says: "D132 — RequiredFieldUnassignedOnEntry: When a transition moves a required field from `omit` in the source state to non-omit in the target state, the transition action chain must include a `set` for that field."
+
+So the guarantee IS as strong as it appears, but it's split across two diagnostics:
+- D94 covers fields that are non-omit at construction time
+- D132 covers fields that materialize from omit → present during any transition (including construction-time transitions)
+
+### The Documentation Gap
+
+This split is invisible to the user. They see D94 and think "that's the construction guarantee." It's not — it's HALF of it. D132 is the other half, and it kicks in precisely when point 3 applies (construction transitions away from initial state).
+
+The fix: document the construction guarantee as the composition of D94 + D132, not as D94 alone. The initial-event semantics doc I wrote earlier should have made this explicit. It didn't. That's a gap in my own analysis.
+
+---
+
+## 7. `no transition` in Stateless Context — VERDICT: (A) Fix Before Ship
+
+### The Problem
+
+In the stateless form, event handlers use `on Event -> actions` with no outcome keyword. There IS no `no transition` because there's no state to not-transition. The spec explicitly says handlers "do not support an outcome keyword."
+
+BUT — my earlier analysis claimed a stateless initial event can use `no transition`. If the spec says handlers don't support outcomes, and the stateless initial event IS a handler, then `no transition` should be a parse error in that context. If it ISN'T a parse error, the grammar is inconsistent with the spec's own description.
+
+### Investigating the Actual Grammar
+
+The grammar distinguishes two forms:
+- `EventHandlerDeclaration`: `on EventTarget ("->" ActionStatement)*` — NO outcome in the grammar
+- `TransitionRowDeclaration`: `FromClause ... Outcome` — requires outcome
+
+Stateless precepts use `EventHandlerDeclaration`. This form has no `Outcome` production. So `no transition` should be a SYNTAX ERROR in a stateless handler.
+
+If it ISN'T currently an error, we have a grammar enforcement bug. If it IS already an error, then my earlier semantics document was wrong to discuss it in that context.
+
+### The Real Issue
+
+The confusion arose because I described construction semantics without clearly distinguishing which grammar form the initial event uses in stateless vs. stateful contexts. In a stateful context, the initial event fires through a `from InitialState on Event -> ... -> no transition` row. In a stateless context, it fires through an `on Event -> actions` handler with NO outcome keyword.
+
+The `no transition` keyword is not applicable to stateless precepts AT ALL. If it appears, it's either a bug or an abstraction leak. Either way: verify parser behavior, and if `no transition` is accepted in a stateless handler, add a diagnostic to reject it.
+
+---
+
+## Summary Table
+
+| # | Issue | Verdict | Action |
+|---|-------|---------|--------|
+| 1 | `initial` keyword overload | **(A) Fix** | Split: `initial` for state, `constructor` for event |
+| 2 | Hollow-then-hydrate | **(C) Fine** | No change needed |
+| 3 | Construction transitions away | **(C) Fine**, **(B) Docs** | Better hover, samples, docs |
+| 4 | Stateless/stateful exclusion | **(A) Fix** | Allow `on Event ->` handlers in stateful precepts |
+| 5 | D93/D94 complexity | **(B) Diagnostics** | Improve error messages, enumerate paths |
+| 6 | Omitted fields + D132 | **(B) Docs** | Document D94+D132 as composite construction guarantee |
+| 7 | `no transition` in stateless | **(A) Fix** | Verify/enforce grammar prohibition; fix parser if accepting |
+
+---
+
+## Recommendations
+
+Three language changes before ship:
+
+1. **Rename `initial` on events to `constructor`.** One keyword, one meaning. No breaking changes in the wild (Precept hasn't shipped; only Test.precept uses it in samples).
+
+2. **Allow `on Event -> actions` in stateful precepts** when no `from ... on <same event>` row exists. Semantics: fires from any state, no transition. Compile error if both forms exist for the same event. Removes a common boilerplate pattern.
+
+3. **Verify `no transition` cannot appear in event handlers.** If the parser currently accepts it, add a diagnostic. The grammar says it shouldn't be there; enforcement should match.
+
+These are small, targeted changes with high readability payoff and zero migration cost.
+
+# Initial Event & Initial State — Semantics Explained
+
+**Author:** Frank (Lead/Architect)
+**Date:** 2026-05-15T19:37:38-04:00
+**Requested by:** Shane
+
+---
+
+## 1. What `initial` Means on a State vs. on an Event
+
+They are **two orthogonal concepts** that happen to share a keyword.
+
+| Surface | Grammar | Meaning |
+|---------|---------|---------|
+| `state Draft initial` | `StateEntry := Identifier ("initial")? StateModifier*` | This state is the **starting position** in the lifecycle graph. The entity begins here at construction. Exactly one state must carry this modifier in a stateful precept. |
+| `event Create(...) initial` | `event Identifier ("(" ArgList ")")? ("initial")?` | This event is the **construction event** — the precept's constructor. The runtime's `Create(args)` fires this event atomically during entity creation. At most one event may carry this modifier. |
+
+**Key insight:** `initial` on a state answers "where does the entity start?" — `initial` on an event answers "how does the entity get created?"
+
+---
+
+## 2. Interaction at Construction Time — The Construction Contract
+
+When BOTH exist in a stateful precept, construction proceeds as:
+
+1. **Build a hollow version:** defaults applied, initial state set, omitted fields structurally absent.
+2. **Fire the initial event** with caller args through the standard pipeline — same guards, mutations, ensures, constraint checking as any other event.
+3. **Return the outcome** — same `EventOutcome` verdict space (Transitioned, Applied, Rejected, ConstraintsFailed, Unmatched).
+
+The initial event doesn't *place* the entity in the initial state — that's already done in step 1. The initial event *acts on* the entity that is already in the initial state. It's a mutation event that runs at construction, not a state-setting mechanism.
+
+**The construction chain is:** Hollow version (with initial state set) → initial event fires → constraints evaluated → outcome returned.
+
+---
+
+## 3. `from State on Event` vs. Stateless `on Event -> ...` — Behavioral Difference
+
+### Stateful pattern: `from <InitialState> on <InitialEvent>`
+```precept
+state Draft initial
+event Create(Name as string) initial
+from Draft on Create -> set Name = Create.Name -> no transition
+```
+
+This is a **transition row**. It supports:
+- `when` guards for conditional routing
+- Multiple rows for the same event (guarded discrimination)
+- Outcomes: `transition X`, `no transition`, `reject "reason"`
+- The entity is already IN `Draft` when this row evaluates
+
+### Stateless pattern: `on Event -> ...`
+```precept
+event Start(Name as string) initial
+on Start -> set Name = Start.Name
+```
+
+This is a **stateless event handler** (§ Stateless event hook). It:
+- Does NOT support `when` guards
+- Does NOT support an outcome keyword — there's no state to transition to/from
+- Is mutually exclusive with having states (compile error if you mix them)
+- Always executes the action chain; always results in `Applied` (or rejection/constraint failure)
+
+### Answer to the direct question:
+An `initial` event is NOT required to use `from <State> on <Event>` constructs. You can write `from Draft on Create -> ...` where `Create` is any event. What makes it the *construction* event is the `initial` modifier on the event declaration. The `from` row just says "when this event fires while in Draft, do this." You can have a non-initial event fire `from Draft on ...` too — it just won't be the construction event.
+
+---
+
+## 4. Edge Cases: States Without Initial Event, and Vice Versa
+
+### Stateless precept WITH initial event
+```precept
+precept Counter
+field count as integer
+event Start initial
+on Start -> set count = 0
+```
+
+- `Version.State` is `null` in the constructed version.
+- Step 1 (initial state set) is **omitted** — no state to assign.
+- State-entry semantics (`to State ensure`, `in State ensure`) do not fire — they're structurally absent.
+- The initial event fires through the full pipeline. Same construction diagnostics apply.
+- Valid and well-defined. The spec explicitly documents this as the natural extension.
+
+### Stateful precept WITHOUT initial event
+```precept
+precept Widget
+field Name as string default "unnamed"
+state Draft initial terminal
+```
+
+- `Create()` is **parameterless** and always succeeds.
+- The compiler guarantees (via `RequiredFieldsNeedInitialEvent`) that all fields have defaults or are optional. If they don't, it's a compile error.
+- The hollow version (defaults + initial state) IS the final version. No event fires.
+- `precept.InitialEvent` is `null` at the API level.
+- `Create()` returns `EventOutcome.Applied` — always.
+
+### Stateless precept WITHOUT initial event
+- Same as above but `Version.State` is also `null`.
+- All fields must have defaults or be optional (enforced by `RequiredFieldsNeedInitialEvent`).
+- Valid configuration for simple data containers.
+
+---
+
+## 5. The Construction Chain When Both Are Present
+
+Yes — in the canonical stateful case, BOTH a state and an event are marked `initial` and they refer to different aspects:
+
+- The **initial state** is where the entity lives (its lifecycle position).
+- The **initial event** is what fires to hydrate the entity's data at that position.
+
+The chain:
+
+```
+Hollow version created
+    ├── State := InitialState (e.g., "Draft")
+    ├── Fields := defaults applied, omitted fields absent
+    │
+    ▼
+Initial event fires (standard pipeline)
+    ├── Guard evaluation (if transition rows have `when` clauses)
+    ├── Matched row's action chain executes (set, add, etc.)
+    ├── Outcome evaluates (no transition / transition X)
+    ├── Entry ensures fire (if transitioning to a state)
+    ├── Field constraints evaluated
+    ├── Global rules evaluated
+    │
+    ▼
+EventOutcome returned to caller
+```
+
+**Critical subtlety:** The initial event can **transition away** from the initial state at construction time! If the matched row says `-> transition Active`, the entity leaves `Draft` immediately. The outcome would be `EventOutcome.Transitioned` with the entity now in `Active`. This is by design — construction-time routing based on intake data.
+
+---
+
+## 6. Type Checker Diagnostics — The Enforcement Surface
+
+The D130–D135 range and related diagnostics are NOT a contiguous "construction block." The construction enforcement lives primarily in:
+
+| Diagnostic | Code | Fires When |
+|------------|------|------------|
+| `MultipleInitialStates` | (type stage) | More than one state has `initial` |
+| `NoInitialState` | (type stage) | Stateful precept, no state marked `initial` |
+| `RequiredFieldsNeedInitialEvent` | D93 | Required fields exist (no default, not optional, not computed) but no event is marked `initial` |
+| `InitialEventMissingAssignments` | D94 | Initial event's construction paths don't assign all required fields that are non-omit at construction |
+| `UninitializedFieldReadInInitialAssignment` | D142 | Self-referential read: `set X = X + 1` where X has no default and no prior assignment in the chain |
+| `UninitializedCrossFieldReadInInitialAssignment` | D144 | Cross-field read: `set Y = X * 2` where X has no default and isn't assigned earlier in the chain |
+| `MaterializedFieldSelfReference` | D143 | Transition materializes a field from `omit` → present, but reads it before any value exists |
+| `RequiredFieldUnassignedOnEntry` | D132 | Transition moves a required field from `omit` to non-omit without assigning it |
+
+**D130–D131** are about omitted-field access (reading/writing omit fields in state-anchored contexts) — related but not construction-specific.
+
+### What D94 actually checks:
+For each row that matches the initial event from an initial state (or wildcard `from any`), it inspects the action chain. If ANY row path fails to assign a required field, D94 fires. It checks **per-row**, not just "at least one row assigns it."
+
+### Stateless construction check:
+D93/D94/D142/D144 all apply to stateless precepts too. The validator inspects stateless initial handlers (`on Event -> ...`) and `from any` wildcard rows identically to explicit initial-state rows.
+
+---
+
+## 7. Subtleties and Gotchas
+
+### 7a. Construction can transition away from the initial state
+Most people assume the entity stays in `Draft` after construction. Wrong. If the initial event's matched row says `-> transition Active`, the entity leaves immediately. `EventOutcome.Transitioned` is a valid construction result.
+
+### 7b. D94 checks per-row, not aggregate
+If you have two guarded rows for the initial event and one of them doesn't assign a required field, D94 fires — even if the other row does. Every construction path must be complete.
+
+### 7c. `from any on InitialEvent` counts as a construction path
+Wildcard `from any` rows are included in the construction guarantee check. If you rely on `from any on Start -> ...` as your construction path, it must assign required fields.
+
+### 7d. Omitted fields in the initial state are NOT required at construction
+If `in Draft omit Name` exists and Draft is the initial state, then `Name` is structurally absent at construction — D94 does NOT require the initial event to set it. The field materializes later when a transition moves to a state where it's not omitted (enforced by D132 at that point).
+
+### 7e. No initial event ≠ broken — it means "all fields self-hydrate"
+A stateful precept with no initial event is perfectly valid IF every field has a default, is optional, or is computed. The compiler enforces this. `Create()` becomes parameterless and infallible.
+
+### 7f. Event handlers cannot coexist with states
+`on Event -> actions` (stateless handler syntax) is a compile error in a stateful precept. You MUST use `from State on Event -> ...` transition rows. These are structurally incompatible forms — you can't mix them.
+
+### 7g. `Unmatched` is a valid construction outcome
+If all initial-event rows have `when` guards and none match the provided args, construction returns `EventOutcome.Unmatched`. The entity is not created. This is intentional — guarded intake discrimination.
+
+### 7h. Entry ensures on the initial state fire at construction
+`to Draft ensure CreditScore >= 300` fires when the entity ENTERS Draft — which includes construction (the entity enters its initial state at construction time). These are construction-time intake invariants with no special syntax.
+
+### 7i. Construction self-read ordering matters
+D142 and D144 check **sequential ordering within the action chain**. `set count = 0 -> set count = count + 1` is fine (count is initialized by the first action). `set count = count + 1` alone is the error. The chain is sequential.
+
+---
+
+## Summary Mental Model
+
+```
+┌─────────────────────────────────────────────────┐
+│  "initial" on STATE = where entity starts       │
+│  "initial" on EVENT = how entity gets created   │
+│                                                 │
+│  They compose: state sets position,             │
+│  event hydrates data AT that position.          │
+│                                                 │
+│  Either can exist without the other.            │
+│  Both absent = defaults-only, parameterless.    │
+│  State absent + event present = stateless ctor. │
+│  State present + event absent = all-defaults.   │
+│  Both present = the canonical construction.     │
+└─────────────────────────────────────────────────┘
+```
+
+No inconsistencies found between the spec (`precept-language-spec.md`), the runtime API doc (`runtime-api.md`), and the diagnostic implementations in `Diagnostics.cs`. The code enforces exactly what the spec describes.
+
+# Fix Spec: 10 Pre-Existing Test Failures — Root Cause Analysis
+
+**Author:** Frank (Lead/Architect)  
+**Date:** 2026-05-15  
+**For:** George (implementation)
+
+---
+
+## Summary
+
+All 10 failures stem from **three root causes**:
+
+1. **`ValidateQualifierCompatibility` fires false-positive `CrossDimensionArithmetic`/`CrossCurrencyArithmetic` on compound-cancellation and dimension-elevation operations** (covers tests 1–6, 8, 10 partially)
+2. **`DimensionCatalog` is missing a "time" alias**, causing `TryDeriveUnitDimensionName("s")` to return false, breaking compound-cancellation resolution in the TypeChecker path (covers test 7)
+3. **ProofEngine cannot clear `DivisionByZero` when the positivity rule uses an interpolated-qualifier bound** (covers test 10's remaining gap after fix 1)
+
+---
+
+## Cluster B7 — Cross-currency (Tests 1, 2)
+
+**Tests:**
+- `Operand_names_in_diagnostics` (line 3839)
+- `Cross_currency_fields_now_detected` (line 3818)
+
+**Root cause:** The `Prove()` test helper calls `TypeCheckerTestHelpers.CheckExpectingClean()` which asserts zero Error-severity diagnostics. But `ValidateQualifierCompatibility` in `TypeChecker.Expressions.cs:986-999` emits `CrossCurrencyArithmetic` (PRE0070, Error severity) for `F1 + F2` where F1 is `money in 'USD'` and F2 is `money in 'EUR'`. The test design expects this mismatch to be caught at the proof level (`QualifierCompatibilityProofRequirement`), not at the type-checker level.
+
+**Classification:** (c) Wrong diagnostic being emitted — or more precisely, the type-checker fires a hard error where the proof engine should do soft detection.
+
+**Files:**
+- `src/Precept/Pipeline/TypeChecker.Expressions.cs` lines 986–999
+
+**Fix:**
+
+The `SameQualifierRequired` result-qualifier on `MoneyPlusMoney` already declares a `QualifierCompatibilityProofRequirement` in its catalog metadata. The type-checker's eager `CrossCurrencyArithmetic` diagnostic duplicates that obligation at a harder (Error) level. The correct architecture is:
+
+**Option A (minimal, recommended):** In `ValidateQualifierCompatibility`, add an early-return guard when the binary operation has a `SameQualifierRequired` result qualifier AND the corresponding proof requirements already declare `QualifierCompatibilityProofRequirement` for the same axis. This defers detection to the proof engine where it belongs.
+
+```csharp
+// At the top of ValidateQualifierCompatibility, after the dynamic-qualifier bail-out:
+if (op.ResultQualifier is SameQualifierRequired
+    && op.ProofRequirements.OfType<QualifierCompatibilityProofRequirement>().Any())
+    return;
+```
+
+**Option B (broader):** Remove the `CrossCurrencyArithmetic` check entirely for operations whose catalog metadata already declares proof requirements. The proof engine is the correct enforcement point for qualifier compatibility. Keep `CrossCurrencyArithmetic` only for operations that do NOT declare proof requirements (none currently exist — all same-qualifier operations declare them).
+
+**Expected result:** Both tests pass — `Prove()` completes, proof engine emits `UnprovedQualifierCompatibility` on the Currency axis, and the test assertions match.
+
+---
+
+## Cluster E3 — Compound-unit cancellation (Tests 3–6)
+
+**Tests:**
+- `CompoundUnit_numerator_unit_extracted` (line 4582) — `Qty(each) * Conv(kg/each) → Result(kg)`
+- `Existing_compound_cancellation_tests_regression` (line 4599) — `Conv * Qty` (reversed operands)
+- `CompoundUnit_cancellation_dimension_qualifier_form` (line 4616) — `of 'each/case'` form
+- `CompoundUnit_cancellation_currency_propagates` (line 4564) — chained `Qty * Conv * P`
+
+**Root cause:** `ValidateQualifierCompatibility` in `TypeChecker.Expressions.cs:1003-1017` fires `CrossDimensionArithmetic` (PRE0071, Error) for `QuantityTimesQuantity` because the two operands have different dimensions (e.g., "count" vs "mass"). But for `CompoundUnitCancellation` operations, different operand dimensions are **expected and correct** — the whole purpose is to cancel the denominator unit against the standalone operand's dimension.
+
+**Classification:** (c) Wrong diagnostic being emitted — pairwise dimension check fires on an operation type that inherently requires different dimensions.
+
+**Files:**
+- `src/Precept/Pipeline/TypeChecker.Expressions.cs` lines 962–1044 (`ValidateQualifierCompatibility`)
+
+**Fix:**
+
+Add an early-return guard at the top of `ValidateQualifierCompatibility` for operations with compound-cancellation or dimension-elevation result qualifiers:
+
+```csharp
+// After line 983 (the enforcePairwiseQualifierChecks guard), add:
+if (op.ResultQualifier is CompoundUnitCancellationRequired or CompoundDimensionElevationRequired)
+    return;
+```
+
+These operations have structurally different operand qualifiers by design. Their qualifier correctness is enforced through the compound-cancellation resolution path (`ResolveCompoundCancellationAxis` / `ResolveCompoundElevationAxis`) and the proof engine's `QualifierChainProofRequirement`, not through pairwise equality.
+
+**Expected result:** All four E3 tests pass — `Compiler.Compile()` returns `HasErrors = false` and no `UnprovedQualifierCompatibility` diagnostics.
+
+---
+
+## Item 7 — TypeChecker compound cancellation (Test 7)
+
+**Test:** `CompoundCancellationResolver_LengthPerTimeAndTime_ProducesLengthForTypeChecker` (TypeCheckerAssignmentQualifierTests line 869)
+
+**Root cause:** `DimensionCatalog` (in `src/Precept/Language/Ucum/DimensionCatalog.cs`) is missing a "time" dimension alias. The vector `(0,0,1,0,0,0,0)` has no entry.
+
+When `TryDeriveUnitDimensionName("s")` is called during compound-cancellation matching:
+1. "s" is not in `CountQualifierUnitCodes`
+2. "s" is not an interpolation pattern `{...}`
+3. `UcumParser.Parse("s")` succeeds, producing a unit with vector `(0,0,1,0,0,0,0)`
+4. `DeriveUnitDimensionName(unit)`: vector is NOT dimensionless → returns `unit.PreferredDimensionAlias ?? ""`
+5. `DimensionCatalog.TryGetAlias((0,0,1,0,0,0,0))` → **returns false** (no "time" alias!)
+6. So `PreferredDimensionAlias` is null → `DeriveUnitDimensionName` returns `""`
+7. `QualifierUnitHelpers.TryDeriveUnitDimensionName` checks `!string.IsNullOrWhiteSpace(dimensionName)` → **returns false**
+
+This causes `TryMatchCompoundUnitCancellation` to fail the denominator-dimension check, and `ResolveCompoundCancellationAxis` falls through to `Unknown`.
+
+Note: The ProofEngine test (`CompoundCancellationResolver_LengthPerTimeAndTime_ProducesLengthForProofEngine`) passes because `ProofEngine.TryResolveCompoundCancellationUnit` does NOT verify denominator-dimension matching — it just extracts the compound numerator and derives from it. It skips the strict matching that the TypeChecker does.
+
+**Classification:** (a) Missing feature — incomplete dimension catalog.
+
+**Files:**
+- `src/Precept/Language/Ucum/DimensionCatalog.cs` line 9–21 (the `Aliases` array)
+
+**Fix:**
+
+Add "time" to the `DimensionCatalog.Aliases` array:
+
+```csharp
+new("time", new DimensionVector(0, 0, 1, 0, 0, 0, 0), "Time"),
+```
+
+Place it after "mass" (or wherever is alphabetically appropriate). This gives `DeriveUnitDimensionName` the alias it needs for time-dimension units like "s", "min", "h".
+
+**Expected result:** `TryDeriveUnitDimensionName("s")` returns `true` with dimensionName = "time". The TypeChecker compound-cancellation resolver matches `standaloneDimension("time") == denominatorDimension("time")` and produces `Resolved` with `Unit("m","length")`.
+
+**Regression risk:** Adding "time" to the catalog may affect other places that call `DimensionCatalog.TryGetAlias` or `DeriveUnitDimensionName`. Verify with `dotnet test` after the change. The risk is low — adding a missing correct entry should only FIX previously-broken lookups.
+
+---
+
+## Cluster Dim — Dimension compatibility (Tests 8, 9)
+
+### Test 8: `Quantity_different_dimension_detected` (ProofEngineTests line 4150)
+
+**Root cause:** Same as Cluster B7/E3. The `Prove()` helper calls `CheckExpectingClean`, but `ValidateQualifierCompatibility` emits `CrossDimensionArithmetic` (PRE0071) for `Q1(mass) + Q2(length)`. The test expects proof-level detection via `QualifierCompatibilityProofRequirement`.
+
+**Classification:** (c) Wrong diagnostic being emitted — same root cause as B7.
+
+**Fix:** Same as B7 fix. The `QuantityPlusQuantity` operation has `QualifierMatch.Same` and declares `QualifierCompatibilityProofRequirement` for the Unit axis. The Option A guard (`SameQualifierRequired` + proof requirements exist → return) covers this case.
+
+**Expected result:** `CheckExpectingClean` passes (no Error diagnostics from type checker). Proof engine emits `UnprovedQualifierCompatibility` on the Unit axis. Test assertions match.
+
+### Test 9: `QuantityBound_CrossDimensionAssignment_IsBlockedByDimensionCheck` (TypeCheckerQuantityNormalizationTests line 88)
+
+**Root cause:** The test itself documents this (lines 90-98). Two implementation gaps:
+
+1. **`'3 m'` is rejected as `InvalidTypedConstantContent`** because the current constant parser doesn't recognize bare "m" as a valid quantity unit in this context. The test expects the constant to parse successfully and THEN get caught by a `DimensionCategoryMismatch` diagnostic.
+
+2. **`ValidateAssignmentQualifiers` early-returns for `TypedTypedConstant { ResultType: Quantity }`** (line 31-32 of `TypeChecker.Expressions.AssignmentQualifiers.cs`), bypassing the dimension compatibility check entirely:
+   ```csharp
+   if (value is TypedTypedConstant { ResultType: TypeKind.Quantity })
+       return;
+   ```
+
+**Classification:** (a) Missing feature — two gaps documented in the test comments. This is contract pressure — the test was written intentionally RED.
+
+**Files:**
+- `src/Precept/Pipeline/TypeChecker.Expressions.AssignmentQualifiers.cs` line 31-32 (the early-return)
+- Quantity constant validation/parsing (wherever `InvalidTypedConstantContent` is emitted for quantity literals)
+
+**Fix:**
+
+1. **Fix the parser/validator** to recognize "m" as a valid UCUM unit in typed constants. The issue is likely in the quantity constant validation path that emits `InvalidTypedConstantContent`. "m" (metres) is a valid UCUM atom — `UcumParser.Parse("m")` should succeed. Check where quantity typed-constant validation happens and why it rejects "3 m".
+
+2. **Remove or guard the `TypedTypedConstant { ResultType: Quantity }` early-return** in `ValidateAssignmentQualifiers`. Replace it with proper dimension-category checking: resolve the constant's dimension via `ResolveAssignmentQualifierAxis(value, QualifierAxis.Dimension)`, compare against the target's dimension qualifier, and emit `DimensionCategoryMismatch` when they differ.
+
+**Expected result:** `'3 m'` parses as a valid quantity constant. The assignment of a length quantity to a mass field emits `DimensionCategoryMismatch`. No `NumericOverflow` diagnostics.
+
+**Note:** This is the hardest fix of the set. George should verify that removing the early-return doesn't break existing tests that rely on typed-quantity constants being exempt from qualifier checking (there may be legitimate cases where the constant's qualifier is inferred differently).
+
+---
+
+## Item 10 — CompoundUnitPositivityProof (Test 10)
+
+**Test:** `CompoundUnitPositivityProof_ClearsDivisionByZero` (ProofEngineTypedArgQualifierTests line 130)
+
+**Root cause:** Two contributing issues:
+
+1. **Primary:** The `ValidateQualifierCompatibility` → `ValidateDenominatorCompatibility` check at `TypeChecker.Expressions.cs:1073-1084` fires `DenominatorUnitMismatch` (PRE0072) for `ListPrice / StockingUnitsPerSaleUnit` where Price dimension ≠ Quantity dimension. BUT — `ExtractSourceFieldName` returns null for compound interpolations like `'{StockingUnit}/{SaleUnit}'` (because the template has multiple holes and a text separator). This means `SourceFieldName` is null, so `TryGetStaticQualifiers` does NOT bail out, and the static check fires on an inherently dynamic qualifier.
+
+2. **Secondary (may remain after fix 1):** The ProofEngine's positivity-rule matching may not handle interpolated-qualifier bounds. The rule `StockingUnitsPerSaleUnit > '0 {StockingUnit}/{SaleUnit}'` needs to be recognized as "StockingUnitsPerSaleUnit is guaranteed positive" to clear the `DivisionByZero` obligation. If the proof engine can't match interpolated bounds, `DivisionByZero` would remain unresolved.
+
+**Classification:** (c) Wrong diagnostic + (a) possible missing proof-clearing feature.
+
+**Files:**
+- `src/Precept/Pipeline/TypeChecker.Expressions.cs` lines 962–1044 (`ValidateQualifierCompatibility`)
+- `src/Precept/Pipeline/TypeChecker.Expressions.cs` line 921 (`TryGetStaticQualifiers`)
+- `src/Precept/Pipeline/ProofEngine.*.cs` (positivity rule matching for interpolated bounds)
+
+**Fix:**
+
+1. **Apply the E3 fix** — the `CompoundDimensionElevationRequired` guard in `ValidateQualifierCompatibility` covers this operation. The denominator compatibility check should be skipped when the operation is a dimension-elevation (the qualifier relationship is already enforced through the elevation resolution path and proof requirements).
+
+2. **Fix `TryGetStaticQualifiers`** to also bail out when qualifiers have interpolation markers (e.g., contain `{` and `}`). Add a check:
+   ```csharp
+   // After the SourceFieldName check, add:
+   if (q is DeclaredQualifierMeta.Unit u && (u.UnitCode.Contains('{') || u.DimensionName.Contains('{')))
+       return null;
+   if (q is DeclaredQualifierMeta.Dimension d && d.DimensionName.Contains('{'))
+       return null;
+   ```
+
+3. **Verify proof clearing** — after fixes 1 and 2, run the test. If `DivisionByZero` still fires, the proof engine needs to recognize interpolated-bound rules as positivity proofs. Check how `ProofEngine` matches rules against `NumericProofRequirement` — the matching must handle `InterpolatedTypedConstant` on the rule's right-hand side as "value > 0" regardless of unit qualifier.
+
+**Expected result:** `HasErrors = false`. No `UnprovedQualifierCompatibility`. No `DivisionByZero`.
+
+---
+
+## Implementation Order
+
+1. **DimensionCatalog "time" alias** (test 7) — one-line addition, zero risk
+2. **`ValidateQualifierCompatibility` guard for compound operations** (tests 1–6, 8, 10) — add early-return for `CompoundUnitCancellationRequired | CompoundDimensionElevationRequired`; also guard `SameQualifierRequired` operations that declare proof requirements
+3. **`TryGetStaticQualifiers` interpolation bail-out** (test 10) — defensive check for dynamic qualifiers that slip through
+4. **Verify test 10 proof clearing** — may need ProofEngine interpolated-bound matching
+5. **Test 9 (quantity constant parsing + dimension check)** — hardest; defer to separate slice if needed
+
+After each fix, run `dotnet test test/Precept.Tests/` to verify regressions. The first three fixes are low-risk and should clear 9 of 10 failures. Test 9 is documented as intentionally RED pending implementation.
+
+---
+
+## Verification
+
+```bash
+dotnet test test/Precept.Tests/ --filter "FullyQualifiedName~Operand_names_in_diagnostics|Cross_currency_fields_now_detected|CompoundUnit_numerator_unit_extracted|Existing_compound_cancellation_tests_regression|CompoundUnit_cancellation_dimension_qualifier_form|CompoundUnit_cancellation_currency_propagates|CompoundCancellationResolver_LengthPerTimeAndTime_ProducesLengthForTypeChecker|Quantity_different_dimension_detected|QuantityBound_CrossDimensionAssignment_IsBlockedByDimensionCheck|CompoundUnitPositivityProof_ClearsDivisionByZero"
+```
+
+# George — construction audit follow-up
+
+**Date:** 2026-05-15T18:51:51.086-04:00
+
+- **Status:** Processed — merged into `.squad/decisions.md` on 2026-05-15T23:14:11Z.
+
+## Decision
+
+Ship the four follow-up fixes from Frank's construction audit as one runtime slice:
+
+1. Treat wildcard `from any` initial rows as covering every initial state they apply to during construction-guarantee validation.
+2. Add `PRE0143 MaterializedFieldSelfReference` for the first assignment that materializes an omitted required field on entry and reads that field directly or through a computed dependency before any value exists.
+3. Make `PRE0142 UninitializedFieldReadInInitialAssignment` walk `SecondaryExpression` as well as the primary input expression.
+4. Add `PRE0144 UninitializedCrossFieldReadInInitialAssignment` for ordered cross-field undefined reads inside initial-event action chains.
+
+## Why
+
+The runtime guarantee here is “no path reads a value before the language has structurally established one.” The audit exposed two blind spots in construction (`from any` coverage and cross-field order) and one blind spot in omit→present materialization (transitive self-reference through computed helpers). These are correctness bugs, not message-polish bugs.
+
+## Files touched
+
+- `src/Precept/Pipeline/TypeChecker.Validation.FieldState.cs`
+- `src/Precept/Language/DiagnosticCode.cs`
+- `src/Precept/Language/Diagnostics.cs`
+- `src/Precept.Analyzers/DiagnosticCoverageAllowLists.cs`
+- `test/Precept.Tests/TypeChecker/TypeCheckerConstructionTests.cs`
+- `test/Precept.Tests/TypeChecker/TypeCheckerFieldStateTests.cs`
+- `test/Precept.Tests/DiagnosticsTests.cs`
+- `test/Precept.Tests/SampleFieldStateRegressionTests.cs`
+- `docs/compiler/diagnostic-system.md`
+- `docs/language/precept-language-spec.md`
+- `docs/Working/diagnostic-enforcement.md`
+- `.squad/agents/george/history.md`
+
+## Validation
+
+- `dotnet build src\Precept\Precept.csproj --no-restore -v minimal` ✅
+- `dotnet test test\Precept.Tests\Precept.Tests.csproj --no-build --filter "FullyQualifiedName~TypeCheckerConstructionTests|FullyQualifiedName~TypeCheckerFieldStateTests|FullyQualifiedName~DiagnosticsTests|FullyQualifiedName~SampleFieldStateRegressionTests" -v minimal` ✅ (690 passed)
+- `dotnet test test\Precept.Tests\Precept.Tests.csproj --no-build --filter "FullyQualifiedName~D144_InitialEvent_CrossFieldReadBeforeFirstAssignment_FiresAtReadSite|FullyQualifiedName~D143_OmitToNonOmit_RequiredField_IndirectComputedSelfReference_Fires|FullyQualifiedName~D94_WildcardInitialRow_AssignsRequiredField_NoDiagnostic" -v minimal` ✅ (3 passed)
+- `dotnet test test\Precept.Tests\Precept.Tests.csproj --no-build -v minimal` ⚠️ current workspace baseline still ends with 10 unrelated failing proof/qualifier tests after the new slice passes its focused coverage.
+
+# George — D94/D142 implementation notes
+
+**Date:** 2026-05-15T18:30:16-04:00
+
+- **Status:** Processed — merged into `.squad/decisions.md` on 2026-05-15T23:14:11Z.
+
+## What shipped
+
+- Closed the stateless D94 blind spot by making construction validation inspect stateless initial handlers (and null-from-state rows when present) instead of returning early.
+- Added `PRE0142 / UninitializedFieldReadInInitialAssignment` so the type checker now rejects `set X = X + ...` on an initial event when `X` has no default and no prior assignment in that action chain.
+- Wired the new validation immediately after construction guarantees in the type-checker pipeline.
+- Added runtime/diagnostic metadata, construction tests, diagnostics metadata coverage, and typed-constant test helpers so unrelated typed-constant fixtures stop failing on construction diagnostics they are not about.
+- Added the new emitted diagnostic to the Gate 2 allow-list because the analyzer cannot see cross-project test references in `test/Precept.Tests/`.
+
+## Validation
+
+- `dotnet test test\Precept.Tests\Precept.Tests.csproj --no-restore --filter "FullyQualifiedName~DiagnosticsTests|FullyQualifiedName~TypeCheckerConstructionTests|FullyQualifiedName~TypeCheckerTypedConstantTests" -v minimal` ✅
+- `dotnet build src\Precept\Precept.csproj --no-restore -v minimal` ✅
+- `dotnet test test\Precept.Tests\Precept.Tests.csproj --no-restore -v minimal` ❌ still ends at the branch baseline: 9 unrelated failures in existing proof/quantity suites (`ProofEngineTests`, `ProofEngineTypedArgQualifierTests`, `TypeCheckerQuantityNormalizationTests`).
+
+# George N1 fix
+
+- **Status:** Processed — merged into `.squad/decisions.md` on 2026-05-15T23:14:11Z.
+
+## Context
+
+Frank's review on commit `85974302` flagged a correctness gap in `ResolveSlotSourceQualifierAxis(...)`: the early-return path treated unresolved slot holes as `Absent` even when the hole expression's type can carry the requested qualifier axis.
+
+## Decision
+
+Use `IsAssignmentQualifierAxisApplicable(...)` before that early return. If the hole expression's type can carry the requested axis, return `QualifierResolutionKind.Unknown`; otherwise keep `QualifierResolutionKind.Absent`.
+
+## Scope
+
+- Surgical runtime-only change in `src/Precept/Pipeline/TypeChecker.Expressions.AssignmentQualifiers.cs`
+- No behavior changes outside `ResolveSlotSourceQualifierAxis(...)`
+- No new diagnostics; `PRE0141` remains the uncertainty signal
+
+## Validation
+
+- `dotnet test test\Precept.Tests\ --no-restore --nologo --verbosity minimal --tl:off`
+  - Remains on the known branch baseline: 5655 passed / 9 failed / 5664 total
+- `dotnet test test\Precept.Tests\ --no-restore --nologo --verbosity minimal --tl:off --filter "FullyQualifiedName~TypeCheckerAssignmentQualifierTests"`
+  - Passed 55 / 55
+
+# George — qualifier pairwise fix closeout
+
+Date: 2026-05-15
+
+## Decision
+
+Implemented Frank's 9-failure fix lane with one important narrowing to preserve the existing green suite:
+
+1. Added the missing `time` physical-dimension alias to `DimensionCatalog` so UCUM-derived units like `s`, `min`, and `h` can round-trip to `time` during compound cancellation.
+2. In `ValidateQualifierCompatibility`, the compound-operation early return now triggers only when the compound cancellation/elevation resolver can actually resolve the derived dimension. This preserves the intended green-path skip for real cancellation/elevation while still surfacing `CrossDimensionArithmetic` / `DenominatorUnitMismatch` on definite non-cancelling operations.
+3. The `SameQualifierRequired` + proof-requirement deferral is limited to non-field-expression contexts (`CurrentFieldIndex < 0`). That keeps event/action proof scenarios on the proof-engine lane without regressing computed-field tests that still expect eager static PRE0070/PRE0071 errors.
+4. `TryGetStaticQualifiers(...)` now bails out on interpolated unit/dimension markers, and `ProofEngine.TryGetStaticNumericValue(...)` now treats zero-magnitude interpolated typed constants with dynamic unit slots as a usable numeric zero. This lets positivity rules like `> '0 {StockingUnit}/{SaleUnit}'` clear `DivisionByZero` without pretending non-zero dynamic-unit thresholds are statically comparable.
+
+## Validation
+
+- Focused 10-test filter: 9 passed, only `QuantityBound_CrossDimensionAssignment_IsBlockedByDimensionCheck` remains red as intentionally deferred.
+- Full `test/Precept.Tests`: 5698 passed / 1 failed / 5699 total; the sole remaining failure is the same intentionally deferred quantity-bound test.
+
+## Test sync
+
+- Updated `DimensionCatalogTests` to expect the new `time` alias.
+- Updated `Slice11B_TemporalPriceDenominatorTests` so `quantity of 'time'` now compiles as a physical dimension backed by the catalog alias.
+
+# Kramer — action-chain continuation completion
+
+- Date: 2026-05-15T18:47:10.829-04:00
+- Requested by: Shane
+- Status: Processed — merged into `.squad/decisions.md` on 2026-05-15T23:14:11Z.
+
+## Context
+
+`SlotContextResolver.TryGetActionChainContext` lost completion routing for a continuation `->` when the parser had not yet extended the enclosing action-chain construct span onto the new line. In `samples/Test.precept`, that made the second `->` fall through to the empty fallback lane.
+
+## Decision
+
+When `construct is null` and the current token is `Arrow`, do a bounded backward scan over recent significant tokens. If the scan finds a prior action verb and then a prior `->` at the same or deeper indentation, classify the site as `InActionVerb` instead of falling through.
+
+## Validation
+
+- Added regression test `Completions_ActionChainContinuationArrow_UsesActionItems`.
+- `dotnet build tools\Precept.LanguageServer\Precept.LanguageServer.csproj --artifacts-path temp/dev-language-server --nologo` succeeded.
+- `dotnet test test\Precept.LanguageServer.Tests\ --nologo` succeeded with 320/320 passing.
+
+# Soup Nazi — N3/N4 qualifier follow-up tests
+
+- **When:** 2026-05-15T19:02:24.3919248-04:00
+- **By:** Soup Nazi
+- **Requested by:** Shane
+- **Status:** Processed — merged into `.squad/decisions.md` on 2026-05-15T23:14:11Z.
+
+## Decision
+
+Add direct regression anchors for Frank's remaining N3/N4 qualifier follow-up gaps instead of relying on indirect coverage.
+
+## What changed
+
+- Added a direct TypeChecker assignment-resolver test proving bare `duration` references resolve the implied `TemporalDimension(Time)` axis as `Resolved`, while the real `duration` assignment still compiles clean.
+- Added paired synthetic compound-cancellation resolver tests in `TypeCheckerAssignmentQualifierTests` and `ProofEngineTypedArgQualifierTests` so both subsystems now assert the shared `QualifierUnitHelpers` path derives `m` / `length` from `m/s` cancelled by `s`.
+- Added function-call qualifier preservation coverage for `min(money, money)`, `max(quantity, quantity)`, and `round(money, places)`, including clean matching assignments plus qualifier-mismatch targets.
+
+## Validation
+
+- Baseline before edits: `dotnet test test\Precept.Tests\ --no-restore --nologo -v q` reported `5655 passed / 9 failed / 5664 total`.
+- Final closeout validation after the follow-up arc finished: `dotnet test test\Precept.Tests\ --no-restore --nologo -v q` reported `5689 passed / 10 failed / 5699 total`.
+- All 26 new N3/N4 tests pass.
+- A transient detached HEAD artifact that surfaced as a duplicate variable in `FieldState.cs` blocked an intermediate rebuild, but it was resolved before the final run.

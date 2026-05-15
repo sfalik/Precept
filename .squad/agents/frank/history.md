@@ -26,6 +26,24 @@
 
 ## Learnings
 
+### 2026-05-15T19:48:03-04:00 — Critical design review of initial event/state semantics identified 3 pre-ship fixes
+
+- `initial` keyword overload is a P5 violation: same word means "graph position" (state) and "construction mechanism" (event). Recommendation: split to `initial` (state) + `constructor` (event).
+- Stateless/stateful mutual exclusion is too rigid: `on Event -> actions` should be allowed in stateful precepts when no `from ... on <same event>` row exists. Current restriction forces boilerplate `from any on X -> ... -> no transition`.
+- `no transition` in stateless handlers: grammar says EventHandlerDeclaration has no Outcome production, but semantics doc implied it was valid. Need parser verification and enforcement.
+- Hollow-then-hydrate pattern is sound (working copy atomicity resolves it).
+- Construction-time transition away from initial state is sound (initial state is dispatch context + omit shape + entry ensures), but needs better documentation.
+- Construction guarantee is composite D94 + D132, not D94 alone — docs should make this explicit.
+
+### 2026-05-15T19:37:38-04:00 — Initial event/state semantics audit confirmed spec-implementation alignment
+
+- `initial` on state (lifecycle position) and `initial` on event (construction mechanism) are orthogonal concepts sharing a keyword.
+- Construction chain: hollow version (state set, defaults applied) → initial event fires through standard pipeline → outcome returned.
+- Initial event CAN transition away from initial state at construction time — `Transitioned` is valid construction outcome.
+- D94 checks per-row completeness, not aggregate — every guarded construction path must assign all required fields.
+- Wildcard `from any` rows count as construction paths; omitted fields in initial state exempt from assignment requirement.
+- No inconsistency found between spec, runtime API doc, and diagnostic implementations.
+
 ### 2026-05-15T18:36:25-04:00 — Broader construction guarantee audit found 4 additional bugs
 
 - Wildcard FromState rows invisible to stateful construction check (false positive + false negative).
@@ -74,3 +92,9 @@
 
 - The shipped assignment qualifier model is now the per-axis `Resolved / Unknown / Absent` contract behind `PRE0141`; unknown constrained axes are never silent success.
 - The separate `PriceIn` / `CompoundPrice` qualifier-shape work remains design-state only and is not a prerequisite for the enforcement repair.
+
+### 2026-05-15T23:26:25Z — Test-failure triage is durably closed to one deferred red test
+
+- Frank's fix spec on the 10 pre-existing failures is now canonical: the lane had three root causes — pairwise qualifier false positives, a missing `time` dimension alias, and the interpolated-qualifier positivity proof seam.
+- George implemented the repair set in commit `a03fcf4e`, and the branch moved from 10 failing tests to 1 remaining intentionally deferred quantity-bound dimension-check failure.
+- Scribe merged Frank's fix spec plus George's pairwise-fix closeout into the canonical decision ledger and cleared the inbox copy.
