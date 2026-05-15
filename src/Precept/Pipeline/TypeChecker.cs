@@ -17,7 +17,8 @@ namespace Precept.Pipeline;
 /// ResolveFieldExpressions → PopulateTransitionRows → PopulateEventHandlers →
 /// PopulateRules → PopulateEnsures → PopulateAccessModes → PopulateStateHooks →
 /// PopulateEditDeclarations → BuildOmitLookup → ValidateModifiers →
-/// ValidateStructural → ValidateFieldStateGuarantees → ValidateCIEnforcement →
+/// ValidateStructural → ValidateFieldStateGuarantees → ValidateConstructionGuarantees →
+/// ValidateInitialAssignmentSelfReads → ValidateCIEnforcement →
 /// BuildSemanticIndex (final assembly with D26 global invariant check).
 /// </remarks>
 internal static partial class TypeChecker
@@ -65,8 +66,9 @@ internal static partial class TypeChecker
         // Field-state guarantees (D130, D131, D132) — Slice 3-5.
         ValidateFieldStateGuarantees(ctx);
 
-        // Construction-time field guarantees (D93, D94) — Slice 10-11.
+        // Construction-time field guarantees (D93, D94, D142) — Slice 10-11 + follow-up gap closure.
         ValidateConstructionGuarantees(ctx);
+        ValidateInitialAssignmentSelfReads(ctx);
 
         // CI enforcement (Slice 8) — runs after all expression resolution;
         // walks resolved expression trees for ~string consistency violations.

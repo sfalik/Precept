@@ -175,6 +175,8 @@ Three levels. No `Hidden` (unlike Roslyn) — Precept's diagnostic surface is sm
 
 `PRE0141 UnprovedAssignmentQualifierCompatibility` is the assignment-time companion to proof-stage `PRE0114 UnprovedQualifierCompatibility`. Use `PRE0141` when the type checker cannot prove a required assignment qualifier axis; keep `PRE0114` for operand-pair proof obligations and keep `PRE0068` / `PRE0069` for definite mismatches.
 
+`PRE0142 UninitializedFieldReadInInitialAssignment` closes the construction-time gap where an initial-event assignment reads a required field before any default or prior assignment establishes its first value. It is distinct from `PRE0094 InitialEventMissingAssignments`: `PRE0094` means the field is never assigned on that construction path; `PRE0142` means the field is assigned, but the RHS reads an undefined value while doing so.
+
 ```csharp
 public enum DiagnosticCode
 {

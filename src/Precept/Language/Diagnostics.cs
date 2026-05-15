@@ -856,10 +856,19 @@ public static class Diagnostics
             ExampleAfter: "precept Example\nfield Name as string optional\nstate Draft initial\nstate Done terminal\nevent Complete\nfrom Draft on Complete -> transition Done"),
         DiagnosticCode.InitialEventMissingAssignments => new(nameof(DiagnosticCode.InitialEventMissingAssignments), DiagnosticStage.Type,  Severity.Error,   "Initial event '{0}' does not assign required field(s): {1}",                                                                           DiagnosticCategory.Structure,
             FixHint: "Add 'set <field>' actions to the initial event body for each required field",
-            TriggerCondition: "An initial event's construction paths (transition rows from initial states) do not assign all required fields that are present in the initial state.",
+            TriggerCondition: "An initial event's construction paths (transition rows from initial states, or stateless initial handlers) do not assign all required fields that are present at construction.",
             RecoverySteps: ["Add 'set FieldName = ...' actions to the initial event for each required field it does not assign"],
             ExampleBefore: "precept Example\nfield Name as string\nfield Email as string\nstate Draft initial\nstate Done terminal\nevent Init(N as string, E as string)\nevent Complete\nfrom Draft on Init -> set Name = Init.N -> no transition\nfrom Draft on Complete -> transition Done",
             ExampleAfter: "precept Example\nfield Name as string\nfield Email as string\nstate Draft initial\nstate Done terminal\nevent Init(N as string, E as string)\nevent Complete\nfrom Draft on Init -> set Name = Init.N -> set Email = Init.E -> no transition\nfrom Draft on Complete -> transition Done"),
+        DiagnosticCode.UninitializedFieldReadInInitialAssignment => new(nameof(DiagnosticCode.UninitializedFieldReadInInitialAssignment), DiagnosticStage.Type, Severity.Error,
+            "Field '{0}' is read in its own initial assignment but has no default value — its value is undefined on first firing of initial event '{1}'",
+            DiagnosticCategory.Structure,
+            RelatedCodes: [DiagnosticCode.InitialEventMissingAssignments, DiagnosticCode.RequiredFieldsNeedInitialEvent],
+            FixHint: "Give the field a default value, assign it earlier in the initial event, or rewrite the assignment so it does not read the field before initialization",
+            TriggerCondition: "A required field without a default is read inside its own first 'set' assignment during the initial event before any prior assignment in that action chain establishes a value.",
+            RecoverySteps: ["Assign the field from another source value instead of reading it", "Add a default value if the field truly has a meaningful initial value", "Or add an earlier 'set Field = ...' action before the self-referential assignment"],
+            ExampleBefore: "precept Example\nfield Count as integer\nevent Start initial\non Start -> set Count = Count + 1",
+            ExampleAfter: "precept Example\nfield Count as integer default 0\nevent Start initial\non Start -> set Count = Count + 1"),
 
         // ── Type (CI enforcement) ─────────────────────────────────────────────
         DiagnosticCode.CaseInsensitiveFieldRequiresTildeNotEquals => new(

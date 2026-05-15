@@ -166,6 +166,7 @@ EventOutcome simple = precept.Create();  // always Applied
 **Compiler enforcement:**
 - **`RequiredFieldsNeedInitialEvent`:** Precept has required fields (non-optional, no default) but does not declare an initial event — construction cannot produce a valid initial version.
 - **`InitialEventMissingAssignments`:** Initial event does not assign all required fields that lack defaults — post-construction state may violate constraints.
+- **`UninitializedFieldReadInInitialAssignment`:** A required field with no default is read inside its own first initial-event assignment — construction would consume an undefined value.
 
 **Open (R3):** The internal representation (slot array vs. dictionary, immutable record shape) is not yet decided. The public contract is unaffected — `Version` exposes named field access regardless of internal storage.
 

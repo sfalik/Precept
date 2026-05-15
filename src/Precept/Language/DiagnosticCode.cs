@@ -178,6 +178,10 @@ public enum DiagnosticCode
     /// Distinct from <see cref="UnprovedQualifierCompatibility"/>, which is proof-stage and operand-pair based.
     /// </summary>
     UnprovedAssignmentQualifierCompatibility = 141,
+    /// <summary>
+    /// A required field without a default is read inside its own first assignment during the initial event.
+    /// </summary>
+    UninitializedFieldReadInInitialAssignment = 142,
 
     // ── Graph ────────────────────────────────────────────
     UnreachableState                   =  80,

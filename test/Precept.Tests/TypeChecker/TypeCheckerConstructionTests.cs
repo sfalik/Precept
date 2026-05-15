@@ -325,16 +325,72 @@ public class TypeCheckerConstructionTests
     }
 
     [Fact]
-    public void D94_StatelessPrecept_WithInitialEvent_SkipsCheck()
+    public void D94_StatelessPrecept_WithInitialEvent_MissingRequiredField_Fires()
+    {
+        var diagnostic = AssertSingleD94("""
+            precept Widget
+            field Name as string
+            field Age as integer optional
+            event Start initial
+            on Start -> set Age = 1
+            """);
+
+        diagnostic.Message.Should().Be("Initial event 'Start' does not assign required field(s): Name");
+    }
+
+    [Fact]
+    public void D94_StatelessPrecept_WithInitialEvent_AssignsRequiredField_NoDiagnostic()
     {
         var precept = """
             precept Widget
             field Name as string
-            event Start(InputName as string) initial
+            event Start initial
+            on Start -> set Name = "created"
             """;
 
-        // Pre-existing gap: stateless precepts with initial events escape both D93 and D94.
         AssertNoD94(precept);
+    }
+
+    [Fact]
+    public void D142_InitialEvent_SelfReadWithoutDefault_FiresAtReadSite()
+    {
+        var diagnostic = AssertSingleD142("""
+            precept Test
+            field count as integer
+            event Increment initial
+            on Increment -> set count = count + 1
+            """);
+
+        diagnostic.Message.Should().Be("Field 'count' is read in its own initial assignment but has no default value — its value is undefined on first firing of initial event 'Increment'");
+        diagnostic.Span.StartLine.Should().Be(4);
+        diagnostic.Span.StartColumn.Should().Be(29);
+        diagnostic.Span.EndColumn.Should().Be(34);
+    }
+
+    [Fact]
+    public void D142_InitialEvent_FieldWithDefault_DoesNotFire()
+    {
+        var precept = """
+            precept Test
+            field count as integer default 0
+            event Increment initial
+            on Increment -> set count = count + 1
+            """;
+
+        AssertNoD142(precept);
+    }
+
+    [Fact]
+    public void D142_InitialEvent_FieldAssignedEarlierInSameActionChain_DoesNotFire()
+    {
+        var precept = """
+            precept Test
+            field count as integer
+            event Increment initial
+            on Increment -> set count = 0 -> set count = count + 1
+            """;
+
+        AssertNoD142(precept);
     }
 
     [Fact]
@@ -377,5 +433,23 @@ public class TypeCheckerConstructionTests
     {
         var (_, diagnostics) = TypeCheckerTestHelpers.Check(precept);
         return diagnostics.Where(d => d.Code == DiagnosticCode.InitialEventMissingAssignments.ToString()).ToArray();
+    }
+
+    private static void AssertNoD142(string precept)
+    {
+        AssertD142s(precept).Should().BeEmpty();
+    }
+
+    private static Diagnostic AssertSingleD142(string precept)
+    {
+        var diagnostics = AssertD142s(precept);
+        diagnostics.Should().ContainSingle();
+        return diagnostics[0];
+    }
+
+    private static Diagnostic[] AssertD142s(string precept)
+    {
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check(precept);
+        return diagnostics.Where(d => d.Code == DiagnosticCode.UninitializedFieldReadInInitialAssignment.ToString()).ToArray();
     }
 }

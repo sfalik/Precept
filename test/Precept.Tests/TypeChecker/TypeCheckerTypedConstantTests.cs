@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using FluentAssertions;
@@ -29,6 +30,16 @@ public class TypeCheckerTypedConstantTests
         field Amount as integer
         state Open initial
         """);
+
+    private static void AssertNoConstructionIndependentErrors(IReadOnlyCollection<Diagnostic> diagnostics)
+    {
+        diagnostics
+            .Where(d => d.Severity == Severity.Error)
+            .Where(d => d.Code != nameof(DiagnosticCode.RequiredFieldsNeedInitialEvent))
+            .Where(d => d.Code != nameof(DiagnosticCode.InitialEventMissingAssignments))
+            .Where(d => d.Code != nameof(DiagnosticCode.UninitializedFieldReadInInitialAssignment))
+            .Should().BeEmpty();
+    }
 
     private static CheckContext BuildContext(string preceptText)
     {
@@ -504,7 +515,7 @@ public class TypeCheckerTypedConstantTests
             field x as integer
             field y as currency
             field z as integer
-            event Go initial
+            event Go
             on Go
                 -> set m = '{x} {y} {z}'
             """);
@@ -523,7 +534,7 @@ public class TypeCheckerTypedConstantTests
             field m as money
             field x as integer
             field y as currency
-            event Go initial
+            event Go
             on Go
                 -> set m = '{x}/{y}'
             """);
@@ -540,7 +551,7 @@ public class TypeCheckerTypedConstantTests
             precept Test
             field m as money
             field x as integer
-            event Go initial
+            event Go
             on Go
                 -> set m = '{x} USD EUR'
             """);
@@ -564,7 +575,7 @@ public class TypeCheckerTypedConstantTests
             precept Test
             field f as {{typeName}}
             field x as integer
-            event Go initial
+            event Go
             on Go
                 -> set f = '{x}'
             """);
@@ -583,7 +594,7 @@ public class TypeCheckerTypedConstantTests
             precept Test
             field q as quantity in 'kg'
             field b as boolean
-            event Go initial
+            event Go
             on Go
                 -> set q = '{b} kg'
             """);
@@ -601,7 +612,7 @@ public class TypeCheckerTypedConstantTests
             precept Test
             field m as money
             field q as quantity in 'kg'
-            event Go initial
+            event Go
             on Go
                 -> set m = '100 {q}'
             """);
@@ -618,7 +629,7 @@ public class TypeCheckerTypedConstantTests
             precept Test
             field m as money
             field q as quantity in 'kg'
-            event Go initial
+            event Go
             on Go
                 -> set m = '{q} USD'
             """);
@@ -635,7 +646,7 @@ public class TypeCheckerTypedConstantTests
             precept Test
             field p as period
             field d as decimal
-            event Go initial
+            event Go
             on Go
                 -> set p = '{d} days'
             """);
@@ -654,7 +665,7 @@ public class TypeCheckerTypedConstantTests
             precept Test
             field q as quantity in 'kg'
             field s as string
-            event Go initial
+            event Go
             on Go
                 -> set q = '{s} kg'
             """);
@@ -671,7 +682,7 @@ public class TypeCheckerTypedConstantTests
             precept Test
             field q as quantity in 'kg'
             field s as string
-            event Go initial
+            event Go
             on Go
                 -> set q = '100 {s}'
             """);
@@ -688,7 +699,7 @@ public class TypeCheckerTypedConstantTests
             precept Test
             field m as money
             field s as string
-            event Go initial
+            event Go
             on Go
                 -> set m = '{s}'
             """);
@@ -707,12 +718,12 @@ public class TypeCheckerTypedConstantTests
             field target as unitofmeasure
             field a as unitofmeasure
             field b as unitofmeasure
-            event Go initial
+            event Go
             on Go
                 -> set target = '{a}/{b}'
             """);
 
-        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        AssertNoConstructionIndependentErrors(diagnostics);
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "target");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
@@ -728,12 +739,12 @@ public class TypeCheckerTypedConstantTests
             field n as integer
             field a as unitofmeasure
             field b as unitofmeasure
-            event Go initial
+            event Go
             on Go
                 -> set target = '{n} {a}/{b}'
             """);
 
-        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        AssertNoConstructionIndependentErrors(diagnostics);
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "target");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
@@ -749,12 +760,12 @@ public class TypeCheckerTypedConstantTests
             field n as decimal
             field a as unitofmeasure
             field b as unitofmeasure
-            event Go initial
+            event Go
             on Go
                 -> set target = '{n} {a}/{b}'
             """);
 
-        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        AssertNoConstructionIndependentErrors(diagnostics);
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "target");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
@@ -769,12 +780,12 @@ public class TypeCheckerTypedConstantTests
             field target as quantity
             field a as unitofmeasure
             field b as unitofmeasure
-            event Go initial
+            event Go
             on Go
                 -> set target = '0 {a}/{b}'
             """);
 
-        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        AssertNoConstructionIndependentErrors(diagnostics);
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "target");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
@@ -788,12 +799,12 @@ public class TypeCheckerTypedConstantTests
             precept Test
             field target as quantity
             field a as unitofmeasure
-            event Go initial
+            event Go
             on Go
                 -> set target = '0 {a}/each'
             """);
 
-        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        AssertNoConstructionIndependentErrors(diagnostics);
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "target");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
@@ -807,12 +818,12 @@ public class TypeCheckerTypedConstantTests
             precept Test
             field target as quantity
             field b as unitofmeasure
-            event Go initial
+            event Go
             on Go
                 -> set target = '0 each/{b}'
             """);
 
-        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        AssertNoConstructionIndependentErrors(diagnostics);
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "target");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
@@ -827,7 +838,7 @@ public class TypeCheckerTypedConstantTests
             field target as unitofmeasure
             field q as quantity in 'kg'
             field b as unitofmeasure
-            event Go initial
+            event Go
             on Go
                 -> set target = '{q}/{b}'
             """);
@@ -844,7 +855,7 @@ public class TypeCheckerTypedConstantTests
             field target as unitofmeasure
             field s as string
             field b as unitofmeasure
-            event Go initial
+            event Go
             on Go
                 -> set target = '{s}/{b}'
             """);
@@ -861,7 +872,7 @@ public class TypeCheckerTypedConstantTests
             field target as unitofmeasure
             field a as unitofmeasure
             field s as string
-            event Go initial
+            event Go
             on Go
                 -> set target = '{a}/{s}'
             """);
@@ -878,7 +889,7 @@ public class TypeCheckerTypedConstantTests
             field target as unitofmeasure
             field n as integer
             field b as unitofmeasure
-            event Go initial
+            event Go
             on Go
                 -> set target = '{n}/{b}'
             """);
@@ -896,7 +907,7 @@ public class TypeCheckerTypedConstantTests
             field a as unitofmeasure
             field b as unitofmeasure
             field c as unitofmeasure
-            event Go initial
+            event Go
             on Go
                 -> set target = '{a}/{b}/{c}'
             """);
@@ -913,7 +924,7 @@ public class TypeCheckerTypedConstantTests
             field target as unitofmeasure
             field a as unitofmeasure
             field b as unitofmeasure
-            event Go initial
+            event Go
             on Go
                 -> set target = '{a}|{b}'
             """);
@@ -932,12 +943,12 @@ public class TypeCheckerTypedConstantTests
             precept Test
             field q as quantity in 'kg'
             field n as integer
-            event Go initial
+            event Go
             on Go
                 -> set q = '{n} kg'
             """);
 
-        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        AssertNoConstructionIndependentErrors(diagnostics);
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "q");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
@@ -952,12 +963,12 @@ public class TypeCheckerTypedConstantTests
             precept Test
             field q as quantity in 'kg'
             field n as decimal
-            event Go initial
+            event Go
             on Go
                 -> set q = '{n} kg'
             """);
 
-        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        AssertNoConstructionIndependentErrors(diagnostics);
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "q");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>();
@@ -972,12 +983,12 @@ public class TypeCheckerTypedConstantTests
             field m as money
             field a as integer
             field c as currency
-            event Go initial
+            event Go
             on Go
                 -> set m = '{a} {c}'
             """);
 
-        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        AssertNoConstructionIndependentErrors(diagnostics);
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "m");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
@@ -994,12 +1005,12 @@ public class TypeCheckerTypedConstantTests
             field r as decimal
             field c as currency
             field u as unitofmeasure
-            event Go initial
+            event Go
             on Go
                 -> set p = '{r} {c}/{u}'
             """);
 
-        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        AssertNoConstructionIndependentErrors(diagnostics);
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "p");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
@@ -1016,12 +1027,12 @@ public class TypeCheckerTypedConstantTests
             field r as decimal
             field f as currency
             field t as currency
-            event Go initial
+            event Go
             on Go
                 -> set x = '{r} {f}/{t}'
             """);
 
-        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        AssertNoConstructionIndependentErrors(diagnostics);
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "x");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
@@ -1036,12 +1047,12 @@ public class TypeCheckerTypedConstantTests
             precept Test
             field p as period
             field n as integer
-            event Go initial
+            event Go
             on Go
                 -> set p = '{n} days'
             """);
 
-        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        AssertNoConstructionIndependentErrors(diagnostics);
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "p");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
@@ -1057,12 +1068,12 @@ public class TypeCheckerTypedConstantTests
             field d as duration
             field n as integer
             field m as integer
-            event Go initial
+            event Go
             on Go
                 -> set d = '{n} hours + {m} minutes'
             """);
 
-        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        AssertNoConstructionIndependentErrors(diagnostics);
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "d");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
@@ -1079,12 +1090,12 @@ public class TypeCheckerTypedConstantTests
             precept Test
             field target as money
             field m as money
-            event Go initial
+            event Go
             on Go
                 -> set target = '{m}'
             """);
 
-        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        AssertNoConstructionIndependentErrors(diagnostics);
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "target");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
@@ -1098,12 +1109,12 @@ public class TypeCheckerTypedConstantTests
             precept Test
             field target as quantity in 'kg'
             field q as quantity in 'kg'
-            event Go initial
+            event Go
             on Go
                 -> set target = '{q}'
             """);
 
-        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        AssertNoConstructionIndependentErrors(diagnostics);
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "target");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>();
@@ -1116,12 +1127,12 @@ public class TypeCheckerTypedConstantTests
             precept Test
             field target as duration
             field d as duration
-            event Go initial
+            event Go
             on Go
                 -> set target = '{d}'
             """);
 
-        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        AssertNoConstructionIndependentErrors(diagnostics);
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "target");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>();
@@ -1134,12 +1145,12 @@ public class TypeCheckerTypedConstantTests
             precept Test
             field target as currency
             field c as currency
-            event Go initial
+            event Go
             on Go
                 -> set target = '{c}'
             """);
 
-        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        AssertNoConstructionIndependentErrors(diagnostics);
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "target");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>();
@@ -1152,12 +1163,12 @@ public class TypeCheckerTypedConstantTests
             precept Test
             field target as unitofmeasure
             field u as unitofmeasure
-            event Go initial
+            event Go
             on Go
                 -> set target = '{u}'
             """);
 
-        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        AssertNoConstructionIndependentErrors(diagnostics);
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "target");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>();
@@ -1173,7 +1184,7 @@ public class TypeCheckerTypedConstantTests
             precept Test
             field target as quantity of 'mass'
             field f1 as quantity of 'length'
-            event Go initial
+            event Go
             on Go
                 -> set target = '1 {f1.unit}'
             """);
@@ -1191,12 +1202,12 @@ public class TypeCheckerTypedConstantTests
             precept Test
             field target as quantity of 'mass'
             field f1 as quantity of 'mass'
-            event Go initial
+            event Go
             on Go
                 -> set target = '1 {f1.unit}'
             """);
 
-        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        AssertNoConstructionIndependentErrors(diagnostics);
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "target");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>();
@@ -1210,7 +1221,7 @@ public class TypeCheckerTypedConstantTests
             precept Test
             field target as quantity of 'mass'
             field f1 as quantity
-            event Go initial
+            event Go
             on Go
                 -> set target = '1 {f1.unit}'
             """);
@@ -1226,12 +1237,12 @@ public class TypeCheckerTypedConstantTests
             precept Test
             field target as quantity
             field f1 as quantity of 'length'
-            event Go initial
+            event Go
             on Go
                 -> set target = '1 {f1.unit}'
             """);
 
-        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        AssertNoConstructionIndependentErrors(diagnostics);
     }
 
     [Fact]
@@ -1242,7 +1253,7 @@ public class TypeCheckerTypedConstantTests
             precept Test
             field target as quantity of 'length'
             field f1 as quantity in 'kg'
-            event Go initial
+            event Go
             on Go
                 -> set target = '1 {f1.unit}'
             """);
@@ -1259,12 +1270,12 @@ public class TypeCheckerTypedConstantTests
             precept Test
             field target as quantity of 'mass'
             field u as unitofmeasure
-            event Go initial
+            event Go
             on Go
                 -> set target = '1 {u}'
             """);
 
-        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        AssertNoConstructionIndependentErrors(diagnostics);
     }
 
     // ── Additional form variations ───────────────────────────────────────
@@ -1277,12 +1288,12 @@ public class TypeCheckerTypedConstantTests
             precept Test
             field m as money
             field c as currency
-            event Go initial
+            event Go
             on Go
                 -> set m = '100 {c}'
             """);
 
-        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        AssertNoConstructionIndependentErrors(diagnostics);
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "m");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
@@ -1297,12 +1308,12 @@ public class TypeCheckerTypedConstantTests
             precept Test
             field m as money
             field n as integer
-            event Go initial
+            event Go
             on Go
                 -> set m = '{n} USD'
             """);
 
-        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        AssertNoConstructionIndependentErrors(diagnostics);
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "m");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
@@ -1317,12 +1328,12 @@ public class TypeCheckerTypedConstantTests
             precept Test
             field q as quantity
             field u as unitofmeasure
-            event Go initial
+            event Go
             on Go
                 -> set q = '100 {u}'
             """);
 
-        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        AssertNoConstructionIndependentErrors(diagnostics);
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "q");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
@@ -1337,12 +1348,12 @@ public class TypeCheckerTypedConstantTests
             precept Test
             field p as price
             field n as decimal
-            event Go initial
+            event Go
             on Go
                 -> set p = '{n} USD/kg'
             """);
 
-        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        AssertNoConstructionIndependentErrors(diagnostics);
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "p");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
@@ -1357,12 +1368,12 @@ public class TypeCheckerTypedConstantTests
             field p as price
             field c as currency
             field u as unitofmeasure
-            event Go initial
+            event Go
             on Go
                 -> set p = '0 {c}/{u}'
             """);
 
-        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        AssertNoConstructionIndependentErrors(diagnostics);
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "p");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
@@ -1379,7 +1390,7 @@ public class TypeCheckerTypedConstantTests
             field StockingUnitsPerPurchaseUnit as quantity in '{StockingUnit}/{PurchaseUnit}' default '1 {StockingUnit}/{PurchaseUnit}'
             """);
 
-        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        AssertNoConstructionIndependentErrors(diagnostics);
         diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnresolvedTypedConstant));
         index.Fields.Single(f => f.Name == "StockingUnitsPerPurchaseUnit")
             .DefaultExpression.Should().BeOfType<InterpolatedTypedConstant>()
@@ -1397,7 +1408,7 @@ public class TypeCheckerTypedConstantTests
             rule StockingUnitsPerPurchaseUnit > '0 {StockingUnit}/{PurchaseUnit}' because "Must be positive"
             """);
 
-        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        AssertNoConstructionIndependentErrors(diagnostics);
         diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnresolvedTypedConstant));
         var comparison = index.Rules.Single().Condition.Should().BeOfType<TypedBinaryOp>().Subject;
         comparison.Right.Should().BeOfType<InterpolatedTypedConstant>()
@@ -1413,7 +1424,7 @@ public class TypeCheckerTypedConstantTests
             field Conv as quantity in '{A}/each' default '1 {A}/each'
             """);
 
-        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        AssertNoConstructionIndependentErrors(diagnostics);
         diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnresolvedTypedConstant));
         index.Fields.Single(f => f.Name == "Conv")
             .DefaultExpression.Should().BeOfType<InterpolatedTypedConstant>()
@@ -1429,7 +1440,7 @@ public class TypeCheckerTypedConstantTests
             field Conv as quantity in 'each/{B}' default '1 each/{B}'
             """);
 
-        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        AssertNoConstructionIndependentErrors(diagnostics);
         diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnresolvedTypedConstant));
         index.Fields.Single(f => f.Name == "Conv")
             .DefaultExpression.Should().BeOfType<InterpolatedTypedConstant>()
@@ -1447,7 +1458,7 @@ public class TypeCheckerTypedConstantTests
             rule AverageCost >= '0 {Currency}/{Unit}' because "Non-negative"
             """);
 
-        diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
+        AssertNoConstructionIndependentErrors(diagnostics);
         diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnresolvedTypedConstant));
         var comparison = index.Rules.Single().Condition.Should().BeOfType<TypedBinaryOp>().Subject;
         comparison.Right.Should().BeOfType<InterpolatedTypedConstant>()

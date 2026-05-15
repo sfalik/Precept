@@ -1885,6 +1885,7 @@ No special "construction constraint" form is needed. `to <InitialState> ensure` 
 **Compiler enforcement:**
 - **`RequiredFieldsNeedInitialEvent`:** Precept has required fields (non-optional, no default) but does not declare an initial event — construction cannot produce a valid initial version.
 - **`InitialEventMissingAssignments`:** Initial event does not assign all required fields that lack defaults — post-construction state may violate constraints.
+- **`UninitializedFieldReadInInitialAssignment`:** A required field with no default is read inside its own first initial-event assignment — the read would observe an undefined value.
 
 **Design rationale:** Construction goes through the full event pipeline because entities must satisfy their constraints from the moment they exist. A parameterless construction path cannot enforce business invariants at intake. By modeling construction as an event, the language reuses all existing machinery — guards can discriminate construction routing, ensures validate args, `reject` can refuse intake, and the caller uses the same pattern matching they use for every event.
 
@@ -1894,7 +1895,7 @@ For precepts that declare no states, `Version.State` is `null` in the constructe
 
 - **Step 1 (initial state set) is omitted.** There is no initial state to assign. The hollow version is built with `State = null`.
 - **State-entry semantics do not fire.** `to <State> ensure` guards and `in <State> ensure` residency checks require a named state to evaluate against. Because no state is entered, they are structurally absent — not evaluated, not skipped conditionally, simply not applicable.
-- **All other steps apply unchanged.** If an initial event is declared, it fires through the standard pipeline (arg ensures, mutations, field constraints, global rules). If no initial event is declared, defaults and computed fields are set and global rules are checked. The construction succeeds if these pass; `Version.State` is `null` in the returned version.
+- **All other steps apply unchanged.** If an initial event is declared, it fires through the standard pipeline (arg ensures, mutations, field constraints, global rules). The same construction diagnostics apply here as in stateful precepts, including missing required assignments and self-reads of undefined required fields in the initial handler. If no initial event is declared, defaults and computed fields are set and global rules are checked. The construction succeeds if these pass; `Version.State` is `null` in the returned version.
 
 This is the natural extension of §3A.5 to precepts without a state machine. Null state is the honest representation of "current field values alone" (§0.2) — no sentinel, no hidden machinery, no separate API path.
 

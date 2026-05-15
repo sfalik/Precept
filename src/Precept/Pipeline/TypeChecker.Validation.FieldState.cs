@@ -320,22 +320,8 @@ internal static partial class TypeChecker
             return;
         }
 
-        if (ctx.States.Count == 0)
-            return;
-
-        var initialStateNames = ctx.States
-            .Where(state => state.Modifiers.Contains(ModifierKind.InitialState))
-            .Select(state => state.Name)
-            .ToHashSet(StringComparer.Ordinal);
-
-        var initialRows = ctx.TransitionRows
-            .Where(row =>
-                string.Equals(row.EventName, initialEvent.Name, StringComparison.Ordinal) &&
-                row.FromState is { } fromState &&
-                initialStateNames.Contains(fromState))
-            .ToImmutableArray();
-
-        if (initialRows.IsDefaultOrEmpty)
+        var initialActionChains = GetInitialConstructionActionChains(ctx, initialEvent);
+        if (initialActionChains.IsDefaultOrEmpty)
         {
             ctx.Diagnostics.Add(
                 Diagnostics.Create(
@@ -346,26 +332,120 @@ internal static partial class TypeChecker
             return;
         }
 
-        foreach (var row in initialRows)
+        foreach (var (span, actions) in initialActionChains)
         {
-            var missingFields = requiredFields
-                .Where(field => !row.Actions.Any(action =>
-                    IsSetAction(action.Kind) &&
-                    string.Equals(action.FieldName, field.Name, StringComparison.Ordinal)))
-                .Select(field => field.Name)
-                .ToImmutableArray();
-
+            var missingFields = GetMissingRequiredFieldAssignments(requiredFields, actions);
             if (missingFields.IsDefaultOrEmpty)
                 continue;
 
             ctx.Diagnostics.Add(
                 Diagnostics.Create(
                     DiagnosticCode.InitialEventMissingAssignments,
-                    row.RowSpan,
+                    span,
                     initialEvent.Name,
                     string.Join(", ", missingFields)));
         }
     }
+
+    private static void ValidateInitialAssignmentSelfReads(CheckContext ctx)
+    {
+        var initialEvent = ctx.Events.FirstOrDefault(evt => evt.IsInitial);
+        if (initialEvent is null)
+            return;
+
+        foreach (var (_, actions) in GetInitialConstructionActionChains(ctx, initialEvent))
+            ValidateInitialAssignmentSelfReads(actions, initialEvent.Name, ctx);
+    }
+
+    private static void ValidateInitialAssignmentSelfReads(
+        ImmutableArray<TypedAction> actions,
+        string initialEventName,
+        CheckContext ctx)
+    {
+        var priorAssignments = new HashSet<string>(StringComparer.Ordinal);
+        var fieldRefs = new List<TypedFieldRef>();
+
+        foreach (var action in actions)
+        {
+            if (!IsSetAction(action.Kind) || action is not TypedInputAction inputAction)
+                continue;
+
+            if (!ctx.FieldLookup.TryGetValue(action.FieldName, out var field))
+                continue;
+
+            var fieldName = field.Name;
+            if (!priorAssignments.Contains(fieldName) && IsRequiredFieldWithoutImplicitValue(field))
+            {
+                fieldRefs.Clear();
+                CollectFieldRefsFromExpression(inputAction.InputExpression, fieldRefs);
+
+                foreach (var fieldRef in fieldRefs)
+                {
+                    if (!string.Equals(fieldRef.FieldName, fieldName, StringComparison.Ordinal))
+                        continue;
+
+                    ctx.Diagnostics.Add(
+                        Diagnostics.Create(
+                            DiagnosticCode.UninitializedFieldReadInInitialAssignment,
+                            fieldRef.Span,
+                            fieldName,
+                            initialEventName));
+                }
+            }
+
+            priorAssignments.Add(fieldName);
+        }
+    }
+
+    private static ImmutableArray<(SourceSpan Span, ImmutableArray<TypedAction> Actions)> GetInitialConstructionActionChains(
+        CheckContext ctx,
+        TypedEvent initialEvent)
+    {
+        var builder = ImmutableArray.CreateBuilder<(SourceSpan Span, ImmutableArray<TypedAction> Actions)>();
+
+        if (ctx.States.Count == 0)
+        {
+            foreach (var row in ctx.TransitionRows.Where(row =>
+                         string.Equals(row.EventName, initialEvent.Name, StringComparison.Ordinal) &&
+                         row.FromState is null))
+            {
+                builder.Add((row.RowSpan, row.Actions));
+            }
+
+            foreach (var handler in ctx.EventHandlers.Where(handler =>
+                         string.Equals(handler.EventName, initialEvent.Name, StringComparison.Ordinal)))
+            {
+                builder.Add((handler.Syntax.Span, handler.Actions));
+            }
+
+            return builder.ToImmutable();
+        }
+
+        var initialStateNames = ctx.States
+            .Where(state => state.Modifiers.Contains(ModifierKind.InitialState))
+            .Select(state => state.Name)
+            .ToHashSet(StringComparer.Ordinal);
+
+        foreach (var row in ctx.TransitionRows.Where(row =>
+                     string.Equals(row.EventName, initialEvent.Name, StringComparison.Ordinal) &&
+                     row.FromState is { } fromState &&
+                     initialStateNames.Contains(fromState)))
+        {
+            builder.Add((row.RowSpan, row.Actions));
+        }
+
+        return builder.ToImmutable();
+    }
+
+    private static ImmutableArray<string> GetMissingRequiredFieldAssignments(
+        ImmutableArray<TypedField> requiredFields,
+        ImmutableArray<TypedAction> actions) =>
+        requiredFields
+            .Where(field => !actions.Any(action =>
+                IsSetAction(action.Kind) &&
+                string.Equals(action.FieldName, field.Name, StringComparison.Ordinal)))
+            .Select(field => field.Name)
+            .ToImmutableArray();
 
     private static bool IsSetAction(ActionKind kind) => kind == ActionKind.Set;
 

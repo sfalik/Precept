@@ -192,6 +192,15 @@ public class DiagnosticsTests
     }
 
     [Fact]
+    public void DiagnosticMeta_D142_HasRequiredFields()
+    {
+        var meta = Diagnostics.GetMeta(DiagnosticCode.UninitializedFieldReadInInitialAssignment);
+
+        AssertRequiredDiagnosticMetadata(meta);
+        meta.RelatedCodes.Should().Contain(DiagnosticCode.InitialEventMissingAssignments);
+    }
+
+    [Fact]
     public void UnprovedModifierRequirement_HasProofStage()
     {
         Diagnostics.GetMeta(DiagnosticCode.UnprovedModifierRequirement).Stage.Should().Be(DiagnosticStage.Proof);
@@ -264,6 +273,7 @@ public class DiagnosticsTests
         { DiagnosticCode.InvalidInterpolatedTypedConstantForm, "'{0}' doesn't match a recognized pattern for this type — check the expected format (e.g. '{{amount}} USD' for money)" },
         { DiagnosticCode.InterpolatedTypedConstantHoleTypeMismatch, "'{{{1}}}' expects a {2} value, but the expression is {0} — use a compatible field or literal" },
         { DiagnosticCode.DimensionMismatchInUnitSlot, "'{0}' measures {1}, but this field requires {2} — use a unit from the '{2}' dimension" },
+        { DiagnosticCode.UninitializedFieldReadInInitialAssignment, "Field '{0}' is read in its own initial assignment but has no default value — its value is undefined on first firing of initial event '{1}'" },
     };
 
     public static TheoryData<DiagnosticCode> LexCodes => new()
@@ -309,6 +319,7 @@ public class DiagnosticsTests
         DiagnosticCode.OmittedFieldReadInState,
         DiagnosticCode.OmittedFieldSetInTargetState,
         DiagnosticCode.RequiredFieldUnassignedOnEntry,
+        DiagnosticCode.UninitializedFieldReadInInitialAssignment,
         DiagnosticCode.UndeclaredEvent,
         DiagnosticCode.UndeclaredFunction,
         DiagnosticCode.MultipleInitialStates,

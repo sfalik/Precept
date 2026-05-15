@@ -109,3 +109,10 @@
 - The durable surfaces are TypedFunctionCall.ResultQualifiers, TypeChecker implied-qualifier parity, shared QualifierUnitHelpers, and the explicit quantity-slot Unknown contract for assignment validation.
 - Frank's earlier review still approves the PRE0141 architecture, and the focused assignment suite is locked green at 55/55.
 
+### 2026-05-15T18:30:16-04:00 — D94 stateless gap and PRE0142 are now closed
+
+- Stateless construction validation cannot piggyback on stateful transition-row logic alone; the current runtime represents stateless initial work in event handlers, so gap closures must inspect both stateless handlers and null-from-state rows when present.
+- `PRE0094` and `PRE0142` solve different failure modes and both matter: one catches missing construction writes, the other catches self-referential reads of a value that still does not exist.
+- The diagnostic coverage analyzers still need Gate 2 allow-list entries for newly emitted codes referenced only from `test/Precept.Tests/`; otherwise PRECEPT0028 fires even when runtime tests exist.
+- Focused construction/diagnostic suites are green; full `Precept.Tests` remains at the existing 9 unrelated proof/quantity failures.
+
