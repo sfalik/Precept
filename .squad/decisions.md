@@ -6,6 +6,76 @@
 
 ---
 
+### 2026-05-15T16:25:03Z: Frank review warnings now gate forward progress the same way blockers do
+
+**By:** Scribe
+
+**Status:** Merged from Shane's follow-up user directive.
+
+**Merged source:** `copilot-directive-2026-05-15T12-25-03.md`.
+
+- After Frank reviews a slice, every finding must be closed before the team moves on: warnings (`W{N}`) are proceed/no-proceed gates, not optional cleanup.
+- This tightens the standing review loop without changing runtime behavior: approval-closeout now means doc sync plus full review-findings closure, not just blocker resolution.
+
+---
+
+### 2026-05-15T16:15:38Z: Slice 24 approval closes the money/price interpolated-interval lane
+
+**By:** Scribe
+
+**Status:** Merged from Frank's approval and George's implementation note.
+
+**Merged sources:** `frank-s24-review.md`; `george-s24-money-price-intervals.md`.
+
+- Frank approved Slice 24: the money magnitude, money WholeValue, price+static-denominator magnitude, and price-dynamic → `Unbounded` paths all match the §5.6 design intent, with `ApplyStaticUnitScaling` correctly handling the inverse-factor price case.
+- George confirmed the Slice 19 single-slot path was already generic enough for money and most price inputs; the true Slice 24 delta was making the Price+Magnitude+no-static-qualifier fallback explicitly return `Unbounded`, documenting the per-type responsibilities, and adding the static-denominator price regression tests.
+- Remaining debt is non-blocking: dedicated money/price WholeValue anchors and a same-unit price regression would strengthen coverage, but Frank cleared the slice and the doc tracker should now show Slice 24 complete.
+
+---
+
+### 2026-05-15T16:15:38Z: Slice 23 locked the static-qualifier routing contract for interpolated typed constants
+
+**By:** Scribe
+
+**Status:** Merged from George's qualifier-routing implementation note and Frank's approval.
+
+**Merged sources:** `george-s23-qualifier-routing.md`; `frank-s23-review.md`.
+
+- `ResolveQualifierFromInterpolatedConstant` now consults `StaticQualifier` per axis before falling back to slot-based logic, eliminating false-positive `PRE0114` cases when an interpolated qualifier is already statically known.
+- `TryGetAssignmentSourceQualifiers` now projects interpolated `StaticQualifier` metadata into assignment checking so `set`/`default` can emit `PRE0134` for definite mismatches instead of silently accepting them.
+- George locked the guardrails too: `WholeValue` forms never populate `StaticQualifier`, axis-specific early returns never hide dynamic holes, and the fallback stays conservative.
+- Frank approved the slice on `c643bc04`: the subtype-to-qualifier mapping is complete, PRE0134 mismatch emission is correct, and the only targeted-suite failure remained the pre-existing `CompoundUnitPositivityProof_ClearsDivisionByZero` baseline.
+- Slice 25 is now unblocked by dependency, while one non-blocking warning remains: add a price/exchangerate mismatch test that exercises simultaneous currency+unit disagreement through the shared `ValidateResolvedQualifiers` path.
+
+---
+
+### 2026-05-15T16:13:52Z: Doc tracker maintenance is now part of the approval-closeout loop
+
+**By:** Scribe
+
+**Status:** Merged from Shane's user directive.
+
+**Merged source:** `copilot-directive-2026-05-15T12-13-52.md`.
+
+- After Frank approves a slice, the Scribe closeout pass must update `docs/working/quantity-normalization-design.md` so the tracker reflects the actual implementation state in the same batch.
+- This is a process-memory decision, not a language/runtime change: the canonical doc tracker now moves in lockstep with review approval instead of waiting for a later cleanup pass.
+
+---
+
+### 2026-05-15T15:37:42Z: Slice 21 coverage is approved and locked as the interpolated-quantity proof baseline
+
+**By:** Scribe
+
+**Status:** Merged from Frank's review and Soup Nazi's coverage report.
+
+**Merged sources:** `frank-s21-review.md`; `soup-nazi-s21-coverage.md`.
+
+- Frank approved Slice 21: all 10 interpolated quantity overflow tests cover the required §5.3/G21 shapes, and the conservative lanes correctly keep unbounded or dynamic-unit inputs on the `NumericOverflow` path instead of producing false proofs.
+- Soup Nazi confirmed the full test slate is green on the branch baseline: the suite locks magnitude-slot scaling, WholeValue recursion, dynamic-unit conservatism, dynamic price-denominator conservatism, money magnitude handling, and the cross-unit WholeValue happy path.
+- Two follow-up warnings stay as explicit debt, not blockers: add a direct `ProofDisposition != Proved` assertion for conservative cases, and add the both-holes dynamic-unit form (`'{intField} {unitField}'`) as a sharper regression anchor.
+
+---
+
 ### 2026-05-15T14:55:25Z: Slice N and M review loop closed with B3 fix and final approval
 
 **By:** Scribe

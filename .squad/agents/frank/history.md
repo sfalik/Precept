@@ -55,3 +55,27 @@
 - Slice 17 review approved the 9-test normalization matrix and preserved the intentionally-red cross-dimension case as honest contract pressure.
 - Slice 18 review approved the authored/normalized display contract split across proof requirements, diagnostics, and MCP projection.
 - Durable warnings to keep live: Slice 19 still needs a cross-unit WholeValue regression plus MCP normalized-bound coverage, and the Test 6 cross-dimension root causes should stay tracked as debt until implementation closes them.
+
+### 2026-05-15T15:37:42Z — Slice 21 review recorded approved
+
+- Slice 21 APPROVED: 10 interpolated quantity integration tests covering all §5.3/G21 required behavioral cases. Conservative-case tests (3, 6, 7) correctly assert `NumericOverflow` fires for unbounded/dynamic-unit inputs.
+- W1: conservative tests verify overflow fires but don't explicitly assert `ProofDisposition != Proved` — adding this would make the false-proof prevention invariant explicit in the suite. Not blocking.
+- W2: both-holes form (`'{intField} {unitField}'`) not tested — single-hole dynamic-unit test (Test 6) covers the architectural invariant. Not blocking.
+- Test 9 cross-unit WholeValue anchor is acceptable for Slice 21 scope; the tighter `max '1 kg'` variant that would actually detect double-normalization is correctly deferred as future obligation.
+- Durable learning: happy-path anchors and regression detectors are distinct test categories — a test that passes regardless of bug presence is an anchor, not a guard. Both are valuable but must not be confused.
+
+### 2026-05-15T12:15:38Z — Slice 24 review recorded approved
+
+- Slice 24 APPROVED: Money/price interpolated interval extraction. Four code paths (money magnitude, money WholeValue, price+static-denominator magnitude, price-dynamic → Unbounded) correctly implemented in `IntervalOfNarrowed` with `ApplyStaticUnitScaling` handling the price inverse-factor case.
+- The `HasSingleMagnitudeSlot` guard in `ApplyStaticUnitScaling` is correctly scoped: WholeValue expressions skip scaling because they're already normalized. The Unbounded guard for Price only fires on Magnitude (correct — WholeValue doesn't need denominator inversion).
+- W1: No WholeValue-specific tests for money/price. The generic Slice 19 WholeValue path covers the behavior, but dedicated anchors should land in follow-up.
+- W2: No same-unit (factor=1.0) price test to detect accidental scaling. Low risk but good regression anchor debt.
+- Doc tracker in §5.0 needs Slice 24 marked complete.
+
+### 2026-05-15T12:15:38Z — Slice 23 review recorded approved
+
+- Slice 23 APPROVED: StaticQualifier routing through proof-engine and type-checker qualifier consumers. Early-return pattern in `ResolveQualifierFromInterpolatedConstant` covers all four subtypes with correct axis fall-through. `BuildQualifiersFromStaticInterpolated` maps subtypes to `DeclaredQualifierMeta` arrays for PRE0134 emission.
+- WholeValue constraint (B23) is structurally enforced: `ResolveStaticQualifier` returns null on WholeValue slots — no double-copy possible.
+- PRE0134 mismatch tests exist for unit (kg/g) and currency (USD/EUR). No price/exchangerate mismatch test — low risk warning.
+- One failing test (`CompoundUnitPositivityProof_ClearsDivisionByZero`) is pre-existing, not a regression.
+- Slice 25 (field-default proof coverage) is now unblocked. Doc tracker in §5.0 needs Slice 23 marked complete.

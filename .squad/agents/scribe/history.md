@@ -40,6 +40,24 @@
 
 ## Recent Updates
 
+### 2026-05-15T16:15:38Z — Frank Slice 23 approval folded into the active decision set
+
+- A follow-up inbox sweep found Frank's Slice 23 approval note after the George-led merge; the review confirms the qualifier-routing contract is approved on commit `c643bc04`.
+- Updated the canonical Slice 23 decision entry to include Frank's approval, the remaining price/exchangerate mismatch warning, and the fact that Slice 25 is now dependency-unblocked.
+
+### 2026-05-15T16:25:03Z — Review-warning gating directive merged
+
+- Follow-up inbox sweep found 1 new directive file immediately after the Slice 21/23/24 merge pass; the 7-day archive gate was still ineligible, so the pass stayed merge-only.
+- Captured Shane's directive that Frank review warnings are proceed/no-proceed gates just like blockers, merged it into `.squad/decisions.md`, and cleared the follow-up inbox file.
+- Durable process update: approval-closeout now requires both tracker sync and full closure of all Frank findings before the team moves to the next slice.
+
+### 2026-05-15T16:15:38Z — Slice 21/23/24 inbox batch merged and Slice 24 tracker synced
+
+- Pre-check measured .squad/decisions.md at 42380 bytes with 6 inbox file(s); the hard-gate 7-day archive pass found 0 eligible active entries older than 2026-05-08T16:15:38Z.
+- Merged 6 inbox notes into 4 canonical decision entries (Slice 24 approval, Slice 23 qualifier routing, the doc-tracker closeout directive, and Slice 21 coverage approval), then deleted the processed inbox files so the inbox returned to zero.
+- Synced docs/working/quantity-normalization-design.md by marking Slice 24 complete per Frank's approval and preserved the existing Frank/George history updates already carrying the review/implementation detail.
+- Health report: decisions.md 42380 B -> 46022 B; inbox processed = 6 (6 -> 0); history files summarized = 0.
+
 ### 2026-05-15T02:32:44Z — Affine conversion design batch recorded
 
 - Pre-check measured `.squad/decisions.md` at 115385 bytes with 2 inbox files; the hard-gate 7-day archive pass ran first and found 0 eligible active entries older than `2026-05-08T02:32:44Z`.

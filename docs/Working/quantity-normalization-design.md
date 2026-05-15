@@ -3577,7 +3577,7 @@ These slices extend the normalization design to cover interpolated typed constan
 |-------|-----------|------------|--------|
 | **22** | Capture `StaticQualifier` on `InterpolatedTypedConstant` | None | ✅ |
 | **23** | Route `StaticQualifier` through qualifier consumers | Slice 22 | ⬜ |
-| **24** | Extend interpolated interval extraction to money/price | Slices 19, 22 | ⬜ |
+| **24** | Extend interpolated interval extraction to money/price | Slices 19, 22 | ✅ |
 | **25** | Field-default proof coverage for interpolated typed constants | Slices 19, 22, 23 | ⬜ |
 | **26** | Event arg default resolution (typed-constant defaults) | Slices 25, 15b | ⬜ |
 
