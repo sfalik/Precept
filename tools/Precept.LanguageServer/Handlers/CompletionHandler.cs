@@ -152,10 +152,13 @@ internal sealed class CompletionHandler : ICompletionHandler
             SlotContext.AfterValueName => CreateCompletionList(GetTypeAnnotationItems()),
             SlotContext.InTypePosition => CreateCompletionList(GetTypeItems()),
             SlotContext.InModifierPosition => CreateModifierList(compilation, position),
-            SlotContext.InStateTarget => CreateCompletionList(GetStateItems(compilation)),
+            SlotContext.InStateTarget => CreateCompletionList(GetStateTargetItems(compilation, position)),
             SlotContext.InEventTarget => CreateCompletionList(GetEventItems(compilation)),
-            SlotContext.InFieldTarget => CreateCompletionList(GetFieldItems(compilation)),
-            SlotContext.InActionVerb => CreateCompletionList(GetActionItems(compilation, position)),
+            SlotContext.InFieldTarget => CreateCompletionList(GetFieldTargetItems(compilation, position)),
+            SlotContext.InActionVerb => CreateCompletionList(GetActionOrOutcomeItems(compilation, position)),
+            SlotContext.AfterStateTarget => CreateCompletionList(GetPostStateTargetItems(compilation, position)),
+            SlotContext.AfterEventTarget => CreateCompletionList(GetPostEventTargetItems(compilation, position)),
+            SlotContext.AfterNo => CreateCompletionList(GetNoTransitionItems()),
             SlotContext.InExpression => CreateCompletionList(GetExpressionItems(compilation, position)),
             SlotContext.InArgDefault => CreateCompletionList(GetExpressionItems(compilation, position)),
             SlotContext.InSetAssignment => CreateCompletionList(GetSetAssignmentItem()),
@@ -422,11 +425,63 @@ internal sealed class CompletionHandler : ICompletionHandler
                     snippetTemplate: meta.SnippetTemplate)));
     }
 
+    private static IEnumerable<CompletionItem> GetActionOrOutcomeItems(Compilation compilation, Position position)
+    {
+        var items = GetActionItems(compilation, position);
+        var construct = SlotContextResolver.GetEnclosingConstruct(compilation, position);
+        if (construct is null || !construct.Meta.Slots.Any(slot => slot.Kind == ConstructSlotKind.Outcome))
+        {
+            return items;
+        }
+
+        return DistinctByLabel(items.Concat(GetOutcomeItems()));
+    }
+
+    private static IEnumerable<CompletionItem> GetOutcomeItems() =>
+        Outcomes.All.Select(CreateOutcomeItem);
+
+    private static IEnumerable<CompletionItem> GetStateTargetItems(Compilation compilation, Position position)
+    {
+        var items = GetStateItems(compilation);
+        if (SlotContextResolver.IsTransitionOutcomeTargetPosition(compilation, position))
+        {
+            return items;
+        }
+
+        return DistinctByLabel(items.Concat([CreateTokenItem(TokenKind.Any)]));
+    }
+
     private static IEnumerable<CompletionItem> GetStateItems(Compilation compilation) =>
         compilation.Semantics.States
             .Select(state => state.Name)
             .Distinct(StringComparer.Ordinal)
             .Select(name => CreateItem(name, "State", CompletionItemKind.EnumMember, CompletionSortGroup.SemanticSymbol));
+
+    private static IEnumerable<CompletionItem> GetPostStateTargetItems(Compilation compilation, Position position)
+    {
+        if (!SlotContextResolver.TryGetCompletedStateTargetLeadingToken(compilation, position, out var leadingToken))
+        {
+            return [];
+        }
+
+        var tokenKinds = Constructs.All
+            .Where(meta => meta.Slots.Count > 0 && meta.Slots[0].Kind == ConstructSlotKind.StateTarget)
+            .SelectMany(meta => meta.Entries
+                .Where(entry => entry.LeadingToken == leadingToken)
+                .SelectMany(entry =>
+                {
+                    var disambiguationTokens = entry.DisambiguationTokens ?? ImmutableArray<TokenKind>.Empty;
+                    if (meta.Slots.Count > 1 && meta.Slots[1].Kind == ConstructSlotKind.GuardClause)
+                    {
+                        return disambiguationTokens.Add(TokenKind.When);
+                    }
+
+                    return disambiguationTokens;
+                }))
+            .Distinct();
+
+        return tokenKinds.Select(CreateTokenItem);
+    }
 
     private static IEnumerable<CompletionItem> GetEventItems(Compilation compilation) =>
         compilation.Semantics.Events
@@ -434,11 +489,73 @@ internal sealed class CompletionHandler : ICompletionHandler
             .Distinct(StringComparer.Ordinal)
             .Select(name => CreateItem(name, "Event", CompletionItemKind.Event, CompletionSortGroup.SemanticSymbol));
 
+    private static IEnumerable<CompletionItem> GetPostEventTargetItems(Compilation compilation, Position position)
+    {
+        var construct = SlotContextResolver.GetEnclosingConstruct(compilation, position);
+        if (construct is null)
+        {
+            return [];
+        }
+
+        var eventTargetIndex = -1;
+        for (var index = 0; index < construct.Meta.Slots.Count; index++)
+        {
+            if (construct.Meta.Slots[index].Kind == ConstructSlotKind.EventTarget)
+            {
+                eventTargetIndex = index;
+                break;
+            }
+        }
+
+        if (eventTargetIndex < 0 || eventTargetIndex >= construct.Meta.Slots.Count - 1)
+        {
+            return [];
+        }
+
+        var nextIndex = eventTargetIndex + 1;
+        var tokenKinds = ImmutableArray.CreateBuilder<TokenKind>();
+        if (construct.Meta.Slots[nextIndex].Kind == ConstructSlotKind.GuardClause)
+        {
+            tokenKinds.Add(TokenKind.When);
+            nextIndex++;
+        }
+
+        if (nextIndex < construct.Meta.Slots.Count)
+        {
+            switch (construct.Meta.Slots[nextIndex].Kind)
+            {
+                case ConstructSlotKind.EnsureClause:
+                    tokenKinds.Add(TokenKind.Ensure);
+                    break;
+                case ConstructSlotKind.ActionChain:
+                case ConstructSlotKind.Outcome:
+                    tokenKinds.Add(TokenKind.Arrow);
+                    break;
+            }
+        }
+
+        return tokenKinds.Select(CreateTokenItem);
+    }
+
+    private static IEnumerable<CompletionItem> GetFieldTargetItems(Compilation compilation, Position position)
+    {
+        var items = GetFieldItems(compilation);
+        if (!SlotContextResolver.IsAccessFieldTargetPosition(compilation, position))
+        {
+            return items;
+        }
+
+        return DistinctByLabel(items.Concat([CreateTokenItem(TokenKind.All)]));
+    }
+
     private static IEnumerable<CompletionItem> GetFieldItems(Compilation compilation) =>
         compilation.Semantics.Fields
             .Select(field => field.Name)
             .Distinct(StringComparer.Ordinal)
             .Select(name => CreateItem(name, "Field", CompletionItemKind.Field, CompletionSortGroup.SemanticSymbol));
+
+    private static IEnumerable<CompletionItem> GetNoTransitionItems() =>
+        [CreateTokenItem(Outcomes.NoTransitionSecondaryToken)];
 
     private static IEnumerable<CompletionItem> GetExpressionItems(Compilation compilation, Position position)
     {
@@ -487,8 +604,49 @@ internal sealed class CompletionHandler : ICompletionHandler
             .Concat(booleanLiteralItems);
     }
 
-    private static IEnumerable<CompletionItem> GetExpressionOperatorItems() =>
-        DistinctByLabel(Operators.All.Select(CreateOperatorItem));
+    private static IEnumerable<CompletionItem> GetExpressionOperatorItems()
+    {
+        var operatorItems = Operators.All.Select(CreateOperatorItem);
+        var tokenItems = GetExpressionKeywordTokenKinds().Select(CreateTokenItem);
+        return DistinctByLabel(operatorItems.Concat(tokenItems));
+    }
+
+    private static IEnumerable<TokenKind> GetExpressionKeywordTokenKinds()
+    {
+        var conditionalDescription = Tokens.GetMeta(TokenKind.If).Description;
+
+        var operatorTokenKinds = Operators.All
+            .SelectMany(GetOperatorTokenKinds)
+            .Where(IsExpressionKeywordTokenKind);
+        var expressionLeadTokenKinds = ExpressionForms.All
+            .SelectMany(meta => meta.LeadTokens)
+            .Where(IsExpressionKeywordTokenKind);
+        var conditionalTokenKinds = Tokens.All
+            .Where(meta => meta.Categories.Contains(TokenCategory.Control))
+            .Where(meta => string.Equals(meta.Description, conditionalDescription, StringComparison.Ordinal))
+            .Select(meta => meta.Kind);
+
+        return operatorTokenKinds
+            .Concat(expressionLeadTokenKinds)
+            .Concat(conditionalTokenKinds)
+            .Distinct();
+    }
+
+    private static IEnumerable<TokenKind> GetOperatorTokenKinds(OperatorMeta meta) => meta switch
+    {
+        SingleTokenOp single => [single.Token.Kind],
+        MultiTokenOp multi => multi.Tokens.Select(token => token.Kind),
+        _ => [],
+    };
+
+    private static bool IsExpressionKeywordTokenKind(TokenKind tokenKind)
+    {
+        var categories = Tokens.GetMeta(tokenKind).Categories;
+        return categories.Contains(TokenCategory.LogicalOperator)
+            || categories.Contains(TokenCategory.Membership)
+            || categories.Contains(TokenCategory.Quantifier)
+            || ExpressionForms.GetMeta(ExpressionFormKind.Quantifier).LeadTokens.Contains(tokenKind);
+    }
 
     private static CompletionItem CreateOperatorItem(OperatorMeta meta)
     {
@@ -506,6 +664,30 @@ internal sealed class CompletionHandler : ICompletionHandler
             sortGroup: CompletionSortGroup.Keyword,
             documentation: meta.HoverDescription ?? meta.Description,
             usageExample: meta.UsageExample);
+    }
+
+    private static CompletionItem CreateOutcomeItem(OutcomeMeta meta) =>
+        CreateItem(
+            label: Tokens.GetMeta(meta.LeadingToken).Text ?? meta.SerializedKind,
+            detail: meta.Description,
+            kind: CompletionItemKind.Keyword,
+            sortGroup: CompletionSortGroup.Action,
+            documentation: meta.Description,
+            usageExample: meta.Example);
+
+    private static CompletionItem CreateTokenItem(TokenKind tokenKind)
+    {
+        var meta = Tokens.GetMeta(tokenKind);
+        var kind = meta.Categories.Contains(TokenCategory.Operator)
+            ? CompletionItemKind.Operator
+            : CompletionItemKind.Keyword;
+
+        return CreateItem(
+            label: meta.Text ?? tokenKind.ToString().ToLowerInvariant(),
+            detail: meta.Description,
+            kind: kind,
+            sortGroup: CompletionSortGroup.Keyword,
+            documentation: meta.Description);
     }
 
     private static IEnumerable<CompletionItem> GetTypedConstantItems(

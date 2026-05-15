@@ -10,6 +10,7 @@
 - **Completion audit + routing hardening (2026-05-15T18:04:26.860-04:00):** keep raw document text available to completion so top-level constructs can be limited to whitespace-only line starts; route `transition`, valued modifiers, and event-arg modifier domains through the correct contexts.
 - **Completion test pattern reminder (2026-05-15T18:04:26.860-04:00):** use a `¦` cursor marker and assert both wanted labels and forbidden noise. Negative assertions catch fallback-routing leaks.
 - **Set-assignment operator context (2026-05-13):** `set FieldName ` is its own `SlotContext.InSetAssignment`; completion should offer only `= ` there, never top-level constructs.
+- **Action-chain continuation arrow (2026-05-15T18:47:10.829-04:00):** when a fresh `->` line sits outside the parsed construct span, recover `InActionVerb` with a short backward scan over significant tokens; require both a prior action verb and a prior same-or-deeper-indented `->` so continuation recovery stays precise.
 
 ## Historical Summary
 

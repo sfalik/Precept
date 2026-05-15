@@ -95,9 +95,10 @@ public class CompletionHandlerTests
     }
 
     [Theory]
+    [InlineData("in ")]
     [InlineData("from ")]
     [InlineData("to ")]
-    public async Task Completions_StateTarget_IncludesDeclaredStates(string prefix)
+    public async Task Completions_StateTarget_IncludesDeclaredStatesAndAnyWildcard(string prefix)
     {
         var source = $$"""
             precept LoanApplication
@@ -112,14 +113,14 @@ public class CompletionHandlerTests
         var labels = completions.Items.Select(item => item.Label).ToArray();
 
         completions.IsIncomplete.Should().BeFalse();
-        labels.Should().Contain(["Draft", "UnderReview", "Approved"]);
+        labels.Should().Contain(["Draft", "UnderReview", "Approved", "any"]);
         labels.Should().NotContain(["precept", "field", "state", "event", "from", "rule"]);
     }
 
     [Theory]
     [InlineData("modify ")]
     [InlineData("omit ")]
-    public async Task Completions_FieldTarget_IncludesDeclaredFields(string prefix)
+    public async Task Completions_AccessFieldTarget_IncludesDeclaredFieldsAndAllWildcard(string prefix)
     {
         var source = $$"""
             precept LoanApplication
@@ -133,7 +134,26 @@ public class CompletionHandlerTests
         var labels = completions.Items.Select(item => item.Label).ToArray();
 
         completions.IsIncomplete.Should().BeFalse();
-        labels.Should().Contain(["Amount", "DecisionNote"]);
+        labels.Should().Contain(["Amount", "DecisionNote", "all"]);
+    }
+
+    [Theory]
+    [InlineData("in Draft", new[] { "ensure", "when", "modify", "omit" }, new[] { "on", "->" })]
+    [InlineData("from Draft", new[] { "on", "ensure", "when", "->" }, new[] { "modify", "omit" })]
+    [InlineData("to Approved", new[] { "ensure", "when", "->" }, new[] { "on", "modify", "omit" })]
+    public async Task Completions_AfterStateTarget_OffersScopedVerbs(string clause, string[] expected, string[] unexpected)
+    {
+        var completions = await GetCompletionsAsync($$"""
+            precept LoanApplication
+            state Draft initial
+            state Approved terminal
+            event Submit
+            {{clause}} ¦
+            """, " ");
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        labels.Should().Contain(expected);
+        labels.Should().NotContain(unexpected);
     }
 
     [Fact]
@@ -236,7 +256,7 @@ public class CompletionHandlerTests
     }
 
     [Fact]
-    public async Task Completions_ActionVerb_UsesActionsCatalog()
+    public async Task Completions_AfterArrow_UsesActionsAndOutcomesCatalog()
     {
         var completions = await GetCompletionsAsync("""
             precept BuildingAccessBadgeRequest
@@ -253,6 +273,9 @@ public class CompletionHandlerTests
         var expected = Precept.Language.Actions.All
             .Select(meta => meta.Token.Text)
             .OfType<string>()
+            .Concat(Precept.Language.Outcomes.All
+                .Select(meta => Precept.Language.Tokens.GetMeta(meta.LeadingToken).Text)
+                .OfType<string>())
             .Distinct(System.StringComparer.Ordinal)
             .ToArray();
 
@@ -261,7 +284,53 @@ public class CompletionHandlerTests
     }
 
     [Fact]
-    public async Task Completions_TransitionOutcomeTarget_IncludesDeclaredStatesWithoutTopLevelKeywords()
+    public async Task Completions_StateActionAfterArrow_SuppressesOutcomes()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept BuildingAccessBadgeRequest
+            field BadgePrinted as boolean default false
+            state Approved initial
+            state Issued terminal
+            to Issued
+                ->¦ set BadgePrinted = true
+            """);
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        labels.Should().Contain(Precept.Language.Actions.All
+            .Select(meta => meta.Token.Text)
+            .OfType<string>()
+            .Distinct(System.StringComparer.Ordinal)
+            .ToArray());
+        labels.Should().NotContain(["transition", "no", "reject"]);
+    }
+
+    [Fact]
+    public async Task Completions_ActionChainContinuationArrow_UsesActionItems()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept Test
+            field count as integer
+            event Increment initial
+
+            on Increment
+                -> set count = count + 1
+                ->¦ 
+            """);
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+        var expected = Precept.Language.Actions.All
+            .Where(meta => meta.PrimaryActionKind is null)
+            .Select(meta => meta.Token.Text)
+            .OfType<string>()
+            .Distinct(System.StringComparer.Ordinal)
+            .ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().BeEquivalentTo(expected);
+        labels.Should().NotContain(["precept", "field", "state", "event", "from", "rule"]);
+    }
+
+    [Fact]
+    public async Task Completions_TransitionOutcomeTarget_IncludesDeclaredStatesWithoutWildcardOrTopLevelKeywords()
     {
         var completions = await GetCompletionsAsync("""
             precept BuildingAccessBadgeRequest
@@ -274,7 +343,39 @@ public class CompletionHandlerTests
         var labels = completions.Items.Select(item => item.Label).ToArray();
 
         labels.Should().Contain(["Approved", "Issued"]);
+        labels.Should().NotContain("any");
         labels.Should().NotContain(["precept", "field", "state", "event", "from", "rule"]);
+    }
+
+    [Fact]
+    public async Task Completions_TransitionRowAfterEventTarget_OffersWhenAndArrow()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept BuildingAccessBadgeRequest
+            state Approved initial
+            state Issued terminal
+            event PrintBadge
+            from Approved on PrintBadge ¦
+            """, " ");
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        labels.Should().Contain(["when", "->"]);
+        labels.Should().NotContain(["ensure", "modify", "omit", "transition", "reject"]);
+    }
+
+    [Fact]
+    public async Task Completions_AfterNo_OffersOnlyTransition()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept BuildingAccessBadgeRequest
+            state Approved initial
+            event PrintBadge
+            from Approved on PrintBadge
+                -> no ¦
+            """, " ");
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        labels.Should().BeEquivalentTo(["transition"]);
     }
 
     [Theory]
@@ -457,6 +558,26 @@ public class CompletionHandlerTests
         labels.Should().Contain(["AssignedCrew", "DispatchRound", "Verified", "CrewName", "Priority", "true", "false", "and", "==", "is set"]);
         labels.Should().NotContain(["precept", "field", "state", "event", "from", "rule"]);
         labels.Where(functionNames.Contains).Should().BeEquivalentTo(functionNames);
+    }
+
+    [Fact]
+    public async Task Completions_Expression_IncludesControlQuantifierAndMembershipVocabulary()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept UtilityOutageReport
+            field AssignedCrew as string optional
+            field DispatchRound as number default 0 nonnegative
+            field Verified as boolean default false
+            state VerifiedState initial
+            event RegisterCrew(CrewName as string notempty, Priority as number default 1)
+            from VerifiedState on RegisterCrew when ¦AssignedCrew is set
+                -> set DispatchRound = Priority
+                -> no transition
+            """);
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        labels.Should().Contain(["and", "or", "not", "contains", "is", "if", "then", "else", "each", "any", "no"]);
+        labels.Should().NotContain(["precept", "field", "state", "event", "from", "rule"]);
     }
 
     [Fact]

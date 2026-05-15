@@ -1,18 +1,10 @@
 ﻿precept Test
 
-field test as quantity of 'mass' max '5 kg'
-field test2 as integer max 2 optional default 2
-field test3 as quantity of 'count' max 4
+field count as integer default 0
+field total as integer default 0
 
-state offState initial
-state onState terminal
+event Increment
 
-event toggle initial
-
-in offState omit test
-
-from offState on toggle 
-    -> set test = '{test2} [lb_av]'
-    -> set test3 = '5 box'
-    -> transition onState
-
+on Increment
+    -> set count = count + 1
+    -> set total = count * 2

@@ -686,6 +686,14 @@ internal static class SlotContextResolver
         Precept.Pipeline.ParsedConstruct? construct,
         out SlotContext context)
     {
+        if (construct is null
+            && token.Kind == Precept.Language.TokenKind.Arrow
+            && IsImplicitActionChainContinuation(tokens, tokenIndex))
+        {
+            context = SlotContext.InActionVerb;
+            return true;
+        }
+
         if (!IsActionChainContext(token, position, construct))
         {
             context = default;
@@ -775,6 +783,48 @@ internal static class SlotContextResolver
         }
 
         return !ConstructHasSlot(construct, Precept.Language.ConstructSlotKind.Outcome);
+    }
+
+    private static bool IsImplicitActionChainContinuation(
+        ImmutableArray<Precept.Language.Token> tokens,
+        int tokenIndex)
+    {
+        if (tokenIndex < 0
+            || tokenIndex >= tokens.Length
+            || tokens[tokenIndex].Kind != Precept.Language.TokenKind.Arrow)
+        {
+            return false;
+        }
+
+        var currentArrow = tokens[tokenIndex];
+        var sawPriorActionVerb = false;
+        var significantTokensScanned = 0;
+
+        for (var index = FindPreviousSignificantToken(tokens, tokenIndex - 1);
+             index >= 0 && significantTokensScanned < 20;
+             index = FindPreviousSignificantToken(tokens, index - 1), significantTokensScanned++)
+        {
+            var candidate = tokens[index];
+            if (candidate.Span.StartLine == currentArrow.Span.StartLine)
+            {
+                return false;
+            }
+
+            if (IsActionVerbToken(candidate.Kind, out _))
+            {
+                sawPriorActionVerb = true;
+                continue;
+            }
+
+            if (candidate.Kind == Precept.Language.TokenKind.Arrow)
+            {
+                return sawPriorActionVerb
+                    && candidate.Span.StartLine < currentArrow.Span.StartLine
+                    && candidate.Span.StartColumn >= currentArrow.Span.StartColumn;
+            }
+        }
+
+        return false;
     }
 
     private static bool IsExpressionContext(
