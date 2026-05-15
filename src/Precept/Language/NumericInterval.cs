@@ -51,6 +51,17 @@ public readonly struct NumericInterval
     private static bool HasSentinelBound(NumericInterval v) =>
         IsSentinel(v.Min) || IsSentinel(v.Max);
 
+    private static decimal ScaleBound(decimal bound, decimal factor)
+    {
+        if (bound == decimal.MinValue)
+            return factor < 0m ? decimal.MaxValue : decimal.MinValue;
+
+        if (bound == decimal.MaxValue)
+            return factor < 0m ? decimal.MinValue : decimal.MaxValue;
+
+        return bound * factor;
+    }
+
     public NumericInterval Add(NumericInterval other)
     {
         if (IsUnbounded || other.IsUnbounded) return Unbounded;
@@ -86,6 +97,15 @@ public readonly struct NumericInterval
     {
         if (IsUnbounded) return Unbounded;
         return new(-Max, -Min);
+    }
+
+    public NumericInterval Scale(decimal factor)
+    {
+        if (IsUnbounded) return Unbounded;
+
+        var scaledMin = ScaleBound(Min, factor);
+        var scaledMax = ScaleBound(Max, factor);
+        return new(Math.Min(scaledMin, scaledMax), Math.Max(scaledMin, scaledMax));
     }
 
     public bool Contains(NumericInterval other)
