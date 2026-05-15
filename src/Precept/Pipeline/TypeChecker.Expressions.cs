@@ -962,7 +962,7 @@ internal static partial class TypeChecker
 
         // PRE0070: Cross-currency arithmetic — Money + Money with different currencies
         if (op.Left.ResultType == TypeKind.Money && op.Right.ResultType == TypeKind.Money
-            && opMeta.Family == OperatorFamily.Arithmetic)
+            && (opMeta.Family == OperatorFamily.Arithmetic || opMeta.Family == OperatorFamily.Comparison))
         {
             var leftCurrency = leftQualifiers.Value.FirstOrDefault(q => q.Axis == QualifierAxis.Currency);
             var rightCurrency = rightQualifiers.Value.FirstOrDefault(q => q.Axis == QualifierAxis.Currency);
@@ -980,7 +980,7 @@ internal static partial class TypeChecker
 
         // PRE0071: Cross-dimension arithmetic — Quantity + Quantity with different dimensions
         if (op.Left.ResultType == TypeKind.Quantity && op.Right.ResultType == TypeKind.Quantity
-            && opMeta.Family == OperatorFamily.Arithmetic)
+            && (opMeta.Family == OperatorFamily.Arithmetic || opMeta.Family == OperatorFamily.Comparison))
         {
             var leftDim = GetDimensionFromQualifiers(leftQualifiers.Value);
             var rightDim = GetDimensionFromQualifiers(rightQualifiers.Value);

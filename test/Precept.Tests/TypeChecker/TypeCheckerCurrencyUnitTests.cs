@@ -95,6 +95,62 @@ public class TypeCheckerCurrencyUnitTests
         TypeCheckerTestHelpers.CheckExpectingClean(precept);
     }
 
+    [Fact]
+    public void MoneyComparison_DifferentCurrencies_EmitsCrossCurrencyArithmetic()
+    {
+        var precept = """
+            precept Invoice
+            field USD as money in 'USD' default '0.00 USD'
+            field EUR as money in 'EUR' default '0.00 EUR'
+            field IsGreater as boolean <- USD > EUR
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.CrossCurrencyArithmetic);
+    }
+
+    [Fact]
+    public void QuantityComparison_DifferentDimensions_EmitsCrossDimensionArithmetic()
+    {
+        var precept = """
+            precept Shipment
+            field Weight as quantity in 'kg' default '0 kg'
+            field Distance as quantity in 'm' default '0 m'
+            field Bad as boolean <- Weight > Distance
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.CrossDimensionArithmetic);
+    }
+
+    [Fact]
+    public void MoneyComparison_SameCurrency_NoDiagnostic()
+    {
+        var precept = """
+            precept Invoice
+            field A as money in 'USD' default '0.00 USD'
+            field B as money in 'USD' default '0.00 USD'
+            field Ok as boolean <- A > B
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void QuantityComparison_SameDimensionDifferentUnits_NoDiagnostic()
+    {
+        var precept = """
+            precept Shipment
+            field A as quantity in 'kg' default '0 kg'
+            field B as quantity in 'g' default '0 g'
+            field Ok as boolean <- A > B
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
     // ════════════════════════════════════════════════════════════════════════
     //  PRE0072: DenominatorUnitMismatch
     // ════════════════════════════════════════════════════════════════════════
