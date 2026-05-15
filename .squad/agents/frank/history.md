@@ -24,6 +24,7 @@
 - When a design says "universal post-step," verify it actually means expression-type-dispatched post-step — the dispatch table is the contract, not the word "universal."
 - Slices that depend on unimplemented runtime infrastructure (stubs) should be explicitly numbered out of the implementation sequence and marked not implementation-ready to prevent ordering confusion.
 - Counting-unit comparisons need unit-code identity, not just dimension-family compatibility; only physically convertible UCUM units should pass same-dimension cross-unit checks.
+- `ResolveSlotSourceQualifierAxis` must distinguish `Unknown` (type supports axis but source doesn't declare it) from `Absent` (type cannot carry qualifier on this axis). The `IsAssignmentQualifierAxisApplicable` check is the discriminator — returning `Absent` for a bare quantity source feeding a unit slot into a dimension-constrained target is a silent acceptance bug.
 - Catalog `QualifierMatch` declarations are only as strong as their enforcement wiring: the Functions catalog declared `QualifierMatch.Same` on min/max/clamp/abs overloads from inception, but `SelectOverload` never read it. Audit principle: every catalog constraint must trace to an enforcement point.
 - Function call resolution and binary operator resolution are architecturally parallel but historically asymmetric: operators have `ValidateQualifierCompatibility`, functions have nothing. Any future qualifier-sensitive surface must wire enforcement at the same time the catalog entry is declared.
 
@@ -33,50 +34,30 @@
 - The durable enforcement baseline is: PRE0078 stays in ProofEngine Strategy 7, PRE0079 is the TypeChecker literal-bounds wire, PRE0019 is retired unless real presence-obligation generation is added, and PRE0094 is already emitted in the checker.
 - Older batch-by-batch detail now lives in `.squad/decisions.md` and `history-archive.md`; this live file keeps only the guidance and latest outcomes other agents need immediately.
 
-## Recent Updates
-
-### 2026-05-15T20:40:13Z — Price qualifier enforcement architecture is now durably closed as shipped work
-
-- George landed the axis-aware assignment resolver with `PRE0141`, matching Frank's rule that constrained qualifier axes must be provably compatible at compile time and that unknown is never silent success on a constrained axis.
-- Soup Nazi's 19-test matrix is now the durable regression surface across `set`, field-default, and event-arg-default lanes, and Scribe merged the full batch into `.squad/decisions.md` plus the orchestration/session logs.
-- The separate `PriceIn` / `CompoundPrice` qualifier-shape proposal remains recorded as proposal-state only; it is not a prerequisite for the shipped enforcement repair.
-
-### 2026-05-15T20:25:45-04:00 — Full price qualifier enforcement model locked
-
-- Wrote the governing analysis in `docs/Working/frank-price-qualifier-full-analysis.md` and recorded the decision in `.squad/decisions/inbox/frank-price-qualifier-full-analysis.md`.
-- Durable ruling: assignment qualifier enforcement is **axis-by-axis proof**, not best-effort extraction. If the target constrains a qualifier axis and the source expression cannot prove compatibility on that axis, the assignment must be rejected at compile time.
-- `PRE0068` remains the diagnostic for **definite mismatch** only. Unknown-source-to-constrained-target cases need a new assignment-specific unproved-qualifier diagnostic; overloading `PRE0068` would be semantically wrong.
-- Verified silent gaps extend well beyond the bare `price` unit-slot repro: bare qualified-type refs, whole-value interpolation, conditional selection, currency-slot interpolation, and exchange-rate from/to-slot interpolation all currently bypass assignment enforcement in representative cases.
-- Architectural directive to George: replace the boolean/partial-array `TryGetAssignmentSourceQualifiers(...)` seam with shared per-axis qualifier resolution (`Resolved` / `Unknown` / `Absent`) and close the model across `price`, `money`, `quantity`, and `exchangerate` — not another one-off patch.
-
-### 2026-05-15T14:55:25Z — Tracker sync and the Wave 2 / Slice N/M review loop are durably closed
-
-- §5.0 tracker rows 15, 15b, 16, 19, 20, 31, 33, 35, 36, and 37 are recorded as ✅ against commit `f1215192`, and the bounds-validation documentation lane is now numbered as Slices 44 and 45.
-- Wave 2 stayed APPROVED after George's `01f255ab` follow-up, which preserved authored-vs-normalized bounds and added the affine-price guard plus regression coverage.
-- Slice N/M closed after two blocker passes: B1/B2 were fixed in `0837ad6f`, B3 was fixed in `70ee2406`, and the final verdict is APPROVED.
-
 ## Learnings
 
-- Suppression fixes must be reviewed against every downstream diagnostic that depends on the suppression, especially when one path intentionally hands off to a more specific diagnostic.
-- Tracker and documentation passes should assign stable slice IDs as soon as standalone fixes appear so later reviews and closeout logs can cite one durable name.
-- WholeValue interval tests using same-unit (scale=1.0) for both source and target cannot detect double-normalization bugs. Cross-unit WholeValue tests are mandatory when Slice 19 lands — track as Slice 19 obligation.
-- Intentionally-red tests that assert the *correct* expected behavior (not `Skip`) are superior contract pressure — they fail loudly on regression AND on fix, ensuring the fix is noticed and the test transitions to green deliberately.
-- Display contract pattern: when a record carries both "math values" and "display values," the construction site must source them from genuinely distinct paths (e.g., `GetFieldBounds()` for normalized, `field.DeclaredMin` for authored). A fallback operator (`AuthoredMin ?? DeclaredMin`) at rendering sites ensures graceful degradation for non-quantity cases.
-- `HasSingleMagnitudeSlot`-style positive guards are more robust than negative exclusion lists — new slot kinds automatically fail the check rather than needing maintenance.
+### 2026-05-15T18:09:43-04:00 — Uninitialized Field Read in Initial Event (diagnostic gap)
 
-### 2026-05-15T15:37:42Z — Slice 17 and Slice 18 reviews recorded approved
+- **Confirmed genuine diagnostic gap:** `set count = count + 1` in an initial event where `count` has no `default` produces zero diagnostics. The compiler silently accepts a provable uninitialized read.
+- **Two distinct gaps found:**
+  1. **D94 stateless blind spot:** `ValidateConstructionGuarantees` returns early at line 323 when `ctx.States.Count == 0`, giving stateless precepts zero per-field construction validation even when an initial event exists and required fields have no defaults.
+  2. **Missing self-referential initial assignment check:** Even if D94 ran, it only checks whether the field IS assigned (`IsSetAction` + `FieldName` match). It never inspects the RHS expression. `set count = count + 1` passes D94's check because `count` IS being set — but the RHS reads an undefined value.
+- **Recommendation:** New diagnostic D142 (`UninitializedFieldReadInInitialAssignment`) in `TypeChecker.Validation.FieldState.cs`. Separate fix for D94's stateless early return. Both are TypeChecker-stage, not ProofEngine.
+- **Durable learning:** Construction guarantee checks that verify "field IS assigned" are necessary but insufficient. The completeness guarantee requires also checking that assignment expressions don't read the field's own undefined value. This is analogous to the "use before def" analysis in traditional compilers — a dimension the field-state validation framework currently lacks entirely.
 
-- Slice 17 review approved the 9-test normalization matrix and preserved the intentionally-red cross-dimension case as honest contract pressure.
-- Slice 18 review approved the authored/normalized display contract split across proof requirements, diagnostics, and MCP projection.
-- Durable warnings to keep live: Slice 19 still needs a cross-unit WholeValue regression plus MCP normalized-bound coverage, and the Test 6 cross-dimension root causes should stay tracked as debt until implementation closes them.
+### 2026-05-15T18:04:26.860-04:00 — Completion Position Specification Review
 
-### 2026-05-15T15:37:42Z — Slice 21 review recorded approved
+- **Top-level keyword leak:** `SlotContextResolver.GetCursorContext` falls through to `SlotContext.TopLevel` as a default when it cannot classify the position. This is the root cause of Shane's complaint — top-level construct keywords (`field`, `state`, `event`, `rule`, `from`, `in`, `on`, `to`) appear in expression contexts, type positions, and modifier positions because an unclassified cursor defaults to `TopLevel`, which maps to `GetTopLevelItems()`. The fix is: unclassified mid-construct cursors should return `AfterKeyword` (empty completions), not `TopLevel`.
+- **SlotContext coverage is incomplete for some grammar positions.** There is no distinct `SlotContext` for: after `->` (where action verbs OR outcome keywords are expected), inside `because` string expressions, after `transition` keyword (where a state name is expected), after `no` keyword (where `transition` is expected), or inside event argument lists (where parameter names then `as` then types are expected). These are all routed through heuristic fallbacks.
+- **Modifier completions are already type-filtered** via `GetModifiers(compilation, position, domain)` — this reads the resolved type and already-applied modifiers. This is correct. State modifiers (`terminal`, `required`, `irreversible`, `success`, `warning`, `error`) and event modifiers (`initial`) are served through `ModifierDomain.State` and `ModifierDomain.Event` respectively. Value modifiers are filtered by `TypeTarget` applicability.
+- **Expression completions correctly include event args** scoped to the current event via `GetCurrentEventArgItems`. They include field names, functions, and boolean literals. Boolean literal suppression exists for known non-boolean target types.
+- **Typed-constant completions are sophisticated** — they include slot-phase detection (number → space → unit), qualifier-aware filtering, currency/unit/dimension catalogs, reuse of existing typed constants in the file, and temporal format examples.
+- **The `any` and `all` keywords** need special handling: `any` is valid in state-target positions (as a wildcard), `all` is valid in field-target positions (for `modify all` / `omit all`). Neither should appear in expression completions.
+- **Outcome keywords (`transition`, `no transition`, `reject`)** need their own completion context after `->` when no action verb is recognized. Currently, `InActionVerb` serves action keywords but doesn't include outcome keywords — they share the same `->` trigger.
 
-- Slice 21 APPROVED: 10 interpolated quantity integration tests covering all §5.3/G21 required behavioral cases. Conservative-case tests (3, 6, 7) correctly assert `NumericOverflow` fires for unbounded/dynamic-unit inputs.
-- W1: conservative tests verify overflow fires but don't explicitly assert `ProofDisposition != Proved` — adding this would make the false-proof prevention invariant explicit in the suite. Not blocking.
-- W2: both-holes form (`'{intField} {unitField}'`) not tested — single-hole dynamic-unit test (Test 6) covers the architectural invariant. Not blocking.
-- Test 9 cross-unit WholeValue anchor is acceptable for Slice 21 scope; the tighter `max '1 kg'` variant that would actually detect double-normalization is correctly deferred as future obligation.
-- Durable learning: happy-path anchors and regression detectors are distinct test categories — a test that passes regardless of bug presence is an anchor, not a guard. Both are valuable but must not be confused.
+## Recent Updates
+
+- Older Recent Updates entries were compacted into history-archive.md on 2026-05-15T22:09:58Z.
 
 ### 2026-05-15T12:15:38Z — Slice 24 review recorded approved
 
@@ -107,3 +88,10 @@
 - `Types.cs` correctly NOT changed — `QS_CurrencyAndDimension` stays on `QualifierAxis.Currency` until QS-2 wires the handler.
 - W1–W4: RichHoverFactory has 5 axis-name/label/text switches and MCP has string interpolation that will show generic/opaque labels for `PriceIn`. All non-blocking — tracked as QS-2 obligations.
 - Durable learning: model-only slices that add enum values and DU subtypes are safe to land independently when all consumers use default/wildcard fallbacks. The exhaustion risk is only real for switches without `_ =>` arms.
+
+### 2026-05-15T22:09:58Z — Deferred qualifier follow-up closure merged and architectural approval preserved
+
+- George shipped all three items from Frank's scoped follow-up plan: qualifier-preserving TypedFunctionCall.ResultQualifiers, TypeChecker implied-qualifier parity, and the explicit quantity-slot Unknown fallback.
+- Soup Nazi's quantity sweep stayed green, confirming the quantity expression lane was already closed before the hardening pass.
+- Scribe merged the deferred-fix closure and Frank's uninitialized-field-read diagnostic-gap ruling into .squad/decisions.md; Frank's earlier PRE0141 review approval remains the standing architectural verdict.
+

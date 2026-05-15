@@ -24,6 +24,12 @@
 
 ## Recent Updates
 
+### 2026-05-15T18:09:58.927-04:00 — Quantity qualifier gap sweep added coverage, but the lane is already green
+
+- Added 8 quantity expression-lane tests to `test/Precept.Tests/TypeChecker/TypeCheckerAssignmentQualifierTests.cs`: bare refs to constrained quantity targets, WholeValue interpolation, bare `.unit` interpolation, binary addition, conditional selection, plus the matching direct/unit-slot pass controls.
+- The requested red PRE0141 pressure is no longer honest: the shared assignment resolver already emits `PRE0141` for the bare-ref, WholeValue, unit-slot, binary, and conditional quantity gaps. The binary case also still emits proof-stage `PRE0114`, and the conditional case emits 2 `PRE0141` diagnostics (one per branch).
+- Validation: targeted run finished `52 passed / 0 failed`; full `test\\Precept.Tests` still shows `9` unrelated baseline failures in existing proof/quantity tests.
+
 ### 2026-05-15T20:40:13Z — The qualifier enforcement regression matrix is now tied to the shipped axis-aware model
 
 - Frank's full analysis is now the canonical rule-set behind the suite: constrained qualifier axes require compile-time proof, and unproved constrained axes fail on the new assignment-stage diagnostic instead of slipping through.
@@ -91,3 +97,9 @@
 - Added the last two Slice 17 tests: price denominator no-overflow (test 4b) and WholeValue overflow (test 8), closing the planned 9-test matrix.
 - Final branch totals moved to 5526 passing (+2) with 9 pre-existing failures; the cross-dimension test remains intentional debt pressure, not a new regression.
 - Frank approved the slice and carried two obligations forward: add a true cross-unit WholeValue regression in Slice 19 and track the Test 6 root causes as explicit debt.
+
+### 2026-05-15T22:09:58Z — Quantity qualifier gap sweep is now recorded as green regression closure
+
+- The 8-test quantity qualifier sweep is now merged into .squad/decisions.md as confirmation that bare refs, whole-value interpolation, unit slots, binary results, and conditionals were already enforcing PRE0141 honestly.
+- George's later quantity-slot hardening now sits on top of an already-green lane rather than rescuing a still-red gap.
+

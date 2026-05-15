@@ -2245,3 +2245,79 @@ Pattern: When a doc has a code block and a prose "pending" note about the same f
 - Slices 38–42 doc annotations are committed and remain the live spec baseline for the normalization track.
 - One durable follow-up stays open: `docs/language/business-domain-types.md:373` still says business counting units are opaque with no shared dimension, which now contradicts the shared `DimensionVector.None` + factor-one representation model.
 - Keep PRE0137 as the enforcing rule for explicit unit-code identity inside that count family; the remaining work is wording correction, not architectural reconsideration.
+---
+
+## Archive Batch — 2026-05-15T22:09:58Z
+
+---
+
+### 2026-05-15T18:09:58-04:00 — Qualifier deferred items scoped (3 items)
+
+- Scoped the three items deferred from PRE0141 enforcement work. Full spec in `docs/Working/frank-qualifier-deferred-scoping.md`, decision in `.squad/decisions/inbox/frank-qualifier-deferred-scoping.md`.
+- **Item 1 (ProofEngine unification): PARTIAL.** Full entry-point unification is premature — the two resolvers serve different contracts (assignment diagnostics vs proof disposition). Required now: implied-qualifier parity in `ResolveDirectQualifierAxis` and compound-cancellation helper extraction into `UnitDimensionHelper`.
+- **Item 2 (Quantity gaps): FULL, one fix.** Four of five gap categories (A/B/D/E) are already handled by the shipped PRE0141 resolver. One gap in category C: `ResolveSlotSourceQualifierAxis` returns `Absent` instead of `Unknown` for bare-but-type-applicable sources in interpolation unit/dimension slots.
+- **Item 3 (Function-call qualifier preservation): FULL.** Add `ResultQualifiers` to `TypedFunctionCall`, populate from first argument when `overload.Match == QualifierMatch.Same`, add case arms to both resolvers. Five functions in scope: `abs`, `min`, `max`, `clamp`, `round(v, places)`.
+- All three items are independent and can be parallelized. No design review gate needed for any of them.
+
+---
+
+### 2026-05-15T18:02:40-04:00 — Full code review: assignment qualifier enforcement APPROVED
+
+- Reviewed George's axis-aware resolver implementation and Soup Nazi's 19-test regression matrix against the governing analysis in `docs/Working/frank-price-qualifier-full-analysis.md`.
+- Verdict: **APPROVED** with zero blocking findings and three non-blocking follow-ups (function-call qualifier preservation, proof-engine unification, language-spec diagnostics appendix).
+- Key architectural confirmations: tri-state `Resolved/Unknown/Absent` model matches § 4.2 exactly; all 16 source forms from § 1.2 are covered; empty-array-means-success antipattern is fully eliminated; `PRE0141` is correctly separated from `PRE0068` (definite mismatch) and `PRE0114` (proof-stage).
+- Decision recorded in `.squad/decisions/inbox/frank-qualifier-enforcement-review.md`.
+
+---
+
+### 2026-05-15T20:40:13Z — Price qualifier enforcement architecture is now durably closed as shipped work
+
+- George landed the axis-aware assignment resolver with `PRE0141`, matching Frank's rule that constrained qualifier axes must be provably compatible at compile time and that unknown is never silent success on a constrained axis.
+- Soup Nazi's 19-test matrix is now the durable regression surface across `set`, field-default, and event-arg-default lanes, and Scribe merged the full batch into `.squad/decisions.md` plus the orchestration/session logs.
+- The separate `PriceIn` / `CompoundPrice` qualifier-shape proposal remains recorded as proposal-state only; it is not a prerequisite for the shipped enforcement repair.
+
+---
+
+### 2026-05-15T20:25:45-04:00 — Full price qualifier enforcement model locked
+
+- Wrote the governing analysis in `docs/Working/frank-price-qualifier-full-analysis.md` and recorded the decision in `.squad/decisions/inbox/frank-price-qualifier-full-analysis.md`.
+- Durable ruling: assignment qualifier enforcement is **axis-by-axis proof**, not best-effort extraction. If the target constrains a qualifier axis and the source expression cannot prove compatibility on that axis, the assignment must be rejected at compile time.
+- `PRE0068` remains the diagnostic for **definite mismatch** only. Unknown-source-to-constrained-target cases need a new assignment-specific unproved-qualifier diagnostic; overloading `PRE0068` would be semantically wrong.
+- Verified silent gaps extend well beyond the bare `price` unit-slot repro: bare qualified-type refs, whole-value interpolation, conditional selection, currency-slot interpolation, and exchange-rate from/to-slot interpolation all currently bypass assignment enforcement in representative cases.
+- Architectural directive to George: replace the boolean/partial-array `TryGetAssignmentSourceQualifiers(...)` seam with shared per-axis qualifier resolution (`Resolved` / `Unknown` / `Absent`) and close the model across `price`, `money`, `quantity`, and `exchangerate` — not another one-off patch.
+
+---
+
+### 2026-05-15T14:55:25Z — Tracker sync and the Wave 2 / Slice N/M review loop are durably closed
+
+- §5.0 tracker rows 15, 15b, 16, 19, 20, 31, 33, 35, 36, and 37 are recorded as ✅ against commit `f1215192`, and the bounds-validation documentation lane is now numbered as Slices 44 and 45.
+- Wave 2 stayed APPROVED after George's `01f255ab` follow-up, which preserved authored-vs-normalized bounds and added the affine-price guard plus regression coverage.
+- Slice N/M closed after two blocker passes: B1/B2 were fixed in `0837ad6f`, B3 was fixed in `70ee2406`, and the final verdict is APPROVED.
+
+## Learnings
+
+- Suppression fixes must be reviewed against every downstream diagnostic that depends on the suppression, especially when one path intentionally hands off to a more specific diagnostic.
+- Tracker and documentation passes should assign stable slice IDs as soon as standalone fixes appear so later reviews and closeout logs can cite one durable name.
+- WholeValue interval tests using same-unit (scale=1.0) for both source and target cannot detect double-normalization bugs. Cross-unit WholeValue tests are mandatory when Slice 19 lands — track as Slice 19 obligation.
+- Intentionally-red tests that assert the *correct* expected behavior (not `Skip`) are superior contract pressure — they fail loudly on regression AND on fix, ensuring the fix is noticed and the test transitions to green deliberately.
+- Display contract pattern: when a record carries both "math values" and "display values," the construction site must source them from genuinely distinct paths (e.g., `GetFieldBounds()` for normalized, `field.DeclaredMin` for authored). A fallback operator (`AuthoredMin ?? DeclaredMin`) at rendering sites ensures graceful degradation for non-quantity cases.
+- `HasSingleMagnitudeSlot`-style positive guards are more robust than negative exclusion lists — new slot kinds automatically fail the check rather than needing maintenance.
+
+---
+
+### 2026-05-15T15:37:42Z — Slice 17 and Slice 18 reviews recorded approved
+
+- Slice 17 review approved the 9-test normalization matrix and preserved the intentionally-red cross-dimension case as honest contract pressure.
+- Slice 18 review approved the authored/normalized display contract split across proof requirements, diagnostics, and MCP projection.
+- Durable warnings to keep live: Slice 19 still needs a cross-unit WholeValue regression plus MCP normalized-bound coverage, and the Test 6 cross-dimension root causes should stay tracked as debt until implementation closes them.
+
+---
+
+### 2026-05-15T15:37:42Z — Slice 21 review recorded approved
+
+- Slice 21 APPROVED: 10 interpolated quantity integration tests covering all §5.3/G21 required behavioral cases. Conservative-case tests (3, 6, 7) correctly assert `NumericOverflow` fires for unbounded/dynamic-unit inputs.
+- W1: conservative tests verify overflow fires but don't explicitly assert `ProofDisposition != Proved` — adding this would make the false-proof prevention invariant explicit in the suite. Not blocking.
+- W2: both-holes form (`'{intField} {unitField}'`) not tested — single-hole dynamic-unit test (Test 6) covers the architectural invariant. Not blocking.
+- Test 9 cross-unit WholeValue anchor is acceptable for Slice 21 scope; the tighter `max '1 kg'` variant that would actually detect double-normalization is correctly deferred as future obligation.
+- Durable learning: happy-path anchors and regression detectors are distinct test categories — a test that passes regardless of bug presence is an anchor, not a guard. Both are valuable but must not be confused.
+

@@ -19,6 +19,14 @@
 
 ## Recent Updates
 
+### 2026-05-15T22:27:03Z — Deferred qualifier fixes closed across TypeChecker and ProofEngine
+
+- `TypedFunctionCall` now carries nullable `ResultQualifiers`, populated from the first argument's resolved qualifier axes for `QualifierMatch.Same` overloads; assignment validation and proof resolution both consume the new surface.
+- `ResolveDirectQualifierAxis(...)` now checks `Types.GetMeta(resultType).ImpliedQualifiers` after declared qualifiers, restoring the missing TypeChecker parity with the proof path.
+- Added shared `QualifierUnitHelpers` so TypeChecker and ProofEngine stop maintaining separate compound-unit split/dimension derivation logic.
+- Added regression coverage for `round(...)` qualifier preservation in assignment validation and proof checks; `TypeCheckerAssignmentQualifierTests` now pass 55/55.
+- Full `dotnet test test/Precept.Tests/ --no-restore` remains on the branch baseline at 5642 passed / 9 failed / 5651 total; focused `ProofEngineTypedArgQualifierTests` still have the same pre-existing `CompoundUnitPositivityProof_ClearsDivisionByZero` failure.
+
 ### 2026-05-15T20:40:13Z — Assignment qualifier architecture closeout is recorded with Frank's rule and Soup Nazi's matrix
 
 - Frank's decision is now canonical: assignment qualifier enforcement is per-axis proof, `PRE0068` / `PRE0069` stay for definite mismatches, and `PRE0141` is the assignment-stage signal for required-axis uncertainty.
@@ -33,6 +41,7 @@
 
 ## Learnings
 
+- When a qualifier-preserving expression can know **some** axes but not all, store the partial resolved set instead of collapsing to all-or-nothing. `quantity of 'mass'` flowing through `round(...)` should preserve the known dimension while still leaving exact-unit checks unresolved.
 - When a task's described implementation is "adding handling for X," verify whether the code is already generic/correct before restructuring. Slice 24's money/price handling was already working via the generic single-slot path from Slice 19. The real Slice 24 contribution was (a) making the Price+Magnitude+no-qualifier defensive Unbounded return explicit, (b) adding explanatory comments for each type path, and (c) adding the missing static-denominator price tests.
 - For Price intervals with a magnitude slot, the split of responsibilities matters: `IntervalOfNarrowed` extracts the raw slot interval; `ApplyStaticUnitScaling` applies the `1/denominatorScale` factor. Documenting this contract explicitly in the code prevents future attempts to "fix" the lack of scaling in `IntervalOfNarrowed`.
 - Stale `.msCoverageSourceRootsMapping_Precept.Tests` and `CoverletSourceRootsMapping_Precept.Tests` files in `test/Precept.Tests/bin/Release/net10.0/` cause transient build failures on first run after a rebuild. Clear them and re-run — they regenerate cleanly on the second attempt.
@@ -93,3 +102,10 @@
 - Suppressed redundant assignment-time uncertainty on definite non-cancelling compound-unit multiplication so `CrossDimensionArithmetic` remains the primary error instead of piling on `PRE0141`.
 - Updated stale regression expectations around the new architecture (`InterpolatedTypedConstant_SourceNoDimension_EmitsUnprovedAssignmentQualifierCompatibility`, `SetAction_NonCancellingCompoundUnitMultiplication_EmitsCrossDimensionArithmetic`) and synced analyzer/language-server tests that depended on old clean-compilation snippets.
 - Validation closed green everywhere except the known branch baseline: `TypeCheckerAssignmentQualifierTests` 44/44, `Precept.Analyzers.Tests` 291/291, `Precept.LanguageServer.Tests` 305/305, `Precept.Tests` back to 5630 passed / 9 failed / 5639 total, and full-repo `dotnet test` at 6270 passed / 9 failed / 6279 total.
+
+### 2026-05-15T22:09:58Z — Deferred qualifier fixes are now the canonical shipped contract
+
+- Scribe merged George's deferred qualifier closeout into .squad/decisions.md and the batch logs.
+- The durable surfaces are TypedFunctionCall.ResultQualifiers, TypeChecker implied-qualifier parity, shared QualifierUnitHelpers, and the explicit quantity-slot Unknown contract for assignment validation.
+- Frank's earlier review still approves the PRE0141 architecture, and the focused assignment suite is locked green at 55/55.
+

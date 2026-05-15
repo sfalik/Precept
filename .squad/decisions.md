@@ -6,6 +6,54 @@
 
 ---
 
+---
+
+### 2026-05-15T22:09:58Z: Deferred qualifier follow-up items are fully closed and the PRE0141 architecture stays approved
+
+**By:** Scribe
+
+**Status:** Merged from Frank's scoped follow-up plan, George's implementation closeout, Soup Nazi's quantity regression pass, and Frank's earlier review approval.
+
+**Merged sources:** rank-qualifier-deferred-scoping.md; george-qualifier-deferred-fixes.md; soup-nazi-quantity-gap-tests.md; rank-qualifier-enforcement-review.md.
+
+- Frank's three deferred items are now the shipped rule set: preserve QualifierMatch.Same function-call qualifiers, restore TypeChecker implied-qualifier parity, and make quantity-slot Unknown vs Absent explicit instead of accidental.
+- George implemented the full closure: TypedFunctionCall now carries nullable ResultQualifiers consumed by both assignment validation and the proof engine, ResolveDirectQualifierAxis(...) consults implied qualifiers, and shared QualifierUnitHelpers now own compound-unit splitting across checker and proof paths.
+- Soup Nazi's eight quantity tests confirmed the quantity expression lane was already green across bare refs, whole-value interpolation, unit slots, binary results, and conditionals, so the quantity-slot change is a contract-hardening clarification rather than a newly-opened lane.
+- Frank's review still stands: the axis-aware Resolved / Unknown / Absent assignment model, PRE0141 split, and regression matrix are architecturally approved with no blocking findings remaining.
+- Validation closed at 55/55 focused assignment tests and the unchanged 5642 passed / 9 failed / 5651 total branch baseline.
+
+---
+
+### 2026-05-15T22:09:58Z: Initial events must not hide uninitialized required-field reads behind assignment presence checks
+
+**By:** Scribe
+
+**Status:** Merged from Frank's diagnostic-gap ruling.
+
+**Merged source:** rank-count-uninitialized-read.md.
+
+- Frank confirmed a genuine lifecycle-validation gap: set count = count + 1 inside an initial event for a required field with no default currently compiles with zero diagnostics even though the right-hand side reads an undefined value.
+- The gap has two distinct parts: ValidateConstructionGuarantees currently returns early for stateless precepts before checking required-field assignment coverage, and the existing D94 lane only proves that a target field is assigned somewhere, not that its RHS avoids self-reading an undefined value.
+- The recommended fix is split, not overloaded: extend stateless initial-event construction validation inside TypeChecker.Validation.FieldState.cs, and add a new dedicated diagnostic (UninitializedFieldReadInInitialAssignment, next slot 142) for self-referential initial assignments that read their own target before any prior value exists.
+- Durable rule: construction guarantees must validate both assignment presence and use-before-definition safety on the initial event path.
+
+---
+
+### 2026-05-15T22:09:58Z: Completion routing is now gated by real cursor position instead of fallback top-level leakage
+
+**By:** Scribe
+
+**Status:** Merged from Frank's completion-position specification and Kramer's implementation audit.
+
+**Merged sources:** rank-completion-position-spec.md; kramer-completion-audit.md.
+
+- Frank locked the governing completion rule: top-level construct keywords only belong in SlotContext.TopLevel at the start of a line (after optional whitespace) and must be explicitly suppressed in expression, modifier, target, and post-keyword positions.
+- Kramer closed the shipped leak by threading raw document text into completion handling, gating top-level construct completions behind a whitespace-only line-prefix check, and correcting the 	ransition routing path so state targets no longer fall back to construct keywords.
+- The audit also broadened the accurate downstream surfaces: post-type declaration completions now include qualifier prepositions and computed-field <-, event arg declarations now receive value modifiers instead of event-only modifiers, valued modifiers route into expression completions, and operator vocabulary is now offered from the catalog-driven expression lane.
+- Durable rule: completion item sets stay catalog-derived, but fallback context routing must fail closed instead of defaulting mid-construct positions to TopLevel.
+
+---
+
 ### 2026-05-15T20:40:13Z: Assignment qualifier enforcement now rejects unproved constrained axes with PRE0141
 
 **By:** Scribe
@@ -18,6 +66,8 @@
 - George replaced the old `TryGetAssignmentSourceQualifiers(...)` seam with axis-aware assignment resolution (`Resolved` / `Unknown` / `Absent`), introduced `PRE0141 UnprovedAssignmentQualifierCompatibility`, and kept definite mismatches on `PRE0068` / `PRE0069`.
 - The new resolver covers direct refs, typed constants, whole-value interpolation, qualifier slots, conditionals, and binary-derived results across `price`, `money`, `quantity`, and `exchangerate`.
 - Soup Nazi's 19-test matrix is now the durable assignment-enforcement surface across `set`, field default, and event-arg default lanes; George validated the change against the unchanged 9-failure branch baseline plus analyzer and language-server suites.
+
+---
 
 ---
 
@@ -36,6 +86,8 @@
 
 ---
 
+---
+
 ### 2026-05-15T20:40:13Z: Interpolated `.unit` price sources now surface slot-backed qualifiers during assignment validation
 
 **By:** Scribe
@@ -47,6 +99,8 @@
 - Frank established that `'4.17 USD/{field.unit}'` resolves as an `InterpolatedTypedConstant` with a unit slot under `TypedMemberAccess`, so the qualifier fact already existed at compile time but never reached assignment validation.
 - George added the slot-backed interpolated extraction path, preserved static currency text for mixed static/dynamic price literals, and reused the same reach-through helper shape as `ValidateUnitSlotDimensionConsistency(...)`.
 - The resulting behavior stays on the existing `PRE0068 QualifierMismatch` lane: interpolated count-unit mismatch and interpolated currency mismatch now fail, while the matching control still passes.
+
+---
 
 ---
 
@@ -64,6 +118,8 @@
 
 ---
 
+---
+
 ### 2026-05-15T19:30:00Z: Slice 26 warnings are closed and the slice is fully approved
 
 **By:** Scribe
@@ -75,6 +131,8 @@
 - Frank verified the arg-default diagnostic context now formats as `arg 'Event.Arg'` through `ArgDefaultContext`, closing the user-facing `"here"` fallback on overflow diagnostics.
 - The new `EventArgDefault_QualifierMismatch_EmitsDiagnostic` test exercises the live `ValidateAssignmentQualifiers` arg-default path with `money in 'USD' default '50 EUR'`.
 - Focused `TypeCheckerEventArgDefaultTests` now pass 8/8, Slice 26 is fully closed, and Slice 27 is unblocked.
+
+---
 
 ---
 
@@ -92,6 +150,8 @@
 
 ---
 
+---
+
 ### 2026-05-15T18:01:02Z: Mandatory commas between field modifiers are rejected
 
 **By:** Scribe
@@ -103,6 +163,8 @@
 - No parser ambiguity or current readability cliff justifies punctuation here: modifier keywords are self-delimiting and no sample in the corpus exceeds four modifiers on one field.
 - Commas already carry list semantics elsewhere in the DSL, so reusing them between modifiers would blur an existing structural cue instead of clarifying the grammar.
 - If modifier readability ever degrades, the preferred intervention is formatter-enforced line breaking rather than grammar-level comma requirements.
+
+---
 
 ---
 
@@ -120,6 +182,8 @@
 
 ---
 
+---
+
 ### 2026-05-15T18:00:00Z: Slice 25 warning closure is verified and the slice is fully closed
 
 **By:** Scribe
@@ -131,6 +195,8 @@
 - Frank verified W1, W2, and W3 are all actually closed on `spike/Precept-V2-Radical`, not just papered over.
 - The new coverage now directly exercises `FoldValue`'s static-magnitude interpolated-default path, documents and tests the forward-reference ordering limitation in `CheckInitialStateSatisfiability`, and restores the formatting break in `CollectDefaultObligations`.
 - All 8 `ProofEngineFieldDefaultTests` pass, the full suite stays at the same 9 pre-existing failures, and Slice 26 is unblocked with Slice 25 marked fully closed.
+
+---
 
 ---
 
@@ -148,6 +214,8 @@
 
 ---
 
+---
+
 ### 2026-05-15T17:00:00Z: Slice 23 and Slice 24 warning closures are approved and do not block forward progress
 
 **By:** Scribe
@@ -159,6 +227,8 @@
 - Frank approved the warning-closure tests for the Slice 23 qualifier-routing path and the Slice 24 money/price interpolated-interval paths, with the suite still holding at 5545 passing and 9 pre-existing failures.
 - The review locks the two-axis price mismatch regression through `BuildQualifiersFromStaticInterpolated → ValidateResolvedQualifiers`, confirms WholeValue money/price interpolations stay on the correct non-scaling path, and confirms the same-unit price magnitude regression stays proved without accidental inverse scaling.
 - One remaining note is explicitly non-blocking: a same-unit test comment should describe the interval as `[decimal.MinValue..3]`, not `[0..3]`.
+
+---
 
 ---
 
@@ -175,6 +245,8 @@
 
 ---
 
+---
+
 ### 2026-05-15T16:15:38Z: Slice 24 approval closes the money/price interpolated-interval lane
 
 **By:** Scribe
@@ -186,6 +258,8 @@
 - Frank approved Slice 24: the money magnitude, money WholeValue, price+static-denominator magnitude, and price-dynamic → `Unbounded` paths all match the §5.6 design intent, with `ApplyStaticUnitScaling` correctly handling the inverse-factor price case.
 - George confirmed the Slice 19 single-slot path was already generic enough for money and most price inputs; the true Slice 24 delta was making the Price+Magnitude+no-static-qualifier fallback explicitly return `Unbounded`, documenting the per-type responsibilities, and adding the static-denominator price regression tests.
 - Remaining debt is non-blocking: dedicated money/price WholeValue anchors and a same-unit price regression would strengthen coverage, but Frank cleared the slice and the doc tracker should now show Slice 24 complete.
+
+---
 
 ---
 
@@ -205,6 +279,8 @@
 
 ---
 
+---
+
 ### 2026-05-15T16:13:52Z: Doc tracker maintenance is now part of the approval-closeout loop
 
 **By:** Scribe
@@ -215,6 +291,8 @@
 
 - After Frank approves a slice, the Scribe closeout pass must update `docs/working/quantity-normalization-design.md` so the tracker reflects the actual implementation state in the same batch.
 - This is a process-memory decision, not a language/runtime change: the canonical doc tracker now moves in lockstep with review approval instead of waiting for a later cleanup pass.
+
+---
 
 ---
 
@@ -229,6 +307,8 @@
 - Frank approved Slice 21: all 10 interpolated quantity overflow tests cover the required §5.3/G21 shapes, and the conservative lanes correctly keep unbounded or dynamic-unit inputs on the `NumericOverflow` path instead of producing false proofs.
 - Soup Nazi confirmed the full test slate is green on the branch baseline: the suite locks magnitude-slot scaling, WholeValue recursion, dynamic-unit conservatism, dynamic price-denominator conservatism, money magnitude handling, and the cross-unit WholeValue happy path.
 - Two follow-up warnings stay as explicit debt, not blockers: add a direct `ProofDisposition != Proved` assertion for conservative cases, and add the both-holes dynamic-unit form (`'{intField} {unitField}'`) as a sharper regression anchor.
+
+---
 
 ---
 
@@ -248,6 +328,8 @@
 
 ---
 
+---
+
 ### 2026-05-15T14:55:25Z: Wave 2 warnings W1 and W2 are closed without new regressions
 
 **By:** Scribe
@@ -263,6 +345,8 @@
 
 ---
 
+---
+
 ### 2026-05-15T14:35:23Z: Bounds-validation documentation lane is locked as Slices 44 and 45
 
 **By:** Scribe
@@ -274,6 +358,8 @@
 - The standalone bounds-validation follow-ups are now numbered as Slice 44 (bare-integer bound promotion) and Slice 45 (PRE0138 CountDimensionBoundsAmbiguous).
 - Frank placed both in a dedicated **Bounds** lane in the §5.7 summary table so they stay distinct from the cross-unit operation-enforcement slices.
 - This is a documentation-only decision: no runtime, checker, or tooling behavior changed in the numbering pass itself.
+
+---
 
 ---
 
@@ -292,6 +378,8 @@
 
 ---
 
+---
+
 ### 2026-05-15T01:05:58Z: Quantity normalization review findings accepted, ordered, and narrowed to implementation-safe scope
 
 **By:** Scribe
@@ -304,6 +392,8 @@
 - Frank accepted every technical finding, corrected the concrete code targets (`TypedArg`, `PopulateEvents`), moved runtime-ingress work out of the active implementation track, and locked the implementation ordering around the review's safety constraints.
 - B16's dynamic-unit rule is canonical: `TryGetStaticNumericValue` must refuse raw `StaticMagnitude` facts when no static scaling factor exists, and interval-containment proof success never suppresses independent PRE0116 presence obligations.
 - Slice 26's track membership and B18's full display contract were left to explicit follow-up decisions; both are now resolved by separate canonical entries below.
+
+---
 
 ---
 
@@ -322,6 +412,8 @@
 
 ---
 
+---
+
 ### 2026-05-15T01:05:58Z: Slice 26 stays inside the quantity-normalization track
 
 **By:** Scribe
@@ -334,6 +426,8 @@
 - The active implementation shape is tight: add `ResolveEventArgExpressions`, populate `TypedArg.DefaultExpression`, route arg defaults through the same assignability and interval-containment machinery, and reuse Slice 15b's normalized arg bounds.
 - The one notable adapter is `ValidateMaxPlaces`, which needs a minor `TypedArg`-compatible path; this is mechanical scope, not a design blocker.
 - General/dynamic default expressions remain conservative: typed-constant defaults are the primary supported proof shape, while interpolated defaults can degrade to unbounded when static scaling facts are unavailable.
+
+---
 
 ---
 
@@ -356,6 +450,8 @@
 
 ---
 
+---
+
 ### 2026-05-15T00:08:25Z: Slice P1 landed typed-constant hole presence-proof traversal in `ProofEngine.WalkExpression`
 
 **By:** Scribe
@@ -369,6 +465,8 @@
 - Added four focused proof-engine presence tests covering unguarded integer/quantity holes, guarded optional holes, and non-optional holes.
 - Validation summary from George: focused `ProofEnginePresenceTests` passed, `samples/Test.precept` now reports `UnprovedPresenceRequirement` on line 14, and `dotnet build src/Precept/Precept.csproj` passed cleanly.
 - Implementation landed in commit `ae19510f`.
+
+---
 
 ---
 
@@ -396,6 +494,8 @@
 
 ---
 
+---
+
 ### 2026-05-14T22:00:00Z: PRE0027 diagnosis — no DuplicateArgName errors exist anywhere in the repository
 
 **By:** Scribe
@@ -409,6 +509,8 @@
 - George's modification (`'6 [lb_av]'` → `'{test2} [lb_av]'`) changed the proof shape from concrete-interval to unbounded-interval but did not introduce a new error category; PRE0078 fires in both versions.
 - `test/Precept.Analyzers.Tests/AnalyzerTestHelper.cs` contains George's new `AnalyzeWithFilePathsAsync<TAnalyzer>()` helper — legitimate C# test infrastructure, not a DSL artifact.
 - **Recommended action:** Revert `samples/Test.precept` to the original (`git checkout samples/Test.precept`). If interpolated-quantity test coverage is needed for normalization work, create a new sample file with satisfiable bounds rather than mutating the existing Test.precept fixture.
+
+---
 
 ---
 
@@ -437,6 +539,8 @@
 
 ---
 
+---
+
 ### 2026-05-15T01:52:56Z: Counting-unit wording now separates dimension-family compatibility from value conversion, and binary-op proof fallback is a real gap
 
 **By:** Scribe
@@ -449,6 +553,8 @@
 - Two inaccurate statements in `business-units-quantity-normalization-survey.md` must be read as wording errors, not as approved semantics: dimension-alias membership is real, but cross-unit value conversion is not.
 - Assignment validation already rejects explicit counting-unit mismatches (`quantity in 'each'` cannot accept `quantity in 'box'`), so documentation must not describe the looser proof path as intended compatibility.
 - Frank surfaced the architectural gap: `ProofEngine.QualifiersAreCompatible` currently lets same-dimension counting units satisfy binary-op qualifier proofs via the `count` fallback, so static comparisons like `each` vs `box` can prove when they should degrade to `Unbounded` or be rejected until a real conversion model exists.
+
+---
 
 ---
 
@@ -469,6 +575,8 @@
 
 ---
 
+---
+
 ### 2026-05-15T02:37:53Z: Function-call qualifier enforcement is missing for same-match counting-unit operations
 
 **By:** Scribe
@@ -482,6 +590,8 @@
 - The implementation-ready fix is `ValidateFunctionQualifierCompatibility` immediately after overload selection, reusing existing catalog metadata instead of adding parallel rules; PRE0137 should cover both binary operators and these same-match function calls.
 - Gap D remains explicitly deferred: `in` / `not in` membership still routes through `CreateSyntheticBinaryOp` and skips `ValidateQualifierCompatibility`.
 - `docs/working/quantity-normalization-design.md` §6.7.9–§6.7.11 is now the durable design surface for the full operator/function taxonomy, the critical function-call hole, and the deferred membership follow-up.
+
+---
 
 ---
 
@@ -500,6 +610,8 @@
 
 ---
 
+---
+
 ### 2026-05-15T03:43:11Z: Business counting-unit docs still need a post-annotation correction
 
 **By:** Scribe
@@ -511,6 +623,8 @@
 - Frank's Slices 38–42 documentation annotations are committed, but `docs/language/business-domain-types.md:373` still describes business counting units such as `each`, `case`, `pack`, and `dozen` as opaque with no shared dimension.
 - The durable architecture remains the opposite: business counting units intentionally share `DimensionVector.None` with factor-one representation, and PRE0137 enforces explicit unit-code identity inside that family.
 - Treat the `business-domain-types.md` wording as a follow-up docs correction outside the completed annotation batch.
+
+---
 
 ---
 
@@ -745,6 +859,7 @@ The chain's invariant: "If the compiler emits no errors, the evaluator should ne
 
 ---
 
+---
 
 ### 2026-05-15: Count/unit bound gap investigation
 **By:** Frank (investigation)
@@ -854,3 +969,4 @@ Branch: spike/Precept-V2-Radical
 
 
 ---
+
