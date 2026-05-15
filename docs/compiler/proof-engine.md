@@ -107,6 +107,8 @@ The proof engine consumes the `SemanticIndex` (typed expressions with attached `
 2. **Proof ledger does NOT cross the compile-runtime boundary** — only `FaultSiteDescriptor` residue (defense-in-depth backstops) crosses into runtime. The proof engine is purely a compile-time analysis stage.
 3. **Catalog-driven obligations** — the proof engine reads `ProofRequirement` records stamped by the type checker from catalog metadata. It does NOT maintain its own list of what needs to be proved.
 
+> **Quantity-normalization precision note:** When proof obligations depend on UCUM quantity normalization or interval scaling, the proof engine operates on `decimal` magnitudes specifically to avoid binary-floating-point rounding drift. The guarantee is exact only for the supported business-domain units whose UCUM scale factors and affine offsets are representable in the design's `UcumExactFactor` + `decimal` model; logarithmic/reference-level units such as `dB` and `[pH]` are outside that proof guarantee.
+
 ---
 
 ## 3. Responsibilities and Boundaries

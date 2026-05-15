@@ -1871,6 +1871,10 @@ For `[lb_av]`:
 
 `UcumExactFactor` uses `BigInteger` numerator/denominator — exact rational arithmetic with no precision loss during composition. The lossy step is `ApplyFactor` where we multiply a `decimal` magnitude by the factor. `decimal` has 28-29 significant digits — far exceeding the precision needs of any real-world quantity in Precept's domain (financial and business quantities).
 
+**Exact-conversion-factor assumption (explicit):** For the supported business-domain unit set, compile-time normalization assumes the UCUM factors we actually admit are exactly representable in the numeric forms we use: `UcumExactFactor` for composed scale metadata, then `decimal` for the final normalized magnitude and interval bounds. This is why the design makes a no-epsilon guarantee for supported normalization paths: comparisons operate on exact `decimal` results, not binary floating-point approximations.
+
+**Why `decimal` here:** normalization and interval proofs intentionally use `decimal`, not `double`, so the engine does not accumulate binary-float rounding noise and then need tolerance-based comparisons. For supported units, normalized bounds and normalized literals compare by exact `decimal` equality/ordering.
+
 **Overflow risk:** `decimal.MaxValue ≈ 7.9 × 10²⁸`. The largest plausible UCUM conversion in Precept's domain is around 10⁶ (e.g., converting metric tons to milligrams). A magnitude of 10²² × 10⁶ = 10²⁸ would overflow. This is not a realistic business scenario. We do not add special overflow handling — if a user declares `max '79228162514264337593543950335 mg'` and assigns in metric tons, they deserve the `OverflowException`.
 
 ---
@@ -2828,6 +2832,8 @@ These three offsets are the complete set of UCUM-defined affine temperature func
 
 **Precision verification:** `273.15m`, `459.67m`, and `218.52m` are all exact in `decimal` representation. `218.52m = 273.15m × 4m / 5m`, which is exact. No precision loss occurs. The `decimal` type has 28-29 significant digits; these offsets use 5 significant digits. The final normalized value `(magnitude + offset) × scale` stays within `decimal` precision for any realistic temperature magnitude in Precept's business domain.
 
+**No-epsilon rule:** These offsets are encoded exactly as `273.15m`, `459.67m`, and `218.52m`. Supported affine normalization therefore uses exact `decimal` arithmetic end-to-end — no tolerance band, no fuzzy comparison, no "close enough" branch. Units that do not reduce to this exact affine/decimal model (logarithmic/reference-level units such as `dB` and `[pH]`) are outside the guarantee and remain excluded from normalization.
+
 **Updated `UcumAtomCatalog` loading path:**
 
 ```csharp
@@ -2941,6 +2947,8 @@ public static decimal? NormalizeQuantity(decimal magnitude, UcumParsedUnit? unit
 ```
 
 This is the same normalization applied in both the TypeChecker (for `NormalizedDeclaredMin/Max`) and the ProofEngine (for typed-constant interval extraction). Both paths use the same formula: `(magnitude + offset) × scale`.
+
+**Precision contract for scalar normalization:** `NormalizeQuantity` and `DenormalizeQuantity` stay on `decimal` specifically so compile-time normalization, runtime ingress normalization, and interval-proof comparisons all share the same non-binary arithmetic model. For supported UCUM business units, the conversion factors and affine offsets used here are exact in `decimal`; the design therefore requires exact equality/ordering on normalized results and does not introduce epsilon comparisons. Logarithmic/reference-level units remain outside this contract.
 
 **Denormalize (inverse):**
 
