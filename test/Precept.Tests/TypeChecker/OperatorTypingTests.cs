@@ -39,6 +39,38 @@ public class OperatorTypingTests
     }
 
     [Fact]
+    public void Contains_QuantitySetWithSameCountingUnit_CompilesCleanly()
+    {
+        TypeCheckerTestHelpers.CheckExpectingClean("""
+            precept Example
+            field QtyEach as quantity in 'each' default '1 each'
+            rule [QtyEach] contains QtyEach because "membership check"
+            """);
+    }
+
+    [Fact]
+    public void Contains_QuantitySetWithDifferentCountingUnit_EmitsCrossCountingUnitOperation()
+    {
+        TypeCheckerTestHelpers.CheckExpectingError("""
+            precept Example
+            field QtyBox as quantity in 'box' default '1 box'
+            field QtyEach as quantity in 'each' default '1 each'
+            rule [QtyBox] contains QtyEach because "membership check"
+            """, DiagnosticCode.CrossCountingUnitOperation);
+    }
+
+    [Fact]
+    public void Contains_QuantitySetWithDifferentDimension_EmitsCrossDimensionArithmetic()
+    {
+        TypeCheckerTestHelpers.CheckExpectingError("""
+            precept Example
+            field Distance as quantity in 'm' default '1 m'
+            field WeightKg as quantity in 'kg' default '1 kg'
+            rule [Distance] contains WeightKg because "membership check"
+            """, DiagnosticCode.CrossDimensionArithmetic);
+    }
+
+    [Fact]
     public void Not_InGuardExpression_CompilesCleanly()
     {
         var index = TypeCheckerTestHelpers.CheckExpectingClean("""

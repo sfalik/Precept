@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using FluentAssertions;
 using Precept;
@@ -178,6 +179,44 @@ from Active on Recalculate
 
         requirement.DeclaredMin.Should().Be(1m);
         requirement.DeclaredMax.Should().Be(5m);
+    }
+
+    [Fact]
+    public void IntervalContainment_QuantityTypedConstantWithStaticUnit_UsesNormalizedMagnitude()
+    {
+        const string precept = @"
+precept QuantityNormalization
+field test as quantity in '[lb_av]' max '10 [lb_av]'
+state offState initial
+event toggle initial
+from offState on toggle
+    -> set test = '6 [lb_av]'
+    -> no transition";
+
+        var result = Compiler.Compile(precept);
+
+        result.Diagnostics
+            .Where(d => d.Code == nameof(DiagnosticCode.NumericOverflow))
+            .Should().BeEmpty(because: "6 lb_av should remain inside a max bound of 10 lb_av after interval normalization");
+    }
+
+    [Fact]
+    public void IntervalContainment_EventArgBoundWithTypedConstant_UsesNormalizedArgInterval()
+    {
+        const string precept = @"
+precept ArgNormalization
+field target as quantity in 'g' max '500 g'
+state Active initial
+event Apply(Amount as quantity in 'kg' max '2 [lb_av]')
+from Active on Apply
+    -> set target = Apply.Amount
+    -> no transition";
+
+        var result = Compiler.Compile(precept);
+
+        result.Diagnostics.Should().Contain(
+            d => d.Code == nameof(DiagnosticCode.NumericOverflow),
+            because: "arg max bound should normalize from 2 lb_av (~907 g), which exceeds the target's 500 g max");
     }
 
     [Fact]

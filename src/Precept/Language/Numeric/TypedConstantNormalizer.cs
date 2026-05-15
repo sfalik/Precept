@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Linq;
 
 namespace Precept.Language;
 
@@ -27,6 +28,22 @@ public static class TypedConstantNormalizer
 
     public static decimal ApplyFactor(decimal magnitude, UcumExactFactor factor) =>
         magnitude * FactorToDecimal(factor);
+
+    public static decimal? TryGetStaticScalingFactor(UcumParsedUnit? unit)
+    {
+        if (unit is null)
+            return null;
+
+        if (unit.AffineOffset.HasValue
+            || unit.SourceText.Contains('{', StringComparison.Ordinal)
+            || unit.CanonicalCode.Contains('{', StringComparison.Ordinal)
+            || unit.UsedAtoms.Any(atom => atom.AffineOffset.HasValue))
+        {
+            return null;
+        }
+
+        return FactorToDecimal(unit.Scale);
+    }
 
     private static decimal FactorToDecimal(UcumExactFactor factor)
     {

@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Linq;
 using Precept.Language;
 
 namespace Precept.Pipeline;
@@ -218,9 +219,39 @@ public static partial class ProofEngine
                 value = typedConstantValue;
                 return true;
 
-            case InterpolatedTypedConstant { StaticMagnitude: { } magnitude }:
-                value = magnitude;
+            case InterpolatedTypedConstant { StaticMagnitude: { } magnitude, StaticQualifier: var qualifier, Slots: var slots }:
+            {
+                var staticUnit = qualifier switch
+                {
+                    StaticUnitQualifier { Unit: var unit } => unit,
+                    StaticCurrencyAndUnitQualifier { Unit: var unit } => unit,
+                    _ => null,
+                };
+
+                if (staticUnit is null)
+                {
+                    if (slots.Any(slot => slot.SlotKind is InterpolationSlotKind.Unit
+                                          or InterpolationSlotKind.NumeratorUnit
+                                          or InterpolationSlotKind.DenominatorUnit))
+                    {
+                        value = default;
+                        return false;
+                    }
+
+                    value = magnitude;
+                    return true;
+                }
+
+                var factor = TypedConstantNormalizer.TryGetStaticScalingFactor(staticUnit);
+                if (!factor.HasValue)
+                {
+                    value = default;
+                    return false;
+                }
+
+                value = factor.Value * magnitude;
                 return true;
+            }
 
             default:
                 value = default;
@@ -245,10 +276,10 @@ public static partial class ProofEngine
                 value = money.Item1;
                 return true;
             case ValueTuple<decimal, UcumParsedUnit?> quantity:
-                value = quantity.Item1;
+                value = TypedConstantNormalizer.NormalizeQuantity(quantity.Item1, quantity.Item2);
                 return true;
             case ValueTuple<decimal, object?, UcumParsedUnit?> price:
-                value = price.Item1;
+                value = TypedConstantNormalizer.NormalizePrice(price.Item1, price.Item3);
                 return true;
             default:
                 value = default;

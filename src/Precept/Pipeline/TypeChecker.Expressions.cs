@@ -457,8 +457,9 @@ internal static partial class TypeChecker
         TypedExpression left,
         TypedExpression right,
         CheckContext ctx,
-        ImmutableArray<ProofRequirement>? proofRequirements = null) =>
-        new(
+        ImmutableArray<ProofRequirement>? proofRequirements = null)
+    {
+        var resolved = new TypedBinaryOp(
             ResolveBinaryResultType(opMeta, resolvedOperation: null, left, ctx),
             operationKind,
             left,
@@ -466,6 +467,10 @@ internal static partial class TypeChecker
             ResultQualifier: null,
             ProofRequirements: proofRequirements ?? ImmutableArray<ProofRequirement>.Empty,
             Span: span);
+
+        ValidateQualifierCompatibility(resolved, opMeta, span, ctx);
+        return resolved;
+    }
 
     private static TypeKind ResolveBinaryResultType(
         OperatorMeta opMeta,
@@ -921,6 +926,7 @@ internal static partial class TypeChecker
             TypedArgRef ar => ar.DeclaredQualifiers,
             TypedLiteral lit => lit.DeclaredQualifiers,
             TypedTypedConstant tc => tc.DeclaredQualifiers,
+            TypedListLiteral { Elements: var elements } when elements.Length > 0 => TryGetStaticQualifiers(elements[0]),
             _ => null,
         };
 
@@ -955,14 +961,29 @@ internal static partial class TypeChecker
     private static void ValidateQualifierCompatibility(
         TypedBinaryOp op, OperatorMeta opMeta, SourceSpan span, CheckContext ctx)
     {
-        var leftQualifiers = TryGetStaticQualifiers(op.Left);
-        var rightQualifiers = TryGetStaticQualifiers(op.Right);
+        var qualifierLeft = op.Left;
+        var qualifierRight = op.Right;
+        if (op.ResolvedOp == OperationKind.CollectionContains
+            && op.Left is TypedListLiteral { Elements: var elements }
+            && elements.Length > 0)
+        {
+            qualifierLeft = elements[0];
+        }
+
+        var leftQualifiers = TryGetStaticQualifiers(qualifierLeft);
+        var rightQualifiers = TryGetStaticQualifiers(qualifierRight);
         if (leftQualifiers is null || rightQualifiers is null)
             return;
 
+        var enforcePairwiseQualifierChecks =
+            opMeta.Family is OperatorFamily.Arithmetic or OperatorFamily.Comparison
+            || op.ResolvedOp == OperationKind.CollectionContains;
+        if (!enforcePairwiseQualifierChecks)
+            return;
+
         // PRE0070: Cross-currency arithmetic — Money + Money with different currencies
-        if (op.Left.ResultType == TypeKind.Money && op.Right.ResultType == TypeKind.Money
-            && (opMeta.Family == OperatorFamily.Arithmetic || opMeta.Family == OperatorFamily.Comparison))
+        if (qualifierLeft.ResultType == TypeKind.Money && qualifierRight.ResultType == TypeKind.Money
+            && enforcePairwiseQualifierChecks)
         {
             var leftCurrency = leftQualifiers.Value.FirstOrDefault(q => q.Axis == QualifierAxis.Currency);
             var rightCurrency = rightQualifiers.Value.FirstOrDefault(q => q.Axis == QualifierAxis.Currency);
@@ -972,15 +993,15 @@ internal static partial class TypeChecker
             {
                 ctx.Diagnostics.Add(
                     Diagnostics.Create(DiagnosticCode.CrossCurrencyArithmetic, span,
-                        GetOperandName(op.Left), lc.CurrencyCode,
-                        GetOperandName(op.Right), rc.CurrencyCode));
+                        GetOperandName(qualifierLeft), lc.CurrencyCode,
+                        GetOperandName(qualifierRight), rc.CurrencyCode));
                 return;
             }
         }
 
         // PRE0071: Cross-dimension arithmetic — Quantity + Quantity with different dimensions
-        if (op.Left.ResultType == TypeKind.Quantity && op.Right.ResultType == TypeKind.Quantity
-            && (opMeta.Family == OperatorFamily.Arithmetic || opMeta.Family == OperatorFamily.Comparison))
+        if (qualifierLeft.ResultType == TypeKind.Quantity && qualifierRight.ResultType == TypeKind.Quantity
+            && enforcePairwiseQualifierChecks)
         {
             var leftDim = GetDimensionFromQualifiers(leftQualifiers.Value);
             var rightDim = GetDimensionFromQualifiers(rightQualifiers.Value);
@@ -988,10 +1009,29 @@ internal static partial class TypeChecker
                 && !StringComparer.Ordinal.Equals(leftDim, rightDim))
             {
                 ctx.Diagnostics.Add(
-                    Diagnostics.Create(DiagnosticCode.CrossDimensionArithmetic, span,
-                        GetOperandName(op.Left), leftDim,
-                        GetOperandName(op.Right), rightDim));
+                        Diagnostics.Create(DiagnosticCode.CrossDimensionArithmetic, span,
+                        GetOperandName(qualifierLeft), leftDim,
+                        GetOperandName(qualifierRight), rightDim));
                 return;
+            }
+
+            if (TryGetQualifierDimensionVector(leftQualifiers.Value, out var leftVector)
+                && TryGetQualifierDimensionVector(rightQualifiers.Value, out var rightVector)
+                && leftVector.Equals(DimensionVector.None)
+                && rightVector.Equals(DimensionVector.None))
+            {
+                var leftUnitCode = GetUnitCodeFromQualifiers(leftQualifiers.Value);
+                var rightUnitCode = GetUnitCodeFromQualifiers(rightQualifiers.Value);
+                if (!string.IsNullOrWhiteSpace(leftUnitCode)
+                    && !string.IsNullOrWhiteSpace(rightUnitCode)
+                    && !StringComparer.OrdinalIgnoreCase.Equals(leftUnitCode, rightUnitCode))
+                {
+                    ctx.Diagnostics.Add(
+                        Diagnostics.Create(DiagnosticCode.CrossCountingUnitOperation, span,
+                            GetOperandName(qualifierLeft), leftUnitCode,
+                            GetOperandName(qualifierRight), rightUnitCode));
+                    return;
+                }
             }
         }
 
@@ -1087,6 +1127,53 @@ internal static partial class TypeChecker
             if (q is DeclaredQualifierMeta.Dimension d) return d.DimensionName;
         }
         return null;
+    }
+
+    private static string? GetUnitCodeFromQualifiers(ImmutableArray<DeclaredQualifierMeta> qualifiers)
+    {
+        foreach (var qualifier in qualifiers)
+        {
+            if (qualifier is DeclaredQualifierMeta.Unit unit)
+                return unit.UnitCode;
+        }
+
+        return null;
+    }
+
+    private static bool TryGetQualifierDimensionVector(
+        ImmutableArray<DeclaredQualifierMeta> qualifiers,
+        out DimensionVector vector)
+    {
+        var unitCode = GetUnitCodeFromQualifiers(qualifiers);
+        if (!string.IsNullOrWhiteSpace(unitCode))
+        {
+            var parsedUnit = UcumParser.Parse(unitCode);
+            if (parsedUnit.IsValid && parsedUnit.Unit is not null)
+            {
+                vector = parsedUnit.Unit.Vector;
+                return true;
+            }
+        }
+
+        var dimensionName = GetDimensionFromQualifiers(qualifiers);
+        if (string.Equals(dimensionName, "count", StringComparison.OrdinalIgnoreCase))
+        {
+            vector = DimensionVector.None;
+            return true;
+        }
+
+        if (!string.IsNullOrWhiteSpace(dimensionName))
+        {
+            var parsedDimension = UcumParser.Parse(dimensionName);
+            if (parsedDimension.IsValid && parsedDimension.Unit is not null)
+            {
+                vector = parsedDimension.Unit.Vector;
+                return true;
+            }
+        }
+
+        vector = default;
+        return false;
     }
 
     // ════════════════════════════════════════════════════════════════════════

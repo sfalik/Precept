@@ -13,7 +13,10 @@ public static partial class ProofEngine
     // ════════════════════════════════════════════════════════════════════════
 
     private static NumericInterval IntervalOf(TypedExpression expr, SemanticIndex semantics)
-        => IntervalOfNarrowed(expr, semantics, null);
+    {
+        var interval = IntervalOfNarrowed(expr, semantics, null);
+        return ApplyStaticUnitScaling(expr, interval);
+    }
 
     private static NumericInterval IntervalOfNarrowed(
         TypedExpression expr,
@@ -25,8 +28,20 @@ public static partial class ProofEngine
             case TypedLiteral literal when TryExtractNumericLiteralMagnitude(literal.Value, out var literalMagnitude):
                 return NumericInterval.Point(literalMagnitude);
 
-            case TypedTypedConstant typedConstant when TryGetTypedConstantMagnitude(typedConstant.ParsedValue, out var typedConstantMagnitude):
+            case TypedTypedConstant typedConstant when TryExtractTypedConstantMagnitudeRaw(typedConstant.ParsedValue, out var typedConstantMagnitude):
                 return NumericInterval.Point(typedConstantMagnitude);
+
+            case InterpolatedTypedConstant interpolated:
+            {
+                if (interpolated.Slots.Length == 1)
+                {
+                    var slot = interpolated.Slots[0];
+                    if (slot.SlotKind is InterpolationSlotKind.Magnitude or InterpolationSlotKind.WholeValue)
+                        return IntervalOfNarrowed(slot.Expression, semantics, narrowed);
+                }
+
+                return NumericInterval.Unbounded;
+            }
 
             case TypedFieldRef fieldRef:
                 if (narrowed is not null && narrowed.TryGetValue(fieldRef.FieldName, out var narrowedInterval))
@@ -95,7 +110,41 @@ public static partial class ProofEngine
                 magnitude = l;
                 return true;
             case ITuple tuple when tuple.Length > 0:
+            {
+                switch (tuple)
+                {
+                    case ValueTuple<decimal, UcumParsedUnit?> quantity:
+                        magnitude = TypedConstantNormalizer.NormalizeQuantity(quantity.Item1, quantity.Item2);
+                        return true;
+                    case ValueTuple<decimal, object?, UcumParsedUnit?> price:
+                        magnitude = TypedConstantNormalizer.NormalizePrice(price.Item1, price.Item3);
+                        return true;
+                }
+
                 return TryExtractNumericLiteralMagnitude(tuple[0], out magnitude);
+            }
+            default:
+                magnitude = default;
+                return false;
+        }
+    }
+
+    private static bool TryExtractTypedConstantMagnitudeRaw(object? parsedValue, out decimal magnitude)
+    {
+        switch (parsedValue)
+        {
+            case decimal decimalValue:
+                magnitude = decimalValue;
+                return true;
+            case int intValue:
+                magnitude = intValue;
+                return true;
+            case long longValue:
+                magnitude = longValue;
+                return true;
+            case ITuple tuple when tuple.Length > 0 && tuple[0] is decimal tupleMagnitude:
+                magnitude = tupleMagnitude;
+                return true;
             default:
                 magnitude = default;
                 return false;
@@ -121,9 +170,12 @@ public static partial class ProofEngine
             if (!string.Equals(arg.Name, argName, StringComparison.Ordinal))
                 continue;
 
-            if (!arg.DeclaredMin.HasValue && !arg.DeclaredMax.HasValue)
+            var min = arg.NormalizedDeclaredMin ?? arg.DeclaredMin;
+            var max = arg.NormalizedDeclaredMax ?? arg.DeclaredMax;
+
+            if (!min.HasValue && !max.HasValue)
                 return NumericInterval.Unbounded;
-            return new NumericInterval(arg.DeclaredMin ?? decimal.MinValue, arg.DeclaredMax ?? decimal.MaxValue);
+            return new NumericInterval(min ?? decimal.MinValue, max ?? decimal.MaxValue);
         }
         return NumericInterval.Unbounded;
     }
@@ -201,8 +253,8 @@ public static partial class ProofEngine
             {
                 var declarationBound = modifierKind switch
                 {
-                    ModifierKind.Min => field.DeclaredMin,
-                    ModifierKind.Max => field.DeclaredMax,
+                    ModifierKind.Min => field.NormalizedDeclaredMin ?? field.DeclaredMin,
+                    ModifierKind.Max => field.NormalizedDeclaredMax ?? field.DeclaredMax,
                     _ => null
                 };
 
@@ -218,6 +270,36 @@ public static partial class ProofEngine
         value = default;
         return false;
     }
+
+    private static NumericInterval ApplyStaticUnitScaling(TypedExpression expr, NumericInterval interval)
+    {
+        if (interval.IsUnbounded)
+            return interval;
+
+        UcumParsedUnit? staticUnit = expr switch
+        {
+            TypedTypedConstant { ParsedValue: ValueTuple<decimal, UcumParsedUnit?> (_, var unit) } => unit,
+            TypedTypedConstant { ParsedValue: ValueTuple<decimal, object?, UcumParsedUnit?> (_, _, var unit) } => unit,
+            InterpolatedTypedConstant { StaticQualifier: StaticUnitQualifier { Unit: var unit } } interpolated
+                when HasSingleMagnitudeSlot(interpolated) => unit,
+            InterpolatedTypedConstant { StaticQualifier: StaticCurrencyAndUnitQualifier { Unit: var unit } } interpolated
+                when HasSingleMagnitudeSlot(interpolated) => unit,
+            _ => null,
+        };
+
+        if (staticUnit is null)
+            return interval;
+
+        var scale = TypedConstantNormalizer.TryGetStaticScalingFactor(staticUnit);
+        if (!scale.HasValue)
+            return interval;
+
+        var factor = expr.ResultType == TypeKind.Price ? 1m / scale.Value : scale.Value;
+        return interval.Scale(factor);
+    }
+
+    private static bool HasSingleMagnitudeSlot(InterpolatedTypedConstant interpolated)
+        => interpolated.Slots.Length == 1 && interpolated.Slots[0].SlotKind == InterpolationSlotKind.Magnitude;
 
     private static bool TryIntervalContainmentProof(
         ProofObligation obligation,
@@ -251,7 +333,9 @@ public static partial class ProofEngine
             return false;
 
         var narrowed = BuildNarrowedIntervals(obligation, semantics);
-        var resultInterval = IntervalOfNarrowed(obligation.Site, semantics, narrowed);
+        var resultInterval = ApplyStaticUnitScaling(
+            obligation.Site,
+            IntervalOfNarrowed(obligation.Site, semantics, narrowed));
         computedInterval = resultInterval;
 
         if (resultInterval.IsUnbounded) return false;

@@ -117,3 +117,10 @@ Key fact: Several methods that the slices will modify already exist as pre-exist
 - The shipped surface is broader than the slice labels alone: `InterpolatedTypedConstant` rename propagation reached runtime, tests, and language-server code, while the branch also gained `TypedConstantNormalizer`, `NumericInterval.Scale(decimal)`, UCUM `AffineOffset`, and static interpolated qualifier metadata.
 - Comparison operators now share qualifier-enforcement strictness with arithmetic, and `QualifierMatch.Same` is finally enforced in `SelectOverload`; because `min`/`max` parse as constraint keywords on this branch, `clamp` and `abs` are the durable regression anchors for that function-call path.
 - PRE0137 is now wired through the function-call same-match path as part of Slice 32.
+
+### 2026-05-15T07:59:53.548-04:00 — Wave 2A slices 15/15b/16/19/20/31/33 implementation learnings
+
+- TryGetComparableTypedConstantValue is the single extraction seam for both field and event-arg min/max modifiers; normalizing there automatically aligns PopulateFields and PopulateEvents without duplicating bound parsing logic.
+- IntervalOf normalization must remain expression-type scoped: scaling only raw typed constants and magnitude-slot interpolations prevents double-normalization of TypedFieldRef/TypedArgRef intervals.
+- TryGetStaticNumericValue for interpolated constants is only sound when unit scaling is statically known; dynamic unit-slot forms must return no trusted fact instead of falling back to raw StaticMagnitude.
+- Routing CreateSyntheticBinaryOp through ValidateQualifierCompatibility cleanly extends PRE0137/PRE0071 checks to contains membership while preserving existing element-type compatibility gates.

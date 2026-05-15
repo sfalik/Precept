@@ -318,6 +318,8 @@ public sealed record TypedField(
     ParsedConstruct Syntax,
     decimal? DeclaredMin = null,
     decimal? DeclaredMax = null,
+    decimal? NormalizedDeclaredMin = null,
+    decimal? NormalizedDeclaredMax = null,
     ImmutableArray<DeclaredQualifierMeta> DeclaredMinBoundQualifiers = default,
     ImmutableArray<DeclaredQualifierMeta> DeclaredMaxBoundQualifiers = default,
     int? DeclaredMinLength = null,
@@ -360,6 +362,8 @@ public sealed record TypedArg(
     SourceSpan Span,
     decimal? DeclaredMin = null,
     decimal? DeclaredMax = null,
+    decimal? NormalizedDeclaredMin = null,
+    decimal? NormalizedDeclaredMax = null,
     ImmutableArray<DeclaredQualifierMeta> DeclaredMinBoundQualifiers = default,
     ImmutableArray<DeclaredQualifierMeta> DeclaredMaxBoundQualifiers = default
 );

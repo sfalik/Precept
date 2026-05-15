@@ -427,6 +427,15 @@ internal static partial class TypeChecker
         if (!parseResult.IsValid || !TryExtractTypedConstantMagnitude(parseResult.Value, out var magnitude))
             return null;
 
+        magnitude = expectedType switch
+        {
+            TypeKind.Quantity when parseResult.Value is ValueTuple<decimal, UcumParsedUnit?> (_, var unit) =>
+                TypedConstantNormalizer.NormalizeQuantity(magnitude, unit),
+            TypeKind.Price when parseResult.Value is ValueTuple<decimal, object?, UcumParsedUnit?> (_, _, var denominatorUnit) =>
+                TypedConstantNormalizer.NormalizePrice(magnitude, denominatorUnit),
+            _ => magnitude,
+        };
+
         var qualifiers = ExtractQualifiersFromParsedValue(expectedType, parseResult.Value)
             ?? ImmutableArray<DeclaredQualifierMeta>.Empty;
         return new ExtractedBoundValue(magnitude, qualifiers);

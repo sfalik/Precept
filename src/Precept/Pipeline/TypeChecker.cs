@@ -397,6 +397,8 @@ internal static partial class TypeChecker
                 Syntax: declared.Syntax,
                 DeclaredMin: declaredMinBound?.Magnitude,
                 DeclaredMax: declaredMaxBound?.Magnitude,
+                NormalizedDeclaredMin: declaredMinBound?.Magnitude,
+                NormalizedDeclaredMax: declaredMaxBound?.Magnitude,
                 DeclaredMinBoundQualifiers: declaredMinBound?.Qualifiers ?? ImmutableArray<DeclaredQualifierMeta>.Empty,
                 DeclaredMaxBoundQualifiers: declaredMaxBound?.Qualifiers ?? ImmutableArray<DeclaredQualifierMeta>.Empty,
                 DeclaredMinLength: declaredMinLengthBound?.Magnitude is { } mnL ? (int)mnL : null,
@@ -533,6 +535,8 @@ internal static partial class TypeChecker
                     Span: arg.NameSpan,
                     DeclaredMin: declaredMinBound?.Magnitude,
                     DeclaredMax: declaredMaxBound?.Magnitude,
+                    NormalizedDeclaredMin: declaredMinBound?.Magnitude,
+                    NormalizedDeclaredMax: declaredMaxBound?.Magnitude,
                     DeclaredMinBoundQualifiers: declaredMinBound?.Qualifiers ?? ImmutableArray<DeclaredQualifierMeta>.Empty,
                     DeclaredMaxBoundQualifiers: declaredMaxBound?.Qualifiers ?? ImmutableArray<DeclaredQualifierMeta>.Empty));
 

@@ -151,6 +151,91 @@ public class TypeCheckerCurrencyUnitTests
         TypeCheckerTestHelpers.CheckExpectingClean(precept);
     }
 
+    [Fact]
+    public void QuantityArithmetic_SameCountingUnit_NoDiagnostic()
+    {
+        var precept = """
+            precept Inventory
+            field Each1 as quantity in 'each' default '1 each'
+            field Each2 as quantity in 'each' default '2 each'
+            field Total as quantity <- Each1 + Each2
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void QuantityArithmetic_DifferentCountingUnits_EmitsCrossCountingUnitOperation()
+    {
+        var precept = """
+            precept Inventory
+            field EachQty as quantity in 'each' default '1 each'
+            field BoxQty as quantity in 'box' default '1 box'
+            field Total as quantity <- EachQty + BoxQty
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.CrossCountingUnitOperation);
+    }
+
+    [Fact]
+    public void QuantityComparison_DifferentCountingUnits_EmitsCrossCountingUnitOperation()
+    {
+        var precept = """
+            precept Inventory
+            field EachQty as quantity in 'each' default '1 each'
+            field PalletQty as quantity in 'pallet' default '1 pallet'
+            field Check as boolean <- EachQty > PalletQty
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.CrossCountingUnitOperation);
+    }
+
+    [Fact]
+    public void QuantityEquality_DifferentCountingUnits_EmitsCrossCountingUnitOperation()
+    {
+        var precept = """
+            precept Inventory
+            field EachQty as quantity in 'each' default '1 each'
+            field BoxQty as quantity in 'box' default '1 box'
+            field Same as boolean <- BoxQty == EachQty
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.CrossCountingUnitOperation);
+    }
+
+    [Fact]
+    public void QuantityArithmetic_CountVsMass_StaysCrossDimensionArithmetic()
+    {
+        var precept = """
+            precept Inventory
+            field Weight as quantity in 'kg' default '1 kg'
+            field EachQty as quantity in 'each' default '1 each'
+            field Bad as quantity <- Weight + EachQty
+            state Open initial
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.CrossDimensionArithmetic);
+    }
+
+    [Fact]
+    public void QuantityComparison_TemperatureUnits_NoCrossCountingUnitDiagnostic()
+    {
+        var precept = """
+            precept TemperatureCheck
+            field Celsius as quantity in 'Cel' default '0 Cel'
+            field Kelvin as quantity in 'K' default '0 K'
+            field Ok as boolean <- Celsius > Kelvin
+            state Open initial
+            """;
+
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check(precept);
+        diagnostics.Should().NotContain(d => d.Code == DiagnosticCode.CrossCountingUnitOperation.ToString());
+    }
+
     // ════════════════════════════════════════════════════════════════════════
     //  PRE0072: DenominatorUnitMismatch
     // ════════════════════════════════════════════════════════════════════════
