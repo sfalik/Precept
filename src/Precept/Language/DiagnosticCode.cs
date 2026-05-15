@@ -182,6 +182,14 @@ public enum DiagnosticCode
     /// A required field without a default is read inside its own first assignment during the initial event.
     /// </summary>
     UninitializedFieldReadInInitialAssignment = 142,
+    /// <summary>
+    /// The first assignment that materializes a required field on entry reads that field directly or through a computed dependency before it exists in the from-state.
+    /// </summary>
+    MaterializedFieldSelfReference    = 143,
+    /// <summary>
+    /// An initial-event assignment reads another required field before that field's first assignment in the same action chain establishes a value.
+    /// </summary>
+    UninitializedCrossFieldReadInInitialAssignment = 144,
 
     // ── Graph ────────────────────────────────────────────
     UnreachableState                   =  80,

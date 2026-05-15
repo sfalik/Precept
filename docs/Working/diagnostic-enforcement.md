@@ -1044,6 +1044,7 @@ Priority 0 is a blocking prerequisite: no gap-closure slice is complete until `P
 - [x] **Slice 2:** Choice value validation (PRE0086–0089) — `TypeChecker.Expressions.cs` choice literal check
 - [x] **Slice 3:** ~~InitialEventMissingAssignments (PRE0094)~~ — **already wired** in `TypeChecker.Validation.FieldState.cs`; no gap-closure work needed
 - [x] **Slice 4:** EventHandlerInStatefulPrecept (PRE0092) — trivial structural check in `ValidateStructural`
+- [x] **Construction guarantee audit follow-up (2026-05-15):** wildcard initial `from any` rows now participate in stateful construction coverage, PRE0142 walks secondary expressions in the same pass, PRE0143 `MaterializedFieldSelfReference` ships for first-entry self/materialization reads, and PRE0144 `UninitializedCrossFieldReadInInitialAssignment` ships for ordered cross-field undefined reads during the initial event
 
 ### Priority 2 — User Experience Gaps
 - [x] **Slice 5:** ~~Temporal constant precision (PRE0055–0058)~~ — **subsumed by Slice 9B** catalog-mediated emission

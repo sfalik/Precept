@@ -145,6 +145,7 @@ internal static partial class TypeChecker
     private static void ValidateFieldStateGuarantees(CheckContext ctx)
     {
         var fieldRefs = new List<TypedFieldRef>();
+        var computedDependencyLookup = BuildComputedDependencyLookup(ctx);
 
         void EmitDiagnosticsForFieldRefs(string? stateName)
         {
@@ -259,7 +260,8 @@ internal static partial class TypeChecker
             }
         }
 
-        // D132: transitions that materialize a required field on entry must assign it.
+        // D132/D143: transitions that materialize a required field on entry must assign it,
+        // and the first materializing assignment cannot read that field before it exists.
         foreach (var row in ctx.TransitionRows)
         {
             if (row.Outcome != TransitionRowOutcome.Transition || row.TargetState is null)
@@ -281,9 +283,44 @@ internal static partial class TypeChecker
                     if (!omitInFrom || omitInTarget)
                         continue;
 
-                    var hasSet = row.Actions.Any(action =>
-                        IsSetAction(action.Kind) &&
-                        string.Equals(action.FieldName, field.Name, StringComparison.Ordinal));
+                    var hasSet = false;
+                    var materialized = false;
+
+                    foreach (var action in row.Actions)
+                    {
+                        if (!IsSetAction(action.Kind) ||
+                            !string.Equals(action.FieldName, field.Name, StringComparison.Ordinal))
+                        {
+                            continue;
+                        }
+
+                        hasSet = true;
+                        if (materialized)
+                            continue;
+
+                        if (action is TypedInputAction inputAction)
+                        {
+                            fieldRefs.Clear();
+                            CollectFieldRefsFromExpression(inputAction.InputExpression, fieldRefs);
+                            CollectFieldRefsFromExpression(inputAction.SecondaryExpression, fieldRefs);
+
+                            foreach (var fieldRef in fieldRefs)
+                            {
+                                if (!FieldDependsTransitivelyOn(fieldRef.FieldName, field.Name, computedDependencyLookup))
+                                    continue;
+
+                                ctx.Diagnostics.Add(
+                                    Diagnostics.Create(
+                                        DiagnosticCode.MaterializedFieldSelfReference,
+                                        fieldRef.Span,
+                                        field.Name,
+                                        fromState,
+                                        row.TargetState));
+                            }
+                        }
+
+                        materialized = true;
+                    }
 
                     if (!hasSet)
                     {
@@ -332,9 +369,9 @@ internal static partial class TypeChecker
             return;
         }
 
-        foreach (var (span, actions) in initialActionChains)
+        foreach (var (span, actions, coveredStateNames) in initialActionChains)
         {
-            var missingFields = GetMissingRequiredFieldAssignments(requiredFields, actions);
+            var missingFields = GetMissingRequiredFieldAssignments(requiredFields, actions, coveredStateNames, ctx);
             if (missingFields.IsDefaultOrEmpty)
                 continue;
 
@@ -353,7 +390,7 @@ internal static partial class TypeChecker
         if (initialEvent is null)
             return;
 
-        foreach (var (_, actions) in GetInitialConstructionActionChains(ctx, initialEvent))
+        foreach (var (_, actions, _) in GetInitialConstructionActionChains(ctx, initialEvent))
             ValidateInitialAssignmentSelfReads(actions, initialEvent.Name, ctx);
     }
 
@@ -363,10 +400,12 @@ internal static partial class TypeChecker
         CheckContext ctx)
     {
         var priorAssignments = new HashSet<string>(StringComparer.Ordinal);
+        var firstAssignmentIndices = GetFirstAssignmentIndices(actions);
         var fieldRefs = new List<TypedFieldRef>();
 
-        foreach (var action in actions)
+        for (var actionIndex = 0; actionIndex < actions.Length; actionIndex++)
         {
+            var action = actions[actionIndex];
             if (!IsSetAction(action.Kind) || action is not TypedInputAction inputAction)
                 continue;
 
@@ -374,34 +413,49 @@ internal static partial class TypeChecker
                 continue;
 
             var fieldName = field.Name;
-            if (!priorAssignments.Contains(fieldName) && IsRequiredFieldWithoutImplicitValue(field))
+            var isFirstRequiredAssignment = !priorAssignments.Contains(fieldName) && IsRequiredFieldWithoutImplicitValue(field);
+
+            fieldRefs.Clear();
+            CollectFieldRefsFromExpression(inputAction.InputExpression, fieldRefs);
+            CollectFieldRefsFromExpression(inputAction.SecondaryExpression, fieldRefs);
+
+            foreach (var fieldRef in fieldRefs)
             {
-                fieldRefs.Clear();
-                CollectFieldRefsFromExpression(inputAction.InputExpression, fieldRefs);
-
-                foreach (var fieldRef in fieldRefs)
+                if (isFirstRequiredAssignment &&
+                    string.Equals(fieldRef.FieldName, fieldName, StringComparison.Ordinal))
                 {
-                    if (!string.Equals(fieldRef.FieldName, fieldName, StringComparison.Ordinal))
-                        continue;
-
                     ctx.Diagnostics.Add(
                         Diagnostics.Create(
                             DiagnosticCode.UninitializedFieldReadInInitialAssignment,
                             fieldRef.Span,
                             fieldName,
                             initialEventName));
+                    continue;
                 }
+
+                if (string.Equals(fieldRef.FieldName, fieldName, StringComparison.Ordinal) ||
+                    !IsReadBeforeFirstAssignment(fieldRef.FieldName, actionIndex, priorAssignments, firstAssignmentIndices, ctx))
+                {
+                    continue;
+                }
+
+                ctx.Diagnostics.Add(
+                    Diagnostics.Create(
+                        DiagnosticCode.UninitializedCrossFieldReadInInitialAssignment,
+                        fieldRef.Span,
+                        fieldRef.FieldName,
+                        initialEventName));
             }
 
             priorAssignments.Add(fieldName);
         }
     }
 
-    private static ImmutableArray<(SourceSpan Span, ImmutableArray<TypedAction> Actions)> GetInitialConstructionActionChains(
+    private static ImmutableArray<(SourceSpan Span, ImmutableArray<TypedAction> Actions, ImmutableArray<string> CoveredStateNames)> GetInitialConstructionActionChains(
         CheckContext ctx,
         TypedEvent initialEvent)
     {
-        var builder = ImmutableArray.CreateBuilder<(SourceSpan Span, ImmutableArray<TypedAction> Actions)>();
+        var builder = ImmutableArray.CreateBuilder<(SourceSpan Span, ImmutableArray<TypedAction> Actions, ImmutableArray<string> CoveredStateNames)>();
 
         if (ctx.States.Count == 0)
         {
@@ -409,13 +463,13 @@ internal static partial class TypeChecker
                          string.Equals(row.EventName, initialEvent.Name, StringComparison.Ordinal) &&
                          row.FromState is null))
             {
-                builder.Add((row.RowSpan, row.Actions));
+                builder.Add((row.RowSpan, row.Actions, ImmutableArray<string>.Empty));
             }
 
             foreach (var handler in ctx.EventHandlers.Where(handler =>
                          string.Equals(handler.EventName, initialEvent.Name, StringComparison.Ordinal)))
             {
-                builder.Add((handler.Syntax.Span, handler.Actions));
+                builder.Add((handler.Syntax.Span, handler.Actions, ImmutableArray<string>.Empty));
             }
 
             return builder.ToImmutable();
@@ -424,14 +478,17 @@ internal static partial class TypeChecker
         var initialStateNames = ctx.States
             .Where(state => state.Modifiers.Contains(ModifierKind.InitialState))
             .Select(state => state.Name)
-            .ToHashSet(StringComparer.Ordinal);
+            .ToImmutableArray();
+        var initialStateLookup = initialStateNames.ToHashSet(StringComparer.Ordinal);
 
         foreach (var row in ctx.TransitionRows.Where(row =>
                      string.Equals(row.EventName, initialEvent.Name, StringComparison.Ordinal) &&
-                     row.FromState is { } fromState &&
-                     initialStateNames.Contains(fromState)))
+                     (row.FromState is null || initialStateLookup.Contains(row.FromState))))
         {
-            builder.Add((row.RowSpan, row.Actions));
+            var coveredStateNames = row.FromState is null
+                ? initialStateNames
+                : ImmutableArray.Create(row.FromState!);
+            builder.Add((row.RowSpan, row.Actions, coveredStateNames));
         }
 
         return builder.ToImmutable();
@@ -439,13 +496,117 @@ internal static partial class TypeChecker
 
     private static ImmutableArray<string> GetMissingRequiredFieldAssignments(
         ImmutableArray<TypedField> requiredFields,
-        ImmutableArray<TypedAction> actions) =>
+        ImmutableArray<TypedAction> actions,
+        ImmutableArray<string> coveredStateNames,
+        CheckContext ctx) =>
         requiredFields
+            .Where(field => IsRequiredOnConstructionPath(field, coveredStateNames, ctx))
             .Where(field => !actions.Any(action =>
                 IsSetAction(action.Kind) &&
                 string.Equals(action.FieldName, field.Name, StringComparison.Ordinal)))
             .Select(field => field.Name)
             .ToImmutableArray();
+
+    private static bool IsRequiredOnConstructionPath(
+        TypedField field,
+        ImmutableArray<string> coveredStateNames,
+        CheckContext ctx)
+    {
+        if (coveredStateNames.IsDefaultOrEmpty)
+            return true;
+
+        return coveredStateNames.Any(stateName => !ctx.OmitLookup.Contains((stateName, field.Name)));
+    }
+
+    private static Dictionary<string, ImmutableArray<string>> BuildComputedDependencyLookup(CheckContext ctx)
+    {
+        var builder = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+
+        foreach (var dep in ctx.ComputedDeps)
+        {
+            if (!builder.TryGetValue(dep.FieldName, out var dependsOn))
+            {
+                dependsOn = new HashSet<string>(StringComparer.Ordinal);
+                builder[dep.FieldName] = dependsOn;
+            }
+
+            foreach (var dependency in dep.DependsOn)
+                dependsOn.Add(dependency);
+        }
+
+        return builder.ToDictionary(
+            pair => pair.Key,
+            pair => pair.Value.ToImmutableArray(),
+            StringComparer.Ordinal);
+    }
+
+    private static bool FieldDependsTransitivelyOn(
+        string referencedFieldName,
+        string targetFieldName,
+        IReadOnlyDictionary<string, ImmutableArray<string>> computedDependencyLookup) =>
+        FieldDependsTransitivelyOn(
+            referencedFieldName,
+            targetFieldName,
+            computedDependencyLookup,
+            new HashSet<string>(StringComparer.Ordinal));
+
+    private static bool FieldDependsTransitivelyOn(
+        string referencedFieldName,
+        string targetFieldName,
+        IReadOnlyDictionary<string, ImmutableArray<string>> computedDependencyLookup,
+        HashSet<string> visited)
+    {
+        if (!visited.Add(referencedFieldName))
+            return false;
+
+        if (string.Equals(referencedFieldName, targetFieldName, StringComparison.Ordinal))
+            return true;
+
+        if (!computedDependencyLookup.TryGetValue(referencedFieldName, out var dependencies))
+            return false;
+
+        foreach (var dependency in dependencies)
+        {
+            if (FieldDependsTransitivelyOn(dependency, targetFieldName, computedDependencyLookup, visited))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static Dictionary<string, int> GetFirstAssignmentIndices(ImmutableArray<TypedAction> actions)
+    {
+        var firstAssignmentIndices = new Dictionary<string, int>(StringComparer.Ordinal);
+
+        for (var actionIndex = 0; actionIndex < actions.Length; actionIndex++)
+        {
+            var action = actions[actionIndex];
+            if (!IsSetAction(action.Kind) || firstAssignmentIndices.ContainsKey(action.FieldName))
+                continue;
+
+            firstAssignmentIndices[action.FieldName] = actionIndex;
+        }
+
+        return firstAssignmentIndices;
+    }
+
+    private static bool IsReadBeforeFirstAssignment(
+        string fieldName,
+        int actionIndex,
+        HashSet<string> priorAssignments,
+        IReadOnlyDictionary<string, int> firstAssignmentIndices,
+        CheckContext ctx)
+    {
+        if (priorAssignments.Contains(fieldName) ||
+            !firstAssignmentIndices.TryGetValue(fieldName, out var firstAssignmentIndex) ||
+            firstAssignmentIndex <= actionIndex ||
+            !ctx.FieldLookup.TryGetValue(fieldName, out var field))
+        {
+            return false;
+        }
+
+        return IsRequiredFieldWithoutImplicitValue(field);
+    }
 
     private static bool IsSetAction(ActionKind kind) => kind == ActionKind.Set;
 

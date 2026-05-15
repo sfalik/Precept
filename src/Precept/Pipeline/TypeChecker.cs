@@ -63,10 +63,10 @@ internal static partial class TypeChecker
         // (populated during expression resolution) for cycle detection.
         ValidateStructural(ctx);
 
-        // Field-state guarantees (D130, D131, D132) — Slice 3-5.
+        // Field-state guarantees (D130, D131, D132, D143) — Slice 3-5 + follow-up gap closure.
         ValidateFieldStateGuarantees(ctx);
 
-        // Construction-time field guarantees (D93, D94, D142) — Slice 10-11 + follow-up gap closure.
+        // Construction-time field guarantees (D93, D94, D142, D144) — Slice 10-11 + follow-up gap closure.
         ValidateConstructionGuarantees(ctx);
         ValidateInitialAssignmentSelfReads(ctx);
 

@@ -15,7 +15,8 @@ public class SampleFieldStateRegressionTests
     [
         nameof(DiagnosticCode.OmittedFieldReadInState),
         nameof(DiagnosticCode.OmittedFieldSetInTargetState),
-        nameof(DiagnosticCode.RequiredFieldUnassignedOnEntry)
+        nameof(DiagnosticCode.RequiredFieldUnassignedOnEntry),
+        nameof(DiagnosticCode.MaterializedFieldSelfReference)
     ];
 
     private static string SamplesRoot =>
@@ -29,13 +30,13 @@ public class SampleFieldStateRegressionTests
 
     [Theory]
     [MemberData(nameof(SampleFiles))]
-    public void Samples_AllSampleFiles_NoUnexpected_D130_D131_D132(string name, string path)
+    public void Samples_AllSampleFiles_NoUnexpected_D130_D131_D132_D143(string name, string path)
     {
         var result = Compiler.Compile(File.ReadAllText(path));
 
         result.Diagnostics
             .Where(d => FieldStateGuaranteeCodes.Contains(d.Code))
-            .Should().BeEmpty($"{name} should not emit D130, D131, or D132 diagnostics");
+            .Should().BeEmpty($"{name} should not emit D130, D131, D132, or D143 diagnostics");
     }
 
     [Fact]
@@ -45,6 +46,6 @@ public class SampleFieldStateRegressionTests
 
         result.Diagnostics
             .Where(d => FieldStateGuaranteeCodes.Contains(d.Code))
-            .Should().BeEmpty("insurance-claim.precept should not emit D130, D131, or D132 diagnostics");
+            .Should().BeEmpty("insurance-claim.precept should not emit D130, D131, D132, or D143 diagnostics");
     }
 }

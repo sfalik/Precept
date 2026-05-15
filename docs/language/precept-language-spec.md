@@ -997,6 +997,8 @@ State-scoped access modes (`in StateTarget`) use `modify` for constraint declara
 5. **`omit` clears on state entry** — field value resets to default on any transition into an `omit` state (including self-transitions); does NOT apply to `no transition`.
 
    **D132 — RequiredFieldUnassignedOnEntry:** When a transition moves a required field (non-optional, no default value, not computed) from `omit` in the source state to non-omit in the target state, the transition action chain must include a `set` for that field. This is the structural dual of `InitialEventMissingAssignments` (D94) applied to state-crossing transitions.
+
+   **D143 — MaterializedFieldSelfReference:** The first assignment that materializes that field on the transition cannot read the field directly or through a computed-field dependency before any value exists in the source state.
 6. **`set` targeting an `omit` field in the target state** is a compile error; `readonly`/`editable` do not restrict `set`.
 
    **D130 — OmittedFieldReadInState:** Reading a field in a state-anchored expression context (transition guard, `in`-state ensure, `from`-state ensure, state hook guard, or action RHS) when that field is `omit` in the anchoring state is a compile error.
@@ -1886,6 +1888,7 @@ No special "construction constraint" form is needed. `to <InitialState> ensure` 
 - **`RequiredFieldsNeedInitialEvent`:** Precept has required fields (non-optional, no default) but does not declare an initial event — construction cannot produce a valid initial version.
 - **`InitialEventMissingAssignments`:** Initial event does not assign all required fields that lack defaults — post-construction state may violate constraints.
 - **`UninitializedFieldReadInInitialAssignment`:** A required field with no default is read inside its own first initial-event assignment — the read would observe an undefined value.
+- **`UninitializedCrossFieldReadInInitialAssignment`:** An initial-event assignment reads another required field before that other field's first assignment in the same action chain establishes a value.
 
 **Design rationale:** Construction goes through the full event pipeline because entities must satisfy their constraints from the moment they exist. A parameterless construction path cannot enforce business invariants at intake. By modeling construction as an event, the language reuses all existing machinery — guards can discriminate construction routing, ensures validate args, `reject` can refuse intake, and the caller uses the same pattern matching they use for every event.
 

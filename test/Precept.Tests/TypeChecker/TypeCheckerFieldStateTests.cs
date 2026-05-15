@@ -404,6 +404,57 @@ public class TypeCheckerFieldStateTests
     }
 
     [Fact]
+    public void D143_OmitToNonOmit_RequiredField_SelfReadOnFirstSet_Fires()
+    {
+        var diagnostic = AssertSingleD143("""
+            precept Widget
+            field F as integer
+            state Draft initial
+            state Review
+            event E
+            in Draft omit F
+            from Draft on E -> set F = F + 1 -> transition Review
+            """);
+
+        diagnostic.Message.Should().Be("Field 'F' is read while being materialized on transition from 'Draft' to 'Review' — it has no value in state 'Draft'");
+    }
+
+    [Fact]
+    public void D143_OmitToNonOmit_RequiredField_IndirectComputedSelfReference_Fires()
+    {
+        var diagnostic = AssertSingleD143("""
+            precept Widget
+            field F as integer
+            field Helper as integer <- F + 1
+            state Draft initial
+            state Review
+            event E
+            in Draft omit F
+            from Draft on E -> set F = Helper -> transition Review
+            """);
+
+        diagnostic.Message.Should().Be("Field 'F' is read while being materialized on transition from 'Draft' to 'Review' — it has no value in state 'Draft'");
+    }
+
+    [Fact]
+    public void D143_OmitToNonOmit_RequiredField_ComputedHelperWithoutSelfReference_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Seed as integer default 1
+            field Helper as integer <- Seed + 1
+            field F as integer
+            state Draft initial
+            state Review
+            event E
+            in Draft omit F
+            from Draft on E -> set F = Helper -> transition Review
+            """;
+
+        AssertNoD143(precept);
+    }
+
+    [Fact]
     public void D132_OmitToNonOmit_OptionalField_NoDiagnostic()
     {
         var precept = """
@@ -661,5 +712,25 @@ public class TypeCheckerFieldStateTests
 
         d132.Should().ContainSingle();
         return d132[0];
+    }
+
+    private static void AssertNoD143(string preceptText)
+    {
+        AssertD143s(preceptText).Should().BeEmpty();
+    }
+
+    private static Diagnostic AssertSingleD143(string preceptText)
+    {
+        var diagnostics = AssertD143s(preceptText);
+        diagnostics.Should().ContainSingle();
+        return diagnostics[0];
+    }
+
+    private static Diagnostic[] AssertD143s(string preceptText)
+    {
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check(preceptText);
+        return diagnostics
+            .Where(d => d.Code == nameof(DiagnosticCode.MaterializedFieldSelfReference))
+            .ToArray();
     }
 }

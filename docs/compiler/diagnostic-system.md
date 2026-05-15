@@ -177,6 +177,10 @@ Three levels. No `Hidden` (unlike Roslyn) — Precept's diagnostic surface is sm
 
 `PRE0142 UninitializedFieldReadInInitialAssignment` closes the construction-time gap where an initial-event assignment reads a required field before any default or prior assignment establishes its first value. It is distinct from `PRE0094 InitialEventMissingAssignments`: `PRE0094` means the field is never assigned on that construction path; `PRE0142` means the field is assigned, but the RHS reads an undefined value while doing so.
 
+`PRE0143 MaterializedFieldSelfReference` closes the entry-materialization gap where a transition brings a required field from `omit` to present but the first materializing assignment reads that field directly or through a computed-field dependency before any value exists in the from-state.
+
+`PRE0144 UninitializedCrossFieldReadInInitialAssignment` closes the sibling construction gap where an initial-event assignment reads another required field before that other field's first assignment later in the same action chain establishes a value.
+
 ```csharp
 public enum DiagnosticCode
 {
@@ -320,12 +324,26 @@ public enum DiagnosticCode
     CollectionInnerTypeError        = 105,
     QuantifierPredicateNotBoolean   = 106,
 
+    // ── Type (late additions) ────────────────────────────
+    BoundsRequireQualifier          = 133,
+    BoundsQualifierMismatch         = 134,
+    LengthBoundViolation            = 135,
+    CountBoundViolation             = 136,
+    CrossCountingUnitOperation      = 137,
+    CountDimensionBoundsAmbiguous   = 138,
+    InvalidQualifierCoexistence     = 139,
+    InvalidPriceQualifier           = 140,
+    UnprovedAssignmentQualifierCompatibility = 141,
+    UninitializedFieldReadInInitialAssignment = 142,
+    MaterializedFieldSelfReference  = 143,
+    UninitializedCrossFieldReadInInitialAssignment = 144,
+
     // ── NameBinder ───────────────────────────────────────
     UndeclaredArg                   = 107,
 }
 ```
 
-**115 total diagnostic codes** across 5 diagnostic stages: 8 Lex, 11 Parse, 83 Type (including NameBinder codes that use `DiagnosticStage.Type`), 6 Graph, 7 Proof. Note: `AmbiguousDispatch` from the original proof-engine design was replaced by richer per-domain diagnostics during TypeChecker implementation.
+**144 total diagnostic codes** across the five diagnostic stages. Note: `AmbiguousDispatch` from the original proof-engine design was replaced by richer per-domain diagnostics during TypeChecker implementation.
 
 The enum **is** the complete set of diagnostic rules. It is a closed set — you cannot produce a diagnostic that is not a member. Adding a member without completing the catalog chain causes a build failure (see the FaultCode → DiagnosticCode Chain section below).
 
@@ -354,7 +372,7 @@ public static class Diagnostics
 {
     public static DiagnosticMeta GetMeta(DiagnosticCode code) => code switch
     {
-        // 115 arms — one per DiagnosticCode member.
+        // 144 arms — one per DiagnosticCode member.
         // Each arm maps the code to its stage, severity, message template, category,
         // and optional related codes, fix hints, fault prevention links, and suggestion sources.
         // Representative examples:

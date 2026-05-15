@@ -122,3 +122,9 @@
 - The diagnostic coverage analyzers still need Gate 2 allow-list entries for newly emitted codes referenced only from `test/Precept.Tests/`; otherwise PRECEPT0028 fires even when runtime tests exist.
 - Focused construction/diagnostic suites are green; full `Precept.Tests` remains at the existing 9 unrelated proof/quantity failures.
 
+### 2026-05-15T18:51:51.086-04:00 — Construction audit follow-up closed
+
+- Stateful construction validation has to carry the set of covered initial states per action chain. Wildcard `from any` rows are not state-less shortcuts; they owe assignment coverage for every initial state they cover, while explicit rows only owe fields that are present in their concrete source state.
+- Initial-event undefined-read validation is an ordering problem, not just a self-match problem. The read set must include `SecondaryExpression`, and cross-field reads must compare against first-assignment order in the same action chain.
+- Entry materialization self-reference needs transitive dependency inspection through computed fields. Direct field-ref scans are insufficient because helper computed expressions can route back to the field being materialized even when the RHS never names it directly.
+

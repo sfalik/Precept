@@ -200,7 +200,9 @@ internal static class DiagnosticCoverageAllowLists
         "UnterminatedInterpolation",
         "UnterminatedStringLiteral",
         "UnterminatedTypedConstant",
+        "UninitializedCrossFieldReadInInitialAssignment",
         "UninitializedFieldReadInInitialAssignment",
+        "MaterializedFieldSelfReference",
         "WritableOnEventArg",
     };
 }

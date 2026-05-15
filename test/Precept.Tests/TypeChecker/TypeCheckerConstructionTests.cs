@@ -325,6 +325,38 @@ public class TypeCheckerConstructionTests
     }
 
     [Fact]
+    public void D94_WildcardInitialRow_AssignsRequiredField_NoDiagnostic()
+    {
+        var precept = """
+            precept Widget
+            field Name as string
+            state Draft initial
+            state Review initial
+            state Done terminal
+            event Start(InputName as string) initial
+            from any on Start -> set Name = InputName -> transition Done
+            """;
+
+        AssertNoD94(precept);
+    }
+
+    [Fact]
+    public void D94_WildcardInitialRow_MissingRequiredField_Fires()
+    {
+        var diagnostic = AssertSingleD94("""
+            precept Widget
+            field Name as string
+            state Draft initial
+            state Review initial
+            state Done terminal
+            event Start initial
+            from any on Start -> transition Done
+            """);
+
+        diagnostic.Message.Should().Be("Initial event 'Start' does not assign required field(s): Name");
+    }
+
+    [Fact]
     public void D94_StatelessPrecept_WithInitialEvent_MissingRequiredField_Fires()
     {
         var diagnostic = AssertSingleD94("""
@@ -394,6 +426,51 @@ public class TypeCheckerConstructionTests
     }
 
     [Fact]
+    public void D144_InitialEvent_CrossFieldReadBeforeFirstAssignment_FiresAtReadSite()
+    {
+        var diagnostic = AssertSingleD144("""
+            precept Test
+            field amount as integer
+            field total as integer
+            event Start initial
+            on Start -> set total = amount * 2 -> set amount = 10
+            """);
+
+        diagnostic.Message.Should().Be("Field 'amount' is read in initial event 'Start' before it has been assigned a value");
+        diagnostic.Span.StartLine.Should().Be(5);
+        diagnostic.Span.StartColumn.Should().Be(25);
+        diagnostic.Span.EndColumn.Should().Be(31);
+    }
+
+    [Fact]
+    public void D144_InitialEvent_CrossFieldRead_FieldWithDefault_DoesNotFire()
+    {
+        var precept = """
+            precept Test
+            field amount as integer default 1
+            field total as integer
+            event Start initial
+            on Start -> set total = amount * 2
+            """;
+
+        AssertNoD144(precept);
+    }
+
+    [Fact]
+    public void D144_InitialEvent_CrossFieldRead_FieldAssignedEarlier_DoesNotFire()
+    {
+        var precept = """
+            precept Test
+            field amount as integer
+            field total as integer
+            event Start initial
+            on Start -> set amount = 10 -> set total = amount * 2
+            """;
+
+        AssertNoD144(precept);
+    }
+
+    [Fact]
     public void D94_NoTransitionRows_InitialEvent_RequiredField_Fires()
     {
         var diagnostic = AssertSingleD94("""
@@ -451,5 +528,23 @@ public class TypeCheckerConstructionTests
     {
         var (_, diagnostics) = TypeCheckerTestHelpers.Check(precept);
         return diagnostics.Where(d => d.Code == DiagnosticCode.UninitializedFieldReadInInitialAssignment.ToString()).ToArray();
+    }
+
+    private static void AssertNoD144(string precept)
+    {
+        AssertD144s(precept).Should().BeEmpty();
+    }
+
+    private static Diagnostic AssertSingleD144(string precept)
+    {
+        var diagnostics = AssertD144s(precept);
+        diagnostics.Should().ContainSingle();
+        return diagnostics[0];
+    }
+
+    private static Diagnostic[] AssertD144s(string precept)
+    {
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check(precept);
+        return diagnostics.Where(d => d.Code == DiagnosticCode.UninitializedCrossFieldReadInInitialAssignment.ToString()).ToArray();
     }
 }
