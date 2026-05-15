@@ -13,6 +13,9 @@
 - When design behavior is still open (diagnostic multiplicity, wildcard fan-out, broadcast identity contracts), wait for the decision before locking tests.
 - Quantity-normalization coverage must separate raw typed literals, WholeValue interpolation, and interpolated magnitude-with-static-unit paths; otherwise the dangerous double-normalization and unbounded-interval branches stay invisible.
 - When implementation types are still landing, reflection-based tests are the honest way to pin the contract without turning the suite into compile errors or skipped placeholders.
+- For `InterpolatedTypedConstant` proof coverage: only `Magnitude` and `WholeValue` slot kinds recurse in `IntervalOfNarrowed`; all other slot kinds (Unit, NumeratorUnit, DenominatorUnit) return Unbounded. Tests must cover both the conservative-overflow case (Unbounded slot) and the proved case (single bounded slot) — the two branches are orthogonal and both need anchors.
+- The double-normalization guard for WholeValue slots is `HasSingleMagnitudeSlot`, which returns false for WholeValue → `ApplyStaticUnitScaling` skips re-scaling. To expose a false-safety double-normalization bug via a NumericOverflow test, the source field's normalized bound must straddle the target max when half-normalized but stay below it when doubly-normalized (or vice versa). A same-base-unit source (kg→kg, scale=1) silently passes both correct and incorrect implementations — always use a cross-unit source field for this regression.
+- For WholeValue cross-unit (lb_av source → kg target), the false-safety variant needs a target max between the normalized bound (3 lb = 1.36 kg) and the doubly-normalized bound (0.617 kg): e.g., `max '1 kg'` would flip the test between false-safe (0.617 < 1, no overflow) and correct (1.36 > 1, overflow). The task-specified `max '5 kg'` target is a regression anchor for the happy path, not a double-normalization detector; add a tight-bound variant if that specific bug resurfaces.
 
 ## Historical Summary
 
@@ -52,7 +55,12 @@
 - The red cases are correctly pinned to still-missing implementation seams: affine metadata/offset behavior, raw-magnitude compare paths, interpolated interval extraction plus static-unit scaling, denominator normalization for cross-unit price comparisons, and the intended cross-dimension diagnostic.
 - Keep the failures red until the implementation lands; they are contract pressure, not suite noise.
 
-### 2026-05-15T11:31:17Z — Slice 17 normalization test coverage completed
+### 2026-05-15T11:37:42Z — Slice 21 interpolated quantity overflow test coverage completed
+
+- Added 8 new tests to `test/Precept.Tests/TypeChecker/TypeCheckerInterpolatedQuantityTests.cs` covering all required Slice 21 cases: unbounded magnitude (conservative overflow), WholeValue within-bound (Proved), WholeValue overflow, dynamic Unit slot (conservative overflow), dynamic price denominator (conservative overflow), money magnitude within-bound, money magnitude overflow, and WholeValue cross-unit (3 lb → 1.36 kg < 5 kg, no double-normalization).
+- All 10 tests in the class pass; suite goes from 5535 → 5543 total, 5526 → 5534 passed, 9 baseline failures unchanged.
+- Added `CompileGeneral` helper alongside the existing `CompileAssignment` to support tests with configurable target field types (price, money, quantity) and multiple extra declarations.
+- Key finding: the double-normalization guard (`HasSingleMagnitudeSlot`) correctly prevents `ApplyStaticUnitScaling` from re-scaling WholeValue intervals. The test 9 fixture (3 lb / 5 kg target) is a happy-path anchor; a tighter target (e.g., `max '1 kg'`) would distinguish correct (overflow at 1.36 > 1) from doubly-normalized (no overflow at 0.617 < 1) — noted in Learnings for future reference if the bug resurfaces.
 
 - Added 2 missing Slice 17 tests: `PriceBound_CrossUnitDenominatorNormalization_WithinBound_DoesNotEmitNumericOverflow` (test 4b: 3 USD/lb ≈ 6.61 USD/kg < 10 USD/kg → no overflow) and `QuantityBound_WholeValueInterpolation_SourceExceedsMax_EmitsNumericOverflow` (test 8: qtyField max '8 kg' assigned to weight max '5 kg' → [0..8] ⊄ [0..5] → NumericOverflow).
 - Both new tests pass immediately; WholeValue interval extraction via the `InterpolationSlotKind.WholeValue` branch in `ProofEngine.Intervals.cs` works correctly when the source field uses the SI base unit (kg). Double-normalization risk (§5.5.2) is dormant for kg-to-kg because scale = 1.0 — Slice 19 must add a non-base-unit WholeValue test to expose any actual double-scaling bug.
