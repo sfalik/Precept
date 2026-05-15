@@ -31,6 +31,13 @@
 
 ## Recent Updates
 
+### 2026-05-15T01:52:56Z — Counting-unit wording fix exposed a proof-gap
+
+- Corrected the counting-unit research note: `count` / `DimensionVector.None` is only a shared dimension-family alias for business units such as `each` and `box`; it is not a conversion rule.
+- Locked the language distinction between dimensional compatibility and value convertibility so future docs do not imply `1 box = 1 each`.
+- Surfaced the deeper architectural issue: binary-op qualifier proof currently falls back through the shared `count` dimension, so explicit-unit comparisons can prove even when no conversion law exists.
+- Decision inbox note merged by Scribe into `.squad/decisions.md`; the research doc corrections and proof-gap follow-up are now durable team context.
+
 ### 2026-05-15T01:37:41Z — External normalization research merged
 
 - Frank-7 validated the quantity-normalization design against F#, Rust/uom, JSR-385, FHIR/UCUM, Modelica, and decimal interval-arithmetic practice; the architecture stays sound, with only medium-priority documentation follow-ups around nonlinear-unit exclusion and exact-decimal conversion assumptions.
@@ -114,3 +121,10 @@
 - Scoped to typed-constant defaults for quantity/money/price args — NOT general expression defaults.
 - Updated §0.7 disposition table, ordering (now `25 → 27 → 26`), and risk item 5.
 - Decision record written to `.squad/decisions/inbox/frank-slice26-reinclusion.md`.
+
+### 2026-05-14T21:49:37.578-04:00 — Counting-unit compatibility wording corrected
+
+- `DimensionVector.None` / `count` is a **dimension-family** fact, not a conversion fact. It tells the type system that a unit belongs to the count family; it does not say `1 box = 1 each`.
+- Current qualifier proof behavior is looser than the phrase "matching unit qualifiers" suggests: on the unit axis, the proof engine accepts same-dimension quantities (`each` vs `box`) as compatible because both reduce to dimension `count`.
+- Assignment checking is stricter than binary-op checking: `set Qty = BoxCount` is rejected when the target is `quantity in 'each'`, but `Qty > BoxCount` currently compiles.
+- Any documentation that says different counting units are "compatible" must explicitly say whether it means **same dimension family** or **defined value conversion**; otherwise it is architecturally misleading.

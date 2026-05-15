@@ -40,6 +40,13 @@
 
 ## Recent Updates
 
+### 2026-05-15T01:52:56Z — Counting-unit analysis batch recorded
+
+- Pre-check measured `.squad/decisions.md` at 112910 bytes with 1 inbox file; the hard-gate 7-day archive pass ran first and found 0 eligible decision entries older than `2026-05-08T01:52:56Z`.
+- Merged Frank's counting-unit compatibility inbox note into one canonical decision, deleted the processed inbox file, wrote the Frank orchestration record, and recorded the brief counting-unit session log.
+- Durable outcome: documentation now distinguishes dimension-family membership from conversion semantics for business units, and the binary-op qualifier fallback on `count` is recorded as an architectural gap rather than silently accepted behavior.
+- Health report: `decisions.md` 112910B -> 114221B; inbox processed = 1 (1 -> 0); history files summarized = 0.
+
 ### 2026-05-15T01:05:58Z — Q1 lock batch recorded
 
 - Pre-check: `.squad/decisions.md` measured 109615 bytes with 4 inbox file(s); the 7-day archive hard gate ran first and found 0 eligible active entries older than `2026-05-08T01:05:58Z`.

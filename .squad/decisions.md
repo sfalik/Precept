@@ -137,6 +137,21 @@
 
 ---
 
+### 2026-05-15T01:52:56Z: Counting-unit wording now separates dimension-family compatibility from value conversion, and binary-op proof fallback is a real gap
+
+**By:** Scribe
+
+**Status:** Merged from Frank's counting-unit compatibility note.
+
+**Merged source:** `frank-counting-unit-compatibility.md`.
+
+- The research note is corrected: `count` / `DimensionVector.None` only identifies the shared dimension family for business counting units; it does not imply semantic convertibility between `each`, `box`, `case`, or other explicit units.
+- Two inaccurate statements in `business-units-quantity-normalization-survey.md` must be read as wording errors, not as approved semantics: dimension-alias membership is real, but cross-unit value conversion is not.
+- Assignment validation already rejects explicit counting-unit mismatches (`quantity in 'each'` cannot accept `quantity in 'box'`), so documentation must not describe the looser proof path as intended compatibility.
+- Frank surfaced the architectural gap: `ProofEngine.QualifiersAreCompatible` currently lets same-dimension counting units satisfy binary-op qualifier proofs via the `count` fallback, so static comparisons like `each` vs `box` can prove when they should degrade to `Unbounded` or be rejected until a real conversion model exists.
+
+---
+
 # Decision Record: Exhaustive Architectural Review— Interpolated Forms & Normalization Design
 
 **Author:** Frank (Lead Architect)
