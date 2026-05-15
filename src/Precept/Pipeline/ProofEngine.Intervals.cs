@@ -34,11 +34,31 @@ public static partial class ProofEngine
 
             case InterpolatedTypedConstant interpolated:
             {
+                // Slice 19 (quantity) + Slice 24 (money, price):
+                // Single-slot interpolations where the slot carries the full numeric value.
                 if (interpolated.Slots.Length == 1)
                 {
                     var slot = interpolated.Slots[0];
                     if (slot.SlotKind is InterpolationSlotKind.Magnitude or InterpolationSlotKind.WholeValue)
+                    {
+                        // Price magnitude intervals require a static denominator unit so that
+                        // ApplyStaticUnitScaling can invert the UCUM factor and place the raw
+                        // magnitude into the field's normalized (per-base-unit) price space.
+                        // A missing or non-unit qualifier means the denominator is dynamic —
+                        // we cannot normalize at compile time, so conservatively return Unbounded.
+                        if (slot.SlotKind == InterpolationSlotKind.Magnitude
+                            && interpolated.ResultType == TypeKind.Price
+                            && interpolated.StaticQualifier is not StaticCurrencyAndUnitQualifier)
+                            return NumericInterval.Unbounded;
+
+                        // Money magnitude/WholeValue: currencies are not UCUM-convertible, so the
+                        // raw magnitude interval IS the money interval. No scaling is applied here;
+                        // ApplyStaticUnitScaling leaves money intervals untouched (no unit to scale).
+                        // Quantity magnitude/WholeValue: interval is in slot units; ApplyStaticUnitScaling
+                        // applies the UCUM factor from StaticUnitQualifier (or StaticCurrencyAndUnitQualifier
+                        // for price) after this method returns.
                         return IntervalOfNarrowed(slot.Expression, semantics, narrowed);
+                    }
                 }
 
                 return NumericInterval.Unbounded;

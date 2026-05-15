@@ -176,6 +176,47 @@ public class TypeCheckerInterpolatedQuantityTests
             because: "amount max 200 exceeds the money bound of 100 USD");
     }
 
+    // ── Test 10: Price with static denominator unit — Slice 24 ───────────────────────
+
+    [Fact]
+    public void InterpolatedPrice_StaticDenominatorUnit_MagnitudeWithinMax_DoesNotEmitNumericOverflow()
+    {
+        // '{n} USD/[lb_av]': single Magnitude slot; StaticQualifier = StaticCurrencyAndUnitQualifier(USD, lb_av).
+        // IntervalOfNarrowed recurses on n → [0..3].
+        // ApplyStaticUnitScaling inverts lb_av factor (≈0.4536 kg/lb): [0..3] * (1/0.4536) ≈ [0..6.61] USD/kg.
+        // Target max '10 USD/kg' → 6.61 ≤ 10 → Proved.
+        var result = CompileGeneral(
+            targetDeclaration: "field x as price in 'USD' of 'mass' max '10 USD/kg' default '0 USD/kg'",
+            assignment: "'{n} USD/[lb_av]'",
+            targetField: "x",
+            "field n as integer max 3 default 3");
+
+        result.Diagnostics
+            .Where(d => d.Code == nameof(DiagnosticCode.NumericOverflow))
+            .Should().BeEmpty(because: "3 USD/lb ≈ 6.61 USD/kg, which is below the 10 USD/kg max");
+
+        result.Proof.Obligations
+            .Where(o => o.Requirement is IntervalContainmentProofRequirement { TargetField: "x" })
+            .Should().ContainSingle()
+            .Which.Disposition.Should().Be(ProofDisposition.Proved,
+                because: "the lb_av→kg inverse-factor scaling must bring the price magnitude interval inside the target bound");
+    }
+
+    [Fact]
+    public void InterpolatedPrice_StaticDenominatorUnit_MagnitudeExceedsMax_EmitsNumericOverflow()
+    {
+        // '{n} USD/[lb_av]' with n max 5: [0..5] * (1/0.4536) ≈ [0..11.02] USD/kg > 10 USD/kg → overflow.
+        var result = CompileGeneral(
+            targetDeclaration: "field x as price in 'USD' of 'mass' max '10 USD/kg' default '0 USD/kg'",
+            assignment: "'{n} USD/[lb_av]'",
+            targetField: "x",
+            "field n as integer max 5 default 5");
+
+        result.Diagnostics.Should().Contain(
+            d => d.Code == nameof(DiagnosticCode.NumericOverflow),
+            because: "5 USD/lb ≈ 11.02 USD/kg exceeds the 10 USD/kg max");
+    }
+
     // ── Test 9: WholeValue cross-unit — double-normalization regression anchor ─────
 
     [Fact]
