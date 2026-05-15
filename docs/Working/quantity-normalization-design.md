@@ -3916,3 +3916,11 @@ The next available slice number is **30**. Slice 27 is already reserved for doc 
 - **Dependencies:** None. Standalone (orthogonal to Slice 44 — different qualifier-resolution paths).
 - **Regression anchors:** PRE0133 must still fire for non-count dimension-only fields; Slice 44's early-exit for explicit-unit fields must remain unaffected; PRE0137 cross-unit enforcement is orthogonal and unaffected.
 - **Status:** ✅ Done (commit 04c16211).
+
+---
+
+### Doc tracker
+
+| Slice | Objective | Status |
+|-------|-----------|--------|
+| **QS-1** | Price qualifier model additions (QualifierAxis.PriceIn, QualifierShape.OfRequiresCurrencyIn, DeclaredQualifierMeta.CompoundPrice) | ✅ |
