@@ -52,6 +52,13 @@
 
 ## Learnings
 
+### 2026-05-14T23:43:11.224-04:00 — First-wave quantity-normalization slices landed with parser/runtime edge constraints
+
+- Slice 43 rename was broader than the initial file list: language-server source (`TypedConstantCollector`, `RichHoverFactory`, handlers) also referenced the semantic node type and had to be renamed with the runtime/test surfaces to keep solution compile integrity.
+- `UcumExactFactor` has no decimal conversion helper; normalization code must derive decimal factors from `Numerator`, `Denominator`, and `Base10Exponent` explicitly.
+- UCUM affine units require preserving function-wrapper identity (`Cel`, `degF`, `degRe`) while still stripping wrappers for scale evaluation; offset assignment cannot depend on stripped expressions alone.
+- `min`/`max` parse as constraint keywords in this branch’s grammar context, so function-call qualifier enforcement regression coverage used `clamp` + `abs` to exercise `QualifierMatch.Same` while keeping the same enforcement path in `SelectOverload`.
+
 ### 2026-05-14T23:17:29Z — Slices 14–27 full codebase audit: all NOT_STARTED
 
 Full audit against `src/Precept/` and `test/Precept.Tests/` confirmed **zero slices implemented**:
