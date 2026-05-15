@@ -317,13 +317,19 @@ public sealed record IntervalContainmentProofRequirement(
 
 **Q7: Should `IntervalContainmentProofRequirement` carry both original and normalized bounds?**
 
+> ✅ RESOLVED: `IntervalContainmentProofRequirement` carries normalized bounds plus the target field's declared qualifier so locked declared-unit rendering has the data it needs. See §7 Q1 / §5.2 Slice 18.
+
 The revised design adds `NormalizedMin/Max` alongside `DeclaredMin/Max` to the proof requirement. Alternative: drop `DeclaredMin/Max` from the requirement entirely (it's always available on `TypedField` via `TargetField` name lookup). This would keep the requirement smaller but make diagnostic rendering require a `SemanticIndex` lookup. The current diagnostic rendering code in `ProofEngine.Diagnostics.cs` and `RichHoverFactory.cs` already has `SemanticIndex` in scope — so dropping the display values from the requirement is viable. **Which do you prefer?**
 
 **Q8: Should `NumericInterval.Scale` use `UcumExactFactor` or `decimal`?**
 
+> ✅ RESOLVED: `NumericInterval.Scale` takes a precomputed `decimal` factor; UCUM-factor conversion happens before interval algebra. See §0.6 Condition 6.
+
 Using `UcumExactFactor` preserves exact rational arithmetic until the final multiplication. Using `decimal` (pre-converting the factor) is simpler but introduces the lossy step earlier. Given that the interval bounds are already `decimal` (lossy), pre-converting the factor to `decimal` before scaling loses no additional precision in practice. **Simpler API (`decimal factor`) or exact API (`UcumExactFactor`)?**
 
 **Q9: Q2's verdict — you asked whether `DeclaredMin/Max` should store original or normalized.**
+
+> ✅ SUPERSEDED: This is the same storage question as Q2. Answer: keep authored `DeclaredMin/Max` and add `NormalizedDeclaredMin/Max` for proof comparison. See §0.6 Condition 1.
 
 The revised design stores BOTH on `TypedField` (original in `DeclaredMin/Max`, normalized in `NormalizedDeclaredMin/Max`). This resolves Q2 definitively: we don't have to choose. The TypeChecker computes both in one pass. Diagnostic display uses original values. Proof comparison uses normalized values. The only cost is 2 extra `decimal?` fields per `TypedField` — negligible. **Do you agree with the "store both" approach, or do you want to minimize `TypedField` width?**
 
@@ -1246,7 +1252,7 @@ The post-step does **NOT** scale:
 | `TypedArgRef` | Same — interval from `ExtractArgInterval` which reads `NormalizedDeclaredMin/Max` after Condition 5 |
 | Everything else | No UCUM scaling context |
 
-The helper `TryGetStaticUnitFactor(TypedExpression) → decimal?` implements this dispatch. It returns the pre-computed scale factor (as `decimal`) for the two scaled cases, and `null` for all others. See Slice 16 for the full implementation spec.
+The helper `TryGetStaticScalingFactor(TypedExpression) → decimal?` implements this dispatch. It returns the pre-computed scale factor (as `decimal`) for the two scaled cases, and `null` for all others. See Slice 16 for the full implementation spec.
 
 ### Condition 3 Resolved: `GetFieldBounds` Reads Normalized Values
 
@@ -1778,15 +1784,21 @@ This recursive unwrap also ignores units. It must be updated to normalize when t
 
 **File:** `src/Precept/Pipeline/ProofEngine.Intervals.cs`
 
+> ⚠️ INCORRECT UNDER §0 DESIGN. §3.6 is SUPERSEDED — `DeclaredMin/Max` carry ORIGINAL (raw) values under §0. `GetFieldBounds` MUST read `NormalizedDeclaredMin/Max` with fallback (`NormalizedDeclaredMin ?? DeclaredMin`). See §0.6 Condition 3.
+
 **Change:** `GetFieldBounds` (line 131) reads `field.DeclaredMin` / `field.DeclaredMax` directly. After the TypeChecker fix (§3.6), these values are already normalized. No change needed here — the normalization flows through automatically.
 
 ### 3.8 Consumer Integration: Future Precept Builder
 
 When the Precept Builder (Phase 3, D8/R4) compiles min/max constraints into `ConstraintPlan` opcode arrays, it will read `TypedField.DeclaredMin` / `DeclaredMax` (which are now normalized) and encode them as immediate values in constraint opcodes. The evaluator then compares `PreceptValue` slot magnitudes against these pre-normalized bounds.
 
+> ⚠️ RESOLVED by §0.4. Decision: Option A — quantities store normalized (base-unit) magnitudes in `PreceptValue`. See §0.4 "PreceptValue Storage Convention for Quantities."
+
 **Open question (see §7):** This means runtime `PreceptValue` slots for quantities must also store normalized magnitudes, OR the Builder must emit normalization opcodes that convert the slot value before comparison. See §3.9.
 
 ### 3.9 Runtime PreceptValue Considerations
+
+> ⚠️ SUPERSEDED BY §0.4. Decision locked: Option A — normalize at storage. Quantities store normalized (base-unit) magnitudes in `PreceptValue`. The "future decision (Phase 3)" note in this section is no longer accurate. See §0.4 "PreceptValue Storage Convention for Quantities."
 
 Two approaches for the future evaluator:
 
@@ -1870,7 +1882,7 @@ These slices follow the existing interval-proof-engine-design numbering (Slices 
 
 | Slice | Objective | Depends On | Agent |
 |-------|-----------|------------|-------|
-| **14** | `NormalizedNumericValue` + `TypedConstantNormalizer` | None (new files) | George |
+| **14** | ~~`NormalizedNumericValue` +~~ `TypedConstantNormalizer` _(⚠️ `NormalizedNumericValue` dropped per §0)_ | None (new files) | George |
 | **15** | Wire TypeChecker bounds extraction to normalizer | Slice 14 | George |
 | **16** | Wire ProofEngine magnitude extraction to normalizer | Slice 14 | George |
 | **17** | Unit + integration + regression tests | Slices 15–16 | Soup Nazi |
@@ -1881,6 +1893,7 @@ These slices follow the existing interval-proof-engine-design numbering (Slices 
 
 **Slice 14: Core normalizer types**
 - Create `src/Precept/Language/Numeric/NormalizedNumericValue.cs`
+> ⚠️ NormalizedNumericValue is DROPPED per §0. Slice 14's deliverable is `TypedConstantNormalizer.cs` returning bare `decimal` — NOT a `NormalizedNumericValue` wrapper type.
 - Create `src/Precept/Language/Numeric/TypedConstantNormalizer.cs`
 - Unit tests for `NormalizeQuantity`, `NormalizePrice`, `ApplyFactor`
 - Test cases: `kg` → identity, `[lb_av]` → 0.45359237×, `mg` → 0.001×, null unit → identity
@@ -1951,7 +1964,7 @@ The interpolated case (`'{field} [unit]'`) is a **separate problem** from the st
 - When the slot is `WholeValue`, recurse on the expression directly (the whole typed value is interpolated)
 - For multi-slot expressions (e.g., `'{mag} {unit}'` with both magnitude and unit interpolated), return `Unbounded` (unit is not statically known)
 - **Impacts (from George's review — B19):** `Pipeline\SemanticIndex.cs` (`TypedInterpolatedTypedConstant`), `Pipeline\TypeChecker.Expressions.TypedConstants.cs` (`ResolveInterpolatedTypedConstant`)
-- **Ordering note (from George's review — B19):** This slice requires a `StaticUnit: UcumParsedUnit?` field on `InterpolatedTypedConstant`. If Slice 22 (static qualifier capture) ships first, `StaticUnit` is subsumed by the richer `StaticQualifier` discriminated union — in that case, Slice 19 should consume `StaticQualifier` rather than adding a separate `StaticUnit` field. Do NOT reshape the node twice. Either: (a) implement 19 first with minimal `StaticUnit`, then Slice 22 widens to `StaticQualifier`; or (b) implement 22 first, then 19 consumes the existing payload.
+- **Ordering note (from George's review — B19):** Ordering locked (option a): implement Slice 19 first with minimal `StaticUnit: UcumParsedUnit?` payload. Slice 22 later widens this to a `StaticQualifier` DU. The implementation sequence (§0.7) already reflects this: 19 → 22.
 
 **Slice 20: Unit-aware interval scaling**
 - When the `TextSegment` portions of the interpolated typed constant contain a static unit suffix (e.g., ` [lb_av]`), extract the `UcumParsedUnit` from the text
@@ -2192,7 +2205,7 @@ Where:
 
 ### Q2: Should DeclaredMin/DeclaredMax on TypedField store original or normalized magnitudes?
 
-> ⚠️ **SUPERSEDED BY §0.** This question is closed. §0's "store both" approach is the approved design: `DeclaredMin/Max` retain the original authored magnitudes (for display); `NormalizedDeclaredMin/Max` carry pre-computed base-unit magnitudes (for proof comparison). Neither Option A below ("overwrite with normalized") nor Option B below ("normalize at proof time") is correct — both are superseded. See §0.6 Condition 1 for the resolution.
+> ✅ SUPERSEDED: §0's "store both" design closes this question. Answer: keep authored values in `DeclaredMin/Max` and store base-unit values in `NormalizedDeclaredMin/Max`. See §0.6 Condition 1.
 
 **(A) Store normalized** (current proposal): `DeclaredMax = 5000` for `max '5 kg'`. ProofEngine gets correct values automatically. Display needs de-normalization.
 
@@ -2204,11 +2217,15 @@ Where:
 
 ### Q3: Scope of this fix — compile-time only or include Builder/runtime design?
 
+> ✅ ADOPTED: This fix stays compile-time; Builder/runtime normalization is deferred to Phase 3 after the runtime surfaces exist. See §0.4 "Impact on Slices 14–21".
+
 The current bug is compile-time only (evaluator is a stub). Should Slices 14–18 include runtime Builder normalization design, or should that be deferred to the Builder implementation (Phase 3, D8/R4)?
 
 **Recommendation:** Compile-time fix only (Slices 14–18). The Builder normalization is a Phase 3 concern — it's blocked on the evaluator/executable-model design (D8/R4) which does not exist yet. Document the runtime implications here, implement them when the Builder ships.
 
 ### Q4: Should the normalizer live in `src/Precept/Language/Numeric/` or `src/Precept/Language/Ucum/`?
+
+> ✅ ADOPTED: The normalizer lives in `src/Precept/Language/Numeric/TypedConstantNormalizer.cs`, not `Language/Ucum/`. See §0 Q4 / §5.2 Slice 14.
 
 The normalizer depends on `UcumParsedUnit` and `UcumExactFactor`, both in `Precept.Language`. Two options:
 
@@ -2220,6 +2237,8 @@ The normalizer depends on `UcumParsedUnit` and `UcumExactFactor`, both in `Prece
 
 ### Q5: For interpolated quantities, should the ProofEngine scale field intervals by the template's unit factor?
 
+> ✅ ADOPTED: The ProofEngine scales static-unit magnitude intervals via `TryGetStaticScalingFactor`, including interpolated magnitude-slot + static-unit forms. See §0.6 Condition 2 / Slice 16.
+
 The interpolated expression `'{test2} [lb_av]'` has a magnitude interval determined by `test2`'s bounds and a unit determined by the static text segment `[lb_av]`. To discharge the proof, the ProofEngine must:
 1. Compute `test2`'s interval → `(-∞, 2]` (from `max 2`)
 2. Scale by `[lb_av]`'s UCUM factor → `(-∞, 907.18]` (in grams)
@@ -2230,6 +2249,8 @@ The interpolated expression `'{test2} [lb_av]'` has a magnitude interval determi
 **Recommendation:** Yes — when the unit is statically known (text segment, not a hole), the ProofEngine should scale the magnitude interval. This requires a small extension to `InterpolatedTypedConstant` to carry the resolved `UcumParsedUnit?` for static unit portions. See §5.3, Slices 19–20.
 
 ### Q6: What is the null/unset semantics for `'{test2} [lb_av]'` when test2 is not set?
+
+> ✅ RESOLVED: Unguarded optional interpolation holes are handled by PRE0116 presence obligations, and interval containment does not suppress that separate proof. See §0.7 (B16) / §5.2 Slice 16.
 
 `test2` is `optional` — it may be unset when the transition fires. In `from offState on toggle → set test = '{test2} [lb_av]'`, there is no guard requiring `test2 is set`. If `test2` is null:
 
@@ -2749,4 +2770,4 @@ These slices extend the normalization design to cover interpolated typed constan
 
 - **Ordering:** Slice 26 comes after Slice 25 (needs the proof path) and after Slice 27 (doc sync). Final position: last implementation slice before Phase 3 deferred work.
 
-- **Key risk:** The `ValidateMaxPlaces` helper currently takes `TypedField`. It needs a minor refactor or overload to accept `TypedArg` (or extract the common parameters: `DeclaredMin`, `DeclaredMax`, `ResolvedType`, `DeclaredQualifiers`). This is a small adapter, not a broad refactor.
+- **Key risk:** The `ValidateMaxPlaces` helper currently takes `TypedField`. Extract the common parameters (`DeclaredMin`, `DeclaredMax`, `ResolvedType`, `DeclaredQualifiers`, `Name`) into a new overload — do NOT introduce a shared interface type. Call the overload from both the `TypedField` and `TypedArg` sites. This is a small adapter (~10 lines), not a broad refactor.

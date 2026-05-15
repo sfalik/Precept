@@ -21926,3 +21926,17 @@ Replaced the incorrect statement with an accurate description: precept_compile r
 
 - docs/Working/quantity-normalization-design.md — corrected line 97
 - .squad/agents/frank/history.md — added learning
+
+### 2026-05-14: quantity-normalization-design.md editorial cleanup
+
+**By:** Frank (requested by Shane)
+**What:** Applied 7 advisory annotations to docs/Working/quantity-normalization-design.md:
+1. §3.8 "Open question" label — marked RESOLVED by §0.4
+2. §3.8 GetFieldBounds claim — marked incorrect under §0 design
+3. §3.9 — marked SUPERSEDED by §0.4
+4. Slice 14 — NormalizedNumericValue.cs reference annotated as dropped by §0
+5. Slice 19 ordering — "either/or" locked to option (a)
+6. TryGetStaticUnitFactor → TryGetStaticScalingFactor (name normalization)
+7. Slice 26 ValidateMaxPlaces adapter — approach locked to "extract common parameters overload"
+**Why:** Deep audit (Frank) found these as stale/ambiguous text from the doc's layered revision history. No design decisions changed — annotations only.
+**Result:** Doc is now implementer-ready with no stale "open question" markers.
