@@ -378,6 +378,7 @@ public class DiagnosticsTests
         DiagnosticCode.InvalidUnitString,
         DiagnosticCode.InvalidCurrencyCode,
         DiagnosticCode.InvalidDimensionString,
+        DiagnosticCode.CrossCountingUnitOperation,
         DiagnosticCode.MutuallyExclusiveQualifiers,
     };
 

@@ -1057,6 +1057,15 @@ public static class Diagnostics
             TriggerCondition: "A collection field assignment or mutation results in an element count outside the declared mincount/maxcount range.",
             RecoverySteps: ["Ensure the collection count is within the declared bounds", "Or adjust the mincount/maxcount modifiers on the field declaration"]),
 
+        DiagnosticCode.CrossCountingUnitOperation => new(
+            nameof(DiagnosticCode.CrossCountingUnitOperation),
+            DiagnosticStage.Type, Severity.Error,
+            "Cannot combine '{0}' ({1}) with '{2}' ({3}) — explicit counting units must match exactly",
+            DiagnosticCategory.BusinessDomain,
+            FixHint: "Use matching counting units on both operands or convert values before combining them",
+            TriggerCondition: "A static comparison or same-match function call combines quantity values in different explicit counting units (for example, each vs box).",
+            RecoverySteps: ["Use the same counting unit on both operands", "Or convert quantities into a shared counting unit before the operation"]),
+
         _ => throw new ArgumentOutOfRangeException(nameof(code), code, null),
     };
 

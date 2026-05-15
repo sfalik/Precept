@@ -639,12 +639,7 @@ internal static partial class TypeChecker
     selected:
         if (bestOverload is not null)
         {
-            return new TypedFunctionCall(
-                bestOverload.ReturnType,
-                bestKind!.Value,
-                resolvedArgs,
-                bestOverload.ProofRequirements.ToImmutableArray(),
-                span);
+            return CreateTypedFunctionCall(bestKind!.Value, bestOverload, resolvedArgs, span, ctx);
         }
 
         // Slice 4: context retry — re-resolve literal args with each candidate's parameter type
@@ -653,12 +648,12 @@ internal static partial class TypeChecker
             var retryResult = TryContextRetryOverload(candidates, resolvedArgs, parsedArgs, ctx);
             if (retryResult is not null)
             {
-                return new TypedFunctionCall(
-                    retryResult.Value.Overload.ReturnType,
+                return CreateTypedFunctionCall(
                     retryResult.Value.Kind,
+                    retryResult.Value.Overload,
                     retryResult.Value.Args,
-                    retryResult.Value.Overload.ProofRequirements.ToImmutableArray(),
-                    span);
+                    span,
+                    ctx);
             }
         }
 
@@ -689,6 +684,103 @@ internal static partial class TypeChecker
         }
 
         return new TypedErrorExpression(span);
+    }
+
+    private static TypedExpression CreateTypedFunctionCall(
+        FunctionKind kind,
+        FunctionOverload overload,
+        ImmutableArray<TypedExpression> args,
+        SourceSpan span,
+        CheckContext ctx)
+    {
+        ValidateFunctionQualifierCompatibility(overload, args, span, ctx);
+        return new TypedFunctionCall(
+            overload.ReturnType,
+            kind,
+            args,
+            overload.ProofRequirements.ToImmutableArray(),
+            span);
+    }
+
+    private static void ValidateFunctionQualifierCompatibility(
+        FunctionOverload overload,
+        ImmutableArray<TypedExpression> args,
+        SourceSpan span,
+        CheckContext ctx)
+    {
+        if (overload.Match != QualifierMatch.Same || args.Length < 2)
+            return;
+
+        for (var i = 1; i < args.Length; i++)
+        {
+            if (TryEmitFunctionQualifierMismatch(args[0], args[i], span, ctx))
+                return;
+        }
+    }
+
+    private static bool TryEmitFunctionQualifierMismatch(
+        TypedExpression left,
+        TypedExpression right,
+        SourceSpan span,
+        CheckContext ctx)
+    {
+        var leftQualifiers = TryGetStaticQualifiers(left);
+        var rightQualifiers = TryGetStaticQualifiers(right);
+        if (leftQualifiers is null || rightQualifiers is null)
+            return false;
+
+        if (left.ResultType == TypeKind.Money && right.ResultType == TypeKind.Money)
+        {
+            var leftCurrency = leftQualifiers.Value.OfType<DeclaredQualifierMeta.Currency>().FirstOrDefault();
+            var rightCurrency = rightQualifiers.Value.OfType<DeclaredQualifierMeta.Currency>().FirstOrDefault();
+            if (leftCurrency is not null
+                && rightCurrency is not null
+                && !StringComparer.OrdinalIgnoreCase.Equals(leftCurrency.CurrencyCode, rightCurrency.CurrencyCode))
+            {
+                ctx.Diagnostics.Add(
+                    Diagnostics.Create(DiagnosticCode.CrossCurrencyArithmetic, span,
+                        GetOperandName(left), leftCurrency.CurrencyCode,
+                        GetOperandName(right), rightCurrency.CurrencyCode));
+                return true;
+            }
+        }
+
+        if (left.ResultType == TypeKind.Quantity && right.ResultType == TypeKind.Quantity)
+        {
+            var leftDimension = GetDimensionFromQualifiers(leftQualifiers.Value);
+            var rightDimension = GetDimensionFromQualifiers(rightQualifiers.Value);
+            if (leftDimension is not null
+                && rightDimension is not null
+                && !StringComparer.Ordinal.Equals(leftDimension, rightDimension))
+            {
+                ctx.Diagnostics.Add(
+                    Diagnostics.Create(DiagnosticCode.CrossDimensionArithmetic, span,
+                        GetOperandName(left), leftDimension,
+                        GetOperandName(right), rightDimension));
+                return true;
+            }
+
+            if (leftDimension is not null
+                && rightDimension is not null
+                && StringComparer.OrdinalIgnoreCase.Equals(leftDimension, "count")
+                && StringComparer.OrdinalIgnoreCase.Equals(rightDimension, "count"))
+            {
+                var leftUnit = leftQualifiers.Value.OfType<DeclaredQualifierMeta.Unit>().FirstOrDefault()?.UnitCode;
+                var rightUnit = rightQualifiers.Value.OfType<DeclaredQualifierMeta.Unit>().FirstOrDefault()?.UnitCode;
+                if (!string.IsNullOrWhiteSpace(leftUnit)
+                    && !string.IsNullOrWhiteSpace(rightUnit)
+                    && !StringComparer.OrdinalIgnoreCase.Equals(leftUnit, rightUnit))
+                {
+                    ctx.Diagnostics.Add(
+                        Diagnostics.Create(DiagnosticCode.CrossCountingUnitOperation, span,
+                            GetOperandName(left), leftUnit,
+                            GetOperandName(right), rightUnit));
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /// <summary>

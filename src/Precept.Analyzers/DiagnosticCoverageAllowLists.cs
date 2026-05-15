@@ -108,6 +108,7 @@ internal static class DiagnosticCoverageAllowLists
         "ConflictingAccessModes",
         "ConflictingModifiers",
         "CountBoundViolation",
+        "CrossCountingUnitOperation",
         "CrossCurrencyArithmetic",
         "CrossDimensionArithmetic",
         "DeadEndState",

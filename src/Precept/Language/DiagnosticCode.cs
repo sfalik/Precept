@@ -159,6 +159,8 @@ public enum DiagnosticCode
     LengthBoundViolation               = 135,
     /// <summary>A collection field assignment cannot be proven to satisfy the declared mincount/maxcount bounds.</summary>
     CountBoundViolation                = 136,
+    /// <summary>A binary/function operation combines business counting units that share dimension family but not unit identity.</summary>
+    CrossCountingUnitOperation         = 137,
 
     // ── Graph ────────────────────────────────────────────
     UnreachableState                   =  80,
