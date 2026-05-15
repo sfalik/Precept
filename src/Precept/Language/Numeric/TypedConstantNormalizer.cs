@@ -18,8 +18,13 @@ public static class TypedConstantNormalizer
         if (denominatorUnit is null)
             return magnitude;
 
-        var factor = FactorToDecimal(denominatorUnit.Scale);
-        return magnitude / factor;
+        if (!TryGetStaticAffineParams(denominatorUnit, out var scale, out var offset))
+            return magnitude;
+
+        if (offset.HasValue)
+            throw new InvalidOperationException("Price normalization does not support affine-offset units");
+
+        return magnitude / scale;
     }
 
     public static decimal DenormalizeQuantity(decimal normalizedMagnitude, UcumParsedUnit? unit)

@@ -28,6 +28,15 @@ public class TypedConstantNormalizerTests
     }
 
     [Fact]
+    public void NormalizePrice_AffineDenominator_Throws()
+    {
+        var act = () => TypedConstantNormalizer.NormalizePrice(1m, ParseUnit("Cel"));
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("Price normalization does not support affine-offset units");
+    }
+
+    [Fact]
     public void NormalizeQuantity_NullUnit_LeavesMagnitudeUnchanged()
     {
         TypedConstantNormalizer.NormalizeQuantity(12.5m, null).Should().Be(12.5m);

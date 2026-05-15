@@ -76,19 +76,41 @@ state Active initial";
     }
 
     [Fact]
-    public void TypeChecker_QuantityFieldWithTypedConstantBounds_PopulatesDeclaredMaxAndQualifier()
+    public void TypeChecker_QuantityFieldWithTypedConstantBounds_PreservesDeclaredMagnitudeAndStoresNormalizedBounds()
     {
         const string precept = @"
 precept QuantityBounds
-field weight as quantity in 'kg' max '5 kg'
+field weight as quantity in 'kg' min '5 g' max '2000 g'
 state Active initial";
 
         var result = Compiler.Compile(precept);
         var weightField = result.Semantics.FieldsByName["weight"];
 
-        weightField.DeclaredMax.Should().Be(5m);
+        weightField.DeclaredMin.Should().Be(5m);
+        weightField.NormalizedDeclaredMin.Should().Be(0.005m);
+        weightField.DeclaredMax.Should().Be(2000m);
+        weightField.NormalizedDeclaredMax.Should().Be(2m);
         weightField.DeclaredMaxBoundQualifiers.OfType<DeclaredQualifierMeta.Unit>().Select(q => q.UnitCode)
-            .Should().ContainSingle().Which.Should().Be("kg");
+            .Should().ContainSingle().Which.Should().Be("g");
+    }
+
+    [Fact]
+    public void TypeChecker_QuantityArgWithTypedConstantBounds_PreservesDeclaredMagnitudeAndStoresNormalizedBounds()
+    {
+        const string precept = @"
+precept QuantityArgBounds
+state Active initial
+event Apply(Amount as quantity in 'kg' min '5 g' max '2000 g')";
+
+        var result = Compiler.Compile(precept);
+        var amountArg = result.Semantics.EventsByName["Apply"].Args.Single(arg => arg.Name == "Amount");
+
+        amountArg.DeclaredMin.Should().Be(5m);
+        amountArg.NormalizedDeclaredMin.Should().Be(0.005m);
+        amountArg.DeclaredMax.Should().Be(2000m);
+        amountArg.NormalizedDeclaredMax.Should().Be(2m);
+        amountArg.DeclaredMaxBoundQualifiers.OfType<DeclaredQualifierMeta.Unit>().Select(q => q.UnitCode)
+            .Should().ContainSingle().Which.Should().Be("g");
     }
 
     [Fact]
