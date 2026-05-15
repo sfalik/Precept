@@ -38,6 +38,9 @@ internal static partial class TypeChecker
         // Pass 1b: resolve field default/computed expressions (B1)
         ResolveFieldExpressions(symbols, ctx);
 
+        // Pass 1c: resolve event arg default expressions (Slice 26)
+        ResolveEventArgExpressions(symbols, ctx);
+
         // Pass 2: normalize transition rows and event handlers (Slice 5)
         PopulateTransitionRows(manifest, ctx);
         PopulateEventHandlers(manifest, ctx);
@@ -709,6 +712,90 @@ internal static partial class TypeChecker
         }
     }
 
+    // ════════════════════════════════════════════════════════════════════════
+    //  Pass 1c — event arg expression resolution (Slice 26)
+    // ════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Resolve default expressions on event args. Populates
+    /// <see cref="TypedArg.DefaultExpression"/> for args that declare a <c>default</c> modifier.
+    /// Field refs are allowed in arg defaults (e.g. interpolated defaults like <c>'1.00 {Currency}'</c>);
+    /// arg-to-arg refs are prohibited (no <c>CurrentEventArgs</c> scope during resolution).
+    /// </summary>
+    private static void ResolveEventArgExpressions(SymbolTable symbols, CheckContext ctx)
+    {
+        for (int eventIdx = 0; eventIdx < ctx.Events.Count; eventIdx++)
+        {
+            var typedEvent = ctx.Events[eventIdx];
+            var declaredEvent = symbols.Events[eventIdx];
+
+            var argsChanged = false;
+            var argsBuilder = typedEvent.Args.ToBuilder();
+
+            for (int argIdx = 0; argIdx < declaredEvent.Args.Length; argIdx++)
+            {
+                var declaredArg = declaredEvent.Args[argIdx];
+                var typedArg = argsBuilder[argIdx];
+
+                var defaultMod = declaredArg.ParsedModifiers.IsDefaultOrEmpty ? null
+                    : declaredArg.ParsedModifiers.FirstOrDefault(m => m.Kind == ModifierKind.Default);
+                if (defaultMod?.Value is null or MissingExpression)
+                    continue;
+
+                // Arg defaults are declaration-time constants: no other args are in scope,
+                // but field refs are allowed (e.g. interpolated defaults like '1.00 {Currency}').
+                var savedScope = ctx.CurrentScope;
+                var savedFieldIndex = ctx.CurrentFieldIndex;
+                var savedEventArgs = ctx.CurrentEventArgs;
+                var savedEventName = ctx.CurrentEventName;
+                ctx.CurrentScope = FieldScopeMode.AllFields;
+                ctx.CurrentFieldIndex = -1;
+                ctx.CurrentEventArgs = null;
+                ctx.CurrentEventName = null;
+
+                var resolved = Resolve(defaultMod.Value, ctx, typedArg.ResolvedType, typedArg.DeclaredQualifiers);
+
+                ctx.CurrentScope = savedScope;
+                ctx.CurrentFieldIndex = savedFieldIndex;
+                ctx.CurrentEventArgs = savedEventArgs;
+                ctx.CurrentEventName = savedEventName;
+
+                if (resolved is not TypedErrorExpression && typedArg.ResolvedType != TypeKind.Error)
+                {
+                    if (!IsAssignable(resolved.ResultType, typedArg.ResolvedType))
+                    {
+                        ctx.Diagnostics.Add(Diagnostics.Create(
+                            DiagnosticCode.TypeMismatch,
+                            defaultMod.Value.Span,
+                            Types.GetMeta(typedArg.ResolvedType).DisplayName,
+                            Types.GetMeta(resolved.ResultType).DisplayName));
+                    }
+                    else if (!typedArg.DeclaredQualifiers.IsDefaultOrEmpty)
+                    {
+                        ValidateAssignmentQualifiers(
+                            resolved,
+                            typedArg.Name,
+                            typedArg.DeclaredQualifiers,
+                            defaultMod.Value.Span,
+                            ctx);
+                    }
+
+                    ValidateMaxPlaces(resolved, typedArg.Modifiers, declaredArg.ParsedModifiers, typedArg.Name, defaultMod.Value.Span, ctx);
+                }
+
+                argsBuilder[argIdx] = typedArg with { DefaultExpression = resolved };
+                argsChanged = true;
+            }
+
+            if (argsChanged)
+            {
+                var updatedEvent = typedEvent with { Args = argsBuilder.ToImmutable() };
+                ctx.Events[eventIdx] = updatedEvent;
+                ctx.EventLookup[typedEvent.Name] = updatedEvent;
+            }
+        }
+    }
+
     private static bool AllowsBareNumericQuantityBound(
         ParsedExpression expression,
         TypeKind targetType,
@@ -737,13 +824,31 @@ internal static partial class TypeChecker
         TypedExpression resolved,
         TypedField field,
         SourceSpan span,
+        CheckContext ctx) =>
+        ValidateMaxPlaces(
+            resolved,
+            field.Modifiers,
+            field.Syntax.GetSlot<ModifierListSlot>(ConstructSlotKind.ModifierList)?.Modifiers
+                ?? ImmutableArray<ParsedModifier>.Empty,
+            field.Name,
+            span,
+            ctx);
+
+    /// <summary>
+    /// PRE0067 — MaxPlacesExceeded: core overload shared by field and event-arg default checks.
+    /// </summary>
+    private static void ValidateMaxPlaces(
+        TypedExpression resolved,
+        ImmutableArray<ModifierKind> modifiers,
+        ImmutableArray<ParsedModifier> parsedModifiers,
+        string name,
+        SourceSpan span,
         CheckContext ctx)
     {
         if (resolved is not TypedLiteral { Value: decimal decValue }) return;
 
-        var maxplacesMod = field.Modifiers.Contains(ModifierKind.Maxplaces)
-            ? field.Syntax.GetSlot<ModifierListSlot>(ConstructSlotKind.ModifierList)?.Modifiers
-                .FirstOrDefault(m => m.Kind == ModifierKind.Maxplaces)
+        var maxplacesMod = modifiers.Contains(ModifierKind.Maxplaces)
+            ? parsedModifiers.FirstOrDefault(m => m.Kind == ModifierKind.Maxplaces)
             : null;
         if (maxplacesMod?.Value is not LiteralExpression { LiteralKind: TokenKind.NumberLiteral, Text: var maxText })
             return;
@@ -757,7 +862,7 @@ internal static partial class TypeChecker
         if (actualPlaces > maxPlaces)
         {
             ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.MaxPlacesExceeded,
-                span, actualPlaces.ToString(), field.Name, maxPlaces.ToString()));
+                span, actualPlaces.ToString(), name, maxPlaces.ToString()));
         }
     }
 

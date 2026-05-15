@@ -216,6 +216,9 @@ public static partial class ProofEngine
         // Fields[].DefaultExpression (Slice 25: interval containment for interpolated defaults)
         CollectDefaultObligations(semantics, obligations);
 
+        // Events[].Args[].DefaultExpression (Slice 26: interval containment for arg defaults)
+        CollectArgDefaultObligations(semantics, obligations);
+
         return obligations;
     }
 

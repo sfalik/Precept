@@ -392,6 +392,60 @@ public static partial class ProofEngine
         }
     }
 
+    // ════════════════════════════════════════════════════════════════════════════
+    //  Part C — Arg default obligation collector (Slice 26)
+    // ════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Generates interval-containment proof obligations for event args whose
+    /// <see cref="TypedArg.DefaultExpression"/> is non-null and whose declared
+    /// bounds are non-empty. Handles both <see cref="TypedTypedConstant"/> and
+    /// <see cref="InterpolatedTypedConstant"/> defaults. Only emits obligations where
+    /// <see cref="IntervalOf"/> returns a bounded (non-<see cref="NumericInterval.Unbounded"/>)
+    /// result.
+    /// </summary>
+    internal static void CollectArgDefaultObligations(SemanticIndex semantics, List<ProofObligation> obligations)
+    {
+        foreach (var evt in semantics.Events)
+        {
+            foreach (var arg in evt.Args)
+            {
+                if (arg.DefaultExpression is null)
+                    continue;
+
+                var min = arg.NormalizedDeclaredMin ?? arg.DeclaredMin;
+                var max = arg.NormalizedDeclaredMax ?? arg.DeclaredMax;
+                if (!min.HasValue && !max.HasValue)
+                    continue;
+
+                // Use the full IntervalOf path (includes ApplyStaticUnitScaling) so unit conversion is applied.
+                var interval = IntervalOf(arg.DefaultExpression, semantics);
+                if (interval.IsUnbounded)
+                    continue;
+
+                var authoredMin = arg.DeclaredMin;
+                var authoredMax = arg.DeclaredMax;
+                var minStr = (authoredMin ?? min)?.ToString() ?? "−∞";
+                var maxStr = (authoredMax ?? max)?.ToString() ?? "+∞";
+                var targetLabel = $"{evt.Name}.{arg.Name}";
+                var intervalReq = new IntervalContainmentProofRequirement(
+                    new SelfSubject(),
+                    targetLabel,
+                    min, max,
+                    authoredMin, authoredMax,
+                    $"Interval containment: default of '{targetLabel}' must be within declared bounds [{minStr} .. {maxStr}]");
+
+                obligations.Add(new ProofObligation(
+                    intervalReq,
+                    arg.DefaultExpression,
+                    new ArgDefaultContext(arg),
+                    ProofDisposition.Unresolved,
+                    null,
+                    null));
+            }
+        }
+    }
+
     private static string FormatViolationReason(TypedEnsure ensure, Dictionary<string, object?> defaults)
     {
         var fields = new List<string>();
