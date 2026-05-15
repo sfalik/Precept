@@ -884,7 +884,7 @@ internal static partial class TypeChecker
             ValidateUnitSlotDimensionConsistency(slot.Expression, qualifiers, expr.Span, ctx);
         }
 
-        return new TypedInterpolatedTypedConstant(
+        return new InterpolatedTypedConstant(
             typedSlots.ToImmutable(),
             targetType,
             expr.Span,
@@ -1009,3 +1009,4 @@ internal static partial class TypeChecker
         return new TypedInterpolatedString(segments.ToImmutable(), expr.Span);
     }
 }
+

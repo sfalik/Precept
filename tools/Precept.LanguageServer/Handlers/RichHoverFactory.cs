@@ -989,7 +989,7 @@ internal static class RichHoverFactory
             case TypedTypedConstant { DeclaredQualifiers: { } constantQualifiers }:
                 return ResolveDeclarationQualifier(expression.ResultType, constantQualifiers, axis);
 
-            case TypedInterpolatedTypedConstant interpolatedConstant:
+            case InterpolatedTypedConstant interpolatedConstant:
                 return ResolveQualifierFromInterpolatedConstant(interpolatedConstant, axis);
 
             case TypedMemberAccess { ResolvedAccessor: FixedReturnAccessor { ReturnsQualifier: var returnsAxis }, Object: var owner }
@@ -1026,7 +1026,7 @@ internal static class RichHoverFactory
             ? ResolveDeclarationQualifier(field.ResolvedType, field.DeclaredQualifiers, axis)
             : null;
 
-    private static DeclaredQualifierMeta? ResolveQualifierFromInterpolatedConstant(TypedInterpolatedTypedConstant constant, QualifierAxis axis)
+    private static DeclaredQualifierMeta? ResolveQualifierFromInterpolatedConstant(InterpolatedTypedConstant constant, QualifierAxis axis)
     {
         var targetSlot = axis switch
         {
@@ -1126,7 +1126,7 @@ internal static class RichHoverFactory
             || ContainsFieldReference(conditional.ThenBranch, fieldName)
             || ContainsFieldReference(conditional.ElseBranch, fieldName),
         TypedInterpolatedString interpolatedString => interpolatedString.Segments.OfType<TypedHoleSegment>().Any(hole => ContainsFieldReference(hole.Expression, fieldName)),
-        TypedInterpolatedTypedConstant interpolatedConstant => interpolatedConstant.Slots.Any(slot => ContainsFieldReference(slot.Expression, fieldName)),
+        InterpolatedTypedConstant interpolatedConstant => interpolatedConstant.Slots.Any(slot => ContainsFieldReference(slot.Expression, fieldName)),
         TypedListLiteral listLiteral => listLiteral.Elements.Any(element => ContainsFieldReference(element, fieldName)),
         TypedPostfixOp postfix => ContainsFieldReference(postfix.Operand, fieldName),
         _ => false,
@@ -1243,7 +1243,7 @@ internal static class RichHoverFactory
                     CollectFieldInputs(hole.Expression, inputs);
                 }
                 break;
-            case TypedInterpolatedTypedConstant interpolatedConstant:
+            case InterpolatedTypedConstant interpolatedConstant:
                 foreach (var slot in interpolatedConstant.Slots)
                 {
                     CollectFieldInputs(slot.Expression, inputs);
@@ -2906,3 +2906,4 @@ internal static class RichHoverFactory
         string? OwnerName,
         bool IsFieldOwner);
 }
+

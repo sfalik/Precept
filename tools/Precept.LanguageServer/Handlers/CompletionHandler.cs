@@ -1648,7 +1648,7 @@ internal sealed class CompletionHandler : ICompletionHandler
         var tokens = compilation.Tokens.Tokens;
         var holeIndex = GetHoleIndex(tokens, position);
 
-        // Look up the already-computed TypedInterpolatedTypedConstant from the semantic model.
+        // Look up the already-computed InterpolatedTypedConstant from the semantic model.
         var interpolated = TypedConstantCollector.FindInterpolatedAtPosition(compilation.Semantics, position);
         if (interpolated is not null && holeIndex >= 0 && holeIndex < interpolated.Slots.Length)
         {
@@ -1832,3 +1832,4 @@ internal sealed class CompletionHandler : ICompletionHandler
         Action = 13,
     }
 }
+

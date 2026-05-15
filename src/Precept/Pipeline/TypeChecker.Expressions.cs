@@ -43,7 +43,7 @@ internal static partial class TypeChecker
                 foreach (var seg in interp.Segments)
                     if (seg is TypedHoleSegment hole) CollectFieldRefs(hole.Expression, refs);
                 break;
-            case TypedInterpolatedTypedConstant itc:
+            case InterpolatedTypedConstant itc:
                 foreach (var slot in itc.Slots)
                     CollectFieldRefs(slot.Expression, refs);
                 break;
@@ -1211,3 +1211,4 @@ internal static partial class TypeChecker
         return Types.GetMeta(source).WidensTo.Contains(target);
     }
 }
+

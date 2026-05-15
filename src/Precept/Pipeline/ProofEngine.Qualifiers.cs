@@ -344,7 +344,7 @@ public static partial class ProofEngine
             case TypedMemberAccess { Object: TypedFieldRef fieldRef2 }:
                 return ResolveFieldQualifier(fieldRef2.FieldName, axis, semantics);
 
-            case TypedInterpolatedTypedConstant itc:
+            case InterpolatedTypedConstant itc:
                 return ResolveQualifierFromInterpolatedConstant(itc, axis);
 
             case TypedBinaryOp binOp when binOp.ResultQualifier is not null:
@@ -404,7 +404,7 @@ public static partial class ProofEngine
     }
 
     private static DeclaredQualifierMeta? ResolveQualifierFromInterpolatedConstant(
-        TypedInterpolatedTypedConstant itc, QualifierAxis axis)
+        InterpolatedTypedConstant itc, QualifierAxis axis)
     {
         InterpolationSlotKind? targetSlot = axis switch
         {
@@ -626,3 +626,4 @@ public static partial class ProofEngine
         return null;
     }
 }
+

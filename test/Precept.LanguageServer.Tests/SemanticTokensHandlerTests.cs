@@ -940,7 +940,7 @@ public sealed class SemanticTokensHandlerTests
     public void IdentifierTokens_FunctionCallInsideTypedConstantHole_EmitsFunctionToken()
     {
         // This is the actual bug I3 regression test: EnumerateExpressionTree must walk
-        // TypedInterpolatedTypedConstant.Slots so TypedFunctionCall nodes inside holes
+        // InterpolatedTypedConstant.Slots so TypedFunctionCall nodes inside holes
         // get their built-in function semantic token.
         var compilation = Compiler.Compile("""
             precept Test
@@ -954,7 +954,7 @@ public sealed class SemanticTokensHandlerTests
             .SelectMany(row => row.Actions)
             .OfType<TypedInputAction>()
             .Select(a => a.InputExpression)
-            .OfType<TypedInterpolatedTypedConstant>()
+            .OfType<InterpolatedTypedConstant>()
             .Single();
         var call = (TypedFunctionCall)slots.Slots.Single().Expression;
         var expectedLength = Functions.GetMeta(call.ResolvedFunction).Name.Length;
@@ -1088,3 +1088,4 @@ internal static class OmniSharpCompatibilityExtensions
         return registry.OnPublishDiagnostics(handler);
     }
 }
+

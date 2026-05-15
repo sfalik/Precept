@@ -1130,7 +1130,7 @@ internal static partial class TypeChecker
         TypedConditional cond => ContainsError(cond.Condition) || ContainsError(cond.ThenBranch) || ContainsError(cond.ElseBranch),
         TypedQuantifier q => ContainsError(q.Collection) || ContainsError(q.Predicate),
         TypedInterpolatedString interp => interp.Segments.Any(s => s is TypedHoleSegment hole && ContainsError(hole.Expression)),
-        TypedInterpolatedTypedConstant itc => itc.Slots.Any(s => ContainsError(s.Expression)),
+        InterpolatedTypedConstant itc => itc.Slots.Any(s => ContainsError(s.Expression)),
         TypedListLiteral list => list.Elements.Any(ContainsError),
         TypedPostfixOp post => ContainsError(post.Operand),
         _ => false, // TypedFieldRef, TypedArgRef, TypedLiteral, TypedTypedConstant
@@ -1158,7 +1158,7 @@ internal static partial class TypeChecker
                                                   .OfType<TypedHoleSegment>()
                                                   .SelectMany(s => CollectFieldRefs(s.Expression)),
         TypedTypedConstant                  => [],
-        TypedInterpolatedTypedConstant itc  => itc.Slots.SelectMany(s => CollectFieldRefs(s.Expression)),
+        InterpolatedTypedConstant itc  => itc.Slots.SelectMany(s => CollectFieldRefs(s.Expression)),
         TypedListLiteral list               => list.Elements.SelectMany(CollectFieldRefs),
         TypedPostfixOp post                 => CollectFieldRefs(post.Operand),
         TypedErrorExpression                => [],
@@ -1187,10 +1187,11 @@ internal static partial class TypeChecker
                                                   .OfType<TypedHoleSegment>()
                                                   .SelectMany(s => CollectArgRefs(s.Expression)),
         TypedTypedConstant                  => [],
-        TypedInterpolatedTypedConstant itc  => itc.Slots.SelectMany(s => CollectArgRefs(s.Expression)),
+        InterpolatedTypedConstant itc  => itc.Slots.SelectMany(s => CollectArgRefs(s.Expression)),
         TypedListLiteral list               => list.Elements.SelectMany(CollectArgRefs),
         TypedPostfixOp post                 => CollectArgRefs(post.Operand),
         TypedErrorExpression                => [],
         TypedExpression                     => [],
     };
 }
+

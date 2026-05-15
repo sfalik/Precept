@@ -28,12 +28,12 @@ internal static class TypedConstantCollector
             .FirstOrDefault();
 
     /// <summary>
-    /// Finds the innermost <see cref="TypedInterpolatedTypedConstant"/> whose span contains
+    /// Finds the innermost <see cref="InterpolatedTypedConstant"/> whose span contains
     /// <paramref name="position"/>. Used to look up the slot kind for a cursor inside a hole.
     /// </summary>
-    internal static TypedInterpolatedTypedConstant? FindInterpolatedAtPosition(SemanticIndex index, Position position) =>
+    internal static InterpolatedTypedConstant? FindInterpolatedAtPosition(SemanticIndex index, Position position) =>
         EnumerateTypedExpressions(index)
-            .OfType<TypedInterpolatedTypedConstant>()
+            .OfType<InterpolatedTypedConstant>()
             .Where(itc => Contains(itc.Span, position))
             .OrderBy(itc => GetSpanWidth(itc.Span))
             .ThenByDescending(itc => itc.Span.StartLine)
@@ -330,3 +330,4 @@ internal static class TypedConstantCollector
         return true;
     }
 }
+

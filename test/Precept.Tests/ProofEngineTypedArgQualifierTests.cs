@@ -25,7 +25,7 @@ public class ProofEngineTypedArgQualifierTests
     }
 
     private static DeclaredQualifierMeta? ResolveInterpolatedConstantQualifier(
-        TypedInterpolatedTypedConstant constant,
+        InterpolatedTypedConstant constant,
         QualifierAxis axis)
     {
         var method = typeof(ProofEngine).GetMethod(
@@ -36,14 +36,14 @@ public class ProofEngineTypedArgQualifierTests
         return (DeclaredQualifierMeta?)method!.Invoke(null, new object?[] { constant, axis });
     }
 
-    private static TypedInterpolatedTypedConstant GetRuleRightConstant(SemanticIndex index)
+    private static InterpolatedTypedConstant GetRuleRightConstant(SemanticIndex index)
     {
         index.Rules.Should().ContainSingle();
         index.Rules[0].Condition.Should().BeOfType<TypedBinaryOp>();
 
         var comparison = (TypedBinaryOp)index.Rules[0].Condition;
-        comparison.Right.Should().BeOfType<TypedInterpolatedTypedConstant>();
-        return (TypedInterpolatedTypedConstant)comparison.Right;
+        comparison.Right.Should().BeOfType<InterpolatedTypedConstant>();
+        return (InterpolatedTypedConstant)comparison.Right;
     }
 
     [Fact]
@@ -184,3 +184,4 @@ public class ProofEngineTypedArgQualifierTests
             && (d.Span.StartLine == 214 || d.Span.StartLine == 220 || d.Span.StartLine == 225));
     }
 }
+

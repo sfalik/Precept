@@ -668,7 +668,7 @@ internal sealed class SemanticTokensHandler : SemanticTokensHandlerBase
                 }
                 break;
 
-            case TypedInterpolatedTypedConstant interpolatedTypedConstant:
+            case InterpolatedTypedConstant interpolatedTypedConstant:
                 foreach (var slot in interpolatedTypedConstant.Slots)
                 {
                     foreach (var nested in EnumerateExpressionTree(slot.Expression))
@@ -715,3 +715,4 @@ internal sealed class SemanticTokensHandler : SemanticTokensHandlerBase
         [property: JsonPropertyName("bold")] bool Bold,
         [property: JsonPropertyName("italic")] bool Italic);
 }
+

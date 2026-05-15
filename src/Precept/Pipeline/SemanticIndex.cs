@@ -133,7 +133,7 @@ public sealed record TypedTypedConstant(
 /// A resolved interpolated typed constant with slot-annotated hole expressions.
 /// Each hole is assigned a semantic slot identity by the type-grammar matching algorithm.
 /// </summary>
-public sealed record TypedInterpolatedTypedConstant(
+public sealed record InterpolatedTypedConstant(
     ImmutableArray<TypedInterpolationSlot> Slots,
     TypeKind ResultType,
     SourceSpan Span,
@@ -576,3 +576,4 @@ public sealed record SemanticIndex(
         Diagnostics:      ImmutableArray<Diagnostic>.Empty
     );
 }
+

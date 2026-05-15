@@ -715,7 +715,7 @@ public class TypeCheckerTypedConstantTests
         diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "target");
-        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>()
+        assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
             .Which.ResultType.Should().Be(TypeKind.UnitOfMeasure);
     }
 
@@ -736,7 +736,7 @@ public class TypeCheckerTypedConstantTests
         diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "target");
-        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>()
+        assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
             .Which.ResultType.Should().Be(TypeKind.Quantity);
     }
 
@@ -757,7 +757,7 @@ public class TypeCheckerTypedConstantTests
         diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "target");
-        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>()
+        assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
             .Which.ResultType.Should().Be(TypeKind.Quantity);
     }
 
@@ -777,7 +777,7 @@ public class TypeCheckerTypedConstantTests
         diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "target");
-        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>()
+        assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
             .Which.ResultType.Should().Be(TypeKind.Quantity);
     }
 
@@ -796,7 +796,7 @@ public class TypeCheckerTypedConstantTests
         diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "target");
-        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>()
+        assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
             .Which.ResultType.Should().Be(TypeKind.Quantity);
     }
 
@@ -815,7 +815,7 @@ public class TypeCheckerTypedConstantTests
         diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "target");
-        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>()
+        assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
             .Which.ResultType.Should().Be(TypeKind.Quantity);
     }
 
@@ -940,7 +940,7 @@ public class TypeCheckerTypedConstantTests
         diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "q");
-        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>()
+        assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
             .Which.ResultType.Should().Be(TypeKind.Quantity);
     }
 
@@ -960,7 +960,7 @@ public class TypeCheckerTypedConstantTests
         diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "q");
-        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>();
+        assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>();
     }
 
     [Fact]
@@ -980,7 +980,7 @@ public class TypeCheckerTypedConstantTests
         diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "m");
-        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>()
+        assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
             .Which.ResultType.Should().Be(TypeKind.Money);
     }
 
@@ -1002,7 +1002,7 @@ public class TypeCheckerTypedConstantTests
         diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "p");
-        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>()
+        assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
             .Which.ResultType.Should().Be(TypeKind.Price);
     }
 
@@ -1024,7 +1024,7 @@ public class TypeCheckerTypedConstantTests
         diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "x");
-        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>()
+        assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
             .Which.ResultType.Should().Be(TypeKind.ExchangeRate);
     }
 
@@ -1044,7 +1044,7 @@ public class TypeCheckerTypedConstantTests
         diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "p");
-        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>()
+        assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
             .Which.ResultType.Should().Be(TypeKind.Period);
     }
 
@@ -1065,7 +1065,7 @@ public class TypeCheckerTypedConstantTests
         diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "d");
-        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>()
+        assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
             .Which.ResultType.Should().Be(TypeKind.Duration);
     }
 
@@ -1087,7 +1087,7 @@ public class TypeCheckerTypedConstantTests
         diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "target");
-        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>()
+        assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
             .Which.ResultType.Should().Be(TypeKind.Money);
     }
 
@@ -1106,7 +1106,7 @@ public class TypeCheckerTypedConstantTests
         diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "target");
-        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>();
+        assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>();
     }
 
     [Fact]
@@ -1124,7 +1124,7 @@ public class TypeCheckerTypedConstantTests
         diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "target");
-        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>();
+        assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>();
     }
 
     [Fact]
@@ -1142,7 +1142,7 @@ public class TypeCheckerTypedConstantTests
         diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "target");
-        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>();
+        assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>();
     }
 
     [Fact]
@@ -1160,7 +1160,7 @@ public class TypeCheckerTypedConstantTests
         diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "target");
-        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>();
+        assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>();
     }
 
     // ── Dimension-unit consistency (DimensionMismatchInUnitSlot) ──────────
@@ -1199,7 +1199,7 @@ public class TypeCheckerTypedConstantTests
         diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "target");
-        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>();
+        assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>();
     }
 
     [Fact]
@@ -1285,7 +1285,7 @@ public class TypeCheckerTypedConstantTests
         diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "m");
-        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>()
+        assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
             .Which.ResultType.Should().Be(TypeKind.Money);
     }
 
@@ -1305,7 +1305,7 @@ public class TypeCheckerTypedConstantTests
         diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "m");
-        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>()
+        assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
             .Which.ResultType.Should().Be(TypeKind.Money);
     }
 
@@ -1325,7 +1325,7 @@ public class TypeCheckerTypedConstantTests
         diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "q");
-        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>()
+        assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
             .Which.ResultType.Should().Be(TypeKind.Quantity);
     }
 
@@ -1345,7 +1345,7 @@ public class TypeCheckerTypedConstantTests
         diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "p");
-        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>()
+        assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
             .Which.ResultType.Should().Be(TypeKind.Price);
     }
 
@@ -1365,7 +1365,7 @@ public class TypeCheckerTypedConstantTests
         diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
         var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "p");
-        assign.InputExpression.Should().BeOfType<TypedInterpolatedTypedConstant>()
+        assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
             .Which.ResultType.Should().Be(TypeKind.Price);
     }
 
@@ -1382,7 +1382,7 @@ public class TypeCheckerTypedConstantTests
         diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
         diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnresolvedTypedConstant));
         index.Fields.Single(f => f.Name == "StockingUnitsPerPurchaseUnit")
-            .DefaultExpression.Should().BeOfType<TypedInterpolatedTypedConstant>()
+            .DefaultExpression.Should().BeOfType<InterpolatedTypedConstant>()
             .Which.ResultType.Should().Be(TypeKind.Quantity);
     }
 
@@ -1400,7 +1400,7 @@ public class TypeCheckerTypedConstantTests
         diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
         diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnresolvedTypedConstant));
         var comparison = index.Rules.Single().Condition.Should().BeOfType<TypedBinaryOp>().Subject;
-        comparison.Right.Should().BeOfType<TypedInterpolatedTypedConstant>()
+        comparison.Right.Should().BeOfType<InterpolatedTypedConstant>()
             .Which.ResultType.Should().Be(TypeKind.Quantity);
     }
 
@@ -1416,7 +1416,7 @@ public class TypeCheckerTypedConstantTests
         diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
         diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnresolvedTypedConstant));
         index.Fields.Single(f => f.Name == "Conv")
-            .DefaultExpression.Should().BeOfType<TypedInterpolatedTypedConstant>()
+            .DefaultExpression.Should().BeOfType<InterpolatedTypedConstant>()
             .Which.ResultType.Should().Be(TypeKind.Quantity);
     }
 
@@ -1432,7 +1432,7 @@ public class TypeCheckerTypedConstantTests
         diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
         diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnresolvedTypedConstant));
         index.Fields.Single(f => f.Name == "Conv")
-            .DefaultExpression.Should().BeOfType<TypedInterpolatedTypedConstant>()
+            .DefaultExpression.Should().BeOfType<InterpolatedTypedConstant>()
             .Which.ResultType.Should().Be(TypeKind.Quantity);
     }
 
@@ -1450,7 +1450,7 @@ public class TypeCheckerTypedConstantTests
         diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
         diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnresolvedTypedConstant));
         var comparison = index.Rules.Single().Condition.Should().BeOfType<TypedBinaryOp>().Subject;
-        comparison.Right.Should().BeOfType<TypedInterpolatedTypedConstant>()
+        comparison.Right.Should().BeOfType<InterpolatedTypedConstant>()
             .Which.ResultType.Should().Be(TypeKind.Price);
     }
 
@@ -1656,3 +1656,4 @@ public class TypeCheckerTypedConstantTests
             d.Code == DiagnosticCode.UnresolvedTypedConstant.ToString());
     }
 }
+

@@ -299,7 +299,7 @@ public static partial class ProofEngine
                 }
                 break;
 
-            case TypedInterpolatedTypedConstant typedConstant:
+            case InterpolatedTypedConstant typedConstant:
                 foreach (var slot in typedConstant.Slots)
                     WalkExpression(slot.Expression, ctx, obligations, semantics, includeOptionalArgRefs: true);
                 break;
@@ -515,7 +515,7 @@ public static partial class ProofEngine
         TypedLiteral { Value: null } => "<value>",
         TypedLiteral literal => $"'{literal.Value}'",
         TypedTypedConstant typedConstant => $"'{typedConstant.RawText}'",
-        TypedInterpolatedTypedConstant => "<typed constant>",
+        InterpolatedTypedConstant => "<typed constant>",
         TypedInterpolatedString => "<string>",
         TypedConditional => "<conditional>",
         TypedQuantifier quantifier => $"{quantifier.BindingName} in {DescribeExpression(quantifier.Collection)}",
@@ -670,3 +670,4 @@ public static partial class ProofEngine
         }
     }
 }
+

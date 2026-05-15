@@ -68,7 +68,7 @@ public static partial class ProofEngine
     }
 
     /// <summary>
-    /// Finds all <see cref="TypedInterpolatedTypedConstant"/> nodes assigned to the
+    /// Finds all <see cref="InterpolatedTypedConstant"/> nodes assigned to the
     /// named field across all transition rows and event handlers. If ANY assignment
     /// to this field is NOT an interpolated typed constant, returns empty (conservative).
     /// </summary>
@@ -218,7 +218,7 @@ public static partial class ProofEngine
                 value = typedConstantValue;
                 return true;
 
-            case TypedInterpolatedTypedConstant { StaticMagnitude: { } magnitude }:
+            case InterpolatedTypedConstant { StaticMagnitude: { } magnitude }:
                 value = magnitude;
                 return true;
 
@@ -256,10 +256,10 @@ public static partial class ProofEngine
         }
     }
 
-    private static ImmutableArray<TypedInterpolatedTypedConstant> FindInterpolatedAssignments(
+    private static ImmutableArray<InterpolatedTypedConstant> FindInterpolatedAssignments(
         string fieldName, SemanticIndex semantics)
     {
-        var builder = ImmutableArray.CreateBuilder<TypedInterpolatedTypedConstant>();
+        var builder = ImmutableArray.CreateBuilder<InterpolatedTypedConstant>();
         bool hasNonInterpolated = false;
 
         void ScanActions(ImmutableArray<TypedAction> actions)
@@ -269,7 +269,7 @@ public static partial class ProofEngine
                 if (action is TypedInputAction { FieldName: var name, InputExpression: var expr }
                     && string.Equals(name, fieldName, StringComparison.Ordinal))
                 {
-                    if (expr is TypedInterpolatedTypedConstant itc)
+                    if (expr is InterpolatedTypedConstant itc)
                         builder.Add(itc);
                     else
                         hasNonInterpolated = true;
@@ -282,14 +282,14 @@ public static partial class ProofEngine
         foreach (var handler in semantics.EventHandlers)
             ScanActions(handler.Actions);
 
-        return hasNonInterpolated ? ImmutableArray<TypedInterpolatedTypedConstant>.Empty : builder.ToImmutable();
+        return hasNonInterpolated ? ImmutableArray<InterpolatedTypedConstant>.Empty : builder.ToImmutable();
     }
 
     /// <summary>
     /// Extracts the magnitude slot source expression from an interpolated typed constant.
     /// Falls back to whole-value slot if no magnitude slot exists.
     /// </summary>
-    private static TypedExpression? GetMagnitudeSlotSource(TypedInterpolatedTypedConstant itc)
+    private static TypedExpression? GetMagnitudeSlotSource(InterpolatedTypedConstant itc)
     {
         TypedExpression? wholeValue = null;
 
@@ -661,3 +661,4 @@ public static partial class ProofEngine
         _ => false
     };
 }
+
