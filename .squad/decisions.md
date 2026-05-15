@@ -6,6 +6,51 @@
 
 ---
 
+### 2026-05-15T14:55:25Z: Slice N and M review loop closed with B3 fix and final approval
+
+**By:** Scribe
+
+**Status:** Merged from Frank's review loop and George's repair notes.
+
+**Merged sources:** `frank-nm-review.md`; `george-nm-fix.md`; `frank-nm-rereview.md`; `george-nm-b3-fix.md`; `frank-nm-final.md`.
+
+- Frank's first review blocked Slice N on B1/B2: `AllowsBareNumericQuantityBound` was suppressing PRE0018 too broadly, and the regression suite lacked bare-numeric negative tests for dimension-only and unqualified quantity bounds.
+- George's `0837ad6f` fix narrowed the suppression to the intended qualifier lane, added both missing negative tests, and removed the duplicate bare-numeric helper implementation.
+- Frank's re-review found the B3 follow-on: count-dimension fields (`quantity of 'count'`) also need PRE0018 suppression so the dedicated PRE0138 path remains the only diagnostic.
+- George's `70ee2406` repair reused the existing `IsCountDimension` helper instead of duplicating count-dimension detection, restored the Slice M contract, and left all 14 qualifier-compatibility tests green.
+- Frank's final verdict is APPROVED: Slices N and M are fully closed with no new regressions beyond the branch baseline.
+
+---
+
+### 2026-05-15T14:55:25Z: Wave 2 warnings W1 and W2 are closed without new regressions
+
+**By:** Scribe
+
+**Status:** Merged from Frank's Wave 2 review and George's follow-up fix note.
+
+**Merged sources:** `frank-wave2-review.md`; `george-w1w2-fix.md`.
+
+- Frank's Wave 2 review approved Slices 15, 15b, 16, 19, 20, 31, 33, 35, 36, and 37 with two follow-up warnings: preserve authored `DeclaredMin/Max` values alongside normalized storage, and guard `NormalizePrice` against affine-offset denominator units.
+- George confirmed the authored-vs-normalized storage split was already present on the current branch for both `TypedField` and `TypedArg`, then added regression coverage so that invariant stays locked.
+- `01f255ab` also hardened `NormalizePrice` by routing through static affine metadata and throwing for affine-offset denominators instead of silently applying scale-only math.
+- Focused tests passed, and George reported that the remaining full-suite failures are unrelated pre-existing branch issues.
+
+---
+
+### 2026-05-15T14:35:23Z: Bounds-validation documentation lane is locked as Slices 44 and 45
+
+**By:** Scribe
+
+**Status:** Merged from Frank's slice-numbering note.
+
+**Merged source:** `frank-slices-nm-doc.md`.
+
+- The standalone bounds-validation follow-ups are now numbered as Slice 44 (bare-integer bound promotion) and Slice 45 (PRE0138 CountDimensionBoundsAmbiguous).
+- Frank placed both in a dedicated **Bounds** lane in the §5.7 summary table so they stay distinct from the cross-unit operation-enforcement slices.
+- This is a documentation-only decision: no runtime, checker, or tooling behavior changed in the numbering pass itself.
+
+---
+
 ### 2026-05-15T02:32:44Z: Affine quantity normalization now carries UCUM pre-offsets for temperature units
 
 **By:** Scribe
@@ -33,6 +78,7 @@
 - Frank accepted every technical finding, corrected the concrete code targets (`TypedArg`, `PopulateEvents`), moved runtime-ingress work out of the active implementation track, and locked the implementation ordering around the review's safety constraints.
 - B16's dynamic-unit rule is canonical: `TryGetStaticNumericValue` must refuse raw `StaticMagnitude` facts when no static scaling factor exists, and interval-containment proof success never suppresses independent PRE0116 presence obligations.
 - Slice 26's track membership and B18's full display contract were left to explicit follow-up decisions; both are now resolved by separate canonical entries below.
+
 ---
 
 ### 2026-05-15T01:05:58Z: Q1 locked the quantity-overflow display contract and fully resolved B18
@@ -47,6 +93,7 @@
 - `IntervalContainmentProofRequirement` must carry the field's declared qualifier so the diagnostic renderer can de-normalize before presenting overflow evidence.
 - This closes the last ambiguity behind B18: the design now specifies the display contract completely enough for Slice 18 implementation, diagnostic rendering, and downstream hover/MCP alignment.
 - Frank wrote the lock directly into `docs/Working/quantity-normalization-design.md`; that document update is staged with this Scribe pass.
+
 ---
 
 ### 2026-05-15T01:05:58Z: Slice 26 stays inside the quantity-normalization track

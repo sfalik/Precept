@@ -19,108 +19,13 @@
 
 ## Recent Updates
 
-### 2026-05-14T17:10:32.283-04:00 — Exhaustive interpolated typed-constant audit widened the normalization track
+### 2026-05-15T14:55:25Z — Wave 2 follow-ups and the Slice N/M repair lane closed
 
-- Audited `TypedInterpolatedTypedConstant` coverage against quantity-normalization Slices 19-21 and confirmed those slices fix the motivating bug but are **not** exhaustive.
-- Confirmed five gap categories: bounded interpolated `set` false positives, qualifier-proof false positives, silent qualifier-mismatch acceptance in assignment/defaults, missing interpolated field-default proofing, and completely unwired event-arg defaults.
-- Durable severity callout: three false-positive classes and one silent-wrong acceptance are already real; only fully dynamic qualifier text (`'{n} {u}'`-style forms) should remain conservative/unproved by design.
-- Recommended the next planning set as slices 22-26: capture static interpolated qualifier metadata, route it through qualifier consumers, extend interval extraction beyond quantity, add field-default proof coverage, and decide event-arg default resolution.
-
-### 2026-05-14T22:00:00Z — PRE0027 diagnosis: Test.precept revert recommended
-
-- Frank investigated suspected PRE0027 (`DuplicateArgName`) errors. Result: **none exist anywhere** in the repository.
-- The only error in `samples/Test.precept` is **PRE0078** (pre-existing), present before George's edit. George's change (`'6 [lb_av]'` → `'{test2} [lb_av]'`) changed proof shape but not error category.
-- **Recommendation from Frank:** revert `samples/Test.precept` via `git checkout samples/Test.precept`. If interpolated-quantity test coverage is needed for normalization work, create a new sample file with satisfiable bounds.
-- `test/Precept.Analyzers.Tests/AnalyzerTestHelper.cs` addition (`AnalyzeWithFilePathsAsync<TAnalyzer>()`) is clean, legitimate C# test infrastructure.
-
-### 2026-05-14T22:00:00Z — Frank's conditions resolution + Slice 15b confirmed: event-arg bound normalization approved
-
-- Frank resolved all six §5.5.6 conditions — the implementation gate for Slices 14–21 is cleared (pending Shane's sign-off).
-- Key outcome for George: **Slice 15b** adds `NormalizedDeclaredMin/Max` to `TypedEventArg` (Option a). This is now a design-locked requirement, architecturally parallel to `TypedField`.
-- Slices 22–26 have full §5.6 detail entries; George can reference those for implementation planning.
-
-
-
-- Frank independently approved the normalization design with conditions and identified the same high-risk areas George's audit hit from the code side: `IntervalOf` scoping, normalized-field bound reads, normalized `StaticMagnitude`, and missing event-arg bound parity.
-- Treat the combined George + Frank result as the current architectural baseline before any implementation slices are started.
-
-### 2026-05-15T00:08:25Z — Slice P1 landed typed-constant hole presence-proof traversal
-
-- `ProofEngine.WalkExpression` now traverses `TypedInterpolatedTypedConstant` slot expressions and can emit presence obligations for optional arg refs only in that hole context.
-- Focused presence tests passed, and `samples/Test.precept` now reports PRE0116 on line 14 instead of compiling cleanly through the gap.
-- Landed as commit `ae19510f`, aligned with Frank's architectural decision that this is a separate presence-proof repair rather than part of quantity-normalization Slices 14–21.
+- `01f255ab` locked regression coverage around the authored-vs-normalized bound split for both `TypedField` and `TypedArg`, and guarded `NormalizePrice` against affine-offset denominator units.
+- `0837ad6f` narrowed bare-numeric quantity-bound PRE0018 suppression to the intended qualifier lane and added the missing negative tests for dimension-only and unqualified quantity bounds.
+- `70ee2406` extended the same suppression to count-dimension fields through the existing `IsCountDimension` helper; Frank's final re-review approved Slices N and M.
 
 ## Learnings
 
-### 2026-05-14T23:43:11.224-04:00 — First-wave quantity-normalization slices landed with parser/runtime edge constraints
-
-- Slice 43 rename was broader than the initial file list: language-server source (`TypedConstantCollector`, `RichHoverFactory`, handlers) also referenced the semantic node type and had to be renamed with the runtime/test surfaces to keep solution compile integrity.
-- `UcumExactFactor` has no decimal conversion helper; normalization code must derive decimal factors from `Numerator`, `Denominator`, and `Base10Exponent` explicitly.
-- UCUM affine units require preserving function-wrapper identity (`Cel`, `degF`, `degRe`) while still stripping wrappers for scale evaluation; offset assignment cannot depend on stripped expressions alone.
-- `min`/`max` parse as constraint keywords in this branch’s grammar context, so function-call qualifier enforcement regression coverage used `clamp` + `abs` to exercise `QualifierMatch.Same` while keeping the same enforcement path in `SelectOverload`.
-
-### 2026-05-14T23:17:29Z — Slices 14–27 full codebase audit: all NOT_STARTED
-
-Full audit against `src/Precept/` and `test/Precept.Tests/` confirmed **zero slices implemented**:
-
-- **Slice 14:** `TypedConstantNormalizer.cs` does not exist; the `Language/Numeric/` subdirectory does not exist.
-- **Slice 15:** `TypedField` has no `NormalizedDeclaredMin/Max`. `TryGetComparableTypedConstantValue` strips raw magnitude without UCUM scaling.
-- **Slice 15b:** `TypedArg` has no `NormalizedDeclaredMin/Max`. `ExtractArgInterval` reads `arg.DeclaredMin` directly.
-- **Slice 16:** `TryGetTypedConstantMagnitude` returns raw tuple item1. `TryGetStaticScalingFactor` does not exist. `GetFieldBounds` and `TryGetStaticNumericValue` use raw declared/static values.
-- **Slice 17:** No cross-unit normalization overflow tests. Only `lb_av` hit is `BoundsQualifierMismatch` rejection test.
-- **Slice 18:** `IntervalContainmentProofRequirement` has no `DeclaredQualifier` field.
-- **Slices 19–21:** `IntervalOfNarrowed` has no `TypedInterpolatedTypedConstant` case. `NumericInterval` has no `Scale(decimal)`.
-- **Slice 22:** `TypedInterpolatedTypedConstant` has `StaticMagnitude` but no `StaticQualifier`.
-- **Slice 23:** `ResolveQualifierFromInterpolatedConstant` exists but reads slots, not `StaticQualifier`.
-- **Slices 24–25:** No interpolated constant interval or fold coverage.
-- **Slice 26:** `TypedArg.DefaultExpression` hardcoded null; no `ResolveEventArgExpressions`.
-- **Slice 27:** No doc sync in `precept-language-spec.md` or `proof-engine.md`.
-
-Key fact: Several methods that the slices will modify already exist as pre-existing baselines (`TryGetComparableTypedConstantValue`, `GetFieldBounds`, `ExtractArgInterval`, `TryGetTypedConstantMagnitude`, `ResolveQualifierFromInterpolatedConstant`) — none carry normalization logic yet. Slice 14 is the hard prerequisite for all others.
-
-- Typed interpolated typed-constant holes were bypassing presence-proof generation entirely; the fix is to recurse `TypedInterpolatedTypedConstant.Slots` through `WalkExpression` so optional field reads inside holes emit PRE0116 unless a guard proves presence. Verified with new proof-engine tests and with `samples/Test.precept`, which now reports `UnprovedPresenceRequirement` on line 14.
-- Quantity-normalization review: the compile-time core is implementable, but the design still has implementation traps Shane should gate on — duplicate Slice 22 numbering, runtime Slice 22 depending on nonexistent `TypeRuntimeMeta`/`TypeRuntime<T>` surfaces, display drift once computed intervals become normalized, and `TryGetStaticNumericValue` becoming unsound if dynamic-unit interpolated constants fall back to raw `StaticMagnitude`. Also: the actual arg semantic type is `TypedArg`, not `TypedEventArg`, so slice specs must target the real code surface.
-
-### 2026-05-15T02:37:53Z — Function-call qualifier enforcement gap added to the counting-unit fix track
-
-- Frank's comprehensive cross-counting-unit audit found the remaining critical checker hole is not another binary-op branch; it is function-call resolution.
-- `TypeChecker.Expressions.Callables.cs` resolves `min`/`max`/`clamp`/`abs` overloads without ever enforcing `FunctionOverload.Match`, so `QualifierMatch.Same` metadata is currently dead for function calls.
-- Implementation direction is locked in the design doc: add `ValidateFunctionQualifierCompatibility` immediately after `SelectOverload`, reuse PRE0137 for explicit cross-counting-unit mismatches, and leave `in` membership as a separate deferred follow-up.
-
-### 2026-05-14T22:57:25.658-04:00 — §5.7 slice review found stale paths and the wrong membership surface
-
-- Blocked the §5.7 execution plan as written: the repo does **not** have `src/Precept/Catalog/...`, `DiagnosticCatalog.cs`, `FunctionsCatalog.cs`, or `TypeChecker.TryGetStaticScalingFactor()` today. The real current surfaces are `src/Precept/Language/Ucum/UcumAtomCatalog.cs`, `src/Precept/Language/Diagnostics.cs`, and `src/Precept/Language/Functions.cs`; any affine helper still needs to be introduced.
-- Confirmed Gap C's real seam is still `TypeChecker.Expressions.Callables.cs` `SelectOverload`, but the qualifier check must guard both `TypedFunctionCall` return paths there (direct winner and context-retry winner).
-- Confirmed Gap D is **not** an `in` / `not in` path in the current DSL. Membership is `contains`, and the checker route is `ResolveBinaryOp` → `TryResolveCatalogBinaryWithoutOperation` → `CreateSyntheticBinaryOp`. `OperatorTypingTests.cs` is the current regression anchor for that surface.
-- Verified PRE0137 is available: `DiagnosticCode.CountBoundViolation = 136` is the current high watermark, so 137 is the next free ordinal.
-- Found missed regression surfaces for slices 30–33: `test/Precept.Tests/ProofEngineTests.cs` PartB Slice7/9 still assume old proof-only behavior, and `test/Precept.Tests/TypeChecker/OperatorTypingTests.cs` already covers `contains` typing.
-
-### 2026-05-14T23:11:17.096-04:00 — §5.7 re-review approved after Frank’s corrections
-
-- Re-reviewed the revised §5.7 slice plan and cleared the original blockers: stale catalog/diagnostic/function references were corrected to the real `src/Precept/Language/...` surfaces, and the membership slice now targets `contains` through `ResolveBinaryOp` → `TryResolveCatalogBinaryWithoutOperation` → `CreateSyntheticBinaryOp`.
-- Spot-checks against source confirmed `ValidateQualifierCompatibility`, `ResolveFunctionCall`, `SelectOverload`, `CreatePendingAtom`, `StripFunctionWrapper`, and the current `TypedInterpolatedTypedConstant` semantic node; PRE0137 remains free because `DiagnosticCode.CountBoundViolation = 136` is still the high watermark.
-
-### 2026-05-15T03:13:42Z — George approved the revised §5.7 slice plan
-
-- George’s re-review cleared the earlier §5.7 blockers: the slice list now points at the real `src/Precept/Language/...` seams, covers both successful `SelectOverload` returns, and moves the membership work to Precept’s actual `contains` operator path.
-- Scribe merged George’s approval note into `.squad/decisions/decisions.md`, cleared the inbox file, and recorded the approval as the current architectural baseline for slices 30–43.
-
-### 2026-05-15T03:17:29Z — Scribe recorded slice-audit baseline
-
-- Scribe merged George's slice-audit note into `.squad/decisions/decisions.md` and cleared `.squad/decisions/inbox/george-slice-audit.md`.
-- Durable baseline: slices 14–27 in `docs/Working/quantity-normalization-design.md` remain **NOT_STARTED** across `src/Precept/` and `test/Precept.Tests/`.
-- Scribe wrote the orchestration/session logs for the slice-audit + doc-tracker batch so later agents can treat George's audit as the canonical pre-implementation status check.
-
-### 2026-05-15T03:43:11Z — First-wave slices 43/14/34/22/30/32 landed on the spike branch
-
-- `spike/Precept-V2-Radical` now carries the first implementation wave for quantity normalization: Slices 43, 14, 34, 22, 30, and 32 are committed, with per-slice `dotnet build src/Precept/Precept.csproj` runs clean.
-- The shipped surface is broader than the slice labels alone: `InterpolatedTypedConstant` rename propagation reached runtime, tests, and language-server code, while the branch also gained `TypedConstantNormalizer`, `NumericInterval.Scale(decimal)`, UCUM `AffineOffset`, and static interpolated qualifier metadata.
-- Comparison operators now share qualifier-enforcement strictness with arithmetic, and `QualifierMatch.Same` is finally enforced in `SelectOverload`; because `min`/`max` parse as constraint keywords on this branch, `clamp` and `abs` are the durable regression anchors for that function-call path.
-- PRE0137 is now wired through the function-call same-match path as part of Slice 32.
-
-### 2026-05-15T07:59:53.548-04:00 — Wave 2A slices 15/15b/16/19/20/31/33 implementation learnings
-
-- TryGetComparableTypedConstantValue is the single extraction seam for both field and event-arg min/max modifiers; normalizing there automatically aligns PopulateFields and PopulateEvents without duplicating bound parsing logic.
-- IntervalOf normalization must remain expression-type scoped: scaling only raw typed constants and magnitude-slot interpolations prevents double-normalization of TypedFieldRef/TypedArgRef intervals.
-- TryGetStaticNumericValue for interpolated constants is only sound when unit scaling is statically known; dynamic unit-slot forms must return no trusted fact instead of falling back to raw StaticMagnitude.
-- Routing CreateSyntheticBinaryOp through ValidateQualifierCompatibility cleanly extends PRE0137/PRE0071 checks to contains membership while preserving existing element-type compatibility gates.
+- When a suppression hands off to a more specific diagnostic, re-run every dependent lane before closing the fix: unit-qualified, count-dimension, non-count dimension, and unqualified quantity cases each exercise a different downstream rule.
+- Warning follow-ups should first verify whether the intended invariant is already present in shipped code and only missing regression locks.
