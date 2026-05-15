@@ -1893,11 +1893,11 @@ For `[lb_av]`:
 | **15** | TypeChecker bounds extraction to normalizer | ✅ Done | Needs 14 |
 | **15b** | TypedArg normalization (`NormalizedDeclaredMin/Max`) | ✅ Done | Needs 14 |
 | **16** | ProofEngine magnitude extraction + `TryGetStaticScalingFactor` | ✅ Done | Needs 14 |
-| **17** | Test coverage (cross-unit bound overflow) | ⬜ Not started | Needs 15, 15b, 16 |
-| **18** | Display review (`IntervalContainmentProofRequirement` shape) | ⬜ Not started | Needs 15, 16 |
+| **17** | Test coverage (cross-unit bound overflow) | ✅ Done | Needs 15, 15b, 16 |
+| **18** | Display review (`IntervalContainmentProofRequirement` shape) | ✅ Done | Needs 15, 16 |
 | **19** | `InterpolatedTypedConstant` case in `IntervalOfNarrowed` | ✅ Done | Needs 14 |
 | **20** | Unit-aware interval scaling (`NumericInterval.Scale`) | ✅ Done | Needs 19, 16 |
-| **21** | Interpolated quantity test coverage | ⬜ Not started | Needs 19, 20 |
+| **21** | Interpolated quantity test coverage | ✅ Done | Needs 19, 20 |
 | **22** | `StaticQualifier` on `InterpolatedTypedConstant` | ✅ Done | None |
 | **23** | Route `StaticQualifier` through qualifier consumers | ⬜ Not started | Needs 22 |
 | **24** | Money/price interpolated interval extraction | ⬜ Not started | Needs 19, 22 |
@@ -1922,7 +1922,7 @@ For `[lb_av]`:
 | **45** | PRE0138 `CountDimensionBoundsAmbiguous` | ✅ Done | None |
 
 **Legend:** ✅ Done · 🔶 Partial · ⬜ Not started
-**Critical path:** 14 → ~~15/15b/16~~ → 17/18 → 21 → 23/24/25 → 26 → 27 _(15/15b/16/19/20 complete; remaining gate is 17/18 → 21 onward)_
+**Critical path:** 14 → ~~15/15b/16~~ → ~~17/18~~ → ~~21~~ → 23/24/25 → 26 → 27 _(15/15b/16/17/18/19/20/21 complete; remaining gate is 23/24/25 → 26 → 27)_
 **Parallel-safe first wave:** 14 · 22 · 30 · 32 · 34 · 38–42 · 43 · 44 · 45 (no code dependencies)
 
 ### 5.1 Implementation Slices
@@ -1934,8 +1934,8 @@ These slices follow the existing interval-proof-engine-design numbering (Slices 
 | **14** | ~~`NormalizedNumericValue` +~~ `TypedConstantNormalizer` _(⚠️ `NormalizedNumericValue` dropped per §0)_ | None (new files) | George | ✅ |
 | **15** | Wire TypeChecker bounds extraction to normalizer | Slice 14 | George | ✅ |
 | **16** | Wire ProofEngine magnitude extraction to normalizer | Slice 14 | George | ✅ |
-| **17** | Unit + integration + regression tests | Slices 15–16 | Soup Nazi | ⬜ |
-| **18** | Hover/diagnostic display review | Slices 15–16 | Kramer | ⬜ |
+| **17** | Unit + integration + regression tests | Slices 15–16 | Soup Nazi | ✅ |
+| **18** | Hover/diagnostic display review | Slices 15–16 | Kramer | ✅ |
 | **27** | Doc sync | Slices 14–21 | Frank | ⬜ |
 
 ### 5.2 Slice Details
@@ -2000,9 +2000,9 @@ The interpolated case (`'{field} [unit]'`) is a **separate problem** from the st
 
 | Slice | Objective | Depends On | Agent | Status |
 |-------|-----------|------------|-------|--------|
-| **19** | Add `InterpolatedTypedConstant` case to `IntervalOfNarrowed` | Slice 14 (normalizer) | George | ⬜ |
-| **20** | Unit-aware interval scaling for interpolated magnitude slots | Slice 19 + Slice 16 | George | ⬜ |
-| **21** | Integration tests for interpolated quantity overflow proofs | Slices 19–20 | Soup Nazi | ⬜ |
+| **19** | Add `InterpolatedTypedConstant` case to `IntervalOfNarrowed` | Slice 14 (normalizer) | George | ✅ |
+| **20** | Unit-aware interval scaling for interpolated magnitude slots | Slice 19 + Slice 16 | George | ✅ |
+| **21** | Integration tests for interpolated quantity overflow proofs | Slices 19–20 | Soup Nazi | ✅ |
 | **27** | Doc sync — propagate normalization changes to all canonical docs | Slices 14–21 | Frank | ⬜ |
 
 **Slice 19: Interval analysis for interpolated typed constants**
@@ -3717,13 +3717,13 @@ The next available slice number is **30**. Slice 27 is already reserved for doc 
 | Slice | Objective | Lane | Status |
 |-------|-----------|------|--------|
 | **30** | Extend PRE0070/PRE0071 to comparison operators | Gap A | ✅ |
-| **31** | PRE0137 `CrossCountingUnitOperation` | Gap B | 🔶 Partial |
+| **31** | PRE0137 `CrossCountingUnitOperation` | Gap B | ✅ |
 | **32** | `QualifierMatch.Same` in `SelectOverload` | Gap C | ✅ |
-| **33** | Qualifier checks on `contains` membership ops | Gap D | ⬜ |
+| **33** | Qualifier checks on `contains` membership ops | Gap D | ✅ |
 | **34** | Affine UCUM catalog extension | Affine | ✅ |
-| **35** | Affine scalar normalization `(value + offset) × scale` | Affine | ⬜ |
-| **36** | Affine interval shifting (`NumericInterval.Shift`) | Affine | ⬜ |
-| **37** | Full affine 24-test matrix | Affine | ⬜ |
+| **35** | Affine scalar normalization `(value + offset) × scale` | Affine | ✅ |
+| **36** | Affine interval shifting (`NumericInterval.Shift`) | Affine | ✅ |
+| **37** | Full affine 24-test matrix | Affine | ✅ |
 | **38** | Doc: temperature scope correction | Doc | ✅ |
 | **39** | Doc: exact-conversion-factor assumption | Doc | ✅ |
 | **40** | Doc: business units factor/dimension | Doc | ✅ |
@@ -3733,7 +3733,7 @@ The next available slice number is **30**. Slice 27 is already reserved for doc 
 | **44** | Bare-integer bound promotion for unit-qualified quantity fields | Bounds | ✅ |
 | **45** | PRE0138 `CountDimensionBoundsAmbiguous` | Bounds | ✅ |
 
-**Status note:** Slice 31 is intentionally marked partial: PRE0137 is wired for same-match function-call enforcement via Slice 32, while the binary-operator path remains wave-2 work. Slices 44–45 close two false-positive / insufficient-diagnostic bugs in bounds validation for unit-qualified and count-dimension fields.
+**Status note:** Slice 31 is complete across the intended operator/function surfaces, Slices 33 and 35–37 are complete, and Slices 44–45 close the two false-positive / insufficient-diagnostic bounds-validation bugs for unit-qualified and count-dimension fields.
 
 ---
 
