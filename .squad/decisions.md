@@ -64,6 +64,8 @@
 
 ---
 
+---
+
 ### 2026-05-15T00:08:25Z: Typed-constant interpolation holes require PRE0116 proof-stage presence checks
 
 **By:** Scribe
@@ -76,6 +78,8 @@
 - The missing traversal case is `TypedInterpolatedTypedConstant`: typed-constant interpolation holes must behave like other value-position optional reads and generate presence obligations unless guards prove presence.
 - Recommended repository action: revert `samples/Test.precept` to the clean literal form and keep any interpolation coverage in a dedicated sample file instead of overloading the fixture.
 - Implementation scope is adjacent to, but separate from, quantity-normalization Slices 14–21.
+
+---
 
 ---
 
@@ -92,6 +96,8 @@
 - Added four focused proof-engine presence tests covering unguarded integer/quantity holes, guarded optional holes, and non-optional holes.
 - Validation summary from George: focused `ProofEnginePresenceTests` passed, `samples/Test.precept` now reports `UnprovedPresenceRequirement` on line 14, and `dotnet build src/Precept/Precept.csproj` passed cleanly.
 - Implementation landed in commit `ae19510f`.
+
+---
 
 ---
 
@@ -115,6 +121,8 @@
 
 ---
 
+---
+
 ### 2026-05-14T22:00:00Z: PRE0027 diagnosis — no DuplicateArgName errors exist anywhere in the repository
 
 **By:** Scribe
@@ -128,6 +136,8 @@
 - George's modification (`'6 [lb_av]'` → `'{test2} [lb_av]'`) changed the proof shape from concrete-interval to unbounded-interval but did not introduce a new error category; PRE0078 fires in both versions.
 - `test/Precept.Analyzers.Tests/AnalyzerTestHelper.cs` contains George's new `AnalyzeWithFilePathsAsync<TAnalyzer>()` helper — legitimate C# test infrastructure, not a DSL artifact.
 - **Recommended action:** Revert `samples/Test.precept` to the original (`git checkout samples/Test.precept`). If interpolated-quantity test coverage is needed for normalization work, create a new sample file with satisfiable bounds rather than mutating the existing Test.precept fixture.
+
+---
 
 ---
 
@@ -152,6 +162,8 @@
 
 ---
 
+---
+
 ### 2026-05-15T01:52:56Z: Counting-unit wording now separates dimension-family compatibility from value conversion, and binary-op proof fallback is a real gap
 
 **By:** Scribe
@@ -164,6 +176,8 @@
 - Two inaccurate statements in `business-units-quantity-normalization-survey.md` must be read as wording errors, not as approved semantics: dimension-alias membership is real, but cross-unit value conversion is not.
 - Assignment validation already rejects explicit counting-unit mismatches (`quantity in 'each'` cannot accept `quantity in 'box'`), so documentation must not describe the looser proof path as intended compatibility.
 - Frank surfaced the architectural gap: `ProofEngine.QualifiersAreCompatible` currently lets same-dimension counting units satisfy binary-op qualifier proofs via the `count` fallback, so static comparisons like `each` vs `box` can prove when they should degrade to `Unbounded` or be rejected until a real conversion model exists.
+
+---
 
 ---
 
@@ -181,6 +195,23 @@
 - `docs/working/quantity-normalization-design.md` §6.7 is now the durable design surface for the gap and its implementation-ready fix.
 
 ---
+
+### 2026-05-15T02:37:53Z: Function-call qualifier enforcement is missing for same-match counting-unit operations
+
+**By:** Scribe
+
+**Status:** Recorded from Frank's comprehensive cross-counting-unit analysis.
+
+**Merged source:** `frank-14` spawn manifest (no inbox file present at merge time).
+
+- Frank's exhaustive 16-category audit confirmed the current §6.7 fix plan only closes binary operators; function calls were an uncovered enforcement surface.
+- **Critical Gap C:** the Functions catalog already declares `QualifierMatch.Same` on quantity/money overloads for `min`, `max`, `clamp`, and `abs`, but `SelectOverload` never reads `FunctionOverload.Match`, so calls like `max(qty_each, qty_box)` currently resolve without qualifier diagnostics.
+- The implementation-ready fix is `ValidateFunctionQualifierCompatibility` immediately after overload selection, reusing existing catalog metadata instead of adding parallel rules; PRE0137 should cover both binary operators and these same-match function calls.
+- Gap D remains explicitly deferred: `in` / `not in` membership still routes through `CreateSyntheticBinaryOp` and skips `ValidateQualifierCompatibility`.
+- `docs/working/quantity-normalization-design.md` §6.7.9–§6.7.11 is now the durable design surface for the full operator/function taxonomy, the critical function-call hole, and the deferred membership follow-up.
+
+---
+
 # Decision Record: Exhaustive Architectural Review— Interpolated Forms & Normalization Design
 
 **Author:** Frank (Lead Architect)
@@ -251,6 +282,8 @@ Recommendation: Option (A) for consistency with the `TypedField` approach.
 ## D7: Overall design verdict — APPROVED WITH CONDITIONS
 
 **Decision:** The quantity normalization design is architecturally sound and may proceed to implementation once the 6 conditions in §5.5.6 are resolved. No condition is design-blocking — all are specification gaps that would otherwise require ad-hoc resolution during implementation.
+
+---
 
 ---
 
@@ -327,6 +360,8 @@ Treat Slices 19–21 as **necessary but not sufficient**. If Shane wants an actu
 
 ---
 
+---
+
 # Decision Record: Diagnostic Enforcement — Compiler/Runtime Alignment Assessment
 
 **Author:** Frank (Lead Architect)
@@ -391,10 +426,14 @@ The chain's invariant: "If the compiler emits no errors, the evaluator should ne
 
 ---
 
+---
+
 ### 2026-05-14: Implementation notes created
 **By:** Frank
 **What:** Created docs/Working/diagnostic-enforcement-implementation-notes.md — technical record of enforcement implementation outcomes
 **Why:** Companion to the plan doc; captures implementation reality, staged infrastructure details, and remaining work for future sessions
+
+---
 
 ---
 
@@ -460,12 +499,16 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 # Decision Record: Catalog Integration for Quantity Normalization
 
 **Author:** Frank (Lead Architect)
 **Date:** 2026-05-14
 **Status:** Proposed
 **Scope:** Whether UCUM quantity normalization requires catalog entries, and how it integrates with the runtime opcode/function infrastructure
+
+---
 
 ---
 
@@ -477,11 +520,15 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 # Decision: Code Sharing Between Compiler and Runtime for Quantity Normalization
 
 **Author:** Frank (Lead Architect)
 **Date:** 2026-05-14
 **Trigger:** Shane's pushback — "How will the runtime share the same code as the compiler if compiler uses decimals and runtime uses PreceptValue?"
+
+---
 
 ---
 
@@ -492,11 +539,15 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 # Decision: Two-Layer Value Architecture for Normalized Bounds
 
 **Author:** Frank (Lead Architect)
 **Date:** 2026-05-14T02:08:59-04:00
 **Trigger:** Shane's representational consistency pushback on §0/§0.1 of quantity-normalization-design.md
+
+---
 
 ---
 
@@ -511,6 +562,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 - Frank corrected `docs/Working/quantity-normalization-design.md` §2.1: `PreceptValue` bytes 8–23 are a three-way union (`decimal`, `long`, or reference region), not a decimal-only payload.
 - The existing 32-byte `PreceptValue` budget therefore does not rule out quantity unit storage through the reference lane; collection backing arrays already prove that lane is viable for composite storage.
 - George should treat quantity runtime storage as an open implementation choice between reference-lane composite storage and descriptor metadata, not as a settled "unit must live outside `PreceptValue`" constraint.
+
+---
 
 ---
 
@@ -529,6 +582,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 ### 2026-05-14T04:43:00Z: Final review corrected PRE0094 inventory drift and annotated PRE0019 retirement in diagnostic enforcement
 
 **By:** Scribe
@@ -540,6 +595,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 - Frank's final audit found PRE0094 was already live in two `TypeChecker.Validation.FieldState.cs` emitters; the enforcement doc's gap count was corrected 50→49 across 9 references, the emission inventory 83→84, and Slice 3 was struck as already wired rather than pending.
 - The §3.7 D2 table now explicitly marks PRE0019 as retired so the plan no longer implies active implementation work for a dead diagnostic.
 - Elaine naming references remain correct, the PRE0019/PRE0079 sections stay accurate, and Q1, Q10, and Q2 are resolved with no new open questions.
+
+---
 
 ---
 
@@ -557,6 +614,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 ### 2026-05-14T06:53:00Z: PRE0019 is retired in favor of proof-stage presence obligations routed through PRE0116
 
 **By:** Scribe
@@ -568,6 +627,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 - Frank's audit confirmed PRE0019 `NullInNonNullableContext` has no live emitters in `src\Precept\`; the catalog entry, metadata, and `FaultCode.UnexpectedNull` link exist, but nothing in the TypeChecker, ProofEngine, or runtime produces the code today.
 - The intermediate wiring analysis concluded the enforcement plan's old "upgrade TypeMismatch" premise was stale because presence checking already belongs to the guard-aware ProofEngine surface, not to a new TypeChecker-side duplicate.
 - The final verdict is RETIRE: presence-proof infrastructure is already plumbed through PRE0116 `UnprovedPresenceRequirement`, but no production code generates `PresenceProofRequirement`; the real fix is to inject those obligations for optional field references and eventually re-point `FaultCode.UnexpectedNull` to PRE0116.
+
+---
 
 ---
 
@@ -585,6 +646,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 ### 2026-05-14T02:33:16Z: Diagnostic naming canon now uses `when` vocabulary, `CaseMismatch*`, and condition-first proof names
 
 **By:** Scribe
@@ -596,6 +659,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 - Graph-theory and proof-engine jargon are below bar for author-facing diagnostics; the durable naming standard is now plain DSL vocabulary that describes the author's condition rather than compiler internals.
 - The adopted family updates are: collection-safety names move to `*WithoutWhen`, CI enforcement names move to `CaseMismatchOn*`, proof diagnostics move to `ModifierNotGuaranteed` / `DimensionQualifierMissing` / `QualifiersMayBeIncompatible` / `InitialStateConstraintUnsatisfied` / `FieldMayBeAbsent`, and PRE0119 settles on `NonTerminalDeadEnd`.
 - Rename passes now carry two standing conventions: messages should stay `Subject — Condition — Repair` parseable, and every rename pass must update `FixHint`, `RecoverySteps`, `TriggerCondition`, and examples in the same change.
+
+---
 
 ---
 
@@ -613,6 +678,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 ### 2026-05-14T00:56:58Z: Dynamic qualifier mismatches stay silent at type-check time and resolve in proof
 
 **By:** Scribe
@@ -624,6 +691,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 - The TypeChecker silently skips PRE0070–PRE0074 cross-currency and related qualifier checks when the qualifier value is dynamic.
 - No partial compile-time diagnostic is emitted for forms like `money in '{CatalogCurrency}'`; Strategy 5 in the ProofEngine remains the enforcement surface.
 - The architectural boundary is now durable team memory: dynamic qualifier validation is a proof-time concern, not a static comparison pass.
+
+---
 
 ---
 
@@ -641,6 +710,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 ### 2026-05-14T00:05:43Z: Diagnostic enforcement revision now treats PRE0078 as an interval-proof obligation and narrows PRE0079
 
 **By:** Scribe
@@ -652,6 +723,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 - Frank corrected the enforcement plan's ownership model: PRE0078 `NumericOverflow` is a ProofEngine obligation failure emitted by Strategy 7 (`IntervalContainment`), not a Slice 8 TypeChecker gap.
 - Slice 9C now depends on interval-engine Slice 2 so the proof-obligation consistency audit covers `IntervalContainment`, while Gate 1 allow-list removal for PRE0078 waits on that external emission path.
 - PRE0079 `OutOfRange` is now narrowed to constant-literal assignments that trivially exceed declared bounds; general expression-level bounds checking belongs to the interval proof engine.
+
+---
 
 ---
 
@@ -669,6 +742,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 ### 2026-05-13T23:55:10Z: Overflow-prevention analysis now defers arithmetic bounds enforcement to Strategy 7
 
 **By:** Scribe
@@ -680,6 +755,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 - Frank revised `overflow-prevention-design-analysis.md` in place so obsolete `@bounds`, bounded-integer, validator-phase, runtime-fallback, extra-diagnostic, and three-wave rollout claims are clearly superseded by the interval proof engine design.
 - Strategy 7 (`IntervalContainment`) now owns bounded arithmetic range checking, `NumericOverflow` emission, modifier-derived bound extraction, guard narrowing, catalog-driven interval transfer, and hover interval display.
 - The overflow-prevention analysis keeps only durable value: problem framing, strategy comparison, and historical context, with explicit cross-references to `interval-proof-engine-design.md`.
+
+---
 
 ---
 
@@ -697,6 +774,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 ### 2026-05-13T04:52:18Z: D94 follow-up coverage now locks omit-boundary, multi-initial-state, and stateless-bailout regressions
 
 **By:** Scribe
@@ -708,6 +787,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 - George added `D94_FieldOmittedInInitialState_NotRequired` to document the D94/D132 boundary where fields omitted in every initial state stay outside D94's construction set.
 - `D94_MultipleInitialStates_AllRowsChecked` now proves every initial-state construction row is checked, and `D94_StatelessPrecept_WithInitialEvent_SkipsCheck` durably documents the pre-existing stateless bailout gap.
 - `Diagnostics.cs` now describes D94's trigger in terms of construction paths from initial-state rows, and commit `d9edee97` closed both targeted and full `Precept.Tests` validation green.
+
+---
 
 ---
 
@@ -725,6 +806,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 ### 2026-05-13T04:32:04Z: User directive keeps all work on `spike/Precept-V2-Radical` with no new branches
 
 **By:** Scribe
@@ -738,6 +821,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 ### 2026-05-13T04:32:04Z: D94 construction analysis now ignores non-initial-state rows on the initial event
 
 **By:** Scribe
@@ -748,6 +833,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 - `ValidateConstructionGuarantees` now analyzes only initial-event rows whose `FromState` is an initial state, so lifecycle transitions on the same initial event no longer participate in construction guarantees.
 - `samples\Test.precept` compiles clean again, `D94_NonInitialStateRow_NotChecked` covers the regression, and `dotnet test test\Precept.Tests\Precept.Tests.csproj` closed green at `5138/5138` with commit `4c567cdc`.
+
+---
 
 ---
 
@@ -765,6 +852,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 ### 2026-05-13T04:22:01Z: D93 RequiredFieldsNeedInitialEvent now blocks construction when required present fields lack any initial event
 
 **By:** Scribe
@@ -776,6 +865,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 - `ValidateConstructionGuarantees` now emits D93 when a precept has no initial event and still exposes required non-collection, non-computed fields at construction time.
 - The construction check reuses the D132 required-field filter, but excludes fields omitted in every initial state so omit-driven draft workflows stay valid until a field becomes present.
 - `TypeChecker.Check` now runs the construction validation immediately after field-state validation; `TypeCheckerConstructionTests` plus coupled fixtures and `samples\Test.precept` closed green at `5127/5127` tests, and the sample now fails with D93.
+
+---
 
 ---
 
@@ -793,6 +884,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 ### 2026-05-13T00:45:00Z: Elaine's adopted diagnostic naming v2 is now the canonical field-state family, and Frank applied it to the v3 doc
 
 **By:** Scribe
@@ -804,6 +897,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 - Elaine's adopted compact v2 naming replaces the earlier sentence-like normalization pass: D130 = `OmittedFieldReadInState`, D131 = `OmittedFieldSetInTargetState`, and D132 = `RequiredFieldUnassignedOnEntry`.
 - The adopted set keeps the catalog house style aligned with compact condition phrases like `InitialEventMissingAssignments` and `RequiredFieldsNeedInitialEvent` while keeping state or entry context explicit instead of compiler shorthand.
 - Frank applied those names throughout `docs\Working\field-state-guarantees-v3.md`, including the summary, tables, section headers, inline prose, and design-motivation references, and intentionally left `src\Precept\Language\SyntaxReference.cs` untouched because Elaine had concurrent prose work there.
+
+---
 
 ---
 
@@ -821,6 +916,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 ### 2026-05-13T00:32:50Z: Elaine's UX review freezes the canonical v3 field-state codes at D130, D131, and D132 and flags D132 naming as unshipped
 
 **By:** Scribe
@@ -835,6 +932,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 ### 2026-05-13T00:26:25Z: Required-field initialization semantics stay compile-time complete across all three precept forms
 
 **By:** Scribe
@@ -846,6 +945,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 - Stateful precepts with an initial event remain compile-time safe because `InitialEventMissingAssignments` must force every required no-default field to be assigned during construction.
 - Stateful precepts without an initial event cannot carry required no-default fields at all because `RequiredFieldsNeedInitialEvent` rejects that shape, while stateless precepts follow the same constructor guarantees without state-entry semantics.
 - The open spec gap remains omit→non-omit reentry: non-optional, no-default fields need a must-set rule on the transition, while defaulted and optional fields can re-materialize from their valid baseline values.
+
+---
 
 ---
 
@@ -864,6 +965,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 ### 2026-05-13T00:26:25Z: Circular static-init crash in Tokens/Types is closed with lazy keyword-set initialization
 
 **By:** Scribe
@@ -875,6 +978,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 - `Tokens.KeywordsValidAsMemberName` now uses a `Lazy<FrozenSet<TokenKind>>` backing field, so `Types.All` is not touched during `Tokens..cctor()`.
 - The crash path was a CLR static-constructor cycle: `Types.GetMeta()` re-entered `Tokens..cctor()`, which previously read `Types.All` before assignment and faulted in `SelectMany`.
 - George reported the public API shape unchanged and the repository suite green at `4996/4996` tests passing.
+
+---
 
 ---
 
@@ -890,6 +995,7 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 - The fix pass also added the missing regression anchors: language-server coverage for the connected-edge/no-proof-obligation path and core projection coverage that duplicate `Requirement.Description` values collapse to one unresolved summary.
 - `docs/Working/hover-design.md` was updated to match the shipped projection/rendering rule, and targeted language-server tests, compiler-edge-proof tests, and the language-server build all passed.
 
+---
 
 ### 2026-05-13T00:00:38Z: Hover B4 review approved the edge-proof projection shape but blocked a no-obligation copy bug and missing de-dup coverage
 
@@ -902,6 +1008,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 - Frank approved the overall B4 architecture: `StateGraph.EdgeProofStatus`, compiler enrichment, incident-edge filtering, and rich state-card rendering were all wired in the expected places.
 - Two blockers remained before closeout: the no-obligations branch used the wrong emptiness check and the projection suite did not yet lock `Requirement.Description` de-duplication.
 - Targeted B4 tests passed even though an unrelated pre-existing modifier-catalog failure still kept the broader core suite red.
+
+---
 
 ---
 
@@ -919,6 +1027,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 ### 2026-05-12T23:56:04Z: B4 edge-proof status projection landed across the compiler, graph model, and rich state hover
 
 **By:** Scribe
@@ -930,6 +1040,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 - George added `StateGraph.EdgeProofStatuses` plus the `EdgeProofStatus` record so graph-level proof projections survive into tooling without rejoining proof data inside the language server.
 - Compiler enrichment now maps unresolved transition-row obligations onto concrete graph edges, de-duplicates repeated descriptions, and marks edges proven when no unresolved summaries remain.
 - The rich state card now renders per-edge proof gaps or the matching proven/no-obligations copy, and targeted test counts rose to `278` language-server tests and `4973` core tests.
+
+---
 
 ---
 
@@ -947,6 +1059,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 ### 2026-05-12T23:50:08Z: Modifier catalog gaps were closed for `price`, `exchangerate`, business-magnitude `maxplaces`, and identity-type redundancy handling
 
 **By:** Scribe
@@ -958,6 +1072,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 - Commit `a727dddb` widened `ZeroBoundNumericTypes` to include `Price` and `ExchangeRate`, widened ranged modifiers to include `Price`, and introduced `BusinessMagnitudeTypes` so `maxplaces` now applies across decimal, money, quantity, price, and exchangerate.
 - The TypeChecker applicability guard now skips implied modifiers, collapsing identity-type `notempty` handling to `RedundantModifier` instead of the previous double-diagnostic shape.
 - George validated the implementation at `4969/4969` core tests green and handed Soup Nazi the missing regression scenarios to lock.
+
+---
 
 ---
 
@@ -975,6 +1091,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 ### 2026-05-12T23:45:45Z: Required-field constructor enforcement is specified but entirely unimplemented
 
 **By:** Scribe
@@ -989,6 +1107,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 ### 2026-05-12T23:42:25Z: Hover B2/B3 re-review stayed blocked until `omit all` gained explicit regression coverage
 
 **By:** Scribe
@@ -1000,6 +1120,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 - Frank confirmed the routing-order fix and omit-driven mutability summaries were structurally correct and that targeted language-server tests were green.
 - The remaining blocker was narrow and explicit: no hover regression yet locked the `omit all` path on field and state cards.
 - Durable review guidance is that B2/B3 were functionally close, but not mergeable until the `omit all` surface was test-covered.
+
+---
 
 ---
 
@@ -1018,6 +1140,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 ### 2026-05-12T23:36:02Z: Field-state guarantees v2 doc was finalized pending owner sign-off after resolving its tracked open questions
 
 **By:** Scribe
@@ -1032,6 +1156,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 ### 2026-05-12T23:33:48Z: Self-loop omit validation intentionally fires both D130 and D133 when `from` and `to` are the same state
 
 **By:** Scribe
@@ -1042,6 +1168,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 - Self-loops remain a general-case path, not a special case: the engine should keep the uniform from-state D130 check and to-state D133 check rather than suppressing one side when the state identities match.
 - Diagnostic expectations and future regression tests should treat dual reporting on self-loops as intentional behavior, not as a deduplication bug.
 - Numbering note: this record uses the pre-canonical field-state numbering; the target-state write diagnostic `D133` was later renumbered to canonical v3 `D131`.
+
+---
 
 ---
 
@@ -1059,6 +1187,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 ### 2026-05-12T23:20:42Z: Soup Nazi re-review approves George's blocker closeout and the explicit-wildcard `ResolvedStateTarget` redesign
 
 **By:** Scribe
@@ -1070,6 +1200,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 - George's commit `53d68d51` closed blocker set B1-B5 plus nit N1 with parser AST anchors, stronger expansion and guard-clone assertions, multi-unknown-state diagnostic fan-out coverage, and the corrected `4969` core-test count in the spike doc.
 - George's commit `cf3c6a81` replaced the `ResolvedStateTarget` null-sentinel with an explicit `IsWildcard` contract while preserving the nullable wildcard bridge only at `NormalizeTransitionRow`.
 - Soup Nazi re-reviewed both commits, reported `0 blockers / 2 good findings`, and approved the spike for merge readiness.
+
+---
 
 ---
 
@@ -1087,6 +1219,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 ### 2026-05-12T23:20:42Z: Frank's B2/B3 hover review keeps declaration-span routing and omit-aware mutability blocked
 
 **By:** Scribe
@@ -1098,6 +1232,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 - Frank confirmed the good news first: state identifier routing is fixed, `reject` and qualifier precedence are correct, and `271/271` language-server tests passed.
 - Blocker B1 remains: `TryCreateTypeHover(...)` and `TryCreateActionHover(...)` still return before rich construct routing, so declaration-span `money` and action keywords can bypass the construct card.
 - Blockers B2 and B3 remain: the field and state mutability summaries still ignore state-local `omit` declarations in the global/unconditional writable fallbacks, so omitted surfaces can still be reported as `✏️` instead of `🔒`.
+
+---
 
 ---
 
@@ -1115,6 +1251,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 ### 2026-05-12T23:02:04Z: George's B1 hover fix pass landed the compact-card contract and cleared the targeted language-server suites
 
 **By:** Scribe
@@ -1126,6 +1264,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 - Commit `c2a38a56` replaced verbose proof-gap hover blocks with the compact qualifier/proof cards, locked the shared badge vocabulary to `✅ Proven`, `⚡ Enforced`, and `⚠️ Gap`, and normalized shipped copy from `proved` to `proven`.
 - `HoverHandler.cs` required no routing change; the fix stayed inside `RichHoverFactory.cs` and matching `HoverHandlerTests.cs` expectations.
 - Validation closed green at `41/41` `HoverHandlerTests` and `269/269` full language-server tests, while repo-wide `dotnet test` still hits the unrelated multi-unknown-state baseline in `TypeCheckerTransitionTests`.
+
+---
 
 ---
 
@@ -1144,6 +1284,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 ### 2026-05-12T23:02:04Z: Comma-list `StateTarget` spike is architecturally approved, but parser/test closure and count reconciliation remain open
 
 **By:** Scribe
@@ -1155,6 +1297,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 - Frank approved commit `a63d88b4` on architecture: parser disambiguation stays catalog-derived, `ResolveStateTargets` remains the single normalization path, expansion is pure-copy, and the grammar already accepts comma lists.
 - The follow-up gate is test completeness, not design shape: parser AST coverage still needs 2-name, 3+-name, whitespace, and trailing-comma anchors, and expansion coverage must assert cloned guard/action/outcome semantics plus multi-unknown-state diagnostic fan-out.
 - Published validation counts must match real output; the durable tester note is that current `dotnet test test\Precept.Tests\Precept.Tests.csproj --no-build --nologo` reports `4962`, so any `4966` claim needs reconciliation before handoff.
+
+---
 
 ---
 
@@ -1173,6 +1317,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 ### 2026-05-12T22:25:28Z: Language-spec audit locks a targeted cleanup for stale references, overclaimed contracts, and incomplete diagnostic coverage
 
 **By:** Scribe
@@ -1184,6 +1330,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 - Frank confirmed several high-confidence spec defects in `docs/language/precept-language-spec.md`: the dead `docs/PreceptLanguageDesign.md` grounding reference, stale "not yet built" pipeline wording, a vestigial open-questions placeholder, misleading `C48`-style labels, six `ConstructKind` names that do not match code, and an incomplete diagnostic-groups table.
 - The audit also preserves the owner-decision boundary: §0.5 and §0.6 currently overclaim shipped behavior if they are meant to describe only implemented guarantees, and ProofEngine Strategy 6 remains undocumented unless the owner wants it promoted to public documentation.
 - Frank ranked the immediate cleanup around preamble/status accuracy, replacing `C48`-`C52` notation with real diagnostic names, and explicitly qualifying which design-contract items are future or partial.
+
+---
 
 ---
 
@@ -1201,6 +1349,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 ### 2026-05-12T22:18:18Z: User model directive locks claude-opus-4.7 behind explicit permission while keeping claude-opus-4.6 available under normal rules
 
 **By:** Scribe
@@ -1212,6 +1362,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 - The hard rule is now durable team memory: no one uses `claude-opus-4.7` unless Shane explicitly authorizes it for the session or task.
 - The clarification also locks the non-ban boundary: `claude-opus-4.6` remains available for complex work under the existing model-selection policy and is not part of the prohibition.
 - Model-selection guidance should therefore treat the directive as a surgical ban on `claude-opus-4.7`, not a general no-opus policy.
+
+---
 
 ---
 
@@ -1231,6 +1383,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 ### 2026-05-12T22:18:18Z: Construct metadata now describes `StateTarget` as a single state, `any`, or a comma-delimited state list
 
 **By:** Scribe
@@ -1240,6 +1394,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 - `src/Precept/Language/ConstructSlot.cs:18` now documents `ConstructSlotKind.StateTarget` as accepting a state name, `any`, or a comma-delimited list of state names.
 - `src/Precept/Language/Constructs.cs:29` now gives the shared `SlotStateTarget` description the same list-capable wording, keeping catalog-facing construct metadata aligned with the shipped parser and type-checker behavior.
 - George reported the S5 catalog wording pass complete and confirmed the validation build passed.
+
+---
 
 ---
 
@@ -1258,6 +1414,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 ### 2026-05-12T22:18:18Z: Canonical samples now demonstrate comma-list state syntax only where semantics stay identical
 
 **By:** Scribe
@@ -1269,6 +1427,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 - `samples/hiring-pipeline.precept`, `samples/it-helpdesk-ticket.precept`, and `samples/utility-outage-report.precept` now use comma-list source states for the pure-copy transitions George's runtime/parser work actually supports.
 - Frank deliberately left rows expanded anywhere guards, actions, or outcomes diverged, preserving the spike ruling that comma lists are syntactic sugar for identical rows rather than a semantic broadening of transition behavior.
 - Validation for the three edited samples stayed clean through VS Code diagnostics even though MCP `precept_compile` was unavailable during the pass.
+
+---
 
 ---
 
@@ -1286,6 +1446,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 ### 2026-05-12T15:15:10Z: Proof hover spec is now consolidated into `docs/Working/hover-design.md`
 
 **By:** Scribe
@@ -1297,6 +1459,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 - Elaine merged the proof-hover design into `docs/Working/hover-design.md`, replacing the old standalone proof-hover draft with the canonical hover spec.
 - Qualifier hover now uses the proof-aware Scenario 4 card, and the working doc carries explicit scenarios for qualified fields, proof-bearing binary expressions, and proof diagnostic squiggles.
 - Hover routing, precedence, proof data-shape requirements, and proof-specific open questions now live in one maintained design surface instead of split working docs.
+
+---
 
 ---
 
@@ -1314,6 +1478,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 ### 2026-05-12T15:15:10Z: Compound-unit interpolated constants now resolve full `{A}/{B}` qualifiers before denominator fallback
 
 **By:** Scribe
@@ -1325,6 +1491,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 - George fixed `ResolveQualifierFromInterpolatedConstant` so typed constants carrying both numerator and denominator unit slots build the full compound qualifier string instead of collapsing to the denominator.
 - The G1 pass shipped in commit `cb4fbf57`, kept `StaticMagnitude` on the typed interpolated constant node, and reused trusted positive-rule proofs so downstream nonzero obligations can discharge from the cleaned qualifier evidence.
 - RC1 fallout is cleared in `samples/inventory-item.precept`: the PRE0114s at plan lines 122/123 and the cascading DivisionByZero diagnostics at lines 137/142 are gone, with docs/history synced in `1ee54bdb`.
+
+---
 
 ---
 
@@ -1342,6 +1510,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 ### 2026-05-12T13:52:04Z: Proof-stage diagnostics and hover need operand truth, repair guidance, and dedicated routing
 
 **By:** Scribe
@@ -1353,6 +1523,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 - Elaine's proof UX audit locked the core teachable-moment failures: `<unknown>`-style placeholders are never acceptable, qualifier diagnostics must show the actual conflicting values, and human repair guidance must be paired with structured args rather than baked into sentence fragments.
 - The audit also established that proof hover is a routing problem as much as a content problem: generic operator and transition hover frequently wins before authors ever see proof context.
 - The durable design split is now explicit: declaration-contract hover, expression-proof hover, and diagnostic-squiggle hover are separate UX jobs and should not be collapsed into one generic card.
+
+---
 
 ---
 
@@ -1370,6 +1542,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 ### 2026-05-12T13:52:04Z: Proof diagnostics now use explicit 'Cannot prove…' wording with structured qualifier payloads
 
 **By:** Scribe
@@ -1381,6 +1555,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 - George implemented Elaine Section A's proof-message rewrites in commit `1d8962f7`, including the six-argument PRE0114 shape that carries operand labels, axis, context clause, and left/right qualifier values separately.
 - PRE0112, PRE0113, PRE0115, PRE0116, PRE0082, PRE0083, and PRE0084 now use clearer author-facing wording while keeping the structured diagnostic contract intact for tooling and AI consumers.
 - The batch updated proof-engine and exact-message regression coverage, synced the proof/diagnostic runtime docs, and stayed green on the targeted core path at `4914/4914`.
+
+---
 
 ---
 
@@ -1398,6 +1574,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 ### 2026-05-12T05:04:03Z: MCP hybrid rollout requires scoped reference tools
 
 **By:** Scribe
@@ -1409,6 +1587,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 - Frank measured the current MCP payloads and found the legacy aggregate `precept_language` surface is about `401 KB`, far beyond a safe routine tool-result budget.
 - The approved hybrid direction still stands, but Newman must add `scope` filtering to `precept_types` and `precept_domains` and keep `precept_operations` filter-first.
 - The pre-ship rule is explicit: do not preserve `precept_language`, even as a hidden compatibility fallback.
+
+---
 
 ---
 
@@ -1426,6 +1606,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 ### 2026-05-12T05:04:03Z: DTO-free MCP working doc is the canonical design surface
 
 **By:** Scribe
@@ -1437,6 +1619,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 - Frank wrote `docs/Working/mcp-dto-free-design.md` as the durable design record for the approved hybrid DTO-free MCP direction.
 - The document explicitly records that Approach 4 (Hybrid) is approved, there are no known programmatic consumers of the current catalog JSON, and implementation may proceed.
 - The architecture boundary stays intact: raw core serialization remains rejected and the public MCP surface stays curated.
+
+---
 
 ---
 
@@ -1454,6 +1638,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 ### 2026-05-12T05:04:03Z: DTO-free MCP architecture analysis confirms hybrid curated projection
 
 **By:** Scribe
@@ -1465,6 +1651,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 - Frank evaluated multiple DTO-free MCP approaches under the no-codegen constraint and rejected raw core serialization plus attribute-driven converter sprawl.
 - The accepted direction keeps the contract curated while removing DTO type maintenance: catalog/reference tools move toward compact rendered output and only genuinely programmatic surfaces keep minimal structured JSON.
 - The core ruling remains that transport shape is a deliberate MCP contract concern, not something to leak back into `src/Precept` domain types.
+
+---
 
 ---
 
@@ -1492,6 +1680,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 ### 2026-05-12T04:29:05Z: Diagnostic Message Teachable Moment Audit
 
 
@@ -1516,6 +1706,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 ### 2026-05-12T04:29:05Z: Diagnostic Message Location Tag Revision
 
 
@@ -1537,6 +1729,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 - The recommended tag format preserves the DSL preposition and scope name (`[on ... ensure]` / `[in ... ensure]`) so event-vs-state ensures stay distinguishable.
 
 - Structured `Args` remain part of the contract so AI agents can reconstruct the location tag without regex-parsing the rendered message.
+
+---
 
 ---
 
@@ -1566,6 +1760,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 ### 2026-05-12T04:00:00Z: Modifier applicability drift was confirmed as catalog gaps for `price`, `maxplaces`, and identity-type redundancy handling
 
 **By:** Scribe
@@ -1577,6 +1773,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 - Frank grounded the issue in catalog metadata, not checker logic: `price` bound modifiers and business-magnitude `maxplaces` were missing from `Modifiers.cs`, while the checker was faithfully enforcing incomplete metadata.
 - The audit locked the design line that `price` magnitude modifiers are semantically valid, `exchangerate min/max` remain deliberately invalid, and `notempty` must stay off scalar business magnitudes.
 - It also recorded the validator-shape bug on identity types: explicit `currency`/`unitofmeasure`/`dimension notempty` should degrade to redundancy-only handling.
+
+---
 
 ---
 
@@ -1606,6 +1804,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 ### 2026-05-12T01:05:25Z: Slice 11B shipped and unblocked temporal price-chain validation
 
 
@@ -1629,6 +1829,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 - MCP type-catalog output now serializes implied qualifiers, and George locked the implementation with 13 new Slice 11B tests. Slice 12 can proceed on top of the completed temporal denominator substrate.
 
 - Tooling follow-up remains open for Kramer: `price of ...` completions should offer `'time'` and `'date'` alongside physical dimensions.
+
+---
 
 ---
 
@@ -1658,6 +1860,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 ### 2026-05-12T00:50:06Z: Derivation operations do not infer qualifiers on resulting `price` values
 
 
@@ -1679,6 +1883,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 - Authors who need temporal-denominated derived prices must assign into fields explicitly declared with `of 'time'` or `of 'date'`.
 
 - The rationale is now locked as D19 in `docs/language/business-domain-types.md`: qualifier inference on derivation would violate Precept's explicit, deterministic, inspectable domain-contract model.
+
+---
 
 ---
 
@@ -1710,6 +1916,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 ### 2026-05-11T22:41:49Z: string Excluded from Typed Constant Interpolation Holes
 
 
@@ -1731,6 +1939,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 - The decision restores the prior compile-time guarantee and rejects runtime-deferral as a structural escape hatch.
 
 - No new diagnostic code is needed because `InterpolatedTypedConstantHoleTypeMismatch` already covers the failure.
+
+---
 
 ---
 
@@ -1760,6 +1970,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 ### 2026-05-11T22:41:49Z: Slice 2 Complete: Full Type-Grammar Matching for Interpolated Typed Constants
 
 
@@ -1786,6 +1998,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 
 ---
 
+---
+
 ### 2026-05-11T22:41:49Z: Slice 1 (Parser) Complete
 
 
@@ -1809,6 +2023,8 @@ A new Slice 22 covers runtime ingress normalization wiring: `TypeRuntimeMeta.Rea
 - Added the interpolated typed-constant expression form to the catalog and moved `TypedConstantStart` to that form.
 
 - Parser coverage landed with 10 round-trip tests.
+
+---
 
 ---
 
@@ -1944,4 +2160,3 @@ Shane identified a real clarity gap, not a real type gap. The design's TYPES wer
 - `docs/Working/quantity-normalization-design.md` — §0 Revised Key Types (clarification added), §0.1 Q2 (rewritten), §0.2 (new section)
 - No type changes to Slices 14–21
 - No changes to `TypedField`, `IntervalContainmentProofRequirement`, or Builder design
-

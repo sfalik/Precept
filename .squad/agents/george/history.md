@@ -53,3 +53,10 @@
 ## Learnings
 
 - Typed interpolated typed-constant holes were bypassing presence-proof generation entirely; the fix is to recurse `TypedInterpolatedTypedConstant.Slots` through `WalkExpression` so optional field reads inside holes emit PRE0116 unless a guard proves presence. Verified with new proof-engine tests and with `samples/Test.precept`, which now reports `UnprovedPresenceRequirement` on line 14.
+- Quantity-normalization review: the compile-time core is implementable, but the design still has implementation traps Shane should gate on — duplicate Slice 22 numbering, runtime Slice 22 depending on nonexistent `TypeRuntimeMeta`/`TypeRuntime<T>` surfaces, display drift once computed intervals become normalized, and `TryGetStaticNumericValue` becoming unsound if dynamic-unit interpolated constants fall back to raw `StaticMagnitude`. Also: the actual arg semantic type is `TypedArg`, not `TypedEventArg`, so slice specs must target the real code surface.
+
+### 2026-05-15T02:37:53Z — Function-call qualifier enforcement gap added to the counting-unit fix track
+
+- Frank's comprehensive cross-counting-unit audit found the remaining critical checker hole is not another binary-op branch; it is function-call resolution.
+- `TypeChecker.Expressions.Callables.cs` resolves `min`/`max`/`clamp`/`abs` overloads without ever enforcing `FunctionOverload.Match`, so `QualifierMatch.Same` metadata is currently dead for function calls.
+- Implementation direction is locked in the design doc: add `ValidateFunctionQualifierCompatibility` immediately after `SelectOverload`, reuse PRE0137 for explicit cross-counting-unit mismatches, and leave `in` membership as a separate deferred follow-up.

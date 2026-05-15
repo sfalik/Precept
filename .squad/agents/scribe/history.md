@@ -176,3 +176,7 @@
 
 - Health report: `decisions.md` 1148937B -> 1032577B; `decisions-archive.md` 1760379B -> 1760379B; inbox processed = 12; history files summarized = 1 (.squad/agents/elaine/history.md).
 
+### 2026-05-15T02:37:53Z — Count-unit comprehensive analysis batch recorded
+
+- Pre-check measured `.squad/decisions.md` at 116539 bytes with 0 inbox file(s); the ≥50 KB hard gate triggered an immediate 7-day archive pass before any merge work.
+- Archived 0 decision entries older than `2026-05-08T02:37:53Z`, recorded Frank's critical function-call qualifier-enforcement gap as a new canonical decision, wrote the Frank orchestration record plus the brief count-unit comprehensive-analysis session log, and propagated the implementation note into George history.
