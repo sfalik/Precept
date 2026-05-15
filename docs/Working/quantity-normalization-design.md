@@ -1885,11 +1885,11 @@ For `[lb_av]`:
 
 ## §5.0 — Implementation Progress Tracker
 
-**Last audited:** 2026-05-14 (George, full codebase scan)
+**Last audited:** 2026-05-15
 
 | Slice | Summary | Status | Blocking |
 |-------|---------|--------|----------|
-| **14** | Core normalizer (`TypedConstantNormalizer`) | ⬜ Not started | Blocks 15, 15b, 16, 19, 20 |
+| **14** | Core normalizer (`TypedConstantNormalizer`) | ✅ Done | Blocks 15, 15b, 16, 19, 20 |
 | **15** | TypeChecker bounds extraction to normalizer | ⬜ Not started | Needs 14 |
 | **15b** | TypedArg normalization (`NormalizedDeclaredMin/Max`) | ⬜ Not started | Needs 14 |
 | **16** | ProofEngine magnitude extraction + `TryGetStaticScalingFactor` | ⬜ Not started | Needs 14 |
@@ -1898,17 +1898,17 @@ For `[lb_av]`:
 | **19** | `InterpolatedTypedConstant` case in `IntervalOfNarrowed` | ⬜ Not started | Needs 14 |
 | **20** | Unit-aware interval scaling (`NumericInterval.Scale`) | ⬜ Not started | Needs 19, 16 |
 | **21** | Interpolated quantity test coverage | ⬜ Not started | Needs 19, 20 |
-| **22** | `StaticQualifier` on `TypedInterpolatedTypedConstant` | ⬜ Not started | None |
+| **22** | `StaticQualifier` on `InterpolatedTypedConstant` | ✅ Done | None |
 | **23** | Route `StaticQualifier` through qualifier consumers | ⬜ Not started | Needs 22 |
 | **24** | Money/price interpolated interval extraction | ⬜ Not started | Needs 19, 22 |
 | **25** | Field-default proof coverage (`FoldValue` + collector) | ⬜ Not started | Needs 19, 22, 23 |
 | **26** | Event arg default resolution (`ResolveEventArgExpressions`) | ⬜ Not started | Needs 25, 15b |
 | **27** | Doc sync (language spec, proof-engine.md, interval design) | ⬜ Not started | Needs 16, 18 (shape freeze) |
-| **30** | Extend PRE0070/PRE0071 to comparison operators | ⬜ Not started | None |
-| **31** | PRE0137 `CrossCountingUnitOperation` | ⬜ Not started | After 30/32 |
-| **32** | `QualifierMatch.Same` in `SelectOverload` (function calls) | ⬜ Not started | None |
+| **30** | Extend PRE0070/PRE0071 to comparison operators | ✅ Done | None |
+| **31** | PRE0137 `CrossCountingUnitOperation` | 🔶 Partial | Binary operators pending wave 2 |
+| **32** | `QualifierMatch.Same` in `SelectOverload` (function calls) | ✅ Done | None |
 | **33** | Qualifier checks on `contains` synthetic membership ops | ⬜ Not started | After 32 |
-| **34** | Affine UCUM catalog extension (`AffineOffset`) | ⬜ Not started | None |
+| **34** | Affine UCUM catalog extension (`AffineOffset`) | ✅ Done | None |
 | **35** | Affine scalar normalization `(value + offset) × scale` | ⬜ Not started | Needs 34 |
 | **36** | Affine interval shifting (`NumericInterval.Shift`) | ⬜ Not started | Needs 35 |
 | **37** | Full affine 24-test matrix | ⬜ Not started | Needs 36 |
@@ -1917,7 +1917,7 @@ For `[lb_av]`:
 | **40** | Doc: business units `UcumExactFactor.One` / `DimensionVector.None` | ✅ Done | None |
 | **41** | Doc: `dozen`/`gross` intentional exclusion | ✅ Done | None |
 | **42** | Doc: `each.dimension = DimensionVector.None` behavior | ✅ Done | None |
-| **43** | Rename `TypedInterpolatedTypedConstant` → `InterpolatedTypedConstant` | ⬜ Not started | None |
+| **43** | Rename `TypedInterpolatedTypedConstant` → `InterpolatedTypedConstant` | ✅ Done | None |
 
 **Legend:** ✅ Done · 🔶 Partial · ⬜ Not started
 **Critical path:** 14 → 15/15b/16 → 17/18/19 → 20/21/22 → 23/24/25 → 26 → 27
@@ -1929,7 +1929,7 @@ These slices follow the existing interval-proof-engine-design numbering (Slices 
 
 | Slice | Objective | Depends On | Agent | Status |
 |-------|-----------|------------|-------|--------|
-| **14** | ~~`NormalizedNumericValue` +~~ `TypedConstantNormalizer` _(⚠️ `NormalizedNumericValue` dropped per §0)_ | None (new files) | George | ⬜ |
+| **14** | ~~`NormalizedNumericValue` +~~ `TypedConstantNormalizer` _(⚠️ `NormalizedNumericValue` dropped per §0)_ | None (new files) | George | ✅ |
 | **15** | Wire TypeChecker bounds extraction to normalizer | Slice 14 | George | ⬜ |
 | **16** | Wire ProofEngine magnitude extraction to normalizer | Slice 14 | George | ⬜ |
 | **17** | Unit + integration + regression tests | Slices 15–16 | Soup Nazi | ⬜ |
@@ -3573,7 +3573,7 @@ These slices extend the normalization design to cover interpolated typed constan
 
 | Slice | Objective | Depends On | Status |
 |-------|-----------|------------|--------|
-| **22** | Capture `StaticQualifier` on `TypedInterpolatedTypedConstant` | None | ⬜ |
+| **22** | Capture `StaticQualifier` on `InterpolatedTypedConstant` | None | ✅ |
 | **23** | Route `StaticQualifier` through qualifier consumers | Slice 22 | ⬜ |
 | **24** | Extend interpolated interval extraction to money/price | Slices 19, 22 | ⬜ |
 | **25** | Field-default proof coverage for interpolated typed constants | Slices 19, 22, 23 | ⬜ |
@@ -3713,11 +3713,11 @@ The next available slice number is **30**. Slice 27 is already reserved for doc 
 
 | Slice | Objective | Lane | Status |
 |-------|-----------|------|--------|
-| **30** | Extend PRE0070/PRE0071 to comparison operators | Gap A | ⬜ |
-| **31** | PRE0137 `CrossCountingUnitOperation` | Gap B | ⬜ |
-| **32** | `QualifierMatch.Same` in `SelectOverload` | Gap C | ⬜ |
+| **30** | Extend PRE0070/PRE0071 to comparison operators | Gap A | ✅ |
+| **31** | PRE0137 `CrossCountingUnitOperation` | Gap B | 🔶 Partial |
+| **32** | `QualifierMatch.Same` in `SelectOverload` | Gap C | ✅ |
 | **33** | Qualifier checks on `contains` membership ops | Gap D | ⬜ |
-| **34** | Affine UCUM catalog extension | Affine | ⬜ |
+| **34** | Affine UCUM catalog extension | Affine | ✅ |
 | **35** | Affine scalar normalization `(value + offset) × scale` | Affine | ⬜ |
 | **36** | Affine interval shifting (`NumericInterval.Shift`) | Affine | ⬜ |
 | **37** | Full affine 24-test matrix | Affine | ⬜ |
@@ -3726,7 +3726,9 @@ The next available slice number is **30**. Slice 27 is already reserved for doc 
 | **40** | Doc: business units factor/dimension | Doc | ✅ |
 | **41** | Doc: dozen/gross exclusion | Doc | ✅ |
 | **42** | Doc: each.dimension behavior | Doc | ✅ |
-| **43** | Rename `TypedInterpolatedTypedConstant` | Standalone | ⬜ |
+| **43** | Rename `TypedInterpolatedTypedConstant` → `InterpolatedTypedConstant` | Standalone | ✅ |
+
+**Status note:** Slice 31 is intentionally marked partial: PRE0137 is wired for same-match function-call enforcement via Slice 32, while the binary-operator path remains wave-2 work.
 
 ---
 
