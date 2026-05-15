@@ -118,4 +118,53 @@ internal static class AnalyzerTestHelper
             .OrderBy(d => d.Location.SourceSpan.Start)
             .ToList();
     }
+
+    /// <summary>
+    /// Compiles multiple source strings with explicit file paths and runs
+    /// <typeparamref name="TAnalyzer"/>. Used for path-sensitive analyzers that distinguish
+    /// emission sources from test sources based on file path conventions.
+    /// </summary>
+    internal static async Task<IReadOnlyList<Diagnostic>> AnalyzeWithFilePathsAsync<TAnalyzer>(
+        params (string source, string filePath)[] entries)
+        where TAnalyzer : DiagnosticAnalyzer, new()
+    {
+        var syntaxTrees = entries
+            .Select(e => CSharpSyntaxTree.ParseText(e.source, path: e.filePath))
+            .ToArray();
+
+        var dotnetDir = Path.GetDirectoryName(typeof(object).Assembly.Location)!;
+        var references = new List<MetadataReference>
+        {
+            MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
+        };
+
+        var systemRuntime = Path.Combine(dotnetDir, "System.Runtime.dll");
+        if (File.Exists(systemRuntime))
+            references.Add(MetadataReference.CreateFromFile(systemRuntime));
+
+        var compilation = CSharpCompilation.Create(
+            "TestAssembly",
+            syntaxTrees,
+            references,
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+        var compilerErrors = compilation.GetDiagnostics()
+            .Where(d => d.Severity == DiagnosticSeverity.Error)
+            .ToList();
+
+        if (compilerErrors.Count > 0)
+        {
+            var messages = string.Join("\n", compilerErrors.Select(d => $"  {d.Id}: {d.GetMessage()}"));
+            throw new InvalidOperationException(
+                $"Test source has {compilerErrors.Count} compiler error(s) — fix the source before running the analyzer:\n{messages}");
+        }
+
+        var withAnalyzers = compilation.WithAnalyzers(
+            ImmutableArray.Create<DiagnosticAnalyzer>(new TAnalyzer()));
+
+        return (await withAnalyzers.GetAnalyzerDiagnosticsAsync())
+            .Where(d => d.Severity != DiagnosticSeverity.Hidden)
+            .OrderBy(d => d.Location.SourceSpan.Start)
+            .ToList();
+    }
 }

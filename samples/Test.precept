@@ -1,22 +1,18 @@
 ﻿precept Test
 
 field test as quantity of 'mass' max '5 kg'
-field test2 as integer max 2 optional
+field test2 as integer max 2 optional default 2
+field test3 as quantity of 'count' max 4
 
 state offState initial
-state onState 
+state onState terminal
 
 event toggle initial
 
 in offState omit test
 
 from offState on toggle 
-    -> set test = '6 [lb_av]'
+    -> set test = '{test2} [lb_av]'
+    -> set test3 = '5 box'
     -> transition onState
 
-from onState on toggle when test2 is set and test2 > 0
-    -> clear test2
-    -> transition offState
-
-from onState on toggle
-    -> transition offState
