@@ -257,6 +257,84 @@ public class TypeCheckerInterpolatedQuantityTests
                        + "without re-applying the lb→kg scale factor (HasSingleMagnitudeSlot guard)");
     }
 
+    // ── Tests 11–12: WholeValue slot for money and price (Slice 24 W1) ──────────────
+
+    [Fact]
+    public void InterpolatedMoney_WholeValueSlot_SourceFieldWithinMax_DoesNotEmitNumericOverflow()
+    {
+        // '{moneyRef}' → single WholeValue slot; IntervalOfNarrowed recurses into moneyRef.
+        // moneyRef max '50 USD' → interval [−∞..50]; target max '100 USD' → 50 ≤ 100 → Proved.
+        // This exercises the WholeValue path in InterpolatedTypedConstant case of IntervalOfNarrowed
+        // for money (Slice 24): no unit scaling is applied since currencies are not UCUM-convertible.
+        var result = CompileGeneral(
+            targetDeclaration: "field x as money in 'USD' max '100 USD' default '0 USD'",
+            assignment: "'{moneyRef}'",
+            targetField: "x",
+            "field moneyRef as money in 'USD' max '50 USD' default '0 USD'");
+
+        result.Diagnostics
+            .Where(d => d.Code == nameof(DiagnosticCode.NumericOverflow))
+            .Should().BeEmpty(because: "source max '50 USD' fits inside the target max '100 USD'");
+
+        result.Proof.Obligations
+            .Where(o => o.Requirement is IntervalContainmentProofRequirement { TargetField: "x" })
+            .Should().ContainSingle()
+            .Which.Disposition.Should().Be(ProofDisposition.Proved,
+                because: "WholeValue money slot reads source field bounds directly without unit scaling");
+    }
+
+    [Fact]
+    public void InterpolatedPrice_WholeValueSlot_SourceFieldWithinMax_DoesNotEmitNumericOverflow()
+    {
+        // '{priceRef}' → single WholeValue slot; IntervalOfNarrowed recurses into priceRef.
+        // priceRef max '10 USD/kg' → interval [−∞..10]; target max '20 USD/kg' → 10 ≤ 20 → Proved.
+        // This exercises the WholeValue path for price (Slice 24): the Magnitude-only guard
+        // (line 49–52) does NOT apply to WholeValue slots, so the slot recurses normally.
+        var result = CompileGeneral(
+            targetDeclaration: "field x as price in 'USD' of 'mass' max '20 USD/kg' default '0 USD/kg'",
+            assignment: "'{priceRef}'",
+            targetField: "x",
+            "field priceRef as price in 'USD' of 'mass' max '10 USD/kg' default '0 USD/kg'");
+
+        result.Diagnostics
+            .Where(d => d.Code == nameof(DiagnosticCode.NumericOverflow))
+            .Should().BeEmpty(because: "source max '10 USD/kg' fits inside the target max '20 USD/kg'");
+
+        result.Proof.Obligations
+            .Where(o => o.Requirement is IntervalContainmentProofRequirement { TargetField: "x" })
+            .Should().ContainSingle()
+            .Which.Disposition.Should().Be(ProofDisposition.Proved,
+                because: "WholeValue price slot reads source field bounds directly without inverse unit scaling");
+    }
+
+    // ── Test 13: Same-unit price regression anchor — no inverse scaling (Slice 24 W2) ─
+
+    [Fact]
+    public void InterpolatedPrice_SameUnit_MagnitudeWithinMax_DoesNotEmitNumericOverflow()
+    {
+        // '{n} USD/kg': single Magnitude slot; StaticQualifier = StaticCurrencyAndUnitQualifier(USD, kg).
+        // IntervalOfNarrowed recurses on n → [0..3].
+        // ApplyStaticUnitScaling: kg is the denominator unit; scale_kg = 1 → interval.Scale(1/1) = [0..3].
+        // No inverse scaling amplification for same-unit case. Target max '10 USD/kg' → 3 ≤ 10 → Proved.
+        // This is the same-unit regression anchor: ensures the Slice 24 price path does NOT
+        // accidentally apply inverse scaling when the assignment unit already matches the field unit.
+        var result = CompileGeneral(
+            targetDeclaration: "field x as price in 'USD' of 'mass' max '10 USD/kg' default '0 USD/kg'",
+            assignment: "'{n} USD/kg'",
+            targetField: "x",
+            "field n as integer max 3 default 3");
+
+        result.Diagnostics
+            .Where(d => d.Code == nameof(DiagnosticCode.NumericOverflow))
+            .Should().BeEmpty(because: "3 USD/kg is below the 10 USD/kg max with no unit conversion needed");
+
+        result.Proof.Obligations
+            .Where(o => o.Requirement is IntervalContainmentProofRequirement { TargetField: "x" })
+            .Should().ContainSingle()
+            .Which.Disposition.Should().Be(ProofDisposition.Proved,
+                because: "same-unit price must not amplify the magnitude interval via inverse scaling");
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────────
 
     /// <summary>

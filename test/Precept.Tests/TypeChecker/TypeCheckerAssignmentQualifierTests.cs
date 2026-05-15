@@ -286,4 +286,25 @@ public class TypeCheckerAssignmentQualifierTests
 
         TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.QualifierMismatch);
     }
+
+    [Fact]
+    public void SetPriceField_FromStaticCurrencyAndUnitInterpolated_BothMismatch_QualifierMismatch()
+    {
+        // '{n} EUR/g' has StaticQualifier = StaticCurrencyAndUnitQualifier(EUR, g).
+        // Target is price in 'USD' of 'kg' — currency AND unit both differ → PRE0134.
+        // This exercises BuildQualifiersFromStaticInterpolated → ValidateResolvedQualifiers
+        // for the StaticCurrencyAndUnitQualifier subtype with a two-axis mismatch.
+        var precept = """
+            precept Widget
+            field Cost as price in 'USD' of 'kg' default '0 USD/kg' writable
+            state Open initial
+            state Closed
+            event Update(n as decimal)
+            from Open on Update
+                -> set Cost = '{n} EUR/g'
+                -> transition Closed
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.QualifierMismatch);
+    }
 }
