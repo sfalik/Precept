@@ -19,6 +19,20 @@
 
 ## Recent Updates
 
+### 2026-05-16 — Slice 8 Runtime: Created outcome and fire-once enforcement
+
+- **Discovery:** `Precept.From()` was completely hollow (`new Precept()`) — storing no compilation data. Updated to store `SemanticIndex` so the runtime can read the event/state topology.
+- **`EventOutcome.Created`** — added as `sealed record Created(Version Result, FiredArgs Args)` following the existing DU pattern (`Transitioned`, `Applied`, etc.).
+- **`FiredArgs.Empty`** — added `public static FiredArgs Empty { get; } = new();` sentinel for no-arg construction events (needed since `FiredArgs` has a private constructor).
+- **`Precept.Create()` spike-level** — iterates `EventHandlers` for rows where `IsConstruction && EventName == initialEvent.Name`; skips guarded rows (R4 deferred); returns `Created` on success row, `Rejected` on reject row, `Created` directly on the no-initial-event path.
+- **Key DSL distinction**: construction rows (`on Event initial -> ...`) go into `EventHandlers` as `TypedEventRow{IsConstruction=true}`. Regular transition rows from the initial state (`from Draft on Event -> ...`) go into `TransitionRows`. Current spike only covers `EventHandlers`. The `from State on InitialEvent -> ...` form is valid but not yet runtime-evaluated (TODO R4).
+- **`Precept.Events` / `InitialEvent` / `InitialState`** — implemented using `SemanticIndex`; `BuildEventDescriptor` converts `TypedEvent` to `EventDescriptor` setting `ModifierKind.InitialEvent` modifier.
+- **`Version.AvailableEvents`** — filters `Precept.Events` to exclude `ModifierKind.InitialEvent` entries; delegates to `Precept.Events` rather than duplicating lookup.
+- **`Version.Fire()` fire-once** — checks `Precept.IsInitialEvent(eventName)`; returns `Rejected` to block post-construction firing of initial events.
+- **Test DSL gotcha**: an unconditional construction reject row (`on E initial -> reject "msg"`) alone triggers `AlwaysRejecting` error. The reject test needs a guarded success row first to satisfy graph analysis, then an unguarded reject row which the spike picks up (guards are skipped).
+- Created `test/Precept.Tests/Runtime/RuntimeConstructionTests.cs` (9 tests): all 8 named spec tests + `EventOutcome_Created_IsPatternMatchable`.
+- Baseline 6,421 (pre-Slice 7 context) → 5,757 was the Precept.Tests count pre-Slice 8 → **5,764 after (+7 new)**. All green. Commit `d95fff84`.
+
 ### 2026-05-16 — Slice 7 Proof Engine construction row context complete
 
 - The proof engine already had `EventHandlerContext(TypedEventRow Handler)` in `ProofLedger.cs` — no new context type was needed.
