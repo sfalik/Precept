@@ -1,0 +1,1 @@
+Merged frank-24's OQ4 note into the decision ledger, deleted the inbox file, and logged the `UnreachableRow` / `EventRow` naming outcome. Decision ledger size changed from 20282 B to 20999 B; no entries older than 30 days were eligible for archive, and no history summarization was required.

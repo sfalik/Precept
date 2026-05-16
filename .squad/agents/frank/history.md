@@ -42,6 +42,17 @@
 - Parser disambiguation: after reaching `->`, if the next token is `reject`, the construct is the Reject variant; otherwise it's the Mutation variant. Same logic applies to both `from` and `on` families.
 - The slot-kind count increased from 17 to 18 (split `Outcome` → `MutationOutcome` + `RejectClause`); construct count increased from 12 to 14.
 
+
+### 2026-05-15T22:47:48.336-04:00 — OQ4 unified as `UnreachableRow`; `EventRow` naming adopted
+
+- Locked OQ4 to a single `UnreachableRow` diagnostic for both construction rows and transition rows shadowed by an earlier always-matching row.
+- Updated the constructor-semantics and grammar docs to rename the construction-row family to `EventRow` / `EventRowReject`, preserving the asymmetric base-name + `Reject` rule alongside `TransitionRow` / `TransitionRowReject`.
+- Durable rule: when two diagnostics describe the same structural defect at different row scopes, unify the code and vary only the message text by context.
+### 2026-05-16T02:47:48Z — Frank-24 decision merged and inbox cleared
+
+- Merged the `frank-oq4-unreachable-row.md` inbox note into `.squad/decisions.md`.
+- The durable row-shadowing diagnostic is `UnreachableRow`; the construction-row family now uses `EventRow` / `EventRowReject`.
+- The inbox note was deleted after merge.
 ## Historical Summary
 
 - 2026-05-12 through 2026-05-16 concentrated Frank's work around hover contract reviews, field-state guarantees, constructor semantics, reject-surface structure, interval-proof design, quantity normalization, diagnostic-enforcement architecture, and counting-unit comparison gaps.
@@ -117,3 +128,5 @@
 - For EventHandler, the success path IS the unmarked default (you write `on Create -> set fields` normally); rejection is the exception case. For TransitionRow, both resolution and rejection are equal-weight paths in a decision matrix — symmetric naming is justified.
 - Recommended: asymmetric naming — `EventHandler` (base, success-implicit) + `EventHandlerReject` (marked exception). This drops `EventHandlerResolution` entirely. TransitionRow keeps its symmetric `Resolution`/`Reject` axis unchanged.
 - Earlier assumption that naming "must stay parallel" across both families was wrong — the families have different semantic weight distributions.
+
+

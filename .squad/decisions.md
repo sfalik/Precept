@@ -2,6 +2,20 @@
 
 ---
 
+### 2026-05-16T02:47:48Z: OQ4 locks `UnreachableRow`; construction rows now use `EventRow`
+
+**By:** Scribe
+
+**Status:** Merged from frank-24's OQ4 lock + EventRow rename batch.
+
+**Merged source:** `frank-oq4-unreachable-row.md`.
+
+- `UnreachableRow` is the single diagnostic code for both construction rows and transition rows that appear after an always-matching row.
+- The construction-row family now uses `EventRow` / `EventRowReject`, preserving the asymmetric base-name + `Reject` rule alongside `TransitionRow` / `TransitionRowReject`.
+- Durable rule: when two diagnostics describe the same structural defect at different row scopes, unify the code and vary only the message text by context.
+
+---
+
 ## ACTIVE DECISIONS — Current Sprint
 
 ---
