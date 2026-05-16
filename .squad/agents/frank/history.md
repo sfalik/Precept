@@ -41,6 +41,18 @@
 
 ## Recent Updates
 
+### 2026-05-16T09:55:00-04:00 — Slice 3 Review: CompletionHandler Cut-Over APPROVED
+
+- Reviewed Kramer's final slice (commit `25cd53a4`): `CompletionHandler` now dispatches via `SlotPositionResolver.Resolve()` + `SlotVocabulary` switch.
+- `SlotContext.cs` (1640 lines) deleted entirely — no residual references in source.
+- `CursorSemanticResolver.cs` extraction is clean; non-dispatch utilities rewired correctly.
+- Token-level fallback layer (lines 139–193) is narrow and intentional — transitional surface for contexts not yet expressible in slot metadata.
+- TODO confirmed at `SlotPositionResolver.cs:213` for hardcoded expression-introducer set.
+- New `TransitionRowAfterStateTarget` test validates the critical post-state-target disambiguation context.
+- Build clean (0 errors), 6443 tests passing.
+- Full 3-slice refactor complete: catalog-driven completions are now the only routing path.
+- Verdict: APPROVED. Decision written to `.squad/decisions/inbox/frank-slice3-review.md`.
+
 ### 2026-05-16T09:02:56-04:00 — Slice 2 Review: SlotPositionResolver APPROVED
 
 - Reviewed Kramer's `SlotPositionResolver.cs` and 31-assertion test file.

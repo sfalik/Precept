@@ -34,6 +34,61 @@
 
 ---
 
+
+### 2026-05-16T09:55:00Z: Slice 8b removes row-level `initial` and makes construction semantics metadata-driven
+
+**By:** Scribe
+
+**Status:** Merged from George's Slice 8b completion note.
+
+**Merged source:** `george-slice-8b-complete.md`.
+
+- Authored construction rows now use `on <Event> -> ...`; the parser emits `EventRow` uniformly and the type checker derives `IsConstruction` from event metadata instead of row syntax.
+- Reject routing, guard-slot layout, PRE0081 coverage accounting, and `GraphEvent.IsInitial` were all realigned around semantic construction handling rather than parser-only classification.
+- Diagnostics, samples, language-server/MCP surface guards, and the full buildable test slate were updated together so the syntax cutover ships as a coherent surface.
+
+---
+
+### 2026-05-16T09:55:00Z: Slice 3 completion cutover ships on `SlotPositionResolver` + `SlotVocabulary`
+
+**By:** Scribe
+
+**Status:** Merged from Kramer's Slice 3 completion note.
+
+**Merged source:** `kramer-slice3-complete.md`.
+
+- Kramer landed Slice 3 on `spike/Precept-V2-Radical` at commit `25cd53a4`, cutting `CompletionHandler` over to `SlotPositionResolver.Resolve(...)` plus slot-vocabulary dispatch.
+- The legacy `SlotContext` path is now gone: `SlotContext.cs` was deleted, `SlotContextResolverTests` were removed, shared cursor semantics moved into `CursorSemanticResolver`, and completion coverage now asserts the cutover behavior directly.
+- Validation stayed fully green at `dotnet build --nologo`, `dotnet test test\\Precept.LanguageServer.Tests\\ --nologo` (`325/325`), and `dotnet test --nologo` (`6443/6443`), with the transition-row post-state-target completion case locked in.
+
+---
+
+### 2026-05-16T09:55:00Z: Slice 3 review approves the catalog-driven completions cutover
+
+**By:** Scribe
+
+**Status:** Merged from Frank's Slice 3 final review.
+
+**Merged source:** `frank-slice3-review.md`.
+
+- Frank approved commit `25cd53a4`: `CompletionHandler` now resolves slot position once, dispatches exhaustively by `SlotVocabulary`, and no handler code still depends on `SlotContext`.
+- The deletion is complete and clean: `SlotContext.cs` and `SlotContextResolverTests.cs` are gone, direct `SlotPositionResolver` tests remain, and behavior is now locked by completion integration coverage instead of shadow-run equivalence checks.
+- The remaining `Assign`/`By`/`At` expression-introducer set plus a narrow token-level fallback layer are explicitly non-blocking advisory follow-ups; the three-slice refactor is complete.
+
+---
+
+### 2026-05-16T09:55:00Z: Slice 11 exposes construction-aware event handlers on the MCP compile surface
+
+**By:** Scribe
+
+**Status:** Merged from Newman's Slice 11 MCP DTO note.
+
+**Merged source:** `newman-slice-11-complete.md`.
+
+- `CompileResultDto` now carries `EventHandlers`, and each handler projects `eventName` plus `isConstruction` through the new `CompileEventRowDto` shape.
+- The compile tool maps the flag directly from `TypedEventRow.IsConstruction`, preserving the DU's shared construction metadata without adding DTO-side dispatch logic.
+- Newman locked the surface with explicit true/false construction-flag tests, kept the JSON shape deterministic, and left the MCP suite green while the unrelated language-server branch breakage stayed out of scope.
+
 ### 2026-05-16T02:40:40Z: Transition-row naming finalization locks the asymmetric family model
 
 **By:** Scribe
