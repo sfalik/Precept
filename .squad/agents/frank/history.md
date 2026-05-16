@@ -26,6 +26,26 @@
 
 ## Learnings
 
+### 2026-05-15T20:16:01-04:00 — Reversed "uniformity" recommendation: `on <Event>` is correct construction syntax for stateful precepts
+
+- Shane's pushback on the "keep `from <InitialState> on <InitialEvent>`" recommendation was correct. Full analysis in `.squad/decisions/inbox/frank-constructor-syntax-on-event.md`.
+- **Core insight:** False uniformity (dressing unconditional genesis as state-dispatched transition) is worse than honest divergence. If terminal construction established that construction is a distinct semantic category, the syntax must follow.
+- Grammar unification is clean: `EventHandlerDeclaration` is the shared production. Disambiguation between construction rows and state-agnostic handlers happens at type-checking via the `initial` modifier on the event declaration. No parser ambiguity.
+- Guard restriction (`EventHandlerDoesNotSupportGuard`) should be removed: `when` guards on `on Event ->` forms are coherent for both construction (guarded paths) and state-agnostic handlers (field-value conditions).
+- Stateless/stateful constructor syntax unification reflects semantic reality: construction IS the same operation in both contexts.
+- Durable learning: "syntactic uniformity" is only valuable when it reflects semantic uniformity. When semantics diverge, forcing shared syntax teaches a lie.
+
+### 2026-05-15T19:57:05-04:00 — Terminal constructor design analysis reverses prior position on construction-time transitions
+
+- Evaluated Shane's proposal: initial event as true constructor (always terminal in initial state + fire-once enforcement).
+- **Reversed prior verdict** that construction-time transitions are "sound." They are technically sound but semantically confusing — `initial` stops meaning "where entities begin" when construction can route elsewhere.
+- The proposal resolves keyword overload more elegantly than a rename: `initial` genuinely means "origin" in both state and event contexts when construction is terminal.
+- Construction-time routing pattern is empirically unused (0/20+ samples) and replaceable with two-step construct + route.
+- D94 simplifies to single-target analysis (always initial state). Proof engine wins.
+- Fire-once enforcement via excluding initial event from post-construction event space (returns `UndefinedEvent`). No new mechanism.
+- Stateless precepts: fully compatible (constraints vacuously satisfied).
+- **Recommendation: Adopt.** Superior to keyword rename approach. Decision saved to `.squad/decisions/inbox/frank-constructor-terminal-design.md`.
+
 ### 2026-05-15T19:48:03-04:00 — Critical design review of initial event/state semantics identified 3 pre-ship fixes
 
 - `initial` keyword overload is a P5 violation: same word means "graph position" (state) and "construction mechanism" (event). Recommendation: split to `initial` (state) + `constructor` (event).
@@ -63,6 +83,12 @@
 - Missing completion cases should first become explicit slot lanes (`AfterStateTarget`, `AfterEventTarget`, `AfterNo`, `InSetAssignment`) before anyone adds ad-hoc item filters.
 
 ## Recent Updates
+
+### 2026-05-15T23:59:59Z — Deferred test-9 fix spec recorded and shipped
+
+- Frank traced the final deferred quantity-bound failure to two seams: typed-constant validator-specific diagnostic codes were not being promoted into `DiagnosticCode`, and quantity typed constants had a dimension-check bypass in assignment-qualifier validation.
+- The repair spec is now durable in `.squad/decisions.md`, and George's follow-up lane reported the branch fully green at `5699/5699`.
+
 
 ### 2026-05-15T23:14:11Z — Deferred qualifier review remains APPROVED after N1–N4 disposition
 

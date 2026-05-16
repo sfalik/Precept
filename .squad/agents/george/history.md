@@ -19,6 +19,12 @@
 
 ## Recent Updates
 
+### 2026-05-15T23:59:59Z — Deferred test-9 closeout reported green
+
+- George closed the remaining quantity-bound red test after Frank's spec, recorded implementation commit `d68eb6bc`, and reported `5699/5699` passing across the validation run.
+- Durable seam: typed-constant validator codes must survive emission when the qualifier text is concrete, and quantity assignment qualifier checks remain regression-sensitive whenever typed constants are special-cased.
+
+
 ### 2026-05-15T23:26:25Z — Pairwise qualifier repair lane reduced the branch from 10 failing tests to 1
 
 - Commit `a03fcf4e` implemented Frank's three-root-cause fix spec for the remaining pre-existing failure cluster.

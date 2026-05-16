@@ -10849,60 +10849,6 @@ Implementation may proceed. The spec is production-quality — no implementer sh
 
 - `ProofEngine.cs` remains the behavioral frontier; Phase 2 should implement runtime-neutral proof analysis against the new carriers rather than reshaping these types again.
 
-# ProofEngine Phase 2 Closeout
-
-**Agent:** George (Runtime Dev)
-
-**Date:** 2026-05-08T23:45:00Z
-
-**Task:** ProofEngine Phase 2 — Full Engine Implementation (S1–S13)
-
-## Commit Hashes
-
-| Slice | Commit | Description |
-
-|-------|--------|-------------|
-
-| S1–S12 | `46c9a4d4` | Full engine implementation — obligation collection, five strategies, error suppression, diagnostics, constraint influence, initial-state satisfiability, forwarding fact consumption |
-
-| S13 | `36618ef9` | Stateless handling verification + documentation sync |
-
-## Build/Test Results
-
-- **Build:** Green, 0 warnings, 0 errors
-
-- **Tests:** 3451 passed, 2 pre-existing TokensTests failures unchanged
-
-- **Baseline preserved:** No regressions introduced
-
-## Deviations from Plan
-
-1. **Combined commit:** Slices S1–S12 were implemented in a single pass and committed together rather than individually. The code structure follows the slice boundaries internally, but the git history has 2 commits instead of 13. Rationale: the implementation was written holistically for correctness across slice boundaries, and incremental commits would have required artificial intermediate states.
-
-2. **FunctionKind.Count:** The spec referenced `FunctionKind.Count` for guard pattern recognition, but `count` is a `TypeAccessor` on collection types, not a function. Guard extraction matches `TypedMemberAccess` with `acc.Name == "count"` instead.
-
-3. **SourceSpan.Empty vs SourceSpan.Missing:** Spec pseudocode used `SourceSpan.Empty` but the actual API is `SourceSpan.Missing`.
-
-4. **ModifierKind.Initial vs ModifierKind.InitialState:** The live enum uses `InitialState`, not `Initial`.
-
-5. **BinaryOperationMeta.Left/Right vs Lhs/Rhs:** Spec pseudocode used `.Left`/`.Right` but actual properties are `.Lhs`/`.Rhs`.
-
-## Surprises
-
-- No functional surprises — the spec was thorough and all 18 gaps were pre-resolved by Frank.
-
-- The modifier effective-modifiers walk needed both `Modifiers` and `ImpliedModifiers` concatenation per the spec's effective-modifiers note (§7).
-
-- `SatisfactionCovers` subsumption logic required careful accessor-name matching for `notempty`'s dual satisfaction rows.
-
-## What's Now Unblocked
-
-- Soup Nazi's ProofEngine test suite can exercise all five strategies
-
-- Precept Builder can consume `ProofLedger` for fault backstops and constraint influence
-
-- Language Server proof diagnostics are now live
-
 # ProofEngine Phase 2 — Post-commit bugfixes
 
 **Date:** 2026-05-09T00:35:00-04:00
@@ -20649,3 +20595,686 @@ Add direct regression anchors for Frank's remaining N3/N4 qualifier follow-up ga
 - Final closeout validation after the follow-up arc finished: `dotnet test test\Precept.Tests\ --no-restore --nologo -v q` reported `5689 passed / 10 failed / 5699 total`.
 - All 26 new N3/N4 tests pass.
 - A transient detached HEAD artifact that surfaced as a duplicate variable in `FieldState.cs` blocked an intermediate rebuild, but it was resolved before the final run.
+
+# Design Analysis: `on <Event>` Syntax for Construction Rows in Stateful Precepts
+
+**Author:** Frank (Lead/Architect)  
+**Date:** 2026-05-15  
+**Status:** Analysis — reversing prior recommendation  
+**Requested by:** Shane  
+**Precursor:** `.squad/decisions/inbox/frank-constructor-terminal-design.md` § Open Question
+
+---
+
+## Proposal Summary
+
+Replace the construction-row syntax in stateful precepts:
+
+```precept
+// Current
+from Draft on Create
+    -> set Name = Create.Name
+
+// Proposed
+on Create
+    -> set Name = Create.Name
+```
+
+The argument: under the terminal constructor design, `from <InitialState>` is structurally redundant — the compiler already knows the construction context is the initial state. The `on <Event>` form, which already exists for stateless handlers, would unify constructor syntax across stateful and stateless precepts.
+
+---
+
+## 1. Does `on <Event>` Collide With Existing Stateful Semantics?
+
+**Current spec rule:** A precept with both `EventHandlerDeclaration` nodes (`on Event -> actions`) and any `state` declarations is an error. Event handlers are stateless-only.
+
+**My prior recommendation (still pending):** Relax this — allow `on Event -> actions` in stateful precepts when no `from ... on <same event>` row exists. This would mean "fire regardless of current state, no transition."
+
+**If both relaxation AND this proposal are adopted:** We'd have two uses of `on Event -> actions` in stateful precepts:
+1. Construction row (event is `initial`)
+2. State-agnostic handler (event is not `initial`)
+
+**Is there a collision?** No. The disambiguation is the `initial` modifier on the event declaration. The parser doesn't need to distinguish them syntactically — the type checker does. The grammar production is identical. The semantic interpretation depends on whether the event is declared `initial`. This is clean disambiguation: same syntax, different semantics based on a declaration-site property.
+
+**Comparison:** This is identical to how `field X as integer` behaves differently depending on whether a state omits it or not. The field declaration doesn't syntactically change — its semantics are shaped by other declarations. Same principle here.
+
+**Verdict: No collision.** Disambiguation is clean, structural, and happens at the type-checking layer where it belongs.
+
+---
+
+## 2. What Distinguishes the Construction Context?
+
+Under `from Draft on Create`, two signals mark construction: (a) the event is `initial`, (b) the from-state is the initial state.
+
+Under `on Create`, only signal (a) remains: the event is `initial`.
+
+**Is one signal sufficient?**
+
+Yes — and here's why the second signal was always redundant under the terminal constructor design. If the initial event is terminal (cannot transition, cannot fire post-construction), then there is exactly one context in which it can fire: construction. The `from <InitialState>` prefix was telling the compiler something it already knows: "this event fires in the initial state." But the compiler knows the initial event ONLY fires in the initial state — that's the whole point of the terminal constructor constraint.
+
+The `from Draft` in a construction row is not carrying information. It's ceremony. Under the old model where construction-time transitions were allowed, the `from Draft` at least said "the row pattern-matches against the Draft state." Under terminal construction, there's no pattern to match — construction always fires in the initial state, period.
+
+**Verdict: One signal is sufficient.** The `initial` keyword on the event declaration is the full semantic marker for "this is a construction event."
+
+---
+
+## 3. Grammar Unification Opportunity
+
+**Question:** Is `on <Event>` for constructors the same production as `on <Event>` for stateless handlers?
+
+**Answer: Yes.** Both are `EventHandlerDeclaration`:
+
+```
+EventHandlerDeclaration := 'on' Identifier [WhenGuard] ActionChain
+```
+
+Wait — there's a wrinkle. The current spec says `EventHandlerDeclaration` does NOT support `when` guards (`EventHandlerDoesNotSupportGuard`). But construction rows DO support guards:
+
+```precept
+from Draft on Create when Priority = "high"
+    -> set Tier = "premium"
+```
+
+Under the proposed syntax:
+
+```precept
+on Create when Priority = "high"
+    -> set Tier = "premium"
+```
+
+This means construction rows need `when` — but current event handlers forbid `when`. The grammar production must either:
+
+**Option A:** Remove the `EventHandlerDoesNotSupportGuard` restriction entirely. Allow `when` on all `on Event -> actions` forms. State-agnostic handlers gain guard capability. Construction rows naturally get it.
+
+**Option B:** Allow `when` only when the event is `initial`. The type checker emits `EventHandlerDoesNotSupportGuard` for non-initial events with guards.
+
+**My preference: Option A.** If we're unifying the syntax, unify it fully. There's no principled reason state-agnostic handlers can't have guards — the current restriction exists because stateless handlers in purely-stateless precepts had no state to guard against, but `when` guards operate on field values, not states. A state-agnostic handler in a stateful precept like `on Heartbeat when IsActive -> set LastPing = now()` is perfectly coherent. The restriction was an artifact of the original stateless-only context, not a deep principle.
+
+**Verdict: Single production. Remove the guard restriction.** The grammar is fully unified. The type checker distinguishes construction from state-agnostic handling based on the `initial` modifier.
+
+---
+
+## 4. Guarded Construction Rows
+
+```precept
+on Create when Priority = "high"
+    -> set Amount = Create.Amount -> set Tier = "premium"
+on Create
+    -> set Amount = Create.Amount -> set Tier = "standard"
+```
+
+**Does this work?** Yes. The semantics are identical to the current guarded construction syntax — the first matching row (top-to-bottom) fires. The absence of `from Draft` changes nothing about guard evaluation semantics.
+
+**Is it readable?** More readable, actually. The construction rows now read as: "On Create, when this condition holds, do these things." Compare to: "From Draft on Create, when this condition holds, do these things." The `from Draft` in the current syntax doesn't add information for the reader either — it's noise. The domain author already knows construction puts the entity in Draft because Draft is declared `initial`.
+
+**Does it conflict?** Only if there are also state-agnostic handlers for the same event — but the `initial` event cannot be a state-agnostic handler (it's structurally a constructor). The type checker prevents mixing: an `initial` event cannot also have `from ... on` rows (terminal constructor constraint), and a non-initial event's `on Event ->` rows are state-agnostic handlers. No event can be both.
+
+**Verdict: Works cleanly.** More readable than the current syntax. No conflicts.
+
+---
+
+## 5. The `initial` Keyword as Semantic Anchor
+
+**Question:** If the reader sees `on Create -> set Name = Create.Name`, how do they know it's construction?
+
+**Answer:** They look at the event declaration: `event Create(Name as string) initial`. The `initial` keyword tells them.
+
+**Is this sufficient for readability?** Consider the alternative: in today's syntax, how does the reader know `from Draft on Create` is construction? They look at: (a) Draft is the initial state, (b) Create is the initial event. They need two cross-references. Under the proposal, they need one cross-reference: Create is the initial event. That's strictly simpler.
+
+**But does it read as construction without the cross-reference?** Here's the honest answer: no. `on Create -> set Name = Create.Name` doesn't scream "CONSTRUCTION" at you the way `from Draft on Create` does (where the `from` keyword evokes "from nothing" or "from the start"). But `from Draft on Create` doesn't actually say "construction" either — it says "when in Draft and Create fires." The reader still needs to know that Draft is initial and Create is the construction event.
+
+**The real readability win:** In practice, construction rows appear at the top of the transition section, after event declarations. The `event Create(...) initial` declaration is typically 1-3 lines above the construction rows. The locality makes the cross-reference trivial. And the `initial` keyword on the event declaration is *more explicit* about construction semantics than the `from Draft` prefix ever was.
+
+**Verdict: The `initial` keyword on the event declaration is the correct semantic anchor.** It's explicit, it's nearby, and it directly says what the event IS rather than requiring the reader to deduce construction from state-matching patterns.
+
+---
+
+## 6. Stateless/Stateful Unification
+
+Under this proposal, both precept types use the same construction syntax:
+
+```precept
+// Stateless precept
+precept Counter
+field Count as integer default 0
+event Create(Initial as integer) initial
+on Create -> set Count = Create.Initial
+
+// Stateful precept
+precept Order
+field Name as string
+state Draft initial
+state Active
+event Create(Name as string) initial
+on Create -> set Name = Create.Name
+from Draft on Submit -> transition Active
+```
+
+**Is complete syntactic unification good?**
+
+Yes. Here's why: construction IS the same operation in both contexts. In both cases, the initial event fires exactly once, establishes field values, and cannot re-fire. The only difference is that stateful precepts have an additional ambient context (the initial state), but that context is implicit in both cases — it's a property of the precept's shape, not something the construction row needs to declare.
+
+**Does it hide an important distinction?** No. The distinction between stateful and stateless precepts is visible everywhere else: state declarations exist (or don't), transition rows exist (or don't), `from ... on` rows exist (or don't). The construction row is the one place where the distinction *doesn't matter* — both types produce an entity via the same mechanism. Syntactic unification here reflects semantic reality.
+
+**Counter-argument:** "But in a stateful precept, `on Create` is implicitly `from <InitialState> on Create`, while in a stateless precept it's genuinely state-free." This is true, but irrelevant to the domain author. The domain author doesn't care about the hollow-version bootstrapping mechanism. They care that `on Create` means "when this entity is created, do this." That meaning is identical in both contexts.
+
+**Verdict: Unification is a feature, not a bug.** Construction syntax should be uniform because construction semantics are uniform.
+
+---
+
+## 7. Reading Cost Comparison
+
+```precept
+// Option A: from Draft on Create
+from Draft on Create
+    -> set Name = Create.Name
+```
+
+What this communicates: "When the entity is in Draft and the Create event fires, set Name." The domain author must know that this is construction because Draft is initial and Create is the initial event. The syntax itself reads as "a regular transition row." The constructionality is *inferred*, not *stated*.
+
+```precept
+// Option B: on Create
+on Create
+    -> set Name = Create.Name
+```
+
+What this communicates: "When Create fires, set Name." The domain author must know that Create is the initial event (from its declaration). The syntax reads as "this event does this thing" — simpler, more direct. The constructionality is inferred from the event's `initial` modifier, but not from a pattern of "from X on Y where X is initial and Y is initial."
+
+**Which is more honest?**
+
+Option A implies that construction is a state-dispatched operation like every other transition row. It isn't. Under terminal construction, there is no state dispatch — the initial event fires in exactly one context, unconditionally (modulo guards). Dressing it as `from Draft on Create` implies state-matching that doesn't exist in any meaningful sense. The entity doesn't "happen to be in Draft when Create fires" — the entity doesn't exist yet. The hollow version is an implementation detail, not a domain concept.
+
+Option B is more honest. It says "Create does this" — which is all the domain author needs to know. The mechanism by which "Create fires during construction" is internal to the engine. The domain author should not need to model it.
+
+**Verdict: Option B is more honest.** Option A dresses an unconditional construction operation in the syntax of a conditional state-dispatched transition. That's a category error at the surface level.
+
+---
+
+## 8. Revisiting My "Uniformity" Argument
+
+My prior recommendation was: "Keep `from <InitialState> on <InitialEvent>`. The syntactic uniformity is worth the minor redundancy."
+
+I was wrong. Here's why:
+
+**Uniformity has value when the unified syntax reflects unified semantics.** Transition rows all use `from X on Y` because they all share the same semantics: pattern-match against state X, fire event Y, evaluate guards, execute actions, optionally transition. Construction rows, under the terminal constructor design, do NOT share these semantics. They:
+
+- Do not pattern-match (there's only one possible from-state)
+- Cannot transition (terminal constraint)
+- Cannot re-fire (fire-once constraint)
+- Are not lifecycle events (they are genesis events)
+
+Forcing construction rows into `from X on Y` syntax creates **false uniformity** — the visual suggestion that construction is "just another transition row" when it structurally is not. False uniformity is worse than honest divergence. It teaches the reader a lie about the execution model.
+
+**The correct uniformity is:** All post-construction transition rows use `from X on Y`. All construction rows use `on <InitialEvent>`. The syntax directly reflects the semantic distinction: post-construction events are state-dispatched, construction events are not.
+
+**The "minor redundancy" framing was also wrong.** Redundancy implies the extra information is merely unnecessary. But `from Draft` on a construction row isn't just unnecessary — it's misleading. It implies state dispatch where none exists. That's not redundancy; it's misinformation baked into syntax.
+
+---
+
+## 9. Final Assessment: Reversal
+
+I am reversing my prior recommendation.
+
+**`on <Event>` for construction rows in stateful precepts is the correct design.** It is:
+
+1. **Semantically honest** — doesn't dress unconditional genesis as state-dispatched transition
+2. **Informationally minimal** — doesn't force the author to state what the compiler already knows
+3. **Syntactically unified** across stateful/stateless precepts — reflecting unified construction semantics
+4. **Grammatically clean** — single production, shared with state-agnostic handlers, disambiguation via `initial` keyword
+5. **Readable** — `on Create -> set Name` reads naturally; `from Draft on Create -> set Name` adds noise
+6. **Consistent with terminal constructor philosophy** — if construction is a distinct category, it deserves distinct syntax
+
+The uniformity argument only holds if construction IS "just another transition." The terminal constructor design established that it isn't. The syntax should follow.
+
+---
+
+## Implementation Notes
+
+1. **Grammar:** No new production needed. `EventHandlerDeclaration` (already exists) gains `when` support (remove `EventHandlerDoesNotSupportGuard` restriction).
+2. **Type checker:** When parsing `on <EventName>` in a stateful precept:
+   - If event is `initial` → treat as construction row (existing D94, D132 analysis applies)
+   - If event is not `initial` → treat as state-agnostic handler (existing or proposed relaxation)
+3. **Migration:** The `from <InitialState> on <InitialEvent>` syntax should be deprecated with a diagnostic suggesting the `on <Event>` form. Not a breaking change — both forms can coexist during migration.
+4. **Spec updates:** §3A transition row grammar, §3A.5 construction semantics, diagnostic table.
+
+---
+
+## Open Questions (For Future Analysis)
+
+1. **Deprecation timeline:** Should `from <InitialState> on <InitialEvent>` remain valid indefinitely (two spellings) or be deprecated? My instinct: deprecate with a warning diagnostic. Two spellings for the same thing is a maintenance burden and a reader confusion source.
+2. **Event ensure interaction:** `on Create ensure ...` already means "event ensure." Under this proposal, `on Create -> ...` means "construction row." The `->` is the disambiguator. This is already how the parser works (ensure vs handler). No new tension.
+3. **Guard restriction removal:** If we remove `EventHandlerDoesNotSupportGuard`, do any existing diagnostics or documentation need updating? Yes — the diagnostic table and the spec prose both reference this restriction.
+
+# Design Critique: Terminal Constructor (Initial Event as True Constructor)
+
+**Author:** Frank (Lead/Architect)  
+**Date:** 2026-05-15  
+**Status:** Analysis — pending owner decision  
+**Requested by:** Shane
+
+---
+
+## Proposal Summary
+
+Make the initial event a **true constructor** with two structural guarantees:
+
+1. **Terminal in initial state** — the action chain cannot include a `transition` outcome. Construction always terminates in the initial state.
+2. **Fire-once enforcement** — the initial event cannot be fired after construction. It is structurally impossible to re-fire it on an existing entity.
+
+---
+
+## 1. What This Changes About the Construction Mental Model
+
+The current model treats the initial event as a regular event that *happens to fire first*. It goes through the full pipeline and produces the full `EventOutcome` space — including `Transitioned`. The entity can land anywhere. Construction is "fire this event in a specific context" — semantically uniform with post-construction events.
+
+The proposed model makes construction a **distinct semantic category**: an event whose sole purpose is to produce the entity in its declared starting position. It is not "an event that fires first" — it is "the act of bringing the entity into existence at its declared origin."
+
+This is a sharper mental model. The current model's uniformity is elegant in theory ("construction is just an event!") but it creates a semantic gap: if construction can transition away from the initial state, then what does `state Draft initial` *mean*? It means "the state that construction starts from, but not necessarily where the entity will be after construction completes." That is confusing. The word "initial" on the state becomes a technical implementation detail about hollow-version bootstrapping rather than a user-facing guarantee about where entities begin their life.
+
+Under the proposal: `state Draft initial` means "entities begin here." Full stop. The initial event is the mechanism that *produces* an entity in Draft. There is no ambiguity about what "initial" means.
+
+**Verdict: The proposed model is semantically cleaner.** The current uniformity is engineer-facing elegance. The proposed model is domain-author-facing clarity.
+
+---
+
+## 2. What Is Gained
+
+### 2.1 Keyword Overload Resolution
+
+My prior critique identified `initial` as a P5 violation — same keyword meaning different things on states vs events. I proposed renaming the event keyword to `constructor`.
+
+The proposal resolves this differently and, I'll concede, **more elegantly**. Under this design:
+
+- `state Draft initial` = "this is the starting position"
+- `event Create(...) initial` = "this is the starting event (the one that produces the entity at the starting position)"
+
+The keyword now means the *same category of thing* in both contexts: "this is where things begin." The state is where the entity begins existing. The event is the act that begins existence. The semantic link between the two is **strengthened** rather than coincidental.
+
+This is better than the `constructor` rename. A rename solves the syntactic ambiguity but creates a vocabulary expansion. This proposal solves the *semantic* ambiguity by making the two uses of `initial` genuinely mean the same thing: origin.
+
+### 2.2 Construction-Time Transition Ambiguity Eliminated
+
+Under the current design, a domain author writes `from Draft on Create -> set Amount = Create.Amount -> transition Active` and must understand that "initial state" is a bootstrapping detail, not a guarantee. Under the proposal, this pattern is a compile error. The meaning of `initial` becomes a guarantee about the entity's post-construction position.
+
+### 2.3 Simpler Caller Mental Model
+
+Currently the caller must handle `Transitioned` from `Create`. Under the proposal, `Create` can only produce `Applied`, `Rejected`, `ConstraintsFailed`, or `Unmatched`. `Transitioned` is structurally impossible at construction. The caller code simplifies:
+
+```csharp
+// Current — must handle arbitrary post-construction state
+Version v = outcome switch {
+    EventOutcome.Transitioned t      => t.Result,      // could be anywhere
+    EventOutcome.Applied a           => a.Result,      // in initial state
+    // ... error cases
+};
+
+// Proposed — construction always produces initial state
+Version v = outcome switch {
+    EventOutcome.Applied a           => a.Result,      // always in initial state
+    // ... error cases
+};
+```
+
+The caller *knows* what state the entity is in after successful construction. That is a meaningful simplification for consuming code.
+
+### 2.4 D94 / Construction Guarantee Simplification
+
+See §5 below.
+
+---
+
+## 3. What Is Lost
+
+### 3.1 Construction-Time Routing
+
+The current design allows patterns like:
+
+```precept
+from Draft on Create when Create.Priority = "urgent"
+    -> set Amount = Create.Amount
+    -> transition Expedited
+
+from Draft on Create
+    -> set Amount = Create.Amount
+    -> transition Review
+```
+
+This lets the initial event *route* the entity to different starting states based on construction-time arguments. Under the proposal, this is forbidden. The entity always starts in Draft.
+
+**How common is this pattern?** Looking at the 20+ sample files in `samples/`: exactly zero use construction-time transitions. Every sample either (a) has no initial event, or (b) has an initial event that stays in the initial state. The construction-time routing pattern is theoretically available but empirically unused.
+
+**Is it replaceable?** Yes. The equivalent under the proposal is:
+
+```precept
+// 1. Construct (always lands in Draft)
+// 2. Immediately fire a routing event
+
+from Draft on Create
+    -> set Amount = Create.Amount
+
+from Draft on Triage when Priority = "urgent"
+    -> transition Expedited
+
+from Draft on Triage
+    -> transition Review
+```
+
+This is *two* operations instead of one, but it is *clearer*: construction produces the entity, then a separate business event routes it. The construction and the routing are distinct concerns. Merging them into one operation saves a call but conflates "bring entity into existence" with "decide where it goes."
+
+**My assessment:** The lost pattern is rare (zero observed usage), replaceable (two-step construction + routing), and conflates concerns (existence vs routing). The loss is acceptable.
+
+### 3.2 The `Transitioned` Outcome Branch in `Create`
+
+The runtime API currently documents `EventOutcome.Transitioned` as a valid construction outcome. Removing it is a breaking API change if any consumer handles it. However, since the compiler would now structurally prevent the case, the branch becomes dead code. This is a documentation and API surface cleanup, not a behavioral break for correct programs.
+
+### 3.3 Atomic Construction-to-Active Patterns
+
+Some domains might want entities that are "born active" — never exist in a draft state. Example: a system-generated audit record that is always "Active" from birth. Under the proposal, such an entity would need either (a) `state Active initial` (just make Active the initial state) or (b) two-step construction + immediate transition.
+
+Option (a) is the clean answer: if entities are always born Active, make Active the initial state. The word "initial" means where things begin — if things begin Active, say so. This is actually *better* domain modeling than "the entity is born in Draft but immediately transitions to Active."
+
+**This is not a real loss.** It is forcing the domain author to name the correct initial state.
+
+---
+
+## 4. Stateless Precepts
+
+Under the current spec, stateless precepts have `State = null`. There is no initial state. The initial event fires through the pipeline with no state-entry semantics.
+
+**Under the proposal:** "Construction always ends in the initial state" and "there is no initial state" are not contradictory — they are vacuously true. The constraint "no `transition` outcome" is already structurally guaranteed for stateless precepts (there are no states to transition to). The constraint "cannot be fired again" applies identically.
+
+For stateless precepts, the proposal adds no new constraints. The initial event already cannot produce `Transitioned` (no states exist). The fire-once enforcement adds a new guarantee but doesn't change the construction flow.
+
+**Compatibility verdict: Fully compatible.** The proposal's constraints are either vacuously satisfied or independently valuable for stateless precepts.
+
+---
+
+## 5. D94 and the Construction Guarantee
+
+Currently, D94 (`InitialEventMissingAssignments`) must check every guarded path through the initial event to ensure all required fields are assigned. If construction can transition away from the initial state, the field-shape requirements depend on the *target* state — a field that is `omit` in the target state doesn't need assignment.
+
+Under the proposal, construction always ends in the initial state. Therefore:
+
+- **The target state is always known at compile time.** It is always the initial state.
+- **The field shape is fixed.** The compiler knows exactly which fields are `omit` in the initial state and which require values.
+- **Per-row target analysis is eliminated.** Every construction path produces the same target state. D94 becomes: "every guarded path through the initial event must assign all required fields that are non-omit in the initial state."
+
+This is a meaningful simplification. The current design requires D94 to potentially consider different field-shape requirements per guarded row (if different rows transition to different states). The proposal makes D94 a single-target check.
+
+**Additionally:** The proof engine no longer needs to reason about "what state does construction land in?" for downstream analysis. Construction outcome is deterministic with respect to state. Entry ensures (`to <InitialState> ensure`) always fire. Residency ensures (`in <InitialState> ensure`) always apply. The constraint surface at construction time is fully knowable at compile time.
+
+**Verdict: Meaningful proof engine simplification.** Not transformative, but real and correct.
+
+---
+
+## 6. "Cannot Be Fired Again" Enforcement
+
+### Compile-Time Enforcement
+
+The type checker can enforce this structurally:
+
+- If an event is marked `initial`, it is a compile error to reference it in any `from <State> on <Event>` row except those with the implicit `from <InitialState>` construction context.
+- Wait — this needs more precision. In the current model, `from Draft on Create` is how you write a construction row. Under the proposal, the initial event cannot appear in ANY `from` row, because it cannot be fired on an existing entity.
+
+Actually, there's a tension here. Currently, the initial event's construction rows ARE written as `from <InitialState> on <EventName>`. If the event can only be used for construction, do we keep that syntax? The hollow version starts in the initial state, so the `from <InitialState> on Create` row is the construction path. Post-construction, the entity is in the initial state, and the event cannot fire again — so even though the entity IS in the initial state and the event IS defined `from <InitialState>`, the runtime refuses re-fire.
+
+**The enforcement splits into:**
+
+1. **Compile-time:** The type checker emits a diagnostic if the initial event appears in any `from <NonInitialState> on <InitialEvent>` row. It can only be defined in the construction context (initial state).
+2. **Runtime:** If the entity already exists (has been constructed), firing the initial event returns — what? `UndefinedEvent`? A new outcome? A specific rejection?
+
+Actually, wait. If the entity is in the initial state post-construction and the event is defined `from <InitialState> on Create`, what prevents re-fire? The *runtime* must track "has this entity been constructed?" — which it knows implicitly (if a Version exists, it was constructed). The Fire operation on a Version should refuse the initial event entirely.
+
+**Proposed enforcement model:**
+
+- **Compile-time:** `PRE0XXX — InitialEventInNonConstructionContext` — the initial event appears in a `from <NonInitialState>` row. This is always an error.
+- **Runtime:** `Fire(initialEventName, args)` on an existing Version returns `EventOutcome.UndefinedEvent` (or a new variant like `Forbidden`). The initial event is not in the set of fireable events for any existing entity, regardless of state.
+- **Inspection:** `InspectFire` for the initial event on an existing version returns `Impossible` or equivalent.
+
+**Is this enforceable at compile-time alone?** Partially. The compiler can prevent the author from writing non-construction rows for the initial event. But the *caller* attempting to `version.Fire("Create", args)` is a runtime check — the compiler cannot prevent a C# consumer from passing the wrong event name string.
+
+**Diagnostic:** Something like `ConstructorEventFiredPostConstruction` — but this is a runtime boundary, not a compile-time diagnostic on the precept definition. In the definition itself, the compile-time check is: the initial event cannot appear as a fireable event from any post-construction state.
+
+Actually — there's a cleaner framing. The initial event simply **does not appear in `precept.Events`** as a fireable event. It is exposed only through `precept.InitialEvent` for construction. The `Version.Fire` method would return `UndefinedEvent` because the event genuinely is not defined in the post-construction event space. This requires no new outcome type and no new runtime check beyond "is this event defined for this state?" — which already returns `UndefinedEvent` for unknown events.
+
+**Verdict: Enforceable.** Compile-time prevents definition-level misuse. Runtime refuses re-fire via existing `UndefinedEvent` semantics by excluding the initial event from the post-construction event space. No new mechanism needed.
+
+---
+
+## 7. Transition Out of Initial State
+
+If construction always lands in the initial state, first-transition semantics become the entity's first real lifecycle event:
+
+```precept
+state Draft initial
+state Active
+state Closed terminal
+
+event Create(Name as string) initial
+event Submit
+event Close
+
+from Draft on Create
+    -> set Name = Create.Name
+
+from Draft on Submit
+    -> transition Active
+
+from Active on Close
+    -> transition Closed
+```
+
+The pattern becomes: **construct → then fire a real event to advance.** This is the standard two-step pattern that every OOP system uses: `var x = new Entity(args); x.Submit();`
+
+**Is this worse, same, or better than construction-time transitions?**
+
+It is **better** for three reasons:
+
+1. **Separation of concerns:** "Bring into existence" and "advance through lifecycle" are distinct operations with distinct semantics. Construction initializes. Events advance. Conflating them hides a lifecycle decision inside what looks like a creation call.
+
+2. **Inspectability:** Under the current model, `InspectCreate` must reveal that construction might land in different states. Under the proposal, `InspectCreate` always shows "entity will be in initial state." Lifecycle inspection starts at `InspectFire` from the initial state — where it belongs.
+
+3. **Atomicity boundaries:** If construction + transition is one operation, failure of the transition also fails construction. The entity doesn't exist. Under the proposal, construction can succeed (entity exists in Draft) and the subsequent event can independently fail (entity stays in Draft). The caller has a created entity to work with even if the first advancement fails.
+
+**Counter-argument:** Some domains want atomic intake-to-active. "A loan application should not exist unless it successfully enters UnderReview." Under the proposal, the entity would exist in Draft even if the subsequent Submit event fails.
+
+**Response:** This is what `reject` is for. If the entity should not exist with invalid intake data, the construction action chain uses `reject` to refuse creation. The initial event can still reject. What it cannot do is *transition*. If the domain requires "entity must not exist in Draft ever" — then Draft is the wrong initial state. Make `UnderReview` the initial state and construct directly into it.
+
+---
+
+## 8. Overall Verdict
+
+### Comparison to My Prior Recommendations
+
+My prior critique recommended:
+1. Rename `initial` → `constructor` on events (solve keyword overload)
+2. Relax stateless/stateful mutual exclusion
+3. Verify `no transition` grammar enforcement
+4. Better docs for construction-time transitions
+
+The proposal replaces recommendations #1 and #4 with a fundamentally different approach: instead of *renaming* the keyword and *documenting* construction-time transitions, it *eliminates the need for both* by making the semantics coherent.
+
+- **#1 (keyword rename):** The proposal makes the rename unnecessary. `initial` genuinely means "origin" in both contexts when construction is terminal. The keyword overload is resolved semantically, not syntactically. This is superior.
+- **#2 (stateless relaxation):** Orthogonal. The proposal doesn't address this and doesn't need to. Still a valid independent improvement.
+- **#3 (`no transition` grammar):** The proposal makes this partially moot. If the initial event structurally cannot transition, there's no need for an explicit `no transition` in construction rows. The grammar question still applies to other contexts.
+- **#4 (better docs):** Replaced entirely. No confusing behavior to document if the behavior doesn't exist.
+
+### Does It Trade One Problem Set For Another?
+
+The main cost is loss of construction-time routing. This is empirically unused in all samples, conceptually replaceable with two-step patterns, and architecturally dubious (conflates concerns). The cost is negligible.
+
+The secondary cost is a slightly more restricted API (`Transitioned` removed from construction outcomes). This is a simplification, not a loss.
+
+No new problems are introduced that I can identify. Stateless compatibility is clean. Proof engine simplifies. Enforcement is achievable with existing mechanisms. The keyword semantics become coherent.
+
+### Final Assessment
+
+**The terminal constructor design is superior to my prior recommendations.** It solves the same problems more elegantly, introduces no new problems, simplifies the proof engine, and produces a cleaner mental model for domain authors.
+
+I am reversing my prior position that "construction-time transition away from initial state is sound." It was *technically* sound but *semantically* confusing. The proposal eliminates the confusion by eliminating the case. The resulting design is tighter, more predictable, and more aligned with Precept's philosophy of making invalid configurations structurally impossible — including the invalid *mental configuration* of "initial state doesn't mean initial state."
+
+**Recommendation: Adopt.** Implement both constraints (terminal in initial state + fire-once enforcement). Do not rename the keyword. The semantic resolution is cleaner than the syntactic one.
+
+---
+
+## Implementation Implications (High-Level)
+
+1. **Type checker:** New diagnostic when initial event's action chain contains `transition` outcome.
+2. **Type checker:** New diagnostic when initial event appears in `from <NonInitialState>` rows.
+3. **Runtime:** Exclude initial event from post-construction event space (Fire returns `UndefinedEvent`).
+4. **Runtime API doc:** Remove `Transitioned` from construction outcome examples.
+5. **D94:** Simplify to single-target analysis (always initial state).
+6. **Spec §3A.5:** Rewrite construction outcomes paragraph to exclude `Transitioned`.
+7. **Spec §3A.2:** Update outcome table for construction context.
+
+---
+
+## Open Question
+
+Should the initial event's `from` rows be written differently syntactically? Currently: `from Draft on Create -> ...`. If the event can *only* fire in the construction context and *only* produces Draft, is the `from Draft` prefix still needed?
+
+Options:
+- **Keep `from <InitialState> on <InitialEvent>`** — consistent with all other transition syntax. The `from` clause is the initial state (which is where the hollow version starts). No grammar change needed.
+- **Allow bare `on <InitialEvent>`** — since the from-state is always known (initial state), the `from` clause is redundant. But this creates a grammar variant that breaks the uniformity of transition declarations.
+
+**My recommendation:** Keep `from <InitialState> on <InitialEvent>`. The syntactic uniformity is worth the minor redundancy. Domain authors can see at a glance that construction rows follow the same structural pattern as all other transitions. No grammar exceptions needed.
+
+# Fix Spec: `QuantityBound_CrossDimensionAssignment_IsBlockedByDimensionCheck`
+
+**Date:** 2026-05-15  
+**Author:** Frank  
+**Status:** Ready for implementation
+
+## Summary
+
+The last deferred red test expects `DimensionCategoryMismatch` when `'3 m'` (length) is assigned to a `quantity of 'mass'` field. Two defects prevent this:
+
+1. **Fix A:** The `QuantityValidator` correctly detects the dimension mismatch and returns `Failed`, but the diagnostic code emitted to the compilation result is `InvalidTypedConstantContent` (generic PRE0053) instead of `DimensionCategoryMismatch` — because `SelectDiagnosticCode` ignores the per-diagnostic `Code` field and falls back to the catalog-level `ContentValidation` error codes (which are null for `QuantityValidation`).
+
+2. **Fix B:** The early-return at `TypeChecker.Expressions.AssignmentQualifiers.cs` line 31–32 skips qualifier validation for all `TypedTypedConstant { ResultType: Quantity }` expressions. This is defense-in-depth — Fix A alone makes the test green — but removing the early-return ensures dimension checking works for quantity constants in all contexts (field refs that flow through `ValidateAssignmentQualifiers` already work because they're `TypedFieldRef`/`TypedArgRef`, not `TypedTypedConstant`).
+
+---
+
+## Fix A — Diagnostic Code Propagation
+
+### Root Cause
+
+`TypeChecker.Expressions.cs` lines 262–267:
+```csharp
+foreach (var diag in result.Diagnostics)
+{
+    var code = SelectDiagnosticCode(cv, diag.ErrorKind);
+    ctx.Diagnostics.Add(
+        Diagnostics.Create(code, lit.Span, rawText, meta.DisplayName));
+}
+```
+
+`SelectDiagnosticCode(cv, diag.ErrorKind)` only reads `ContentValidation.FormatErrorCode` / `SemanticErrorCode`. `QuantityValidation` declares neither (it's just `FormatDescription` + `Examples`). The fallback is always `InvalidTypedConstantContent`.
+
+Meanwhile, `QuantityValidator.Validate` line 62–66 puts the correct code (`DiagnosticCode.DimensionCategoryMismatch.ToString()`) into `TypedConstantDiagnostic.Code` — but nobody reads it.
+
+### Fix
+
+**Option A1 (recommended):** Modify the diagnostic emission loop to check whether `diag.Code` maps to a known `DiagnosticCode` enum value, and use it as an override when present. This keeps the catalog-mediated fallback intact while allowing validators to declare specific per-diagnostic codes.
+
+In `TypeChecker.Expressions.cs`, replace lines 262–267 with:
+
+```csharp
+foreach (var diag in result.Diagnostics)
+{
+    var code = Enum.TryParse<DiagnosticCode>(diag.Code, out var specificCode)
+        ? specificCode
+        : SelectDiagnosticCode(cv, diag.ErrorKind);
+    ctx.Diagnostics.Add(
+        Diagnostics.Create(code, lit.Span, rawText, meta.DisplayName));
+}
+```
+
+**Rationale:** The `TypedConstantDiagnostic.Code` field already exists for this purpose (validators like `QuantityValidator` set it to `DiagnosticCode.DimensionCategoryMismatch.ToString()`). This makes the existing contract work without modifying validator APIs or adding new `ContentValidation` properties.
+
+### Regression Risk
+
+- **`QuantityLiteral_WrongDimension_EmitsInvalidTypedConstantContent`** in `TypeCheckerTypedConstantTests.cs` line 161–170: This test explicitly expects `InvalidTypedConstantContent` for a wrong-dimension quantity. After Fix A, it will emit `DimensionCategoryMismatch` instead. **Update this test** to expect `DimensionCategoryMismatch`. This is a correctness improvement, not a regression — the old code was emitting a generic code where a specific one should have been emitted.
+- All other validators (`MoneyValidator`, `PriceValidator`, `ExchangeRateValidator`) use `TypedConstantDiagnostic` codes like `"TC012"`, `"UCUM002"`, etc. — these will NOT parse as `DiagnosticCode` enum values, so they fall through to `SelectDiagnosticCode` unchanged. Zero regression.
+- `QuantityValidator`'s format errors (TC012, UCUM codes) also won't parse as `DiagnosticCode` enum values. Only the `DimensionCategoryMismatch.ToString()` and `QualifierMismatch.ToString()` codes set on lines 44 and 65 will match. Both are semantically correct.
+
+---
+
+## Fix B — Remove Quantity Early-Return in `ValidateAssignmentQualifiers`
+
+### Root Cause
+
+`TypeChecker.Expressions.AssignmentQualifiers.cs` lines 31–32:
+```csharp
+if (value is TypedTypedConstant { ResultType: TypeKind.Quantity })
+    return;
+```
+
+This unconditionally skips qualifier validation for all quantity typed constants. It was likely added as a workaround because quantity constants don't carry `DeclaredQualifiers` in the same shape as field refs — but `ResolveTypedConstantQualifierAxis` (line 192–209) and `ProjectQualifierForAxis` (line 540–548) already handle this correctly by projecting `Unit.DimensionName` to a `Dimension` qualifier.
+
+### Fix
+
+**Delete lines 31–32 entirely.** No replacement logic needed.
+
+When a quantity typed constant passes validation (e.g., `'5 kg'` assigned to `quantity of 'mass'`):
+1. `ExtractQualifiersFromParsedValue` returns `[Unit("kg", "mass")]`
+2. `ResolveAssignmentQualifierAxis` → `ResolveTypedConstantQualifierAxis` → `ResolveDirectQualifierAxis(Quantity, [Unit("kg", "mass")], QualifierAxis.Dimension)` → `ProjectQualifierForAxis` projects to `Dimension("mass")` → `Resolved`
+3. `ResolvedQualifierSatisfiesTarget(Dimension("mass"), Dimension("mass"))` → `true` → no diagnostic
+
+When a cross-dimension constant somehow passes validation (shouldn't happen with Fix A, but defense-in-depth):
+1. Same flow but dimension names differ → `ResolvedQualifierSatisfiesTarget` → `false` → `EmitAssignmentQualifierMismatch` emits `DimensionCategoryMismatch`
+
+### Why This Is Safe
+
+The early-return was bypassing validation that would have succeeded silently for all currently-passing tests. Proof:
+- `FieldDefault_MatchingDimension_NoDiagnostic` (`field q as quantity of 'mass' default '5 kg'`) — uses `ValidateAssignmentQualifiers` at TypeChecker.cs:681. Currently exits early. After fix: resolves `Unit("kg","mass")` → projects to `Dimension("mass")` → matches target `Dimension("mass")` → no diagnostic. ✓
+- `FieldMax_MatchingDimension_NoDiagnostic` (`max '100 kg'`) — same flow. ✓
+- All `TypeCheckerQuantityNormalizationTests` — same flow for `kg`, `g`, `[lb_av]` etc. within correct dimension. ✓
+
+### Regression Risk
+
+- All tests that currently pass with matching-dimension quantity constants will continue to pass because the resolution path produces correct `Resolved` qualifiers.
+- Cross-dimension quantity constants currently fail at the validator level (Fix A's domain) and become `TypedErrorExpression` — they never reach `ValidateAssignmentQualifiers`. After Fix A + B, both detection paths work.
+- If `ExtractQualifiersFromParsedValue` returns `null` (e.g., parsed value doesn't match expected tuple shape), `DeclaredQualifiers` on the `TypedTypedConstant` is null → `ResolveDirectQualifierAxis` returns `Unknown` for applicable axes → emits `UnprovedAssignmentQualifierCompatibility`. Verify this doesn't happen for well-formed quantities by checking that `QuantityValidator` always returns `(decimal, UcumParsedUnit?)` tuples on success.
+
+---
+
+## Affected Tests to Verify
+
+### Must Update
+
+| Test | File | Change |
+|------|------|--------|
+| `QuantityLiteral_WrongDimension_EmitsInvalidTypedConstantContent` | `TypeCheckerTypedConstantTests.cs:161` | Rename + expect `DimensionCategoryMismatch` |
+
+### Must Stay Green (Regression Guards)
+
+| Test | File | Why |
+|------|------|-----|
+| `QuantityLiteral_MatchingDimension_Succeeds` | `TypeCheckerTypedConstantTests.cs:173` | Fix B: matching dimension must not emit |
+| `QuantityLiteral_NoDeclaredDimension_Succeeds` | `TypeCheckerTypedConstantTests.cs:184` | Fix B: no qualifier = no check |
+| `FieldDefault_MatchingDimension_NoDiagnostic` | `TypeCheckerFieldDefaultTests.cs:49` | Fix B: `default '5 kg'` for mass field |
+| `FieldMax_MatchingDimension_NoDiagnostic` | `TypeCheckerFieldDefaultTests.cs:73` | Fix B: `max '100 kg'` for mass field |
+| `FieldDefault_ComputedFieldRefCrossDimension_EmitsDimensionCategoryMismatch` | `TypeCheckerFieldDefaultTests.cs:36` | Unaffected (TypedFieldRef path) |
+| `SetAction_MassDimensionToLengthField_EmitsDimensionCategoryMismatch` | `TypeCheckerExpressionTests.cs:1197` | Unaffected (TypedArgRef path) |
+| `SetAction_MatchingDimension_NoDiagnostic` | `TypeCheckerExpressionTests.cs:1214` | Unaffected (TypedArgRef path) |
+| All `TypeCheckerQuantityNormalizationTests` except the target test | Same file | Fix B: verify no spurious diagnostics |
+| `MoneyQuantityModifierRegressionTests` | Same dir | Has 3 `DimensionCategoryMismatch` references |
+| `InvalidCurrencyCode_EmitsInvalidTypedConstantContent` | `TypeCheckerTypedConstantTests.cs:116` | Fix A: money codes don't parse as DiagnosticCode → unchanged |
+| `InvalidUnitCode_EmitsInvalidTypedConstantContent` | `TypeCheckerTypedConstantTests.cs:150` | Fix A: UCUM codes don't parse as DiagnosticCode → unchanged |
+
+---
+
+## Implementation Order
+
+1. Fix A (diagnostic propagation) — makes the target test green
+2. Fix B (remove early-return) — defense-in-depth
+3. Update `QuantityLiteral_WrongDimension_EmitsInvalidTypedConstantContent` to expect `DimensionCategoryMismatch`
+4. Run full `dotnet test test/Precept.Tests/` — verify no regressions
+
+# George Test 9 Fix Outcome
+
+- Implemented typed-constant diagnostic code propagation in `src/Precept/Pipeline/TypeChecker.Expressions.cs`, but guarded enum-code promotion when declared qualifiers contain interpolated text so dynamic qualifier forms keep the generic fallback.
+- Updated wrong-dimension quantity assertions in `test/Precept.Tests/TypeChecker/TypeCheckerTypedConstantTests.cs` and `test/Precept.Tests/TypeChecker/TypeCheckerFieldDefaultTests.cs` to expect `DimensionCategoryMismatch` for concrete quantity qualifier mismatches.
+- Validation: `dotnet test test/Precept.Tests/ --no-build` initially failed only `QuantityBound_CrossDimensionAssignment_IsBlockedByDimensionCheck`; after the fix, `dotnet build src/Precept/Precept.csproj` and `dotnet test test/Precept.Tests/` both passed (5699/5699).
+- Note: removing the quantity typed-constant early-return regressed interpolated qualifier scenarios, so the shipped fix relies on Fix A plus the dynamic-qualifier guard rather than broadening assignment-qualifier validation.

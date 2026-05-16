@@ -33550,3 +33550,57 @@ Four new normalization methods following the established `manifest.ByKind` + Res
 - **Event arg default expressions** — DeclaredArg only carries ModifierKind array, not values (future work)
 
 - **DiagnosticCode.TypeMismatch reuse** for MissingExpression — Frank may want a dedicated code in the future
+
+# ProofEngine Phase 2 Closeout
+
+**Agent:** George (Runtime Dev)
+
+**Date:** 2026-05-08T23:45:00Z
+
+**Task:** ProofEngine Phase 2 — Full Engine Implementation (S1–S13)
+
+## Commit Hashes
+
+| Slice | Commit | Description |
+
+|-------|--------|-------------|
+
+| S1–S12 | `46c9a4d4` | Full engine implementation — obligation collection, five strategies, error suppression, diagnostics, constraint influence, initial-state satisfiability, forwarding fact consumption |
+
+| S13 | `36618ef9` | Stateless handling verification + documentation sync |
+
+## Build/Test Results
+
+- **Build:** Green, 0 warnings, 0 errors
+
+- **Tests:** 3451 passed, 2 pre-existing TokensTests failures unchanged
+
+- **Baseline preserved:** No regressions introduced
+
+## Deviations from Plan
+
+1. **Combined commit:** Slices S1–S12 were implemented in a single pass and committed together rather than individually. The code structure follows the slice boundaries internally, but the git history has 2 commits instead of 13. Rationale: the implementation was written holistically for correctness across slice boundaries, and incremental commits would have required artificial intermediate states.
+
+2. **FunctionKind.Count:** The spec referenced `FunctionKind.Count` for guard pattern recognition, but `count` is a `TypeAccessor` on collection types, not a function. Guard extraction matches `TypedMemberAccess` with `acc.Name == "count"` instead.
+
+3. **SourceSpan.Empty vs SourceSpan.Missing:** Spec pseudocode used `SourceSpan.Empty` but the actual API is `SourceSpan.Missing`.
+
+4. **ModifierKind.Initial vs ModifierKind.InitialState:** The live enum uses `InitialState`, not `Initial`.
+
+5. **BinaryOperationMeta.Left/Right vs Lhs/Rhs:** Spec pseudocode used `.Left`/`.Right` but actual properties are `.Lhs`/`.Rhs`.
+
+## Surprises
+
+- No functional surprises — the spec was thorough and all 18 gaps were pre-resolved by Frank.
+
+- The modifier effective-modifiers walk needed both `Modifiers` and `ImpliedModifiers` concatenation per the spec's effective-modifiers note (§7).
+
+- `SatisfactionCovers` subsumption logic required careful accessor-name matching for `notempty`'s dual satisfaction rows.
+
+## What's Now Unblocked
+
+- Soup Nazi's ProofEngine test suite can exercise all five strategies
+
+- Precept Builder can consume `ProofLedger` for fault backstops and constraint influence
+
+- Language Server proof diagnostics are now live
