@@ -41,6 +41,15 @@
 
 ## Recent Updates
 
+### 2026-05-16T09:02:56-04:00 — Slice 2 Review: SlotPositionResolver APPROVED
+
+- Reviewed Kramer's `SlotPositionResolver.cs` and 31-assertion test file.
+- Architecture is sound: reuses `GetEnclosingConstruct()`, derives phase from slot metadata (`IsList`, `IsChainable`, `ItemIntroducerToken`, `TerminationTokens`).
+- Identified one advisory (non-blocking): line 213's `Assign`/`By`/`At` hardcoded set should become catalog-derived once `ActionSyntaxSlot` gains role→vocabulary annotation. Tracked for Slice 3.
+- Shadow-run tests validate equivalence against legacy resolver. `InList` and `InChain` phases tested explicitly — core bug class covered.
+- Verdict: APPROVED. Slice 3 may proceed.
+- Decision written to `.squad/decisions/inbox/frank-slice2-review.md`.
+
 ### 2026-05-16T09:08:43-04:00 — Graph Analyzer: Complete Row Taxonomy Analysis (Broadened)
 
 - Broadened the frank-25 construction-row analysis to cover ALL row types in Precept.
@@ -128,3 +137,11 @@
 - The `SlotOrderingDriftTests` asserts an exact set of scoped constructs — new kinds need adding there.
 - `ConstructsTests` has count invariants (`Total_Count`, `TopLevel_Count`, `SharedLeadingTokens_HaveCorrectCandidateCount`) that must be updated when constructs are added.
 - The EventRow slots are left unchanged for Slice 1 (no guard slot yet); Slice 2 parser routing will add it when PRE0014 is removed.
+
+### 2026-05-16T09:20:00-04:00 — Kramer Slice 2 shipped for catalog-driven completions
+
+- Kramer landed Slice 2 on `spike/Precept-V2-Radical` at commit `6842353e`.
+- Added `tools/Precept.LanguageServer/SlotPositionResolver.cs` as an additive shadow-path resolver that reuses enclosing-construct selection, resolves ownership from parsed slot spans plus slot-order gaps, and uses a bounded backward scan for trailing implicit action-chain arrows.
+- Added `test/Precept.LanguageServer.Tests/SlotPositionResolverTests.cs` with 31 assertions covering comma list continuations, trailing chain arrows, action-expression subpositions, state-entry continuations, guard/ensure/rule expressions, and outcome follow-up positions.
+- Validation stayed green across `dotnet test test\\Precept.LanguageServer.Tests\\ --nologo`, `dotnet build --nologo`, and `dotnet test --nologo` for a final `6479` passed / `0` failed.
+- Slice 3 review focus: keep `SlotPositionResolver` as the structural backbone, then decide explicitly how `AfterValueName`, `InArgDefault`, `InSetAssignment`, and the remaining pre-disambiguation/post-keyword micro-contexts are preserved or intentionally collapsed at cutover.
