@@ -75,6 +75,11 @@
 
 ## Recent Updates
 
+### 2026-05-16T03:25:00Z — OQ8 diagram entry arrow locked
+
+- Frank's OQ8 decision was merged into `.squad/decisions.md`.
+- Construction now uses the `●` pseudo-node entry arrow and keeps construction rows in the inspector section above transition rows.
+- The inbox note was deleted after merge.
 ### 2026-05-16T03:20:00Z — Scribe batch closed
 
 - The planned runtime-tool note was already present in `.squad/decisions.md`, so the inbox copy was cleared without duplication.

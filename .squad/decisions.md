@@ -2,6 +2,18 @@
 
 ---
 
+### 2026-05-16T03:25:00Z: OQ8 locks diagram entry arrow for construction
+
+**By:** Scribe
+
+**Status:** Merged from frank-28's OQ8 diagram note.
+
+**Merged source:** `frank-oq8-diagram-entry-arrow.md`.
+
+- Construction is shown as a ● pseudo-node entry arrow in the diagram.
+- Construction rows stay in the inspector section above transition rows.
+- Durable rule: prefer the UML initial-pseudostate convention when it keeps construction legible and uncluttered.
+
 ### 2026-05-16T02:47:48Z: OQ4 locks `UnreachableRow`; construction rows now use `EventRow`
 
 **By:** Scribe
@@ -307,4 +319,5 @@
 ---
 
 ---
+
 
