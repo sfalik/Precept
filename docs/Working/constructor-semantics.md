@@ -878,12 +878,12 @@ Before marking any slice **done**:
 | 5 | Type Checker Field State | 2 | 6 | 4 | ✅ Done |
 | 6 | Graph Analyzer | 2 | 4 | 3, 4 | ✅ Done |
 | 7 | Proof Engine | 3 | 4 | 3 | ✅ Done |
-| 8 | Runtime | 4 | 8 | 3, 6 |
-| 8b | Syntax Refactor — drop `initial` from rows | 3+ | 0 | 8 |
-| 9 | Language Server | 3 | 3 | 3 |
-| 10 | Grammar Generator | 1 | 2 | 1 |
-| 11 | MCP DTO | 1 | 2 | 3 |
-| 12 | Docs and Samples | 4 | 0 | all |
+| 8 | Runtime | 4 | 8 | 3, 6 | ✅ Done |
+| 8b | Syntax Refactor — drop `initial` from rows | 3+ | 0 | 8 | ✅ Done |
+| 9 | Language Server | 3 | 3 | 3 | ✅ Done |
+| 10 | Grammar Generator | 1 | 2 | 1 | ✅ Done |
+| 11 | MCP DTO | 1 | 2 | 3 | ✅ Done |
+| 12 | Docs and Samples | 4 | 0 | all | ✅ Done |
 
 **Total: ~43 new tests across 13 slices.**
 
@@ -1134,6 +1134,8 @@ Before marking any slice **done**:
 
 #### Slice 8: Runtime
 
+**Status:** ✅ Completed (2026-05-16)
+
 **Goal:** Implement `EventOutcome.Created`, `Precept.Create()`, fire-once enforcement, and `Version.AvailableEvents` filtering.
 
 **Files:**
@@ -1175,7 +1177,9 @@ Before marking any slice **done**:
 
 #### Slice 8b: Syntax Refactor — Drop `initial` from Construction Rows
 
-**Goal:** Remove the `initial` disambiguation token from construction row syntax. After this slice, `on create { ... }` is a valid construction row; `on create initial { ... }` is a parse error. The type checker classifies construction rows via `resolvedEvent.IsInitial` — no parser change is needed for the event declaration (`event create initial { ... }` is unchanged).
+**Status:** ✅ Completed (2026-05-16)
+
+**Goal:** Remove the `initial` disambiguation token from construction row syntax.After this slice, `on create { ... }` is a valid construction row; `on create initial { ... }` is a parse error. The type checker classifies construction rows via `resolvedEvent.IsInitial` — no parser change is needed for the event declaration (`event create initial { ... }` is unchanged).
 
 **Rationale:** Frank confirmed (2026-05-16) that `initial` on the row is not architecturally load-bearing. The type checker already resolves the event and knows `IsInitial` via `ctx.EventLookup`. Moving classification from parser-time to type-check-time requires no extra pass and is architecturally cleaner — semantic rules belong in the type checker, not the parser.
 
@@ -1224,6 +1228,8 @@ on create when x > 0 reject "msg"
 
 #### Slice 9: Language Server
 
+**Status:** ✅ Completed (2026-05-16)
+
 **Goal:** Update completions, hover, and semantic tokens for construction row syntax.
 
 **Files:**
@@ -1258,6 +1264,8 @@ on create when x > 0 reject "msg"
 
 #### Slice 10: Grammar Generator
 
+**Status:** ✅ Completed (2026-05-16)
+
 **Goal:** Update grammar generator to emit construction row patterns.
 
 **Files:**
@@ -1286,6 +1294,8 @@ on create when x > 0 reject "msg"
 
 #### Slice 11: MCP DTO
 
+**Status:** ✅ Completed (2026-05-16)
+
 **Goal:** Update MCP compile tool DTOs to expose construction row information.
 
 **Files:**
@@ -1313,6 +1323,8 @@ on create when x > 0 reject "msg"
 ---
 
 #### Slice 12: Docs and Samples
+
+**Status:** ✅ Completed (2026-05-16)
 
 **Goal:** Update documentation and fix sample file.
 

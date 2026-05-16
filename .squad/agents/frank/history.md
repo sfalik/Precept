@@ -22,6 +22,8 @@
 - When the grammar can make an invalid form impossible, do that instead of inventing a later semantic ban.
 - Hollow-entity validation should be shared across all pre-materialization expression lanes, not re-added slot by slot.
 - Formal grammar production rules must reflect structural exclusion decisions immediately — the grammar doc is a design deliverable, not an afterthought that waits for implementation.
+- Documentation updates for a shipped feature must verify against the actual source — spec claims and runtime-api.md must match `EventOutcome.cs`, `Precept.cs`, and `Version.cs` exactly. The MCP tool can be stale; always cross-check with `dotnet build` + test suite.
+- Construction row syntax: `initial` is ONLY on event DECLARATIONS. The row form is bare `on <Event>` — the type checker classifies construction via `resolvedEvent.IsInitial`, not parser-time disambiguation.
 
 - Completed the planned runtime-tool section in `docs/tooling/mcp.md` so all four planned tools now have purpose, inputs, outputs, and explicit runtime-implementation dependencies: `precept_create`, `precept_update`, `precept_inspect`, and `precept_fire`.
 - Locked OQ7 in `docs/working/constructor-semantics.md`: construction inspection will be implemented as `InspectCreate()` in core and exposed through `precept_inspect`.

@@ -1831,7 +1831,17 @@ The outcome types are:
 
 #### Construction outcomes
 
-Entity construction via the initial event produces the same outcome space. All event outcomes are valid at construction: `Transitioned` (construction-time routing to a different state), `Applied` (stayed in initial state), `Rejected` (business rejection at intake), `ConstraintsFailed` (data truth violation at intake), `Unmatched` (guarded initial rows, none matched). `UndefinedEvent` cannot occur — the compiler guarantees the initial event exists. The caller uses the same pattern matching for construction that they use for every event.
+Entity construction via the initial event produces a restricted outcome space. Construction always terminates in the initial state — the grammar structurally excludes `transition` from construction rows, making `Transitioned` impossible. Valid construction outcomes:
+
+| Outcome | Meaning |
+|---------|---------|
+| `Created` | Construction succeeded. Entity now exists in the initial state (stateful) or with `State = null` (stateless). |
+| `Rejected` | Intake refused — an authored `reject` row matched, or all guards failed with no unconditional fallback. |
+| `ConstraintsFailed` | Post-mutation constraint violations (collect-all semantics). |
+| `InvalidArgs` | Argument validation failed before row matching. |
+| `Faulted` | Evaluator impossible path / runtime fault. |
+
+Structurally impossible outcomes: `Transitioned` (grammar excludes `transition` from construction rows), `Applied` (exclusively a `Fire()` outcome — `Create()` produces `Created`), `Unmatched` (compiler guarantees construction rows exist; guard-failure produces `Rejected`), `UndefinedEvent` (compiler guarantees the initial event exists).
 
 #### Restoration outcomes
 
@@ -1864,9 +1874,51 @@ This guarantee applies to all mutation surfaces: event-driven transitions, state
 
 Construction is modeled as an **initial event** — the precept's constructor. This solves the fundamental problem that entities with required fields (non-optional, no default) cannot be constructed parameterlessly: the author would be forced to either invent nonsense defaults or make things optional that should not be.
 
+#### Event declaration with `initial` modifier
+
 ```precept
 event Create(ApplicantName as string, Amount as currency in USD, CreditScore as integer) initial
 ```
+
+The `initial` modifier on an event declaration designates it as the construction event. Only one event per precept may carry `initial`. The modifier appears after the parameter list (or after the event name if parameterless): `event <Name>[(args)] initial`.
+
+#### Construction row syntax
+
+Construction rows use the `on <EventName>` form — NOT the `from <State> on <EventName>` transition row form. The entity does not yet exist in any state when the initial event fires; the `from` prefix would be misinformation.
+
+```precept
+// Construction row — success path (sets initial field values)
+on Create
+    -> set ApplicantName = Create.ApplicantName
+    -> set RequestedAmount = Create.Amount
+
+// Construction row — guarded success path
+on Create when Create.Amount > '0.00 USD'
+    -> set ApplicantName = Create.ApplicantName
+    -> set RequestedAmount = Create.Amount
+
+// Construction row — reject path
+on Create when Create.Amount <= '0.00 USD'
+    -> reject "Loan amount must be positive"
+
+// Construction row — unconditional reject fallback
+on Create
+    -> reject "Invalid construction arguments"
+```
+
+Construction rows are NOT transition rows. Key distinctions:
+
+| Property | Construction row (`on Event`) | Transition row (`from State on Event`) |
+|----------|-------------------------------|----------------------------------------|
+| Prefix | `on <InitialEvent>` | `from <State> on <Event>` |
+| `transition` allowed | No — structurally excluded by grammar | Yes |
+| `no transition` allowed | No — structurally excluded by grammar | Yes |
+| When fires | At entity creation (before entity exists) | After entity exists, in a specific state |
+| Result on success | `EventOutcome.Created` | `EventOutcome.Transitioned` or `Applied` |
+
+The type checker classifies a row as a construction row when `resolvedEvent.IsInitial` is true. This is a semantic classification — the parser produces the same `EventRow` construct for both construction rows and stateless event handlers.
+
+#### Construction semantics
 
 The `initial` modifier on an event designates it as the construction event. The runtime's `Create(args)` operation fires this event atomically as part of entity creation:
 
@@ -1893,6 +1945,14 @@ No special "construction constraint" form is needed. `to <InitialState> ensure` 
 - **`UninitializedCrossFieldReadInInitialAssignment`:** An initial-event assignment reads another required field before that other field's first assignment in the same action chain establishes a value.
 
 **Design rationale:** Construction goes through the full event pipeline because entities must satisfy their constraints from the moment they exist. A parameterless construction path cannot enforce business invariants at intake. By modeling construction as an event, the language reuses all existing machinery — guards can discriminate construction routing, ensures validate args, `reject` can refuse intake, and the caller uses the same pattern matching they use for every event.
+
+#### Fire-once guarantee
+
+The initial event fires exactly once — at construction time. After construction succeeds, the initial event is excluded from the entity's post-construction event space:
+
+- **Compile-time:** The initial event cannot appear in any `from <State> on <InitialEvent>` transition row. If it does, the compiler emits `InitialEventInTransitionRow` (Error). The initial event's dispatch space is construction-only.
+- **Runtime:** `version.Fire(initialEventName, args)` on an existing entity returns `EventOutcome.UndefinedEvent`. The initial event does not appear in the post-construction dispatch table.
+- **`Version.AvailableEvents`:** Excludes the initial event. Only events that can be fired in the entity's current post-construction state are listed.
 
 #### Stateless Precepts (no states declared)
 
