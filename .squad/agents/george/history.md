@@ -42,3 +42,4 @@
 - Warning follow-ups should first verify whether the intended invariant is already present in shipped code and only missing regression locks.
 - `IntervalContainmentProofRequirement.DeclaredMin/Max` remain normalized proof-math bounds even though their names read like authored values; display surfaces need parallel authored fields.
 - For compound quantity operations, eager pairwise mismatch diagnostics must respect whether the operation's catalog semantics resolve qualifiers structurally or defer them to proof requirements.
+- Typed-constant validator codes can safely promote to `DiagnosticCode` only when the declared qualifiers are concrete; interpolated qualifier text must keep the generic catalog fallback to avoid false `DimensionCategoryMismatch` emissions.

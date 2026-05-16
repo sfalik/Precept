@@ -7,7 +7,7 @@ namespace Precept.Tests.TypeChecker;
 public class TypeCheckerFieldDefaultTests
 {
     [Fact]
-    public void FieldDefault_WrongDimension_EmitsDiagnostic()
+    public void FieldDefault_WrongDimension_EmitsDimensionCategoryMismatch()
     {
         var precept = """
             precept Widget
@@ -17,7 +17,7 @@ public class TypeCheckerFieldDefaultTests
 
         var (_, diagnostics) = TypeCheckerTestHelpers.Check(precept);
 
-        diagnostics.Should().Contain(d => d.Code == DiagnosticCode.InvalidTypedConstantContent.ToString());
+        diagnostics.Should().Contain(d => d.Code == DiagnosticCode.DimensionCategoryMismatch.ToString());
     }
 
     [Fact]
@@ -58,7 +58,7 @@ public class TypeCheckerFieldDefaultTests
     }
 
     [Fact]
-    public void FieldMin_WrongDimension_EmitsDiagnostic()
+    public void FieldMin_WrongDimension_EmitsDimensionCategoryMismatch()
     {
         var precept = """
             precept Widget
@@ -66,7 +66,7 @@ public class TypeCheckerFieldDefaultTests
             state Open initial
             """;
 
-        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.InvalidTypedConstantContent);
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.DimensionCategoryMismatch);
     }
 
     [Fact]

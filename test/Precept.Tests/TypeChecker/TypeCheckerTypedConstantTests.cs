@@ -158,7 +158,7 @@ public class TypeCheckerTypedConstantTests
     }
 
     [Fact]
-    public void QuantityLiteral_WrongDimension_EmitsInvalidTypedConstantContent()
+    public void QuantityLiteral_WrongDimension_EmitsDimensionCategoryMismatch()
     {
         var ctx = MinimalContext();
         var qualifiers = ImmutableArray.Create<DeclaredQualifierMeta>(new DeclaredQualifierMeta.Dimension("length"));
@@ -166,7 +166,7 @@ public class TypeCheckerTypedConstantTests
 
         result.Should().BeOfType<TypedErrorExpression>();
         ctx.Diagnostics.Should().ContainSingle()
-            .Which.Code.Should().Be(DiagnosticCode.InvalidTypedConstantContent.ToString());
+            .Which.Code.Should().Be(DiagnosticCode.DimensionCategoryMismatch.ToString());
     }
 
     [Fact]

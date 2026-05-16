@@ -261,9 +261,9 @@ internal static partial class TypeChecker
 
         foreach (var diag in result.Diagnostics)
         {
-            var code = SelectDiagnosticCode(cv, diag.ErrorKind);
+            var code = SelectTypedConstantDiagnosticCode(diag, cv, qualifiers);
             ctx.Diagnostics.Add(
-                Diagnostics.Create(code, lit.Span, rawText, meta.DisplayName));
+                CreateTypedConstantDiagnostic(code, lit.Span, rawText, meta.DisplayName, qualifiers));
         }
 
         return new TypedErrorExpression(lit.Span);
@@ -336,6 +336,144 @@ internal static partial class TypeChecker
         };
 
         return catalogCode ?? DiagnosticCode.InvalidTypedConstantContent;
+    }
+
+    private static DiagnosticCode SelectTypedConstantDiagnosticCode(
+        TypedConstantDiagnostic diagnostic,
+        ContentValidation validation,
+        ImmutableArray<DeclaredQualifierMeta>? qualifiers)
+    {
+        if (Enum.TryParse<DiagnosticCode>(diagnostic.Code, out var specificCode)
+            && ShouldUseSpecificTypedConstantDiagnostic(specificCode, qualifiers))
+        {
+            return specificCode;
+        }
+
+        return SelectDiagnosticCode(validation, diagnostic.ErrorKind);
+    }
+
+    private static bool ShouldUseSpecificTypedConstantDiagnostic(
+        DiagnosticCode code,
+        ImmutableArray<DeclaredQualifierMeta>? qualifiers) =>
+        code switch
+        {
+            DiagnosticCode.DimensionCategoryMismatch or DiagnosticCode.QualifierMismatch => !QualifiersContainDynamicText(qualifiers),
+            _ => true,
+        };
+
+    private static bool QualifiersContainDynamicText(ImmutableArray<DeclaredQualifierMeta>? qualifiers)
+    {
+        if (qualifiers is not { } declaredQualifiers || declaredQualifiers.IsDefaultOrEmpty)
+            return false;
+
+        foreach (var qualifier in declaredQualifiers)
+        {
+            if (!TryGetQualifierText(qualifier, qualifier.Axis, out var qualifierValue))
+                continue;
+
+            if (qualifierValue.Contains('{', StringComparison.Ordinal)
+                || qualifierValue.Contains('}', StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static Diagnostic CreateTypedConstantDiagnostic(
+        DiagnosticCode code,
+        SourceSpan span,
+        string rawText,
+        string typeDisplayName,
+        ImmutableArray<DeclaredQualifierMeta>? qualifiers) =>
+        code switch
+        {
+            DiagnosticCode.DimensionCategoryMismatch => Diagnostics.Create(
+                code,
+                span,
+                TryGetQuantityLiteralDimensionName(rawText, out var sourceDimension) ? sourceDimension : rawText,
+                TryGetDeclaredDimensionName(qualifiers, out var targetDimension) ? targetDimension : typeDisplayName,
+                typeDisplayName),
+            DiagnosticCode.QualifierMismatch => Diagnostics.Create(
+                code,
+                span,
+                TryGetDeclaredQualifierValue(qualifiers, out var targetQualifier) ? targetQualifier : typeDisplayName,
+                typeDisplayName),
+            _ => Diagnostics.Create(code, span, rawText, typeDisplayName),
+        };
+
+    private static bool TryGetQuantityLiteralDimensionName(string rawText, out string dimensionName)
+    {
+        dimensionName = string.Empty;
+
+        var trimmed = rawText.Trim();
+        var separatorIndex = -1;
+        for (var i = 0; i < trimmed.Length; i++)
+        {
+            if (char.IsWhiteSpace(trimmed[i]))
+            {
+                separatorIndex = i;
+                break;
+            }
+        }
+
+        if (separatorIndex < 0)
+            return false;
+
+        var unitText = trimmed[(separatorIndex + 1)..].Trim();
+        if (unitText.Length == 0)
+            return false;
+
+        var unitResult = UcumParser.Parse(unitText);
+        if (!unitResult.IsValid || unitResult.Unit is null)
+            return false;
+
+        dimensionName = UnitDimensionHelper.DeriveUnitDimensionName(unitResult.Unit);
+        return true;
+    }
+
+    private static bool TryGetDeclaredDimensionName(
+        ImmutableArray<DeclaredQualifierMeta>? qualifiers,
+        out string dimensionName)
+    {
+        dimensionName = string.Empty;
+
+        if (qualifiers is not { } declaredQualifiers || declaredQualifiers.IsDefaultOrEmpty)
+            return false;
+
+        foreach (var qualifier in declaredQualifiers)
+        {
+            switch (qualifier)
+            {
+                case DeclaredQualifierMeta.Dimension { DimensionName: var declaredDimension }:
+                    dimensionName = declaredDimension;
+                    return true;
+                case DeclaredQualifierMeta.Unit { DimensionName: var declaredUnitDimension }:
+                    dimensionName = declaredUnitDimension;
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool TryGetDeclaredQualifierValue(
+        ImmutableArray<DeclaredQualifierMeta>? qualifiers,
+        out string qualifierValue)
+    {
+        qualifierValue = string.Empty;
+
+        if (qualifiers is not { } declaredQualifiers || declaredQualifiers.IsDefaultOrEmpty)
+            return false;
+
+        foreach (var qualifier in declaredQualifiers)
+        {
+            if (TryGetQualifierText(qualifier, qualifier.Axis, out qualifierValue))
+                return true;
+        }
+
+        return false;
     }
 
     /// <summary>
