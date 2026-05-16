@@ -19,7 +19,19 @@
 
 ## Recent Updates
 
-### 2026-07-17 — Slice 6 Graph Analyzer construction row awareness complete
+### 2026-05-16 — Slice 7 Proof Engine construction row context complete
+
+- The proof engine already had `EventHandlerContext(TypedEventRow Handler)` in `ProofLedger.cs` — no new context type was needed.
+- Extended three guard-extraction switch expressions to handle `EventHandlerContext h => h.Handler.Guard`:
+  - `TryGuardInPathProof` (Strategy 3) in `ProofEngine.Strategies.cs`
+  - `TryFlowNarrowingProof` (Strategy 4) in `ProofEngine.Strategies.cs`
+  - `BuildNarrowedIntervals` in `ProofEngine.Intervals.cs`
+- Key discovery: construction row guards cannot reference regular fields — `ValidateConstructionGuardFieldAccess` in `TypeChecker.Validation.FieldState.cs` emits `ConstructionGuardReadsUninitializedField` for any field ref in a construction guard (fields are uninitialized at construction time). Test 2 uses `ProveAllowingDiagnostics` to test interval narrowing in isolation of this TypeChecker constraint.
+- Guard narrowing for event arg refs in construction guards still requires explicit extension of `ExtractGuardLeafConstraints` (currently only handles `TypedFieldRef`, not `TypedArgRef` for numeric comparisons).
+- Created `test/Precept.Tests/ProofEngine/ProofEngineConstructionTests.cs` (4 tests): guard extracts constraints, guard intervals correct, no-guard baseline, end-to-end integration.
+- All 6,421 tests green (+4 new). Commit `f1eb3cab`.
+
+
 
 - Added `RowSpan` (`required SourceSpan`) to `TypedEventRow` abstract record, mirroring the `TypedTransitionRow` pattern.
 - Set `RowSpan = construct.Span` in `TypeChecker.NormalizeEventHandler` for both `TypedEventRowSuccess` and `TypedEventRowReject`.
