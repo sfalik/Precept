@@ -28,10 +28,48 @@ public enum ConstructSlotKind
 }
 
 /// <summary>
+/// Declares what completion vocabulary a slot offers.
+/// Drives CompletionHandler dispatch once SlotPositionResolver ships (Slice 3).
+/// </summary>
+public enum SlotVocabulary
+{
+    /// <summary>No completions (identifier slots, because-clause text, initial marker, argument list).</summary>
+    None = 0,
+    /// <summary>Declared state names from the semantic index.</summary>
+    StateNames = 1,
+    /// <summary>Declared event names from the semantic index.</summary>
+    EventNames = 2,
+    /// <summary>Declared field names from the semantic index.</summary>
+    FieldNames = 3,
+    /// <summary>Action verb keywords from the Actions catalog.</summary>
+    ActionVerbs = 4,
+    /// <summary>Type keywords from the Types catalog.</summary>
+    TypeKeywords = 5,
+    /// <summary>Modifier keywords (context-sensitive to construct's ModifierDomain).</summary>
+    Modifiers = 6,
+    /// <summary>Expression context: field refs, functions, literals, operators.</summary>
+    Expression = 7,
+    /// <summary>Top-level construct keywords.</summary>
+    TopLevel = 8,
+    /// <summary>Outcome keywords (transition, no transition).</summary>
+    OutcomeKeywords = 9,
+    /// <summary>Access mode keywords (readonly, editable).</summary>
+    AccessModes = 10,
+    /// <summary>State entry names with optional modifiers (state declaration body).</summary>
+    StateEntryNames = 11,
+    /// <summary>Reject clause: string literal for refusal reason.</summary>
+    RejectReason = 12,
+}
+
+/// <summary>
 /// A single typed slot in a construct declaration shape.
 /// </summary>
 public sealed record ConstructSlot(
     ConstructSlotKind Kind,
     bool              IsRequired = true,
     string?           Description = null,
-    TokenKind[]?      TerminationTokens = null);
+    TokenKind[]?      TerminationTokens = null,
+    bool              IsList = false,
+    bool              IsChainable = false,
+    TokenKind?        ItemIntroducerToken = null,
+    SlotVocabulary    Vocabulary = SlotVocabulary.None);

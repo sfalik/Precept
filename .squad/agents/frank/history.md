@@ -96,6 +96,26 @@
 
 ## Recent Updates
 
+### 2026-05-16T09:00:00-04:00 — Slice 1: Completion vocabulary metadata shipped
+
+- Implemented Option (b) from the catalog-driven completions architecture analysis.
+- Added `SlotVocabulary` enum (13 values) to `src/Precept/Language/ConstructSlot.cs`.
+- Extended `ConstructSlot` record with `IsList`, `IsChainable`, `ItemIntroducerToken`, and `Vocabulary` fields.
+- Populated all 24 slot instances in `Constructs.cs` with correct metadata.
+- Key design decision: `ModifierList.IsList=false` because modifiers are whitespace-separated (no explicit introducer token), unlike comma-separated lists.
+- Added 16 tests in `SlotVocabularyMetadataTests.cs` covering individual slot assertions and structural invariants.
+- Full 3-slice implementation plan written to `.squad/decisions/inbox/frank-completions-plan.md`.
+- All 6,157 tests pass (5780 + 333 + 44).
+
+### 2026-05-16T09:00:00-04:00 — Test.precept line 8 diagnostic analysis
+
+- Analyzed 4 diagnostics on `samples/Test.precept` after premature syntax update (removed `initial` from construction row before Slice 8b implementation).
+- All 4 diagnostics are logically consistent cascade from single root cause: parser classifies `on create` (without `initial`) as plain EventHandler, not ConstructionRow.
+- Identified stale diagnostic messages in PRE0146 and PRE0147 that reference old `on {0} initial` syntax — must be updated in Slice 8b scope.
+- Flagged latent question: does `UnhandledEvent` (PRE0081) correctly exempt initial events with construction rows? Recommended regression test for 8b.
+- Verdict: revert Test.precept to `on create initial` until 8b ships; update the sample in the same PR as the parser change.
+- Decision written to `.squad/decisions/inbox/frank-test-precept-line8-analysis.md`.
+
 ### 2026-05-16T03:25:00Z — OQ8 diagram entry arrow locked
 
 - Frank's OQ8 decision was merged into `.squad/decisions.md`.

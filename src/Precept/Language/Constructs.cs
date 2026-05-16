@@ -14,30 +14,30 @@ public static class Constructs
     //  Shared slot instances (reused across construct entries)
     // ════════════════════════════════════════════════════════════════════════════
 
-    private static readonly ConstructSlot SlotIdentifierList    = new(ConstructSlotKind.IdentifierList);
-    private static readonly ConstructSlot SlotTypeExpression    = new(ConstructSlotKind.TypeExpression);
-    private static readonly ConstructSlot SlotModifierList      = new(ConstructSlotKind.ModifierList,       IsRequired: false);
-    private static readonly ConstructSlot SlotStateEntryList    = new(ConstructSlotKind.StateEntryList);
+    private static readonly ConstructSlot SlotIdentifierList    = new(ConstructSlotKind.IdentifierList,    IsList: true, ItemIntroducerToken: TokenKind.Comma);
+    private static readonly ConstructSlot SlotTypeExpression    = new(ConstructSlotKind.TypeExpression,    Vocabulary: SlotVocabulary.TypeKeywords);
+    private static readonly ConstructSlot SlotModifierList      = new(ConstructSlotKind.ModifierList,       IsRequired: false, Vocabulary: SlotVocabulary.Modifiers);
+    private static readonly ConstructSlot SlotStateEntryList    = new(ConstructSlotKind.StateEntryList,    IsList: true, ItemIntroducerToken: TokenKind.Comma, Vocabulary: SlotVocabulary.StateEntryNames);
     private static readonly ConstructSlot SlotArgumentList      = new(ConstructSlotKind.ArgumentList,       IsRequired: false);
-    private static readonly ConstructSlot SlotComputeExpression    = new(ConstructSlotKind.ComputeExpression,  IsRequired: false, TerminationTokens: []);
-    private static readonly ConstructSlot SlotGuardClause          = new(ConstructSlotKind.GuardClause,        IsRequired: false, Description: "when expression", TerminationTokens: [TokenKind.Because, TokenKind.Arrow]);
-    private static readonly ConstructSlot SlotPreVerbGuardEnsure   = new(ConstructSlotKind.GuardClause,        IsRequired: false, Description: "when expression", TerminationTokens: [TokenKind.Ensure]);
-    private static readonly ConstructSlot SlotPreVerbGuardArrow    = new(ConstructSlotKind.GuardClause,        IsRequired: false, Description: "when expression", TerminationTokens: [TokenKind.Arrow]);
-    private static readonly ConstructSlot SlotPreVerbGuardModify   = new(ConstructSlotKind.GuardClause,        IsRequired: false, Description: "when expression", TerminationTokens: [TokenKind.Modify]);
-    private static readonly ConstructSlot SlotActionChain          = new(ConstructSlotKind.ActionChain,        IsRequired: false);
-    private static readonly ConstructSlot SlotOutcome           = new(ConstructSlotKind.Outcome);
-    private static readonly ConstructSlot SlotStateTarget       = new(ConstructSlotKind.StateTarget,        Description: "single state name, `any` for all states, or comma-delimited list of state names");
-    private static readonly ConstructSlot SlotOptStateTarget    = new(ConstructSlotKind.StateTarget,        IsRequired: false);
-    private static readonly ConstructSlot SlotEventTarget       = new(ConstructSlotKind.EventTarget);
-    private static readonly ConstructSlot SlotEnsureClause      = new(ConstructSlotKind.EnsureClause,       TerminationTokens: [TokenKind.Because]);
+    private static readonly ConstructSlot SlotComputeExpression    = new(ConstructSlotKind.ComputeExpression,  IsRequired: false, TerminationTokens: [], Vocabulary: SlotVocabulary.Expression);
+    private static readonly ConstructSlot SlotGuardClause          = new(ConstructSlotKind.GuardClause,        IsRequired: false, Description: "when expression", TerminationTokens: [TokenKind.Because, TokenKind.Arrow], Vocabulary: SlotVocabulary.Expression);
+    private static readonly ConstructSlot SlotPreVerbGuardEnsure   = new(ConstructSlotKind.GuardClause,        IsRequired: false, Description: "when expression", TerminationTokens: [TokenKind.Ensure], Vocabulary: SlotVocabulary.Expression);
+    private static readonly ConstructSlot SlotPreVerbGuardArrow    = new(ConstructSlotKind.GuardClause,        IsRequired: false, Description: "when expression", TerminationTokens: [TokenKind.Arrow], Vocabulary: SlotVocabulary.Expression);
+    private static readonly ConstructSlot SlotPreVerbGuardModify   = new(ConstructSlotKind.GuardClause,        IsRequired: false, Description: "when expression", TerminationTokens: [TokenKind.Modify], Vocabulary: SlotVocabulary.Expression);
+    private static readonly ConstructSlot SlotActionChain          = new(ConstructSlotKind.ActionChain,        IsRequired: false, IsChainable: true, ItemIntroducerToken: TokenKind.Arrow, Vocabulary: SlotVocabulary.ActionVerbs);
+    private static readonly ConstructSlot SlotOutcome           = new(ConstructSlotKind.Outcome,           Vocabulary: SlotVocabulary.OutcomeKeywords);
+    private static readonly ConstructSlot SlotStateTarget       = new(ConstructSlotKind.StateTarget,        Description: "single state name, `any` for all states, or comma-delimited list of state names", IsList: true, ItemIntroducerToken: TokenKind.Comma, Vocabulary: SlotVocabulary.StateNames);
+    private static readonly ConstructSlot SlotOptStateTarget    = new(ConstructSlotKind.StateTarget,        IsRequired: false, IsList: true, ItemIntroducerToken: TokenKind.Comma, Vocabulary: SlotVocabulary.StateNames);
+    private static readonly ConstructSlot SlotEventTarget       = new(ConstructSlotKind.EventTarget,       Vocabulary: SlotVocabulary.EventNames);
+    private static readonly ConstructSlot SlotEnsureClause      = new(ConstructSlotKind.EnsureClause,       TerminationTokens: [TokenKind.Because], Vocabulary: SlotVocabulary.Expression);
     private static readonly ConstructSlot SlotBecauseClause     = new(ConstructSlotKind.BecauseClause);
     private static readonly ConstructSlot SlotOptBecauseClause  = new(ConstructSlotKind.BecauseClause,      IsRequired: false);
-    private static readonly ConstructSlot SlotAccessModeKeyword = new(ConstructSlotKind.AccessModeKeyword);
-    private static readonly ConstructSlot SlotFieldTarget       = new(ConstructSlotKind.FieldTarget);
-    private static readonly ConstructSlot SlotRuleExpression    = new(ConstructSlotKind.RuleExpression,     TerminationTokens: [TokenKind.When, TokenKind.Because]);
+    private static readonly ConstructSlot SlotAccessModeKeyword = new(ConstructSlotKind.AccessModeKeyword, Vocabulary: SlotVocabulary.AccessModes);
+    private static readonly ConstructSlot SlotFieldTarget       = new(ConstructSlotKind.FieldTarget,       IsList: true, ItemIntroducerToken: TokenKind.Comma, Vocabulary: SlotVocabulary.FieldNames);
+    private static readonly ConstructSlot SlotRuleExpression    = new(ConstructSlotKind.RuleExpression,     TerminationTokens: [TokenKind.When, TokenKind.Because], Vocabulary: SlotVocabulary.Expression);
     private static readonly ConstructSlot SlotInitialMarker     = new(ConstructSlotKind.InitialMarker,      IsRequired: false);
-    private static readonly ConstructSlot SlotRejectClause      = new(ConstructSlotKind.RejectClause);
-    private static readonly ConstructSlot SlotSuccessOutcome    = new(ConstructSlotKind.SuccessOutcome);
+    private static readonly ConstructSlot SlotRejectClause      = new(ConstructSlotKind.RejectClause,      Vocabulary: SlotVocabulary.RejectReason);
+    private static readonly ConstructSlot SlotSuccessOutcome    = new(ConstructSlotKind.SuccessOutcome,    Vocabulary: SlotVocabulary.OutcomeKeywords);
 
     // ════════════════════════════════════════════════════════════════════════════
     //  GetMeta — exhaustive switch
