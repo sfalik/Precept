@@ -89,10 +89,10 @@ public class ParserOutcomeTests
         var tokens = Lexer.Lex("from Draft on Submit -> reject");
         var manifest = Pipeline.Parser.Parse(tokens);
 
-        var row = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.TransitionRow);
-        var outcomeSlot = row.Slots.OfType<OutcomeSlot>().Single();
+        var row = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.TransitionRowReject);
+        var rejectSlot = row.Slots.OfType<RejectClauseSlot>().Single();
 
-        outcomeSlot.Outcome.Should().BeOfType<MalformedOutcome>();
+        rejectSlot.Reason.Should().BeEmpty();
     }
 
     [Fact]

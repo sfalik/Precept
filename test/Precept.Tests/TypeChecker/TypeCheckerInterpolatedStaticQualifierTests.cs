@@ -95,7 +95,7 @@ public class TypeCheckerInterpolatedStaticQualifierTests
 
     private static InterpolatedTypedConstant GetAssignedConstant(SemanticIndex index, string fieldName)
     {
-        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+        var assign = index.EventHandlers.OfType<TypedEventRowSuccess>().Single().Actions.OfType<TypedInputAction>()
             .Single(action => action.FieldName == fieldName);
         return assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>().Subject;
     }

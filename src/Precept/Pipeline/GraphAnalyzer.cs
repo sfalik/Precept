@@ -344,11 +344,12 @@ public static class GraphAnalyzer
             return;
         }
 
-        string? toState = row.Outcome switch
+        string? toState = row switch
         {
-            TransitionRowOutcome.Transition when row.TargetState is not null && semantics.StatesByName.ContainsKey(row.TargetState)
-                => row.TargetState,
-            TransitionRowOutcome.NoTransition or TransitionRowOutcome.Reject
+            TypedTransitionRowSuccess { TargetState: not null } success
+                when semantics.StatesByName.ContainsKey(success.TargetState)
+                => success.TargetState,
+            TypedTransitionRowSuccess { TargetState: null } or TypedTransitionRowReject
                 => fromState,
             _ => null,
         };
@@ -730,7 +731,7 @@ public static class GraphAnalyzer
 
         foreach (var group in rowsByEvent)
         {
-            if (group.Any(row => row.Outcome != TransitionRowOutcome.Reject))
+            if (group.Any(row => row is not TypedTransitionRowReject))
                 continue;
 
             d1FlaggedEvents.Add(group.Key);
@@ -783,7 +784,7 @@ public static class GraphAnalyzer
                 if (effectiveList.Count == 0)
                     continue;
 
-                if (!effectiveList.All(row => row.Outcome == TransitionRowOutcome.Reject))
+                if (!effectiveList.All(row => row is TypedTransitionRowReject))
                     continue;
 
                 foreach (var row in effectiveList)

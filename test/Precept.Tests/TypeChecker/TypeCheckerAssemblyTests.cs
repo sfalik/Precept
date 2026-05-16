@@ -574,10 +574,10 @@ public class TypeCheckerAssemblyTests
             index.EventsByName.Should().ContainKey(row.EventName,
                 $"transition event '{row.EventName}' must exist");
 
-            if (row.TargetState is not null)
+            if (row is TypedTransitionRowSuccess successRow && successRow.TargetState is not null)
             {
-                index.StatesByName.Should().ContainKey(row.TargetState,
-                    $"transition target state '{row.TargetState}' must exist");
+                index.StatesByName.Should().ContainKey(successRow.TargetState,
+                    $"transition target state '{successRow.TargetState}' must exist");
             }
         }
     }
@@ -694,8 +694,8 @@ public class TypeCheckerAssemblyTests
 
         // The action's expression tree must be a resolved TypedBinaryOp, not TypedErrorExpression
         var row = index.TransitionRows.First();
-        row.Actions.Should().NotBeEmpty();
-        var inputAction = row.Actions[0] as TypedInputAction;
+        ((TypedTransitionRowSuccess)row).Actions.Should().NotBeEmpty();
+        var inputAction = ((TypedTransitionRowSuccess)row).Actions[0] as TypedInputAction;
         inputAction.Should().NotBeNull();
         inputAction!.InputExpression.Should().NotBeOfType<TypedErrorExpression>(
             "string concatenation expression should not be a stub error");

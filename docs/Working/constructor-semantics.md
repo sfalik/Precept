@@ -873,7 +873,7 @@ Before marking any slice **done**:
 |---|-------|-------|-----------|--------------|--------|
 | 1 | Grammar Foundations | 3 | 0 | — | ✅ Done |
 | 2 | Parser Routing | 2 | 6 | 1 | ✅ Done |
-| 3 | Semantic Model DU | 4 | 0 | 1 |
+| 3 | Semantic Model DU | 4 | 0 | 1 | ✅ Done |
 | 4 | Type Checker Structural | 2 | 8 | 2, 3 |
 | 5 | Type Checker Field State | 2 | 6 | 4 |
 | 6 | Graph Analyzer | 2 | 4 | 3, 4 |
@@ -959,6 +959,8 @@ Before marking any slice **done**:
 ---
 
 #### Slice 3: Semantic Model DU
+
+**Status:** ✅ Completed (2026-07-17)
 
 **Goal:** Redesign `TypedEventRow` and `TypedTransitionRow` as discriminated unions with success/reject subtypes.
 

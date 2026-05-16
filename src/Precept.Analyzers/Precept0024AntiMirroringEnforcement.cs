@@ -40,11 +40,15 @@ public sealed class Precept0024AntiMirroringEnforcement : DiagnosticAnalyzer
         "TypedState",
         "TypedEvent",
         "TypedTransitionRow",
+        "TypedTransitionRowSuccess",
+        "TypedTransitionRowReject",
         "TypedRule",
         "TypedEnsure",
         "TypedAccessMode",
         "TypedStateHook",
-        "TypedEventHandler",
+        "TypedEventRow",
+        "TypedEventRowSuccess",
+        "TypedEventRowReject",
         "TypedEditDeclaration");
 
     private const string PipelineNamespace = "Precept.Pipeline";

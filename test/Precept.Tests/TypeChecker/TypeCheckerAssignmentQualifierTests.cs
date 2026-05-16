@@ -1080,8 +1080,9 @@ public class TypeCheckerAssignmentQualifierTests
     private static TypedExpression GetSingleSetInputExpression(SemanticIndex index)
     {
         index.TransitionRows.Should().ContainSingle();
-        index.TransitionRows[0].Actions.Should().ContainSingle();
-        return index.TransitionRows[0].Actions[0]
+        var success = (TypedTransitionRowSuccess)index.TransitionRows[0];
+        success.Actions.Should().ContainSingle();
+        return success.Actions[0]
             .Should().BeOfType<TypedInputAction>().Which.InputExpression;
     }
 

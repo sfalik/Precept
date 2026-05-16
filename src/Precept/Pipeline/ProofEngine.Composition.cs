@@ -315,9 +315,9 @@ public static partial class ProofEngine
         }
 
         foreach (var row in semantics.TransitionRows)
-            ScanActions(row.Actions);
+            if (row is TypedTransitionRowSuccess s1) ScanActions(s1.Actions);
         foreach (var handler in semantics.EventHandlers)
-            ScanActions(handler.Actions);
+            if (handler is TypedEventRowSuccess s2) ScanActions(s2.Actions);
 
         return hasNonInterpolated ? ImmutableArray<InterpolatedTypedConstant>.Empty : builder.ToImmutable();
     }

@@ -451,7 +451,7 @@ public class TypeCheckerTypedConstantTests
             d.Severity == Severity.Error
             && d.Code == nameof(DiagnosticCode.InterpolatedTypedConstantHoleTypeMismatch));
 
-        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+        var assign = index.EventHandlers.OfType<TypedEventRowSuccess>().Single().Actions.OfType<TypedInputAction>()
             .Single(action => action.FieldName == "q");
         assign.InputExpression.Should().BeOfType<TypedErrorExpression>();
     }
@@ -724,7 +724,7 @@ public class TypeCheckerTypedConstantTests
             """);
 
         AssertNoConstructionIndependentErrors(diagnostics);
-        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+        var assign = index.EventHandlers.OfType<TypedEventRowSuccess>().Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "target");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
             .Which.ResultType.Should().Be(TypeKind.UnitOfMeasure);
@@ -745,7 +745,7 @@ public class TypeCheckerTypedConstantTests
             """);
 
         AssertNoConstructionIndependentErrors(diagnostics);
-        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+        var assign = index.EventHandlers.OfType<TypedEventRowSuccess>().Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "target");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
             .Which.ResultType.Should().Be(TypeKind.Quantity);
@@ -766,7 +766,7 @@ public class TypeCheckerTypedConstantTests
             """);
 
         AssertNoConstructionIndependentErrors(diagnostics);
-        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+        var assign = index.EventHandlers.OfType<TypedEventRowSuccess>().Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "target");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
             .Which.ResultType.Should().Be(TypeKind.Quantity);
@@ -786,7 +786,7 @@ public class TypeCheckerTypedConstantTests
             """);
 
         AssertNoConstructionIndependentErrors(diagnostics);
-        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+        var assign = index.EventHandlers.OfType<TypedEventRowSuccess>().Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "target");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
             .Which.ResultType.Should().Be(TypeKind.Quantity);
@@ -805,7 +805,7 @@ public class TypeCheckerTypedConstantTests
             """);
 
         AssertNoConstructionIndependentErrors(diagnostics);
-        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+        var assign = index.EventHandlers.OfType<TypedEventRowSuccess>().Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "target");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
             .Which.ResultType.Should().Be(TypeKind.Quantity);
@@ -824,7 +824,7 @@ public class TypeCheckerTypedConstantTests
             """);
 
         AssertNoConstructionIndependentErrors(diagnostics);
-        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+        var assign = index.EventHandlers.OfType<TypedEventRowSuccess>().Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "target");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
             .Which.ResultType.Should().Be(TypeKind.Quantity);
@@ -949,7 +949,7 @@ public class TypeCheckerTypedConstantTests
             """);
 
         AssertNoConstructionIndependentErrors(diagnostics);
-        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+        var assign = index.EventHandlers.OfType<TypedEventRowSuccess>().Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "q");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
             .Which.ResultType.Should().Be(TypeKind.Quantity);
@@ -969,7 +969,7 @@ public class TypeCheckerTypedConstantTests
             """);
 
         AssertNoConstructionIndependentErrors(diagnostics);
-        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+        var assign = index.EventHandlers.OfType<TypedEventRowSuccess>().Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "q");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>();
     }
@@ -989,7 +989,7 @@ public class TypeCheckerTypedConstantTests
             """);
 
         AssertNoConstructionIndependentErrors(diagnostics);
-        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+        var assign = index.EventHandlers.OfType<TypedEventRowSuccess>().Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "m");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
             .Which.ResultType.Should().Be(TypeKind.Money);
@@ -1011,7 +1011,7 @@ public class TypeCheckerTypedConstantTests
             """);
 
         AssertNoConstructionIndependentErrors(diagnostics);
-        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+        var assign = index.EventHandlers.OfType<TypedEventRowSuccess>().Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "p");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
             .Which.ResultType.Should().Be(TypeKind.Price);
@@ -1033,7 +1033,7 @@ public class TypeCheckerTypedConstantTests
             """);
 
         AssertNoConstructionIndependentErrors(diagnostics);
-        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+        var assign = index.EventHandlers.OfType<TypedEventRowSuccess>().Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "x");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
             .Which.ResultType.Should().Be(TypeKind.ExchangeRate);
@@ -1053,7 +1053,7 @@ public class TypeCheckerTypedConstantTests
             """);
 
         AssertNoConstructionIndependentErrors(diagnostics);
-        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+        var assign = index.EventHandlers.OfType<TypedEventRowSuccess>().Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "p");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
             .Which.ResultType.Should().Be(TypeKind.Period);
@@ -1074,7 +1074,7 @@ public class TypeCheckerTypedConstantTests
             """);
 
         AssertNoConstructionIndependentErrors(diagnostics);
-        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+        var assign = index.EventHandlers.OfType<TypedEventRowSuccess>().Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "d");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
             .Which.ResultType.Should().Be(TypeKind.Duration);
@@ -1096,7 +1096,7 @@ public class TypeCheckerTypedConstantTests
             """);
 
         AssertNoConstructionIndependentErrors(diagnostics);
-        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+        var assign = index.EventHandlers.OfType<TypedEventRowSuccess>().Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "target");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
             .Which.ResultType.Should().Be(TypeKind.Money);
@@ -1115,7 +1115,7 @@ public class TypeCheckerTypedConstantTests
             """);
 
         AssertNoConstructionIndependentErrors(diagnostics);
-        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+        var assign = index.EventHandlers.OfType<TypedEventRowSuccess>().Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "target");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>();
     }
@@ -1133,7 +1133,7 @@ public class TypeCheckerTypedConstantTests
             """);
 
         AssertNoConstructionIndependentErrors(diagnostics);
-        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+        var assign = index.EventHandlers.OfType<TypedEventRowSuccess>().Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "target");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>();
     }
@@ -1151,7 +1151,7 @@ public class TypeCheckerTypedConstantTests
             """);
 
         AssertNoConstructionIndependentErrors(diagnostics);
-        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+        var assign = index.EventHandlers.OfType<TypedEventRowSuccess>().Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "target");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>();
     }
@@ -1169,7 +1169,7 @@ public class TypeCheckerTypedConstantTests
             """);
 
         AssertNoConstructionIndependentErrors(diagnostics);
-        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+        var assign = index.EventHandlers.OfType<TypedEventRowSuccess>().Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "target");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>();
     }
@@ -1208,7 +1208,7 @@ public class TypeCheckerTypedConstantTests
             """);
 
         AssertNoConstructionIndependentErrors(diagnostics);
-        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+        var assign = index.EventHandlers.OfType<TypedEventRowSuccess>().Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "target");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>();
     }
@@ -1294,7 +1294,7 @@ public class TypeCheckerTypedConstantTests
             """);
 
         AssertNoConstructionIndependentErrors(diagnostics);
-        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+        var assign = index.EventHandlers.OfType<TypedEventRowSuccess>().Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "m");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
             .Which.ResultType.Should().Be(TypeKind.Money);
@@ -1314,7 +1314,7 @@ public class TypeCheckerTypedConstantTests
             """);
 
         AssertNoConstructionIndependentErrors(diagnostics);
-        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+        var assign = index.EventHandlers.OfType<TypedEventRowSuccess>().Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "m");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
             .Which.ResultType.Should().Be(TypeKind.Money);
@@ -1334,7 +1334,7 @@ public class TypeCheckerTypedConstantTests
             """);
 
         AssertNoConstructionIndependentErrors(diagnostics);
-        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+        var assign = index.EventHandlers.OfType<TypedEventRowSuccess>().Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "q");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
             .Which.ResultType.Should().Be(TypeKind.Quantity);
@@ -1354,7 +1354,7 @@ public class TypeCheckerTypedConstantTests
             """);
 
         AssertNoConstructionIndependentErrors(diagnostics);
-        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+        var assign = index.EventHandlers.OfType<TypedEventRowSuccess>().Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "p");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
             .Which.ResultType.Should().Be(TypeKind.Price);
@@ -1374,7 +1374,7 @@ public class TypeCheckerTypedConstantTests
             """);
 
         AssertNoConstructionIndependentErrors(diagnostics);
-        var assign = index.EventHandlers.Single().Actions.OfType<TypedInputAction>()
+        var assign = index.EventHandlers.OfType<TypedEventRowSuccess>().Single().Actions.OfType<TypedInputAction>()
             .Single(a => a.FieldName == "p");
         assign.InputExpression.Should().BeOfType<InterpolatedTypedConstant>()
             .Which.ResultType.Should().Be(TypeKind.Price);

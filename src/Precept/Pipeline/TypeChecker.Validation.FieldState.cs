@@ -178,15 +178,18 @@ internal static partial class TypeChecker
             CollectFieldRefsFromExpression(row.Guard, fieldRefs);
             EmitDiagnosticsForFieldRefs(row.FromState);
 
-            foreach (var action in row.Actions)
+            if (row is TypedTransitionRowSuccess successRow)
             {
-                if (action is not TypedInputAction inputAction)
-                    continue;
+                foreach (var action in successRow.Actions)
+                {
+                    if (action is not TypedInputAction inputAction)
+                        continue;
 
-                fieldRefs.Clear();
-                CollectFieldRefsFromExpression(inputAction.InputExpression, fieldRefs);
-                CollectFieldRefsFromExpression(inputAction.SecondaryExpression, fieldRefs);
-                EmitDiagnosticsForFieldRefs(row.FromState);
+                    fieldRefs.Clear();
+                    CollectFieldRefsFromExpression(inputAction.InputExpression, fieldRefs);
+                    CollectFieldRefsFromExpression(inputAction.SecondaryExpression, fieldRefs);
+                    EmitDiagnosticsForFieldRefs(row.FromState);
+                }
             }
         }
 
@@ -222,9 +225,9 @@ internal static partial class TypeChecker
         }
 
         // D131: write actions cannot target fields omitted in the target or entered state.
-        foreach (var row in ctx.TransitionRows)
+        foreach (var row in ctx.TransitionRows.OfType<TypedTransitionRowSuccess>())
         {
-            if (row.Outcome != TransitionRowOutcome.Transition || row.TargetState is null)
+            if (row.TargetState is null)
                 continue;
 
             foreach (var action in row.Actions)
@@ -262,9 +265,9 @@ internal static partial class TypeChecker
 
         // D132/D143: transitions that materialize a required field on entry must assign it,
         // and the first materializing assignment cannot read that field before it exists.
-        foreach (var row in ctx.TransitionRows)
+        foreach (var row in ctx.TransitionRows.OfType<TypedTransitionRowSuccess>())
         {
-            if (row.Outcome != TransitionRowOutcome.Transition || row.TargetState is null)
+            if (row.TargetState is null)
                 continue;
 
             var effectiveFromStates = row.FromState is not null
@@ -459,14 +462,14 @@ internal static partial class TypeChecker
 
         if (ctx.States.Count == 0)
         {
-            foreach (var row in ctx.TransitionRows.Where(row =>
+            foreach (var row in ctx.TransitionRows.OfType<TypedTransitionRowSuccess>().Where(row =>
                          string.Equals(row.EventName, initialEvent.Name, StringComparison.Ordinal) &&
                          row.FromState is null))
             {
                 builder.Add((row.RowSpan, row.Actions, ImmutableArray<string>.Empty));
             }
 
-            foreach (var handler in ctx.EventHandlers.Where(handler =>
+            foreach (var handler in ctx.EventHandlers.OfType<TypedEventRowSuccess>().Where(handler =>
                          string.Equals(handler.EventName, initialEvent.Name, StringComparison.Ordinal)))
             {
                 builder.Add((handler.Syntax.Span, handler.Actions, ImmutableArray<string>.Empty));
@@ -481,7 +484,7 @@ internal static partial class TypeChecker
             .ToImmutableArray();
         var initialStateLookup = initialStateNames.ToHashSet(StringComparer.Ordinal);
 
-        foreach (var row in ctx.TransitionRows.Where(row =>
+        foreach (var row in ctx.TransitionRows.OfType<TypedTransitionRowSuccess>().Where(row =>
                      string.Equals(row.EventName, initialEvent.Name, StringComparison.Ordinal) &&
                      (row.FromState is null || initialStateLookup.Contains(row.FromState))))
         {

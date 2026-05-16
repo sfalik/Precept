@@ -134,12 +134,12 @@ internal static class RichHoverFactory
     {
         foreach (var row in compilation.Semantics.TransitionRows)
         {
-            if (row.Outcome != TransitionRowOutcome.Reject || !SymbolNavigation.Contains(row.RowSpan, position))
+            if (row is not TypedTransitionRowReject rejectRow || !SymbolNavigation.Contains(row.RowSpan, position))
             {
                 continue;
             }
 
-            hover = MakeHover(CreateRejectMarkdown(compilation, row), row.RowSpan);
+            hover = MakeHover(CreateRejectMarkdown(compilation, rejectRow), row.RowSpan);
             return true;
         }
 
@@ -1653,7 +1653,7 @@ internal static class RichHoverFactory
         return string.Join("\n", lines);
     }
 
-    private static string CreateRejectMarkdown(Compilation compilation, TypedTransitionRow row)
+    private static string CreateRejectMarkdown(Compilation compilation, TypedTransitionRowReject row)
     {
         var lines = new List<string>
         {
@@ -2582,13 +2582,13 @@ internal static class RichHoverFactory
                 ? "source reachable"
                 : $"source `{EscapeInline(row.FromState)}` unreachable";
 
-        var target = row.Outcome switch
+        var target = row switch
         {
-            TransitionRowOutcome.Transition when row.TargetState is not null && graph.ReachableStates.Contains(row.TargetState)
-                => $"target `{EscapeInline(row.TargetState)}` reachable",
-            TransitionRowOutcome.Transition when row.TargetState is not null
-                => $"target `{EscapeInline(row.TargetState)}` unreachable",
-            TransitionRowOutcome.Reject => "reject outcome",
+            TypedTransitionRowSuccess { TargetState: not null } success when graph.ReachableStates.Contains(success.TargetState)
+                => $"target `{EscapeInline(success.TargetState)}` reachable",
+            TypedTransitionRowSuccess { TargetState: not null } success
+                => $"target `{EscapeInline(success.TargetState)}` unreachable",
+            TypedTransitionRowReject => "reject outcome",
             _ => "state unchanged",
         };
 
@@ -2598,9 +2598,9 @@ internal static class RichHoverFactory
     private static string FormatTransitionRouteLine(TypedTransitionRow row)
     {
         var from = row.FromState ?? "*";
-        var target = row.Outcome switch
+        var target = row switch
         {
-            TransitionRowOutcome.Transition => row.TargetState ?? "*",
+            TypedTransitionRowSuccess { TargetState: not null } success => success.TargetState,
             _ => row.FromState ?? "*",
         };
 
@@ -2610,10 +2610,10 @@ internal static class RichHoverFactory
     private static string FormatTransitionHeader(TypedTransitionRow row)
     {
         var from = row.FromState ?? "*";
-        return row.Outcome switch
+        return row switch
         {
-            TransitionRowOutcome.Transition => $"from {from} on {row.EventName} -> {row.TargetState}",
-            TransitionRowOutcome.Reject => $"from {from} on {row.EventName} -> reject",
+            TypedTransitionRowSuccess { TargetState: not null } success => $"from {from} on {row.EventName} -> {success.TargetState}",
+            TypedTransitionRowReject => $"from {from} on {row.EventName} -> reject",
             _ => $"from {from} on {row.EventName} -> no transition",
         };
     }

@@ -138,11 +138,12 @@ public static class Compiler
             return null;
         }
 
-        return row.Outcome switch
+        return row switch
         {
-            TransitionRowOutcome.Transition when row.TargetState is not null && semantics.StatesByName.ContainsKey(row.TargetState)
-                => row.TargetState,
-            TransitionRowOutcome.NoTransition or TransitionRowOutcome.Reject
+            TypedTransitionRowSuccess { TargetState: not null } success
+                when semantics.StatesByName.ContainsKey(success.TargetState)
+                => success.TargetState,
+            TypedTransitionRowSuccess { TargetState: null } or TypedTransitionRowReject
                 => fromState,
             _ => null,
         };

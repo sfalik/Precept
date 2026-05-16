@@ -171,14 +171,16 @@ public static partial class ProofEngine
         foreach (var row in semantics.TransitionRows)
         {
             var ctx = new TransitionRowContext(row);
-            WalkActions(row.Actions, ctx, obligations, semantics);
+            if (row is TypedTransitionRowSuccess success)
+                WalkActions(success.Actions, ctx, obligations, semantics);
         }
 
         // EventHandlers[].Actions[]
         foreach (var handler in semantics.EventHandlers)
         {
             var ctx = new EventHandlerContext(handler);
-            WalkActions(handler.Actions, ctx, obligations, semantics);
+            if (handler is TypedEventRowSuccess success)
+                WalkActions(success.Actions, ctx, obligations, semantics);
         }
 
         // StateHooks[].Actions[]
@@ -665,8 +667,8 @@ public static partial class ProofEngine
 
             // Suppress obligations on transitions FROM dead-end states TO other dead-end states
             if (deadEndStates.Contains(fromState) &&
-                trc.Row.TargetState is not null &&
-                deadEndStates.Contains(trc.Row.TargetState))
+                trc.Row is TypedTransitionRowSuccess { TargetState: not null } successRow &&
+                deadEndStates.Contains(successRow.TargetState))
             {
                 obligations[i] = obl with
                 {

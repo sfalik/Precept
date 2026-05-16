@@ -46,17 +46,17 @@ public class ProofEngineSlice7ObligationCollectionTests
             ImmutableArray<ProofRequirement>.Empty,
             SourceSpan.Missing);
 
-        var row = new TypedTransitionRow(
-            FromState: null,
-            EventName: "Update",
-            TargetState: null,
-            Guard: null,
-            Actions: [action],
-            Outcome: TransitionRowOutcome.NoTransition,
-            RejectReason: null,
-            ResultQualifier: null,
-            RowSpan: SourceSpan.Missing,
-            Syntax: MakeSyntax(ConstructKind.TransitionRow));
+        var row = new TypedTransitionRowSuccess
+        {
+            FromState = null,
+            EventName = "Update",
+            TargetState = null,
+            Guard = null,
+            Actions = [action],
+            ResultQualifier = null,
+            RowSpan = SourceSpan.Missing,
+            Syntax = MakeSyntax(ConstructKind.TransitionRow),
+        };
 
         var semantics = SemanticIndex.Empty with
         {

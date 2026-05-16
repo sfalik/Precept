@@ -75,7 +75,7 @@ public class ProofEngineTests
         ImmutableArray<TypedTransitionRow>? transitionRows = null,
         ImmutableArray<TypedRule>? rules = null,
         ImmutableArray<TypedEnsure>? ensures = null,
-        ImmutableArray<TypedEventHandler>? eventHandlers = null,
+        ImmutableArray<TypedEventRow>? eventHandlers = null,
         ImmutableArray<TypedStateHook>? stateHooks = null,
         ImmutableArray<TypedState>? states = null)
     {
@@ -90,7 +90,7 @@ public class ProofEngineTests
             TransitionRows = transitionRows ?? ImmutableArray<TypedTransitionRow>.Empty,
             Rules = rules ?? ImmutableArray<TypedRule>.Empty,
             Ensures = ensures ?? ImmutableArray<TypedEnsure>.Empty,
-            EventHandlers = eventHandlers ?? ImmutableArray<TypedEventHandler>.Empty,
+            EventHandlers = eventHandlers ?? ImmutableArray<TypedEventRow>.Empty,
             StateHooks = stateHooks ?? ImmutableArray<TypedStateHook>.Empty,
         };
     }
@@ -133,17 +133,17 @@ public class ProofEngineTests
         string eventName,
         TypedExpression? guard,
         params TypedAction[] actions)
-        => new(
-            fromState,
-            eventName,
-            null,
-            guard,
-            actions.ToImmutableArray(),
-            TransitionRowOutcome.NoTransition,
-            null,
-            null,
-            SourceSpan.Missing,
-            MakeSyntax(ConstructKind.TransitionRow));
+        => new TypedTransitionRowSuccess
+        {
+            FromState = fromState,
+            EventName = eventName,
+            TargetState = null,
+            Guard = guard,
+            Actions = actions.ToImmutableArray(),
+            ResultQualifier = null,
+            RowSpan = SourceSpan.Missing,
+            Syntax = MakeSyntax(ConstructKind.TransitionRow),
+        };
 
     private static TypedStateHook MakeStateHook(string stateName, TypedExpression? guard, params TypedAction[] actions)
         => new(AnchorScope.OnEntry, stateName, guard, actions.ToImmutableArray(), MakeSyntax(ConstructKind.StateAction));
@@ -2318,7 +2318,7 @@ public class ProofEngineTests
             var draftObligation = ledger.Obligations.FirstOrDefault(o =>
                 o.Context is TransitionRowContext trc &&
                 trc.Row.FromState == "Draft" &&
-                trc.Row.TargetState == "Stalled" &&
+                (trc.Row as TypedTransitionRowSuccess)?.TargetState == "Stalled" &&
                 o.Requirement is NumericProofRequirement { Comparison: OperatorKind.NotEquals, Threshold: 0m });
 
             if (draftObligation is not null)
@@ -3696,7 +3696,7 @@ public class ProofEngineTests
             var draftObligation = ledger.Obligations.FirstOrDefault(o =>
                 o.Context is TransitionRowContext trc &&
                 trc.Row.FromState == "Draft" &&
-                trc.Row.TargetState == "Stalled" &&
+                (trc.Row as TypedTransitionRowSuccess)?.TargetState == "Stalled" &&
                 o.Requirement is NumericProofRequirement { Comparison: OperatorKind.NotEquals, Threshold: 0m });
 
             if (draftObligation is not null)

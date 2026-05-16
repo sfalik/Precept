@@ -375,30 +375,56 @@ public sealed record TypedArg(
 // ════════════════════════════════════════════════════════════════════════════
 
 /// <summary>
+/// Abstract base of the TypedTransitionRow discriminated union.
 /// A normalized transition row from the state-machine table.
 /// </summary>
-public sealed record TypedTransitionRow(
+public abstract record TypedTransitionRow
+{
     /// <summary>
     /// Source state name, or <c>null</c> for the any-state wildcard (the <c>*</c> transition).
     /// A <c>null</c> value means the row fires in any source state — it is NOT an unresolved
     /// reference. <see cref="GraphAnalyzer"/> filters wildcard rows with <c>== null</c>.
     /// </summary>
-    string? FromState,
-    string EventName,
-    string? TargetState,
-    TypedExpression? Guard,
-    ImmutableArray<TypedAction> Actions,
-    TransitionRowOutcome Outcome,
-    string? RejectReason,
-    QualifierBinding? ResultQualifier,
+    public required string? FromState { get; init; }
+    public required string EventName { get; init; }
+    public required TypedExpression? Guard { get; init; }
+    public required QualifierBinding? ResultQualifier { get; init; }
     /// <summary>
     /// Span covering the full transition row construct.
     /// Pre-extracted in <see cref="TypeChecker"/> from <c>construct.Span</c>;
     /// available in <see cref="GraphAnalyzer"/> without violating PRECEPT0024.
     /// </summary>
-    SourceSpan RowSpan,
-    ParsedConstruct Syntax
-);
+    public required SourceSpan RowSpan { get; init; }
+    public required ParsedConstruct Syntax { get; init; }
+
+    /// <summary>The outcome classification for this row.</summary>
+    public abstract TransitionRowOutcome Outcome { get; }
+}
+
+/// <summary>
+/// Success subtype — transition rows that transition to another state or stay (no-transition).
+/// </summary>
+public sealed record TypedTransitionRowSuccess : TypedTransitionRow
+{
+    public required string? TargetState { get; init; }
+    public required ImmutableArray<TypedAction> Actions { get; init; }
+
+    /// <summary>
+    /// <see cref="TransitionRowOutcome.Transition"/> when <see cref="TargetState"/> is non-null,
+    /// <see cref="TransitionRowOutcome.NoTransition"/> otherwise.
+    /// </summary>
+    public override TransitionRowOutcome Outcome =>
+        TargetState is not null ? TransitionRowOutcome.Transition : TransitionRowOutcome.NoTransition;
+}
+
+/// <summary>
+/// Reject subtype — transition rows that reject the event.
+/// </summary>
+public sealed record TypedTransitionRowReject : TypedTransitionRow
+{
+    public required string? RejectReason { get; init; }
+    public override TransitionRowOutcome Outcome => TransitionRowOutcome.Reject;
+}
 
 /// <summary>Outcome of a transition row.</summary>
 public enum TransitionRowOutcome { Transition = 1, NoTransition = 2, Reject = 3 }
@@ -440,12 +466,34 @@ public sealed record TypedStateHook(
     ParsedConstruct Syntax
 );
 
-/// <summary>A normalized event handler (unconditional action chain on an event).</summary>
-public sealed record TypedEventHandler(
-    string EventName,
-    ImmutableArray<TypedAction> Actions,
-    ParsedConstruct Syntax
-);
+/// <summary>
+/// Abstract base of the TypedEventRow discriminated union.
+/// A normalized event row (unconditional event handler or construction row).
+/// </summary>
+public abstract record TypedEventRow
+{
+    public required string EventName { get; init; }
+    public required TypedExpression? Guard { get; init; }
+    /// <summary>True when this row originates from a construction-row construct kind.</summary>
+    public required bool IsConstruction { get; init; }
+    public required ParsedConstruct Syntax { get; init; }
+}
+
+/// <summary>
+/// Success subtype — event rows that carry an action chain (normal event rows + construction rows).
+/// </summary>
+public sealed record TypedEventRowSuccess : TypedEventRow
+{
+    public required ImmutableArray<TypedAction> Actions { get; init; }
+}
+
+/// <summary>
+/// Reject subtype — event rows (construction rows) that only reject.
+/// </summary>
+public sealed record TypedEventRowReject : TypedEventRow
+{
+    public required string? RejectReason { get; init; }
+}
 
 /// <summary>
 /// Placeholder for stateless-precept edit declarations (<c>edit all</c> / <c>edit Field1, Field2</c>).
@@ -544,7 +592,7 @@ public sealed record SemanticIndex(
     ImmutableArray<TypedEnsure>           Ensures,
     ImmutableArray<TypedAccessMode>       AccessModes,
     ImmutableArray<TypedStateHook>        StateHooks,
-    ImmutableArray<TypedEventHandler>     EventHandlers,
+    ImmutableArray<TypedEventRow>         EventHandlers,
     ImmutableArray<TypedEditDeclaration>  EditDeclarations,
 
     // ── Secondary derived indexes over normalized declarations (CC#22) ─────
@@ -577,7 +625,7 @@ public sealed record SemanticIndex(
         Ensures:          ImmutableArray<TypedEnsure>.Empty,
         AccessModes:      ImmutableArray<TypedAccessMode>.Empty,
         StateHooks:       ImmutableArray<TypedStateHook>.Empty,
-        EventHandlers:    ImmutableArray<TypedEventHandler>.Empty,
+        EventHandlers:    ImmutableArray<TypedEventRow>.Empty,
         EditDeclarations: ImmutableArray<TypedEditDeclaration>.Empty,
         EnsuresByState:   FrozenDictionary<string, ImmutableArray<TypedEnsure>>.Empty,
         ComputedDeps:     ImmutableArray<ComputedFieldDep>.Empty,

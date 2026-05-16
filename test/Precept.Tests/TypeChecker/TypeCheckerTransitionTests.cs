@@ -43,7 +43,7 @@ public class TypeCheckerTransitionTests
 
         row.FromState.Should().Be("Draft");
         row.EventName.Should().Be("Publish");
-        row.TargetState.Should().Be("Published");
+        ((TypedTransitionRowSuccess)row).TargetState.Should().Be("Published");
         row.Outcome.Should().Be(TransitionRowOutcome.Transition);
     }
 
@@ -67,8 +67,8 @@ public class TypeCheckerTransitionTests
         index.TransitionRows.Should().HaveCount(2);
         index.TransitionRows.Select(row => row.FromState).Should().Equal("Draft", "Pending");
         index.TransitionRows.All(row => row.EventName == "Submit").Should().BeTrue();
-        index.TransitionRows.All(row => row.TargetState == "Active").Should().BeTrue();
-        index.TransitionRows.Should().OnlyContain(row => row.Actions.Length == 1);
+        index.TransitionRows.OfType<TypedTransitionRowSuccess>().All(row => row.TargetState == "Active").Should().BeTrue();
+        index.TransitionRows.Should().OnlyContain(row => ((TypedTransitionRowSuccess)row).Actions.Length == 1);
         index.TransitionRows.Should().OnlyContain(row => row.Outcome == TransitionRowOutcome.Transition);
     }
 
@@ -186,7 +186,7 @@ public class TypeCheckerTransitionTests
         index.TransitionRows.Should().OnlyContain(row => row.Guard != null,
             because: "the 'when Count > 0' guard must be propagated to every expanded row");
         index.TransitionRows.Should().OnlyContain(row => row.Outcome == TransitionRowOutcome.Transition);
-        index.TransitionRows.Should().OnlyContain(row => row.TargetState == "Active");
+        index.TransitionRows.OfType<TypedTransitionRowSuccess>().Should().OnlyContain(row => row.TargetState == "Active");
     }
 
     [Fact]
@@ -267,7 +267,7 @@ public class TypeCheckerTransitionTests
         var row = index.TransitionRows.Single();
 
         row.Outcome.Should().Be(TransitionRowOutcome.NoTransition);
-        row.TargetState.Should().BeNull();
+        ((TypedTransitionRowSuccess)row).TargetState.Should().BeNull();
     }
 
     [Fact]
@@ -285,7 +285,7 @@ public class TypeCheckerTransitionTests
         var row = index.TransitionRows.Single();
 
         row.Outcome.Should().Be(TransitionRowOutcome.Reject);
-        row.RejectReason.Should().Be("Not allowed");
+        ((TypedTransitionRowReject)row).RejectReason.Should().Be("Not allowed");
     }
 
     [Fact]
@@ -414,8 +414,8 @@ public class TypeCheckerTransitionTests
         var index = TypeCheckerTestHelpers.CheckExpectingClean(precept);
         var row = index.TransitionRows.Single();
 
-        row.Actions.Should().ContainSingle();
-        var action = row.Actions[0];
+        ((TypedTransitionRowSuccess)row).Actions.Should().ContainSingle();
+        var action = ((TypedTransitionRowSuccess)row).Actions[0];
         action.FieldName.Should().Be("Count");
         action.FieldType.Should().Be(TypeKind.Number);
     }
@@ -432,7 +432,7 @@ public class TypeCheckerTransitionTests
             """;
 
         var index = TypeCheckerTestHelpers.CheckExpectingClean(precept);
-        var action = index.TransitionRows.Single().Actions.Single();
+        var action = index.TransitionRows.OfType<TypedTransitionRowSuccess>().Single().Actions.Single();
 
         action.Should().BeOfType<TypedInputAction>();
         var input = (TypedInputAction)action;
@@ -488,9 +488,9 @@ public class TypeCheckerTransitionTests
         var index = TypeCheckerTestHelpers.CheckExpectingClean(precept);
         var row = index.TransitionRows.Single();
 
-        row.Actions.Should().HaveCount(2);
-        row.Actions[0].FieldName.Should().Be("Count");
-        row.Actions[1].FieldName.Should().Be("Name");
+        ((TypedTransitionRowSuccess)row).Actions.Should().HaveCount(2);
+        ((TypedTransitionRowSuccess)row).Actions[0].FieldName.Should().Be("Count");
+        ((TypedTransitionRowSuccess)row).Actions[1].FieldName.Should().Be("Name");
     }
 
     [Fact]
@@ -505,7 +505,7 @@ public class TypeCheckerTransitionTests
             """;
 
         var index = TypeCheckerTestHelpers.CheckExpectingClean(precept);
-        var action = index.TransitionRows.Single().Actions.Single();
+        var action = index.TransitionRows.OfType<TypedTransitionRowSuccess>().Single().Actions.Single();
 
         action.FieldName.Should().Be("Name");
         action.Should().NotBeOfType<TypedInputAction>();
@@ -571,7 +571,7 @@ public class TypeCheckerTransitionTests
             """;
 
         var index = TypeCheckerTestHelpers.CheckExpectingClean(precept);
-        var action = index.EventHandlers.Single().Actions.Single();
+        var action = index.EventHandlers.OfType<TypedEventRowSuccess>().Single().Actions.Single();
 
         action.FieldName.Should().Be("Name");
         action.FieldType.Should().Be(TypeKind.String);
@@ -641,11 +641,11 @@ public class TypeCheckerTransitionTests
 
         var startRow = index.TransitionRows.Single(r => r.EventName == "Start");
         startRow.FromState.Should().Be("Draft");
-        startRow.TargetState.Should().Be("Active");
+        ((TypedTransitionRowSuccess)startRow).TargetState.Should().Be("Active");
 
         var stopRow = index.TransitionRows.Single(r => r.EventName == "Stop");
         stopRow.FromState.Should().Be("Active");
-        stopRow.TargetState.Should().Be("Draft");
+        ((TypedTransitionRowSuccess)stopRow).TargetState.Should().Be("Draft");
     }
 
     [Fact]
@@ -664,7 +664,7 @@ public class TypeCheckerTransitionTests
         var row = index.TransitionRows.Single();
 
         row.Guard.Should().NotBeNull();
-        row.Actions.Should().HaveCount(2);
+        ((TypedTransitionRowSuccess)row).Actions.Should().HaveCount(2);
         row.Outcome.Should().Be(TransitionRowOutcome.NoTransition);
     }
 
@@ -722,7 +722,7 @@ public class TypeCheckerTransitionTests
 
         var index = TypeCheckerTestHelpers.CheckExpectingClean(precept);
         var row = index.TransitionRows.Should().ContainSingle().Subject;
-        var action = row.Actions.Should().ContainSingle().Subject;
+        var action = ((TypedTransitionRowSuccess)row).Actions.Should().ContainSingle().Subject;
 
         action.Should().BeOfType<TypedInputAction>();
         var input = (TypedInputAction)action;

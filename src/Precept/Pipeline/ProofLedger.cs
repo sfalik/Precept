@@ -25,7 +25,7 @@ public abstract record ObligationContext;
 public sealed record TransitionRowContext(TypedTransitionRow Row) : ObligationContext;
 public sealed record ConstraintContext(ConstraintIdentity Constraint) : ObligationContext;
 public sealed record StateHookContext(TypedStateHook Hook) : ObligationContext;
-public sealed record EventHandlerContext(TypedEventHandler Handler) : ObligationContext;
+public sealed record EventHandlerContext(TypedEventRow Handler) : ObligationContext;
 public sealed record FieldExpressionContext(TypedField Field) : ObligationContext;
 public sealed record FieldDefaultContext(TypedField Field) : ObligationContext;
 public sealed record ArgDefaultContext(TypedArg Arg) : ObligationContext;

@@ -49,9 +49,10 @@ public class OutcomesCatalogTests
 
         compilation.Diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
 
-        var outcome = GetOutcomeSlot(GetOnlyTransitionRow(compilation)).Outcome;
-        outcome.Should().BeOfType<RejectOutcome>()
-            .Which.Reason.Should().Be("Denied");
+        var row = GetOnlyTransitionRow(compilation);
+        row.Meta.Kind.Should().Be(ConstructKind.TransitionRowReject);
+        var rejectSlot = row.Slots.OfType<RejectClauseSlot>().Single();
+        rejectSlot.Reason.Should().Be("Denied");
     }
 
     [Fact]
@@ -89,7 +90,6 @@ public class OutcomesCatalogTests
     [Theory]
     [InlineData("from Draft on Submit -> transition")]
     [InlineData("from Draft on Submit -> no")]
-    [InlineData("from Draft on Submit -> reject")]
     public void Outcome_PartialForm_ReturnsMalformedOutcomeAndExpectedOutcomeDiagnostic(string row)
     {
         var manifest = ParsePrecept(
@@ -101,6 +101,21 @@ public class OutcomesCatalogTests
 
         outcome.Should().BeOfType<MalformedOutcome>();
         manifest.Diagnostics.Should().ContainSingle(d => d.Code == nameof(DiagnosticCode.ExpectedOutcome));
+    }
+
+    [Fact]
+    public void RejectRow_MissingReason_ProducesExpectedTokenDiagnostic()
+    {
+        var manifest = ParsePrecept(
+            "state Draft initial",
+            "event Submit",
+            "from Draft on Submit -> reject");
+
+        var row = GetOnlyTransitionRow(manifest);
+        row.Meta.Kind.Should().Be(ConstructKind.TransitionRowReject);
+        var rejectSlot = row.Slots.OfType<RejectClauseSlot>().Single();
+        rejectSlot.Reason.Should().BeEmpty();
+        manifest.Diagnostics.Should().ContainSingle(d => d.Code == nameof(DiagnosticCode.ExpectedToken));
     }
 
     [Fact]
@@ -144,14 +159,21 @@ public class OutcomesCatalogTests
 
         compilation.Diagnostics.Where(d => d.Severity == Severity.Error).Should().BeEmpty();
 
-        var outcomes = GetTransitionRows(compilation.ConstructManifest)
-            .Select(row => GetOutcomeSlot(row).Outcome)
-            .ToList();
+        var manifest = compilation.ConstructManifest;
 
-        outcomes.Should().HaveCount(3);
+        // Transition and NoTransition rows remain as TransitionRow constructs with OutcomeSlot
+        var transitionRows = manifest.Constructs
+            .Where(c => c.Meta.Kind == ConstructKind.TransitionRow).ToList();
+        transitionRows.Should().HaveCount(2);
+        var outcomes = transitionRows.Select(row => GetOutcomeSlot(row).Outcome).ToList();
         outcomes[0].Should().BeOfType<TransitionOutcome>();
         outcomes[1].Should().BeOfType<NoTransitionOutcome>();
-        outcomes[2].Should().BeOfType<RejectOutcome>();
+
+        // Reject row is now a TransitionRowReject construct with RejectClauseSlot
+        var rejectRows = manifest.Constructs
+            .Where(c => c.Meta.Kind == ConstructKind.TransitionRowReject).ToList();
+        rejectRows.Should().ContainSingle();
+        rejectRows[0].Slots.OfType<RejectClauseSlot>().Single().Reason.Should().Be("Denied");
     }
 
     [Fact]
@@ -167,15 +189,20 @@ public class OutcomesCatalogTests
             "from Draft on Hold -> reject",
             "from Draft on Deny -> no transition");
 
-        var outcomes = GetTransitionRows(manifest)
-            .Select(row => GetOutcomeSlot(row).Outcome)
-            .ToList();
-
-        outcomes.Should().HaveCount(3);
+        // TransitionRow constructs (transition + no transition)
+        var transitionRows = manifest.Constructs
+            .Where(c => c.Meta.Kind == ConstructKind.TransitionRow).ToList();
+        transitionRows.Should().HaveCount(2);
+        var outcomes = transitionRows.Select(row => GetOutcomeSlot(row).Outcome).ToList();
         outcomes[0].Should().BeOfType<TransitionOutcome>();
-        outcomes[1].Should().BeOfType<MalformedOutcome>();
-        outcomes[2].Should().BeOfType<NoTransitionOutcome>();
-        manifest.Diagnostics.Should().ContainSingle(d => d.Code == nameof(DiagnosticCode.ExpectedOutcome));
+        outcomes[1].Should().BeOfType<NoTransitionOutcome>();
+
+        // Reject row (missing reason) is TransitionRowReject with empty reason and diagnostic
+        var rejectRows = manifest.Constructs
+            .Where(c => c.Meta.Kind == ConstructKind.TransitionRowReject).ToList();
+        rejectRows.Should().ContainSingle();
+        rejectRows[0].Slots.OfType<RejectClauseSlot>().Single().Reason.Should().BeEmpty();
+        manifest.Diagnostics.Should().ContainSingle(d => d.Code == nameof(DiagnosticCode.ExpectedToken));
     }
 
     private static Compilation CompilePrecept(params string[] bodyLines)
@@ -198,13 +225,15 @@ public class OutcomesCatalogTests
 
     private static ParsedConstruct GetOnlyTransitionRow(ConstructManifest manifest)
     {
-        manifest.Constructs.Should().ContainSingle(c => c.Meta.Kind == ConstructKind.TransitionRow);
-        return manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.TransitionRow);
+        var transitionRows = manifest.Constructs.Where(c =>
+            c.Meta.Kind == ConstructKind.TransitionRow || c.Meta.Kind == ConstructKind.TransitionRowReject).ToList();
+        transitionRows.Should().ContainSingle();
+        return transitionRows.Single();
     }
 
     private static OutcomeSlot GetOutcomeSlot(ParsedConstruct row) =>
         row.Slots.OfType<OutcomeSlot>().Single();
 
     private static IQueryable<ParsedConstruct> GetTransitionRows(ConstructManifest manifest) =>
-        manifest.Constructs.Where(c => c.Meta.Kind == ConstructKind.TransitionRow).AsQueryable();
+        manifest.Constructs.Where(c => c.Meta.Kind == ConstructKind.TransitionRow || c.Meta.Kind == ConstructKind.TransitionRowReject).AsQueryable();
 }

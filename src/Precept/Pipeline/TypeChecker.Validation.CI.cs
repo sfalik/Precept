@@ -26,14 +26,18 @@ internal static partial class TypeChecker
         {
             if (row.Guard is not null)
                 EnforceCIInExpression(row.Guard, ctx);
-            foreach (var action in row.Actions)
-                EnforceCIInAction(action, ctx);
+            if (row is TypedTransitionRowSuccess successRow)
+                foreach (var action in successRow.Actions)
+                    EnforceCIInAction(action, ctx);
         }
 
         foreach (var handler in ctx.EventHandlers)
         {
-            foreach (var action in handler.Actions)
-                EnforceCIInAction(action, ctx);
+            if (handler.Guard is not null)
+                EnforceCIInExpression(handler.Guard, ctx);
+            if (handler is TypedEventRowSuccess successHandler)
+                foreach (var action in successHandler.Actions)
+                    EnforceCIInAction(action, ctx);
         }
 
         foreach (var rule in ctx.Rules)

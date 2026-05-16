@@ -330,7 +330,7 @@ public class TypeCheckerSymbolTests
             """;
 
         var index = TypeCheckerTestHelpers.CheckExpectingClean(precept);
-        var action = index.EventHandlers.Single().Actions.Single().Should().BeOfType<TypedInputAction>().Which;
+        var action = index.EventHandlers.OfType<TypedEventRowSuccess>().Single().Actions.Single().Should().BeOfType<TypedInputAction>().Which;
         var argRef = action.InputExpression.Should().BeOfType<TypedArgRef>().Which;
 
         argRef.DeclaredQualifiers.Should().NotBeNull();
@@ -421,7 +421,7 @@ public class TypeCheckerSymbolTests
             """;
 
         var index = TypeCheckerTestHelpers.CheckExpectingClean(precept);
-        var action = index.EventHandlers.Single().Actions.Single().Should().BeOfType<TypedInputAction>().Which;
+        var action = index.EventHandlers.OfType<TypedEventRowSuccess>().Single().Actions.Single().Should().BeOfType<TypedInputAction>().Which;
         var argRef = action.InputExpression.Should().BeOfType<TypedArgRef>().Which;
 
         (argRef.DeclaredQualifiers is null || argRef.DeclaredQualifiers.Value.IsEmpty)

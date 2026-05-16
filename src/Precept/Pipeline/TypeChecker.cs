@@ -1047,16 +1047,15 @@ internal static partial class TypeChecker
 
             // —— Outcome resolution ——
             var outcomeSlot = construct.GetSlot<OutcomeSlot>(ConstructSlotKind.Outcome);
-            TransitionRowOutcome outcome = TransitionRowOutcome.NoTransition;
             string? targetState = null;
             string? rejectReason = null;
+            bool isReject = false;
 
             if (outcomeSlot is not null)
             {
                 switch (outcomeSlot.Outcome)
                 {
                     case TransitionOutcome trans:
-                        outcome = TransitionRowOutcome.Transition;
                         if (ctx.StateLookup.TryGetValue(trans.StateName, out var toTypedState))
                         {
                             targetState = toTypedState.Name;
@@ -1069,32 +1068,56 @@ internal static partial class TypeChecker
                         }
                         break;
                     case NoTransitionOutcome:
-                        outcome = TransitionRowOutcome.NoTransition;
                         break;
                     case RejectOutcome reject:
-                        outcome = TransitionRowOutcome.Reject;
+                        isReject = true;
                         rejectReason = reject.Reason;
                         break;
                     case MalformedOutcome:
-                        outcome = TransitionRowOutcome.NoTransition;
                         break;
                 }
+            }
+
+            // Also check if construct kind is TransitionRowReject
+            if (construct.Meta.Kind == ConstructKind.TransitionRowReject)
+            {
+                isReject = true;
+                // Extract reject reason from RejectClause slot if present
+                var rejectSlot = construct.GetSlot<RejectClauseSlot>(ConstructSlotKind.RejectClause);
+                if (rejectSlot is not null)
+                    rejectReason = rejectSlot.Reason;
             }
 
             var rowBuilder = ImmutableArray.CreateBuilder<TypedTransitionRow>(fromStates.Length);
             foreach (var fromState in fromStates)
             {
-                rowBuilder.Add(new TypedTransitionRow(
-                    FromState: fromState,
-                    EventName: eventName,
-                    TargetState: targetState,
-                    Guard: guard,
-                    Actions: actions,
-                    Outcome: outcome,
-                    RejectReason: rejectReason,
-                    ResultQualifier: null,
-                    RowSpan: construct.Span,
-                    Syntax: construct));
+                if (isReject)
+                {
+                    rowBuilder.Add(new TypedTransitionRowReject
+                    {
+                        FromState = fromState,
+                        EventName = eventName,
+                        Guard = guard,
+                        RejectReason = rejectReason,
+                        ResultQualifier = null,
+                        RowSpan = construct.Span,
+                        Syntax = construct,
+                    });
+                }
+                else
+                {
+                    rowBuilder.Add(new TypedTransitionRowSuccess
+                    {
+                        FromState = fromState,
+                        EventName = eventName,
+                        TargetState = targetState,
+                        Guard = guard,
+                        Actions = actions,
+                        ResultQualifier = null,
+                        RowSpan = construct.Span,
+                        Syntax = construct,
+                    });
+                }
             }
 
             return rowBuilder.MoveToImmutable();
@@ -1106,9 +1129,12 @@ internal static partial class TypeChecker
         }
     }
 
-    /// <summary>Normalize an event handler construct into a <see cref="TypedEventHandler"/>.</summary>
-    private static TypedEventHandler NormalizeEventHandler(ParsedConstruct construct, CheckContext ctx)
+    /// <summary>Normalize an event handler construct into a <see cref="TypedEventRow"/>.</summary>
+    private static TypedEventRow NormalizeEventHandler(ParsedConstruct construct, CheckContext ctx)
     {
+        bool isConstruction = construct.Meta.Kind is ConstructKind.ConstructionRow or ConstructKind.ConstructionRowReject;
+        bool isReject = construct.Meta.Kind == ConstructKind.ConstructionRowReject;
+
         // —— Event resolution ——
         var eventTargetSlot = construct.GetRequiredSlot<EventTargetSlot>(ConstructSlotKind.EventTarget);
         string eventName = "";
@@ -1142,6 +1168,41 @@ internal static partial class TypeChecker
 
         try
         {
+            // —— Guard resolution ——
+            TypedExpression? guard = null;
+            var guardSlot = construct.GetSlot<GuardClauseSlot>(ConstructSlotKind.GuardClause);
+            if (guardSlot is not null)
+            {
+                ctx.CurrentScope = FieldScopeMode.AllFields;
+                guard = Resolve(guardSlot.Expression, ctx);
+                if (guard is not TypedErrorExpression && guard.ResultType != TypeKind.Boolean)
+                {
+                    ctx.Diagnostics.Add(
+                        Diagnostics.Create(DiagnosticCode.TypeMismatch, guardSlot.Expression.Span,
+                            Types.GetMeta(TypeKind.Boolean).DisplayName,
+                            Types.GetMeta(guard.ResultType).DisplayName));
+                    guard = new TypedErrorExpression(guardSlot.Expression.Span);
+                }
+            }
+
+            // —— Reject path ——
+            if (isReject)
+            {
+                string? rejectReason = null;
+                var rejectSlot = construct.GetSlot<RejectClauseSlot>(ConstructSlotKind.RejectClause);
+                if (rejectSlot is not null)
+                    rejectReason = rejectSlot.Reason;
+
+                return new TypedEventRowReject
+                {
+                    EventName = eventName,
+                    Guard = guard,
+                    IsConstruction = isConstruction,
+                    RejectReason = rejectReason,
+                    Syntax = construct,
+                };
+            }
+
             // —— Action chain resolution ——
             var actionChainSlot = construct.GetSlot<ActionChainSlot>(ConstructSlotKind.ActionChain);
             var actions = ImmutableArray<TypedAction>.Empty;
@@ -1153,10 +1214,14 @@ internal static partial class TypeChecker
                 actions = builder.MoveToImmutable();
             }
 
-            return new TypedEventHandler(
-                EventName: eventName,
-                Actions: actions,
-                Syntax: construct);
+            return new TypedEventRowSuccess
+            {
+                EventName = eventName,
+                Guard = guard,
+                IsConstruction = isConstruction,
+                Actions = actions,
+                Syntax = construct,
+            };
         }
         finally
         {
@@ -1169,12 +1234,15 @@ internal static partial class TypeChecker
     private static bool ContainsErrorExpression(TypedTransitionRow row)
     {
         if (row.Guard is TypedErrorExpression) return true;
-        foreach (var action in row.Actions)
+        if (row is TypedTransitionRowSuccess success)
         {
-            if (action is TypedInputAction ia)
+            foreach (var action in success.Actions)
             {
-                if (ia.InputExpression is TypedErrorExpression) return true;
-                if (ia.SecondaryExpression is TypedErrorExpression) return true;
+                if (action is TypedInputAction ia)
+                {
+                    if (ia.InputExpression is TypedErrorExpression) return true;
+                    if (ia.SecondaryExpression is TypedErrorExpression) return true;
+                }
             }
         }
         return false;
@@ -1270,7 +1338,7 @@ internal static partial class TypeChecker
         {
             if (ContainsError(row.Guard))
                 return true;
-            if (ActionsContainError(row.Actions))
+            if (row is TypedTransitionRowSuccess success && ActionsContainError(success.Actions))
                 return true;
         }
 
@@ -1304,10 +1372,12 @@ internal static partial class TypeChecker
                 return true;
         }
 
-        // Event handlers: actions
+        // Event handlers: guard + actions
         foreach (var handler in index.EventHandlers)
         {
-            if (ActionsContainError(handler.Actions))
+            if (ContainsError(handler.Guard))
+                return true;
+            if (handler is TypedEventRowSuccess success && ActionsContainError(success.Actions))
                 return true;
         }
 

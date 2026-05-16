@@ -13,17 +13,17 @@ public class ProofLedgerTests
         => new(Constructs.GetMeta(kind), ImmutableArray<SlotValue>.Empty, SourceSpan.Missing);
 
     private static TypedTransitionRow CreateRow()
-        => new(
-            FromState: "Open",
-            EventName: "Submit",
-            TargetState: null,
-            Guard: null,
-            Actions: ImmutableArray<TypedAction>.Empty,
-            Outcome: TransitionRowOutcome.NoTransition,
-            RejectReason: null,
-            ResultQualifier: null,
-            RowSpan: SourceSpan.Missing,
-            Syntax: SyntaxFor(ConstructKind.TransitionRow));
+        => new TypedTransitionRowSuccess
+        {
+            FromState = "Open",
+            EventName = "Submit",
+            TargetState = null,
+            Guard = null,
+            Actions = ImmutableArray<TypedAction>.Empty,
+            ResultQualifier = null,
+            RowSpan = SourceSpan.Missing,
+            Syntax = SyntaxFor(ConstructKind.TransitionRow),
+        };
 
     private static TypedField CreateField()
         => new(
@@ -52,11 +52,15 @@ public class ProofLedgerTests
             Actions: ImmutableArray<TypedAction>.Empty,
             Syntax: SyntaxFor(ConstructKind.StateAction));
 
-    private static TypedEventHandler CreateEventHandler()
-        => new(
-            EventName: "Submit",
-            Actions: ImmutableArray<TypedAction>.Empty,
-            Syntax: SyntaxFor(ConstructKind.EventRow));
+    private static TypedEventRow CreateEventHandler()
+        => new TypedEventRowSuccess
+        {
+            EventName = "Submit",
+            Guard = null,
+            IsConstruction = false,
+            Actions = ImmutableArray<TypedAction>.Empty,
+            Syntax = SyntaxFor(ConstructKind.EventRow),
+        };
 
     [Fact]
     public void ObligationContext_TransitionRowContext_HoldsRow()

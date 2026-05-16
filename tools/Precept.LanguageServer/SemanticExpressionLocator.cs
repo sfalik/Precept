@@ -155,9 +155,12 @@ internal static class SemanticExpressionLocator
                 }
             }
 
-            foreach (var expression in EnumerateActionExpressions(row.Actions))
+            if (row is TypedTransitionRowSuccess successRow)
             {
-                yield return expression;
+                foreach (var expression in EnumerateActionExpressions(successRow.Actions))
+                {
+                    yield return expression;
+                }
             }
         }
 
@@ -234,9 +237,12 @@ internal static class SemanticExpressionLocator
 
         foreach (var handler in semantics.EventHandlers)
         {
-            foreach (var expression in EnumerateActionExpressions(handler.Actions))
+            if (handler is TypedEventRowSuccess successHandler)
             {
-                yield return expression;
+                foreach (var expression in EnumerateActionExpressions(successHandler.Actions))
+                {
+                    yield return expression;
+                }
             }
         }
     }

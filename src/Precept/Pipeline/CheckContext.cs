@@ -101,8 +101,8 @@ internal sealed class CheckContext
     /// <summary>Normalized state lifecycle hooks accumulated during Pass 2.</summary>
     public List<TypedStateHook> StateHooks { get; } = [];
 
-    /// <summary>Normalized event handler declarations accumulated during Pass 2.</summary>
-    public List<TypedEventHandler> EventHandlers { get; } = [];
+    /// <summary>Normalized event row declarations accumulated during Pass 2.</summary>
+    public List<TypedEventRow> EventHandlers { get; } = [];
 
     /// <summary>Normalized edit declarations accumulated during Pass 2.</summary>
     public List<TypedEditDeclaration> EditDeclarations { get; } = [];

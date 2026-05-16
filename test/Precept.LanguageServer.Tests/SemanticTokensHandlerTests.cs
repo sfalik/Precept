@@ -951,6 +951,7 @@ public sealed class SemanticTokensHandlerTests
                 -> set Timeout = '{round(Hours)} hours'
             """);
         var slots = compilation.Semantics.TransitionRows
+            .OfType<TypedTransitionRowSuccess>()
             .SelectMany(row => row.Actions)
             .OfType<TypedInputAction>()
             .Select(a => a.InputExpression)

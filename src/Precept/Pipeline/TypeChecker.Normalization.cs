@@ -10,8 +10,9 @@ internal static partial class TypeChecker
     // ════════════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Iterate all <see cref="ConstructKind.TransitionRow"/> constructs from the manifest,
-    /// resolve each to a <see cref="TypedTransitionRow"/>, and accumulate into <see cref="CheckContext.TransitionRows"/>.
+    /// Iterate all <see cref="ConstructKind.TransitionRow"/> and <see cref="ConstructKind.TransitionRowReject"/>
+    /// constructs from the manifest, resolve each to a <see cref="TypedTransitionRow"/>, and accumulate
+    /// into <see cref="CheckContext.TransitionRows"/>.
     /// Records <see cref="StateReference"/> and <see cref="EventReference"/> sites for LS navigation.
     /// </summary>
     private static void PopulateTransitionRows(ConstructManifest manifest, CheckContext ctx)
@@ -20,6 +21,15 @@ internal static partial class TypeChecker
         {
             var rows = NormalizeTransitionRow(construct, ctx);
             ctx.TransitionRows.AddRange(rows);
+        }
+
+        if (manifest.ByKind.Contains(ConstructKind.TransitionRowReject))
+        {
+            foreach (var construct in manifest.ByKind[ConstructKind.TransitionRowReject])
+            {
+                var rows = NormalizeTransitionRow(construct, ctx);
+                ctx.TransitionRows.AddRange(rows);
+            }
         }
 
         // D26: if any TypedErrorExpression in transition rows → at least one Error diagnostic must exist
@@ -32,8 +42,9 @@ internal static partial class TypeChecker
     }
 
     /// <summary>
-    /// Iterate all <see cref="ConstructKind.EventRow"/> constructs from the manifest,
-    /// resolve each to a <see cref="TypedEventHandler"/>, and accumulate into <see cref="CheckContext.EventHandlers"/>.
+    /// Iterate all <see cref="ConstructKind.EventRow"/>, <see cref="ConstructKind.ConstructionRow"/>,
+    /// and <see cref="ConstructKind.ConstructionRowReject"/> constructs from the manifest,
+    /// resolve each to a <see cref="TypedEventRow"/>, and accumulate into <see cref="CheckContext.EventHandlers"/>.
     /// Records <see cref="EventReference"/> sites for LS navigation.
     /// </summary>
     private static void PopulateEventHandlers(ConstructManifest manifest, CheckContext ctx)
@@ -44,8 +55,26 @@ internal static partial class TypeChecker
             ctx.EventHandlers.Add(handler);
         }
 
+        if (manifest.ByKind.Contains(ConstructKind.ConstructionRow))
+        {
+            foreach (var construct in manifest.ByKind[ConstructKind.ConstructionRow])
+            {
+                var handler = NormalizeEventHandler(construct, ctx);
+                ctx.EventHandlers.Add(handler);
+            }
+        }
+
+        if (manifest.ByKind.Contains(ConstructKind.ConstructionRowReject))
+        {
+            foreach (var construct in manifest.ByKind[ConstructKind.ConstructionRowReject])
+            {
+                var handler = NormalizeEventHandler(construct, ctx);
+                ctx.EventHandlers.Add(handler);
+            }
+        }
+
         // D26: if any TypedErrorExpression in event handlers → at least one Error diagnostic must exist
-        if (ctx.EventHandlers.Any(h => h.Actions.Any(a => a is TypedInputAction ia && ContainsErrorExpressionInAction(ia)))
+        if (ctx.EventHandlers.OfType<TypedEventRowSuccess>().Any(h => h.Actions.Any(a => a is TypedInputAction ia && ContainsErrorExpressionInAction(ia)))
             && !ctx.Diagnostics.Any(d => d.Severity == Severity.Error))
         {
             throw new InvalidOperationException(
