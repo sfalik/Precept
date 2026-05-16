@@ -94,7 +94,7 @@ public class ParserBackArrowTests
         var manifest = Parse("on UpdateName -> set name = newName");
 
         manifest.Diagnostics.Should().BeEmpty();
-        var handler = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.EventHandler);
+        var handler = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.EventRow);
         handler.Slots.Should().Contain(s => s.Kind == ConstructSlotKind.ActionChain);
     }
 
@@ -115,7 +115,7 @@ public class ParserBackArrowTests
         var manifest = Parse("on UpdateName <- set name = newName");
 
         manifest.Diagnostics.Should().Contain(d => d.Stage == DiagnosticStage.Parse);
-        manifest.Constructs.Should().NotContain(c => c.Meta.Kind == ConstructKind.EventHandler);
+        manifest.Constructs.Should().NotContain(c => c.Meta.Kind == ConstructKind.EventRow);
     }
 
     [Fact]

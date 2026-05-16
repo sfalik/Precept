@@ -358,7 +358,7 @@ public static partial class Parser
                     _diagnostics.Add(DiagnosticsCatalog.Create(
                         DiagnosticCode.OmitDoesNotSupportGuard, whenSpan));
                 }
-                else if (meta.Kind == ConstructKind.EventHandler)
+                else if (meta.Kind == ConstructKind.EventRow)
                 {
                     var whenSpan = Advance().Span;
                     SkipToConstructBoundary();

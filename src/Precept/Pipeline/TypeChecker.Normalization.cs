@@ -32,13 +32,13 @@ internal static partial class TypeChecker
     }
 
     /// <summary>
-    /// Iterate all <see cref="ConstructKind.EventHandler"/> constructs from the manifest,
+    /// Iterate all <see cref="ConstructKind.EventRow"/> constructs from the manifest,
     /// resolve each to a <see cref="TypedEventHandler"/>, and accumulate into <see cref="CheckContext.EventHandlers"/>.
     /// Records <see cref="EventReference"/> sites for LS navigation.
     /// </summary>
     private static void PopulateEventHandlers(ConstructManifest manifest, CheckContext ctx)
     {
-        foreach (var construct in manifest.ByKind[ConstructKind.EventHandler])
+        foreach (var construct in manifest.ByKind[ConstructKind.EventRow])
         {
             var handler = NormalizeEventHandler(construct, ctx);
             ctx.EventHandlers.Add(handler);

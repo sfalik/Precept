@@ -45,7 +45,7 @@ public class ConstructsTests
     [Fact]
     public void Total_Count()
     {
-        Constructs.All.Should().HaveCount(12);
+        Constructs.All.Should().HaveCount(15);
     }
 
     [Fact]
@@ -124,7 +124,7 @@ public class ConstructsTests
     [InlineData(ConstructKind.TransitionRow)]
     [InlineData(ConstructKind.AccessMode)]
     [InlineData(ConstructKind.OmitDeclaration)]
-    [InlineData(ConstructKind.EventHandler)]
+    [InlineData(ConstructKind.EventRow)]
     public void TopLevelConstructs_HaveEmptyAllowedIn(ConstructKind kind)
     {
         Constructs.GetMeta(kind).AllowedIn.Should().BeEmpty(
@@ -173,7 +173,7 @@ public class ConstructsTests
     [Fact]
     public void TopLevel_Count()
     {
-        Constructs.All.Count(c => c.AllowedIn.Length == 0).Should().Be(9);
+        Constructs.All.Count(c => c.AllowedIn.Length == 0).Should().Be(12);
     }
 
     [Fact]
@@ -402,7 +402,7 @@ public class ConstructsTests
     [InlineData(ConstructKind.OmitDeclaration,  TokenKind.In)]
     [InlineData(ConstructKind.StateAction,      TokenKind.To)]
     [InlineData(ConstructKind.EventEnsure,      TokenKind.On)]
-    [InlineData(ConstructKind.EventHandler,     TokenKind.On)]
+    [InlineData(ConstructKind.EventRow,     TokenKind.On)]
     public void PrimaryLeadingToken_MatchesExpectedToken(ConstructKind kind, TokenKind expectedToken)
     {
         Constructs.GetMeta(kind).PrimaryLeadingToken.Should().Be(expectedToken);
@@ -491,7 +491,7 @@ public class ConstructsTests
     [InlineData(ConstructKind.OmitDeclaration,   1)]
     [InlineData(ConstructKind.StateAction,       2)]
     [InlineData(ConstructKind.EventEnsure,       1)]
-    [InlineData(ConstructKind.EventHandler,      1)]
+    [InlineData(ConstructKind.EventRow,      1)]
     [InlineData(ConstructKind.TransitionRow,     1)]
     public void DisambiguatedConstructs_HaveCorrectEntryCount(ConstructKind kind, int expectedCount)
     {
@@ -572,8 +572,8 @@ public class ConstructsTests
     [Theory]
     [InlineData(TokenKind.In,   3)]
     [InlineData(TokenKind.To,   2)]
-    [InlineData(TokenKind.From, 3)]
-    [InlineData(TokenKind.On,   2)]
+    [InlineData(TokenKind.From, 4)]
+    [InlineData(TokenKind.On,   4)]
     public void SharedLeadingTokens_HaveCorrectCandidateCount(TokenKind token, int expectedCount)
     {
         Constructs.ByLeadingToken[token].Length.Should().Be(expectedCount,

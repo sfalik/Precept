@@ -70,12 +70,15 @@ public class SlotOrderingDriftTests
         var expected = new[]
         {
             ConstructKind.TransitionRow,
+            ConstructKind.TransitionRowReject,
             ConstructKind.StateEnsure,
             ConstructKind.AccessMode,
             ConstructKind.OmitDeclaration,
             ConstructKind.StateAction,
             ConstructKind.EventEnsure,
-            ConstructKind.EventHandler,
+            ConstructKind.EventRow,
+            ConstructKind.ConstructionRow,
+            ConstructKind.ConstructionRowReject,
         };
 
         scopedConstructs.Should().BeEquivalentTo(expected,

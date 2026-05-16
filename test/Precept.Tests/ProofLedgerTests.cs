@@ -56,7 +56,7 @@ public class ProofLedgerTests
         => new(
             EventName: "Submit",
             Actions: ImmutableArray<TypedAction>.Empty,
-            Syntax: SyntaxFor(ConstructKind.EventHandler));
+            Syntax: SyntaxFor(ConstructKind.EventRow));
 
     [Fact]
     public void ObligationContext_TransitionRowContext_HoldsRow()

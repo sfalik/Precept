@@ -869,9 +869,9 @@ Before marking any slice **done**:
 
 ### 11.3 Slice Summary Table
 
-| # | Slice | Files | New Tests | Dependencies |
-|---|-------|-------|-----------|--------------|
-| 1 | Grammar Foundations | 3 | 0 | — |
+| # | Slice | Files | New Tests | Dependencies | Status |
+|---|-------|-------|-----------|--------------|--------|
+| 1 | Grammar Foundations | 3 | 0 | — | ✅ Done |
 | 2 | Parser Routing | 2 | 6 | 1 |
 | 3 | Semantic Model DU | 4 | 0 | 1 |
 | 4 | Type Checker Structural | 2 | 8 | 2, 3 |
@@ -893,6 +893,8 @@ Before marking any slice **done**:
 ---
 
 #### Slice 1: Grammar Foundations
+
+**Status:** ✅ Completed (2026-05-16)
 
 **Goal:** Split `ConstructKind` and `ConstructSlotKind` to distinguish construction rows from transition rows, and success outcomes from reject clauses.
 

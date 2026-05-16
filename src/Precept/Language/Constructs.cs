@@ -36,6 +36,8 @@ public static class Constructs
     private static readonly ConstructSlot SlotFieldTarget       = new(ConstructSlotKind.FieldTarget);
     private static readonly ConstructSlot SlotRuleExpression    = new(ConstructSlotKind.RuleExpression,     TerminationTokens: [TokenKind.When, TokenKind.Because]);
     private static readonly ConstructSlot SlotInitialMarker     = new(ConstructSlotKind.InitialMarker,      IsRequired: false);
+    private static readonly ConstructSlot SlotRejectClause      = new(ConstructSlotKind.RejectClause);
+    private static readonly ConstructSlot SlotSuccessOutcome    = new(ConstructSlotKind.SuccessOutcome);
 
     // ════════════════════════════════════════════════════════════════════════════
     //  GetMeta — exhaustive switch
@@ -172,15 +174,45 @@ public static class Constructs
             [new(TokenKind.On, [TokenKind.Ensure])],
             RoutingFamily.EventScoped),
 
-        ConstructKind.EventHandler => new(
+        ConstructKind.EventRow => new(
             kind,
-            "event handler",
+            "event row",
             "Event handler with actions but no state transitions (stateless precepts)",
             "on UpdateName -> set name = newName",
             [],
             [SlotEventTarget, SlotActionChain],
             [new(TokenKind.On, [TokenKind.Arrow])],
             RoutingFamily.EventScoped),
+
+        ConstructKind.ConstructionRow => new(
+            kind,
+            "construction row",
+            "Construction success path: event handler for initial events with actions",
+            "on Create -> set status = \"active\"",
+            [],
+            [SlotEventTarget, SlotPreVerbGuardArrow, SlotActionChain],
+            [new(TokenKind.On, [TokenKind.Initial])],
+            RoutingFamily.EventScoped),
+
+        ConstructKind.ConstructionRowReject => new(
+            kind,
+            "construction row reject",
+            "Construction reject path: refuses entity creation with a reason",
+            "on Create when amount <= 0 -> reject \"Amount must be positive\"",
+            [],
+            [SlotEventTarget, SlotPreVerbGuardArrow, SlotRejectClause],
+            [new(TokenKind.On, [TokenKind.Initial, TokenKind.Reject])],
+            RoutingFamily.EventScoped),
+
+        ConstructKind.TransitionRowReject => new(
+            kind,
+            "transition row reject",
+            "Transition reject path: refuses event with a reason instead of transitioning",
+            "from Draft on Submit when reviewer == \"\" -> reject \"Reviewer required\"",
+            [],
+            [SlotStateTarget, SlotEventTarget, SlotGuardClause, SlotRejectClause],
+            [new(TokenKind.From, [TokenKind.On, TokenKind.Reject])],
+            RoutingFamily.StateScoped),
 
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind,
             $"Unknown ConstructKind: {kind}"),

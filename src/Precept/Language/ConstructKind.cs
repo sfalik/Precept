@@ -44,5 +44,16 @@ public enum ConstructKind
 
     // ── Stateless ───────────────────────────────────────────────────
     /// <summary><c>on Event -> Actions</c> (no state machine)</summary>
-    EventHandler      = 12,
+    EventRow          = 12,
+
+    // ── Construction rows ────────────────────────────────────────────
+    /// <summary><c>on Event [when Guard] -> Actions</c> (construction success path)</summary>
+    ConstructionRow        = 19,
+
+    /// <summary><c>on Event [when Guard] -> reject "reason"</c> (construction reject path)</summary>
+    ConstructionRowReject  = 20,
+
+    // ── Transition reject ────────────────────────────────────────────
+    /// <summary><c>from State on Event [when Guard] -> reject "reason"</c> (transition reject path)</summary>
+    TransitionRowReject    = 21,
 }

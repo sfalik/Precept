@@ -23,6 +23,8 @@ public enum ConstructSlotKind
     FieldTarget       = 15, // field name or "all"
     RuleExpression    = 16, // the rule's boolean expression (e.g. amount > 0)
     InitialMarker     = 17, // optional "initial" keyword on event declarations
+    RejectClause      = 18, // "reject "message"" refusal outcome
+    SuccessOutcome    = 19, // success transition target (transition State | no transition)
 }
 
 /// <summary>

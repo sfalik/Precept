@@ -39,7 +39,7 @@ public class ParserScopedConstructTests
     [InlineData(ConstructKind.OmitDeclaration,  2)]
     [InlineData(ConstructKind.StateAction,      3)]
     [InlineData(ConstructKind.EventEnsure,      4)]
-    [InlineData(ConstructKind.EventHandler,     2)]
+    [InlineData(ConstructKind.EventRow,     2)]
     public void ScopedConstruct_CatalogSlotCount_MatchesExpectedCount(
         ConstructKind kind, int expectedCount)
     {
@@ -65,7 +65,7 @@ public class ParserScopedConstructTests
 
     [Theory]
     [InlineData(ConstructKind.EventEnsure)]
-    [InlineData(ConstructKind.EventHandler)]
+    [InlineData(ConstructKind.EventRow)]
     public void EventScopedConstruct_RoutingFamily_IsEventScoped(ConstructKind kind)
     {
         // GREEN
@@ -217,7 +217,7 @@ public class ParserScopedConstructTests
     public void EventHandler_CatalogSlotOrder_IsEventTarget_ActionChain()
     {
         // GREEN
-        var slots = Constructs.GetMeta(ConstructKind.EventHandler).Slots;
+        var slots = Constructs.GetMeta(ConstructKind.EventRow).Slots;
         slots[0].Kind.Should().Be(ConstructSlotKind.EventTarget, "Slots[0]: event name");
         slots[1].Kind.Should().Be(ConstructSlotKind.ActionChain, "Slots[1]: optional actions");
         slots[1].IsRequired.Should().BeFalse("ActionChain is optional on EventHandler");
@@ -227,7 +227,7 @@ public class ParserScopedConstructTests
     public void EventHandler_CatalogSlots_DoNotInclude_OutcomeSlot()
     {
         // GREEN — EventHandler is stateless: it fires actions but causes no transition.
-        var slots = Constructs.GetMeta(ConstructKind.EventHandler).Slots;
+        var slots = Constructs.GetMeta(ConstructKind.EventRow).Slots;
         slots.Should().NotContain(
             s => s.Kind == ConstructSlotKind.Outcome,
             "EventHandler must not declare an Outcome slot — it causes no state transition");
@@ -237,7 +237,7 @@ public class ParserScopedConstructTests
     public void EventHandler_CatalogSlots_DoNotInclude_StateTargetSlot()
     {
         // GREEN — EventHandler is not state-scoped; it has no source-state target.
-        var slots = Constructs.GetMeta(ConstructKind.EventHandler).Slots;
+        var slots = Constructs.GetMeta(ConstructKind.EventRow).Slots;
         slots.Should().NotContain(
             s => s.Kind == ConstructSlotKind.StateTarget,
             "EventHandler must not declare a StateTarget slot — it is event-scoped, not state-scoped");
@@ -261,7 +261,7 @@ public class ParserScopedConstructTests
     public void EventHandler_CatalogEntry_LeadingToken_IsOn_WithDisambiguationToken_Arrow()
     {
         // GREEN
-        var meta = Constructs.GetMeta(ConstructKind.EventHandler);
+        var meta = Constructs.GetMeta(ConstructKind.EventRow);
         meta.Entries.Should().ContainSingle("EventHandler has a single leading-token entry");
         var entry = meta.Entries[0];
         entry.LeadingToken.Should().Be(TokenKind.On,
@@ -1162,7 +1162,7 @@ public class ParserScopedConstructTests
         manifest.Diagnostics.Should().BeEmpty(
             "'on Event -> actions' is valid EventHandler DSL");
         manifest.Constructs.Should().ContainSingle(
-            c => c.Meta.Kind == ConstructKind.EventHandler,
+            c => c.Meta.Kind == ConstructKind.EventRow,
             "'on UpdateName ->' must produce EventHandler, not EventEnsure");
     }
 
@@ -1173,7 +1173,7 @@ public class ParserScopedConstructTests
         var tokens = Lexer.Lex("on UpdateName -> set name = newName");
         var manifest = Precept.Pipeline.Parser.Parse(tokens);
 
-        var handler = manifest.Constructs.SingleOrDefault(c => c.Meta.Kind == ConstructKind.EventHandler);
+        var handler = manifest.Constructs.SingleOrDefault(c => c.Meta.Kind == ConstructKind.EventRow);
         handler.Should().NotBeNull();
 
         var eventSlot = handler!.Slots.OfType<EventTargetSlot>().FirstOrDefault();
@@ -1189,7 +1189,7 @@ public class ParserScopedConstructTests
         var tokens = Lexer.Lex("on UpdateName -> set name = newName");
         var manifest = Precept.Pipeline.Parser.Parse(tokens);
 
-        var handler = manifest.Constructs.SingleOrDefault(c => c.Meta.Kind == ConstructKind.EventHandler);
+        var handler = manifest.Constructs.SingleOrDefault(c => c.Meta.Kind == ConstructKind.EventRow);
         handler.Should().NotBeNull();
 
         handler!.Slots.Should().Contain(
@@ -1204,7 +1204,7 @@ public class ParserScopedConstructTests
         var tokens = Lexer.Lex("on UpdateName -> set name = newName");
         var manifest = Precept.Pipeline.Parser.Parse(tokens);
 
-        var handler = manifest.Constructs.SingleOrDefault(c => c.Meta.Kind == ConstructKind.EventHandler);
+        var handler = manifest.Constructs.SingleOrDefault(c => c.Meta.Kind == ConstructKind.EventRow);
         handler.Should().NotBeNull();
 
         handler!.Slots.Should().NotContain(
@@ -1219,7 +1219,7 @@ public class ParserScopedConstructTests
         var tokens = Lexer.Lex("on UpdateName -> set name = newName");
         var manifest = Precept.Pipeline.Parser.Parse(tokens);
 
-        var handler = manifest.Constructs.SingleOrDefault(c => c.Meta.Kind == ConstructKind.EventHandler);
+        var handler = manifest.Constructs.SingleOrDefault(c => c.Meta.Kind == ConstructKind.EventRow);
         handler.Should().NotBeNull();
 
         handler!.Slots.Should().NotContain(
@@ -1234,7 +1234,7 @@ public class ParserScopedConstructTests
         var tokens = Lexer.Lex("on UpdateName -> set name = newName");
         var manifest = Precept.Pipeline.Parser.Parse(tokens);
 
-        var handler = manifest.Constructs.SingleOrDefault(c => c.Meta.Kind == ConstructKind.EventHandler);
+        var handler = manifest.Constructs.SingleOrDefault(c => c.Meta.Kind == ConstructKind.EventRow);
         handler.Should().NotBeNull();
 
         var eventIdx  = handler!.Slots.IndexOf(handler.Slots.First(s => s.Kind == ConstructSlotKind.EventTarget));
@@ -1394,7 +1394,7 @@ public class ParserScopedConstructTests
         var manifest = Precept.Pipeline.Parser.Parse(tokens);
 
         manifest.Constructs.Should().ContainSingle(
-            c => c.Meta.Kind == ConstructKind.EventHandler,
+            c => c.Meta.Kind == ConstructKind.EventRow,
             "'on Event ->' must route to EventHandler via peek(2) == '->'");
         manifest.Constructs.Should().NotContain(
             c => c.Meta.Kind == ConstructKind.EventEnsure,
@@ -1412,7 +1412,7 @@ public class ParserScopedConstructTests
             c => c.Meta.Kind == ConstructKind.EventEnsure,
             "'on Event ensure' must route to EventEnsure via peek(2) == 'ensure'");
         manifest.Constructs.Should().NotContain(
-            c => c.Meta.Kind == ConstructKind.EventHandler,
+            c => c.Meta.Kind == ConstructKind.EventRow,
             "EventHandler must NOT be produced when peek(2) is 'ensure'");
     }
 }
