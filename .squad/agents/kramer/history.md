@@ -38,3 +38,12 @@
 - All 24 slot instances were populated with the new metadata contract.
 - Validation stayed clean: 16 new tests passed, and there were zero regressions against 6,157 existing tests.
 - Slice 2 can now assume the slot metadata baseline exists when building the resolver path.
+
+### 2026-05-16 — Slices 9+10: hover/grammar for `initial` on event declarations
+
+- Updated `InitialEvent` modifier description from stale "Auto-fire entry point event" to "Construction mechanism — fires once at entity creation".
+- Added `TryCreateEventModifierHover` to `HoverHandler.cs`: checks token is an `EventModifierMeta` token AND enclosing construct is `EventDeclaration`; returns context-specific hover. Implemented generically over the full `EventModifierMeta` set — new event modifiers get hover automatically.
+- Grammar generator (`Program.cs`) now derives event modifier alternation from `Modifiers.All.OfType<EventModifierMeta>()` and adds an explicit group 5 capture `(\s+(?:initial)\b)?` before the args group (renumbered to 6). Group 5 uses nested `"patterns"` (not flat `"name"`) so whitespace is not scoped. Regenerated `precept.tmLanguage.json`.
+- 3 new tests added: `Hover_InitialModifier_ReturnsText`, `SemanticTokens_InitialModifier_Classified`, `Grammar_EventInitial_Highlighted`.
+- Completions were already working via `TryGetModifierFallbackItems` — no code change needed there.
+- Validation: 327 LS tests passing, 5782 Precept.Tests passing. Commit `ec5525d2`.
