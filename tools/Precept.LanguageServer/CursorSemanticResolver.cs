@@ -119,7 +119,8 @@ internal static class CursorSemanticResolver
         }
 
         if (TryGetPositionBefore(tokens[dotIndex].Span, out var receiverPosition)
-            && TryGetInnermostExpressionType(compilation, receiverPosition, out receiverType))
+            && TryGetInnermostExpressionType(compilation, receiverPosition, out receiverType)
+            && receiverType != TypeKind.Error)
         {
             return true;
         }
@@ -218,7 +219,8 @@ internal static class CursorSemanticResolver
             return false;
         }
 
-        if (TryGetInnermostExpressionType(compilation, receiverPosition, out receiverType))
+        if (TryGetInnermostExpressionType(compilation, receiverPosition, out receiverType)
+            && receiverType != TypeKind.Error)
         {
             return true;
         }

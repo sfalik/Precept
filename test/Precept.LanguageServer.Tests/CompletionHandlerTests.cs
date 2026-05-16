@@ -765,6 +765,53 @@ public class CompletionHandlerTests
     }
 
     [Fact]
+    public async Task Completions_DotTrigger_FieldDefaultTrailingDot_ShowsAccessors()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept LabResult
+            field Reading as quantity default '2.5 mg/dL'
+            field ReadingUnit as unitofmeasure default Reading.¦
+            """, ".");
+
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+        var expected = Precept.Language.Types.GetMeta(Precept.Language.TypeKind.Quantity).Accessors
+            .Select(accessor => accessor.Name)
+            .Distinct(System.StringComparer.Ordinal)
+            .ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().BeEquivalentTo(expected);
+    }
+
+    [Fact]
+    public void DotTrigger_FieldDefaultTrailingDot_CompilationKeepsDotTokenAndFieldSemantic()
+    {
+        var (compilation, position) = GetCompilationAtCursor("""
+            precept LabResult
+            field Reading as quantity default '2.5 mg/dL'
+            field ReadingUnit as unitofmeasure default Reading.¦
+            """);
+        var dotSearchPos = new Position(position.Line, position.Character - 1);
+
+        compilation.Tokens.Tokens.Any(token => token.Kind == Precept.Language.TokenKind.Dot && Contains(token.Span, dotSearchPos)).Should().BeTrue();
+        compilation.Semantics.FieldsByName.ContainsKey("Reading").Should().BeTrue();
+        CursorSemanticResolver.TryGetEventForDotTrigger(compilation, position, out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public void DotTrigger_FieldDefaultTrailingDot_ResolverReturnsFieldType()
+    {
+        var (compilation, position) = GetCompilationAtCursor("""
+            precept LabResult
+            field Reading as quantity default '2.5 mg/dL'
+            field ReadingUnit as unitofmeasure default Reading.¦
+            """);
+
+        CursorSemanticResolver.TryGetReceiverTypeForDotTrigger(compilation, position, out var receiverType).Should().BeTrue();
+        receiverType.Should().Be(Precept.Language.TypeKind.Quantity);
+    }
+
+    [Fact]
     public async Task Completions_ArgDefault_ReusesExpressionCompletions()
     {
         const string expressionSource = """
