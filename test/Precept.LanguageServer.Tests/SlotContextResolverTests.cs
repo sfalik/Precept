@@ -139,6 +139,19 @@ public class SlotContextResolverTests
     }
 
     [Fact]
+    public void GetCursorContext_FromClauseStateListContinuation_ReturnsInStateTarget()
+    {
+        var context = GetCursorContext("""
+            precept Test
+            state off initial
+            state running
+            from off, ¦
+            """);
+
+        context.Should().Be(SlotContext.InStateTarget);
+    }
+
+    [Fact]
     public void GetCursorContext_AccessModePreVerbWhenGuard_RoutesGuardExpressionBeforeModifyFieldTarget()
     {
         var guardContext = GetCursorContext("""

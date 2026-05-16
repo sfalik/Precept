@@ -350,6 +350,10 @@ internal static class SlotContextResolver
         TryGetCurrentTriggerToken(compilation, position, out var token)
         && token.Kind == Precept.Language.TokenKind.Transition;
 
+    internal static bool IsStateTargetListContinuationPosition(Compilation compilation, Position position) =>
+        TryGetCurrentTriggerToken(compilation, position, out var token)
+        && TryGetStateTargetListContinuationToken(compilation.Tokens.Tokens, GetCurrentTriggerTokenIndex(compilation, position), token, position, out _);
+
     internal static bool IsAccessFieldTargetPosition(Compilation compilation, Position position) =>
         TryGetCurrentTriggerToken(compilation, position, out var token)
         && token.Kind is Precept.Language.TokenKind.Modify or Precept.Language.TokenKind.Omit;
@@ -407,6 +411,12 @@ internal static class SlotContextResolver
     {
         if (TryGetActionChainContext(tokens, tokenIndex, token, position, construct, out context))
         {
+            return true;
+        }
+
+        if (TryGetStateTargetListContinuationToken(tokens, tokenIndex, token, position, out _))
+        {
+            context = SlotContext.InStateTarget;
             return true;
         }
 
@@ -468,24 +478,28 @@ internal static class SlotContextResolver
         Position position,
         out Precept.Language.Token token)
     {
+        var tokenIndex = GetCurrentTriggerTokenIndex(compilation, position);
+        if (tokenIndex < 0)
+        {
+            token = default;
+            return false;
+        }
+
+        token = compilation.Tokens.Tokens[tokenIndex];
+        return true;
+    }
+
+    private static int GetCurrentTriggerTokenIndex(Compilation compilation, Position position)
+    {
         var tokens = compilation.Tokens.Tokens;
         var tokenIndex = FindTokenAtOrBeforeCursor(tokens, position);
         if (tokenIndex < 0)
         {
-            token = default;
-            return false;
+            return -1;
         }
 
         tokenIndex = AdjustTokenIndexForBoundary(tokens, tokenIndex, position);
-        tokenIndex = FindPreviousSignificantToken(tokens, tokenIndex);
-        if (tokenIndex < 0)
-        {
-            token = default;
-            return false;
-        }
-
-        token = tokens[tokenIndex];
-        return true;
+        return FindPreviousSignificantToken(tokens, tokenIndex);
     }
 
     private static bool TryGetCompletedStateTargetLeadingToken(
@@ -530,6 +544,40 @@ internal static class SlotContextResolver
         }
 
         return false;
+    }
+
+    private static bool TryGetStateTargetListContinuationToken(
+        ImmutableArray<Precept.Language.Token> tokens,
+        int tokenIndex,
+        Precept.Language.Token token,
+        Position position,
+        out Precept.Language.TokenKind leadingToken)
+    {
+        leadingToken = default;
+
+        int previousStateIndex;
+        if (token.Kind == Precept.Language.TokenKind.Comma && !Contains(token.Span, position))
+        {
+            previousStateIndex = FindPreviousSignificantToken(tokens, tokenIndex - 1);
+        }
+        else if (token.Kind == Precept.Language.TokenKind.Identifier && Contains(token.Span, position))
+        {
+            var previousIndex = FindPreviousSignificantToken(tokens, tokenIndex - 1);
+            if (previousIndex < 0 || tokens[previousIndex].Kind != Precept.Language.TokenKind.Comma)
+            {
+                return false;
+            }
+
+            previousStateIndex = FindPreviousSignificantToken(tokens, previousIndex - 1);
+        }
+        else
+        {
+            return false;
+        }
+
+        return previousStateIndex >= 0
+            && tokens[previousStateIndex].Kind == Precept.Language.TokenKind.Identifier
+            && TryGetCompletedStateTargetLeadingToken(tokens, previousStateIndex, position, out leadingToken);
     }
 
     private static bool IsCompletedTransitionRowEventTarget(

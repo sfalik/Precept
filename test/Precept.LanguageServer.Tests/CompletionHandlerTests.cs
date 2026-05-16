@@ -117,6 +117,24 @@ public class CompletionHandlerTests
         labels.Should().NotContain(["precept", "field", "state", "event", "from", "rule"]);
     }
 
+    [Fact]
+    public async Task Completions_FromClauseStateListContinuation_OffersRemainingDeclaredStates()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept Test
+            state off initial
+            state running
+            event start
+            from off, ¦
+            -> no transition
+            """, " ");
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain("running");
+        labels.Should().NotContain(["off", "any", "precept", "field", "state", "event", "from", "rule"]);
+    }
+
     [Theory]
     [InlineData("modify ")]
     [InlineData("omit ")]

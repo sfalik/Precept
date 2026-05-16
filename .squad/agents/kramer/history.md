@@ -6,6 +6,7 @@
 
 ## Learnings
 
+- **From-clause comma continuation routing (2026-05-16T08:23:29.087-04:00):** the empty completion list after `from off, ` was a slot-routing failure, not a missing catalog. Because commas are significant punctuation, the resolver stayed on the comma, fell back to `TopLevel`, and then whitespace-gated top-level completions collapsed to nothing; recover `InStateTarget` for comma continuations, suppress `any`, and filter already-listed states from the same `StateTargetSlot`.
 - **Completion pass 2 closeout (2026-05-15T18:18:38.540-04:00):** the remaining completion gaps were routing problems, not missing catalogs. Use narrow slot lanes (`AfterStateTarget`, `AfterEventTarget`, `AfterNo`) and derive state-target verbs, `->` outcomes, and expression keywords from catalog metadata; gate `any` and `all` by target family.
 - **Completion audit + routing hardening (2026-05-15T18:04:26.860-04:00):** keep raw document text available to completion so top-level constructs can be limited to whitespace-only line starts; route `transition`, valued modifiers, and event-arg modifier domains through the correct contexts.
 - **Completion test pattern reminder (2026-05-15T18:04:26.860-04:00):** use a `¦` cursor marker and assert both wanted labels and forbidden noise. Negative assertions catch fallback-routing leaks.

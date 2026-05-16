@@ -442,8 +442,9 @@ internal sealed class CompletionHandler : ICompletionHandler
 
     private static IEnumerable<CompletionItem> GetStateTargetItems(Compilation compilation, Position position)
     {
-        var items = GetStateItems(compilation);
-        if (SlotContextResolver.IsTransitionOutcomeTargetPosition(compilation, position))
+        var items = GetStateItems(compilation, position);
+        if (SlotContextResolver.IsTransitionOutcomeTargetPosition(compilation, position)
+            || SlotContextResolver.IsStateTargetListContinuationPosition(compilation, position))
         {
             return items;
         }
@@ -451,11 +452,49 @@ internal sealed class CompletionHandler : ICompletionHandler
         return DistinctByLabel(items.Concat([CreateTokenItem(TokenKind.Any)]));
     }
 
-    private static IEnumerable<CompletionItem> GetStateItems(Compilation compilation) =>
-        compilation.Semantics.States
+    private static IEnumerable<CompletionItem> GetStateItems(Compilation compilation, Position position)
+    {
+        var alreadySelectedStates = GetAlreadySelectedStateNames(compilation, position);
+        return compilation.Semantics.States
             .Select(state => state.Name)
             .Distinct(StringComparer.Ordinal)
+            .Where(name => !alreadySelectedStates.Contains(name))
             .Select(name => CreateItem(name, "State", CompletionItemKind.EnumMember, CompletionSortGroup.SemanticSymbol));
+    }
+
+    private static ImmutableHashSet<string> GetAlreadySelectedStateNames(Compilation compilation, Position position)
+    {
+        if (!SlotContextResolver.IsStateTargetListContinuationPosition(compilation, position))
+        {
+            return ImmutableHashSet<string>.Empty;
+        }
+
+        var construct = SlotContextResolver.GetEnclosingConstruct(compilation, position);
+        var stateTargetSlot = construct?.GetSlot<StateTargetSlot>(ConstructSlotKind.StateTarget);
+        if (stateTargetSlot is null)
+        {
+            return ImmutableHashSet<string>.Empty;
+        }
+
+        var builder = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+        for (var index = 0; index < stateTargetSlot.StateNames.Length && index < stateTargetSlot.NameSpans.Length; index++)
+        {
+            if (EndsBeforeCursor(stateTargetSlot.NameSpans[index], position))
+            {
+                builder.Add(stateTargetSlot.StateNames[index]);
+            }
+        }
+
+        return builder.ToImmutable();
+    }
+
+    private static bool EndsBeforeCursor(SourceSpan span, Position position)
+    {
+        var cursorLine = position.Line + 1;
+        var cursorCharacter = position.Character + 1;
+        return span.EndLine < cursorLine
+            || (span.EndLine == cursorLine && span.EndColumn <= cursorCharacter);
+    }
 
     private static IEnumerable<CompletionItem> GetPostStateTargetItems(Compilation compilation, Position position)
     {
