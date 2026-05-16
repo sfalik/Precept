@@ -1001,7 +1001,7 @@ internal sealed class CompletionHandler : ICompletionHandler
             TypeKind.Duration or TypeKind.Period => GetTemporalLiteralItems(compilation, tcContext, position),
             TypeKind.Money => GetMoneyLiteralItems(compilation, tcContext, position),
             TypeKind.Date or TypeKind.Time or TypeKind.Instant or TypeKind.DateTime
-                or TypeKind.ZonedDateTime => GetStructuredExampleItems(compilation, tcContext),
+                or TypeKind.ZonedDateTime => GetTemporalDateTimeSnippetItems(compilation, tcContext),
             TypeKind.Timezone => GetTimezoneItems(compilation, tcContext),
             TypeKind.Currency => GetCurrencyCodeItems(tcContext),
             TypeKind.UnitOfMeasure => GetUnitOfMeasureItems(tcContext),
@@ -1054,7 +1054,8 @@ internal sealed class CompletionHandler : ICompletionHandler
         var examples = typeMeta.ContentValidation?.Examples ?? [];
         var reused = TypedConstantCollector.CollectByType(compilation.Semantics, tcContext.ExpectedType);
         return DistinctByLabel(
-            reused.Select(v => CreateItem(v, "temporal literal", CompletionItemKind.Value, CompletionSortGroup.TypedConstant))
+            GetTemporalBuilderSnippets(tcContext)
+            .Concat(reused.Select(v => CreateItem(v, "temporal literal", CompletionItemKind.Value, CompletionSortGroup.TypedConstant)))
             .Concat(examples.Select(e => CreateItem(e, "example format", CompletionItemKind.Snippet, CompletionSortGroup.TypedConstant))));
     }
 
@@ -1070,7 +1071,8 @@ internal sealed class CompletionHandler : ICompletionHandler
         var examples = typeMeta.ContentValidation?.Examples ?? [];
         var reused = TypedConstantCollector.CollectByType(compilation.Semantics, tcContext.ExpectedType);
         return DistinctByLabel(
-            reused.Select(v => CreateItem(v, "money literal", CompletionItemKind.Value, CompletionSortGroup.TypedConstant))
+            GetMoneySnippetItems(tcContext)
+            .Concat(reused.Select(v => CreateItem(v, "money literal", CompletionItemKind.Value, CompletionSortGroup.TypedConstant)))
             .Concat(examples.Select(e => CreateItem(e, "example format", CompletionItemKind.Snippet, CompletionSortGroup.TypedConstant))));
     }
 
@@ -1083,6 +1085,225 @@ internal sealed class CompletionHandler : ICompletionHandler
         return DistinctByLabel(
             reused.Select(v => CreateItem(v, detail, CompletionItemKind.Value, CompletionSortGroup.TypedConstant))
             .Concat(examples.Select(e => CreateItem(e, detail, CompletionItemKind.Constant, CompletionSortGroup.TypedConstant))));
+    }
+
+    // ── Premium snippet templates for temporal date/time types ─────────────────
+
+    private static IEnumerable<CompletionItem> GetTemporalDateTimeSnippetItems(Compilation compilation, TypedConstantContext tcContext)
+    {
+        var snippets = tcContext.ExpectedType switch
+        {
+            TypeKind.Date => GetDateSnippets(),
+            TypeKind.Time => GetTimeSnippets(),
+            TypeKind.Instant => GetInstantSnippets(),
+            TypeKind.DateTime => GetDateTimeSnippets(),
+            TypeKind.ZonedDateTime => GetZonedDateTimeSnippets(),
+            _ => Enumerable.Empty<CompletionItem>(),
+        };
+        return DistinctByLabel(snippets.Concat(GetStructuredExampleItems(compilation, tcContext)));
+    }
+
+    private static IEnumerable<CompletionItem> GetDateSnippets()
+    {
+        yield return CreateItem(
+            label: "date — YYYY-MM-DD",
+            detail: "ISO 8601 date",
+            kind: CompletionItemKind.Snippet,
+            sortGroup: CompletionSortGroup.TypedConstantSnippet,
+            snippetTemplate: "${1:2026}-${2:05}-${3:16}");
+    }
+
+    private static IEnumerable<CompletionItem> GetTimeSnippets()
+    {
+        yield return CreateItem(
+            label: "time — HH:mm",
+            detail: "24-hour time (short form)",
+            kind: CompletionItemKind.Snippet,
+            sortGroup: CompletionSortGroup.TypedConstantSnippet,
+            snippetTemplate: "${1:09}:${2:00}");
+        yield return CreateItem(
+            label: "time — HH:mm:ss",
+            detail: "24-hour time with seconds",
+            kind: CompletionItemKind.Snippet,
+            sortGroup: CompletionSortGroup.TypedConstantSnippet,
+            snippetTemplate: "${1:09}:${2:00}:${3:00}");
+    }
+
+    private static IEnumerable<CompletionItem> GetInstantSnippets()
+    {
+        yield return CreateItem(
+            label: "instant — UTC timestamp",
+            detail: "ISO 8601 UTC instant",
+            kind: CompletionItemKind.Snippet,
+            sortGroup: CompletionSortGroup.TypedConstantSnippet,
+            snippetTemplate: "${1:2026}-${2:05}-${3:16}T${4:14}:${5:30}:${6:00}Z");
+    }
+
+    private static IEnumerable<CompletionItem> GetDateTimeSnippets()
+    {
+        yield return CreateItem(
+            label: "date-time — local",
+            detail: "ISO 8601 local datetime",
+            kind: CompletionItemKind.Snippet,
+            sortGroup: CompletionSortGroup.TypedConstantSnippet,
+            snippetTemplate: "${1:2026}-${2:05}-${3:16}T${4:14}:${5:30}:${6:00}");
+        yield return CreateItem(
+            label: "date-time — midnight",
+            detail: "Midnight on a date",
+            kind: CompletionItemKind.Snippet,
+            sortGroup: CompletionSortGroup.TypedConstantSnippet,
+            snippetTemplate: "${1:2026}-${2:05}-${3:16}T00:00:00");
+    }
+
+    private static IEnumerable<CompletionItem> GetZonedDateTimeSnippets()
+    {
+        yield return CreateItem(
+            label: "zoned date-time — explicit zone",
+            detail: "Zoned datetime with bracketed timezone",
+            kind: CompletionItemKind.Snippet,
+            sortGroup: CompletionSortGroup.TypedConstantSnippet,
+            snippetTemplate: "${1:2026}-${2:05}-${3:16}T${4:14}:${5:30}:${6:00}[${7:America/New_York}]");
+        yield return CreateItem(
+            label: "zoned date-time — UTC",
+            detail: "Zoned datetime anchored to UTC",
+            kind: CompletionItemKind.Snippet,
+            sortGroup: CompletionSortGroup.TypedConstantSnippet,
+            snippetTemplate: "${1:2026}-${2:05}-${3:16}T${4:14}:${5:30}:${6:00}[UTC]");
+    }
+
+    // ── Premium snippet templates for duration/period builder ──────────────────
+
+    private static IEnumerable<CompletionItem> GetTemporalBuilderSnippets(TypedConstantContext tcContext)
+    {
+        var unitQualifier = tcContext.Qualifiers.OfType<DeclaredQualifierMeta.TemporalUnit>().FirstOrDefault();
+
+        if (tcContext.ExpectedType == TypeKind.Duration)
+        {
+            if (unitQualifier is not null)
+            {
+                yield return CreateItem(
+                    label: $"duration — {unitQualifier.UnitName}",
+                    detail: $"duration in {unitQualifier.UnitName}",
+                    kind: CompletionItemKind.Snippet,
+                    sortGroup: CompletionSortGroup.TypedConstantSnippet,
+                    snippetTemplate: $"${{1:1}} {unitQualifier.UnitName}");
+            }
+            else
+            {
+                yield return CreateItem("duration — hours + minutes", "hours and minutes builder", CompletionItemKind.Snippet, CompletionSortGroup.TypedConstantSnippet, snippetTemplate: "${1:2} hours + ${2:30} minutes");
+                yield return CreateItem("duration — hours only", "hours only", CompletionItemKind.Snippet, CompletionSortGroup.TypedConstantSnippet, snippetTemplate: "${1:4} hours");
+                yield return CreateItem("duration — minutes only", "minutes only", CompletionItemKind.Snippet, CompletionSortGroup.TypedConstantSnippet, snippetTemplate: "${1:30} minutes");
+            }
+        }
+        else if (tcContext.ExpectedType == TypeKind.Period)
+        {
+            if (unitQualifier is not null)
+            {
+                yield return CreateItem(
+                    label: $"period — {unitQualifier.UnitName}",
+                    detail: $"period in {unitQualifier.UnitName}",
+                    kind: CompletionItemKind.Snippet,
+                    sortGroup: CompletionSortGroup.TypedConstantSnippet,
+                    snippetTemplate: $"${{1:1}} {unitQualifier.UnitName}");
+            }
+            else
+            {
+                yield return CreateItem("period — days", "period in days", CompletionItemKind.Snippet, CompletionSortGroup.TypedConstantSnippet, snippetTemplate: "${1:30} days");
+                yield return CreateItem("period — weeks", "period in weeks", CompletionItemKind.Snippet, CompletionSortGroup.TypedConstantSnippet, snippetTemplate: "${1:2} weeks");
+                yield return CreateItem("period — years + months", "years and months builder", CompletionItemKind.Snippet, CompletionSortGroup.TypedConstantSnippet, snippetTemplate: "${1:1} year + ${2:6} months");
+            }
+        }
+    }
+
+    // ── Qualifier-aware money snippet templates ─────────────────────────────────
+
+    private static IEnumerable<CompletionItem> GetMoneySnippetItems(TypedConstantContext tcContext)
+    {
+        var currencyQualifier = tcContext.Qualifiers.OfType<DeclaredQualifierMeta.Currency>().FirstOrDefault();
+        if (currencyQualifier is not null)
+        {
+            if (currencyQualifier.SourceFieldName is not null)
+            {
+                yield return CreateItem(
+                    label: $"money — {currencyQualifier.SourceFieldName} currency",
+                    detail: "money with declared currency field",
+                    kind: CompletionItemKind.Snippet,
+                    sortGroup: CompletionSortGroup.TypedConstantSnippet,
+                    snippetTemplate: $"${{1:0.00}} {{{currencyQualifier.SourceFieldName}}}");
+            }
+            else
+            {
+                yield return CreateItem(
+                    label: $"money — {currencyQualifier.CurrencyCode}",
+                    detail: $"money in {currencyQualifier.CurrencyCode}",
+                    kind: CompletionItemKind.Snippet,
+                    sortGroup: CompletionSortGroup.TypedConstantSnippet,
+                    snippetTemplate: $"${{1:0.00}} {currencyQualifier.CurrencyCode}");
+            }
+        }
+        else
+        {
+            yield return CreateItem(
+                label: "money — amount + currency",
+                detail: "money amount with currency code",
+                kind: CompletionItemKind.Snippet,
+                sortGroup: CompletionSortGroup.TypedConstantSnippet,
+                snippetTemplate: "${1:0.00} ${2:USD}");
+        }
+    }
+
+    // ── Qualifier-aware quantity snippet templates ──────────────────────────────
+
+    private static IEnumerable<CompletionItem> GetQuantitySnippetItems(TypedConstantContext tcContext)
+    {
+        var unitQualifier = tcContext.Qualifiers.OfType<DeclaredQualifierMeta.Unit>().FirstOrDefault();
+        if (unitQualifier is not null)
+        {
+            if (unitQualifier.SourceFieldName is not null)
+            {
+                yield return CreateItem(
+                    label: $"quantity — {unitQualifier.SourceFieldName}",
+                    detail: "quantity with declared unit field",
+                    kind: CompletionItemKind.Snippet,
+                    sortGroup: CompletionSortGroup.TypedConstantSnippet,
+                    snippetTemplate: $"${{1:0}} {{{unitQualifier.SourceFieldName}}}");
+            }
+            else
+            {
+                yield return CreateItem(
+                    label: $"quantity — {unitQualifier.UnitCode}",
+                    detail: $"quantity in {unitQualifier.UnitCode}",
+                    kind: CompletionItemKind.Snippet,
+                    sortGroup: CompletionSortGroup.TypedConstantSnippet,
+                    snippetTemplate: $"${{1:0}} {unitQualifier.UnitCode}");
+            }
+
+            yield break;
+        }
+
+        var dimQualifier = tcContext.Qualifiers.OfType<DeclaredQualifierMeta.Dimension>().FirstOrDefault();
+        if (dimQualifier is not null && DimensionCatalog.All.TryGetValue(dimQualifier.DimensionName, out var dimAlias))
+        {
+            foreach (var atom in UcumCatalog.BrowseTier1().Where(a => a.Vector == dimAlias.Vector))
+            {
+                var label = atom.PrintSymbol ?? atom.Code;
+                yield return CreateItem(
+                    label: $"quantity — {label}",
+                    detail: atom.Name,
+                    kind: CompletionItemKind.Snippet,
+                    sortGroup: CompletionSortGroup.TypedConstantSnippet,
+                    snippetTemplate: $"${{1:0}} {atom.Code}");
+            }
+
+            yield break;
+        }
+
+        yield return CreateItem(
+            label: "quantity — amount + unit",
+            detail: "quantity with unit",
+            kind: CompletionItemKind.Snippet,
+            sortGroup: CompletionSortGroup.TypedConstantSnippet,
+            snippetTemplate: "${1:0} ${2:each}");
     }
 
     private static IEnumerable<CompletionItem> GetTimezoneItems(Compilation compilation, TypedConstantContext tcContext)
@@ -1127,7 +1348,8 @@ internal sealed class CompletionHandler : ICompletionHandler
         var examples = typeMeta.ContentValidation?.Examples ?? [];
         var reused = TypedConstantCollector.CollectByType(compilation.Semantics, tcContext.ExpectedType);
         return DistinctByLabel(
-            reused.Select(v => CreateItem(v, "quantity literal", CompletionItemKind.Value, CompletionSortGroup.TypedConstant))
+            GetQuantitySnippetItems(tcContext)
+            .Concat(reused.Select(v => CreateItem(v, "quantity literal", CompletionItemKind.Value, CompletionSortGroup.TypedConstant)))
             .Concat(examples.Select(e => CreateItem(e, "example format", CompletionItemKind.Snippet, CompletionSortGroup.TypedConstant))));
     }
 
@@ -3109,8 +3331,9 @@ internal sealed class CompletionHandler : ICompletionHandler
     {
         SemanticArgument = 0,
         SemanticSymbol = 1,
-        TypedConstant = 2,
-        TypedConstantSegment = 3,
+        TypedConstantSnippet = 2,   // Premium snippet templates — sort before plain examples
+        TypedConstant = 3,
+        TypedConstantSegment = 4,
         Type = 10,
         Keyword = 11,
         Function = 12,

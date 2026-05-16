@@ -2174,6 +2174,295 @@ public class CompletionHandlerTests
     ];
 
     private const string CursorMarker = "¦";
+
+    // ─── Slice A — Premium snippet templates ──────────────────────────────────────
+
+    [Fact]
+    public async Task Completions_TypedConstant_Date_ReturnsPremiumSnippet()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept ScheduleTest
+            field SubmittedOn as date default ¦
+            state Open initial terminal
+            """, "'");
+
+        var item = completions.Items.Single(i => i.Label == "date — YYYY-MM-DD");
+
+        completions.IsIncomplete.Should().BeFalse();
+        item.InsertTextFormat.Should().Be(InsertTextFormat.Snippet);
+        item.InsertText.Should().StartWith("${1:");
+        item.InsertText.Should().EndWith("'");
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_Time_ShowsBothForms()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept ScheduleTest
+            field StartTime as time default ¦
+            state Open initial terminal
+            """, "'");
+
+        var labels = completions.Items.Select(i => i.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain("time — HH:mm");
+        labels.Should().Contain("time — HH:mm:ss");
+
+        var shortForm = completions.Items.Single(i => i.Label == "time — HH:mm");
+        var longForm = completions.Items.Single(i => i.Label == "time — HH:mm:ss");
+        shortForm.InsertTextFormat.Should().Be(InsertTextFormat.Snippet);
+        longForm.InsertTextFormat.Should().Be(InsertTextFormat.Snippet);
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_Instant_ShowsUTCTemplate()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept EventLog
+            field OccurredAt as instant default ¦
+            state Open initial terminal
+            """, "'");
+
+        var item = completions.Items.Single(i => i.Label == "instant — UTC timestamp");
+
+        completions.IsIncomplete.Should().BeFalse();
+        item.InsertTextFormat.Should().Be(InsertTextFormat.Snippet);
+        item.InsertText.Should().Contain("Z'", "instant snippet must teach the trailing Z");
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_DateTime_ShowsLocalTemplate()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept EventLog
+            field ScheduledAt as datetime default ¦
+            state Open initial terminal
+            """, "'");
+
+        var labels = completions.Items.Select(i => i.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain("date-time — local");
+
+        var localItem = completions.Items.Single(i => i.Label == "date-time — local");
+        localItem.InsertTextFormat.Should().Be(InsertTextFormat.Snippet);
+        localItem.InsertText.Should().Contain("T", "datetime snippet must teach the T separator");
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_ZonedDateTime_ShowsBracketedZone()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept EventLog
+            field MeetingAt as zoneddatetime default ¦
+            state Open initial terminal
+            """, "'");
+
+        var labels = completions.Items.Select(i => i.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain("zoned date-time — explicit zone");
+
+        var item = completions.Items.Single(i => i.Label == "zoned date-time — explicit zone");
+        item.InsertTextFormat.Should().Be(InsertTextFormat.Snippet);
+        item.InsertText.Should().Contain("[", "ZDT snippet must teach the bracket syntax");
+        item.InsertText.Should().Contain("]", "ZDT snippet must teach the bracket syntax");
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_Date_SnippetBeforeExamples()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept ScheduleTest
+            field SubmittedOn as date default ¦
+            state Open initial terminal
+            """, "'");
+
+        var snippetItem = completions.Items.Single(i => i.Label == "date — YYYY-MM-DD");
+        var exampleItems = completions.Items
+            .Where(i => i.Kind == CompletionItemKind.Constant || i.Kind == CompletionItemKind.Value)
+            .ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        exampleItems.Should().NotBeEmpty("example items must still be present");
+        foreach (var example in exampleItems)
+        {
+            string.CompareOrdinal(snippetItem.SortText, example.SortText).Should().BeLessThan(0,
+                $"snippet item '{snippetItem.Label}' must sort before plain example '{example.Label}'");
+        }
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_Duration_ShowsBuilderSnippets()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept WorkflowTest
+            field Delay as duration default ¦
+            """, "'");
+
+        var labels = completions.Items.Select(i => i.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain("duration — hours + minutes");
+
+        var item = completions.Items.Single(i => i.Label == "duration — hours + minutes");
+        item.InsertTextFormat.Should().Be(InsertTextFormat.Snippet);
+        item.InsertText.Should().StartWith("${1:");
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_Period_ShowsDaysBuilder()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept WorkflowTest
+            field Grace as period default ¦
+            """, "'");
+
+        var labels = completions.Items.Select(i => i.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain("period — days");
+
+        var item = completions.Items.Single(i => i.Label == "period — days");
+        item.InsertTextFormat.Should().Be(InsertTextFormat.Snippet);
+        item.InsertText.Should().Contain("days'");
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_Duration_SnippetBeforeExamples()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept WorkflowTest
+            field Delay as duration default ¦
+            """, "'");
+
+        var snippetItem = completions.Items.Single(i => i.Label == "duration — hours + minutes");
+        var exampleItems = completions.Items
+            .Where(i => i.Kind == CompletionItemKind.Snippet && i.Label != "duration — hours + minutes"
+                     && i.Label != "duration — hours only" && i.Label != "duration — minutes only")
+            .ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        foreach (var example in exampleItems)
+        {
+            string.CompareOrdinal(snippetItem.SortText, example.SortText).Should().BeLessThanOrEqualTo(0,
+                $"builder snippet must sort before or at example item '{example.Label}'");
+        }
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_Money_Unqualified_ReturnsSnippetWithCurrencyTabStop()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept PaymentTest
+            field Cost as money default ¦
+            """, "'");
+
+        var item = completions.Items.Single(i => i.Label == "money — amount + currency");
+
+        completions.IsIncomplete.Should().BeFalse();
+        item.InsertTextFormat.Should().Be(InsertTextFormat.Snippet);
+        item.InsertText.Should().Contain("${1:", "must have an amount tab stop");
+        item.InsertText.Should().Contain("${2:", "must have a currency tab stop");
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_Money_QualifierAware_CurrencyPrefilled()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept PaymentTest
+            field Cost as money in 'USD' default ¦
+            """, "'");
+
+        var item = completions.Items.Single(i => i.Label == "money — USD");
+
+        completions.IsIncomplete.Should().BeFalse();
+        item.InsertTextFormat.Should().Be(InsertTextFormat.Snippet);
+        item.InsertText.Should().Contain("USD", "currency must be prefilled");
+        item.InsertText.Should().NotContain("${2:", "no second tab stop — currency is already fixed");
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_Money_QualifiedUSD_NoGenericCurrencyTab()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept PaymentTest
+            field Cost as money in 'USD' default ¦
+            """, "'");
+
+        var labels = completions.Items.Select(i => i.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().NotContain("money — amount + currency",
+            "when currency is fixed by qualifier, generic template must not appear");
+        labels.Should().Contain("money — USD");
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_Quantity_Unqualified_ReturnsSnippetWithUnitTabStop()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept MeasurementTest
+            field Weight as quantity default ¦
+            """, "'");
+
+        var item = completions.Items.Single(i => i.Label == "quantity — amount + unit");
+
+        completions.IsIncomplete.Should().BeFalse();
+        item.InsertTextFormat.Should().Be(InsertTextFormat.Snippet);
+        item.InsertText.Should().Contain("${1:", "must have an amount tab stop");
+        item.InsertText.Should().Contain("${2:", "must have a unit tab stop");
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_Quantity_InKg_PrefillsUnit()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept MeasurementTest
+            field Weight as quantity in 'kg' default ¦
+            """, "'");
+
+        var item = completions.Items.Single(i => i.Label == "quantity — kg");
+
+        completions.IsIncomplete.Should().BeFalse();
+        item.InsertTextFormat.Should().Be(InsertTextFormat.Snippet);
+        item.InsertText.Should().Contain("kg", "unit must be prefilled");
+        item.InsertText.Should().NotContain("${2:", "no second tab stop — unit is already fixed");
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_Quantity_OfMass_ShowsDimensionFiltered()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept MeasurementTest
+            field Weight as quantity of 'mass' default ¦
+            """, "'");
+
+        var labels = completions.Items.Select(i => i.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain(l => l == "quantity — kg", "kg is a mass unit");
+        labels.Should().Contain(l => l == "quantity — g", "g is a mass unit");
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_Quantity_OfMass_NoLengthUnits()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept MeasurementTest
+            field Weight as quantity of 'mass' default ¦
+            """, "'");
+
+        var snippetLabels = completions.Items
+            .Where(i => i.InsertTextFormat == InsertTextFormat.Snippet)
+            .Select(i => i.Label)
+            .ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        snippetLabels.Should().NotContain("quantity — m", "m is a length unit, not mass");
+        snippetLabels.Should().NotContain("quantity — L", "L is a volume unit, not mass");
+    }
 }
 
 internal static class LanguageClientTestExtensions
