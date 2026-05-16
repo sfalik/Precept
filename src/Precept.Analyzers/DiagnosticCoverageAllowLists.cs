@@ -136,6 +136,7 @@ internal static class DiagnosticCoverageAllowLists
         "IndexBoundsGuard",
         "InitialEventInTransitionRow",
         "InitialEventMissingAssignments",
+        "ConstructionGuardReadsUninitializedField",
         "InputTooLarge",
         "InterpolatedTypedConstantHoleTypeMismatch",
         "InterpolationNotSupportedForType",

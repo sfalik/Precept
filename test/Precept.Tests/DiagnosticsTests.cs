@@ -219,6 +219,15 @@ public class DiagnosticsTests
     }
 
     [Fact]
+    public void DiagnosticMeta_D148_HasRequiredFields()
+    {
+        var meta = Diagnostics.GetMeta(DiagnosticCode.ConstructionGuardReadsUninitializedField);
+
+        AssertRequiredDiagnosticMetadata(meta);
+        meta.RelatedCodes.Should().Contain(DiagnosticCode.UninitializedFieldReadInInitialAssignment);
+    }
+
+    [Fact]
     public void UnprovedModifierRequirement_HasProofStage()
     {
         Diagnostics.GetMeta(DiagnosticCode.UnprovedModifierRequirement).Stage.Should().Be(DiagnosticStage.Proof);
@@ -294,6 +303,7 @@ public class DiagnosticsTests
         { DiagnosticCode.UninitializedFieldReadInInitialAssignment, "Field '{0}' is read in its own initial assignment but has no default value — its value is undefined on first firing of initial event '{1}'" },
         { DiagnosticCode.MaterializedFieldSelfReference, "Field '{0}' is read while being materialized on transition from '{1}' to '{2}' — it has no value in state '{1}'" },
         { DiagnosticCode.UninitializedCrossFieldReadInInitialAssignment, "Field '{0}' is read in initial event '{1}' before it has been assigned a value" },
+        { DiagnosticCode.ConstructionGuardReadsUninitializedField, "Construction guard on initial event '{1}' reads field '{0}' before the entity exists — only event payload values are available here" },
     };
 
     public static TheoryData<DiagnosticCode> LexCodes => new()
@@ -342,6 +352,7 @@ public class DiagnosticsTests
         DiagnosticCode.UninitializedFieldReadInInitialAssignment,
         DiagnosticCode.MaterializedFieldSelfReference,
         DiagnosticCode.UninitializedCrossFieldReadInInitialAssignment,
+        DiagnosticCode.ConstructionGuardReadsUninitializedField,
         DiagnosticCode.UndeclaredEvent,
         DiagnosticCode.UndeclaredFunction,
         DiagnosticCode.MultipleInitialStates,

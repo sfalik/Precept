@@ -374,8 +374,8 @@ internal static partial class TypeChecker
 
         foreach (var (span, actions, coveredStateNames) in initialActionChains)
         {
-            var missingFields = GetMissingRequiredFieldAssignments(requiredFields, actions, coveredStateNames, ctx);
-            if (missingFields.IsDefaultOrEmpty)
+            var invalidFields = GetInvalidRequiredFieldAssignments(requiredFields, actions, coveredStateNames, ctx);
+            if (invalidFields.IsDefaultOrEmpty)
                 continue;
 
             ctx.Diagnostics.Add(
@@ -383,7 +383,31 @@ internal static partial class TypeChecker
                     DiagnosticCode.InitialEventMissingAssignments,
                     span,
                     initialEvent.Name,
-                    string.Join(", ", missingFields)));
+                    string.Join(", ", invalidFields)));
+        }
+    }
+
+    private static void ValidateConstructionGuardFieldAccess(CheckContext ctx)
+    {
+        var fieldRefs = new List<TypedFieldRef>();
+
+        foreach (var row in ctx.EventHandlers.Where(handler => handler.IsConstruction))
+        {
+            if (row.Guard is null)
+                continue;
+
+            fieldRefs.Clear();
+            CollectFieldRefsFromExpression(row.Guard, fieldRefs);
+
+            foreach (var fieldRef in fieldRefs)
+            {
+                ctx.Diagnostics.Add(
+                    Diagnostics.Create(
+                        DiagnosticCode.ConstructionGuardReadsUninitializedField,
+                        fieldRef.Span,
+                        fieldRef.FieldName,
+                        row.EventName));
+            }
         }
     }
 
@@ -462,6 +486,12 @@ internal static partial class TypeChecker
 
         if (ctx.States.Count == 0)
         {
+            foreach (var handler in ctx.EventHandlers.OfType<TypedEventRowSuccess>().Where(handler =>
+                         string.Equals(handler.EventName, initialEvent.Name, StringComparison.Ordinal)))
+            {
+                builder.Add((handler.Syntax.Span, handler.Actions, ImmutableArray<string>.Empty));
+            }
+
             foreach (var row in ctx.TransitionRows.OfType<TypedTransitionRowSuccess>().Where(row =>
                          string.Equals(row.EventName, initialEvent.Name, StringComparison.Ordinal) &&
                          row.FromState is null))
@@ -469,11 +499,25 @@ internal static partial class TypeChecker
                 builder.Add((row.RowSpan, row.Actions, ImmutableArray<string>.Empty));
             }
 
-            foreach (var handler in ctx.EventHandlers.OfType<TypedEventRowSuccess>().Where(handler =>
-                         string.Equals(handler.EventName, initialEvent.Name, StringComparison.Ordinal)))
-            {
-                builder.Add((handler.Syntax.Span, handler.Actions, ImmutableArray<string>.Empty));
-            }
+            return builder.ToImmutable();
+        }
+
+        var constructionHandlers = ctx.EventHandlers
+            .OfType<TypedEventRowSuccess>()
+            .Where(handler =>
+                handler.IsConstruction &&
+                string.Equals(handler.EventName, initialEvent.Name, StringComparison.Ordinal))
+            .ToImmutableArray();
+
+        if (!constructionHandlers.IsDefaultOrEmpty)
+        {
+            var coveredStateNames = ctx.States
+                .Where(state => state.Modifiers.Contains(ModifierKind.InitialState))
+                .Select(state => state.Name)
+                .ToImmutableArray();
+
+            foreach (var handler in constructionHandlers)
+                builder.Add((handler.Syntax.Span, handler.Actions, coveredStateNames));
 
             return builder.ToImmutable();
         }
@@ -497,16 +541,16 @@ internal static partial class TypeChecker
         return builder.ToImmutable();
     }
 
-    private static ImmutableArray<string> GetMissingRequiredFieldAssignments(
+    private static ImmutableArray<string> GetInvalidRequiredFieldAssignments(
         ImmutableArray<TypedField> requiredFields,
         ImmutableArray<TypedAction> actions,
         ImmutableArray<string> coveredStateNames,
         CheckContext ctx) =>
         requiredFields
             .Where(field => IsRequiredOnConstructionPath(field, coveredStateNames, ctx))
-            .Where(field => !actions.Any(action =>
+            .Where(field => actions.Count(action =>
                 IsSetAction(action.Kind) &&
-                string.Equals(action.FieldName, field.Name, StringComparison.Ordinal)))
+                string.Equals(action.FieldName, field.Name, StringComparison.Ordinal)) != 1)
             .Select(field => field.Name)
             .ToImmutableArray();
 

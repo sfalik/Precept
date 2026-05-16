@@ -914,6 +914,15 @@ public static class Diagnostics
             RecoverySteps: ["Keep one event as the construction entry event", "Convert the other event to a normal lifecycle event without 'initial' construction-row usage"],
             ExampleBefore: "precept Example\nfield Count as integer default 0\nstate Draft initial terminal\nevent Start initial\nevent Seed initial\non Start initial -> set Count = 1\non Seed initial -> set Count = 2",
             ExampleAfter: "precept Example\nfield Count as integer default 0\nstate Draft initial terminal\nevent Start initial\nevent Seed\non Start initial -> set Count = 1\non Seed -> set Count = 2"),
+        DiagnosticCode.ConstructionGuardReadsUninitializedField => new(nameof(DiagnosticCode.ConstructionGuardReadsUninitializedField), DiagnosticStage.Type, Severity.Error,
+            "Construction guard on initial event '{1}' reads field '{0}' before the entity exists — only event payload values are available here",
+            DiagnosticCategory.Structure,
+            RelatedCodes: [DiagnosticCode.UninitializedFieldReadInInitialAssignment, DiagnosticCode.UninitializedCrossFieldReadInInitialAssignment],
+            FixHint: "Use event payload values in the guard, or move field-dependent logic into a post-construction transition row",
+            TriggerCondition: "A guard on a construction row reads a precept field. Construction guards run before any field value exists on the entity, so only event payload values are valid there.",
+            RecoverySteps: ["Replace the field reference with an event payload value", "Or move the field-dependent condition into a post-construction transition row after the entity exists"],
+            ExampleBefore: "precept Example\nfield Total as integer optional\nstate Draft initial terminal\nevent Start(Amount as integer) initial\non Start initial when Total > 0 -> set Total = Amount",
+            ExampleAfter: "precept Example\nfield Total as integer optional\nstate Draft initial terminal\nevent Start(Amount as integer) initial\non Start initial when Amount > 0 -> set Total = Amount"),
 
         // ── Type (CI enforcement) ─────────────────────────────────────────────
         DiagnosticCode.CaseInsensitiveFieldRequiresTildeNotEquals => new(

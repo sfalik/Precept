@@ -203,6 +203,8 @@ public enum DiagnosticCode
     ZeroConstructionRows             = 146,
     /// <summary>Multiple distinct events are marked as construction entry events.</summary>
     MultipleInitialEvents            = 147,
+    /// <summary>A construction-row guard reads a field before the entity exists.</summary>
+    ConstructionGuardReadsUninitializedField = 148,
 
     // ── Graph ────────────────────────────────────────────
     UnreachableState                   =  80,

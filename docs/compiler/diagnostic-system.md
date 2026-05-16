@@ -181,6 +181,8 @@ Three levels. No `Hidden` (unlike Roslyn) — Precept's diagnostic surface is sm
 
 `PRE0144 UninitializedCrossFieldReadInInitialAssignment` closes the sibling construction gap where an initial-event assignment reads another required field before that other field's first assignment later in the same action chain establishes a value.
 
+`PRE0148 ConstructionGuardReadsUninitializedField` closes the construction-guard gap where a guarded construction row reads a precept field before the entity exists. Construction guards may read event payload values, but never fields.
+
 ```csharp
 public enum DiagnosticCode
 {
@@ -337,13 +339,17 @@ public enum DiagnosticCode
     UninitializedFieldReadInInitialAssignment = 142,
     MaterializedFieldSelfReference  = 143,
     UninitializedCrossFieldReadInInitialAssignment = 144,
+    InitialEventInTransitionRow     = 145,
+    ZeroConstructionRows            = 146,
+    MultipleInitialEvents           = 147,
+    ConstructionGuardReadsUninitializedField = 148,
 
     // ── NameBinder ───────────────────────────────────────
     UndeclaredArg                   = 107,
 }
 ```
 
-**144 total diagnostic codes** across the five diagnostic stages. Note: `AmbiguousDispatch` from the original proof-engine design was replaced by richer per-domain diagnostics during TypeChecker implementation.
+**145 total diagnostic codes** across the five diagnostic stages. Note: `AmbiguousDispatch` from the original proof-engine design was replaced by richer per-domain diagnostics during TypeChecker implementation.
 
 The enum **is** the complete set of diagnostic rules. It is a closed set — you cannot produce a diagnostic that is not a member. Adding a member without completing the catalog chain causes a build failure (see the FaultCode → DiagnosticCode Chain section below).
 

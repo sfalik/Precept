@@ -875,7 +875,7 @@ Before marking any slice **done**:
 | 2 | Parser Routing | 2 | 6 | 1 | ✅ Done |
 | 3 | Semantic Model DU | 4 | 0 | 1 | ✅ Done |
 | 4 | Type Checker Structural | 2 | 8 | 2, 3 | ✅ Done |
-| 5 | Type Checker Field State | 2 | 6 | 4 |
+| 5 | Type Checker Field State | 2 | 6 | 4 | ✅ Done |
 | 6 | Graph Analyzer | 2 | 4 | 3, 4 |
 | 7 | Proof Engine | 3 | 4 | 3 |
 | 8 | Runtime | 4 | 8 | 3, 6 |
@@ -1030,7 +1030,7 @@ Before marking any slice **done**:
 
 ---
 
-#### Slice 5: Type Checker Field State
+#### Slice 5: Type Checker Field State ✅
 
 **Goal:** Simplify D94 to single-target; add hollow-context validator as ship gate.
 
@@ -1044,15 +1044,15 @@ Before marking any slice **done**:
 **Methods to add/modify:**
 
 - `DiagnosticCode` enum — add 1 member
-- `TypeChecker.ValidateFieldMustBeSet()` — simplify from multi-target (all-rows-set-same-value) to single-target (every execution path sets field exactly once before use)
-- `TypeChecker.ValidateConstructionGuardFieldAccess()` — for each `TypedEventRowSuccess` where `IsConstruction`, check guard expression for field reads; emit PRE0148 if guard reads any field (all fields are uninitialized at construction guard evaluation time)
+- `TypeChecker.ValidateConstructionGuarantees()` / `GetInvalidRequiredFieldAssignments()` — simplify D94 to single-target validation (every execution path sets each required field exactly once)
+- `TypeChecker.ValidateConstructionGuardFieldAccess()` — for each construction `TypedEventRow` (success or reject), check guard expression for field reads; emit PRE0148 if guard reads any field (all fields are uninitialized at construction guard evaluation time)
 
 **Named tests:**
 
 | Test | Assertion |
 |------|-----------|
 | `D94_SingleTarget_Success` | Construction row with `set total = amount` satisfies D94 |
-| `D94_SingleTarget_Failure` | Construction row with `set total = amount` in one branch, `set total = 0` in another, fails D94 |
+| `D94_SingleTarget_Failure` | Construction row with `set total = amount` in one branch and no `set total` in another fails D94 |
 | `PRE0148_ConstructionGuardReadsField_Emitted` | `event start initial when total > 0 { ... }` emits PRE0148 |
 | `PRE0148_ConstructionGuardReadsField_NotEmitted` | `event start initial when amount > 0 { ... }` (payload, not field) does NOT emit PRE0148 |
 | `PRE0148_ConstructionGuardReadsField_NotEmitted_NoGuard` | `event start initial { ... }` (no guard) does NOT emit PRE0148 |

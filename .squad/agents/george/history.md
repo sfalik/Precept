@@ -64,3 +64,5 @@
 - `IntervalContainmentProofRequirement.DeclaredMin/Max` remain normalized proof-math bounds even though their names read like authored values; display surfaces need parallel authored fields.
 - For compound quantity operations, eager pairwise mismatch diagnostics must respect whether the operation's catalog semantics resolve qualifiers structurally or defer them to proof requirements.
 - Typed-constant validator codes can safely promote to `DiagnosticCode` only when the declared qualifiers are concrete; interpolated qualifier text must keep the generic catalog fallback to avoid false `DimensionCategoryMismatch` emissions.
+- Slice 5 field-state work must keep the stateless initial-event handler lane (`event Start initial` + `on Start -> ...`) in the same construction-chain helper as stateful construction rows, or D94/D142/D144 regress immediately.
+- New emitted diagnostics still need a `Precept.Analyzers` Gate 2 allow-list entry even when the real coverage lives in `test/Precept.Tests/`; PRECEPT0028 cannot see cross-project test references.
