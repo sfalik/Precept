@@ -38,4 +38,10 @@ public abstract record EventOutcome
     /// should have prevented (programmer error, not a business outcome).
     /// </summary>
     public sealed record Faulted(Fault Fault) : EventOutcome;
+
+    /// <summary>
+    /// Construction succeeded — initial entity version in initial state with fields set
+    /// from the construction event. Returned by <see cref="Precept.Create"/>.
+    /// </summary>
+    public sealed record Created(Version Result, FiredArgs Args) : EventOutcome;
 }

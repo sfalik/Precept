@@ -13,6 +13,9 @@ public sealed class FiredArgs
 {
     private FiredArgs() { }
 
+    /// <summary>A no-arg sentinel — use when no event args were submitted (e.g. construction with no args).</summary>
+    public static FiredArgs Empty { get; } = new();
+
     /// <summary>Returns the raw <see cref="PreceptValue"/> for the named arg.</summary>
     public PreceptValue this[string name]
         => throw new NotImplementedException();

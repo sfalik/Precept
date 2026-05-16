@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Text.Json;
 
 namespace Precept.Runtime;
@@ -39,8 +40,14 @@ public sealed record Version
 
     // ── Structural queries (precomputed — zero evaluation cost) ─────
 
+    /// <summary>
+    /// Events available for firing in the current state, excluding initial events.
+    /// Initial events can only be used during construction via <see cref="Precept.Create"/>.
+    /// </summary>
     public IReadOnlyList<EventDescriptor> AvailableEvents
-        => throw new NotImplementedException();                         // events with rows in current state
+        => Precept.Events
+            .Where(e => !e.Modifiers.Contains(Language.ModifierKind.InitialEvent))
+            .ToArray();
 
     public IReadOnlyList<ArgDescriptor> RequiredArgs(EventDescriptor @event)
         => throw new NotImplementedException();
@@ -59,8 +66,20 @@ public sealed record Version
     // ── Commit ──────────────────────────────────────────────────────
 
     // JSON lane — wire callers that already have JsonElement on hand
+    /// <summary>
+    /// Fires an event on this version. Initial events are rejected — they can only be
+    /// used during construction via <see cref="Precept.Create"/> (fire-once enforcement).
+    /// </summary>
     public EventOutcome Fire(string eventName, JsonElement? args = null)
-        => throw new NotImplementedException();
+    {
+        // Fire-once enforcement: initial events are structurally forbidden after construction.
+        if (Precept.IsInitialEvent(eventName))
+            return new EventOutcome.Rejected(
+                $"'{eventName}' is an initial event and can only be used during construction.",
+                FiredArgs.Empty);
+
+        return new EventOutcome.UndefinedEvent(); // TODO D8/R4: full fire pipeline
+    }
 
     public UpdateOutcome Update(JsonElement? fields = null)
         => throw new NotImplementedException();

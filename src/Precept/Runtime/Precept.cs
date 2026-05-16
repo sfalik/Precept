@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+using System.Linq;
 using System.Text.Json;
 using Precept.Language;
 using Precept.Pipeline;
@@ -24,7 +26,9 @@ namespace Precept.Runtime;
 /// </remarks>
 public sealed class Precept
 {
-    private Precept() { }
+    private readonly SemanticIndex _semantics;
+
+    private Precept(SemanticIndex semantics) { _semantics = semantics; }
 
     // ── Construction ────────────────────────────────────────────────
 
@@ -33,7 +37,7 @@ public sealed class Precept
         if (compilation.HasErrors)
             throw new InvalidOperationException("Cannot create a Precept from a compilation with errors.");
 
-        return new Precept();
+        return new Precept(compilation.Semantics);
     }
 
     /// <summary>
@@ -49,9 +53,43 @@ public sealed class Precept
     ///
     /// The compiler enforces (C100) that precepts with required fields lacking defaults
     /// declare an initial event, and (C101) that the initial event assigns those fields.
+    ///
+    /// Spike-level (R4): guard evaluation is deferred — only unconditional rows are matched.
     /// </remarks>
     public EventOutcome Create(JsonElement? args = null)
-        => new EventOutcome.Unmatched(); // TODO R4: implement creation pipeline
+    {
+        var initialStateName = _semantics.States
+            .FirstOrDefault(s => s.Modifiers.Contains(ModifierKind.InitialState))?.Name;
+
+        var initialEvent = _semantics.Events.FirstOrDefault(e => e.IsInitial);
+
+        if (initialEvent is null)
+        {
+            // No initial event — construct from defaults (always succeeds by compile-time guarantee)
+            return new EventOutcome.Created(new Version(this, initialStateName), FiredArgs.Empty);
+        }
+
+        // Find construction rows for the initial event; evaluate in declaration order.
+        // Spike-level: skip guarded rows (guard evaluation requires the full executable model, D8/R4).
+        foreach (var row in _semantics.EventHandlers)
+        {
+            if (!row.IsConstruction || !string.Equals(row.EventName, initialEvent.Name, StringComparison.Ordinal))
+                continue;
+            if (row.Guard is not null)
+                continue; // guarded rows deferred to R4
+
+            return row switch
+            {
+                TypedEventRowReject reject =>
+                    new EventOutcome.Rejected(reject.RejectReason ?? "rejected by construction rule", FiredArgs.Empty),
+                TypedEventRowSuccess =>
+                    new EventOutcome.Created(new Version(this, initialStateName), FiredArgs.Empty),
+                _ => new EventOutcome.Unmatched()
+            };
+        }
+
+        return new EventOutcome.Unmatched();
+    }
 
     /// <inheritdoc cref="Create(JsonElement?)"/>
     public EventOutcome Create(Action<IArgBuilder>? args = null)
@@ -91,19 +129,24 @@ public sealed class Precept
     public IReadOnlyList<FieldDescriptor> Fields
         => throw new NotImplementedException();
 
+    /// <summary>All declared events as runtime descriptors.</summary>
     public IReadOnlyList<EventDescriptor> Events
-        => throw new NotImplementedException();
+        => _semantics.Events.Select(BuildEventDescriptor).ToArray();
 
     /// <summary>The initial state descriptor, or <c>null</c> for stateless precepts.</summary>
     public StateDescriptor? InitialState
-        => throw new NotImplementedException();
+        => _semantics.States.FirstOrDefault(s => s.Modifiers.Contains(ModifierKind.InitialState)) is { } st
+            ? new StateDescriptor(st.Name, st.Modifiers, st.NameSpan.StartLine)
+            : null;
 
     /// <summary>
     /// The initial event descriptor, or <c>null</c> if the precept does not declare one.
     /// When non-null, <see cref="Create"/> fires this event atomically.
     /// </summary>
     public EventDescriptor? InitialEvent
-        => throw new NotImplementedException();
+        => _semantics.Events.FirstOrDefault(e => e.IsInitial) is { } ev
+            ? BuildEventDescriptor(ev)
+            : null;
 
     public bool IsStateless
         => throw new NotImplementedException();
@@ -114,4 +157,24 @@ public sealed class Precept
 
     public IReadOnlyList<ConstraintDescriptor> Constraints              // TODO D8/R4: backed by executable model
         => throw new NotImplementedException();
+
+    // ── Internal helpers ─────────────────────────────────────────────
+
+    internal bool IsInitialEvent(string eventName) =>
+        _semantics.Events.Any(e => e.IsInitial && string.Equals(e.Name, eventName, StringComparison.Ordinal));
+
+    private static EventDescriptor BuildEventDescriptor(TypedEvent ev) =>
+        new(
+            Name: ev.Name,
+            Modifiers: ev.IsInitial
+                ? ImmutableArray<ModifierKind>.Empty.Add(ModifierKind.InitialEvent)
+                : ImmutableArray<ModifierKind>.Empty,
+            Args: ev.Args.Select(a => new ArgDescriptor(
+                Name: a.Name,
+                Type: a.ResolvedType,
+                IsOptional: a.IsOptional,
+                DefaultExpression: null,        // TODO D8/R4: stringify typed expression
+                SourceLine: a.Span.StartLine
+            )).ToArray(),
+            SourceLine: ev.NameSpan.StartLine);
 }

@@ -879,12 +879,13 @@ Before marking any slice **done**:
 | 6 | Graph Analyzer | 2 | 4 | 3, 4 | ✅ Done |
 | 7 | Proof Engine | 3 | 4 | 3 | ✅ Done |
 | 8 | Runtime | 4 | 8 | 3, 6 |
+| 8b | Syntax Refactor — drop `initial` from rows | 3+ | 0 | 8 |
 | 9 | Language Server | 3 | 3 | 3 |
 | 10 | Grammar Generator | 1 | 2 | 1 |
 | 11 | MCP DTO | 1 | 2 | 3 |
 | 12 | Docs and Samples | 4 | 0 | all |
 
-**Total: ~43 new tests across 12 slices.**
+**Total: ~43 new tests across 13 slices.**
 
 ---
 
@@ -936,7 +937,7 @@ Before marking any slice **done**:
 
 **Methods to add/modify:**
 
-- `Parser.ParseEventHandler()` → detect `initial` modifier, choose `ConstructionRow` vs `EventRow`
+- `Parser.ParseEventHandler()` → detect `initial` modifier, choose `ConstructionRow` vs `EventRow` *(Note: Slice 8b removes this — post-8b all `on <name>` rows parse identically; classification moves to TypeChecker)*
 - `Parser.ParseOutcome()` → emit `RejectClause` slot for `reject`, `SuccessOutcome` for others
 - `Parser.ParseTransitionRow()` → emit `TransitionRowReject` for reject-only rows
 
@@ -944,10 +945,10 @@ Before marking any slice **done**:
 
 | Test | Assertion |
 |------|-----------|
-| `ConstructionRow_EmitsCorrectKind` | `event start initial { ... }` parses to `ConstructKind.ConstructionRow` |
-| `ConstructionRowReject_EmitsCorrectKind` | `event start initial when ... reject ...` parses to `ConstructKind.ConstructionRowReject` |
-| `ConstructionRow_AllowsGuard` | `event start initial when amount > 0 { ... }` parses without PRE0014 |
-| `EventRow_NoInitial_EmitsEventRow` | `event pause { ... }` parses to `ConstructKind.EventRow` |
+| `ConstructionRow_EmitsCorrectKind` | `on start initial { ... }` parses to `ConstructKind.ConstructionRow` *(Slice 8b rewrites this test — post-8b `initial` on the row is a parse error)* |
+| `ConstructionRowReject_EmitsCorrectKind` | `on start initial when ... reject ...` parses to `ConstructKind.ConstructionRowReject` *(Slice 8b removes)* |
+| `ConstructionRow_AllowsGuard` | `on start initial when amount > 0 { ... }` parses without PRE0014 *(Slice 8b: becomes `on start when amount > 0 { ... }`)* |
+| `EventRow_NoInitial_EmitsEventRow` | `on pause { ... }` parses to `ConstructKind.EventRow` |
 | `TransitionRowReject_EmitsCorrectKind` | `from idle on start when ... reject ...` parses to `ConstructKind.TransitionRowReject` |
 | `RejectClause_EmitsCorrectSlot` | `reject "msg"` outcome parses to `ConstructSlotKind.RejectClause` |
 
@@ -1169,6 +1170,48 @@ Before marking any slice **done**:
 - `RuntimeFireTests` — existing fire tests
 - `RuntimeVersionTests` — existing version tests
 - `EvaluatorTests` — existing evaluator tests
+
+---
+
+#### Slice 8b: Syntax Refactor — Drop `initial` from Construction Rows
+
+**Goal:** Remove the `initial` disambiguation token from construction row syntax. After this slice, `on create { ... }` is a valid construction row; `on create initial { ... }` is a parse error. The type checker classifies construction rows via `resolvedEvent.IsInitial` — no parser change is needed for the event declaration (`event create initial { ... }` is unchanged).
+
+**Rationale:** Frank confirmed (2026-05-16) that `initial` on the row is not architecturally load-bearing. The type checker already resolves the event and knows `IsInitial` via `ctx.EventLookup`. Moving classification from parser-time to type-check-time requires no extra pass and is architecturally cleaner — semantic rules belong in the type checker, not the parser.
+
+**New syntax:**
+
+```precept
+// Before (Slices 1-8):
+on create initial { set status to "active" }
+on create initial when x > 0 reject "msg"
+
+// After (Slice 8b+):
+on create { set status to "active" }
+on create when x > 0 reject "msg"
+```
+
+**Files:**
+
+| File | Changes |
+|------|---------|
+| `src/Precept/Pipeline/Parser.cs` | Remove `initial` token disambiguation from construction row path; parse `on <name> { ... }` and `on <name> when ... reject` identically regardless of initial/non-initial |
+| `src/Precept/Pipeline/TypeChecker.cs` | Classify construction rows by `resolvedEvent.IsInitial` instead of checking ConstructKind; unify ConstructionRow and EventRow parsing, promote in type checker |
+| All test files with `on <name> initial` DSL strings | Remove `initial` token from row syntax in all test precept snippets (grep sweep) |
+| `samples/` | Remove `initial` token from all construction row syntax in sample files |
+
+**Methods to modify:**
+
+- `Parser.ParseEventRow()` — remove branch that checks for `initial` token at position 2; return a single construct kind for all `on <name> ...` rows
+- `TypeChecker.CheckEventRow()` (or equivalent) — after resolving the event, check `resolvedEvent?.IsInitial ?? false`; promote to `TypedEventRowSuccess`/`TypedEventRowReject` with `IsConstruction = true` when initial
+
+**No new tests.** This is a refactor — all existing construction row tests must pass with the new syntax. The sweep of DSL strings in test files is the work.
+
+**Regression anchors:**
+
+- All Slice 2–5 parser and type checker tests (they use construction row DSL)
+- All Slice 8 runtime tests (runtime uses construction row DSL)
+- Full `dotnet test` must be green before commit
 
 ---
 
