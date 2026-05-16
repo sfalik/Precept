@@ -1,3 +1,29 @@
+# Frank — `precept_create` MCP tool
+
+Date: 2026-05-15
+
+## What
+Lock OQ6 to Option A: add `precept_create` as a planned MCP tool. The tool is the dedicated construction entrypoint: it accepts precept definition text (or a loaded-definition reference), the construction event name, and construction arguments, then returns `Created`, `Rejected`, or `NoMatchingRow` plus the matched row and any resulting state or reject reason.
+
+## Why
+Construction is a different lifecycle seam from firing events on an existing entity. Keeping `precept_create` separate preserves a clean MCP contract: `precept_fire` stays bound to existing-entity execution, while creation maps directly to the runtime's planned `Create()` path.
+
+## Tradeoff
+`precept_create` remains planned until the runtime `Create()` implementation and MCP wrapper exist. AI agents still cannot construct entities through MCP today, and create-time inspection remains a separate follow-up question for `InspectCreate` / `precept_inspect`.
+
+# Frank — OQ5 MCP canonical
+
+Date: 2026-05-15
+
+## What
+`docs/tooling/mcp.md` is the canonical MCP contract document. `docs/McpServerDesign.md` has been consolidated into it and archived as a redirect.
+
+## Why
+This eliminates the three-way documentation conflict and anchors the contract on the verified live tool surface in `tools/Precept.Mcp/Tools/`.
+
+## Tradeoff
+`tools/Precept.Plugin/README.md` remains a separate distribution-surface document. It describes the shipped plugin payload and configuration surfaces, not the source-first development contract.
+
 # Doc Tracker Update — quantity-normalization-design.md
 
 **Author:** Frank (Lead Architect)

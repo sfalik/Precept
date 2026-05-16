@@ -25,6 +25,18 @@
 
 ## Learnings
 
+### 2026-05-15T23:05:36.097-04:00 — OQ6 locked: `precept_create` is the planned construction MCP tool
+
+- Shane chose Option A: add `precept_create` as a dedicated planned MCP tool instead of overloading `precept_fire`.
+- Updated `docs/tooling/mcp.md` so `precept_create` is documented as planned with purpose, inputs, outputs, and the `Create()` runtime dependency.
+- Updated `docs/working/constructor-semantics.md` to replace the open-question callout with a locked decision block; `precept_fire` remains existing-entity-only.
+
+### 2026-05-15T22:59:42.817-04:00 — OQ5 locked: `docs/tooling/mcp.md` is canonical
+
+- Consolidated `docs/McpServerDesign.md` into `docs/tooling/mcp.md` and archived the old file as a redirect stub.
+- Verified the live discoverable MCP surface from `tools/Precept.Mcp/Tools/`: `precept_ping`, `precept_quickstart`, `precept_syntax`, `precept_types`, `precept_operations`, `precept_proofs`, `precept_patterns`, `precept_diagnostic`, `precept_domains`, and `precept_compile`.
+- Durable rule: `docs/tooling/mcp.md` is the single MCP contract doc; `tools/Precept.Plugin/README.md` remains a separate shipped-payload/distribution note, not the live contract.
+
 ### 2026-05-15T22:29:35-04:00 — Naming decision applied: Resolution/Reject
 
 - Shane chose Option A (`Resolution/Reject`) as the naming axis for the grammar-level split constructs.
@@ -60,6 +72,10 @@
 - Older slice-by-slice review detail now lives in `history-archive.md` and `.squad/decisions.md`; this file keeps only the guidance and outcomes other agents need immediately.
 
 ## Recent Updates
+### 2026-05-16T03:07:39Z — MCP consolidation batch recorded
+
+- Merged the `frank-precept-create-tool.md` inbox note into `.squad/decisions.md`; the earlier OQ5 canonical note was already present.
+- No decision entries older than 30 days were archived; no agent history crossed the 15 KB gate on this pass.
 
 ### 2026-05-16T02:40:40Z — TransitionRow asymmetric naming finalized in docs
 
