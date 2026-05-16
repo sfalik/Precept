@@ -23,7 +23,9 @@
 - Hollow-entity validation should be shared across all pre-materialization expression lanes, not re-added slot by slot.
 - Formal grammar production rules must reflect structural exclusion decisions immediately — the grammar doc is a design deliverable, not an afterthought that waits for implementation.
 
-## Learnings
+- Completed the planned runtime-tool section in `docs/tooling/mcp.md` so all four planned tools now have purpose, inputs, outputs, and explicit runtime-implementation dependencies: `precept_create`, `precept_update`, `precept_inspect`, and `precept_fire`.
+- Locked OQ7 in `docs/working/constructor-semantics.md`: construction inspection will be implemented as `InspectCreate()` in core and exposed through `precept_inspect`.
+- Wrote the confirmation note to `.squad/decisions/inbox/frank-planned-runtime-tools.md` so the canonical MCP doc reflects Shane's confirmed surface before runtime work begins.
 
 ### 2026-05-15T23:05:36.097-04:00 — OQ6 locked: `precept_create` is the planned construction MCP tool
 
@@ -72,6 +74,10 @@
 - Older slice-by-slice review detail now lives in `history-archive.md` and `.squad/decisions.md`; this file keeps only the guidance and outcomes other agents need immediately.
 
 ## Recent Updates
+### 2026-05-16T03:08:40Z — Precept-create OQ6 batch recorded
+
+- Pre-check found .squad/decisions.md at 20999 bytes and 0 inbox notes; the archive gate found no entries older than 30 days.
+- No decision merge was needed, no history file crossed the 15 KB summarization gate, and the batch ended with orchestration/session logs only.
 ### 2026-05-16T03:07:39Z — MCP consolidation batch recorded
 
 - Merged the `frank-precept-create-tool.md` inbox note into `.squad/decisions.md`; the earlier OQ5 canonical note was already present.
@@ -144,5 +150,10 @@
 - For EventHandler, the success path IS the unmarked default (you write `on Create -> set fields` normally); rejection is the exception case. For TransitionRow, both resolution and rejection are equal-weight paths in a decision matrix — symmetric naming is justified.
 - Recommended: asymmetric naming — `EventHandler` (base, success-implicit) + `EventHandlerReject` (marked exception). This drops `EventHandlerResolution` entirely. TransitionRow keeps its symmetric `Resolution`/`Reject` axis unchanged.
 - Earlier assumption that naming "must stay parallel" across both families was wrong — the families have different semantic weight distributions.
+
+
+
+
+
 
 

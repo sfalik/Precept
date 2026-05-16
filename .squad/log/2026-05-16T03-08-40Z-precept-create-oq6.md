@@ -1,0 +1,1 @@
+Frank-26's precept_create batch was already durable: `decisions.md` was over the archive threshold but contained no entries older than 30 days, the inbox was empty, and no history file crossed the summarization gate. I recorded the orchestration and session logs and left the decision ledger unchanged.

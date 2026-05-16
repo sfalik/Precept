@@ -2,23 +2,11 @@
 
 - Owns the squad's durable record: `.squad/decisions.md`, `.squad/decisions-archive.md`, `.squad/orchestration-log/`, `.squad/log/`, agent histories, and PR-body stewardship.
 - The standing Scribe loop is fixed: measure health first, run archive gates before merges, consolidate overlapping inbox notes into canonical decisions, propagate affected history updates, and stage only the exact allowed `.squad/` paths written in-session.
-- When a history file crosses the 15 KB gate, summarize it immediately and keep only the live batch state in `## Recent Updates`.
+- When a history file crosses the 15 KB gate, summarize it immediately and keep only the live batch state in `## Recent Updates
+### 2026-05-16T03:08:40Z — Frank-26 batch recorded
 
-## Learnings
-
-- Measure decision-ledger size, inbox count, and archive eligibility before every merge pass; log pre/post health explicitly.
-- Deduplicate overlapping inbox notes into one canonical decision entry and name every merged source.
-- Record no-op outcomes explicitly when an inbox is empty, an archive pass is ineligible, or no PR/body update is required.
-- Only mark work complete in durable records when the agent output or validation confirms it.
-- Oversized histories should be compressed back into durable guidance plus the newest batch state instead of carrying full chronology forever.
-
-## Historical Summary
-
-- Earlier Scribe passes already recorded the quantity-normalization review loop, the Slice 21/23/24 closeout batches, the review-warning gating directive, the affine conversion and cross-unit comparison decisions, and the associated health reports; those details now live canonically in `.squad/decisions.md` and the matching session logs.
-- The durable Scribe baseline is unchanged: archive before merge when the size gate triggers, merge overlapping inbox files into canonical entries, clear the inbox, propagate cross-agent context, summarize oversized histories immediately, and stage only the exact `.squad/` paths written during the pass.
-
-## Recent Updates
-
+- decisions.md was already above the archive threshold, but no entries were older than 30 days, so no archive move occurred.
+- The decision inbox was empty, no history crossed the summarization gate, and the batch closed with logs only.
 ### 2026-05-15T20:40:13Z — Price qualifier enforcement architecture batch recorded
 
 - Pre-check measured `.squad/decisions.md` at 53606 bytes with 9 inbox file(s); the hard-gate 7-day archive pass ran before merge and moved 0 active entries.
@@ -45,3 +33,8 @@
 
 - Recorded the cross-unit comparison closeout as one canonical decision and kept the history focused on the durable outcome plus process lessons.
 - Continued the pattern of trimming long chronology back into a compact durable baseline.
+
+
+
+
+
