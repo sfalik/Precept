@@ -429,6 +429,11 @@ internal sealed class CompletionHandler : ICompletionHandler
     private static IEnumerable<CompletionItem> GetActionOrOutcomeItems(Compilation compilation, Position position)
     {
         var items = GetActionItems(compilation, position);
+        if (SlotContextResolver.IsImplicitActionChainContinuationPosition(compilation, position))
+        {
+            return items;
+        }
+
         var construct = SlotContextResolver.GetEnclosingConstruct(compilation, position);
         if (construct is null || !construct.Meta.Slots.Any(slot => slot.Kind == ConstructSlotKind.Outcome))
         {

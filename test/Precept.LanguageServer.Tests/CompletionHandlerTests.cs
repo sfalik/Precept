@@ -389,6 +389,39 @@ public class CompletionHandlerTests
     }
 
     [Fact]
+    public async Task Completions_TrailingArrowInTransitionRowActionChain_UsesActionItems()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept Test
+            field counter as integer
+            state off initial
+            state running
+            event reset
+            from off, running on reset
+                -> set counter = 0
+                -> clear events
+                ->¦ 
+            """);
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+        var expected = Precept.Language.Actions.All
+            .Where(meta => meta.PrimaryActionKind is null)
+            .Select(meta => meta.Token.Text)
+            .OfType<string>()
+            .Distinct(System.StringComparer.Ordinal)
+            .ToArray();
+        var unexpectedOutcomes = Precept.Language.Outcomes.All
+            .Select(meta => Precept.Language.Tokens.GetMeta(meta.LeadingToken).Text)
+            .OfType<string>()
+            .Distinct(System.StringComparer.Ordinal)
+            .ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().BeEquivalentTo(expected);
+        labels.Should().NotContain(["precept", "field", "state", "event", "from", "rule"]);
+        labels.Should().NotContain(unexpectedOutcomes);
+    }
+
+    [Fact]
     public async Task Completions_TransitionOutcomeTarget_IncludesDeclaredStatesWithoutWildcardOrTopLevelKeywords()
     {
         var completions = await GetCompletionsAsync("""

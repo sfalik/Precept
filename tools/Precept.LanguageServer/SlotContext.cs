@@ -355,6 +355,11 @@ internal static class SlotContextResolver
         TryGetCurrentTriggerToken(compilation, position, out var token)
         && TryGetStateTargetListContinuationToken(compilation.Tokens.Tokens, GetCurrentTriggerTokenIndex(compilation, position), token, position, out _);
 
+    internal static bool IsImplicitActionChainContinuationPosition(Compilation compilation, Position position) =>
+        TryGetCurrentTriggerToken(compilation, position, out var token)
+        && token.Kind == Precept.Language.TokenKind.Arrow
+        && IsImplicitActionChainContinuation(compilation.Tokens.Tokens, GetCurrentTriggerTokenIndex(compilation, position));
+
     internal static bool IsAccessFieldTargetPosition(Compilation compilation, Position position) =>
         TryGetCurrentTriggerToken(compilation, position, out var token)
         && token.Kind is Precept.Language.TokenKind.Modify or Precept.Language.TokenKind.Omit;
@@ -803,8 +808,7 @@ internal static class SlotContextResolver
         Precept.Pipeline.ParsedConstruct? construct,
         out SlotContext context)
     {
-        if (construct is null
-            && token.Kind == Precept.Language.TokenKind.Arrow
+        if (token.Kind == Precept.Language.TokenKind.Arrow
             && IsImplicitActionChainContinuation(tokens, tokenIndex))
         {
             context = SlotContext.InActionVerb;
