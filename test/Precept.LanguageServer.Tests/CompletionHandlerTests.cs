@@ -2463,6 +2463,64 @@ public class CompletionHandlerTests
         snippetLabels.Should().NotContain("quantity — m", "m is a length unit, not mass");
         snippetLabels.Should().NotContain("quantity — L", "L is a volume unit, not mass");
     }
+
+    [Fact]
+    public async Task Completions_TypedConstant_Period_WithTemporalUnitQualifier_PrefillsUnit()
+    {
+        // period supports TemporalUnit qualifiers via QualifierShape; duration does not (no QualifierShape).
+        // When qualifier is set, GetTemporalBuilderSnippets takes the unitQualifier branch and yields
+        // only the single prefilled template — suppressing the generic 3-template set.
+        var completions = await GetCompletionsAsync("""
+            precept WorkflowTest
+            field Grace as period in 'days' default ¦
+            """, "'");
+
+        var labels = completions.Items.Select(i => i.Label).ToArray();
+        var item = completions.Items.Single(i => i.Label == "period — days");
+
+        completions.IsIncomplete.Should().BeFalse();
+        item.InsertTextFormat.Should().Be(InsertTextFormat.Snippet);
+        item.InsertText.Should().Contain("days", "unit must be prefilled from qualifier");
+        labels.Should().NotContain("period — weeks",
+            "qualifier-aware branch suppresses the generic template set");
+        labels.Should().NotContain("period — years + months",
+            "qualifier-aware branch suppresses the generic template set");
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_Period_WithWeeksQualifier_SuppressesOtherTemplates()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept WorkflowTest
+            field TrialPeriod as period in 'weeks' default ¦
+            """, "'");
+
+        var labels = completions.Items.Select(i => i.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain("period — weeks", "qualifier-aware snippet uses the declared unit");
+        labels.Should().NotContain("period — days",
+            "only the qualifier-pinned unit template appears when qualifier is set");
+        labels.Should().NotContain("period — years + months",
+            "qualifier-aware branch suppresses the generic template set");
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_Money_SourceFieldName_UsesInterpolation()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept InventoryTest
+            field CatalogCurrency as currency default 'USD'
+            field Cost as money in '{CatalogCurrency}' default ¦
+            """, "'");
+
+        var item = completions.Items.Single(i => i.Label == "money — CatalogCurrency currency");
+
+        completions.IsIncomplete.Should().BeFalse();
+        item.InsertTextFormat.Should().Be(InsertTextFormat.Snippet);
+        item.InsertText.Should().Contain("{CatalogCurrency}", "template must use literal brace interpolation for the field name");
+        item.InsertText.Should().NotContain("${2:", "no second tab stop — currency is provided by field reference");
+    }
 }
 
 internal static class LanguageClientTestExtensions
