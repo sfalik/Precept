@@ -27,6 +27,15 @@
 - Locked OQ7 in `docs/working/constructor-semantics.md`: construction inspection will be implemented as `InspectCreate()` in core and exposed through `precept_inspect`.
 - Wrote the confirmation note to `.squad/decisions/inbox/frank-planned-runtime-tools.md` so the canonical MCP doc reflects Shane's confirmed surface before runtime work begins.
 
+### 2026-05-16T00:41:00-04:00 — Slice 3 Review Gate: APPROVED
+
+- Reviewed commit 7c49f9c7 (`feat: Slice 3 — Semantic Model DU`).
+- Verified DU shapes: `TypedTransitionRow` (abstract) → `TypedTransitionRowSuccess` / `TypedTransitionRowReject`; `TypedEventRow` (abstract) → `TypedEventRowSuccess` / `TypedEventRowReject`. All sealed records in `SemanticIndex.cs`.
+- TypeChecker emits correct subtypes based on `ConstructKind` (`ConstructionRowReject` → `TypedEventRowReject`, `TransitionRowReject` → `TypedTransitionRowReject`).
+- All downstream callsites use pattern matching (`.OfType<>()`, `is` patterns). No bare access to subtype-only properties on base type.
+- 6,360 tests pass. No new TODOs, HACKs, or skipped tests.
+- Decision written to `.squad/decisions/inbox/frank-slice3-approved.md`.
+
 ### 2026-05-15T23:05:36.097-04:00 — OQ6 locked: `precept_create` is the planned construction MCP tool
 
 - Shane chose Option A: add `precept_create` as a dedicated planned MCP tool instead of overloading `precept_fire`.
