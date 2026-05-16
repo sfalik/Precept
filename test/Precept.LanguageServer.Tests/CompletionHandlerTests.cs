@@ -1246,6 +1246,26 @@ public class CompletionHandlerTests
         labels.Should().Contain(["USD", "EUR", "GBP"]);
     }
 
+    [Fact]
+    public async Task TypedConstant_Timezone_ShowsFullTzdbCatalog()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept ScheduleTest
+            field LocalTimezone as timezone default '¦'
+            """, new CompletionContext
+        {
+            TriggerKind = CompletionTriggerKind.Invoked,
+            TriggerCharacter = string.Empty,
+        });
+
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Length.Should().BeGreaterThan(100, "the TZDB catalog should expose far more than the two hardcoded examples");
+        labels.Should().Contain(["America/New_York", "Europe/London", "UTC"]);
+        labels.Should().NotContain(["field", "state", "event", "rule"], "DSL keywords must not appear inside timezone typed constants");
+    }
+
     // ─── Slice 2 — Space Trigger Slot Detection ──────────────────────────────────
 
     [Fact]

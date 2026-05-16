@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using NodaTime;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
@@ -991,7 +992,8 @@ internal sealed class CompletionHandler : ICompletionHandler
             TypeKind.Duration or TypeKind.Period => GetTemporalLiteralItems(compilation, tcContext, position),
             TypeKind.Money => GetMoneyLiteralItems(compilation, tcContext, position),
             TypeKind.Date or TypeKind.Time or TypeKind.Instant or TypeKind.DateTime
-                or TypeKind.ZonedDateTime or TypeKind.Timezone => GetStructuredExampleItems(compilation, tcContext),
+                or TypeKind.ZonedDateTime => GetStructuredExampleItems(compilation, tcContext),
+            TypeKind.Timezone => GetTimezoneItems(compilation, tcContext),
             TypeKind.Currency => GetCurrencyCodeItems(tcContext),
             TypeKind.UnitOfMeasure => GetUnitOfMeasureItems(tcContext),
             TypeKind.Dimension => GetDimensionItems(tcContext),
@@ -1072,6 +1074,15 @@ internal sealed class CompletionHandler : ICompletionHandler
         return DistinctByLabel(
             reused.Select(v => CreateItem(v, detail, CompletionItemKind.Value, CompletionSortGroup.TypedConstant))
             .Concat(examples.Select(e => CreateItem(e, detail, CompletionItemKind.Constant, CompletionSortGroup.TypedConstant))));
+    }
+
+    private static IEnumerable<CompletionItem> GetTimezoneItems(Compilation compilation, TypedConstantContext tcContext)
+    {
+        var reused = TypedConstantCollector.CollectByType(compilation.Semantics, tcContext.ExpectedType);
+        var allZoneIds = DateTimeZoneProviders.Tzdb.Ids;
+        return DistinctByLabel(
+            reused.Select(v => CreateItem(v, "IANA timezone", CompletionItemKind.Value, CompletionSortGroup.TypedConstant))
+                .Concat(allZoneIds.Select(id => CreateItem(id, "IANA timezone", CompletionItemKind.Unit, CompletionSortGroup.TypedConstantSegment))));
     }
 
     private static IEnumerable<CompletionItem> GetCurrencyCodeItems(TypedConstantContext tcContext)
