@@ -59,6 +59,7 @@ public class ProofLedgerTests
             Guard = null,
             IsConstruction = false,
             Actions = ImmutableArray<TypedAction>.Empty,
+            RowSpan = SourceSpan.Missing,
             Syntax = SyntaxFor(ConstructKind.EventRow),
         };
 

@@ -1200,6 +1200,7 @@ internal static partial class TypeChecker
                     Guard = guard,
                     IsConstruction = isConstruction,
                     RejectReason = rejectReason,
+                    RowSpan = construct.Span,
                     Syntax = construct,
                 };
             }
@@ -1221,6 +1222,7 @@ internal static partial class TypeChecker
                 Guard = guard,
                 IsConstruction = isConstruction,
                 Actions = actions,
+                RowSpan = construct.Span,
                 Syntax = construct,
             };
         }

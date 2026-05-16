@@ -718,6 +718,8 @@ public static class GraphAnalyzer
     /// D1: Emits <see cref="DiagnosticCode.AlwaysRejecting"/> for every event whose rows
     /// are all reject outcomes across all states. Returns the set of flagged event names
     /// so D2 can suppress them.
+    /// Construction rows that are all-reject emit with <see cref="Severity.Error"/> because
+    /// an always-rejecting construction path means the precept can never be created.
     /// </summary>
     private static HashSet<string> EmitAlwaysRejecting(
         SemanticIndex semantics,
@@ -741,6 +743,27 @@ public static class GraphAnalyzer
                     DiagnosticCode.AlwaysRejecting,
                     row.RowSpan,
                     group.Key));
+            }
+        }
+
+        // Construction rows: all-reject means the precept can never be constructed via this event.
+        // Promote severity to Error — an unprovable construction path is a hard failure.
+        var constructionRowsByEvent = semantics.EventHandlers
+            .Where(row => row.IsConstruction && semantics.EventsByName.ContainsKey(row.EventName))
+            .GroupBy(row => row.EventName, StringComparer.Ordinal);
+
+        foreach (var group in constructionRowsByEvent)
+        {
+            if (group.Any(row => row is not TypedEventRowReject))
+                continue;
+
+            d1FlaggedEvents.Add(group.Key);
+            foreach (var row in group)
+            {
+                diagnostics.Add(Diagnostics.Create(
+                    DiagnosticCode.AlwaysRejecting,
+                    row.RowSpan,
+                    group.Key) with { Severity = Severity.Error });
             }
         }
 

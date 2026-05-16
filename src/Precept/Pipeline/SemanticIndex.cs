@@ -476,6 +476,12 @@ public abstract record TypedEventRow
     public required TypedExpression? Guard { get; init; }
     /// <summary>True when this row originates from a construction-row construct kind.</summary>
     public required bool IsConstruction { get; init; }
+    /// <summary>
+    /// Span covering the full event row construct.
+    /// Pre-extracted in <see cref="TypeChecker"/> from <c>construct.Span</c>;
+    /// available in <see cref="GraphAnalyzer"/> without violating PRECEPT0024.
+    /// </summary>
+    public required SourceSpan RowSpan { get; init; }
     public required ParsedConstruct Syntax { get; init; }
 }
 
