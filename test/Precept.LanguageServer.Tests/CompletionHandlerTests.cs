@@ -117,15 +117,18 @@ public class CompletionHandlerTests
         labels.Should().NotContain(["precept", "field", "state", "event", "from", "rule"]);
     }
 
-    [Fact]
-    public async Task Completions_FromClauseStateListContinuation_OffersRemainingDeclaredStates()
+    [Theory]
+    [InlineData("from")]
+    [InlineData("to")]
+    [InlineData("in")]
+    public async Task Completions_StateTargetListContinuation_OffersRemainingDeclaredStates(string leadingKeyword)
     {
-        var completions = await GetCompletionsAsync("""
+        var completions = await GetCompletionsAsync($$"""
             precept Test
             state off initial
             state running
             event start
-            from off, ¦
+            {{leadingKeyword}} off, ¦
             -> no transition
             """, " ");
         var labels = completions.Items.Select(item => item.Label).ToArray();
@@ -133,6 +136,24 @@ public class CompletionHandlerTests
         completions.IsIncomplete.Should().BeFalse();
         labels.Should().Contain("running");
         labels.Should().NotContain(["off", "any", "precept", "field", "state", "event", "from", "rule"]);
+    }
+
+    [Fact]
+    public async Task Completions_StateDeclarationListContinuation_OffersRemainingDeclaredStates()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept Test
+            state off initial
+            state running
+            state off, ¦
+            event start
+            from off on start -> transition running
+            """, " ");
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain("running");
+        labels.Should().NotContain(["off", "initial", "terminal", "any", "precept", "field", "state", "event", "from", "rule"]);
     }
 
     [Theory]
@@ -153,6 +174,26 @@ public class CompletionHandlerTests
 
         completions.IsIncomplete.Should().BeFalse();
         labels.Should().Contain(["Amount", "DecisionNote", "all"]);
+    }
+
+    [Theory]
+    [InlineData("modify")]
+    [InlineData("omit")]
+    public async Task Completions_AccessFieldTargetListContinuation_OffersRemainingDeclaredFields(string accessVerb)
+    {
+        var completions = await GetCompletionsAsync($$"""
+            precept LoanApplication
+            field Amount as number
+            field DecisionNote as string optional
+            field RiskScore as integer default 0
+            state Draft initial
+            in Draft {{accessVerb}} Amount, ¦
+            """, " ");
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain(["DecisionNote", "RiskScore"]);
+        labels.Should().NotContain(["Amount", "all", "precept", "field", "state", "event", "from", "rule"]);
     }
 
     [Theory]

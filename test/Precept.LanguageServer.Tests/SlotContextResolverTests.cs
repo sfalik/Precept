@@ -138,17 +138,49 @@ public class SlotContextResolverTests
         context.Should().Be(SlotContext.InExpression);
     }
 
+    [Theory]
+    [InlineData("from")]
+    [InlineData("to")]
+    [InlineData("in")]
+    public void GetCursorContext_StateTargetListContinuation_ReturnsInStateTarget(string leadingKeyword)
+    {
+        var context = GetCursorContext($$"""
+            precept Test
+            state off initial
+            state running
+            {{leadingKeyword}} off, ¦
+            """);
+
+        context.Should().Be(SlotContext.InStateTarget);
+    }
+
     [Fact]
-    public void GetCursorContext_FromClauseStateListContinuation_ReturnsInStateTarget()
+    public void GetCursorContext_StateDeclarationListContinuation_ReturnsInStateDeclarationName()
     {
         var context = GetCursorContext("""
             precept Test
             state off initial
             state running
-            from off, ¦
+            state off, ¦
             """);
 
-        context.Should().Be(SlotContext.InStateTarget);
+        context.Should().Be(SlotContext.InStateDeclarationName);
+    }
+
+    [Theory]
+    [InlineData("modify")]
+    [InlineData("omit")]
+    public void GetCursorContext_AccessFieldListContinuation_ReturnsInFieldTarget(string accessVerb)
+    {
+        var context = GetCursorContext($$"""
+            precept LoanApplication
+            field Amount as number
+            field DecisionNote as string optional
+            state Draft initial
+            in Draft {{accessVerb}} Amount, ¦
+            """);
+
+        context.Should().Be(SlotContext.InFieldTarget);
     }
 
     [Fact]

@@ -15,6 +15,7 @@ internal enum SlotContext
     InTypePosition,
     InModifierPosition,
     InStateTarget,
+    InStateDeclarationName,
     InEventTarget,
     InFieldTarget,
     InActionVerb,
@@ -358,6 +359,24 @@ internal static class SlotContextResolver
         TryGetCurrentTriggerToken(compilation, position, out var token)
         && token.Kind is Precept.Language.TokenKind.Modify or Precept.Language.TokenKind.Omit;
 
+    internal static bool IsStateDeclarationNameListContinuationPosition(Compilation compilation, Position position) =>
+        TryGetCurrentTriggerToken(compilation, position, out var token)
+        && IsStateDeclarationNameListContinuationToken(
+            compilation.Tokens.Tokens,
+            GetCurrentTriggerTokenIndex(compilation, position),
+            token,
+            position,
+            GetEnclosingConstruct(compilation, position));
+
+    internal static bool IsFieldTargetListContinuationPosition(Compilation compilation, Position position) =>
+        TryGetCurrentTriggerToken(compilation, position, out var token)
+        && IsFieldTargetListContinuationToken(
+            compilation.Tokens.Tokens,
+            GetCurrentTriggerTokenIndex(compilation, position),
+            token,
+            position,
+            GetEnclosingConstruct(compilation, position));
+
     internal static bool TryGetCompletedStateTargetLeadingToken(
         Compilation compilation,
         Position position,
@@ -417,6 +436,18 @@ internal static class SlotContextResolver
         if (TryGetStateTargetListContinuationToken(tokens, tokenIndex, token, position, out _))
         {
             context = SlotContext.InStateTarget;
+            return true;
+        }
+
+        if (IsStateDeclarationNameListContinuationToken(tokens, tokenIndex, token, position, construct))
+        {
+            context = SlotContext.InStateDeclarationName;
+            return true;
+        }
+
+        if (IsFieldTargetListContinuationToken(tokens, tokenIndex, token, position, construct))
+        {
+            context = SlotContext.InFieldTarget;
             return true;
         }
 
@@ -554,30 +585,68 @@ internal static class SlotContextResolver
         out Precept.Language.TokenKind leadingToken)
     {
         leadingToken = default;
+        return TryGetCommaListContinuationPreviousTokenIndex(tokens, tokenIndex, token, position, out var previousStateIndex)
+            && tokens[previousStateIndex].Kind == Precept.Language.TokenKind.Identifier
+            && TryGetCompletedStateTargetLeadingToken(tokens, previousStateIndex, position, out leadingToken);
+    }
 
-        int previousStateIndex;
-        if (token.Kind == Precept.Language.TokenKind.Comma && !Contains(token.Span, position))
-        {
-            previousStateIndex = FindPreviousSignificantToken(tokens, tokenIndex - 1);
-        }
-        else if (token.Kind == Precept.Language.TokenKind.Identifier && Contains(token.Span, position))
-        {
-            var previousIndex = FindPreviousSignificantToken(tokens, tokenIndex - 1);
-            if (previousIndex < 0 || tokens[previousIndex].Kind != Precept.Language.TokenKind.Comma)
-            {
-                return false;
-            }
+    private static bool IsStateDeclarationNameListContinuationToken(
+        ImmutableArray<Precept.Language.Token> tokens,
+        int tokenIndex,
+        Precept.Language.Token token,
+        Position position,
+        Precept.Pipeline.ParsedConstruct? construct)
+    {
+        return construct?.Meta.ModifierDomain == Precept.Language.ModifierDomain.State
+            && ConstructHasSlot(construct, Precept.Language.ConstructSlotKind.StateEntryList)
+            && construct.GetSlot<Precept.Pipeline.StateEntryListSlot>(Precept.Language.ConstructSlotKind.StateEntryList) is { Entries.Length: > 0 }
+            && TryGetCommaListContinuationPreviousTokenIndex(tokens, tokenIndex, token, position, out _);
+    }
 
-            previousStateIndex = FindPreviousSignificantToken(tokens, previousIndex - 1);
-        }
-        else
+    private static bool IsFieldTargetListContinuationToken(
+        ImmutableArray<Precept.Language.Token> tokens,
+        int tokenIndex,
+        Precept.Language.Token token,
+        Position position,
+        Precept.Pipeline.ParsedConstruct? construct)
+    {
+        return ConstructHasSlot(construct, Precept.Language.ConstructSlotKind.FieldTarget)
+            && TryGetCommaListContinuationPreviousTokenIndex(tokens, tokenIndex, token, position, out var previousFieldIndex)
+            && tokens[previousFieldIndex].Kind == Precept.Language.TokenKind.Identifier;
+    }
+
+    private static bool TryGetCommaListContinuationPreviousTokenIndex(
+        ImmutableArray<Precept.Language.Token> tokens,
+        int tokenIndex,
+        Precept.Language.Token token,
+        Position position,
+        out int previousItemIndex)
+    {
+        previousItemIndex = -1;
+        if (tokenIndex < 0)
         {
             return false;
         }
 
-        return previousStateIndex >= 0
-            && tokens[previousStateIndex].Kind == Precept.Language.TokenKind.Identifier
-            && TryGetCompletedStateTargetLeadingToken(tokens, previousStateIndex, position, out leadingToken);
+        if (token.Kind == Precept.Language.TokenKind.Comma && !Contains(token.Span, position))
+        {
+            previousItemIndex = FindPreviousSignificantToken(tokens, tokenIndex - 1);
+            return previousItemIndex >= 0;
+        }
+
+        if (token.Kind != Precept.Language.TokenKind.Identifier || !Contains(token.Span, position))
+        {
+            return false;
+        }
+
+        var commaIndex = FindPreviousSignificantToken(tokens, tokenIndex - 1);
+        if (commaIndex < 0 || tokens[commaIndex].Kind != Precept.Language.TokenKind.Comma)
+        {
+            return false;
+        }
+
+        previousItemIndex = FindPreviousSignificantToken(tokens, commaIndex - 1);
+        return previousItemIndex >= 0;
     }
 
     private static bool IsCompletedTransitionRowEventTarget(

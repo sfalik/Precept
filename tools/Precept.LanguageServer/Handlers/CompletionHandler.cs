@@ -153,6 +153,7 @@ internal sealed class CompletionHandler : ICompletionHandler
             SlotContext.InTypePosition => CreateCompletionList(GetTypeItems()),
             SlotContext.InModifierPosition => CreateModifierList(compilation, position),
             SlotContext.InStateTarget => CreateCompletionList(GetStateTargetItems(compilation, position)),
+            SlotContext.InStateDeclarationName => CreateCompletionList(GetStateItems(compilation, position)),
             SlotContext.InEventTarget => CreateCompletionList(GetEventItems(compilation)),
             SlotContext.InFieldTarget => CreateCompletionList(GetFieldTargetItems(compilation, position)),
             SlotContext.InActionVerb => CreateCompletionList(GetActionOrOutcomeItems(compilation, position)),
@@ -464,24 +465,36 @@ internal sealed class CompletionHandler : ICompletionHandler
 
     private static ImmutableHashSet<string> GetAlreadySelectedStateNames(Compilation compilation, Position position)
     {
-        if (!SlotContextResolver.IsStateTargetListContinuationPosition(compilation, position))
+        if (!SlotContextResolver.IsStateTargetListContinuationPosition(compilation, position)
+            && !SlotContextResolver.IsStateDeclarationNameListContinuationPosition(compilation, position))
         {
             return ImmutableHashSet<string>.Empty;
         }
 
         var construct = SlotContextResolver.GetEnclosingConstruct(compilation, position);
+        var builder = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+
         var stateTargetSlot = construct?.GetSlot<StateTargetSlot>(ConstructSlotKind.StateTarget);
-        if (stateTargetSlot is null)
+        if (stateTargetSlot is not null)
         {
-            return ImmutableHashSet<string>.Empty;
+            for (var index = 0; index < stateTargetSlot.StateNames.Length && index < stateTargetSlot.NameSpans.Length; index++)
+            {
+                if (EndsBeforeCursor(stateTargetSlot.NameSpans[index], position))
+                {
+                    builder.Add(stateTargetSlot.StateNames[index]);
+                }
+            }
         }
 
-        var builder = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
-        for (var index = 0; index < stateTargetSlot.StateNames.Length && index < stateTargetSlot.NameSpans.Length; index++)
+        var stateEntrySlot = construct?.GetSlot<StateEntryListSlot>(ConstructSlotKind.StateEntryList);
+        if (stateEntrySlot is not null)
         {
-            if (EndsBeforeCursor(stateTargetSlot.NameSpans[index], position))
+            foreach (var entry in stateEntrySlot.Entries)
             {
-                builder.Add(stateTargetSlot.StateNames[index]);
+                if (EndsBeforeCursor(entry.NameSpan, position))
+                {
+                    builder.Add(entry.Name);
+                }
             }
         }
 
@@ -578,13 +591,54 @@ internal sealed class CompletionHandler : ICompletionHandler
 
     private static IEnumerable<CompletionItem> GetFieldTargetItems(Compilation compilation, Position position)
     {
-        var items = GetFieldItems(compilation);
+        var items = GetFieldItems(compilation, position);
         if (!SlotContextResolver.IsAccessFieldTargetPosition(compilation, position))
         {
             return items;
         }
 
         return DistinctByLabel(items.Concat([CreateTokenItem(TokenKind.All)]));
+    }
+
+    private static IEnumerable<CompletionItem> GetFieldItems(Compilation compilation, Position position)
+    {
+        var alreadySelectedFields = GetAlreadySelectedFieldNames(compilation, position);
+        return compilation.Semantics.Fields
+            .Select(field => field.Name)
+            .Distinct(StringComparer.Ordinal)
+            .Where(name => !alreadySelectedFields.Contains(name))
+            .Select(name => CreateItem(name, "Field", CompletionItemKind.Field, CompletionSortGroup.SemanticSymbol));
+    }
+
+    private static ImmutableHashSet<string> GetAlreadySelectedFieldNames(Compilation compilation, Position position)
+    {
+        if (!SlotContextResolver.IsFieldTargetListContinuationPosition(compilation, position))
+        {
+            return ImmutableHashSet<string>.Empty;
+        }
+
+        var fieldTargetSlot = SlotContextResolver.GetEnclosingConstruct(compilation, position)
+            ?.GetSlot<FieldTargetSlot>(ConstructSlotKind.FieldTarget);
+        if (fieldTargetSlot is null)
+        {
+            return ImmutableHashSet<string>.Empty;
+        }
+
+        var builder = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+        if (fieldTargetSlot.FieldName is not null && EndsBeforeCursor(fieldTargetSlot.NameSpan, position))
+        {
+            builder.Add(fieldTargetSlot.FieldName);
+        }
+
+        foreach (var (name, span) in fieldTargetSlot.AdditionalFields)
+        {
+            if (EndsBeforeCursor(span, position))
+            {
+                builder.Add(name);
+            }
+        }
+
+        return builder.ToImmutable();
     }
 
     private static IEnumerable<CompletionItem> GetFieldItems(Compilation compilation) =>
