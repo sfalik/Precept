@@ -289,15 +289,33 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
 
     // ── eventDeclaration — parenthesized args (current syntax) ───────────
     // Replaces stale eventWithArgsDeclaration that used retired `with` syntax.
+
+    // Derive event modifier keywords from catalog for explicit capture in event declarations.
+    var eventModifierTokens = Modifiers.All
+        .OfType<EventModifierMeta>()
+        .Select(m => m.Token)
+        .Where(t => t.Text is not null)
+        .ToList();
+
+    var eventModifierAlt = string.Join("|", eventModifierTokens
+        .Select(t => Regex.Escape(t.Text!))
+        .OrderByDescending(t => t.Length)
+        .ThenBy(t => t));
+
+    // Derive the TextMate scope from the catalog visual category of the modifier token.
+    var eventModifierScope = eventModifierTokens.Count > 0 && eventModifierTokens[0].VisualCategory.HasValue
+        ? SemanticTokenTypes.GetMeta(eventModifierTokens[0].VisualCategory!.Value).TextMateScope
+        : "keyword.other.semantic.precept";
+
     repo["eventDeclaration"] = new JsonObject
     {
-        ["comment"] = "event Name[, Name, ...] or event Name(Arg as type, ...)",
+        ["comment"] = "event Name[, Name, ...] [modifier] or event Name [modifier](Arg as type, ...)",
         ["patterns"] = new JsonArray
         {
             new JsonObject
             {
                 ["name"] = "meta.declaration.event.precept",
-                ["match"] = "^(\\s*)(event)(\\s+)((?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)(\\s*\\(.*)?",
+                ["match"] = $"^(\\s*)(event)(\\s+)((?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)(\\s+(?:{eventModifierAlt})\\b)?(\\s*\\(.*)?",
                 ["captures"] = new JsonObject
                 {
                     ["2"] = new JsonObject { ["name"] = "keyword.declaration.precept" },
@@ -310,6 +328,13 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
                         }
                     },
                     ["5"] = new JsonObject
+                    {
+                        ["patterns"] = new JsonArray
+                        {
+                            new JsonObject { ["name"] = eventModifierScope, ["match"] = $"\\b(?:{eventModifierAlt})\\b" }
+                        }
+                    },
+                    ["6"] = new JsonObject
                     {
                         ["patterns"] = new JsonArray
                         {

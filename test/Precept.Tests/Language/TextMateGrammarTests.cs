@@ -67,6 +67,21 @@ public sealed class TextMateGrammarTests
     }
 
     [Fact]
+    public void Grammar_EventInitial_Highlighted()
+    {
+        // Slice 10: The grammar generator must emit an explicit capture group for the
+        // `initial` modifier in event declarations so it gets the correct scope even
+        // when there are no parenthesized args (e.g. `event Create initial`).
+        var capture5 = GetCapture("eventDeclaration", "5");
+        var patterns = capture5["patterns"]!.AsArray();
+
+        // group 5 must have a pattern that matches the event modifier keyword
+        var initialIndex = FindPatternIndex(patterns, "keyword.other.semantic.precept", "\\b(?:initial)\\b");
+        initialIndex.Should().BeGreaterThanOrEqualTo(0,
+            because: "initial modifier must be captured with keyword.other.semantic.precept scope in event declaration group 5");
+    }
+
+    [Fact]
     public void DoubleQuotedStringEscapes_UseEscapeScope()
         => Grammar["repository"]!
             .AsObject()["strings"]!

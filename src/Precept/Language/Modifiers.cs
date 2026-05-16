@@ -288,7 +288,7 @@ public static class Modifiers
         // ── Event modifiers ─────────────────────────────────────────────────────
         ModifierKind.InitialEvent => new EventModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Initial),
-            "Auto-fire entry point event",
+            "Construction mechanism — fires once at entity creation",
             ModifierCategory.Structural, GraphAnalysisKind.InitialEventCompatibility),
 
         // ── Access modifiers ────────────────────────────────────────────────────

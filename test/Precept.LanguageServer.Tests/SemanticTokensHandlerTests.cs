@@ -99,6 +99,24 @@ public sealed class SemanticTokensHandlerTests
     }
 
     [Fact]
+    public void SemanticTokens_InitialModifier_Classified()
+    {
+        // Slice 9: `initial` on an event declaration uses KeywordSemantic visual category
+        // from the catalog, meaning it is colored by TextMate grammar rather than LSP
+        // semantic tokens (KeywordSemantic tokens are intentionally suppressed from LSP output).
+        var compilation = Compiler.Compile("precept Sample\nfield Name as string\nstate Draft initial\nevent Create initial");
+
+        var initialToken = compilation.Tokens.Tokens.FirstOrDefault(t => t.Kind == TokenKind.Initial && t.Span.StartLine == 3);
+        initialToken.Should().NotBe(default(Precept.Language.Token), because: "initial token must exist on event declaration line");
+        TokensCatalog.GetMeta(initialToken.Kind).VisualCategory.Should().Be(SemanticTokenTypeKind.KeywordSemantic,
+            because: "initial modifier uses KeywordSemantic so it is colored by TextMate grammar");
+
+        var lspTokens = SemanticTokensHandler.ProjectLexicalTokens(compilation);
+        lspTokens.Should().NotContain(token => token.Kind == TokenKind.Initial,
+            because: "KeywordSemantic tokens are suppressed from LSP semantic tokens output");
+    }
+
+    [Fact]
     public void LexicalTokens_MultipleSuppressedKeywordsOnSameLine_AreNotEmitted()
     {
         var compilation = Compiler.Compile("precept Sample\nstate Draft initial terminal");

@@ -258,11 +258,11 @@
       ]
     },
     "eventDeclaration": {
-      "comment": "event Name[, Name, ...] or event Name(Arg as type, ...)",
+      "comment": "event Name[, Name, ...] [modifier] or event Name [modifier](Arg as type, ...)",
       "patterns": [
         {
           "name": "meta.declaration.event.precept",
-          "match": "^(\\s*)(event)(\\s\u002B)((?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)(\\s*\\(.*)?",
+          "match": "^(\\s*)(event)(\\s\u002B)((?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)(\\s\u002B(?:initial)\\b)?(\\s*\\(.*)?",
           "captures": {
             "2": {
               "name": "keyword.declaration.precept"
@@ -280,6 +280,14 @@
               ]
             },
             "5": {
+              "patterns": [
+                {
+                  "name": "keyword.other.semantic.precept",
+                  "match": "\\b(?:initial)\\b"
+                }
+              ]
+            },
+            "6": {
               "patterns": [
                 {
                   "match": "\\b([A-Za-z_][A-Za-z0-9_]*)(?=\\s\u002Bas\\b)",

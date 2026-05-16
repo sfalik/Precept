@@ -199,6 +199,27 @@ internal sealed class HoverHandler : IHoverHandler
         return false;
     }
 
+    private static bool TryCreateEventModifierHover(Compilation compilation, Token token, Position position, out Hover hover)
+    {
+        hover = null!;
+
+        var modifierMeta = Modifiers.All.OfType<EventModifierMeta>()
+            .FirstOrDefault(m => m.Token.Kind == token.Kind);
+        if (modifierMeta is null)
+        {
+            return false;
+        }
+
+        var construct = CursorSemanticResolver.GetEnclosingConstruct(compilation, position);
+        if (construct?.Meta.Kind != ConstructKind.EventDeclaration)
+        {
+            return false;
+        }
+
+        hover = MakeHover($"**{modifierMeta.Token.Text}** *(event modifier)*\n\n{modifierMeta.Description}", token.Span);
+        return true;
+    }
+
     private static bool TryCreateTypeHover(Compilation compilation, Token token, out Hover hover)
     {
         hover = null!;

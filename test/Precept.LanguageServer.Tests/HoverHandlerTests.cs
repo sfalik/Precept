@@ -598,6 +598,23 @@ state Draft initial
     }
 
     [Fact]
+    public void Hover_InitialModifier_ReturnsText()
+    {
+        // Slice 9: Hovering over the `initial` modifier keyword in an event declaration
+        // returns a modifier-specific description, not the generic token metadata fallback.
+        const string source = """
+            precept InitialModifierHover
+            event Create(Name as string) initial
+            """;
+
+        var markup = GetHoverMarkdown(source, "initial");
+
+        markup.Should().Contain("initial");
+        markup.Should().Contain("Construction mechanism");
+        markup.Should().NotBe(string.Empty);
+    }
+
+    [Fact]
     public void Hover_OnInitialEvent_ShowsConstructorWording()
     {
         const string source = """
