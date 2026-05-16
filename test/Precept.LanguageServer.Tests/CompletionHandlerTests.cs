@@ -8,6 +8,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Client;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using Precept.Language;
 using Precept.LanguageServer.Handlers;
 using Xunit;
 
@@ -213,6 +214,21 @@ public class CompletionHandlerTests
 
         labels.Should().Contain(expected);
         labels.Should().NotContain(unexpected);
+    }
+
+    [Fact]
+    public async Task Completions_TransitionRowAfterStateTarget_OffersOnWhenAndArrow()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept BuildingAccessBadgeRequest
+            state Approved initial
+            state Issued terminal
+            event PrintBadge
+            from Approved ¦
+            """, " ");
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        labels.Should().Contain(["on", "when", "->"]);
     }
 
     [Fact]
@@ -846,7 +862,7 @@ public class CompletionHandlerTests
     }
 
     [Fact]
-    public void TypedConstantCursorDiagnostic_DefaultEmptyLiteral_ReportsTopLevelContextAndTypedConstantToken()
+    public void TypedConstantCursorDiagnostic_DefaultEmptyLiteral_ReportsModifierExpressionSlotAndTypedConstantToken()
     {
         var (compilation, position) = GetCompilationAtCursor("""
             precept TravelReimbursement
@@ -855,17 +871,19 @@ public class CompletionHandlerTests
             state Draft initial terminal
             """);
 
-        var context = SlotContextResolver.GetCursorContext(compilation, position);
+        var slotPosition = SlotPositionResolver.Resolve(compilation, position);
         var tokenIndex = FindTokenAtOrBeforeCursor(compilation, position);
         var token = compilation.Tokens.Tokens[tokenIndex];
 
-        context.Should().Be(SlotContext.TopLevel);
+        slotPosition.Should().NotBeNull();
+        slotPosition!.Value.SlotKind.Should().Be(ConstructSlotKind.ModifierList);
+        slotPosition.Value.Phase.Should().Be(SlotPhase.InExpression);
         token.Kind.Should().Be(Precept.Language.TokenKind.TypedConstant);
         Contains(token.Span, position).Should().BeTrue();
     }
 
     [Fact]
-    public void TypedConstantCursorDiagnostic_ExpressionEmptyLiteral_ReportsExpressionContextAndTypedConstantToken()
+    public void TypedConstantCursorDiagnostic_ExpressionEmptyLiteral_ReportsExpressionSlotAndTypedConstantToken()
     {
         var (compilation, position) = GetCompilationAtCursor("""
             precept LoanApplication
@@ -874,11 +892,13 @@ public class CompletionHandlerTests
             state Draft initial terminal
             """);
 
-        var context = SlotContextResolver.GetCursorContext(compilation, position);
+        var slotPosition = SlotPositionResolver.Resolve(compilation, position);
         var tokenIndex = FindTokenAtOrBeforeCursor(compilation, position);
         var token = compilation.Tokens.Tokens[tokenIndex];
 
-        context.Should().Be(SlotContext.InExpression);
+        slotPosition.Should().NotBeNull();
+        slotPosition!.Value.SlotKind.Should().Be(ConstructSlotKind.RuleExpression);
+        slotPosition.Value.Phase.Should().Be(SlotPhase.InExpression);
         token.Kind.Should().Be(Precept.Language.TokenKind.TypedConstant);
         Contains(token.Span, position).Should().BeTrue();
     }

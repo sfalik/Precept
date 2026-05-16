@@ -102,6 +102,11 @@ internal sealed class HoverHandler : IHoverHandler
             return TryIdentifierHover(compilation, token.Value, position);
         }
 
+        if (TryCreateEventModifierHover(compilation, token.Value, position, out var eventModifierHover))
+        {
+            return eventModifierHover;
+        }
+
         if (HasRicherCatalogOwner(compilation, position, token.Value))
         {
             return null;
@@ -198,7 +203,7 @@ internal sealed class HoverHandler : IHoverHandler
     {
         hover = null!;
 
-        if (token.Kind == TokenKind.Set && !SlotContextResolver.IsSetInTypePosition(compilation, token))
+        if (token.Kind == TokenKind.Set && !CursorSemanticResolver.IsSetInTypePosition(compilation, token))
         {
             return false;
         }
@@ -400,7 +405,7 @@ internal sealed class HoverHandler : IHoverHandler
 
     private static bool HasRicherCatalogOwner(Compilation compilation, Position position, Token token)
     {
-        if (token.Kind == TokenKind.Set && SlotContextResolver.IsSetInTypePosition(compilation, token))
+        if (token.Kind == TokenKind.Set && CursorSemanticResolver.IsSetInTypePosition(compilation, token))
         {
             return true;
         }
@@ -815,3 +820,4 @@ internal sealed class HoverHandler : IHoverHandler
         return -1;
     }
 }
+

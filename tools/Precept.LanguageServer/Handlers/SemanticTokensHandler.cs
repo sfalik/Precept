@@ -193,7 +193,7 @@ internal sealed class SemanticTokensHandler : SemanticTokensHandlerBase
             // Contextual reclassification: 'set' emits the type custom token in type-expression position.
             // SetType.VisualCategory is intentionally null (parser-synthesized; never in the lexer stream),
             // so we derive the type token from the catalog rather than the synthetic token kind.
-            else if (token.Kind == TokenKind.Set && SlotContextResolver.IsSetInTypePosition(compilation, token))
+            else if (token.Kind == TokenKind.Set && CursorSemanticResolver.IsSetInTypePosition(compilation, token))
             {
                 effectiveTokenType = SemanticTokenTypesCatalog.GetMeta(SemanticTokenTypeKind.Type).CustomType;
             }
@@ -721,4 +721,5 @@ internal sealed class SemanticTokensHandler : SemanticTokensHandlerBase
         [property: JsonPropertyName("bold")] bool Bold,
         [property: JsonPropertyName("italic")] bool Italic);
 }
+
 

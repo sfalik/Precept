@@ -118,7 +118,7 @@ internal static class CallContextResolver
             Math.Max(tokens[memberNameIndex].Span.StartLine - 1, 0),
             Math.Max(tokens[memberNameIndex].Span.StartColumn - 1, 0));
 
-        if (SlotContextResolver.TryGetReceiverType(compilation, receiverPosition, out receiverType)
+        if (CursorSemanticResolver.TryGetReceiverType(compilation, receiverPosition, out receiverType)
             && receiverType != TypeKind.Error)
         {
             return true;
@@ -134,7 +134,7 @@ internal static class CallContextResolver
         var receiverToken = tokens[receiverTokenIndex];
         if (receiverToken.Kind == TokenKind.Identifier)
         {
-            var eventName = SlotContextResolver.GetCurrentEventName(compilation, receiverPosition);
+            var eventName = CursorSemanticResolver.GetCurrentEventName(compilation, receiverPosition);
             if (eventName is not null
                 && compilation.Semantics.EventsByName.TryGetValue(eventName, out var currentEvent))
             {
@@ -268,3 +268,4 @@ internal static class CallContextResolver
         return true;
     }
 }
+

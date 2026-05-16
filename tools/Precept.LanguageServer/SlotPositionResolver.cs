@@ -28,7 +28,7 @@ internal static class SlotPositionResolver
             return null;
         }
 
-        var construct = SlotContextResolver.GetEnclosingConstruct(compilation, position);
+        var construct = CursorSemanticResolver.GetEnclosingConstruct(compilation, position);
         if (construct is null)
         {
             return TryResolveImplicitChainPosition(compilation, tokens, tokenIndex, out var implicitChain)
@@ -89,7 +89,7 @@ internal static class SlotPositionResolver
                 continue;
             }
 
-            var construct = SlotContextResolver.GetEnclosingConstruct(
+            var construct = CursorSemanticResolver.GetEnclosingConstruct(
                 compilation,
                 new Position(candidate.Span.StartLine - 1, candidate.Span.StartColumn - 1));
             if (construct is null
@@ -210,6 +210,7 @@ internal static class SlotPositionResolver
 
         if (owner.Meta.Kind == ConstructSlotKind.ActionChain)
         {
+            // TODO: derive from ActionSyntaxSlot.Vocabulary annotations once that catalog gap is filled
             return previousToken.Kind is TokenKind.Assign or TokenKind.By or TokenKind.At;
         }
 
@@ -372,3 +373,4 @@ internal enum SlotPhase
     AfterSlot,
     InExpression,
 }
+

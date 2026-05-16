@@ -94,7 +94,7 @@ internal sealed class CompletionHandler : ICompletionHandler
                 return CreateCompletionList(slotItems);
             }
 
-            return new CompletionList([], true);
+            return new CompletionList([], false);
         }
 
         // Dot trigger: always attempt member access completions.
@@ -136,6 +136,11 @@ internal sealed class CompletionHandler : ICompletionHandler
             return CreateCompletionList(GetHoleItems(compilation, position));
         }
 
+        if (slotPosition is { Construct: ConstructKind.PreceptHeader, SlotKind: ConstructSlotKind.IdentifierList })
+        {
+            return CreateCompletionList(GetTopLevelItems(lineText, position.Character));
+        }
+
         if (IsAfterValueNamePosition(compilation, position))
         {
             return CreateCompletionList(GetTypeAnnotationItems());
@@ -144,6 +149,47 @@ internal sealed class CompletionHandler : ICompletionHandler
         if (IsSetAssignmentPosition(compilation, position))
         {
             return CreateCompletionList(GetSetAssignmentItem());
+        }
+
+        if (TryGetCompletedStateTargetLeadingToken(compilation.Tokens.Tokens, position, out _))
+        {
+            return CreateCompletionList(GetPostStateTargetItems(compilation, position));
+        }
+
+        if (IsFieldTargetListContinuationPosition(compilation, position))
+        {
+            return CreateCompletionList(GetFieldContinuationItems(compilation, position));
+        }
+
+        if (IsImplicitActionChainContinuationPosition(compilation, position))
+        {
+            return CreateCompletionList(GetActionKeywordItems(compilation, position));
+        }
+
+        if (IsEventTargetStartPosition(compilation, position, slotPosition))
+        {
+            return CreateCompletionList(GetEventItems(compilation));
+        }
+
+        if (IsStateTargetStartPosition(compilation, position, slotPosition))
+        {
+            return CreateCompletionList(GetStateTargetStartItems(compilation, position));
+        }
+
+        if (IsAccessFieldTargetStartPosition(compilation, position))
+        {
+            return CreateCompletionList(GetAccessFieldTargetStartItems(compilation));
+        }
+
+        if (IsEventArgDefaultFallbackPosition(compilation, position)
+            || IsValuedModifierExpressionPosition(compilation, position))
+        {
+            return CreateCompletionList(GetExpressionItems(compilation, position));
+        }
+
+        if (TryGetModifierFallbackItems(compilation, position, out var modifierFallbackItems))
+        {
+            return CreateCompletionList(modifierFallbackItems);
         }
 
         if (slotPosition is null)
@@ -406,7 +452,7 @@ internal sealed class CompletionHandler : ICompletionHandler
         Position position,
         ResolvedSlotPosition slotPosition)
     {
-        if (slotPosition.Phase == SlotPhase.AfterSlot)
+        if (!ShouldOfferTypeKeywordItems(compilation, position))
         {
             return GetModifierItems(compilation, position, slotPosition);
         }
@@ -435,6 +481,11 @@ internal sealed class CompletionHandler : ICompletionHandler
         Position position,
         ResolvedSlotPosition slotPosition)
     {
+        if (IsActionFieldTargetPosition(compilation, position))
+        {
+            return GetFieldItems(compilation);
+        }
+
         if (slotPosition.Phase == SlotPhase.InExpression)
         {
             return GetExpressionItems(compilation, position);
@@ -776,6 +827,15 @@ internal sealed class CompletionHandler : ICompletionHandler
     private static IEnumerable<CompletionItem> GetNoTransitionItems() =>
         [CreateTokenItem(Outcomes.NoTransitionSecondaryToken)];
 
+    private static IEnumerable<CompletionItem> GetAccessModeItems() =>
+        GetModifiers(ModifierDomain.Access)
+            .Select(meta => CreateItem(
+                label: meta.Token.Text ?? meta.Kind.ToString().ToLowerInvariant(),
+                detail: meta.Description,
+                kind: CompletionItemKind.Keyword,
+                sortGroup: CompletionSortGroup.Keyword,
+                documentation: meta.Description));
+
     private static IEnumerable<CompletionItem> GetExpressionItems(Compilation compilation, Position position)
     {
         if (CursorSemanticResolver.TryGetReceiverType(compilation, position, out var receiverType))
@@ -916,7 +976,14 @@ internal sealed class CompletionHandler : ICompletionHandler
         bool appendClosingQuote = false)
     {
         if (!TryGetTypedConstantContext(compilation, position, slotPosition, out var tcContext))
-            return [];
+        {
+            if (!TryGetCurrentDeclarationType(compilation, position, out var declaredType))
+            {
+                return [];
+            }
+
+            tcContext = TypedConstantContext.FromType(declaredType);
+        }
 
         var items = tcContext.ExpectedType switch
         {
@@ -1446,7 +1513,8 @@ internal sealed class CompletionHandler : ICompletionHandler
             return true;
         }
 
-        if (IsEventArgDefaultPosition(slotPosition) && TryGetCurrentEventArg(compilation, position, out var arg))
+        if ((IsEventArgDefaultPosition(slotPosition) || slotPosition is null)
+            && TryGetCurrentEventArg(compilation, position, out var arg))
         {
             tcContext = TypedConstantContext.FromArg(arg);
             return true;
@@ -1476,6 +1544,12 @@ internal sealed class CompletionHandler : ICompletionHandler
             return true;
         }
 
+        if (IsExpressionPosition(slotPosition) && TryGetCurrentDeclarationType(compilation, position, out var declarationType))
+        {
+            tcContext = TypedConstantContext.FromType(declarationType);
+            return true;
+        }
+
         if (IsExpressionPosition(slotPosition)
             && TryGetBinaryPeerOperandType(compilation, position, out var peerType, out var peerQualifiers))
         {
@@ -1496,7 +1570,7 @@ internal sealed class CompletionHandler : ICompletionHandler
         };
 
     private static bool IsExpressionPosition(ResolvedSlotPosition? slotPosition) =>
-        slotPosition is { Phase: SlotPhase.InExpression };
+        slotPosition is null || slotPosition is { Phase: SlotPhase.InExpression };
 
     private static bool TryGetDeclarationQualifierContext(
         Compilation compilation,
@@ -2021,16 +2095,42 @@ internal sealed class CompletionHandler : ICompletionHandler
         return false;
     }
 
+    private static ParsedConstruct? GetEnclosingConstructAtOrBefore(Compilation compilation, Position position)
+    {
+        for (var character = position.Character; character >= 0; character--)
+        {
+            var construct = CursorSemanticResolver.GetEnclosingConstruct(compilation, new Position(position.Line, character));
+            if (construct is not null)
+            {
+                return construct;
+            }
+        }
+
+        return null;
+    }
+
+    private static bool TryGetPreviousPosition(Position position, out Position previousPosition)
+    {
+        if (position.Character <= 0)
+        {
+            previousPosition = new Position(position.Line, 0);
+            return false;
+        }
+
+        previousPosition = new Position(position.Line, position.Character - 1);
+        return true;
+    }
+
     private static bool TryGetEnclosingField(Compilation compilation, Position position, out TypedField field)
     {
-        var construct = CursorSemanticResolver.GetEnclosingConstruct(compilation, position);
+        var construct = GetEnclosingConstructAtOrBefore(compilation, position);
         field = compilation.Semantics.Fields.FirstOrDefault(candidate => candidate.Syntax == construct)!;
         return field is not null;
     }
 
     private static bool TryGetCurrentEventArg(Compilation compilation, Position position, out TypedArg arg)
     {
-        var construct = CursorSemanticResolver.GetEnclosingConstruct(compilation, position);
+        var construct = GetEnclosingConstructAtOrBefore(compilation, position);
         var currentEvent = compilation.Semantics.Events.FirstOrDefault(candidate => candidate.Syntax == construct);
         if (currentEvent is null)
         {
@@ -2153,6 +2253,288 @@ internal sealed class CompletionHandler : ICompletionHandler
         return tokens[previousIndex].Kind == TokenKind.Into
             && TryGetCurrentActionMeta(tokens, previousIndex, out var intoAction)
             && ExpectsFieldTargetAfterInto(intoAction.SyntaxShape);
+    }
+
+    private static bool IsActionFieldTargetPosition(Compilation compilation, Position position)
+    {
+        var tokens = compilation.Tokens.Tokens;
+        var tokenIndex = GetCurrentTriggerTokenIndex(tokens, position);
+        if (tokenIndex < 0)
+        {
+            return false;
+        }
+
+        var token = tokens[tokenIndex];
+        if (Actions.ByTokenKind.TryGetValue(token.Kind, out var actionMeta))
+        {
+            return ExpectsFieldTargetAfterActionVerb(actionMeta.SyntaxShape);
+        }
+
+        if (token.Kind != TokenKind.Into)
+        {
+            return false;
+        }
+
+        for (var index = tokenIndex - 1; index >= 0; index = FindPreviousSignificantToken(tokens, index - 1))
+        {
+            if (!Actions.ByTokenKind.TryGetValue(tokens[index].Kind, out var currentAction))
+            {
+                continue;
+            }
+
+            return ExpectsFieldTargetAfterInto(currentAction.SyntaxShape);
+        }
+
+        return false;
+    }
+
+    private static bool ShouldOfferTypeKeywordItems(Compilation compilation, Position position)
+    {
+        var tokens = compilation.Tokens.Tokens;
+        var tokenIndex = GetCurrentTriggerTokenIndex(tokens, position);
+        if (tokenIndex < 0)
+        {
+            return false;
+        }
+
+        var kind = tokens[tokenIndex].Kind;
+        if (kind == TokenKind.As)
+        {
+            return true;
+        }
+
+        if (kind != TokenKind.Of)
+        {
+            return false;
+        }
+
+        var previousIndex = FindPreviousSignificantToken(tokens, tokenIndex - 1);
+        if (previousIndex < 0)
+        {
+            return false;
+        }
+
+        var lookupKind = tokens[previousIndex].Kind == TokenKind.Set
+            ? TokenKind.SetType
+            : tokens[previousIndex].Kind;
+        if (!Types.ByToken.TryGetValue(lookupKind, out var previousType))
+        {
+            return false;
+        }
+
+        return previousType.Category == TypeCategory.Collection
+            || previousType.Kind == TypeKind.Choice;
+    }
+
+    private static bool IsFieldTargetListContinuationPosition(Compilation compilation, Position position)
+    {
+        var tokens = compilation.Tokens.Tokens;
+        var tokenIndex = GetCurrentTriggerTokenIndex(tokens, position);
+        if (tokenIndex < 0)
+        {
+            return false;
+        }
+
+        var construct = CursorSemanticResolver.GetEnclosingConstruct(compilation, position);
+        return construct?.Meta.Slots.Any(slot => slot.Kind == ConstructSlotKind.FieldTarget) == true
+            && TryGetCommaListContinuationPreviousTokenIndex(tokens, tokenIndex, tokens[tokenIndex], position, out var previousFieldIndex)
+            && tokens[previousFieldIndex].Kind == TokenKind.Identifier;
+    }
+
+    private static IEnumerable<CompletionItem> GetFieldContinuationItems(Compilation compilation, Position position)
+    {
+        var alreadySelectedFields = GetAlreadySelectedFieldNamesFromConstruct(compilation, position);
+        return compilation.Semantics.Fields
+            .Select(field => field.Name)
+            .Distinct(StringComparer.Ordinal)
+            .Where(name => !alreadySelectedFields.Contains(name))
+            .Select(name => CreateItem(name, "Field", CompletionItemKind.Field, CompletionSortGroup.SemanticSymbol));
+    }
+
+    private static ImmutableHashSet<string> GetAlreadySelectedFieldNamesFromConstruct(Compilation compilation, Position position)
+    {
+        var fieldTargetSlot = CursorSemanticResolver.GetEnclosingConstruct(compilation, position)
+            ?.GetSlot<FieldTargetSlot>(ConstructSlotKind.FieldTarget);
+        if (fieldTargetSlot is null)
+        {
+            return ImmutableHashSet<string>.Empty;
+        }
+
+        var builder = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+        if (fieldTargetSlot.FieldName is not null && EndsBeforeCursor(fieldTargetSlot.NameSpan, position))
+        {
+            builder.Add(fieldTargetSlot.FieldName);
+        }
+
+        foreach (var (name, span) in fieldTargetSlot.AdditionalFields)
+        {
+            if (EndsBeforeCursor(span, position))
+            {
+                builder.Add(name);
+            }
+        }
+
+        return builder.ToImmutable();
+    }
+
+    private static bool IsEventTargetStartPosition(
+        Compilation compilation,
+        Position position,
+        ResolvedSlotPosition? slotPosition)
+    {
+        var tokens = compilation.Tokens.Tokens;
+        var tokenIndex = GetCurrentTriggerTokenIndex(tokens, position);
+        if (tokenIndex < 0)
+        {
+            return false;
+        }
+
+        return tokens[tokenIndex].Kind switch
+        {
+            TokenKind.On => true,
+            TokenKind.When => slotPosition is null,
+            _ => false,
+        };
+    }
+
+    private static bool IsStateTargetStartPosition(
+        Compilation compilation,
+        Position position,
+        ResolvedSlotPosition? slotPosition)
+    {
+        var tokens = compilation.Tokens.Tokens;
+        var tokenIndex = GetCurrentTriggerTokenIndex(tokens, position);
+        return tokenIndex >= 0 && tokens[tokenIndex].Kind is TokenKind.In or TokenKind.From or TokenKind.To or TokenKind.Transition;
+    }
+
+    private static bool IsAccessFieldTargetStartPosition(Compilation compilation, Position position)
+    {
+        var tokens = compilation.Tokens.Tokens;
+        var tokenIndex = GetCurrentTriggerTokenIndex(tokens, position);
+        return tokenIndex >= 0 && tokens[tokenIndex].Kind is TokenKind.Modify or TokenKind.Omit;
+    }
+
+    private static IEnumerable<CompletionItem> GetAccessFieldTargetStartItems(Compilation compilation) =>
+        DistinctByLabel(GetFieldItems(compilation).Concat([CreateTokenItem(TokenKind.All)]));
+
+    private static bool IsValuedModifierExpressionPosition(Compilation compilation, Position position)
+    {
+        var construct = GetEnclosingConstructAtOrBefore(compilation, position);
+        if (construct?.Meta.Kind is not (ConstructKind.FieldDeclaration or ConstructKind.EventDeclaration))
+        {
+            return false;
+        }
+
+        var tokens = compilation.Tokens.Tokens;
+        var tokenIndex = GetCurrentTriggerTokenIndex(tokens, position);
+        return tokenIndex >= 0
+            && Modifiers.ByValueToken.TryGetValue(tokens[tokenIndex].Kind, out var modifierMeta)
+            && modifierMeta.HasValue;
+    }
+
+    private static bool TryGetModifierFallbackItems(
+        Compilation compilation,
+        Position position,
+        out IEnumerable<CompletionItem> items)
+    {
+        var construct = GetEnclosingConstructAtOrBefore(compilation, position);
+        if (construct is null)
+        {
+            items = [];
+            return false;
+        }
+
+        var tokens = compilation.Tokens.Tokens;
+        var tokenIndex = GetCurrentTriggerTokenIndex(tokens, position);
+        if (tokenIndex < 0)
+        {
+            items = [];
+            return false;
+        }
+
+        var token = tokens[tokenIndex];
+        var tokenMeta = Tokens.GetMeta(token.Kind);
+        var isDeclarationName = token.Kind == TokenKind.Identifier
+            && !Contains(token.Span, position)
+            && (construct.Meta.Kind == ConstructKind.EventDeclaration && FindPreviousSignificantToken(tokens, tokenIndex - 1) >= 0
+                && tokens[FindPreviousSignificantToken(tokens, tokenIndex - 1)].Kind == TokenKind.Event);
+        var isModifierToken = tokenMeta.Categories.Contains(TokenCategory.StateModifier)
+            || tokenMeta.Categories.Contains(TokenCategory.Constraint)
+            || Modifiers.All.Any(modifier => modifier.Token.Kind == token.Kind);
+        var isDeclarationTypeToken = tokenMeta.Categories.Contains(TokenCategory.Type)
+            && construct.Meta.Kind is ConstructKind.FieldDeclaration or ConstructKind.EventDeclaration;
+
+        if (!isDeclarationName && !isModifierToken && !isDeclarationTypeToken)
+        {
+            items = [];
+            return false;
+        }
+
+        var domain = GetModifierDomain(compilation, position, construct);
+        items = GetModifierPositionItems(compilation, position, construct, domain);
+        return true;
+    }
+
+    private static IEnumerable<CompletionItem> GetStateTargetStartItems(Compilation compilation, Position position)
+    {
+        var tokens = compilation.Tokens.Tokens;
+        var tokenIndex = GetCurrentTriggerTokenIndex(tokens, position);
+        if (tokenIndex < 0)
+        {
+            return [];
+        }
+
+        return tokens[tokenIndex].Kind == TokenKind.Transition
+            ? GetStateItems(compilation)
+            : DistinctByLabel(GetStateItems(compilation).Concat([CreateTokenItem(TokenKind.Any)]));
+    }
+
+    private static bool IsEventArgDefaultFallbackPosition(Compilation compilation, Position position)
+    {
+        var tokens = compilation.Tokens.Tokens;
+        var tokenIndex = GetCurrentTriggerTokenIndex(tokens, position);
+        if (tokenIndex < 0)
+        {
+            return false;
+        }
+
+        return Modifiers.ByValueToken.TryGetValue(tokens[tokenIndex].Kind, out var modifierMeta)
+            && modifierMeta.Kind == ModifierKind.Default
+            && TryGetCurrentEventArg(compilation, position, out _);
+    }
+
+    private static bool TryGetCommaListContinuationPreviousTokenIndex(
+        ImmutableArray<Token> tokens,
+        int tokenIndex,
+        Token token,
+        Position position,
+        out int previousItemIndex)
+    {
+        previousItemIndex = -1;
+        if (tokenIndex < 0)
+        {
+            return false;
+        }
+
+        if (token.Kind == TokenKind.Comma && !Contains(token.Span, position))
+        {
+            previousItemIndex = FindPreviousSignificantToken(tokens, tokenIndex - 1);
+            return previousItemIndex >= 0;
+        }
+
+        if (token.Kind != TokenKind.Identifier || !Contains(token.Span, position))
+        {
+            return false;
+        }
+
+        var commaIndex = FindPreviousSignificantToken(tokens, tokenIndex - 1);
+        if (commaIndex < 0 || tokens[commaIndex].Kind != TokenKind.Comma)
+        {
+            return false;
+        }
+
+        previousItemIndex = FindPreviousSignificantToken(tokens, commaIndex - 1);
+        return previousItemIndex >= 0;
     }
 
     private static bool IsFieldDeclarationNameToken(ImmutableArray<Token> tokens, int tokenIndex)
