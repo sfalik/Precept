@@ -1021,7 +1021,7 @@ internal sealed class CompletionHandler : ICompletionHandler
         {
             Label = item.Label,
             InsertText = (item.InsertText ?? item.Label) + suffix,
-            InsertTextFormat = InsertTextFormat.PlainText,
+            InsertTextFormat = item.InsertTextFormat,
             Documentation = item.Documentation,
             SortText = item.SortText,
             Detail = item.Detail,

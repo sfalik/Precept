@@ -56,3 +56,9 @@
 - Newman's MCP DTO follow-through and Frank's docs/sample closeout completed the remaining downstream surfaces, so the tooling lane now ships as part of a full vertical slice rather than an isolated editor change.
 - Scribe merged the Slices 9+10 completion note into `.squad/decisions.md` and recorded the batch in squad logs.
 
+### 2026-05-16T18:59:08-04:00 — Slice 0 snippet-format prerequisite closed
+
+- Fixed `CompletionHandler.AppendToInsertText` so `'`-trigger typed-constant completions preserve the source `InsertTextFormat` instead of downgrading snippets to plain text.
+- Added regression coverage in `CompletionHandlerTests` for both branches: plain-text items still append the closing quote without becoming snippets, and snippet items with `${1:...}` keep `InsertTextFormat.Snippet` after suffix append.
+- Validation: targeted `CompletionHandlerTests.Completions_TypedConstant_SingleQuoteTrigger*` passed, then full `dotnet test --nologo` passed. Slice A is unblocked.
+

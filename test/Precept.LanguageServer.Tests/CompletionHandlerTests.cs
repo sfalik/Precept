@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
@@ -1153,6 +1154,42 @@ public class CompletionHandlerTests
     }
 
     [Fact]
+    public void Completions_TypedConstant_SingleQuoteTrigger_PlainTextItem_AppendsClosingQuote()
+    {
+        var item = new CompletionItem
+        {
+            Label = "USD",
+            InsertText = "USD",
+            InsertTextFormat = InsertTextFormat.PlainText,
+            Detail = "currency code",
+            Kind = CompletionItemKind.Unit,
+        };
+
+        var appended = AppendToInsertText(item, "'");
+
+        appended.InsertText.Should().Be("USD'");
+        appended.InsertTextFormat.Should().NotBe(InsertTextFormat.Snippet);
+    }
+
+    [Fact]
+    public void Completions_TypedConstant_SingleQuoteTrigger_SnippetItem_PreservesFormat()
+    {
+        var item = new CompletionItem
+        {
+            Label = "date — YYYY-MM-DD",
+            InsertText = "${1:2026}-${2:05}-${3:16}",
+            InsertTextFormat = InsertTextFormat.Snippet,
+            Detail = "date literal",
+            Kind = CompletionItemKind.Snippet,
+        };
+
+        var appended = AppendToInsertText(item, "'");
+
+        appended.InsertText.Should().Be("${1:2026}-${2:05}-${3:16}'");
+        appended.InsertTextFormat.Should().Be(InsertTextFormat.Snippet);
+    }
+
+    [Fact]
     public async Task Completions_SortsSemanticSymbolsBeforeCatalogItems()
     {
         var completions = await GetCompletionsAsync("""
@@ -2007,6 +2044,15 @@ public class CompletionHandlerTests
         completions.Items.Single(item =>
             string.Equals(item.Label, label, StringComparison.Ordinal)
             && string.Equals(item.Detail, detail, StringComparison.Ordinal));
+
+    private static CompletionItem AppendToInsertText(CompletionItem item, string suffix)
+    {
+        var method = typeof(CompletionHandler).GetMethod("AppendToInsertText", BindingFlags.NonPublic | BindingFlags.Static);
+        method.Should().NotBeNull();
+        var result = method!.Invoke(null, [item, suffix]);
+        result.Should().BeOfType<CompletionItem>();
+        return (CompletionItem)result!;
+    }
 
     private static (Precept.Pipeline.Compilation Compilation, Position Position) GetCompilationAtCursor(string sourceWithCursor)
     {
