@@ -1,161 +1,38 @@
 ## Core Context
 
 - Owns language research, spec wording, and cross-surface architecture documentation for the Precept DSL and runtime.
-- Catalog metadata remains the language truth; pipeline, runtime, tooling, and docs should derive from durable metadata rather than enum-identity switches or parallel lists.
-- Proof, qualifier, field-state, and normalization design work must stay grounded in shipped surfaces and verified implementation seams.
+- Catalog metadata remains the language truth; parser, analyzer, evaluator, tooling, and docs should derive from durable metadata rather than enum-identity switches or parallel keyword lists.
+- Constructor-semantics work stays complete only when docs, diagnostics, samples, and downstream tooling surfaces match shipped behavior.
 
 ## Live Guidance
 
 - Quantity normalization still has two durable lanes: compile-time normalization for declarations/literals and runtime normalization for ingress values; both should stay on shared normalizer logic.
 - `TypedField` remains the normalization handshake between analysis and execution: authored bounds stay available for display, normalized bounds feed proof/comparison surfaces.
 - Comparison/equality checking must stay as strict about explicit counting-unit identity as assignment is about constrained qualifier axes.
-- Completion-provider defects should be treated as context-routing mistakes first; prefer catalog-sourced vocabularies plus explicit slot lanes over local keyword lists.
-- Reject-bearing surfaces should be split structurally: success/mutation rows and refusal rows are separate constructs, not a shared slot plus cleanup diagnostics.
+- When the grammar can make an invalid form impossible, do that instead of inventing a later semantic ban.
+- Documentation updates for a shipped feature must verify against the actual source and validation run; stale tooling builds are ops drift, not spec truth.
 
 ## Durable Learnings
 
 - Any claim that work happens "only at compile time" must be stress-tested against Fire/Update/Restore ingress paths.
-- Dynamic-unit interpolated forms MUST produce `Unbounded` / not-proved — never fall back to raw `StaticMagnitude` against normalized bounds.
-- Counting-unit comparisons need unit-code identity, not just dimension-family compatibility.
-- `ResolveSlotSourceQualifierAxis` must distinguish `Unknown` from `Absent`; `IsAssignmentQualifierAxisApplicable` is the discriminator.
-- Function-call qualifier preservation belongs in the same enforcement story as operator qualifier compatibility.
-- When the grammar can make an invalid form impossible, do that instead of inventing a later semantic ban.
+- Construction row syntax is now declaration-driven: `initial` lives only on event declarations, while authored rows are bare `on <Event>` and the type checker classifies construction from event metadata.
+- Graph analysis for construction must stay semantic, not topological: construction handlers do not generate graph edges, PRE0081 must consult construction handlers, and `GraphEvent.IsInitial` must come from event metadata.
 - Hollow-entity validation should be shared across all pre-materialization expression lanes, not re-added slot by slot.
-- Formal grammar production rules must reflect structural exclusion decisions immediately — the grammar doc is a design deliverable, not an afterthought that waits for implementation.
-- Documentation updates for a shipped feature must verify against the actual source — spec claims and runtime-api.md must match `EventOutcome.cs`, `Precept.cs`, and `Version.cs` exactly. The MCP tool can be stale; always cross-check with `dotnet build` + test suite.
-- Construction row syntax: `initial` is ONLY on event DECLARATIONS. The row form is bare `on <Event>` — the type checker classifies construction via `resolvedEvent.IsInitial`, not parser-time disambiguation.
+- Formal grammar production rules must reflect structural exclusion decisions immediately; the grammar doc is a design deliverable, not follow-up cleanup.
 
-- Completed the planned runtime-tool section in `docs/tooling/mcp.md` so all four planned tools now have purpose, inputs, outputs, and explicit runtime-implementation dependencies: `precept_create`, `precept_update`, `precept_inspect`, and `precept_fire`.
-- Locked OQ7 in `docs/working/constructor-semantics.md`: construction inspection will be implemented as `InspectCreate()` in core and exposed through `precept_inspect`.
-- Wrote the confirmation note to `.squad/decisions/inbox/frank-planned-runtime-tools.md` so the canonical MCP doc reflects Shane's confirmed surface before runtime work begins.
-
-### 2026-05-16T02:47:48Z — Frank-24 decision merged and inbox cleared
-
-- Merged the `frank-oq4-unreachable-row.md` inbox note into `.squad/decisions.md`.
-- The durable row-shadowing diagnostic is `UnreachableRow`; the construction-row family now uses `EventRow` / `EventRowReject`.
-- The inbox note was deleted after merge.
 ## Historical Summary
 
 - 2026-05-12 through 2026-05-16 concentrated Frank's work around hover contract reviews, field-state guarantees, constructor semantics, reject-surface structure, interval-proof design, quantity normalization, diagnostic-enforcement architecture, and counting-unit comparison gaps.
 - The constructor/reject track settled three durable ideas: `on <Event>` is the honest construction surface, fallback `reject` is valid authored refusal rather than misuse, and grammar-level structural exclusion is preferred whenever the language already knows a path is impossible.
-- The 2026-05-15/16 constructor spike also locked OQ4/OQ5/OQ6, applied the `Resolution/Reject` naming sweep, and cleared Slice 3/4 review gates; the detailed batch-by-batch notes now live in `.squad/decisions.md`.
-- Older slice-by-slice review detail now lives in `history-archive.md` and `.squad/decisions.md`; this file keeps only the guidance and outcomes other agents need immediately.
+- Detailed batch-by-batch chronology now lives in `.squad/decisions.md` and `history-archive.md`; this file keeps only the guidance and latest durable closeout.
 
 ## Recent Updates
 
-### 2026-05-16T09:55:00-04:00 — Slice 3 Review: CompletionHandler Cut-Over APPROVED
+### 2026-05-16T13:08:43Z — Constructor semantics batch closed end-to-end
 
-- Reviewed Kramer's final slice (commit `25cd53a4`): `CompletionHandler` now dispatches via `SlotPositionResolver.Resolve()` + `SlotVocabulary` switch.
-- `SlotContext.cs` (1640 lines) deleted entirely — no residual references in source.
-- `CursorSemanticResolver.cs` extraction is clean; non-dispatch utilities rewired correctly.
-- Token-level fallback layer (lines 139–193) is narrow and intentional — transitional surface for contexts not yet expressible in slot metadata.
-- TODO confirmed at `SlotPositionResolver.cs:213` for hardcoded expression-introducer set.
-- New `TransitionRowAfterStateTarget` test validates the critical post-state-target disambiguation context.
-- Build clean (0 errors), 6443 tests passing.
-- Full 3-slice refactor complete: catalog-driven completions are now the only routing path.
-- Verdict: APPROVED. Decision written to `.squad/decisions/inbox/frank-slice3-review.md`.
+- Frank's graph-analyzer passes locked the durable analyzer model: construction handlers live in `EventHandlers`, do not create topology edges, and require semantic handling for PRE0081 and `GraphEvent.IsInitial`.
+- George completed Slice 8b at commit `c72db9b0`, removing row-level `initial` and making construction classification metadata/type-check driven.
+- Kramer completed Slices 9+10 at commits `ec5525d2` and `e19736f6`, aligning hover and grammar generation with declaration-level `initial` semantics.
+- Newman completed Slice 11, adding `isConstruction` to the MCP compile event-handler DTO surface without duplicating core logic.
+- Frank completed Slice 12 docs/sample closeout: the language spec and constructor-semantics tracker are current, `CHANGELOG.md` records the shipped surface, and `samples/Test.precept` was locally verified while the stale MCP result was correctly treated as deployment drift.
 
-### 2026-05-16T09:02:56-04:00 — Slice 2 Review: SlotPositionResolver APPROVED
-
-- Reviewed Kramer's `SlotPositionResolver.cs` and 31-assertion test file.
-- Architecture is sound: reuses `GetEnclosingConstruct()`, derives phase from slot metadata (`IsList`, `IsChainable`, `ItemIntroducerToken`, `TerminationTokens`).
-- Identified one advisory (non-blocking): line 213's `Assign`/`By`/`At` hardcoded set should become catalog-derived once `ActionSyntaxSlot` gains role→vocabulary annotation. Tracked for Slice 3.
-- Shadow-run tests validate equivalence against legacy resolver. `InList` and `InChain` phases tested explicitly — core bug class covered.
-- Verdict: APPROVED. Slice 3 may proceed.
-- Decision written to `.squad/decisions/inbox/frank-slice2-review.md`.
-
-### 2026-05-16T09:08:43-04:00 — Graph Analyzer: Complete Row Taxonomy Analysis (Broadened)
-
-- Broadened the frank-25 construction-row analysis to cover ALL row types in Precept.
-- Complete taxonomy: 5 row kinds — `TransitionRow`, `TransitionRowReject` (generate edges, live in `TransitionRows`), `EventRow`, `ConstructionRow`, `ConstructionRowReject` (no edges, live in `EventHandlers`).
-- Validated user's intuition: ALL EventRow-family rows are structurally incapable of state transitions — no `FromState`, no `TargetState`, no `Outcome`. The graph analyzer should NOT generate edges for them. Correct.
-- Confirmed `BuildEdges` is complete — it correctly processes only `TransitionRows` and correctly handles both success and reject subtypes.
-- Confirmed PRE0081 is the ONLY diagnostic with a false-positive gap. All 8 other graph-analyzer diagnostics reason about state-to-state topology and are immune.
-- `AlwaysRejecting` (PRE0082) already correctly scans BOTH collections — no gap there.
-- Plain `EventRow` (stateless handler) cannot cause false positives in stateful precepts because: (a) the `States.Length > 0` gate on PRE0081 protects stateless precepts, and (b) `PRE0092` blocks plain EventRows in stateful precepts at type-check time.
-- Net recommendation: the ~6-line Slice 8b fix is surgical and complete. No structural refactoring needed.
-- Decision written to `.squad/decisions/inbox/frank-graph-analyzer-all-event-rows.md`.
-
-### 2026-05-16T09:06:00-04:00 — Graph Analyzer × Constructor Semantics Deep Dive
-
-- Deep analysis of `GraphAnalyzer.cs` confirmed construction rows should NOT generate graph edges — edges model state-to-state transitions, construction is pre-existence.
-- Confirmed PRE0081 (`UnhandledEvent`) is a **false positive** on construction-only events: `BuildEdges` only processes `TransitionRows`, construction rows live in `EventHandlers`, so construction events produce zero edges and trip the "unhandled" check.
-- Confirmed `AlwaysRejecting` severity promotion (Slice 6) is correct — it already scans `EventHandlers`.
-- Identified 3 gaps: (1) PRE0081 false positive [MUST FIX in 8b], (2) `GraphEvent.IsInitial` flag wrong for construction events [fix in 8b], (3) `EventCoverageFact` cosmetic gap [deferred].
-- Fix for Gap 1: before emitting PRE0081, check `semantics.EventHandlers.Any(row => row.IsConstruction && row.EventName == evt.Name)` and skip.
-- Fix for Gap 2: OR construction-row existence into `GraphEvent.IsInitial` computation.
-- Decision written to `.squad/decisions/inbox/frank-graph-analyzer-construction-deep-dive.md`.
-
-### 2026-05-16T09:00:00-04:00 — Slice 1: Completion vocabulary metadata shipped
-
-- Implemented Option (b) from the catalog-driven completions architecture analysis.
-- Added `SlotVocabulary` enum (13 values) to `src/Precept/Language/ConstructSlot.cs`.
-- Extended `ConstructSlot` record with `IsList`, `IsChainable`, `ItemIntroducerToken`, and `Vocabulary` fields.
-- Populated all 24 slot instances in `Constructs.cs` with correct metadata.
-- Key design decision: `ModifierList.IsList=false` because modifiers are whitespace-separated (no explicit introducer token), unlike comma-separated lists.
-- Added 16 tests in `SlotVocabularyMetadataTests.cs` covering individual slot assertions and structural invariants.
-- Full 3-slice implementation plan written to `.squad/decisions/inbox/frank-completions-plan.md`.
-- All 6,157 tests pass (5780 + 333 + 44).
-
-### 2026-05-16T09:00:00-04:00 — Test.precept line 8 diagnostic analysis
-
-- Analyzed 4 diagnostics on `samples/Test.precept` after premature syntax update (removed `initial` from construction row before Slice 8b implementation).
-- All 4 diagnostics are logically consistent cascade from single root cause: parser classifies `on create` (without `initial`) as plain EventHandler, not ConstructionRow.
-- Identified stale diagnostic messages in PRE0146 and PRE0147 that reference old `on {0} initial` syntax — must be updated in Slice 8b scope.
-- Flagged latent question: does `UnhandledEvent` (PRE0081) correctly exempt initial events with construction rows? Recommended regression test for 8b.
-- Verdict: revert Test.precept to `on create initial` until 8b ships; update the sample in the same PR as the parser change.
-- Decision written to `.squad/decisions/inbox/frank-test-precept-line8-analysis.md`.
-
-### 2026-05-16T03:25:00Z — OQ8 diagram entry arrow locked
-
-- Frank's OQ8 decision was merged into `.squad/decisions.md`.
-- Construction now uses the `●` pseudo-node entry arrow and keeps construction rows in the inspector section above transition rows.
-- The inbox note was deleted after merge.
-### 2026-05-16T03:20:00Z — Scribe batch closed
-
-- The planned runtime-tool note was already present in `.squad/decisions.md`, so the inbox copy was cleared without duplication.
-- No decision entries were older than 30 days, so the archive gate made no changes.
-- Frank history was condensed to stay below the 15 KB threshold.
-
-### 2026-05-16T03:08:40Z — Precept-create OQ6 batch recorded
-
-- Pre-check found `.squad/decisions.md` at 20999 bytes and 0 inbox notes; the archive gate found no entries older than 30 days.
-- No decision merge was needed, no history file crossed the 15 KB summarization gate, and the batch ended with orchestration/session logs only.
-
-### 2026-05-16T03:07:39Z — MCP consolidation batch recorded
-
-- Merged the `frank-precept-create-tool.md` inbox note into `.squad/decisions.md`; the earlier OQ5 canonical note was already present.
-- No decision entries older than 30 days were archived; no agent history crossed the 15 KB gate on this pass.
-
-### Batch summary
-
-- 2026-05-16 02:40 through 02:12: TransitionRow/EventHandler naming was finalized, the reject-only split was confirmed, and constructor/runtime doc sync closed.
-- 2026-05-15 23:59 through 22:12: qualifier follow-ups, completion-position validation, and runtime API sync were completed.
-
-## Learnings
-
-### 2026-05-16T04:16:00Z — Slice 2 Parser Routing implemented
-
-- Secondary disambiguation pattern: `ResolveRejectVariant()` does lookahead for `-> reject` AFTER primary disamb resolves the base kind. Keeps catalog-driven disamb clean while adding post-arrow split logic.
-- `ParseRejectClause` and `ParseSuccessOutcome` live in `Parser.Expressions.cs` alongside `ParseOutcome`.
-- `RejectClauseSlot` and `SuccessOutcomeSlot` added to `SlotValue.cs` with sentinels wired in `MakeSentinel()`.
-- PRE0014 is structurally bypassed: construction rows have `SlotPreVerbGuardArrow` which consumes `when` during slot parsing, so the post-slot guard gate never sees it. No code change needed in the guard gate itself.
-- The `on` leading-token candidate array orders `ConstructionRow` (19) before `ConstructionRowReject` (20), so primary disamb on `Initial` always picks the base kind; reject variant is resolved by secondary lookahead.
-- `TransitionRow` outcome tests that previously used `OutcomeSlot`+`RejectOutcome` must now use `RejectClauseSlot` on `TransitionRowReject`.
-
-### 2026-05-16T04:16:00Z — Slice 1 Grammar Foundations implemented
-
-- `ConstructMeta` record lives in `src/Precept/Language/Construct.cs` (not a separate ConstructMeta.cs file).
-- `Constructs.GetMeta()` is the exhaustive switch in `src/Precept/Language/Constructs.cs` — this is where new kind entries go.
-- `ConstructSlotKind` values 14-17 were already taken (`AccessModeKeyword`, `FieldTarget`, `RuleExpression`, `InitialMarker`); used 18/19 for `RejectClause`/`SuccessOutcome`.
-- The `SlotOrderingDriftTests` asserts an exact set of scoped constructs — new kinds need adding there.
-- `ConstructsTests` has count invariants (`Total_Count`, `TopLevel_Count`, `SharedLeadingTokens_HaveCorrectCandidateCount`) that must be updated when constructs are added.
-- The EventRow slots are left unchanged for Slice 1 (no guard slot yet); Slice 2 parser routing will add it when PRE0014 is removed.
-
-### 2026-05-16T09:20:00-04:00 — Kramer Slice 2 shipped for catalog-driven completions
-
-- Kramer landed Slice 2 on `spike/Precept-V2-Radical` at commit `6842353e`.
-- Added `tools/Precept.LanguageServer/SlotPositionResolver.cs` as an additive shadow-path resolver that reuses enclosing-construct selection, resolves ownership from parsed slot spans plus slot-order gaps, and uses a bounded backward scan for trailing implicit action-chain arrows.
-- Added `test/Precept.LanguageServer.Tests/SlotPositionResolverTests.cs` with 31 assertions covering comma list continuations, trailing chain arrows, action-expression subpositions, state-entry continuations, guard/ensure/rule expressions, and outcome follow-up positions.
-- Validation stayed green across `dotnet test test\\Precept.LanguageServer.Tests\\ --nologo`, `dotnet build --nologo`, and `dotnet test --nologo` for a final `6479` passed / `0` failed.
-- Slice 3 review focus: keep `SlotPositionResolver` as the structural backbone, then decide explicitly how `AfterValueName`, `InArgDefault`, `InSetAssignment`, and the remaining pre-disambiguation/post-keyword micro-contexts are preserved or intentionally collapsed at cutover.

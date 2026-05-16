@@ -112,3 +112,10 @@
 - Typed-constant validator codes can safely promote to `DiagnosticCode` only when the declared qualifiers are concrete; interpolated qualifier text must keep the generic catalog fallback to avoid false `DimensionCategoryMismatch` emissions.
 - Slice 5 field-state work must keep the stateless initial-event handler lane (`event Start initial` + `on Start -> ...`) in the same construction-chain helper as stateful construction rows, or D94/D142/D144 regress immediately.
 - New emitted diagnostics still need a `Precept.Analyzers` Gate 2 allow-list entry even when the real coverage lives in `test/Precept.Tests/`; PRECEPT0028 cannot see cross-project test references.
+
+### 2026-05-16T13:08:43Z — Constructor semantics downstream closeout recorded
+
+- Scribe recorded George's Slice 8b completion (commit `c72db9b0`) as the semantic cutover that made `initial` declaration-only and construction rows uniformly `on <Event> -> ...`.
+- Kramer finished the downstream language-server and grammar work at `ec5525d2` and `e19736f6`, Newman finished the MCP `isConstruction` surface, and Frank closed docs/sample verification.
+- Durable batch outcome: construction semantics are now aligned across parser/checker, graph analysis, tooling, MCP, docs, and the canonical sample.
+

@@ -54,3 +54,10 @@
 ### 2026-05-09 to 2026-05-10 — Earlier MCP rollout condensed
 - The `precept_language` / `precept_compile` rollout, focused-tool implementation pattern, stdout-to-stderr transport fix, and the tool-discovery diagnosis were all recorded in `.squad/decisions.md`; this live file now keeps only the durable posture and latest checkpoints.
 - Key standing posture: focused tools project from `LanguageTool.Language()`, the repo-root `.mcp.json` stays the Copilot CLI surface, and older DTO/doc-drift details remain preserved in the ledger instead of repeated here.
+
+### 2026-05-16T13:08:43Z — Constructor semantics batch closed around MCP surface
+
+- George's Slice 8b and Kramer's Slices 9+10 established the semantic/editor baseline that the MCP `isConstruction` DTO now reflects.
+- Frank's docs/sample closeout means the MCP compile contract, language tooling, docs, and sample surface now describe the same declaration-level `initial` model.
+- Scribe recorded the full-stack closeout and preserved the durable MCP note in `.squad/decisions.md`.
+

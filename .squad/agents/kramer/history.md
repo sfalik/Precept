@@ -47,3 +47,10 @@
 - 3 new tests added: `Hover_InitialModifier_ReturnsText`, `SemanticTokens_InitialModifier_Classified`, `Grammar_EventInitial_Highlighted`.
 - Completions were already working via `TryGetModifierFallbackItems` — no code change needed there.
 - Validation: 327 LS tests passing, 5782 Precept.Tests passing. Commit `ec5525d2`.
+
+### 2026-05-16T13:08:43Z — Team closeout recorded for constructor semantics tooling lane
+
+- George's Slice 8b semantic cutover (`c72db9b0`) established the declaration-level `initial` baseline that Slices 9+10 carried through hover and grammar.
+- Newman's MCP DTO follow-through and Frank's docs/sample closeout completed the remaining downstream surfaces, so the tooling lane now ships as part of a full vertical slice rather than an isolated editor change.
+- Scribe merged the Slices 9+10 completion note into `.squad/decisions.md` and recorded the batch in squad logs.
+

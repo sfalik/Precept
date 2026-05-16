@@ -375,4 +375,32 @@
 
 ---
 
+---
+
+### 2026-05-16T13:08:43Z: Slices 9+10 lock event-declaration `initial` across hover and grammar
+
+**By:** Scribe
+
+**Status:** Merged from Kramer's Slices 9+10 completion note.
+
+**Merged source:** `kramer-slices-9-10-complete.md`.
+
+- The `initial` event modifier now has constructor-accurate copy, context-sensitive event-declaration hover, and explicit grammar capture before event args, so both `event Create initial` and `event Create(args) initial` stay aligned.
+- The grammar generator derives the event-modifier alternation from catalog metadata and regenerated `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json` instead of relying on a grammar-local keyword list.
+- Durable rule: when a keyword is declaration-context-specific, hover and grammar should both be driven by catalog metadata and locked with targeted tests even if completions and semantic tokens already behave correctly.
+
+---
+
+### 2026-05-16T13:08:43Z: Slice 12 closes constructor-semantics docs, changelog, and sample verification
+
+**By:** Scribe
+
+**Status:** Merged from Frank's Slice 12 completion note.
+
+**Merged source:** `frank-slice-12-complete.md`.
+
+- The language spec and constructor-semantics working doc now reflect the shipped construction outcome model, declaration-level `initial` syntax, and the fact that all 12 constructor-semantics slices are complete.
+- `CHANGELOG.md` now records the shipped language/tooling/runtime surface, while `docs/runtime/runtime-api.md` required no edits because the current API docs were already accurate.
+- Durable rule: closeout for a surface change includes verifying the sample still compiles locally; stale MCP diagnostics against that sample are deployment drift, not a reason to weaken the source-of-truth docs.
+
 
