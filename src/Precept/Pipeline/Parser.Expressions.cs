@@ -757,5 +757,90 @@ public static partial class Parser
                 DiagnosticCode.ExpectedOutcome, leadingToken.Span));
             return new MalformedOutcome(SourceSpan.Covering(arrowToken.Span, leadingToken.Span));
         }
+
+        // ── RejectClause slot parser ────────────────────────────────────────────
+        // Parses: -> reject "reason"
+
+        private SlotValue ParseRejectClause(ConstructSlot slot)
+        {
+            if (Peek().Kind != TokenKind.Arrow)
+            {
+                if (slot.IsRequired)
+                {
+                    _diagnostics.Add(Language.Diagnostics.Create(
+                        DiagnosticCode.ExpectedToken, Peek().Span, "->", Peek().Text));
+                }
+                return MakeSentinel(slot);
+            }
+
+            var arrowToken = Advance(); // consume '->'
+
+            if (Peek().Kind != TokenKind.Reject)
+            {
+                _diagnostics.Add(Language.Diagnostics.Create(
+                    DiagnosticCode.ExpectedToken, Peek().Span, "reject", Peek().Text));
+                return new RejectClauseSlot("", arrowToken.Span);
+            }
+
+            var rejectToken = Advance(); // consume 'reject'
+
+            if (TryParseStringExpression(out var reason, out var reasonSpan))
+            {
+                var span = SourceSpan.Covering(arrowToken.Span, reasonSpan);
+                return new RejectClauseSlot(reason, span);
+            }
+
+            // Missing reason string
+            _diagnostics.Add(Language.Diagnostics.Create(
+                DiagnosticCode.ExpectedToken, rejectToken.Span, "string literal", Peek().Text));
+            return new RejectClauseSlot("", SourceSpan.Covering(arrowToken.Span, rejectToken.Span));
+        }
+
+        // ── SuccessOutcome slot parser ──────────────────────────────────────────
+        // Parses: -> transition State | -> no transition
+        // Unlike the generic Outcome parser, this does NOT accept -> reject.
+
+        private SlotValue ParseSuccessOutcome(ConstructSlot slot)
+        {
+            if (Peek().Kind != TokenKind.Arrow)
+            {
+                if (slot.IsRequired)
+                {
+                    _diagnostics.Add(Language.Diagnostics.Create(
+                        DiagnosticCode.ExpectedOutcome, Peek().Span));
+                }
+                return MakeSentinel(slot);
+            }
+
+            var arrowToken = Advance(); // consume '->'
+            var outcomeToken = Peek();
+
+            if (!Outcomes.ByLeadingToken.TryGetValue(outcomeToken.Kind, out var meta))
+            {
+                _diagnostics.Add(Language.Diagnostics.Create(
+                    DiagnosticCode.ExpectedOutcome, arrowToken.Span));
+                return new SuccessOutcomeSlot(new MalformedOutcome(arrowToken.Span), arrowToken.Span);
+            }
+
+            // Reject is not valid in a success outcome slot
+            if (outcomeToken.Kind == TokenKind.Reject)
+            {
+                _diagnostics.Add(Language.Diagnostics.Create(
+                    DiagnosticCode.ExpectedOutcome, outcomeToken.Span));
+                return new SuccessOutcomeSlot(new MalformedOutcome(arrowToken.Span), arrowToken.Span);
+            }
+
+            var leadingToken = Advance(); // consume leading token
+
+            ParsedOutcome outcome = meta.ArgumentKind switch
+            {
+                OutcomeArgumentKind.None => ParseOutcomeNoArg(arrowToken, leadingToken),
+                OutcomeArgumentKind.RequiredIdentifier => ParseOutcomeIdentifierArg(arrowToken, leadingToken),
+                OutcomeArgumentKind.SecondaryToken => ParseOutcomeSecondaryToken(arrowToken, leadingToken),
+                _ => new MalformedOutcome(SourceSpan.Covering(arrowToken.Span, leadingToken.Span)),
+            };
+
+            return new SuccessOutcomeSlot(outcome, outcome.Span);
+        }
     }
 }

@@ -114,3 +114,11 @@ public sealed record RuleExpressionSlot(ParsedExpression Expression, SourceSpan 
 /// <summary>Optional "initial" keyword on event declarations.</summary>
 public sealed record InitialMarkerSlot(bool IsPresent, SourceSpan Span)
     : SlotValue(ConstructSlotKind.InitialMarker, Span);
+
+/// <summary>Reject clause: "-> reject "reason"" refusal outcome.</summary>
+public sealed record RejectClauseSlot(string Reason, SourceSpan Span)
+    : SlotValue(ConstructSlotKind.RejectClause, Span);
+
+/// <summary>Success outcome: "-> transition State" or "-> no transition".</summary>
+public sealed record SuccessOutcomeSlot(ParsedOutcome Outcome, SourceSpan Span)
+    : SlotValue(ConstructSlotKind.SuccessOutcome, Span);

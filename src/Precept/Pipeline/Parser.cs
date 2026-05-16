@@ -190,7 +190,12 @@ public static partial class Parser
                             resolved = candidates[0].Kind;
                         }
 
-                        var selectedMeta = ConstructsCatalog.GetMeta(resolved.Value);
+                        // Secondary disambiguation: detect reject-variant forms
+                        var finalKind = resolved.Value is ConstructKind.ConstructionRow or ConstructKind.TransitionRow
+                            ? ResolveRejectVariant(resolved.Value)
+                            : resolved.Value;
+
+                        var selectedMeta = ConstructsCatalog.GetMeta(finalKind);
                         if (selectedMeta.RoutingFamily == RoutingFamily.Direct)
                             ParseConstruct(selectedMeta);
                         else
@@ -269,6 +274,46 @@ public static partial class Parser
             }
 
             return offset;
+        }
+
+        /// <summary>
+        /// After primary disambiguation resolves to ConstructionRow or TransitionRow,
+        /// performs secondary lookahead to detect reject-variant forms by finding
+        /// the first Arrow token and checking if the next token is Reject.
+        /// </summary>
+        private ConstructKind ResolveRejectVariant(ConstructKind baseKind)
+        {
+            var offset = 1; // start past leading token
+            while (true)
+            {
+                var token = Peek(offset);
+                if (token.Kind == TokenKind.EndOfSource)
+                    return baseKind;
+                if (token.Kind == TokenKind.Arrow)
+                {
+                    var afterArrow = Peek(offset + 1);
+                    if (afterArrow.Kind == TokenKind.Reject)
+                    {
+                        return baseKind switch
+                        {
+                            ConstructKind.ConstructionRow => ConstructKind.ConstructionRowReject,
+                            ConstructKind.TransitionRow => ConstructKind.TransitionRowReject,
+                            _ => baseKind,
+                        };
+                    }
+                    // Arrow found but not followed by reject — base kind stands
+                    return baseKind;
+                }
+                // Stop at construct boundaries (but allow 'on' which appears mid-TransitionRow)
+                if (offset > 2
+                    && ConstructsCatalog.LeadingTokens.Contains(token.Kind)
+                    && token.Kind != TokenKind.On
+                    && token.Kind != TokenKind.When)
+                {
+                    return baseKind;
+                }
+                offset++;
+            }
         }
 
         private void SkipToConstructBoundary()
@@ -406,6 +451,8 @@ public static partial class Parser
                 ConstructSlotKind.EnsureClause      => ParseEnsureClause(slot),
                 ConstructSlotKind.ActionChain       => ParseActionChain(slot),
                 ConstructSlotKind.Outcome           => ParseOutcome(slot),
+                ConstructSlotKind.RejectClause      => ParseRejectClause(slot),
+                ConstructSlotKind.SuccessOutcome    => ParseSuccessOutcome(slot),
                 ConstructSlotKind.StateTarget       => ParseStateTarget(slot),
                 ConstructSlotKind.EventTarget       => ParseEventTarget(slot),
                 ConstructSlotKind.AccessModeKeyword => ParseAccessMode(slot),
@@ -429,6 +476,8 @@ public static partial class Parser
             ConstructSlotKind.EnsureClause      => new EnsureClauseSlot(new LiteralExpression(TokenKind.True, "true", SourceSpan.Missing), SourceSpan.Missing),
             ConstructSlotKind.ActionChain       => new ActionChainSlot(ImmutableArray<ParsedAction>.Empty, SourceSpan.Missing),
             ConstructSlotKind.Outcome           => new OutcomeSlot(new MalformedOutcome(SourceSpan.Missing), SourceSpan.Missing),
+            ConstructSlotKind.RejectClause      => new RejectClauseSlot("", SourceSpan.Missing),
+            ConstructSlotKind.SuccessOutcome    => new SuccessOutcomeSlot(new MalformedOutcome(SourceSpan.Missing), SourceSpan.Missing),
             ConstructSlotKind.StateTarget       => new StateTargetSlot(ImmutableArray<string>.Empty, ImmutableArray<SourceSpan>.Empty, SourceSpan.Missing),
             ConstructSlotKind.EventTarget       => new EventTargetSlot(null, SourceSpan.Missing),
             ConstructSlotKind.AccessModeKeyword => new AccessModeSlot(TokenKind.Readonly, SourceSpan.Missing),

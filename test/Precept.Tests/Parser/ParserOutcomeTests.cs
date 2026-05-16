@@ -49,11 +49,10 @@ public class ParserOutcomeTests
         var tokens = Lexer.Lex("from Draft on Submit -> reject \"invalid\"");
         var manifest = Pipeline.Parser.Parse(tokens);
 
-        var row = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.TransitionRow);
-        var outcomeSlot = row.Slots.OfType<OutcomeSlot>().Single();
+        var row = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.TransitionRowReject);
+        var rejectSlot = row.Slots.OfType<RejectClauseSlot>().Single();
 
-        outcomeSlot.Outcome.Should().BeOfType<RejectOutcome>()
-            .Which.Reason.Should().Be("invalid");
+        rejectSlot.Reason.Should().Be("invalid");
     }
 
     // ════════════════════════════════════════════════════════════════════════════
@@ -190,15 +189,14 @@ public class ParserOutcomeTests
         var tokens = Lexer.Lex(input);
         var manifest = Pipeline.Parser.Parse(tokens);
 
-        var row = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.TransitionRow);
-        var outcomeSlot = row.Slots.OfType<OutcomeSlot>().Single();
-        var outcome = outcomeSlot.Outcome.Should().BeOfType<RejectOutcome>().Subject;
+        var row = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.TransitionRowReject);
+        var rejectSlot = row.Slots.OfType<RejectClauseSlot>().Single();
 
         var arrowStart = input.IndexOf("->");
         var reasonEnd = input.IndexOf("\"invalid\"") + "\"invalid\"".Length;
 
-        outcome.Span.Offset.Should().Be(arrowStart);
-        outcome.Span.End.Should().Be(reasonEnd);
+        rejectSlot.Span.Offset.Should().Be(arrowStart);
+        rejectSlot.Span.End.Should().Be(reasonEnd);
     }
 
     // ════════════════════════════════════════════════════════════════════════════

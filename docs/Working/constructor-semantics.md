@@ -872,7 +872,7 @@ Before marking any slice **done**:
 | # | Slice | Files | New Tests | Dependencies | Status |
 |---|-------|-------|-----------|--------------|--------|
 | 1 | Grammar Foundations | 3 | 0 | — | ✅ Done |
-| 2 | Parser Routing | 2 | 6 | 1 |
+| 2 | Parser Routing | 2 | 6 | 1 | ✅ Done |
 | 3 | Semantic Model DU | 4 | 0 | 1 |
 | 4 | Type Checker Structural | 2 | 8 | 2, 3 |
 | 5 | Type Checker Field State | 2 | 6 | 4 |
@@ -922,6 +922,8 @@ Before marking any slice **done**:
 ---
 
 #### Slice 2: Parser Routing
+
+**Status:** ✅ Completed (2026-05-16)
 
 **Goal:** Remove PRE0014 guard rejection; route `event ... initial` to construction-row constructs; route `reject` clauses to `RejectClause` slot.
 

@@ -27,6 +27,13 @@ public enum DiagnosticCode
     /// </summary>
     InvalidCallTarget                  =  12,
     OmitDoesNotSupportGuard            =  13,
+    /// <summary>
+    /// A 'when' guard appears on an event row where guards are not supported.
+    /// </summary>
+    /// <remarks>
+    /// No longer emitted for construction rows (event ... initial). Still emitted
+    /// for plain event rows with guards if the parser detects a guard where none is expected.
+    /// </remarks>
     EventHandlerDoesNotSupportGuard    =  14,
     PreEventGuardNotAllowed            =  15,
     ExpectedOutcome                    =  16,
