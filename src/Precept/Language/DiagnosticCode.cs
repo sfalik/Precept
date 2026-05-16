@@ -197,6 +197,12 @@ public enum DiagnosticCode
     /// An initial-event assignment reads another required field before that field's first assignment in the same action chain establishes a value.
     /// </summary>
     UninitializedCrossFieldReadInInitialAssignment = 144,
+    /// <summary>An event used by construction rows cannot also appear in a transition row.</summary>
+    InitialEventInTransitionRow       = 145,
+    /// <summary>A stateful precept has no construction entry surface.</summary>
+    ZeroConstructionRows             = 146,
+    /// <summary>Multiple distinct events are marked as construction entry events.</summary>
+    MultipleInitialEvents            = 147,
 
     // ── Graph ────────────────────────────────────────────
     UnreachableState                   =  80,

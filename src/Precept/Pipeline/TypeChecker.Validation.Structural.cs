@@ -13,18 +13,8 @@ internal static partial class TypeChecker
     /// </summary>
     private static void ValidateStructural(CheckContext ctx)
     {
-        // ── PRE0092 — EventHandlerInStatefulPrecept ─────────────────────────
-        // Event handlers are the stateless-precept equivalent of transition rows.
-        // Using them in a stateful precept creates ambiguous execution semantics.
-        // TODO(allow-list): remove PRE0092 after Slice 0 ships
-        if (ctx.States.Count > 0 && ctx.EventHandlers.Count > 0)
-        {
-            foreach (var handler in ctx.EventHandlers)
-            {
-                ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.EventHandlerInStatefulPrecept,
-                    handler.Syntax.Span, handler.EventName));
-            }
-        }
+        ValidateStatelessEventOnNonStatelessPrecept(ctx);
+        ValidateConstructionRowStructure(ctx);
 
         // ── PRE0039 — ComputedFieldWithDefault ──────────────────────────────
         // A computed field (derives via `<-`) cannot also have a `default` expression.
@@ -124,6 +114,97 @@ internal static partial class TypeChecker
             }
         }
 
+    }
+
+    private static void ValidateStatelessEventOnNonStatelessPrecept(CheckContext ctx)
+    {
+        // ── PRE0092 — EventHandlerInStatefulPrecept ─────────────────────────
+        // Event handlers are the stateless-precept equivalent of transition rows.
+        // Using them in a stateful precept creates ambiguous execution semantics.
+        // Construction rows are exempt because they are the stateful construction lane.
+        if (ctx.States.Count == 0 || ctx.EventHandlers.Count == 0)
+            return;
+
+        foreach (var handler in ctx.EventHandlers)
+        {
+            if (handler.IsConstruction)
+                continue;
+
+            ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.EventHandlerInStatefulPrecept,
+                GetEventNameSpan(handler.Syntax, handler.Syntax.Span), handler.EventName));
+        }
+    }
+
+    private static void ValidateConstructionRowStructure(CheckContext ctx)
+    {
+        if (ctx.States.Count == 0)
+            return;
+
+        var constructionRows = ctx.EventHandlers
+            .Where(handler => handler.IsConstruction)
+            .ToList();
+
+        var initialStateNames = ctx.States
+            .Where(state => state.Modifiers.Contains(ModifierKind.InitialState))
+            .Select(state => state.Name)
+            .ToHashSet(StringComparer.Ordinal);
+
+        if (constructionRows.Count == 0)
+        {
+            foreach (var initialEvent in ctx.Events.Where(evt => evt.IsInitial))
+            {
+                bool hasLegacyInitialPath = ctx.TransitionRows.Any(row =>
+                    string.Equals(row.EventName, initialEvent.Name, StringComparison.Ordinal) &&
+                    (row.FromState is null || initialStateNames.Contains(row.FromState)));
+
+                if (!hasLegacyInitialPath)
+                {
+                    ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.ZeroConstructionRows,
+                        initialEvent.NameSpan,
+                        initialEvent.Name));
+                }
+            }
+        }
+
+        var constructionEventNames = new List<string>();
+        var constructionEventNameSet = new HashSet<string>(StringComparer.Ordinal);
+        SourceSpan secondInitialEventSpan = ctx.States[0].NameSpan;
+
+        foreach (var row in constructionRows)
+        {
+            if (string.IsNullOrWhiteSpace(row.EventName))
+                continue;
+
+            if (!constructionEventNameSet.Add(row.EventName))
+                continue;
+
+            constructionEventNames.Add(row.EventName);
+            if (constructionEventNames.Count == 2)
+                secondInitialEventSpan = GetEventNameSpan(row.Syntax, row.Syntax.Span);
+        }
+
+        foreach (var row in ctx.TransitionRows)
+        {
+            if (!constructionEventNameSet.Contains(row.EventName))
+                continue;
+
+            ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.InitialEventInTransitionRow,
+                GetEventNameSpan(row.Syntax, row.RowSpan), row.EventName));
+        }
+
+        if (constructionEventNames.Count > 1)
+        {
+            ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.MultipleInitialEvents,
+                secondInitialEventSpan,
+                constructionEventNames[0],
+                constructionEventNames[1]));
+        }
+    }
+
+    private static SourceSpan GetEventNameSpan(ParsedConstruct syntax, SourceSpan fallbackSpan)
+    {
+        var eventTarget = syntax.GetSlot<EventTargetSlot>(ConstructSlotKind.EventTarget);
+        return eventTarget?.NameSpan ?? fallbackSpan;
     }
 
     /// <summary>

@@ -32,6 +32,7 @@
 - DU refactors that touch abstract base properties (`Outcome`) need careful downstream mapping — keeping computed properties on the base (dispatching to subtypes) minimizes callsite churn.
 - Slice 2 parser routing changes (reject → `TransitionRowReject` construct kind) had test-level consequences that weren't caught at Slice 2 time. Test fixups belong to the slice that surfaces the failure.
 - `required` keyword on record properties is the right pattern when abstract bases can't use positional syntax.
+- Slice 4 structural checks must recognize construction rows without breaking the still-shipped declared-initial + transition-row path used by D93/D94 coverage; construction-specific diagnostics need to key off the new `IsConstruction` lane rather than blanket-banning legacy initial-event flows.
 
 ### 2026-05-15T23:59:59Z — Deferred test-9 closeout reported green
 

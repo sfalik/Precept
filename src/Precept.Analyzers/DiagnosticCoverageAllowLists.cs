@@ -134,6 +134,7 @@ internal static class DiagnosticCoverageAllowLists
         "ExpectedToken",
         "FunctionArityMismatch",
         "IndexBoundsGuard",
+        "InitialEventInTransitionRow",
         "InitialEventMissingAssignments",
         "InputTooLarge",
         "InterpolatedTypedConstantHoleTypeMismatch",
@@ -158,6 +159,7 @@ internal static class DiagnosticCoverageAllowLists
         "ListLiteralOutsideDefault",
         "MaxPlacesExceeded",
         "MissingOrderingKey",
+        "MultipleInitialEvents",
         "MultipleInitialStates",
         "MutuallyExclusiveQualifiers",
         "NoInitialState",
@@ -204,5 +206,6 @@ internal static class DiagnosticCoverageAllowLists
         "UninitializedFieldReadInInitialAssignment",
         "MaterializedFieldSelfReference",
         "WritableOnEventArg",
+        "ZeroConstructionRows",
     };
 }
