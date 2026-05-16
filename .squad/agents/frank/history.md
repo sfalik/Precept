@@ -50,11 +50,17 @@
 
 ## Recent Updates
 
+### 2026-05-16T02:40:40Z — TransitionRow asymmetric naming finalized in docs
+
+- Applied the final doc rename from `TransitionRowResolution` to `TransitionRow` across `docs/language/precept-grammar.md` (8) and `docs/working/constructor-semantics.md` (11).
+- The documentation surface now uses one naming rule for both construct families: `TransitionRow` / `TransitionRowReject` and `EventHandler` / `EventHandlerReject`.
+- Durable naming rule: base names denote the success path; only refusal paths carry the `Reject` suffix.
+
 ### 2026-05-16T02:37:56Z — EventHandler asymmetric naming locked and docs updated
 
 - EventHandler asymmetric naming decision locked: `EventHandler` + `EventHandlerReject`; `EventHandlerResolution` is no longer the chosen design name.
 - Applied 22 documentation renames across `docs/language/precept-grammar.md` (7) and `docs/working/constructor-semantics.md` (15).
-- TransitionRow keeps the symmetric `Resolution` / `Reject` naming model.
+- That batch left TransitionRow naming unresolved; the follow-up finalization now locks `TransitionRow` / `TransitionRowReject` as the same asymmetric base-name + `Reject` pattern.
 - Typed `TypedEventHandlerResolution` snippet names remain deferred until implementation-time renames.
 
 ### 2026-05-16T02:12:27Z — Transition-row reject mutual exclusion remains an implementation gap
