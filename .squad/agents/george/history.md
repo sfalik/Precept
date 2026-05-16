@@ -19,6 +19,20 @@
 
 ## Recent Updates
 
+### 2026-07-17 — Slice 3 Semantic Model DU complete
+
+- Converted `TypedTransitionRow` and `TypedEventHandler` to discriminated unions (abstract base + Success + Reject subtypes).
+- Renamed `TypedEventHandler` → `TypedEventRow` for naming consistency.
+- TypeChecker now emits correct subtypes based on `ConstructKind` (TransitionRowReject, ConstructionRow, ConstructionRowReject).
+- Fixed 5 parser tests broken by Slice 2's reject routing — `TransitionRowReject` constructs use `RejectClauseSlot`, not `OutcomeSlot`.
+- All 6,360 tests green. Commit `7c49f9c7`.
+
+## Learnings
+
+- DU refactors that touch abstract base properties (`Outcome`) need careful downstream mapping — keeping computed properties on the base (dispatching to subtypes) minimizes callsite churn.
+- Slice 2 parser routing changes (reject → `TransitionRowReject` construct kind) had test-level consequences that weren't caught at Slice 2 time. Test fixups belong to the slice that surfaces the failure.
+- `required` keyword on record properties is the right pattern when abstract bases can't use positional syntax.
+
 ### 2026-05-15T23:59:59Z — Deferred test-9 closeout reported green
 
 - George closed the remaining quantity-bound red test after Frank's spec, recorded implementation commit `d68eb6bc`, and reported `5699/5699` passing across the validation run.
