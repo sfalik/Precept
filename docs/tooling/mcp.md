@@ -264,7 +264,8 @@ Returns compact JSON with diagnostics and proof obligations:
   "diagnosticCount": 0,
   "diagnostics": [],
   "summary": "TrafficLight: 4 states, 3 events, 12 transitions, 2 rules, 0 ensures, 0 type errors.",
-  "proofObligations": []
+  "proofObligations": [],
+  "eventHandlers": []
 }
 ```
 
@@ -297,6 +298,17 @@ Proof obligation entry shape:
   "normalizedDeclaredMax": 100
 }
 ```
+
+Event handler row entry shape:
+
+```json
+{
+  "eventName": "Create",
+  "isConstruction": true
+}
+```
+
+`isConstruction` is `true` when the event row handles an `initial` event (a construction row that runs when the entity is first created). It is `false` for regular stateless event rows (`on Event -> actions`).
 
 `summary` is a compact prose description, not a projected definition graph.
 

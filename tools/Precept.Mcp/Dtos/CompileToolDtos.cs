@@ -5,7 +5,8 @@ public sealed record CompileResultDto(
     int DiagnosticCount,
     CompileDiagnosticDto[] Diagnostics,
     string Summary,
-    CompileProofObligationDto[] ProofObligations);
+    CompileProofObligationDto[] ProofObligations,
+    CompileEventRowDto[] EventHandlers);
 
 public sealed record CompileDiagnosticDto(
     int Line,
@@ -26,3 +27,15 @@ public sealed record CompileProofObligationDto(
     decimal? DeclaredMax,
     decimal? NormalizedDeclaredMin,
     decimal? NormalizedDeclaredMax);
+
+/// <summary>
+/// Compact DTO for a single event handler row in <c>precept_compile</c> output.
+/// </summary>
+/// <param name="EventName">The name of the event this row handles.</param>
+/// <param name="IsConstruction">
+/// <c>true</c> when this row is a construction row — its event is declared <c>initial</c>
+/// and the row runs when the entity is first created.  <c>false</c> for regular event rows.
+/// </param>
+public sealed record CompileEventRowDto(
+    string EventName,
+    bool IsConstruction);

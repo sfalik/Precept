@@ -51,7 +51,8 @@ public class CompileToolTests
             "diagnosticCount",
             "diagnostics",
             "summary",
-            "proofObligations");
+            "proofObligations",
+            "eventHandlers");
 
         var diagnostic = document.RootElement.GetProperty("diagnostics")[0];
         diagnostic.EnumerateObject().Select(property => property.Name).Should().Equal(
@@ -106,6 +107,25 @@ public class CompileToolTests
         obligation.DeclaredMax.Should().Be(100m);
     }
 
+    [Fact]
+    public void CompileTool_EventRow_IsConstruction_True()
+    {
+        var result = CompileTool.Compile(ConstructionRowSource);
+
+        result.Success.Should().BeTrue();
+        result.EventHandlers.Should().ContainSingle(row => row.EventName == "Create")
+            .Which.IsConstruction.Should().BeTrue();
+    }
+
+    [Fact]
+    public void CompileTool_EventRow_IsConstruction_False()
+    {
+        var result = CompileTool.Compile(RegularEventRowSource);
+
+        result.EventHandlers.Should().ContainSingle(row => row.EventName == "Increment")
+            .Which.IsConstruction.Should().BeFalse();
+    }
+
     private static string BuildLargeErrorSource(int fieldCount)
     {
         var sb = new StringBuilder();
@@ -148,5 +168,21 @@ public class CompileToolTests
         from Active on Add
             -> set total = Add.A + Add.B
             -> no transition
+        """;
+
+    private const string ConstructionRowSource = """
+        precept Widget
+        field Count as integer default 0
+        state Draft initial terminal
+        event Create initial
+        on Create -> set Count = 1
+        """;
+
+    private const string RegularEventRowSource = """
+        precept Widget
+        field Count as integer default 0
+        state Active initial terminal
+        event Increment
+        on Increment -> set Count = 1
         """;
 }
