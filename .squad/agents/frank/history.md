@@ -10,6 +10,7 @@
 - `TypedField` remains the normalization handshake between analysis and execution: authored bounds stay available for display, normalized bounds feed proof/comparison surfaces.
 - Comparison/equality checking must stay as strict about explicit counting-unit identity as assignment is about constrained qualifier axes.
 - Completion-provider defects should be treated as context-routing mistakes first; prefer catalog-sourced vocabularies plus explicit slot lanes over local keyword lists.
+- Reject-bearing surfaces should be split structurally: success/mutation rows and refusal rows are separate constructs, not a shared slot plus cleanup diagnostics.
 
 ## Durable Learnings
 
@@ -18,77 +19,36 @@
 - Counting-unit comparisons need unit-code identity, not just dimension-family compatibility.
 - `ResolveSlotSourceQualifierAxis` must distinguish `Unknown` from `Absent`; `IsAssignmentQualifierAxisApplicable` is the discriminator.
 - Function-call qualifier preservation belongs in the same enforcement story as operator qualifier compatibility.
+- When the grammar can make an invalid form impossible, do that instead of inventing a later semantic ban.
+- Hollow-entity validation should be shared across all pre-materialization expression lanes, not re-added slot by slot.
 
 ## Historical Summary
 
-- 2026-05-12 through 2026-05-15 concentrated Frank's work around hover contract reviews, field-state guarantees, constructor diagnostics, interval-proof design, quantity normalization, diagnostic-enforcement architecture, and counting-unit comparison gaps.
-- Older slice-by-slice approval detail now lives in `history-archive.md` and `.squad/decisions.md`; this file keeps only the guidance and outcomes other agents need immediately.
-
-## Learnings
-
-### 2026-05-15T20:16:01-04:00 — Reversed "uniformity" recommendation: `on <Event>` is correct construction syntax for stateful precepts
-
-- Shane's pushback on the "keep `from <InitialState> on <InitialEvent>`" recommendation was correct. Full analysis in `.squad/decisions/inbox/frank-constructor-syntax-on-event.md`.
-- **Core insight:** False uniformity (dressing unconditional genesis as state-dispatched transition) is worse than honest divergence. If terminal construction established that construction is a distinct semantic category, the syntax must follow.
-- Grammar unification is clean: `EventHandlerDeclaration` is the shared production. Disambiguation between construction rows and state-agnostic handlers happens at type-checking via the `initial` modifier on the event declaration. No parser ambiguity.
-- Guard restriction (`EventHandlerDoesNotSupportGuard`) should be removed: `when` guards on `on Event ->` forms are coherent for both construction (guarded paths) and state-agnostic handlers (field-value conditions).
-- Stateless/stateful constructor syntax unification reflects semantic reality: construction IS the same operation in both contexts.
-- Durable learning: "syntactic uniformity" is only valuable when it reflects semantic uniformity. When semantics diverge, forcing shared syntax teaches a lie.
-
-### 2026-05-15T19:57:05-04:00 — Terminal constructor design analysis reverses prior position on construction-time transitions
-
-- Evaluated Shane's proposal: initial event as true constructor (always terminal in initial state + fire-once enforcement).
-- **Reversed prior verdict** that construction-time transitions are "sound." They are technically sound but semantically confusing — `initial` stops meaning "where entities begin" when construction can route elsewhere.
-- The proposal resolves keyword overload more elegantly than a rename: `initial` genuinely means "origin" in both state and event contexts when construction is terminal.
-- Construction-time routing pattern is empirically unused (0/20+ samples) and replaceable with two-step construct + route.
-- D94 simplifies to single-target analysis (always initial state). Proof engine wins.
-- Fire-once enforcement via excluding initial event from post-construction event space (returns `UndefinedEvent`). No new mechanism.
-- Stateless precepts: fully compatible (constraints vacuously satisfied).
-- **Recommendation: Adopt.** Superior to keyword rename approach. Decision saved to `.squad/decisions/inbox/frank-constructor-terminal-design.md`.
-
-### 2026-05-15T19:48:03-04:00 — Critical design review of initial event/state semantics identified 3 pre-ship fixes
-
-- `initial` keyword overload is a P5 violation: same word means "graph position" (state) and "construction mechanism" (event). Recommendation: split to `initial` (state) + `constructor` (event).
-- Stateless/stateful mutual exclusion is too rigid: `on Event -> actions` should be allowed in stateful precepts when no `from ... on <same event>` row exists. Current restriction forces boilerplate `from any on X -> ... -> no transition`.
-- `no transition` in stateless handlers: grammar says EventHandlerDeclaration has no Outcome production, but semantics doc implied it was valid. Need parser verification and enforcement.
-- Hollow-then-hydrate pattern is sound (working copy atomicity resolves it).
-- Construction-time transition away from initial state is sound (initial state is dispatch context + omit shape + entry ensures), but needs better documentation.
-- Construction guarantee is composite D94 + D132, not D94 alone — docs should make this explicit.
-
-### 2026-05-15T19:37:38-04:00 — Initial event/state semantics audit confirmed spec-implementation alignment
-
-- `initial` on state (lifecycle position) and `initial` on event (construction mechanism) are orthogonal concepts sharing a keyword.
-- Construction chain: hollow version (state set, defaults applied) → initial event fires through standard pipeline → outcome returned.
-- Initial event CAN transition away from initial state at construction time — `Transitioned` is valid construction outcome.
-- D94 checks per-row completeness, not aggregate — every guarded construction path must assign all required fields.
-- Wildcard `from any` rows count as construction paths; omitted fields in initial state exempt from assignment requirement.
-- No inconsistency found between spec, runtime API doc, and diagnostic implementations.
-
-### 2026-05-15T18:36:25-04:00 — Broader construction guarantee audit found 4 additional bugs
-
-- Wildcard FromState rows invisible to stateful construction check (false positive + false negative).
-- D132 materialization check lacks self-referential RHS validation (proposed D143).
-- D142 ignores SecondaryExpression (inconsistent with D130 sibling).
-- D142 ignores cross-field uninitialized reads (proposed D144).
-- Durable learning: construction guarantee completeness requires checking which chains are considered, what constitutes a valid assignment, and what scope of field references is checked.
-
-### 2026-05-15T18:09:43-04:00 — Uninitialized field reads in initial events need dedicated checking
-
-- `ValidateConstructionGuarantees` currently misses stateless precepts and cannot detect self-referential reads on the RHS of an initial `set` action.
-- Treat the repair as two TypeChecker fixes: keep `PRE0094` focused on missing required-field assignments, and add a separate D142-style diagnostic for `set X = f(X)` when `X` has no default or prior assignment.
-
-### 2026-05-15T18:04:26.860-04:00 — Completion position specs should drive context routing, not local suppression lists
-
-- Top-level constructs belong only to `SlotContext.TopLevel` and only at whitespace-only line starts.
-- Missing completion cases should first become explicit slot lanes (`AfterStateTarget`, `AfterEventTarget`, `AfterNo`, `InSetAssignment`) before anyone adds ad-hoc item filters.
+- 2026-05-12 through 2026-05-16 concentrated Frank's work around hover contract reviews, field-state guarantees, constructor semantics, reject-surface structure, interval-proof design, quantity normalization, diagnostic-enforcement architecture, and counting-unit comparison gaps.
+- The constructor/reject track settled three durable ideas: `on <Event>` is the honest construction surface, fallback `reject` is valid authored refusal rather than misuse, and grammar-level structural exclusion is preferred whenever the language already knows a path is impossible.
+- Older slice-by-slice review detail now lives in `history-archive.md` and `.squad/decisions.md`; this file keeps only the guidance and outcomes other agents need immediately.
 
 ## Recent Updates
+
+### 2026-05-16T02:12:27Z — Transition-row reject mutual exclusion remains an implementation gap
+
+- OQ1 is already locked: reject must be its own row shape anywhere the language offers a work-or-reject surface.
+- `TransitionRow` still combines `SlotActionChain` with a shared `SlotOutcome`, so mutate-then-reject hybrids remain writable until the construct and semantic-model split lands.
+- The OQ1-compliant repair is direct: `TransitionRowMutation` keeps action chain plus success-only outcome, `TransitionRowReject` gets a dedicated reject clause, and the parser can disambiguate on the first token after `->`.
+- Critical constraint: valid authored rows do not need migration. The split only removes the invalid action-plus-reject hybrid while preserving existing mutation rows and reject-only fallback rows.
+- Construction-side guidance remains grammar-first: `EventHandler` already excludes success outcomes structurally, and any construction reject lane should come from a dedicated `SlotRejectClause`.
+
+### 2026-05-16T00:10:00Z — §4.8 gap is broader than construction guards
+
+- Audited the shipped PRE0142/PRE0144 path in `TypeChecker.Validation.FieldState.cs`; the implementation only walks `set` action primary/secondary expressions from initial construction chains.
+- Confirmed the documented guard gap is real, but also found two additional construction-row gaps: non-`set` input actions are skipped, and `InterpolatedTypedConstant` holes are not visited by `CollectFieldRefsFromExpression(...)`.
+- Confirmed `reject` reasons are not currently typed expressions, so there is no hidden reject-message lane to audit.
+- Identified field `default` expressions as a second hollow-entity context: `PriorFieldsOnly` enforces order, not value availability.
 
 ### 2026-05-15T23:59:59Z — Deferred test-9 fix spec recorded and shipped
 
 - Frank traced the final deferred quantity-bound failure to two seams: typed-constant validator-specific diagnostic codes were not being promoted into `DiagnosticCode`, and quantity typed constants had a dimension-check bypass in assignment-qualifier validation.
 - The repair spec is now durable in `.squad/decisions.md`, and George's follow-up lane reported the branch fully green at `5699/5699`.
-
 
 ### 2026-05-15T23:14:11Z — Deferred qualifier review remains APPROVED after N1–N4 disposition
 
@@ -96,31 +56,16 @@
 - `N2` was already Shane's work and became moot; the remaining follow-up work was George's N1 slot-hole applicability fix plus Soup Nazi's N3/N4 regression coverage.
 - Subsequent commits `f55e283b` and `3468dec0` closed the outstanding notes without changing Frank's approval posture.
 
-### 2026-05-15T22:27:03Z — Deferred qualifier follow-up landed
-
-- George closed the three deferred PRE0141 items: `TypedFunctionCall.ResultQualifiers`, implied-qualifier parity in `ResolveDirectQualifierAxis`, shared compound-unit helpers, and explicit `Unknown` fallback for qualifier-capable slot sources.
-- Targeted qualifier suites stayed green and the full core suite returned to the unchanged 9-failure branch baseline.
-
 ### 2026-05-15T22:18:38Z — Completion position spec is now validated end-to-end
 
 - Kramer's two passes consumed the 40-position completion spec and closed all 8 identified gaps without introducing LS-local keyword arrays.
 - Durable rule: completion correctness here is a slot-routing problem. Use catalog-sourced vocabularies plus narrow `SlotContext` lanes when a completed target changes the valid next token set.
 - Validation closed at 319/319 `Precept.LanguageServer.Tests` passing.
 
-### 2026-05-15T18:34:40-04:00 — Deferred qualifier fixes APPROVED (commit 85974302)
+### 2026-05-15T22:12:27-04:00 — Runtime doc sync for constructor semantics
 
-- Reviewed George's implementation of three deferred items from PRE0141 seam replacement. All three core fixes are correct and match spec intent.
-- ImpliedQualifiers parity, UCUM helper extraction, function-call qualifier preservation, and slot Absent→Unknown fix all land cleanly.
-- Non-blocking: early-return in `ResolveSlotSourceQualifierAxis` still returns Absent (spec prescribed Unknown for applicable types), but the path is unreachable in practice. LS changes (~400 lines) bundled out of scope — approved but flagged for commit hygiene.
-- Decision recorded in `.squad/decisions/inbox/frank-deferred-fixes-review.md`.
-
-### 2026-05-15T20:40:13Z — Price qualifier enforcement architecture is durably closed
-
-- The shipped assignment qualifier model is now the per-axis `Resolved / Unknown / Absent` contract behind `PRE0141`; unknown constrained axes are never silent success.
-- The separate `PriceIn` / `CompoundPrice` qualifier-shape work remains design-state only and is not a prerequisite for the enforcement repair.
-
-### 2026-05-15T23:26:25Z — Test-failure triage is durably closed to one deferred red test
-
-- Frank's fix spec on the 10 pre-existing failures is now canonical: the lane had three root causes — pairwise qualifier false positives, a missing `time` dimension alias, and the interpolated-qualifier positivity proof seam.
-- George implemented the repair set in commit `a03fcf4e`, and the branch moved from 10 failing tests to 1 remaining intentionally deferred quantity-bound dimension-check failure.
-- Scribe merged Frank's fix spec plus George's pairwise-fix closeout into the canonical decision ledger and cleared the inbox copy.
+- Shane's directive: runtime docs must be updated as design deliverables, not afterthoughts.
+- Audited `docs/runtime/runtime-api.md` against locked constructor semantics design. Found 11 gaps: `Created` variant undocumented, construction outcome space wrong (showed all 7 as reachable), `Create()` without initial event said `Applied`, fire-once not explicit, hollow-context rules absent, `AlwaysRejecting` promotion absent, `TransitionRowMutation`/`TransitionRowReject` dispatch undocumented, no-match to Rejected undocumented, new diagnostics missing, variant count stale, stateless contract still said `Applied`.
+- Rewrote Construction section of runtime-api.md. Updated variant count, design decisions, stateless contract, and Fire section.
+- Added section 10 to `docs/working/constructor-semantics.md` making runtime doc updates explicit deliverables with per-PR gates and an implementer verification rule.
+- Durable learning: runtime API docs are a ship-gate artifact. Design decisions that change outcome semantics MUST land in the runtime doc in the same pass as the design lock, not deferred to implementation time.

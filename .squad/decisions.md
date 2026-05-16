@@ -8,6 +8,59 @@
 
 ---
 
+### 2026-05-16T02:12:27Z: Constructor-semantics runtime documentation is a ship gate, not follow-up cleanup
+
+**By:** Scribe
+
+**Status:** Merged from Frank's constructor runtime-doc sync note.
+
+**Merged source:** `frank-runtime-doc-sync.md`.
+
+- `docs/runtime/runtime-api.md` needed an explicit constructor-semantics sync: `Created` must be documented as the construction success outcome, invalid construction-only outcome variants must be called out, fire-once enforcement and hollow-context rules must be described, and stateless construction text must stop talking about `Applied`.
+- The runtime/API docs also need the constructor-specific row-dispatch and diagnostic story kept honest: `AlwaysRejecting` severity promotion for initial events, the mutation-vs-reject row model, and the current set of constructor diagnostics all belong in the implementation-facing narrative.
+- Durable rule: constructor-semantics work is not complete until the runtime docs, result-type docs, evaluator docs, and MCP-facing contract notes are verified against the shipped wire/runtime surface.
+
+---
+### 2026-05-16T02:12:27Z: Constructor semantics are locked around `on <Event>` intake rows and explicit refusal semantics
+
+**By:** Scribe
+
+**Status:** Merged from Frank's constructor-semantics and reject-surface notes.
+
+**Merged sources:** `frank-constructor-semantics-design.md`; `frank-constructor-design-updated.md`; `frank-conditional-construction-research.md`; `frank-reject-construction-semantics.md`; `frank-decision5-rationale.md`.
+
+- The durable constructor surface is `on <Event>`: construction is authored as intake handling, guards remain allowed, and the stateful `on Event` restriction stays deliberate rather than accidental.
+- Frank's precedent sweep confirmed conditional construction is normal language design; Precept's differentiator is declarative, guarded, inspectable construction rather than imperative constructor code.
+- A fallback `reject` on construction rows is valid authored refusal, not misuse: omission means no construction path exists, `Unmatched` is the implicit no-guard-hit verdict, and `reject` is the explicit reason-bearing version of that refusal surface.
+
+---
+### 2026-05-16T02:12:27Z: Construction enforcement must stay grammar-first, and hollow-entity validation is a shared problem
+
+**By:** Scribe
+
+**Status:** Merged from Frank's constructor-semantics and reject-surface notes.
+
+**Merged sources:** `frank-structural-exclusion.md`; `frank-construction-transition-enforcement.md`; `frank-construction-diagnostics.md`; `frank-4.8-gap-analysis.md`.
+
+- `transition` and `no transition` are already structurally impossible on `EventHandler` because the construct omits `SlotOutcome`; construction should gain refusal through a dedicated `SlotRejectClause`, not by reviving a shared outcome slot or a type-checker-only ban.
+- `AlwaysRejecting` already detects all-reject event surfaces; the remaining diagnostics work is to treat initial events as an error lane and keep the construction documentation aligned with the shipped analyzer/type-checker behavior.
+- The PRE0142/PRE0144 follow-up is broader than construction guards: hollow-entity availability checks should cover construction guards, all expression-carrying construction actions, interpolated typed-constant holes, and field `default` expressions from one shared validation story.
+
+---
+### 2026-05-16T02:12:27Z: Transition-row reject mutual exclusion is still an implementation gap, not a new design question
+
+**By:** Scribe
+
+**Status:** Merged from Frank's constructor-semantics and reject-surface notes.
+
+**Merged sources:** `frank-reject-mutual-exclusion.md`; `frank-transition-row-slot-consistency.md`; `frank-transition-grammar-surface.md`.
+
+- OQ1 is already decided: any work-or-reject surface must split success/mutation and reject into separate grammar constructs so hybrid rows are unwritable by construction.
+- The shipped `TransitionRow` still carries optional `SlotActionChain` plus combined `SlotOutcome`, so `-> set ... -> reject ...` remains syntactically writable today even though no sample relies on it.
+- The repair is to split `TransitionRow` into mutation and reject forms, narrow success outcomes away from `reject`, mirror the split in the typed semantic-model DU, and update the language spec to describe the separated row shapes.
+- The authored DSL surface stays effectively unchanged for valid rows: existing mutation rows and reject-only fallback rows remain writable as-is, while only the invalid action-plus-reject hybrid becomes structurally impossible.
+
+---
 ### 2026-05-15T23:14:11Z: Qualifier enforcement closeout is now durable across N1 and N3/N4
 
 **By:** Scribe
@@ -1012,4 +1065,5 @@ Branch: spike/Precept-V2-Radical
 
 
 ---
+
 

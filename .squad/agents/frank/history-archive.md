@@ -2329,3 +2329,82 @@ Pattern: When a doc has a code block and a prose "pending" note about the same f
 
 - Compressed the live file by archiving detailed same-day notes for Slice 23/24 approvals, modifier comma assessment, QS-1 model review, qualifier deferred scoping, and the full PRE0141 approval pass.
 - Durable outcomes remain in `.squad/decisions.md`; keep `history.md` focused on live guidance, the uninitialized-initial-read gap, and the completion-spec closeout.
+
+---
+
+## Archive Batch — 2026-05-16T02:12:27Z
+
+---
+
+## Learnings
+
+### 2026-05-15T21:00:06-04:00 — Structural exclusion replaces terminal constraint framing
+
+- Shane's direction: "just make that construct not include that slot." Researched parser/grammar: the EventHandler construct ALREADY lacks the Outcome slot. `transition`/`no transition` were already structurally impossible. The design doc was proposing type-checker enforcement for something the grammar already prevents.
+- `ConstructionTransitionNotAllowed` diagnostic deleted — unnecessary. Grammar makes it unreachable.
+- New `SlotRejectClause` needed on EventHandler because `reject` lives in the Outcome slot (exclusive to TransitionRow). A narrow restricted slot provides `reject` to construction rows without introducing `transition`/`no transition`.
+- Durable learning: before proposing downstream enforcement (type checker, graph analyzer), verify whether the grammar already prevents the invalid form. Construct slot definitions ARE the grammar — if a slot isn't in the construct, the parser never attempts to parse it.
+- Durable learning: Precept's philosophy "impossible by construction" applies to language design itself. The grammar is the first enforcer. Type-checker enforcement is for semantic violations that the grammar cannot distinguish (like initial-event detection requiring event metadata).
+
+### 2026-05-15T20:16:01-04:00 — Reversed "uniformity" recommendation: `on <Event>` is correct construction syntax for stateful precepts
+
+- Shane's pushback on the "keep `from <InitialState> on <InitialEvent>`" recommendation was correct. Full analysis in `.squad/decisions/inbox/frank-constructor-syntax-on-event.md`.
+- **Core insight:** False uniformity (dressing unconditional genesis as state-dispatched transition) is worse than honest divergence. If terminal construction established that construction is a distinct semantic category, the syntax must follow.
+- Grammar unification is clean: `EventHandlerDeclaration` is the shared production. Disambiguation between construction rows and state-agnostic handlers happens at type-checking via the `initial` modifier on the event declaration. No parser ambiguity.
+- Guard restriction (`EventHandlerDoesNotSupportGuard`) should be removed: `when` guards on `on Event ->` forms are coherent for both construction (guarded paths) and state-agnostic handlers (field-value conditions).
+- Stateless/stateful constructor syntax unification reflects semantic reality: construction IS the same operation in both contexts.
+- Durable learning: "syntactic uniformity" is only valuable when it reflects semantic uniformity. When semantics diverge, forcing shared syntax teaches a lie.
+
+### 2026-05-15T19:57:05-04:00 — Terminal constructor design analysis reverses prior position on construction-time transitions
+
+- Evaluated Shane's proposal: initial event as true constructor (always terminal in initial state + fire-once enforcement).
+- **Reversed prior verdict** that construction-time transitions are "sound." They are technically sound but semantically confusing — `initial` stops meaning "where entities begin" when construction can route elsewhere.
+- The proposal resolves keyword overload more elegantly than a rename: `initial` genuinely means "origin" in both state and event contexts when construction is terminal.
+- Construction-time routing pattern is empirically unused (0/20+ samples) and replaceable with two-step construct + route.
+- D94 simplifies to single-target analysis (always initial state). Proof engine wins.
+- Fire-once enforcement via excluding initial event from post-construction event space (returns `UndefinedEvent`). No new mechanism.
+- Stateless precepts: fully compatible (constraints vacuously satisfied).
+- **Recommendation: Adopt.** Superior to keyword rename approach. Decision saved to `.squad/decisions/inbox/frank-constructor-terminal-design.md`.
+
+### 2026-05-15T19:48:03-04:00 — Critical design review of initial event/state semantics identified 3 pre-ship fixes
+
+- `initial` keyword overload is a P5 violation: same word means "graph position" (state) and "construction mechanism" (event). Recommendation: split to `initial` (state) + `constructor` (event).
+- Stateless/stateful mutual exclusion is too rigid: `on Event -> actions` should be allowed in stateful precepts when no `from ... on <same event>` row exists. Current restriction forces boilerplate `from any on X -> ... -> no transition`.
+- `no transition` in stateless handlers: grammar says EventHandlerDeclaration has no Outcome production, but semantics doc implied it was valid. Need parser verification and enforcement.
+- Hollow-then-hydrate pattern is sound (working copy atomicity resolves it).
+- Construction-time transition away from initial state is sound (initial state is dispatch context + omit shape + entry ensures), but needs better documentation.
+- Construction guarantee is composite D94 + D132, not D94 alone — docs should make this explicit.
+
+### 2026-05-15T19:37:38-04:00 — Initial event/state semantics audit confirmed spec-implementation alignment
+
+- `initial` on state (lifecycle position) and `initial` on event (construction mechanism) are orthogonal concepts sharing a keyword.
+- Construction chain: hollow version (state set, defaults applied) → initial event fires through standard pipeline → outcome returned.
+- Initial event CAN transition away from initial state at construction time — `Transitioned` is valid construction outcome.
+- D94 checks per-row completeness, not aggregate — every guarded construction path must assign all required fields.
+- Wildcard `from any` rows count as construction paths; omitted fields in initial state exempt from assignment requirement.
+- No inconsistency found between spec, runtime API doc, and diagnostic implementations.
+
+### 2026-05-15T18:36:25-04:00 — Broader construction guarantee audit found 4 additional bugs
+
+- Wildcard FromState rows invisible to stateful construction check (false positive + false negative).
+- D132 materialization check lacks self-referential RHS validation (proposed D143).
+- D142 ignores SecondaryExpression (inconsistent with D130 sibling).
+- D142 ignores cross-field uninitialized reads (proposed D144).
+- Durable learning: construction guarantee completeness requires checking which chains are considered, what constitutes a valid assignment, and what scope of field references is checked.
+
+### 2026-05-15T18:09:43-04:00 — Uninitialized field reads in initial events need dedicated checking
+
+- `ValidateConstructionGuarantees` currently misses stateless precepts and cannot detect self-referential reads on the RHS of an initial `set` action.
+- Treat the repair as two TypeChecker fixes: keep `PRE0094` focused on missing required-field assignments, and add a separate D142-style diagnostic for `set X = f(X)` when `X` has no default or prior assignment.
+
+### 2026-05-15T18:04:26.860-04:00 — Completion position specs should drive context routing, not local suppression lists
+
+- Top-level constructs belong only to `SlotContext.TopLevel` and only at whitespace-only line starts.
+- Missing completion cases should first become explicit slot lanes (`AfterStateTarget`, `AfterEventTarget`, `AfterNo`, `InSetAssignment`) before anyone adds ad-hoc item filters.
+
+### 2026-05-15T21:54:57.644-04:00 — Reject mutual exclusion belongs in grammar across the whole language
+
+- Audit result: the shipped surface currently accepts `reject` only on `TransitionRow` via the `Outcome` slot; `EventHandler` still has no reject lane, and no other construct in `Constructs.cs` carries rejection.
+- `Tokens.cs` already classifies `reject` correctly (`ValidAfter: VA_AfterArrow`, `IsMessagePosition: true`). The problem is not token identity; it is construct shape.
+- `docs/language/precept-language-spec.md` still models transition rows as `("->" ActionStatement)* "->" Outcome`, which means the grammar presently allows `mutate then reject` even though the samples already author reject as separate fallback rows.
+- Durable rule: whenever Precept offers a "do work OR reject" surface, the grammar must split it into mutation/success and reject constructs. Do not make hybrid rows writable and then clean them up with type-checker diagnostics. Mirror the split in semantic-model DU shapes.
