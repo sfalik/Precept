@@ -27,6 +27,18 @@
 - Locked OQ7 in `docs/working/constructor-semantics.md`: construction inspection will be implemented as `InspectCreate()` in core and exposed through `precept_inspect`.
 - Wrote the confirmation note to `.squad/decisions/inbox/frank-planned-runtime-tools.md` so the canonical MCP doc reflects Shane's confirmed surface before runtime work begins.
 
+### 2026-05-16T00:41:43-04:00 — Slice 4 Review Gate: APPROVED
+
+- Reviewed commit f8b1febd (`feat: Slice 4 — TypeChecker structural validation`).
+- Verified 3 new diagnostic codes (145/146/147) in `DiagnosticCode.cs` — no collisions.
+- Full catalog entries in `Diagnostics.cs` with messages, fix hints, examples, related codes.
+- PRE0092 exception correct: `IsConstruction` rows skipped in `ValidateStatelessEventOnNonStatelessPrecept`.
+- `ValidateConstructionRowStructure()` logic correct: legacy-path escape hatch for PRE0146, event-name dedup for PRE0147, transition-row scan for PRE0145.
+- Method wired into `ValidateStructural()` at top of pass.
+- All 8 named tests present, exercising real DSL definitions — no trivially-passing tests.
+- 6,386 tests pass (291 + 44 + 5731 + 320). §11.3 updated ✅.
+- Decision written to `.squad/decisions/inbox/frank-slice4-approved.md`.
+
 ### 2026-05-16T00:41:00-04:00 — Slice 3 Review Gate: APPROVED
 
 - Reviewed commit 7c49f9c7 (`feat: Slice 3 — Semantic Model DU`).

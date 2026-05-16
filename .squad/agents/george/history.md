@@ -19,6 +19,15 @@
 
 ## Recent Updates
 
+### 2026-07-17 — Slice 6 Graph Analyzer construction row awareness complete
+
+- Added `RowSpan` (`required SourceSpan`) to `TypedEventRow` abstract record, mirroring the `TypedTransitionRow` pattern.
+- Set `RowSpan = construct.Span` in `TypeChecker.NormalizeEventHandler` for both `TypedEventRowSuccess` and `TypedEventRowReject`.
+- Extended `GraphAnalyzer.EmitAlwaysRejecting` with a second loop over `EventHandlers` filtered to `IsConstruction == true`, grouping by event name; if ALL rows for an event are `TypedEventRowReject`, emits `AlwaysRejecting` with `Severity.Error` (overriding catalog default via `with { Severity = Severity.Error }`).
+- Created `test/Precept.Tests/GraphAnalyzer/GraphAnalyzerConstructionTests.cs` (4 tests): all-reject construction path → Error, mixed path → no diagnostic, transition row → Warning, reachability inclusion.
+- Fixed `ProofLedgerTests.cs` `CreateEventHandler` to supply `RowSpan = SourceSpan.Missing` for new required property.
+- All 6,407 tests green. Commit `1e1d109a`.
+
 ### 2026-07-17 — Slice 3 Semantic Model DU complete
 
 - Converted `TypedTransitionRow` and `TypedEventHandler` to discriminated unions (abstract base + Success + Reject subtypes).
