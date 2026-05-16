@@ -1678,6 +1678,8 @@ Type errors: applying a set operation to a non-set field, a queue operation to a
 
 A precept that contains both `EventHandlerDeclaration` nodes (`on Event -> actions`) and any `state` declarations is an error. In a stateful precept, event handlers are redundant with `from any on Event -> no transition` followed by rules. Mixing the two creates ambiguity about execution order.
 
+This restriction is deliberate. `from any on Event -> no transition` already expresses the state-agnostic handling case in a stateful precept, so a bare handler would add only redundant surface. Allowing both forms would also invite pseudo-lifecycle designs where field mutation bypasses explicit state topology and weakens the lifecycle guarantee.
+
 A stateless precept (no states, no `from`, no transitions) that uses only event hooks is valid.
 
 ### 3.9 Error Recovery

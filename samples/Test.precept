@@ -1,10 +1,13 @@
 ﻿precept Test
 
-field count as integer default 0
-field total as integer default 0
+field counter as integer
 
-event Increment
+state off initial, running, stopped
 
-on Increment
-    -> set count = count + 1
-    -> set total = count * 2
+event start initial
+
+on start
+    -> set counter = 0
+
+
+

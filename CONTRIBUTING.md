@@ -116,7 +116,7 @@ Every implementation PR must update documentation in the same pass:
 | New keyword, operator, or syntax | `docs/PreceptLanguageDesign.md` + `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json` |
 | New or changed API behavior | `docs/RuntimeApiDesign.md` |
 | New editability semantics | `docs/EditableFieldsDesign.md` |
-| New MCP tool behavior | `docs/McpServerDesign.md` |
+| New MCP tool behavior | `docs/tooling/mcp.md` |
 | Feature claims in README | `README.md` |
 | New or changed proof engine diagnostic (C76, C92–C98, future) | `test/integrationtests/diagnostics/` — add or update a `.precept` sample that demonstrates the diagnostic scenario. See § Diagnostic Samples below. |
 

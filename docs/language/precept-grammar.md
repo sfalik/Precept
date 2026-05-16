@@ -16,7 +16,7 @@
 | Doc purpose | Design reference — grammar principles, structure, and invariants |
 | Primary source | `docs/language/catalog-system.md` (constructs, slots, disambiguation) |
 | Related | `docs/compiler/parser.md` · `docs/language/precept-language-spec.md` |
-| Updated | 2026-05-12 |
+| Updated | 2026-05-15 |
 
 ---
 
@@ -114,9 +114,9 @@ field  →  FieldDeclaration
 state  →  StateDeclaration
 event  →  EventDeclaration
 rule   →  RuleDeclaration
-from   →  TransitionRow | StateEnsure | StateAction   (disambiguated by family verb: on | ensure | ->)
+from   →  TransitionRow | TransitionRowReject | StateEnsure | StateAction   (disambiguated by family verb: on | ensure | ->)
 in     →  StateEnsure | AccessMode | OmitDeclaration  (disambiguated by family verb: ensure | modify | omit)
-on     →  EventEnsure | EventHandler                  (disambiguated by family verb: ensure | ->)
+on     →  EventEnsure | EventRow | EventRowReject   (disambiguated by family verb: ensure | ->)
 to     →  StateEnsure | StateAction                   (disambiguated by family verb: ensure | ->)
 ```
 
@@ -208,7 +208,7 @@ The critical property of this hierarchy: **the construct level is flat**. Expres
 
 ### What a construct is
 
-A construct is a complete declaration — a "sentence" in the DSL. There are 12 construct kinds, each mapped to a `ConstructMeta` entry in the Constructs catalog:
+A construct is a complete declaration — a "sentence" in the DSL. There are 14 construct kinds, each mapped to a `ConstructMeta` entry in the Constructs catalog:
 
 | Construct | Leading keyword | Description |
 |-----------|----------------|-------------|
@@ -217,13 +217,15 @@ A construct is a complete declaration — a "sentence" in the DSL. There are 12 
 | `StateDeclaration` | `state` | Declares lifecycle state(s) |
 | `EventDeclaration` | `event` | Declares an event with typed arguments |
 | `RuleDeclaration` | `rule` | Declares a global data constraint |
-| `TransitionRow` | `from` + `on` | Declares one transition in the state machine |
+| `TransitionRow` | `from` + `on` | Declares a mutation transition (action chain + transition/no-transition outcome) |
+| `TransitionRowReject` | `from` + `on` | Declares a rejection transition (reject clause only, no action chain) |
 | `StateEnsure` | `in`/`to`/`from` + `ensure` | Declares a state-scoped constraint |
 | `AccessMode` | `in` + `modify` | Declares field editability in a state |
 | `OmitDeclaration` | `in` + `omit` | Declares field omission in a state |
 | `StateAction` | `to`/`from` + `->` | Declares a state entry or exit action hook |
 | `EventEnsure` | `on` + `ensure` | Declares an event precondition |
-| `EventHandler` | `on` + `->` | Declares a stateless event handler |
+| `EventRow` | `on` + `->` | Declares an event row on the success path (action chain only) |
+| `EventRowReject` | `on` + `->` | Declares an event row on the reject path (reject clause only) |
 
 ### The flat model
 
@@ -254,7 +256,7 @@ These examples are chosen to cover every distinct slot shape and routing pattern
 - a family-routed declaration with field target and access mode adjective (`in ... modify`)
 - a family-routed declaration with reasoned constraint (`in ... ensure`)
 - a state hook declaration via disambiguation token (`to ... ->` / `from ... ->`)
-- an event-scoped action handler (`on ... ->`)
+- an event-scoped action row (`on ... ->`)
 - the richest routed declaration with guard, action chain, and terminal outcome (`from ... on`)
 
 `OmitDeclaration` is omitted — its slot shape (`StateTarget` + `FieldTarget`) is a strict subset of `AccessMode`'s shape, and its omit-specific disambiguation token adequately conveys the difference. `EventEnsure` is shown explicitly because its `EnsureClause` + `BecauseClause` split mirrors `StateEnsure`. See §4 for construct family routing and disambiguation details.
@@ -319,7 +321,7 @@ on  Submit  [when  IsHighValue]  ensure  Amount > 0  because  "…"
  │    │       ↑         │          ↑          │         ↑        │
 [1]  [2]    slot       [3]     disambig.     [4]       slot     [5]
             marker                token                marker
-[1] Leading token: `on`   ← shared with EventHandler
+[1] Leading token: `on`   ← shared with EventRow / EventRowReject
 [2] EventTarget slot — the anchor event name
 [3] GuardClause slot (optional) — `when` expression; scopes which invocations this ensure governs
 [4] EnsureClause slot — the expression condition (`ensure <expression>`)
@@ -387,8 +389,8 @@ on  Submit  ->  set ClaimAmount = Submit.Amount
 [1]  [2]  disambig.        [3]
            token
 [1] Leading token: `on`   ← shared with EventEnsure
-[2] EventTarget slot — the event whose handler is being declared
-[3] ActionChain slot — one or more `-> action` steps for the event-scoped handler
+[2] EventTarget slot — the event whose row is being declared
+[3] ActionChain slot — one or more `-> action` steps for the event-scoped row
 ```
 
 ---
@@ -414,13 +416,15 @@ Direct       field            none                 FieldDeclaration
 StateScoped  in               scan to family verb  StateEnsure (ensure)
                                                    AccessMode (modify)
                                                    OmitDeclaration (omit)
-             from             scan to family verb  TransitionRow (on)
+             from             scan to family verb  TransitionRow (on, then non-reject)
+                                                   TransitionRowReject (on, then reject)
                                                    StateEnsure (ensure)
                                                    StateAction (->)
              to               scan to family verb  StateEnsure (ensure)
                                                    StateAction (->)
 EventScoped  on               scan to family verb  EventEnsure (ensure)
-                                                   EventHandler (→)
+                                                   EventRow (→, success path after `->`)
+                                                   EventRowReject (→, reject path after `->`)
 ────────────────────────────────────────────────────────────────────────────────────
 ```
 
@@ -465,21 +469,32 @@ The second keyword (`ensure`, `modify`, `omit`) is the disambiguation token. `re
 #### The `on` family (EventScoped)
 
 ```
-on  EventName  [when Guard]  ensure  Expr  [because  "..."]  → EventEnsure
-on  EventName  ->  actions                                   → EventHandler
+on  EventName  [when Guard]  ensure  Expr  [because  "..."]            → EventEnsure
+on  EventName  ->  actions                                             → EventRow
+on  EventName  ->  reject  "reason"                                    → EventRowReject
 ```
 
-The second keyword (`ensure` vs `->`) is the disambiguation token.
+The second keyword (`ensure` vs `->`) is the disambiguation token. After `->`, the parser inspects the next token: if it is `reject`, the construct is `EventRowReject`; otherwise it is `EventRow` (the unmarked success path).
 
 #### The `from` family (StateScoped)
 
 ```
-from  [AnchorState[, ...] | any]  on  EventName  [when Guard]  -> ActionChain -> Outcome  → TransitionRow
-from  [AnchorState[, ...] | any]  [when Guard]  ensure  Expr  [because  "..."]             → StateEnsure
-from  [AnchorState[, ...] | any]  [when Guard]  ->  actions                                → StateAction
+from  [AnchorState[, ...] | any]  on  EventName  [when Guard]  -> ActionChain -> ResolutionOutcome  → TransitionRow
+from  [AnchorState[, ...] | any]  on  EventName  [when Guard]  -> reject "reason"                 → TransitionRowReject
+from  [AnchorState[, ...] | any]  [when Guard]  ensure  Expr  [because  "..."]                    → StateEnsure
+from  [AnchorState[, ...] | any]  [when Guard]  ->  actions                                       → StateAction
 ```
 
-The second keyword (`on`, `ensure`, or `->`) is the disambiguation token. `on` leads `TransitionRow`; `ensure` leads `StateEnsure` (exit constraint); `->` leads `StateAction` (exit hook).
+The second keyword (`on`, `ensure`, or `->`) is the disambiguation token. `on` leads to the transition row family; `ensure` leads `StateEnsure` (exit constraint); `->` leads `StateAction` (exit hook).
+
+Within the `on` sub-family, after the parser resolves through the guard and reaches `->`, it inspects the next token: if it is `reject`, the construct is `TransitionRowReject`; otherwise it is `TransitionRow`. `TransitionRow` is the unmarked success path; `TransitionRowReject` is the explicitly-marked reject path.
+
+**`ResolutionOutcome`** is the narrowed outcome for mutation rows — only `transition StateName` or `no transition` are valid. The `reject` outcome is structurally excluded; reject is its own construct.
+
+```
+ResolutionOutcome  =  'transition' StateName  |  'no' 'transition'
+RejectClause     =  'reject' StringLiteral
+```
 
 #### The `to` family (StateScoped)
 
@@ -516,7 +531,7 @@ A slot is a named, typed position in a construct's grammar, defined by `Construc
 
 ### Slot kinds
 
-The 17 `ConstructSlotKind` values cover every distinct slot type in the language:
+The 18 `ConstructSlotKind` values cover every distinct slot type in the language:
 
 | Kind | What it holds | Where it appears |
 |------|---------------|-----------------|
@@ -528,7 +543,8 @@ The 17 `ConstructSlotKind` values cover every distinct slot type in the language
 | `ComputeExpression` | Computed field body expression | `<- UnitPrice * Quantity` |
 | `GuardClause` | Optional `when` condition expression | `when DocumentsVerified and CreditScore >= 680` |
 | `ActionChain` | Sequence of `-> action` steps | `-> set ApprovedAmount = ...` |
-| `Outcome` | Terminal transition outcome | `-> transition Approved` / `-> reject "..."` / `-> no transition` |
+| `ResolutionOutcome` | Narrowed transition outcome (success only) | `-> transition Approved` / `-> no transition` |
+| `RejectClause` | Rejection with reason string | `-> reject "reason"` |
 | `StateTarget` | State name(s) or `any` wildcard | `from Draft`, `from Draft, Pending`, `to Approved` |
 | `EventTarget` | An event name reference | `on Submit` |
 | `EnsureClause` | Constraint expression | `ensure ApprovedAmount > 0` |
@@ -543,9 +559,9 @@ The 17 `ConstructSlotKind` values cover every distinct slot type in the language
 Here is the complete slot sequence for a `TransitionRow`:
 
 ```
-from   Draft   on   Submit   when   Expr   -> action* -> Outcome
-  │      │      │     │        │      │         │            │
- [1]    [2]    [3]   [4]      [5]   [6]        [7]          [8]
+from   Draft   on   Submit   when   Expr   -> action* -> ResolutionOutcome
+  │      │      │     │        │      │         │              │
+ [1]    [2]    [3]   [4]      [5]   [6]        [7]            [8]
 
 Slot # │ Kind             │ Required │ Notes
 ───────┼──────────────────┼──────────┼────────────────────────────────────────
@@ -556,8 +572,29 @@ Slot # │ Kind             │ Required │ Notes
   [5]  │ (slot marker)    │  no      │ `when` keyword — slot delimiter
   [6]  │ GuardClause      │  no      │ Guard expression
   [7]  │ ActionChain      │  no      │ Mutation verbs (zero or more)
-  [8]  │ Outcome          │  yes     │ Terminal disposition
+  [8]  │ ResolutionOutcome  │  yes     │ Terminal disposition: `transition StateName` or `no transition`
 ```
+
+Here is the complete slot sequence for a `TransitionRowReject`:
+
+```
+from   Draft   on   Submit   when   Expr   -> reject  "reason"
+  │      │      │     │        │      │         │        │
+ [1]    [2]    [3]   [4]      [5]   [6]        [7]     [8]
+
+Slot # │ Kind             │ Required │ Notes
+───────┼──────────────────┼──────────┼────────────────────────────────────────
+  [1]  │ (leading token)  │  yes     │ Structural marker, not a slot
+  [2]  │ StateTarget      │  yes     │ Source state name(s), comma-delimited list, or `any`
+  [3]  │ (disambiguation token) │  yes     │ `on` keyword — family verb / event slot boundary after the full state target
+  [4]  │ EventTarget      │  yes     │ Event name
+  [5]  │ (slot marker)    │  no      │ `when` keyword — slot delimiter
+  [6]  │ GuardClause      │  no      │ Guard expression
+  [7]  │ (slot marker)    │  yes     │ `->` arrow — introduces reject clause
+  [8]  │ RejectClause     │  yes     │ `reject "reason"` — rejection with reason string
+```
+
+> **Design constraint:** `TransitionRowReject` has no `ActionChain` slot. The reject keyword immediately follows `->`, making action-plus-reject hybrids structurally impossible.
 
 ### Named positions vs. positional arguments
 
@@ -580,7 +617,7 @@ No counting positions. No consulting a function signature. **The keyword markers
 
 ### Where expressions appear
 
-Expressions appear **only** in expression-typed slots. The six expression-typed slot kinds are:
+Expressions appear **only** in expression-typed slots. The seven expression-typed slot kinds are:
 
 | Slot kind | Where it appears | Example |
 |-----------|-----------------|---------|
@@ -589,7 +626,8 @@ Expressions appear **only** in expression-typed slots. The six expression-typed 
 | `EnsureClause` | State/event constraint expression | `ensure ApprovedAmount > 0` |
 | `RuleExpression` | Rule body | `rule ExistingDebt <= AnnualIncome * 3` |
 | `ActionChain` | Action assignments | `-> set ApprovedAmount = min(Approve.Amount, RequestedAmount)` |
-| `Outcome` | Terminal transition outcome | `-> transition Approved` / `-> reject "reason"` |
+| `ResolutionOutcome` | Terminal mutation outcome | `-> transition Approved` / `-> no transition` |
+| `RejectClause` | Rejection with reason | `-> reject "reason"` |
 
 ### Expression as a value, not a statement
 
@@ -849,7 +887,8 @@ The parser, completions, TextMate grammar, MCP vocabulary, and AI grounding all 
 ```
 Header     ─► precept
 Direct     ─► field  │  state  │  event  │  rule
-StateScoped─► from [state]   on [event] → TransitionRow
+StateScoped─► from [state]   on [event] → TransitionRow  (non-reject after ->)
+            ─► from [state]   on [event] → TransitionRowReject    (reject after ->)
             ─► in  [state]   ensure     → StateEnsure
             ─► to  [state]   ensure     → StateEnsure
             ─► from [state]  ensure     → StateEnsure
@@ -858,7 +897,8 @@ StateScoped─► from [state]   on [event] → TransitionRow
             ─► to  [state]   -> …       → StateAction
             ─► from [state]  -> …       → StateAction
 EventScoped─► on  [event]   ensure     → EventEnsure
-            ─► on  [event]   -> …       → EventHandler
+            ─► on  [event]   -> …       → EventRow         (success path after ->)
+            ─► on  [event]   -> …       → EventRowReject   (reject path after ->)
 ```
 
 Note: `StateEnsure`, `StateAction`, `EventEnsure`, and `AccessMode` support optional `[when Guard]` before the disambiguation token. See §4 family details.
@@ -883,7 +923,7 @@ ComputeExpression         YES — arbitrary expression
 GuardClause               YES — boolean expression
 EnsureClause              YES — boolean expression
 RuleExpression            YES — boolean expression
-Outcome / ActionChain     YES — expressions within action assignments
+Outcome / ActionChain     YES — expressions within action assignments / reject reason
 ```
 
 ### Grammar invariants at a glance
@@ -896,3 +936,4 @@ Outcome / ActionChain     YES — expressions within action assignments
 5. Block bodies explicitly permitted by ConstructMeta — not implied by indentation
 6. New constructs join an existing family (new disambig token) or start a new one (new keyword)
 ```
+

@@ -160,9 +160,9 @@ See `docs/language/catalog-system.md` — specifically § Architectural Identity
 
 The MCP server tools in `tools/Precept.Mcp/Tools/` are thin wrappers around core APIs. When core types or behavior change, check whether MCP DTOs need updates:
 
-- When core model types change (`PreceptDefinition`, `PreceptField`, `PreceptState`, `PreceptEvent`, `PreceptTransitionRow`, etc.), check whether MCP tool DTOs in `tools/Precept.Mcp/Tools/` need corresponding updates.
-- When `ConstructCatalog` or `DiagnosticCatalog` records gain or lose properties, verify `LanguageTool.cs` serialization still matches `McpServerDesign.md § precept_language` output format.
-- When the fire pipeline stages change, update the static `FirePipeline` array in `LanguageTool.cs`.
+- When core model types or compile-result shapes change, check whether `tools/Precept.Mcp/Dtos/CompileToolDtos.cs` and any affected tool projections need corresponding updates.
+- When catalog, diagnostic, or domain metadata changes, verify `tools/Precept.Mcp/CatalogFormatters.cs` and `docs/tooling/mcp.md` still match the live discoverable tool surface.
+- When live MCP tools are added, removed, or their contracts change, update `docs/tooling/mcp.md` in the same pass and treat the registered files in `tools/Precept.Mcp/Tools/` as the implementation sync target.
 - The MCP tools are **thin wrappers** — never duplicate domain logic. If a tool method exceeds ~30 lines of non-serialization code, the logic probably belongs in `src/Precept/`.
 
 ## Test Conventions

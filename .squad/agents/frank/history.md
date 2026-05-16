@@ -100,3 +100,23 @@
 
 - 2026-05-16 02:40 through 02:12: TransitionRow/EventHandler naming was finalized, the reject-only split was confirmed, and constructor/runtime doc sync closed.
 - 2026-05-15 23:59 through 22:12: qualifier follow-ups, completion-position validation, and runtime API sync were completed.
+
+## Learnings
+
+### 2026-05-16T04:16:00Z — Slice 2 Parser Routing implemented
+
+- Secondary disambiguation pattern: `ResolveRejectVariant()` does lookahead for `-> reject` AFTER primary disamb resolves the base kind. Keeps catalog-driven disamb clean while adding post-arrow split logic.
+- `ParseRejectClause` and `ParseSuccessOutcome` live in `Parser.Expressions.cs` alongside `ParseOutcome`.
+- `RejectClauseSlot` and `SuccessOutcomeSlot` added to `SlotValue.cs` with sentinels wired in `MakeSentinel()`.
+- PRE0014 is structurally bypassed: construction rows have `SlotPreVerbGuardArrow` which consumes `when` during slot parsing, so the post-slot guard gate never sees it. No code change needed in the guard gate itself.
+- The `on` leading-token candidate array orders `ConstructionRow` (19) before `ConstructionRowReject` (20), so primary disamb on `Initial` always picks the base kind; reject variant is resolved by secondary lookahead.
+- `TransitionRow` outcome tests that previously used `OutcomeSlot`+`RejectOutcome` must now use `RejectClauseSlot` on `TransitionRowReject`.
+
+### 2026-05-16T04:16:00Z — Slice 1 Grammar Foundations implemented
+
+- `ConstructMeta` record lives in `src/Precept/Language/Construct.cs` (not a separate ConstructMeta.cs file).
+- `Constructs.GetMeta()` is the exhaustive switch in `src/Precept/Language/Constructs.cs` — this is where new kind entries go.
+- `ConstructSlotKind` values 14-17 were already taken (`AccessModeKeyword`, `FieldTarget`, `RuleExpression`, `InitialMarker`); used 18/19 for `RejectClause`/`SuccessOutcome`.
+- The `SlotOrderingDriftTests` asserts an exact set of scoped constructs — new kinds need adding there.
+- `ConstructsTests` has count invariants (`Total_Count`, `TopLevel_Count`, `SharedLeadingTokens_HaveCorrectCandidateCount`) that must be updated when constructs are added.
+- The EventRow slots are left unchanged for Slice 1 (no guard slot yet); Slice 2 parser routing will add it when PRE0014 is removed.

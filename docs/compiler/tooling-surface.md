@@ -1207,7 +1207,7 @@ Open questions from this section have been resolved. See `docs/compiler/grammar-
 | Semantic tokens two-pass | `docs/tooling/language-server.md` | §7.2 Semantic Tokens |
 | Catalog-driven completions | `docs/tooling/language-server.md` | §7.3 Catalog-Driven Completions |
 | Hover implementation | `docs/tooling/language-server.md` | §7.4 Hover |
-| MCP `precept_language` tool | `docs/tooling/McpServerDesign.md` | §precept_language |
+| Focused MCP catalog tools | `docs/tooling/mcp.md` | §3, §6 |
 | VS Code extension details | `tools/Precept.VsCode/package.json` | contributes.grammars, semanticTokenTypes |
 | Diagnostic system | `docs/compiler/diagnostic-system.md` | — |
 | Runtime evaluator (preview) | `docs/runtime/runtime-api.md` | §Inspection API |

@@ -103,7 +103,7 @@ The runtime API surface is deliberately minimal: two types (`Precept` and `Versi
 **Outputs:**
 - `Precept` — the executable model; returned from `Precept.From()`
 - `Version` — the hydrated entity snapshot; returned from `Precept.Restore()` on `Restored`
-- `EventOutcome` (7 variants) — returned from `Create`, `Fire`; see `result-types.md`
+- `EventOutcome` (9 variants) — returned from `Create`, `Fire`; see `result-types.md`
 - `UpdateOutcome` (4 variants) — returned from `Update`; see `result-types.md`
 - `EventInspection` — returned from `InspectCreate`, `InspectFire`; full annotated landscape
 - `UpdateInspection` — returned from `InspectUpdate`; annotated landscape with event prospects
@@ -142,31 +142,65 @@ EventOutcome outcome = precept.Create(
 
 Version version = outcome switch
 {
-    EventOutcome.Transitioned t           => t.Result,     // initial event transitioned to another state
-    EventOutcome.Applied a                => a.Result,     // stayed in initial state
+    EventOutcome.Created c                => c.Result,     // construction succeeded — entity now exists in initial state
     EventOutcome.Rejected r               => throw new BusinessException(r.Reason),
     EventOutcome.InvalidArgs e            => throw new ArgumentException(e.Reason),
     EventOutcome.ConstraintsFailed f      => HandleViolations(f.Violations),
-    EventOutcome.Unmatched                => HandleNoMatch(),
-    EventOutcome.UndefinedEvent           => throw new InvalidOperationException(),  // compiler prevents this
+    EventOutcome.Faulted fault            => throw new InvalidOperationException(fault.Fault.Message),
+    // Transitioned — structurally impossible (construction is terminal in initial state)
+    // Applied — not a Create() outcome (Create() produces Created, not Applied)
+    // Unmatched — structurally impossible (no-match at construction → Rejected)
+    // UndefinedEvent — structurally impossible (compiler ensures initial event rows exist)
 };
 
 // Precepts WITHOUT an initial event — all fields have defaults
-EventOutcome simple = precept.Create();  // always Applied
+EventOutcome simple = precept.Create();  // always Created
 ```
 
-`Create` is construction. If the precept declares an `initial` event, `Create` fires it atomically: build hollow version (defaults + initial state + omitted fields) → fire initial event with args → return `EventOutcome`. If no initial event is declared, `Create` constructs from defaults and returns `Applied` (always succeeds by compile-time guarantee C59/C86).
+`Create` is construction. It always returns `EventOutcome.Created` on success — regardless of whether an initial event is declared. `Created` means "an entity was brought into existence." Whether that creation involved firing an initial event or just applying defaults is an implementation detail — the outcome category is the same.
 
-**Why `Create` returns `EventOutcome`:** Construction goes through the full event pipeline — same guards, same ensures, same constraint checking, same outcomes. No special construction result type. The caller uses the same pattern matching they use for every `Fire`.
+If the precept declares an `initial` event, `Create` fires it atomically: build hollow version (defaults + initial state + omitted fields) → evaluate construction rows (first-match) → execute matched row's action chain → evaluate constraints → return outcome. If no initial event is declared, `Create` constructs from defaults and returns `Created` (always succeeds by compile-time guarantee C59/C86).
+
+**Construction outcome space:** `Create()` returns exactly one of:
+
+| Outcome | Meaning | When produced |
+|---------|---------|---------------|
+| `Created` | Construction succeeded. Entity now exists in the initial state (stateful) or with `State = null` (stateless). | A mutation row matched and all post-mutation constraints passed. |
+| `Rejected` | Intake refused. Entity was NOT created. | An authored `reject` row matched, OR all `when` guards failed with no unconditional fallback (synthesized reason: `"No construction row matched arguments"`). |
+| `InvalidArgs` | Argument validation failed before row matching. | Wrong type, unknown key, or missing required argument. |
+| `ConstraintsFailed` | Post-mutation constraint violations (collect-all semantics). | A mutation row matched and executed, but constraint evaluation found violations. |
+| `Faulted` | Evaluator impossible path / runtime fault. | The evaluator encountered an impossible condition that the compiler should have prevented. |
+
+**Structurally impossible outcomes from `Create()`:**
+- `Transitioned` — the grammar excludes `transition` from construction rows. Construction always terminates in the initial state.
+- `Applied` — exclusively a `Fire()` outcome. `Create()` produces `Created`, never `Applied`.
+- `Unmatched` — the compiler guarantees at least one construction row exists (`ZeroConstructionRows` diagnostic). If all guards fail at runtime, the result is `Rejected`, not `Unmatched`.
+- `UndefinedEvent` — `Create()` targets the declared initial event; the compiler ensures it has rows.
+
+**Why `Create` returns `EventOutcome`:** Construction goes through the full event pipeline — same guards, same ensures, same constraint checking. The caller uses the same exhaustive pattern matching they use for every `Fire`, minus the impossible variants.
+
+**Semantic guarantee:** After successful construction (`EventOutcome.Created`), `version.State == precept.InitialState.Name` for stateful precepts, or `version.State == null` for stateless precepts. Always. No exceptions.
 
 **Discovery:** `precept.InitialEvent` names the initial event (or null). `precept.RequiredArgs(initialEvent)` returns typed arg descriptors — the construction contract.
 
 **Preview:** `precept.InspectCreate(args?)` returns `EventInspection` with the same progressive resolution model as `InspectFire` — Certain/Possible/Impossible per row, constraint results, field snapshots.
 
+**Fire-once enforcement:** The initial event fires exactly once — at construction time. After construction succeeds, the initial event is excluded from the entity's post-construction event space. Calling `version.Fire(initialEventName, args)` on an existing entity returns `EventOutcome.UndefinedEvent`. No new mechanism is required — the initial event simply does not appear in the post-construction dispatch table. `version.AvailableEvents` (when exposed) excludes the initial event.
+
+**Hollow context (construction guard evaluation):** During construction, the entity does not yet exist. Construction row guards (`when` clauses) are evaluated against the *hollow version* — a working copy with defaults applied and initial state set, but no field values established by prior actions. Guard expressions may read:
+- **Event args (`args.*`):** Always valid. The caller-supplied arguments are bound before row matching.
+- **Defaulted fields:** Valid — fields with declared `default` values are pre-populated on the hollow version.
+- **Non-defaulted fields (`self.*` without defaults):** Invalid reads. The compiler enforces this via hollow-context validation — a field with no default has no value until a construction action establishes it. Reading such a field in a guard is a compile-time error.
+
+**`AlwaysRejecting` for initial events:** If every construction row for the initial event unconditionally rejects (zero mutation rows, or all mutation row guards are provably unsatisfiable), the compiler emits `AlwaysRejecting` at **Error** severity (promoted from Warning for non-initial events). An unconstructible precept is a definition-level defect — the entity type can never be instantiated.
+
 **Compiler enforcement:**
 - **`RequiredFieldsNeedInitialEvent`:** Precept has required fields (non-optional, no default) but does not declare an initial event — construction cannot produce a valid initial version.
 - **`InitialEventMissingAssignments`:** Initial event does not assign all required fields that lack defaults — post-construction state may violate constraints.
 - **`UninitializedFieldReadInInitialAssignment`:** A required field with no default is read inside its own first initial-event assignment — construction would consume an undefined value.
+- **`ZeroConstructionRows`:** Initial event is declared but has zero `on <InitialEvent>` construction rows — the event cannot fire.
+- **`MultipleInitialEvents`:** More than one event carries the `initial` modifier — only one initial event is permitted per precept.
+- **`InitialEventInTransitionRow`:** The initial event appears in a `from <State> on <InitialEvent>` transition row — the initial event is reserved for construction rows only.
 
 **Open (R3):** The internal representation (slot array vs. dictionary, immutable record shape) is not yet decided. The public contract is unaffected — `Version` exposes named field access regardless of internal storage.
 
@@ -208,8 +242,8 @@ public sealed class Precept
 - **Sealed class, not record.** `Precept` owns internal mutable-during-construction state (dispatch tables, slot arrays) that is frozen after `From()` completes. Records imply value semantics; `Precept` has reference identity.
 - **Definition-level queries are structural.** They are precomputed from graph analysis during construction. No evaluator involved — zero runtime cost.
 - **Single `Precept` per definition.** Thread-safe, shareable, cacheable. Mirrors CEL's `Program` (one compiled program evaluated against many activations) and OPA's `PreparedEvalQuery`.
-- **Construction mirrors operations.** `Create` / `InspectCreate` parallel `Version.Fire` / `Version.InspectFire`. Same pipeline, same outcome types, same pattern matching. No special construction path.
-- **`InitialEvent` nullable.** `null` means no initial event is declared — `Create()` builds from defaults (always `Applied`). Non-null (`EventDescriptor`) means the initial event fires atomically during construction. The compiler ensures (`RequiredFieldsNeedInitialEvent`/`InitialEventMissingAssignments`) that this is coherent.
+- **Construction mirrors operations.** `Create` / `InspectCreate` parallel `Version.Fire` / `Version.InspectFire`. Same pipeline, same outcome types, same pattern matching. No special construction path. `Create()` returns `Created` (not `Applied`) — semantically distinct from mutation on an existing entity.
+- **`InitialEvent` nullable.** `null` means no initial event is declared — `Create()` builds from defaults (always `Created`). Non-null (`EventDescriptor`) means the initial event fires atomically during construction. The compiler ensures (`RequiredFieldsNeedInitialEvent`/`InitialEventMissingAssignments`) that this is coherent.
 - **`InitialState` nullable.** `null` for stateless precepts; otherwise a `StateDescriptor`.
 - **Constraint catalog is definition-level.** `Precept.Constraints` exposes every declared constraint (rules, state ensures, event ensures) with full metadata: kind, scope, anchor, `because` rationale, referenced fields, guard presence. This is the full catalog — unfiltered by state. Callers use it for definition-level introspection (e.g., "what rules does this precept declare?").
 
@@ -322,7 +356,9 @@ Version next = outcome switch
 };
 ```
 
-Fire runs the full event pipeline: arg validation → row matching (first-match with guard evaluation) → action chain execution on working copy → computed field recomputation → constraint evaluation (collect-all) → commit or discard. Returns one `EventOutcome` variant. See `result-types.md` for the full hierarchy.
+Fire runs the full event pipeline: arg validation → row matching (first-match with guard evaluation) → action chain execution on working copy (mutation rows) or rejection (reject rows) → computed field recomputation → constraint evaluation (collect-all) → commit or discard. Returns one `EventOutcome` variant. See `result-types.md` for the full hierarchy.
+
+**Row dispatch model:** Transition rows come in two shapes — mutation rows (`TransitionRowMutation`: carry action chain + success outcome) and reject rows (`TransitionRowReject`: carry reject clause only). Row matching evaluates guards in declaration order; the first matching row's shape determines the outcome. A mutation row executes its action chain and produces `Transitioned`, `Applied`, or `ConstraintsFailed`. A reject row produces `Rejected` with the authored reason string. The two shapes are grammar-level constructs — a single row cannot mix mutations with rejection.
 
 ### Update
 
@@ -832,8 +868,8 @@ For stateless precepts (no `state` declarations), `CreateInitialVersion` returns
 | Working copy promotion/discard | Standard protocol | Standard protocol |
 
 **Contract:**
-- `Version.State` is `null` for stateless precepts in all outcomes that include a version (`Applied`, `Transitioned`).
-- `CreateInitialVersion` returns `EventOutcome.Applied(version)` where `version.State == null` when construction succeeds.
+- `Version.State` is `null` for stateless precepts in all outcomes that include a version (`Created`, `Transitioned`).
+- `CreateInitialVersion` returns `EventOutcome.Created(version)` where `version.State == null` when construction succeeds.
 - `EventOutcome.Transitioned` is never produced during stateless construction — there are no transitions.
 - The `Rejected` and `ConstraintsFailed` outcomes remain possible; stateless construction does not suppress business-rule failures.
 

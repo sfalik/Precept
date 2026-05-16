@@ -2073,7 +2073,7 @@ The same inputs always produce the same outputs. This enables confident testing 
 | Constraint catalog and DU subtypes | `docs/language/catalog-system.md §Constraints` |
 | Actions catalog and SyntaxShape | `docs/language/catalog-system.md §Actions` |
 | Fault–diagnostic correspondence | `docs/compiler/proof-engine.md §Fault Backstops` |
-| MCP tools that invoke the evaluator | `docs/mcp/McpServerDesign.md §precept_fire, §precept_update, §precept_inspect` |
+| MCP runtime-tool status and contract doc | `docs/tooling/mcp.md §4` |
 
 ### Constraint Evaluation Matrix
 
