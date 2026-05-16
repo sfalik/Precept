@@ -21,6 +21,26 @@
 - Function-call qualifier preservation belongs in the same enforcement story as operator qualifier compatibility.
 - When the grammar can make an invalid form impossible, do that instead of inventing a later semantic ban.
 - Hollow-entity validation should be shared across all pre-materialization expression lanes, not re-added slot by slot.
+- Formal grammar production rules must reflect structural exclusion decisions immediately — the grammar doc is a design deliverable, not an afterthought that waits for implementation.
+
+## Learnings
+
+### 2026-05-15T22:29:35-04:00 — Naming decision applied: Resolution/Reject
+
+- Shane chose Option A (`Resolution/Reject`) as the naming axis for the grammar-level split constructs.
+- Applied renames across `docs/language/precept-grammar.md` (21 occurrences) and `docs/working/constructor-semantics.md` (23 occurrences).
+- `TransitionRowMutation` → `TransitionRowResolution`, `EventHandlerMutation` → `EventHandlerResolution`, `MutationOutcome` → `ResolutionOutcome`.
+- Typed model records also renamed: `TypedEventHandlerMutation` → `TypedEventHandlerResolution`, `TypedTransitionMutationRow` → `TypedTransitionResolutionRow`.
+- Prose uses of "mutation" (describing field writes) left untouched.
+- Decision record written to `.squad/decisions/inbox/frank-resolution-naming.md`.
+
+### 2026-05-15T22:20:33-04:00 — Grammar doc updated: TransitionRow/EventHandler → mutation/reject split
+
+- Updated `docs/language/precept-grammar.md` to reflect the OQ1-locked structural split.
+- `TransitionRow` → `TransitionRowMutation` + `TransitionRowReject`; `EventHandler` → `EventHandlerMutation` + `EventHandlerReject`.
+- Introduced `MutationOutcome` (narrowed: `transition StateName` | `no transition`) and `RejectClause` (`reject StringLiteral`) as distinct slot kinds replacing the old combined `Outcome`.
+- Parser disambiguation: after reaching `->`, if the next token is `reject`, the construct is the Reject variant; otherwise it's the Mutation variant. Same logic applies to both `from` and `on` families.
+- The slot-kind count increased from 17 to 18 (split `Outcome` → `MutationOutcome` + `RejectClause`); construct count increased from 12 to 14.
 
 ## Historical Summary
 
@@ -29,6 +49,13 @@
 - Older slice-by-slice review detail now lives in `history-archive.md` and `.squad/decisions.md`; this file keeps only the guidance and outcomes other agents need immediately.
 
 ## Recent Updates
+
+### 2026-05-16T02:37:56Z — EventHandler asymmetric naming locked and docs updated
+
+- EventHandler asymmetric naming decision locked: `EventHandler` + `EventHandlerReject`; `EventHandlerResolution` is no longer the chosen design name.
+- Applied 22 documentation renames across `docs/language/precept-grammar.md` (7) and `docs/working/constructor-semantics.md` (15).
+- TransitionRow keeps the symmetric `Resolution` / `Reject` naming model.
+- Typed `TypedEventHandlerResolution` snippet names remain deferred until implementation-time renames.
 
 ### 2026-05-16T02:12:27Z — Transition-row reject mutual exclusion remains an implementation gap
 
@@ -69,3 +96,18 @@
 - Rewrote Construction section of runtime-api.md. Updated variant count, design decisions, stateless contract, and Fire section.
 - Added section 10 to `docs/working/constructor-semantics.md` making runtime doc updates explicit deliverables with per-PR gates and an implementer verification rule.
 - Durable learning: runtime API docs are a ship-gate artifact. Design decisions that change outcome semantics MUST land in the runtime doc in the same pass as the design lock, not deferred to implementation time.
+
+### 2026-05-15T22:27:17-04:00 — Terminology review: "mutation" vs alternatives for the non-reject row form
+
+- Shane flagged that `TransitionRowMutation` / `SlotMutationOutcome` implies the row always mutates something, which isn't true — a guard-only row that transitions without touching fields still uses the "mutation" construct.
+- The actual semantic axis is: the row **resolves** (succeeds with or without state change) vs the row **rejects** (refuses with a reason). The contrast is resolution vs refusal, not mutation vs non-mutation.
+- Presented 4 candidate name pairs; recommendation pending Shane's selection.
+- Naming must stay parallel across both `TransitionRow___` and `EventHandler___` families — they are the same structural split applied to two scopes.
+
+### 2026-05-15T22:34:18-04:00 — EventHandlerResolution naming reconsideration
+
+- Shane objected that `EventHandlerResolution` doesn't carry the same semantic clarity as `TransitionRowResolution`. A transition row *resolves the state-disposition question*; an event handler doesn't "resolve" in any natural reading.
+- Critical insight: `EventHandler` serves dual duty — construction rows (when event is `initial`) AND stateless behavior rows. This is structurally different from `TransitionRow` which is always state-dispatched. The two families are NOT the same structural split applied symmetrically.
+- For EventHandler, the success path IS the unmarked default (you write `on Create -> set fields` normally); rejection is the exception case. For TransitionRow, both resolution and rejection are equal-weight paths in a decision matrix — symmetric naming is justified.
+- Recommended: asymmetric naming — `EventHandler` (base, success-implicit) + `EventHandlerReject` (marked exception). This drops `EventHandlerResolution` entirely. TransitionRow keeps its symmetric `Resolution`/`Reject` axis unchanged.
+- Earlier assumption that naming "must stay parallel" across both families was wrong — the families have different semantic weight distributions.

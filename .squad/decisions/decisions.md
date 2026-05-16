@@ -21278,3 +21278,31 @@ The early-return was bypassing validation that would have succeeded silently for
 - Updated wrong-dimension quantity assertions in `test/Precept.Tests/TypeChecker/TypeCheckerTypedConstantTests.cs` and `test/Precept.Tests/TypeChecker/TypeCheckerFieldDefaultTests.cs` to expect `DimensionCategoryMismatch` for concrete quantity qualifier mismatches.
 - Validation: `dotnet test test/Precept.Tests/ --no-build` initially failed only `QuantityBound_CrossDimensionAssignment_IsBlockedByDimensionCheck`; after the fix, `dotnet build src/Precept/Precept.csproj` and `dotnet test test/Precept.Tests/` both passed (5699/5699).
 - Note: removing the quantity typed-constant early-return regressed interpolated qualifier scenarios, so the shipped fix relies on Fix A plus the dynamic-qualifier guard rather than broadening assignment-qualifier validation.
+
+# Decision: EventHandler naming finalized as EventHandler / EventHandlerReject
+
+**Date:** 2026-05-15T22:37:56.900-04:00
+**Decided by:** Shane
+**Recorded by:** Scribe
+**Sources:** frank-21 manifest, frank-22 manifest, frank-resolution-naming.md, frank-grammar-transition-split.md
+
+## Decision
+
+The `EventHandler` family is asymmetric: `EventHandler` is the default success-path construct and `EventHandlerReject` is the explicit refusal construct. `EventHandlerResolution` is retired.
+
+The `TransitionRow` family stays symmetric: `TransitionRowResolution`, `TransitionRowReject`, and `ResolutionOutcome` remain the correct names there.
+
+## Rationale
+
+`EventHandler` already reads naturally for the normal success path in both construction and stateless contexts. Only the reject branch needs a suffix. `TransitionRow` still names a symmetric resolution-vs-reject decision surface, so its `Resolution` / `Reject` split remains appropriate.
+
+## Applied documentation sync
+
+- `docs/language/precept-grammar.md`: 7 renames
+- `docs/working/constructor-semantics.md`: 15 renames
+- Prose updated to describe the asymmetric model
+- `TypedEventHandlerResolution` snippet names intentionally left unchanged pending implementation-time renames
+
+## Supersession
+
+This final decision supersedes the earlier uniform `EventHandlerResolution` naming proposal contained in the processed inbox material.
