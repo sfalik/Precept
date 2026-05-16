@@ -162,6 +162,47 @@ internal static class CursorSemanticResolver
         return false;
     }
 
+    internal static bool TryGetEventForDotTrigger(Compilation compilation, Position position, out TypedEvent dotEvent)
+    {
+        dotEvent = default!;
+        var tokens = compilation.Tokens.Tokens;
+
+        if (position.Character <= 0)
+        {
+            return false;
+        }
+
+        var dotSearchPos = new Position(position.Line, position.Character - 1);
+        var dotIndex = -1;
+        for (var i = 0; i < tokens.Length; i++)
+        {
+            if (tokens[i].Kind == TokenKind.Dot && Contains(tokens[i].Span, dotSearchPos))
+            {
+                dotIndex = i;
+                break;
+            }
+        }
+
+        if (dotIndex <= 0)
+        {
+            return false;
+        }
+
+        var receiverTokenIndex = FindPreviousSignificantToken(tokens, dotIndex - 1);
+        if (receiverTokenIndex < 0 || tokens[receiverTokenIndex].Kind != TokenKind.Identifier)
+        {
+            return false;
+        }
+
+        if (compilation.Semantics.EventsByName.TryGetValue(tokens[receiverTokenIndex].Text, out var evt))
+        {
+            dotEvent = evt;
+            return true;
+        }
+
+        return false;
+    }
+
     internal static bool TryGetReceiverType(Compilation compilation, Position position, out TypeKind receiverType)
     {
         receiverType = default;

@@ -18,6 +18,7 @@
 - **Action-chain continuation arrow (2026-05-15T18:47:10.829-04:00):** when a fresh `->` line sits outside the parsed construct span, recover `InActionVerb` with a short backward scan over significant tokens; require both a prior action verb and a prior same-or-deeper-indented `->` so continuation recovery stays precise.
 - **SlotPositionResolver shadow path (2026-05-16T09:02:56-04:00):** `tools/Precept.LanguageServer/SlotPositionResolver.cs` can classify structural slot ownership by letting parsed slot spans own the gaps between slots, then deriving `InList`, `InChain`, `AfterSlot`, and `InExpression` from slot metadata plus the previous significant token.
 - **Shadow-run test shape (2026-05-16T09:02:56-04:00):** `test/Precept.LanguageServer.Tests/SlotPositionResolverTests.cs` works best as two layers: legacy-context shadow comparisons for stable structural anchors, plus direct slot/phase assertions for catalog behaviors that do not yet map one-to-one to legacy `SlotContext` micro-states.
+- **Dot-trigger event receivers must win before generic receiver typing (2026-05-16T18:32:32.380-04:00):** after `EventName.`, `TryGetReceiverTypeForDotTrigger` can still succeed with `TypeKind.Error` because the incomplete member access parses as an error-typed expression. Check `EventsByName` first in the `"."` trigger branch, then fall back to field/type accessor resolution, and lock both paths with trigger-character integration tests.
 
 ## Historical Summary
 

@@ -726,6 +726,45 @@ public class CompletionHandlerTests
     }
 
     [Fact]
+    public async Task Completions_DotTrigger_EventName_ShowsEventArgs()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept ElevatorDispatch
+            state Pending initial
+            event Submit(Floor as number, Reason as string)
+            from Pending on Submit when Submit.¦
+                -> no transition
+            """, ".");
+
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().BeEquivalentTo(["Floor", "Reason"]);
+    }
+
+    [Fact]
+    public async Task Completions_DotTrigger_FieldName_ShowsAccessors()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept UtilityOutageReport
+            field CrewQueue as queue of string
+            state VerifiedState initial
+            event DispatchCrew
+            from VerifiedState on DispatchCrew when CrewQueue.¦count > 0
+                -> no transition
+            """, ".");
+
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+        var expected = Precept.Language.Types.GetMeta(Precept.Language.TypeKind.Queue).Accessors
+            .Select(accessor => accessor.Name)
+            .Distinct(System.StringComparer.Ordinal)
+            .ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().BeEquivalentTo(expected);
+    }
+
+    [Fact]
     public async Task Completions_ArgDefault_ReusesExpressionCompletions()
     {
         const string expressionSource = """

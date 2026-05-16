@@ -107,15 +107,24 @@ internal sealed class CompletionHandler : ICompletionHandler
         // lands exactly at the dot token's start column — causing the dot to be missed entirely.
         if (triggerCharacter == ".")
         {
-            return CursorSemanticResolver.TryGetReceiverTypeForDotTrigger(compilation, position, out var receiverType)
-                ? CreateCompletionList(Types.GetMeta(receiverType).Accessors.Select(accessor =>
+            if (CursorSemanticResolver.TryGetEventForDotTrigger(compilation, position, out var dotEvent))
+            {
+                return CreateCompletionList(dotEvent.Args.Select(arg =>
+                    CreateItem(arg.Name, "Event argument", CompletionItemKind.Variable, CompletionSortGroup.SemanticArgument)));
+            }
+
+            if (CursorSemanticResolver.TryGetReceiverTypeForDotTrigger(compilation, position, out var receiverType))
+            {
+                return CreateCompletionList(Types.GetMeta(receiverType).Accessors.Select(accessor =>
                     CreateItem(
                         label: GetAccessorLabel(accessor),
                         detail: accessor.Description,
                         kind: accessor.ParameterType is null ? CompletionItemKind.Property : CompletionItemKind.Method,
                         sortGroup: CompletionSortGroup.Keyword,
-                        documentation: accessor.Description)))
-                : new CompletionList([], true);
+                        documentation: accessor.Description)));
+            }
+
+            return new CompletionList([], true);
         }
 
         // Ctrl+Space / invoked completion inside an already-open typed constant (e.g. cursor
