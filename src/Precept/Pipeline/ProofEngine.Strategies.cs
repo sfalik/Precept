@@ -274,6 +274,7 @@ public static partial class ProofEngine
         {
             TransitionRowContext t => t.Row.Guard,
             StateHookContext s => s.Hook.Guard,
+            EventHandlerContext h => h.Handler.Guard,
             _ => null
         };
         if (guard is null) return false;
@@ -514,6 +515,7 @@ public static partial class ProofEngine
         {
             TransitionRowContext t => t.Row.Guard,
             StateHookContext s => s.Hook.Guard,
+            EventHandlerContext h => h.Handler.Guard,
             _ => null
         };
         if (guard is null) return false;
