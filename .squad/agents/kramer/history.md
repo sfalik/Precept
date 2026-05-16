@@ -27,3 +27,11 @@
 - Pass 1 and Pass 2 closed the top-level keyword leak and the six spec-driven completion gaps: state/event-target continuations, `any`/`all` gating, `no -> transition`, `->` outcome keywords, and expanded expression operator/keyword vocabulary.
 - All fixes remained catalog-sourced through `Constructs`, `Modifiers`, `Actions`, `Operators`, `Outcomes`, `ExpressionForms`, and token metadata rather than language-server-local keyword arrays.
 - Validation endpoint: `dotnet test test\Precept.LanguageServer.Tests\ --nologo` → 319/319 passing.
+
+### 2026-05-16T09:02:56Z — Catalog-driven completions Slice 1 metadata landed
+
+- Frank landed Slice 1 on `spike/Precept-V2-Radical` at commit `069145da`.
+- `ConstructSlot` now carries `IsList`, `IsChainable`, `ItemIntroducerToken`, and `Vocabulary` metadata, backed by a 13-value `SlotVocabulary` enum.
+- All 24 slot instances were populated with the new metadata contract.
+- Validation stayed clean: 16 new tests passed, and there were zero regressions against 6,157 existing tests.
+- Slice 2 can now assume the slot metadata baseline exists when building the resolver path.

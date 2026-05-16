@@ -33604,3 +33604,587 @@ Four new normalization methods following the established `manifest.ByKind` + Res
 - Precept Builder can consume `ProofLedger` for fault backstops and constraint influence
 
 - Language Server proof diagnostics are now live
+
+# PE-G2 Analysis — ProofDischarge + FieldModifierMeta.ProofDischarges
+
+**Date:** 2026-05-08T21:29:51.919-04:00
+
+**Author:** Frank (Lead/Architect)
+
+**Status:** Ready for Shane sign-off
+
+## 1. Source-verified findings
+
+1. `FieldModifierMeta` currently exposes `Kind`, `Token`, `Description`, `Category`, `ApplicableTo`, `HasValue`, `Subsumes`, `HoverDescription`, `UsageExample`, `SnippetTemplate`, `DesugarsToRule`, and `MutuallyExclusiveWith`; there is no `ProofDischarges` constructor parameter or property in source today. (`src/Precept/Language/Modifier.cs:116-133`)
+
+2. The catalog population for modifiers is not in `Modifier.cs`; it lives in `Modifiers.cs`. The relevant field modifiers are declared there: `nonnegative`, `positive`, `nonzero`, `notempty`, `min`, `max`, `minlength`, `maxlength`, `mincount`, and `maxcount`. (`src/Precept/Language/Modifiers.cs:10-29`, `src/Precept/Language/Modifiers.cs:61-145`)
+
+3. `NumericProofRequirement` already fixes `Kind` to `ProofRequirementKind.Numeric` and carries the actual proof payload as `(Subject, Comparison, Threshold, Description)`. The kind metadata is separately recoverable through `ProofRequirements.GetMeta(kind)`. `ProofDischarge` therefore does **not** need a redundant `ProofRequirementKind` field. (`src/Precept/Language/ProofRequirement.cs:41-53`, `src/Precept/Language/ProofRequirements.cs:13-19`)
+
+4. Current live numeric obligation shapes are broader than `Operations.cs` alone:
+
+   - `Operations.cs` emits only `OperatorKind.NotEquals, 0m` obligations at every numeric site. (`src/Precept/Language/Operations.cs:100`, `src/Precept/Language/Operations.cs:109`, `src/Precept/Language/Operations.cs:131`, `src/Precept/Language/Operations.cs:140`, `src/Precept/Language/Operations.cs:162`, `src/Precept/Language/Operations.cs:171`, `src/Precept/Language/Operations.cs:193`, `src/Precept/Language/Operations.cs:202`, `src/Precept/Language/Operations.cs:224`, `src/Precept/Language/Operations.cs:233`, `src/Precept/Language/Operations.cs:335`, `src/Precept/Language/Operations.cs:344`, `src/Precept/Language/Operations.cs:353`, `src/Precept/Language/Operations.cs:418`, `src/Precept/Language/Operations.cs:428`, `src/Precept/Language/Operations.cs:438`, `src/Precept/Language/Operations.cs:447`, `src/Precept/Language/Operations.cs:456`, `src/Precept/Language/Operations.cs:465`, `src/Precept/Language/Operations.cs:497`, `src/Precept/Language/Operations.cs:507`, `src/Precept/Language/Operations.cs:517`, `src/Precept/Language/Operations.cs:526`, `src/Precept/Language/Operations.cs:535`, `src/Precept/Language/Operations.cs:595`, `src/Precept/Language/Operations.cs:613`)
+
+   - `Functions.cs` emits `OperatorKind.GreaterThanOrEqual, 0m` for integer `pow` exponents and `sqrt` arguments. (`src/Precept/Language/Functions.cs:163-188`)
+
+   - `Types.cs` and `Actions.cs` emit `OperatorKind.GreaterThan, 0m` and one `OperatorKind.GreaterThanOrEqual, 0m` against collection cardinality (`SelfSubject(CollectionCountAccessor)`). (`src/Precept/Language/Types.cs:153-164`, `src/Precept/Language/Types.cs:166-288`, `src/Precept/Language/Actions.cs:92-100`, `src/Precept/Language/Actions.cs:110-118`, `src/Precept/Language/Actions.cs:145-166`, `src/Precept/Language/Actions.cs:189-198`)
+
+5. Because collection non-empty obligations target `SelfSubject(CollectionCountAccessor)`, declaration-attribute proof must distinguish **field-value** bounds from **cardinality** bounds; comparison + threshold alone is not enough. The shared accessor is literally `count`. (`src/Precept/Language/Types.cs:153-154`, `src/Precept/Language/Types.cs:163-170`, `src/Precept/Language/Types.cs:181-288`)
+
+6. Valued modifiers are parsed and preserved as `ParsedModifier(ModifierKind Kind, ParsedExpression? Value)` on `DeclaredField`, but `TypedField.Modifiers` keeps only `ModifierKind`. The original field syntax is still retained on `TypedField.Syntax`, and `ParsedConstruct.GetSlot<T>()` can recover the `ModifierListSlot`. Therefore parametric discharges (`min`, `max`, `mincount`, etc.) must encode “threshold comes from the modifier value,” not a fixed decimal stored in catalog metadata. (`src/Precept/Pipeline/SlotValue.cs:26-30`, `src/Precept/Pipeline/SymbolTable.cs:54-62`, `src/Precept/Pipeline/TypeChecker.cs:99-102`, `src/Precept/Pipeline/SemanticIndex.cs:239-253`, `src/Precept/Pipeline/ParsedConstruct.cs:20-29`)
+
+7. Existing spec text is not implementable as written: both `proof-engine.md` and `catalog-system.md` currently model `ProofDischarge` as `(ProofRequirementKind, OperatorKind?, decimal?)`, which cannot represent (a) whether the discharge applies to the field value vs cardinality and (b) whether the threshold is fixed vs modifier-sourced. (`docs/compiler/proof-engine.md:517-607`, `docs/compiler/proof-engine.md:1179-1203`, `docs/language/catalog-system.md:1298-1324`)
+
+## 2. Recommended `ProofDischarge` record definition
+
+## Recommendation
+
+Use a single top-level `ProofDischarge` record with a **narrow subject discriminator** and a **threshold-source DU**:
+
+```csharp
+
+public enum ProofDischargeSubject
+
+{
+
+    FieldValue  = 1,
+
+    Cardinality = 2,
+
+}
+
+public sealed record ProofDischarge(
+
+    ProofDischargeSubject Subject,
+
+    OperatorKind Comparison,
+
+    ProofDischargeThreshold Threshold);
+
+public abstract record ProofDischargeThreshold
+
+{
+
+    public sealed record Fixed(decimal Value) : ProofDischargeThreshold;
+
+    public sealed record ModifierValue() : ProofDischargeThreshold;
+
+}
+
+```
+
+## Why this shape
+
+- **No `ProofRequirementKind`:** `FieldModifierMeta.ProofDischarges` is only for Strategy-2 numeric declaration proofs, and `NumericProofRequirement` already fixes `Kind = Numeric`; storing the kind again is redundant metadata. (`src/Precept/Language/ProofRequirement.cs:41-53`, `src/Precept/Language/ProofRequirements.cs:13-19`)
+
+- **Needs a subject discriminator:** the source emits both field-value proofs (`x != 0`, `x >= 0`) and cardinality proofs (`collection.count > 0`, `collection.count >= 0`). `notempty` and `mincount` do not establish the same thing as `positive` and `min`. (`src/Precept/Language/Types.cs:153-164`, `src/Precept/Language/Types.cs:181-288`, `src/Precept/Language/Actions.cs:92-100`, `src/Precept/Language/Functions.cs:163-188`, `src/Precept/Language/Operations.cs:100-613`)
+
+- **Needs a threshold source, not just a threshold value:** fixed modifiers (`positive`, `nonnegative`, `nonzero`, `notempty`) prove against `0m`; valued modifiers (`min`, `max`, `mincount`, etc.) must read the declaration’s own value expression. (`src/Precept/Language/Modifiers.cs:61-145`, `src/Precept/Pipeline/SlotValue.cs:26-30`, `src/Precept/Pipeline/TypeChecker.cs:99-102`)
+
+- **DU only where shape actually varies:** the only shape variation is threshold source (`Fixed(decimal)` vs `ModifierValue()`), so the DU belongs there. The top-level discharge row is still the same shape for every modifier: subject axis + comparison + threshold source.
+
+## 3. Recommended `ProofDischarges` property signature on `FieldModifierMeta`
+
+## Recommendation
+
+Use the same small-array pattern the language catalogs already use for proof metadata:
+
+```csharp
+
+public sealed record FieldModifierMeta(
+
+    ModifierKind Kind,
+
+    TokenMeta Token,
+
+    string Description,
+
+    ModifierCategory Category,
+
+    TypeTarget[] ApplicableTo,
+
+    bool HasValue = false,
+
+    ModifierKind[] Subsumes = default!,
+
+    ProofDischarge[]? ProofDischarges = null,
+
+    string? HoverDescription = null,
+
+    string? UsageExample = null,
+
+    string? SnippetTemplate = null,
+
+    bool DesugarsToRule = false,
+
+    ModifierKind[]? MutuallyExclusiveWith = null)
+
+    : ModifierMeta(Kind, Token, Description, Category, DesugarsToRule, MutuallyExclusiveWith)
+
+{
+
+    public ModifierKind[] Subsumes { get; init; } = Subsumes ?? [];
+
+    public ProofDischarge[] ProofDischarges { get; init; } = ProofDischarges ?? [];
+
+}
+
+```
+
+## Why `ProofDischarge[]` instead of `ImmutableArray<>` / `FrozenSet<>`
+
+- Strategy 2’s access pattern is a tiny linear scan: `foreach (var discharge in meta.ProofDischarges)`. There is no key lookup to justify `FrozenSet<>`. (`docs/compiler/proof-engine.md:586-593`)
+
+- Adjacent catalog surfaces already use the same array shape for proof metadata: `TypeAccessor.ProofRequirements`, `ActionMeta.ProofRequirements`, and `FunctionOverload.ProofRequirements`. (`src/Precept/Language/Type.cs:77-87`, `src/Precept/Language/Action.cs:7-26`, `src/Precept/Language/Function.cs:18-26`)
+
+- `FieldModifierMeta` already uses arrays for other tiny metadata bags (`ApplicableTo`, `Subsumes`, `MutuallyExclusiveWith`). (`src/Precept/Language/Modifier.cs:116-133`)
+
+## 4. Per-modifier population table
+
+## Recommended population
+
+| Modifier | Recommended `ProofDischarges` entries | Live against current source? | Notes |
+
+|---|---|---:|---|
+
+| `positive` | `new ProofDischarge(ProofDischargeSubject.FieldValue, OperatorKind.GreaterThan, new ProofDischargeThreshold.Fixed(0m))` | Yes | Canonical fact is `value > 0`; generic subsumption can cover `!= 0` and `>= 0` from that stronger bound. `positive` already structurally subsumes `nonnegative` and `nonzero`. (`src/Precept/Language/Modifiers.cs:69-76`, `docs/compiler/proof-engine.md:600-606`) |
+
+| `nonnegative` | `new ProofDischarge(ProofDischargeSubject.FieldValue, OperatorKind.GreaterThanOrEqual, new ProofDischargeThreshold.Fixed(0m))` | Yes | Directly matches current `sqrt` / integer-`pow` proof obligations. (`src/Precept/Language/Modifiers.cs:61-67`, `src/Precept/Language/Functions.cs:163-188`) |
+
+| `nonzero` | `new ProofDischarge(ProofDischargeSubject.FieldValue, OperatorKind.NotEquals, new ProofDischargeThreshold.Fixed(0m))` | Yes | Directly matches current divide/modulo-style obligations from `Operations.cs`. (`src/Precept/Language/Modifiers.cs:78-83`, `src/Precept/Language/Operations.cs:100-613`) |
+
+| `notempty` | `new ProofDischarge(ProofDischargeSubject.Cardinality, OperatorKind.GreaterThan, new ProofDischargeThreshold.Fixed(0m))` | Yes | This is a cardinality fact, not a presence fact. It discharges current collection `.count > 0` obligations and, via subsumption, `.count >= 0` obligations. (`src/Precept/Language/Modifiers.cs:85-90`, `src/Precept/Language/ModifierKind.cs:21-22`, `src/Precept/Language/Types.cs:153-164`, `src/Precept/Language/Actions.cs:92-100`) |
+
+| `min(N)` | `new ProofDischarge(ProofDischargeSubject.FieldValue, OperatorKind.GreaterThanOrEqual, new ProofDischargeThreshold.ModifierValue())` | Yes | Parameterized lower bound on the field value. With a concrete declaration value, this can discharge current `>= 0`, and may also subsume `> 0` / `!= 0` when `N > 0`. (`src/Precept/Language/Modifiers.cs:98-103`, `src/Precept/Pipeline/SlotValue.cs:26-30`) |
+
+| `max(N)` | `new ProofDischarge(ProofDischargeSubject.FieldValue, OperatorKind.LessThanOrEqual, new ProofDischargeThreshold.ModifierValue())` | Not yet | Semantically correct upper-bound metadata; current source does not emit any `<=` numeric obligations yet, but this belongs in the catalog because `max` is a first-class declaration of that bound. (`src/Precept/Language/Modifiers.cs:105-110`) |
+
+| `mincount(N)` | `new ProofDischarge(ProofDischargeSubject.Cardinality, OperatorKind.GreaterThanOrEqual, new ProofDischargeThreshold.ModifierValue())` | Yes | Current collection-accessor/action obligations are cardinality-based, so `mincount` is relevant and should not be omitted. (`src/Precept/Language/Modifiers.cs:126-131`, `src/Precept/Language/Types.cs:153-164`, `src/Precept/Language/Actions.cs:92-100`) |
+
+| `maxcount(N)` | `new ProofDischarge(ProofDischargeSubject.Cardinality, OperatorKind.LessThanOrEqual, new ProofDischargeThreshold.ModifierValue())` | Not yet | Semantically correct upper-bound metadata for future cardinality upper-bound obligations. (`src/Precept/Language/Modifiers.cs:133-138`) |
+
+| `minlength(N)` | `new ProofDischarge(ProofDischargeSubject.Cardinality, OperatorKind.GreaterThanOrEqual, new ProofDischargeThreshold.ModifierValue())` | Not yet | Current source has no string-cardinality proof emitters, but this is the string parallel to `mincount`. (`src/Precept/Language/Modifiers.cs:112-117`) |
+
+| `maxlength(N)` | `new ProofDischarge(ProofDischargeSubject.Cardinality, OperatorKind.LessThanOrEqual, new ProofDischargeThreshold.ModifierValue())` | Not yet | Current source has no string-cardinality upper-bound proof emitters, but catalog truth should still declare the bound. (`src/Precept/Language/Modifiers.cs:119-124`) |
+
+## Modifiers that should **not** get `ProofDischarges`
+
+- `optional` — presence/nullability is not modeled by the current numeric discharge path. (`src/Precept/Language/Modifiers.cs:49-53`, `src/Precept/Language/ProofRequirement.cs:56-63`)
+
+- `ordered` — used by direct `ModifierRequirement`, not numeric discharge lookup. (`src/Precept/Language/Modifiers.cs:55-59`, `src/Precept/Language/ProofRequirement.cs:103-116`)
+
+- `default` — initialization expression, not a declaration-time proof bound. (`src/Precept/Language/Modifiers.cs:92-96`)
+
+- `maxplaces` — decimal precision constraint; there is no corresponding `ProofRequirement` shape in source. (`src/Precept/Language/Modifiers.cs:140-145`, `src/Precept/Language/ProofRequirement.cs:41-116`)
+
+- `writable` — access-mode/editability semantics, not proof discharge. (`src/Precept/Language/Modifiers.cs:147-151`)
+
+## 5. `proof-engine.md` update instructions
+
+1. **Replace the flat `ProofDischarge(ProofRequirementKind, OperatorKind?, decimal?)` snippet** in Strategy 2 and Decision 5 with the subject-aware + threshold-source shape above. The current doc shape cannot represent cardinality-vs-field-value or modifier-sourced thresholds. (`docs/compiler/proof-engine.md:517-537`, `docs/compiler/proof-engine.md:1188-1193`)
+
+2. **Remove `PresenceProofRequirement` from the `ProofDischarges` path.** Strategy 2’s catalog lookup arm should be numeric-only. `notempty` is a cardinality/numeric proof, not a presence proof, and the source’s current non-empty callers all emit `NumericProofRequirement`, not `PresenceProofRequirement`. (`docs/compiler/proof-engine.md:571-603`, `src/Precept/Language/Types.cs:153-164`, `src/Precept/Language/Actions.cs:92-100`)
+
+3. **Teach the pseudocode to compare the discharge subject axis** (`FieldValue` vs `Cardinality`) against the resolved requirement subject. The current pseudocode only compares requirement kind/comparison/threshold, which is insufficient. (`docs/compiler/proof-engine.md:542-607`, `src/Precept/Language/Types.cs:153-154`)
+
+4. **Update Strategy 2 pseudocode to read valued modifier arguments from field syntax** (for example via `attributeField.Syntax.GetSlot<ModifierListSlot>(ConstructSlotKind.ModifierList)`), because `TypedField.Modifiers` is kind-only. Without this, `min/max/mincount/...` cannot discharge anything parameterized. (`docs/compiler/proof-engine.md:580-590`, `src/Precept/Pipeline/TypeChecker.cs:99-102`, `src/Precept/Pipeline/SemanticIndex.cs:239-253`, `src/Precept/Pipeline/ParsedConstruct.cs:20-29`)
+
+5. **Iterate both declared and implied modifiers** when doing declaration-attribute proof. Strategy 2 text already says it reads “modifier-implied metadata,” but the pseudocode currently walks only `attributeField.Modifiers`. (`docs/compiler/proof-engine.md:485-487`, `docs/compiler/proof-engine.md:586-590`, `src/Precept/Pipeline/SemanticIndex.cs:244-245`, `src/Precept/Language/Types.cs:458-460`, `src/Precept/Language/Types.cs:525-529`, `src/Precept/Language/Types.cs:554-562`, `src/Precept/Language/Types.cs:565-574`)
+
+6. **Expand the modifier table** so it includes the semantically relevant cardinality modifiers (`mincount`, `maxcount`, `minlength`, `maxlength`) or explicitly state that the table is intentionally current-consumer-only. Right now the doc table is incomplete relative to the modifier catalog. (`docs/compiler/proof-engine.md:489-499`, `docs/compiler/proof-engine.md:1196-1203`, `src/Precept/Language/Modifiers.cs:112-138`)
+
+7. **Remove the “resolved in source” language until code lands.** The doc currently claims CC#5 is already canonical/in source, but the actual `FieldModifierMeta` shape still lacks the property. (`docs/compiler/proof-engine.md:609-611`, `src/Precept/Language/Modifier.cs:116-133`)
+
+## 6. Decision summary
+
+| Decision | Recommendation | Rationale |
+
+|---|---|---|
+
+| 1. `ProofDischarge` shape | Use `ProofDischarge(ProofDischargeSubject Subject, OperatorKind Comparison, ProofDischargeThreshold Threshold)` with `ProofDischargeThreshold.Fixed(decimal)` / `ModifierValue()`; do **not** store `ProofRequirementKind`. | Numeric declaration proof needs subject axis + comparison + threshold source, and only the threshold source has shape variation. |
+
+| 2. `FieldModifierMeta.ProofDischarges` signature | Add `ProofDischarge[]? ProofDischarges = null` to the record constructor and materialize `public ProofDischarge[] ProofDischarges { get; init; } = ProofDischarges ?? [];`. | Strategy 2 linearly enumerates tiny per-modifier tables, and adjacent catalog surfaces already use arrays for proof metadata. |
+
+| 3. Population entries | Populate all bound-establishing field modifiers now: live rows for `positive`, `nonnegative`, `nonzero`, `notempty`, `min`, `mincount`; semantically complete dormant rows for `max`, `maxcount`, `minlength`, and `maxlength`. | This keeps modifier meaning catalog-declared instead of consumer-hardcoded and prevents the next proof-engine feature from reopening the same metadata gap. |
+
+# PE-G2 Broader Design Review — Should `ProofDischarge` cover all requirement kinds?
+
+**Date:** 2026-05-08T21:41:41.253-04:00
+
+**Author:** Frank (Lead/Architect)
+
+**Status:** Ready for Shane sign-off
+
+**Trigger:** Shane challenged the narrow numeric-only `ProofDischarge` scope — asking whether a broader DU covering all three Strategy 2 proof requirement kinds would be more coherent.
+
+## 1. Verdict: Narrow is correct
+
+The narrow numeric-only `ProofDischarge` shape from the prior analysis is the architecturally correct design. A broader DU would add structural complexity with zero information gain — two of the three subtypes would either be tautological or permanently empty.
+
+## 2. Per-arm analysis against the metadata-driven architecture principle
+
+The metadata-driven principle asks: *"Does any pipeline stage switch on a `*Kind` enum value to apply per-member behavior?"* If yes, that behavior belongs in catalog metadata. Let me apply this test rigorously to each Strategy 2 arm.
+
+## Arm 1: `NumericProofRequirement` — ProofDischarges path ✅ Catalog-driven
+
+**Current design:** Strategy 2 reads `FieldModifierMeta.ProofDischarges` and calls `DischargeCovers(discharge, requirement)`. The proof engine never switches on `ModifierKind`. It iterates the discharge array generically. Domain knowledge (which modifiers establish which bounds) lives entirely in catalog metadata entries.
+
+**Verdict:** This is textbook metadata-driven architecture. The `ProofDischarge` catalog entry carries the domain knowledge; the engine is generic machinery. No change needed.
+
+## Arm 2: `ModifierRequirement` — Direct presence check ✅ Already generic machinery
+
+**Current pseudocode:** `field.Modifiers.Contains(modReq.Required)` — a single generic set-membership test.
+
+**Does it switch on a `ModifierKind` value to apply per-member behavior?** No. It doesn't switch on *which* modifier is required. The `Required` value comes from the obligation itself (emitted by the Operations catalog — e.g., choice ordering operations emit `ModifierRequirement(Subject, ModifierKind.Ordered, ...)`). The proof engine simply checks: "does the field have it?" This is structurally identical to `list.Contains(item)` — the most generic possible predicate.
+
+**Would `ProofDischarge.ModifierPresence(ModifierKind.Ordered)` on the `ordered` modifier's metadata add information?** No. It would be tautological metadata: "the `ordered` modifier proves that the field has the `ordered` modifier." The modifier's *existence on the field* is the proof — declaring that fact as a separate metadata entry restates identity as data. The engine can derive this from the modifier's presence without any catalog entry.
+
+**Is there any modifier whose proof-discharge relationship to `ModifierRequirement` is non-obvious or non-identity?** No. The subsumption relationship (`positive` subsumes `nonzero`) exists only in numeric bound semantics. For modifier presence, `ordered` is `ordered` — there is no "modifier A implies modifier B is present" relationship that would benefit from catalog declaration.
+
+**Verdict:** The `ModifierRequirement` arm is generic machinery that reads a value from the obligation and checks set membership. No per-member behavior exists. Adding `ModifierPresence` discharges would be tautological metadata that restates the modifier's identity. The current arm is correct as-is.
+
+## Arm 3: `DimensionProofRequirement` — Period dimension resolution ✅ Different knowledge source
+
+**Current pseudocode:** `ResolvePeriodDimension(subject, semantics)` reads the period dimension from the literal's temporal unit or the field's type qualifier, then compares against `dimReq.RequiredDimension`.
+
+**Does this involve modifier metadata at all?** No. Period dimension is a property of the *type system* (qualifier on a `period` field or unit on a period literal), not a property of any modifier. The dimension data lives in `TypedField`'s qualifier metadata and in period literal units — neither of which are modifiers.
+
+**Are there modifiers in the catalog that declare a period dimension?** No. Checking `Modifiers.cs` exhaustively: there are no `year`, `month`, `day`, `week`, `hour`, `minute`, or `second` modifiers. Period temporal granularity is not expressed through field modifiers — it's expressed through type qualifiers (e.g., `field DueDate as period of days`).
+
+**Would `ProofDischarge.Dimension(PeriodDimension.Date)` entries on any `FieldModifierMeta` have entries?** Zero entries. No modifier in the catalog establishes a period dimension. This subtype would be permanently empty — a shape that exists but is never populated.
+
+**Verdict:** Period dimension is type-system knowledge, not modifier knowledge. `FieldModifierMeta.ProofDischarges` is the wrong home for dimension data. The current arm correctly reads from the type/qualifier system. Adding a `Dimension` discharge subtype would create a permanently empty DU arm — the exact shape-without-substance anti-pattern.
+
+## 3. Why the broader DU fails the architecture test
+
+The proposed broader DU:
+
+```csharp
+
+public abstract record ProofDischarge {
+
+    public sealed record Numeric(...) : ProofDischarge;
+
+    public sealed record ModifierPresence(ModifierKind Required) : ProofDischarge;
+
+    public sealed record Dimension(PeriodDimension Dimension) : ProofDischarge;
+
+}
+
+```
+
+Fails on three counts:
+
+| Criterion | Result |
+
+|---|---|
+
+| **Does it eliminate hardcoded per-member logic from the proof engine?** | No. The `ModifierRequirement` arm has no per-member logic to eliminate — `Contains` is generic. The `DimensionProofRequirement` arm reads from the type system, not modifiers. |
+
+| **Does it actually add catalog entries where domain knowledge currently lives in pipeline code?** | No. `ModifierPresence` entries would be tautological (identity = proof). `Dimension` entries would be empty (no modifier declares a dimension). |
+
+| **Does it have the right shape variation? (DU only where shapes actually differ)** | No. Two of three arms would be degenerate: `ModifierPresence` restates what the modifier already is; `Dimension` has zero inhabitants. DU arms with zero or tautological members are structural noise, not shape variation. |
+
+The metadata-driven principle says: *catalog what IS domain knowledge.* But not everything is domain knowledge:
+
+- **"The `ordered` modifier proves `ordered` is present"** is not domain knowledge — it's a logical tautology.
+
+- **"Period dimension comes from the type qualifier"** is not modifier domain knowledge — it's type-system domain knowledge that lives in a different catalog surface.
+
+Cataloging these would violate the principle's corollary: catalogs carry *meaningful* metadata that consumers can't derive from the member's identity alone.
+
+## 4. What makes the Strategy 2 arms NOT hardcoded per-member knowledge
+
+The metadata-driven principle targets a specific smell: `kind switch { FooKind.Bar => ..., FooKind.Baz => ... }` where each branch exists because "the language says so." Here's why each arm avoids that smell:
+
+| Arm | What it switches on | Why it's not the smell |
+
+|---|---|---|
+
+| **NumericProofRequirement** | Nothing — iterates `ProofDischarges[]` generically | Catalog-driven loop, no per-modifier branching |
+
+| **ModifierRequirement** | Nothing — calls `field.Modifiers.Contains(modReq.Required)` | Generic set-membership test. The `Required` value comes from the obligation emitter (Operations catalog), not from a switch in the proof engine |
+
+| **DimensionProofRequirement** | `PeriodDimension` enum — but this comparison is `resolved == required`, not a per-member behavior switch | Reads dimension from type metadata and compares to requirement. No per-dimension branching logic. `dimension == PeriodDimension.Any \|\| dimension == dimReq.RequiredDimension` is a universal pattern (wildcard + exact match), not per-member dispatch |
+
+The proof engine switches on **requirement subtype** (`is DimensionProofRequirement`, `is ModifierRequirement`, `is NumericProofRequirement`) to dispatch to the correct arm. This is switching on a DU subtype — which the architecture rules explicitly permit: *"Switching on a DU subtype is correct — the subtype is the metadata shape, not a classification axis."*
+
+## 5. Decision summary
+
+| Decision | Recommendation | Rationale | Tradeoff accepted |
+
+|---|---|---|---|
+
+| Narrow vs. broader `ProofDischarge` | **Narrow** — keep `ProofDischarge` as the numeric-only shape from the prior analysis | `ModifierPresence` discharges would be tautological (identity = proof). `Dimension` discharges would be permanently empty (no modifier declares a period dimension). Neither arm has per-member pipeline logic to extract. | The three Strategy 2 arms remain structurally distinct code paths rather than a single unified catalog loop. This is the correct design because they read from *different knowledge sources* (modifier catalog, field modifier set, type qualifier system). |
+
+| Strategy 2 arm structure | Keep three dedicated arms: (1) ProofDischarges catalog loop for `NumericProofRequirement`, (2) `Contains` check for `ModifierRequirement`, (3) dimension resolution for `DimensionProofRequirement` | Each arm reads from a different metadata surface. Unifying them into a single `ProofDischarges` loop would force modifier and dimension knowledge into the wrong catalog surface (`FieldModifierMeta`) where it doesn't naturally belong. | Strategy 2 has three code paths instead of one. But each path is ~3-5 lines of generic machinery. Simplicity of the unified loop is illusory — it would push complexity into tautological or empty catalog entries. |
+
+## 6. Recommendation
+
+Proceed with the narrow `ProofDischarge` shape exactly as specified in the prior PE-G2 analysis. The broader DU is architecturally weaker, not stronger — it would catalog non-knowledge (tautologies and empty sets) in pursuit of a false uniformity. The current three-arm Strategy 2 design is the correct metadata-driven architecture because each arm reads from the *right* metadata source for its proof obligation kind.
+
+# Decision: ProofEngine Spec Complete — All 18 Gaps Resolved
+
+**Date:** 2026-05-08T22:54:50.625-04:00
+
+**Author:** Frank (Lead/Architect)
+
+**Status:** Approved by Shane — implementation may proceed
+
+---
+
+## Summary
+
+All 18 ProofEngine gaps (PE-G1 through PE-G18) are now RESOLVED and incorporated into the canonical spec at `docs/compiler/proof-engine.md`. The spec is the authoritative implementation target with zero open questions, zero deferrals, and zero placeholders.
+
+## Resolution Timeline
+
+- **PE-G1** (3 unhandled requirement kinds): Resolved 2026-05-08 — Strategy 2 expanded, Strategy 5 added
+
+- **PE-G2** (ProofSatisfaction DU): Resolved 2026-05-08 — full DU with 5 subtypes + 3 supporting DUs, carrier types defined
+
+- **PE-G3** (ProofLedger shape): Resolved 2026-05-08 — 9 supporting types specified
+
+- **PE-G4–G18** (remaining 15 gaps): Resolved 2026-05-08 per Shane's no-deferral mandate, spec corrections applied same day
+
+## New Types Introduced
+
+## ObligationContext DU (PE-G6) — 5 subtypes
+
+```csharp
+
+public abstract record ObligationContext;
+
+public sealed record TransitionRowContext(TypedTransitionRow Row) : ObligationContext;
+
+public sealed record ConstraintContext(ConstraintIdentity Constraint) : ObligationContext;
+
+public sealed record StateHookContext(TypedStateHook Hook) : ObligationContext;
+
+public sealed record EventHandlerContext(TypedEventHandler Handler) : ObligationContext;
+
+public sealed record FieldExpressionContext(TypedField Field) : ObligationContext;
+
+```
+
+Added to `ProofObligation` as a `Context` field — set at Pass 1 instantiation time, replaces the undefined `FindEnclosingTransitionRow` with O(1) lookup.
+
+## New Diagnostic Codes
+
+| Code | Name | Severity |
+
+|------|------|----------|
+
+| 96 | `UnprovedModifierRequirement` | Error |
+
+| 97 | `UnprovedDimensionRequirement` | Error |
+
+| 98 | `UnprovedQualifierCompatibility` | Error |
+
+| 99 | `UnsatisfiableInitialState` | Error |
+
+These are spec-defined and pending registration in `DiagnosticCode.cs` and `Diagnostics.cs` at implementation time.
+
+## Key Design Decisions Locked
+
+1. **Explicit walk-target enumeration** (PE-G4) — no `AllTypedExpressions` on SemanticIndex
+
+2. **Source shapes canonical** for ConstraintIdentity (PE-G5)
+
+3. **Context-at-instantiation** pattern for obligation context (PE-G6)
+
+4. **Reference-equality parameter lookup** for subject resolution (PE-G7)
+
+5. **Bounded constant folding** for initial-state satisfiability (PE-G8)
+
+6. **Type checker owns collection diagnostics** (PE-G9)
+
+7. **AND decomposes, OR does NOT, negation inverts** for guard decomposition (PE-G10)
+
+8. **Builder proof-consumption contract** with 3 consumption patterns (PE-G11)
+
+9. **Error-tainted obligations suppress proof diagnostics** (PE-G13)
+
+10. **12-entry exhaustive guard relation triple table**, subtraction-only (PE-G14)
+
+11. **Stateless precepts**: Strategies 3/4 skip, all others apply (PE-G15)
+
+12. **ReferenceEqualityComparer.Instance** for site identity matching (PE-G16)
+
+## Artifacts Updated
+
+- `docs/compiler/proof-engine.md` — canonical spec, all corrections applied
+
+- `docs/Working/frank-proof-engine-gap-analysis.md` — all 18 gaps marked RESOLVED, verdict READY
+
+- `docs/Working/inbox/frank-pe-g4-to-g18-resolution.md` — source material (retained as rationale record)
+
+## Next Steps
+
+Implementation may proceed. The spec is production-quality — no implementer should need to make design decisions. Shape declarations (Slice 0), obligation instantiation, strategy dispatch, and diagnostic emission are all fully specified.
+
+## 2026-05-08: DesugarsToRule flag on ModifierMeta
+
+**By:** George (requested by Shane)
+
+**What:** Added `DesugarsToRule: bool = false` to `ModifierMeta`. Set true on: `nonnegative`, `positive`, `nonzero`, `notempty`, `min`, `max`, `minlength`, `maxlength`, `mincount`, `maxcount`, `maxplaces`
+
+**Why:** Grammar generator gap — modifiers that desugar to rules were gold-highlighted in the old hand-authored grammar but this was not carried over to the catalog-driven generator.
+
+**Rationale:** Catalog should be the single source of truth for all gold-color decisions, not the generator or hand-authored grammar.
+
+## 2026-05-08: PE-G3 ProofLedger output types implemented
+
+**By:** George (requested by Shane)
+
+**What:** Expanded `src/Precept/Pipeline/ProofLedger.cs` from the single-field stub to the full approved PE-G3 shape: `ProofLedger`, `ProofObligation`, `ProofDisposition`, `ProofStrategy`, `FaultSiteLink`, `FaultSiteAnnotation`, `ConstraintInfluenceEntry`, `EventArgReference`, `InitialStateSatisfiabilityResult`, and `UnsatisfiedConstraint`.
+
+**Files modified:** `src/Precept/Pipeline/ProofLedger.cs`, `src/Precept/Pipeline/ProofEngine.cs`, `docs/compiler/proof-engine.md`
+
+**Files created:** `.squad/decisions/inbox/george-pe-g3-implemented.md`
+
+**Validation:** `dotnet build src\Precept\Precept.csproj --nologo` succeeded with zero errors.
+
+## 2026-05-08T23:21:03.236-04:00: Phase 1 proof-engine prework closed
+
+**By:** George (requested by Shane)
+
+**What:** Completed the Phase 1 proof-engine prework slices P1-P8 with structural-only changes: proof satisfaction carriers, declared presence/qualifier metadata, modifier proof-satisfaction catalog data, semantic-index carrier slots on `TypedField`/`TypedArg`, `ObligationContext` on `ProofObligation`, proof diagnostic codes 112-115, and the matching doc ordinal corrections.
+
+**Commits:**
+
+- P1 `f1de70dc` — `feat(proof-engine): P1 — ProofSatisfaction DU and supporting types`
+
+- P2 `161eb1fa` — `feat(proof-engine): P2 — DeclaredPresenceMeta carrier type`
+
+- P3 `267dd7bd` — `feat(proof-engine): P3 — DeclaredQualifierMeta carrier type`
+
+- P4 `5d6945c4` — `feat(proof-engine): P4 — FieldModifierMeta.ProofSatisfactions catalog metadata`
+
+- P5 `1bdf53f4` — `feat(proof-engine): P5 — TypedField/TypedArg presence and qualifier carrier properties`
+
+- P6 `445c3127` — `feat(proof-engine): P6 — ObligationContext DU on ProofObligation`
+
+- P7 `247ba37f` — `feat(proof-engine): P7 — diagnostic codes 112-115 for proof stage`
+
+- P8 `647de929` — `docs(proof-engine): P8 — correct diagnostic code ordinals 96-99 → 112-115`
+
+**Files touched (high-signal):**
+
+- Runtime/language: `src/Precept/Language/ProofRequirement.cs`, `src/Precept/Language/DeclaredPresence.cs`, `src/Precept/Language/DeclaredQualifierMeta.cs`, `src/Precept/Language/Modifier.cs`, `src/Precept/Language/Modifiers.cs`, `src/Precept/Pipeline/SemanticIndex.cs`, `src/Precept/Pipeline/TypeChecker.cs`, `src/Precept/Pipeline/ProofLedger.cs`, `src/Precept/Language/DiagnosticCode.cs`, `src/Precept/Language/Diagnostics.cs`
+
+- Tests: `test/Precept.Tests/ProofRequirementTests.cs`, `test/Precept.Tests/ModifiersTests.cs`, `test/Precept.Tests/TypeChecker/TypeCheckerExpressionTests.cs`, `test/Precept.Tests/TypeChecker/TypeCheckerQuantifierTests.cs`, `test/Precept.Tests/TypeChecker/TypeCheckerSymbolTests.cs`, `test/Precept.Tests/ProofLedgerTests.cs`, `test/Precept.Tests/DiagnosticsTests.cs`
+
+- Docs: `docs/compiler/proof-engine.md`, `docs/compiler/diagnostic-system.md`, `docs/Working/frank-proof-engine-gap-analysis.md`
+
+**Validation:**
+
+- `dotnet build src\Precept\Precept.csproj --nologo` succeeded during slice validation.
+
+- Final `dotnet test -nologo` summary: 3910 total, 3714 passed, 196 failed.
+
+- Final `dotnet build -nologo` succeeded.
+
+- Remaining failures are pre-existing: 194 `Precept.LanguageServer.Tests` failures from `LanguageServerStubs.cs` `NotImplementedException` paths, plus 2 `Precept.Tests` `TokensTests` failures around `TokenKind.Set` classification.
+
+**Surprises / deviations:**
+
+- `ConstraintIdentity` already existed in `SemanticIndex.cs`, so no new identity carrier was needed for P6.
+
+- The spec's proof diagnostic ordinals were stale; the implementation correctly used 112-115 instead of 96-99.
+
+- `docs/compiler/proof-engine.md` already carried a large unrelated branch diff, so the P8 doc commit necessarily rode on top of a broader proof-engine doc sync instead of a tiny isolated ordinal-only patch.
+
+- `FieldModifierMeta.ProofSatisfactions` test assertions had to avoid FluentAssertions expression-tree paths; simple `foreach` assertions were more robust.
+
+**Tricky construction sites:**
+
+- `TypedField` record construction in `src/Precept/Pipeline/TypeChecker.cs`
+
+- Manual `TypedArg` scaffolds in `test/Precept.Tests/TypeChecker/TypeCheckerExpressionTests.cs`
+
+- Manual `TypedArg` scaffolds in `test/Precept.Tests/TypeChecker/TypeCheckerQuantifierTests.cs`
+
+- Proof-ledger shape tests in `test/Precept.Tests/ProofLedgerTests.cs`
+
+**Phase 2 handoff:**
+
+- The structural metadata surface is now in place for obligation instantiation, strategy evaluation, and proof diagnostic emission.
+
+- Phase 2 can assume proof-bearing modifiers already declare satisfactions, semantic symbols expose presence/qualifier carriers, obligations can record context, and proof-stage diagnostics 112-115 are reserved with metadata.
+
+- `ProofEngine.cs` remains the behavioral frontier; Phase 2 should implement runtime-neutral proof analysis against the new carriers rather than reshaping these types again.
+
+# Soup Nazi — ProofEngine Phase 2 tests done
+
+**Date:** 2026-05-08T23:45:00.367-04:00
+
+**Scope:** `test/Precept.Tests/ProofEngineTests.cs`
+
+## Test count per slice
+
+- S1 Obligation collection — 7 required tests
+
+- S2 Subject resolution — 9 required tests
+
+- S3 Literal proof — 6 required tests
+
+- S4 Declaration-attribute proof — 11 required tests
+
+- S5 Guard-in-path proof — 11 required tests
+
+- S6 Flow narrowing — 7 required tests
+
+- S7 Qualifier compatibility — 5 required tests
+
+- S8 Error-tainted suppression — 4 required tests
+
+- S9 Diagnostics + fault links — 11 required tests
+
+- S10 Constraint influence — 4 required tests
+
+- S11 Initial-state satisfiability — 8 required tests
+
+- S12 Proof-forwarding facts — 5 required tests
+
+- S13 Stateless + integration — 9 required tests
+
+- **Required inventory total:** 97 named tests from the task plan
+
+- **Discovered `ProofEngineTests` total on branch:** 158 tests (required-name inventory plus supplemental coverage already in the file)
+
+## Validation
+
+- `dotnet build test/Precept.Tests/ --nologo` **passed**.
+
+- Baseline before this work: `dotnet test test/Precept.Tests/ --nologo --no-build` still showed the known 2 failing `TokensTests` only.
+
+- Focused run after authoring: `dotnet test test/Precept.Tests/ --nologo --no-build --filter FullyQualifiedName~ProofEngineTests` ran **158** tests with **153 passed / 5 failed**.
+
+## What failed in the focused ProofEngine run
+
+1. `Slice12_ProofForwardingFacts.ForwardingFacts_UnreachableState_ObligationsVacuouslyProved`
+
+2. `Slice12_ProofForwardingFacts.ForwardingFacts_DeadEndToDeadEnd_ObligationsSuppressed`
+
+3. `RequiredNameInventory.ForwardingFacts_UnreachableState_SuppressesObligations`
+
+4. `RequiredNameInventory.ForwardingFacts_DeadEndToDeadEnd_SuppressesObligations`
+
+5. `RequiredNameInventory.GetFieldName_NonFieldRef_ReturnsNull`
+
+## Gaps / surprises
+
+- Forwarding-fact suppression is still red on the current branch: obligations marked proved during forwarding-fact incorporation end up unresolved by the end of `ProofEngine.Prove`.
+
+- `GetFieldName_NonFieldRef_ReturnsNull` is red on the current branch: a non-field subject path still reaches declaration-attribute proof unexpectedly.
+
+- Several proof behaviors (especially qualifier compatibility and flow narrowing) needed manual `SemanticIndex` construction because the public DSL surface does not express every proof-shape directly.
+
+## Extra edge cases not explicitly called out in the plan
+
+- Operand metadata identity matters: `integer / number` and `number / number` do not stress subject resolution the same way because catalog parameter instances differ.
+
+- Boolean guard composition (`and` / `or`) can go red at type-check time if the catalog does not carry the boolean operation entries the proof strategy assumes.
+
+- Flow narrowing is easy to under-test when the risky obligation sits on an outer node (`sqrt(A - B)`, `Y / (A - B)`) rather than on the subtraction node itself.

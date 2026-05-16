@@ -27,62 +27,6 @@
 - Locked OQ7 in `docs/working/constructor-semantics.md`: construction inspection will be implemented as `InspectCreate()` in core and exposed through `precept_inspect`.
 - Wrote the confirmation note to `.squad/decisions/inbox/frank-planned-runtime-tools.md` so the canonical MCP doc reflects Shane's confirmed surface before runtime work begins.
 
-### 2026-05-16T00:41:43-04:00 — Slice 4 Review Gate: APPROVED
-
-- Reviewed commit f8b1febd (`feat: Slice 4 — TypeChecker structural validation`).
-- Verified 3 new diagnostic codes (145/146/147) in `DiagnosticCode.cs` — no collisions.
-- Full catalog entries in `Diagnostics.cs` with messages, fix hints, examples, related codes.
-- PRE0092 exception correct: `IsConstruction` rows skipped in `ValidateStatelessEventOnNonStatelessPrecept`.
-- `ValidateConstructionRowStructure()` logic correct: legacy-path escape hatch for PRE0146, event-name dedup for PRE0147, transition-row scan for PRE0145.
-- Method wired into `ValidateStructural()` at top of pass.
-- All 8 named tests present, exercising real DSL definitions — no trivially-passing tests.
-- 6,386 tests pass (291 + 44 + 5731 + 320). §11.3 updated ✅.
-- Decision written to `.squad/decisions/inbox/frank-slice4-approved.md`.
-
-### 2026-05-16T00:41:00-04:00 — Slice 3 Review Gate: APPROVED
-
-- Reviewed commit 7c49f9c7 (`feat: Slice 3 — Semantic Model DU`).
-- Verified DU shapes: `TypedTransitionRow` (abstract) → `TypedTransitionRowSuccess` / `TypedTransitionRowReject`; `TypedEventRow` (abstract) → `TypedEventRowSuccess` / `TypedEventRowReject`. All sealed records in `SemanticIndex.cs`.
-- TypeChecker emits correct subtypes based on `ConstructKind` (`ConstructionRowReject` → `TypedEventRowReject`, `TransitionRowReject` → `TypedTransitionRowReject`).
-- All downstream callsites use pattern matching (`.OfType<>()`, `is` patterns). No bare access to subtype-only properties on base type.
-- 6,360 tests pass. No new TODOs, HACKs, or skipped tests.
-- Decision written to `.squad/decisions/inbox/frank-slice3-approved.md`.
-
-### 2026-05-15T23:05:36.097-04:00 — OQ6 locked: `precept_create` is the planned construction MCP tool
-
-- Shane chose Option A: add `precept_create` as a dedicated planned MCP tool instead of overloading `precept_fire`.
-- Updated `docs/tooling/mcp.md` so `precept_create` is documented as planned with purpose, inputs, outputs, and the `Create()` runtime dependency.
-- Updated `docs/working/constructor-semantics.md` to replace the open-question callout with a locked decision block; `precept_fire` remains existing-entity-only.
-
-### 2026-05-15T22:59:42.817-04:00 — OQ5 locked: `docs/tooling/mcp.md` is canonical
-
-- Consolidated `docs/McpServerDesign.md` into `docs/tooling/mcp.md` and archived the old file as a redirect stub.
-- Verified the live discoverable MCP surface from `tools/Precept.Mcp/Tools/`: `precept_ping`, `precept_quickstart`, `precept_syntax`, `precept_types`, `precept_operations`, `precept_proofs`, `precept_patterns`, `precept_diagnostic`, `precept_domains`, and `precept_compile`.
-- Durable rule: `docs/tooling/mcp.md` is the single MCP contract doc; `tools/Precept.Plugin/README.md` remains a separate shipped-payload/distribution note, not the live contract.
-
-### 2026-05-15T22:29:35-04:00 — Naming decision applied: Resolution/Reject
-
-- Shane chose Option A (`Resolution/Reject`) as the naming axis for the grammar-level split constructs.
-- Applied renames across `docs/language/precept-grammar.md` (21 occurrences) and `docs/working/constructor-semantics.md` (23 occurrences).
-- `TransitionRowMutation` → `TransitionRowResolution`, `EventHandlerMutation` → `EventHandlerResolution`, `MutationOutcome` → `ResolutionOutcome`.
-- Typed model records also renamed: `TypedEventHandlerMutation` → `TypedEventHandlerResolution`, `TypedTransitionMutationRow` → `TypedTransitionResolutionRow`.
-- Prose uses of "mutation" (describing field writes) left untouched.
-- Decision record written to `.squad/decisions/inbox/frank-resolution-naming.md`.
-
-### 2026-05-15T22:20:33-04:00 — Grammar doc updated: TransitionRow/EventHandler → mutation/reject split
-
-- Updated `docs/language/precept-grammar.md` to reflect the OQ1-locked structural split.
-- `TransitionRow` → `TransitionRowMutation` + `TransitionRowReject`; `EventHandler` → `EventHandlerMutation` + `EventHandlerReject`.
-- Introduced `MutationOutcome` (narrowed: `transition StateName` | `no transition`) and `RejectClause` (`reject StringLiteral`) as distinct slot kinds replacing the old combined `Outcome`.
-- Parser disambiguation: after reaching `->`, if the next token is `reject`, the construct is the Reject variant; otherwise it's the Mutation variant. Same logic applies to both `from` and `on` families.
-- The slot-kind count increased from 17 to 18 (split `Outcome` → `MutationOutcome` + `RejectClause`); construct count increased from 12 to 14.
-
-
-### 2026-05-15T22:47:48.336-04:00 — OQ4 unified as `UnreachableRow`; `EventRow` naming adopted
-
-- Locked OQ4 to a single `UnreachableRow` diagnostic for both construction rows and transition rows shadowed by an earlier always-matching row.
-- Updated the constructor-semantics and grammar docs to rename the construction-row family to `EventRow` / `EventRowReject`, preserving the asymmetric base-name + `Reject` rule alongside `TransitionRow` / `TransitionRowReject`.
-- Durable rule: when two diagnostics describe the same structural defect at different row scopes, unify the code and vary only the message text by context.
 ### 2026-05-16T02:47:48Z — Frank-24 decision merged and inbox cleared
 
 - Merged the `frank-oq4-unreachable-row.md` inbox note into `.squad/decisions.md`.
@@ -92,9 +36,32 @@
 
 - 2026-05-12 through 2026-05-16 concentrated Frank's work around hover contract reviews, field-state guarantees, constructor semantics, reject-surface structure, interval-proof design, quantity normalization, diagnostic-enforcement architecture, and counting-unit comparison gaps.
 - The constructor/reject track settled three durable ideas: `on <Event>` is the honest construction surface, fallback `reject` is valid authored refusal rather than misuse, and grammar-level structural exclusion is preferred whenever the language already knows a path is impossible.
+- The 2026-05-15/16 constructor spike also locked OQ4/OQ5/OQ6, applied the `Resolution/Reject` naming sweep, and cleared Slice 3/4 review gates; the detailed batch-by-batch notes now live in `.squad/decisions.md`.
 - Older slice-by-slice review detail now lives in `history-archive.md` and `.squad/decisions.md`; this file keeps only the guidance and outcomes other agents need immediately.
 
 ## Recent Updates
+
+### 2026-05-16T09:08:43-04:00 — Graph Analyzer: Complete Row Taxonomy Analysis (Broadened)
+
+- Broadened the frank-25 construction-row analysis to cover ALL row types in Precept.
+- Complete taxonomy: 5 row kinds — `TransitionRow`, `TransitionRowReject` (generate edges, live in `TransitionRows`), `EventRow`, `ConstructionRow`, `ConstructionRowReject` (no edges, live in `EventHandlers`).
+- Validated user's intuition: ALL EventRow-family rows are structurally incapable of state transitions — no `FromState`, no `TargetState`, no `Outcome`. The graph analyzer should NOT generate edges for them. Correct.
+- Confirmed `BuildEdges` is complete — it correctly processes only `TransitionRows` and correctly handles both success and reject subtypes.
+- Confirmed PRE0081 is the ONLY diagnostic with a false-positive gap. All 8 other graph-analyzer diagnostics reason about state-to-state topology and are immune.
+- `AlwaysRejecting` (PRE0082) already correctly scans BOTH collections — no gap there.
+- Plain `EventRow` (stateless handler) cannot cause false positives in stateful precepts because: (a) the `States.Length > 0` gate on PRE0081 protects stateless precepts, and (b) `PRE0092` blocks plain EventRows in stateful precepts at type-check time.
+- Net recommendation: the ~6-line Slice 8b fix is surgical and complete. No structural refactoring needed.
+- Decision written to `.squad/decisions/inbox/frank-graph-analyzer-all-event-rows.md`.
+
+### 2026-05-16T09:06:00-04:00 — Graph Analyzer × Constructor Semantics Deep Dive
+
+- Deep analysis of `GraphAnalyzer.cs` confirmed construction rows should NOT generate graph edges — edges model state-to-state transitions, construction is pre-existence.
+- Confirmed PRE0081 (`UnhandledEvent`) is a **false positive** on construction-only events: `BuildEdges` only processes `TransitionRows`, construction rows live in `EventHandlers`, so construction events produce zero edges and trip the "unhandled" check.
+- Confirmed `AlwaysRejecting` severity promotion (Slice 6) is correct — it already scans `EventHandlers`.
+- Identified 3 gaps: (1) PRE0081 false positive [MUST FIX in 8b], (2) `GraphEvent.IsInitial` flag wrong for construction events [fix in 8b], (3) `EventCoverageFact` cosmetic gap [deferred].
+- Fix for Gap 1: before emitting PRE0081, check `semantics.EventHandlers.Any(row => row.IsConstruction && row.EventName == evt.Name)` and skip.
+- Fix for Gap 2: OR construction-row existence into `GraphEvent.IsInitial` computation.
+- Decision written to `.squad/decisions/inbox/frank-graph-analyzer-construction-deep-dive.md`.
 
 ### 2026-05-16T09:00:00-04:00 — Slice 1: Completion vocabulary metadata shipped
 
