@@ -1197,6 +1197,7 @@ on create when x > 0 reject "msg"
 |------|---------|
 | `src/Precept/Pipeline/Parser.cs` | Remove `initial` token disambiguation from construction row path; parse `on <name> { ... }` and `on <name> when ... reject` identically regardless of initial/non-initial |
 | `src/Precept/Pipeline/TypeChecker.cs` | Classify construction rows by `resolvedEvent.IsInitial` instead of checking ConstructKind; unify ConstructionRow and EventRow parsing, promote in type checker |
+| `src/Precept/Language/Diagnostics.cs` | Update PRE0146 and PRE0147 message text, fix hint, and examples — both currently reference the old `on {0} initial ->` syntax (~lines 895–907); update to `on {0} ->` post-8b |
 | All test files with `on <name> initial` DSL strings | Remove `initial` token from row syntax in all test precept snippets (grep sweep) |
 | `samples/` | Remove `initial` token from all construction row syntax in sample files |
 
@@ -1205,7 +1206,13 @@ on create when x > 0 reject "msg"
 - `Parser.ParseEventRow()` — remove branch that checks for `initial` token at position 2; return a single construct kind for all `on <name> ...` rows
 - `TypeChecker.CheckEventRow()` (or equivalent) — after resolving the event, check `resolvedEvent?.IsInitial ?? false`; promote to `TypedEventRowSuccess`/`TypedEventRowReject` with `IsConstruction = true` when initial
 
-**No new tests.** This is a refactor — all existing construction row tests must pass with the new syntax. The sweep of DSL strings in test files is the work.
+**Named tests:**
+
+| Test | Assertion |
+|------|-----------|
+| `PRE0081_NotEmitted_InitialEventWithConstructionRow` | Initial event with a valid construction row does NOT emit `UnhandledEvent` (PRE0081) — regression guard for graph analyzer construction-row blind spot |
+
+*(Note: Frank's analysis (2026-05-16) flagged that `BuildEdges` in the graph analyzer constructs coverage from `TransitionRows` only. Construction rows generate no graph edges. There must be a suppression path for initial events — this test guards that it survives the 8b refactor.)*
 
 **Regression anchors:**
 

@@ -411,7 +411,16 @@ public class ConstructsTests
     [Fact]
     public void Entries_IsNotEmpty_ForAllConstructs()
     {
-        foreach (var meta in Constructs.All)
+        // Slice 8b: ConstructionRow and ConstructionRowReject are parser-internal kinds with no
+        // disambiguation entries — they are produced by ResolveRejectVariant, not by direct
+        // parser dispatch. All other constructs must have at least one entry.
+        var parserInternalKinds = new HashSet<ConstructKind>
+        {
+            ConstructKind.ConstructionRow,
+            ConstructKind.ConstructionRowReject,
+        };
+
+        foreach (var meta in Constructs.All.Where(m => !parserInternalKinds.Contains(m.Kind)))
         {
             meta.Entries.Should().NotBeEmpty($"{meta.Kind} must have at least one DisambiguationEntry");
         }
@@ -422,7 +431,16 @@ public class ConstructsTests
     [Fact]
     public void AllConstructsHaveAtLeastOneEntry()
     {
-        foreach (var meta in Constructs.All)
+        // Slice 8b: ConstructionRow and ConstructionRowReject are parser-internal kinds with no
+        // disambiguation entries — they are produced by ResolveRejectVariant, not by direct
+        // parser dispatch. All other constructs must have at least one entry.
+        var parserInternalKinds = new HashSet<ConstructKind>
+        {
+            ConstructKind.ConstructionRow,
+            ConstructKind.ConstructionRowReject,
+        };
+
+        foreach (var meta in Constructs.All.Where(m => !parserInternalKinds.Contains(m.Kind)))
         {
             meta.Entries.Length.Should().BeGreaterThan(0,
                 $"{meta.Kind} must have at least one entry");
@@ -573,7 +591,7 @@ public class ConstructsTests
     [InlineData(TokenKind.In,   3)]
     [InlineData(TokenKind.To,   2)]
     [InlineData(TokenKind.From, 4)]
-    [InlineData(TokenKind.On,   4)]
+    [InlineData(TokenKind.On,   2)]  // Slice 8b: ConstructionRow/ConstructionRowReject removed from parser dispatch
     public void SharedLeadingTokens_HaveCorrectCandidateCount(TokenKind token, int expectedCount)
     {
         Constructs.ByLeadingToken[token].Length.Should().Be(expectedCount,

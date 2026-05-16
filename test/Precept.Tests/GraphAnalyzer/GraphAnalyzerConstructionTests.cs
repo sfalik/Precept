@@ -24,7 +24,7 @@ public class GraphAnalyzerConstructionTests
             field Count as integer default 0
             state Draft initial terminal
             event Start initial
-            on Start initial when false -> reject "never"
+            on Start when false -> reject "never"
             """);
 
         var d1 = graph.Diagnostics
@@ -45,7 +45,7 @@ public class GraphAnalyzerConstructionTests
             field Count as integer
             state Draft initial terminal
             event Start(InputCount as integer) initial
-            on Start initial when InputCount > 0 -> set Count = InputCount
+            on Start when InputCount > 0 -> set Count = InputCount
             """);
 
         graph.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.AlwaysRejecting));
@@ -83,12 +83,29 @@ public class GraphAnalyzerConstructionTests
             field Count as integer default 0
             state Draft initial terminal
             event Start initial
-            on Start initial -> set Count = 1
+            on Start -> set Count = 1
             """);
 
         graph.ReachableStates.Should().Contain("Draft");
         graph.UnreachableStates.Should().BeEmpty();
         graph.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnreachableState));
+    }
+
+    [Fact]
+    public void PRE0081_NotEmitted_InitialEventWithConstructionRow()
+    {
+        // Slice 8b: initial events handled via construction rows (EventHandlers) must not trigger
+        // PRE0081 (UnhandledEvent). Construction rows don't generate graph edges, but the event IS handled.
+        var (_, _, graph) = AnalyzeAllowingDiagnostics("""
+            precept Widget
+            field Count as integer default 0
+            state Draft initial terminal
+            event Create initial
+            on Create -> set Count = 1
+            """);
+
+        graph.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnhandledEvent),
+            "initial events handled via construction rows must not emit PRE0081");
     }
 
     private static (SemanticIndex Index, IReadOnlyList<Diagnostic> Diagnostics, StateGraph Graph) AnalyzeAllowingDiagnostics(string source)

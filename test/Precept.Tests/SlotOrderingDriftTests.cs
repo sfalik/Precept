@@ -42,6 +42,8 @@ public class SlotOrderingDriftTests
             "EventEnsure guard now lives in the slot list immediately after EventTarget");
         Constructs.GetMeta(ConstructKind.AccessMode).Slots[1].Kind.Should().Be(ConstructSlotKind.GuardClause,
             "AccessMode guard moved ahead of the modify verb and field target");
+        Constructs.GetMeta(ConstructKind.EventRow).Slots[1].Kind.Should().Be(ConstructSlotKind.GuardClause,
+            "Slice 8b: EventRow guard now lives at Slots[1] immediately after EventTarget");
 
         Constructs.GetMeta(ConstructKind.OmitDeclaration).Slots.Should().NotContain(s => s.Kind == ConstructSlotKind.GuardClause,
             "OmitDeclaration must never have a guard slot");
@@ -77,8 +79,6 @@ public class SlotOrderingDriftTests
             ConstructKind.StateAction,
             ConstructKind.EventEnsure,
             ConstructKind.EventRow,
-            ConstructKind.ConstructionRow,
-            ConstructKind.ConstructionRowReject,
         };
 
         scopedConstructs.Should().BeEquivalentTo(expected,

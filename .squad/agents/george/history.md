@@ -19,7 +19,18 @@
 
 ## Recent Updates
 
-### 2026-05-16 — Slice 8 Runtime: Created outcome and fire-once enforcement
+### 2026-07-18 — Slice 8b: Removed `initial` from construction row syntax
+
+- **Design:** `on <name> initial -> ...` → `on <name> -> ...`. Construction classification moves from parser-time to type-check-time via `resolvedEvent?.IsInitial ?? false`.
+- **Catalog change:** `EventRow` gains `SlotPreVerbGuardArrow` (now 3 slots). `ConstructionRow` and `ConstructionRowReject` get `Entries: []` — no longer produced by direct parser dispatch. `ResolveRejectVariant` extended: `EventRow → ConstructionRowReject`.
+- **PRE0014 retired:** Guard gate for `EventRow` removed from Parser.cs — guards are now valid on all `on`-rows. Added to Gate1 allow-list.
+- **GraphAnalyzer PRE0081 false positive fixed:** Initial events handled via `EventHandlers` (construction rows) were falsely emitting `UnhandledEvent` because they don't generate graph edges. Added EventHandlers guard in the loop.
+- **GraphEvent.IsInitial fixed:** Changed from edge-based topology detection to `evt.IsInitial` semantic flag. An event is initial iff it has the `initial` modifier — not based on graph reachability from the initial state.
+- **Diagnostics.cs:** Updated PRE0145–PRE0148 messages to remove `initial` from construction row syntax examples.
+- **Test sweep:** 6 test files (DSL string sweep) + structural changes in 5 parser/catalog/analyzer test files. New test: `PRE0081_NotEmitted_InitialEventWithConstructionRow`.
+- All 5,781 Precept.Tests + 364 LS Tests + 44 MCP Tests + 291 Analyzer Tests green.
+
+
 
 - **Discovery:** `Precept.From()` was completely hollow (`new Precept()`) — storing no compilation data. Updated to store `SemanticIndex` so the runtime can read the event/state topology.
 - **`EventOutcome.Created`** — added as `sealed record Created(Version Result, FiredArgs Args)` following the existing DU pattern (`Transitioned`, `Applied`, etc.).

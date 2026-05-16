@@ -42,9 +42,11 @@ internal static partial class TypeChecker
     }
 
     /// <summary>
-    /// Iterate all <see cref="ConstructKind.EventRow"/>, <see cref="ConstructKind.ConstructionRow"/>,
-    /// and <see cref="ConstructKind.ConstructionRowReject"/> constructs from the manifest,
-    /// resolve each to a <see cref="TypedEventRow"/>, and accumulate into <see cref="CheckContext.EventHandlers"/>.
+    /// Iterate all <see cref="ConstructKind.EventRow"/> and <see cref="ConstructKind.ConstructionRowReject"/>
+    /// constructs from the manifest, resolve each to a <see cref="TypedEventRow"/>, and accumulate into
+    /// <see cref="CheckContext.EventHandlers"/>. <see cref="ConstructKind.ConstructionRow"/> is no longer
+    /// produced by the parser (Slice 8b: all on-rows parse as EventRow; construction classification happens
+    /// via resolvedEvent.IsInitial in NormalizeEventHandler).
     /// Records <see cref="EventReference"/> sites for LS navigation.
     /// </summary>
     private static void PopulateEventHandlers(ConstructManifest manifest, CheckContext ctx)

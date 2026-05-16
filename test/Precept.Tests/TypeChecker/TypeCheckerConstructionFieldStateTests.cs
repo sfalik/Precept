@@ -15,7 +15,7 @@ public class TypeCheckerConstructionFieldStateTests
             field Total as integer
             state Draft initial terminal
             event Start(Amount as integer) initial
-            on Start initial -> set Total = Amount
+            on Start -> set Total = Amount
             """;
 
         TypeCheckerTestHelpers.CheckExpectingClean(precept);
@@ -30,8 +30,8 @@ public class TypeCheckerConstructionFieldStateTests
             field Note as string optional
             state Draft initial terminal
             event Start(Amount as integer, IsLarge as boolean) initial
-            on Start initial when IsLarge -> set Total = Amount
-            on Start initial -> set Note = "small"
+            on Start when IsLarge -> set Total = Amount
+            on Start -> set Note = "small"
             """);
 
         diagnostic.Message.Should().Be("Initial event 'Start' does not assign required field(s): Total");
@@ -45,7 +45,7 @@ public class TypeCheckerConstructionFieldStateTests
             field Total as integer optional
             state Draft initial terminal
             event Start(Amount as integer) initial
-            on Start initial when Total > 0 -> set Total = Amount
+            on Start when Total > 0 -> set Total = Amount
             """);
 
         diagnostic.Message.Should().Be("Construction guard on initial event 'Start' reads field 'Total' before the entity exists — only event payload values are available here");
@@ -59,7 +59,7 @@ public class TypeCheckerConstructionFieldStateTests
             field Total as integer optional
             state Draft initial terminal
             event Start(Amount as integer) initial
-            on Start initial when Amount > 0 -> set Total = Amount
+            on Start when Amount > 0 -> set Total = Amount
             """;
 
         AssertNoD148(precept);
@@ -73,7 +73,7 @@ public class TypeCheckerConstructionFieldStateTests
             field Total as integer optional
             state Draft initial terminal
             event Start(Amount as integer) initial
-            on Start initial -> set Total = Amount
+            on Start -> set Total = Amount
             """;
 
         AssertNoD148(precept);

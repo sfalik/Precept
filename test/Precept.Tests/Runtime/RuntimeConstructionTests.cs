@@ -58,7 +58,7 @@ public class RuntimeConstructionTests
             field Count as integer default 0
             state Draft initial terminal
             event Create initial
-            on Create initial -> set Count = 42
+            on Create -> set Count = 42
             """);
 
         precept.Create((System.Text.Json.JsonElement?)null).Should().BeOfType<EventOutcome.Created>();
@@ -73,8 +73,8 @@ public class RuntimeConstructionTests
             field Count as integer default 0
             state Draft initial terminal
             event Create(InputCount as integer) initial
-            on Create initial when InputCount > 0 -> set Count = InputCount
-            on Create initial -> reject "construction not allowed"
+            on Create when InputCount > 0 -> set Count = InputCount
+            on Create -> reject "construction not allowed"
             """);
 
         var outcome = precept.Create((System.Text.Json.JsonElement?)null);
@@ -90,7 +90,7 @@ public class RuntimeConstructionTests
             field Count as integer default 0
             state Draft initial terminal
             event Create initial
-            on Create initial -> set Count = 1
+            on Create -> set Count = 1
             """);
 
         var outcome = precept.Create((System.Text.Json.JsonElement?)null);
@@ -124,7 +124,7 @@ public class RuntimeConstructionTests
             state Done terminal
             event Create initial
             event Complete
-            on Create initial -> set Count = 1
+            on Create -> set Count = 1
             from Draft on Complete -> transition Done
             """);
 
@@ -146,7 +146,7 @@ public class RuntimeConstructionTests
             state Done terminal
             event Create initial
             event Complete
-            on Create initial -> set Count = 1
+            on Create -> set Count = 1
             from Draft on Complete -> transition Done
             """);
 
@@ -168,7 +168,7 @@ public class RuntimeConstructionTests
             field Count as integer default 0
             state Draft initial terminal
             event Create initial
-            on Create initial -> set Count = 1
+            on Create -> set Count = 1
             """);
 
         precept.Create((System.Text.Json.JsonElement?)null)
@@ -184,7 +184,7 @@ public class RuntimeConstructionTests
             field Count as integer default 0
             state Draft initial terminal
             event Create initial
-            on Create initial -> set Count = 1
+            on Create -> set Count = 1
             """);
 
         var createOutcome = precept.Create((System.Text.Json.JsonElement?)null);

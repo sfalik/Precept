@@ -6,7 +6,7 @@ field events as log of string
 state off initial, running
 
 event create initial
-on create initial
+on create
     -> set counter = 0
 
 event start

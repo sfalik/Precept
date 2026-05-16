@@ -151,6 +151,11 @@ public static class GraphAnalyzer
         {
             if (semantics.States.Length > 0 && !eventCoverage.HandlingStatesByEvent[evt.Name].Any())
             {
+                // Skip initial events handled via construction rows (EventHandlers) — construction rows
+                // don't generate graph edges, so HandlingStatesByEvent is empty, but the event IS handled.
+                if (semantics.EventHandlers.Any(h => h.EventName == evt.Name))
+                    continue;
+
                 diagnostics.Add(Diagnostics.Create(
                     DiagnosticCode.UnhandledEvent,
                     evt.NameSpan,
@@ -208,7 +213,7 @@ public static class GraphAnalyzer
         var graphEvents = semantics.Events
             .Select(evt => new GraphEvent(
                 Name: evt.Name,
-                IsInitial: initialState is not null && edgeIndex[evt.Name].Contains(initialState.Name),
+                IsInitial: evt.IsInitial,
                 HandledInStates: eventCoverage.HandlingStatesByEvent[evt.Name]))
             .ToImmutableArray();
 

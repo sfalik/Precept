@@ -210,7 +210,8 @@ public class GraphAnalyzerTests
         dominanceFact.RequiredState.Should().Be("Review");
         dominanceFact.DominatedTerminals.Should().Equal("Approved", "Rejected");
 
-        graph.Events.Single(e => e.Name == "Submit").IsInitial.Should().BeTrue();
+        graph.Events.Single(e => e.Name == "Submit").IsInitial.Should().BeFalse(
+            "Submit has no 'initial' modifier — it is a regular lifecycle event that fires from the initial state");
     }
 
     [Fact]

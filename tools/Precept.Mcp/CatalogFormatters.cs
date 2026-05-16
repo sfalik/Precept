@@ -73,10 +73,13 @@ internal static class CatalogFormatters
         {
             var slots = construct.Slots.Select(RenderConstructSlot);
             var entries = construct.Entries.Select(RenderDisambiguationEntry);
+            var leadingToken = construct.Entries.Length > 0
+                ? RenderToken(construct.PrimaryLeadingToken)
+                : "(internal — produced by ResolveRejectVariant, no direct dispatch)";
             var line = new StringBuilder()
                 .Append("- **").Append(construct.Name).Append("** (`").Append(construct.Kind).Append("`) — ")
                 .Append(construct.Description)
-                .Append(" Lead: ").Append(RenderToken(construct.PrimaryLeadingToken)).Append('.')
+                .Append(" Lead: ").Append(leadingToken).Append('.')
                 .Append(" Allowed in: ").Append(RenderConstructScopes(construct.AllowedIn)).Append('.')
                 .Append(" Slots: ").Append(JoinOrNone(slots)).Append('.')
                 .Append(" Disambiguation: ").Append(JoinOrNone(entries)).Append('.')

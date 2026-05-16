@@ -1133,7 +1133,6 @@ internal static partial class TypeChecker
     /// <summary>Normalize an event handler construct into a <see cref="TypedEventRow"/>.</summary>
     private static TypedEventRow NormalizeEventHandler(ParsedConstruct construct, CheckContext ctx)
     {
-        bool isConstruction = construct.Meta.Kind is ConstructKind.ConstructionRow or ConstructKind.ConstructionRowReject;
         bool isReject = construct.Meta.Kind == ConstructKind.ConstructionRowReject;
 
         // —— Event resolution ——
@@ -1155,6 +1154,10 @@ internal static partial class TypeChecker
                     Diagnostics.Create(DiagnosticCode.UndeclaredEvent, eventTargetSlot.NameSpan, eventTargetSlot.EventName));
             }
         }
+
+        // Classification: construction rows are identified by the event's IsInitial flag (Slice 8b).
+        // The parser no longer distinguishes construction rows from event rows at parse time.
+        bool isConstruction = resolvedEvent?.IsInitial ?? false;
 
         // —— Set event args scope ——
         IReadOnlyDictionary<string, TypedArg>? previousArgs = ctx.CurrentEventArgs;

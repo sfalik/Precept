@@ -39,7 +39,7 @@ public class ParserScopedConstructTests
     [InlineData(ConstructKind.OmitDeclaration,  2)]
     [InlineData(ConstructKind.StateAction,      3)]
     [InlineData(ConstructKind.EventEnsure,      4)]
-    [InlineData(ConstructKind.EventRow,     2)]
+    [InlineData(ConstructKind.EventRow,     3)]
     public void ScopedConstruct_CatalogSlotCount_MatchesExpectedCount(
         ConstructKind kind, int expectedCount)
     {
@@ -214,13 +214,16 @@ public class ParserScopedConstructTests
     }
 
     [Fact]
-    public void EventHandler_CatalogSlotOrder_IsEventTarget_ActionChain()
+    public void EventHandler_CatalogSlotOrder_IsEventTarget_GuardClause_ActionChain()
     {
-        // GREEN
+        // GREEN — Slice 8b: EventRow now carries an optional guard (SlotPreVerbGuardArrow)
+        // between EventTarget and ActionChain, matching ConstructionRow's former slot layout.
         var slots = Constructs.GetMeta(ConstructKind.EventRow).Slots;
         slots[0].Kind.Should().Be(ConstructSlotKind.EventTarget, "Slots[0]: event name");
-        slots[1].Kind.Should().Be(ConstructSlotKind.ActionChain, "Slots[1]: optional actions");
-        slots[1].IsRequired.Should().BeFalse("ActionChain is optional on EventHandler");
+        slots[1].Kind.Should().Be(ConstructSlotKind.GuardClause, "Slots[1]: optional pre-verb when-guard");
+        slots[1].IsRequired.Should().BeFalse("GuardClause is optional on EventRow");
+        slots[2].Kind.Should().Be(ConstructSlotKind.ActionChain, "Slots[2]: optional actions");
+        slots[2].IsRequired.Should().BeFalse("ActionChain is optional on EventRow");
     }
 
     [Fact]

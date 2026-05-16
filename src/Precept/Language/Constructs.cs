@@ -177,31 +177,31 @@ public static class Constructs
         ConstructKind.EventRow => new(
             kind,
             "event row",
-            "Event handler with actions but no state transitions (stateless precepts)",
+            "Event handler with optional guard and actions — serves both stateless handlers and construction rows; type checker classifies construction via resolvedEvent.IsInitial",
             "on UpdateName -> set name = newName",
             [],
-            [SlotEventTarget, SlotActionChain],
+            [SlotEventTarget, SlotPreVerbGuardArrow, SlotActionChain],
             [new(TokenKind.On, [TokenKind.Arrow])],
             RoutingFamily.EventScoped),
 
         ConstructKind.ConstructionRow => new(
             kind,
             "construction row",
-            "Construction success path: event handler for initial events with actions",
+            "Construction success path (Slice 8b: no longer produced by parser; all on-rows parse as EventRow and are promoted by the type checker via resolvedEvent.IsInitial)",
             "on Create -> set status = \"active\"",
             [],
             [SlotEventTarget, SlotPreVerbGuardArrow, SlotActionChain],
-            [new(TokenKind.On, [TokenKind.Initial])],
+            [],
             RoutingFamily.EventScoped),
 
         ConstructKind.ConstructionRowReject => new(
             kind,
             "construction row reject",
-            "Construction reject path: refuses entity creation with a reason",
+            "Reject path for on-rows: refuses event with a reason (produced by ResolveRejectVariant from EventRow, not via direct disambiguation)",
             "on Create when amount <= 0 -> reject \"Amount must be positive\"",
             [],
             [SlotEventTarget, SlotPreVerbGuardArrow, SlotRejectClause],
-            [new(TokenKind.On, [TokenKind.Initial, TokenKind.Reject])],
+            [],
             RoutingFamily.EventScoped),
 
         ConstructKind.TransitionRowReject => new(

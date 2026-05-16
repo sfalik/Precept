@@ -34,6 +34,9 @@ internal static class DiagnosticCoverageAllowLists
         // ── Root Cause C — Structural Single-Check Gaps ──────────────────────────
         // EventHandlerInStatefulPrecept — wired (Slice 8)
 
+        // ── Retired diagnostics (pending removal) ────────────────────────────────
+        "EventHandlerDoesNotSupportGuard",    // Slice 8b: retired — guards are now valid on all on-rows
+
         // ── Root Cause D1 — Parser Expression Precision ──────────────────────────
         "NonAssociativeComparison",           // D1: parser emits generic ExpectedToken instead
         "UnexpectedKeyword",                  // D1: parser emits generic ExpectedToken instead

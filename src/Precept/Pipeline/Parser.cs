@@ -191,7 +191,7 @@ public static partial class Parser
                         }
 
                         // Secondary disambiguation: detect reject-variant forms
-                        var finalKind = resolved.Value is ConstructKind.ConstructionRow or ConstructKind.TransitionRow
+                        var finalKind = resolved.Value is ConstructKind.EventRow or ConstructKind.TransitionRow
                             ? ResolveRejectVariant(resolved.Value)
                             : resolved.Value;
 
@@ -296,7 +296,7 @@ public static partial class Parser
                     {
                         return baseKind switch
                         {
-                            ConstructKind.ConstructionRow => ConstructKind.ConstructionRowReject,
+                            ConstructKind.EventRow => ConstructKind.ConstructionRowReject,
                             ConstructKind.TransitionRow => ConstructKind.TransitionRowReject,
                             _ => baseKind,
                         };
@@ -393,7 +393,7 @@ public static partial class Parser
             }
 
             // ── Guard gates: post-slot rejection for constructs that forbid guards ──
-            // TODO(allow-list): remove PRE0013/PRE0014 from allow-list after Slice 0 ships
+            // TODO(allow-list): remove PRE0013 from allow-list after Slice 0 ships
             if (Peek().Kind == TokenKind.When)
             {
                 if (meta.Kind == ConstructKind.OmitDeclaration)
@@ -402,13 +402,6 @@ public static partial class Parser
                     SkipToConstructBoundary();
                     _diagnostics.Add(DiagnosticsCatalog.Create(
                         DiagnosticCode.OmitDoesNotSupportGuard, whenSpan));
-                }
-                else if (meta.Kind == ConstructKind.EventRow)
-                {
-                    var whenSpan = Advance().Span;
-                    SkipToConstructBoundary();
-                    _diagnostics.Add(DiagnosticsCatalog.Create(
-                        DiagnosticCode.EventHandlerDoesNotSupportGuard, whenSpan));
                 }
             }
 

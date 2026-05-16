@@ -30,7 +30,7 @@ public class CompletionHandlerTests
         var completions = await GetCompletionsAsync(string.Empty, new Position(0, 0));
         var labels = completions.Items.Select(item => item.Label).ToArray();
         var expected = Precept.Language.Constructs.All
-            .Where(meta => meta.AllowedIn.Length == 0)
+            .Where(meta => meta.AllowedIn.Length == 0 && meta.Entries.Length > 0)
             .Select(meta => Precept.Language.Tokens.GetMeta(meta.PrimaryLeadingToken).Text)
             .OfType<string>()
             .Distinct(System.StringComparer.Ordinal)

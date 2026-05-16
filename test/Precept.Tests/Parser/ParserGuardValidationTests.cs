@@ -64,11 +64,11 @@ public class ParserGuardValidationTests
     }
 
     // ════════════════════════════════════════════════════════════════════════════
-    //  §2. EventHandler guard gate (PRE0014)
+    //  §2. EventHandler guard gate (PRE0014 removed in Slice 8b)
     // ════════════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public void EventHandler_WithGuard_EmitsEventHandlerDoesNotSupportGuard()
+    public void EventHandler_WithGuard_NoLongerEmitsPRE0014_GuardsNowAllowed()
     {
         var source = """
             precept Example
@@ -80,7 +80,8 @@ public class ParserGuardValidationTests
         var manifest = Parse(source);
 
         manifest.Diagnostics
-            .Should().Contain(d => d.Code == nameof(DiagnosticCode.EventHandlerDoesNotSupportGuard));
+            .Should().NotContain(d => d.Code == nameof(DiagnosticCode.EventHandlerDoesNotSupportGuard),
+                "Slice 8b: guards are valid on all on-rows — PRE0014 must not fire");
     }
 
     [Fact]

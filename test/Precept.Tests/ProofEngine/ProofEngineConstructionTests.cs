@@ -11,7 +11,7 @@ namespace Precept.Tests;
 /// Slice 7 — Proof engine construction row context tests.
 /// Verifies that guard-aware proof strategies (Strategy 3 GuardInPath, Strategy 4 FlowNarrowing,
 /// and BuildNarrowedIntervals for interval containment) handle EventHandlerContext from
-/// construction rows (<c>on EventName initial when ...</c>) symmetrically with transition rows.
+/// construction rows (<c>on EventName when ...</c>) symmetrically with transition rows.
 /// </summary>
 public class ProofEngineConstructionTests
 {
@@ -36,7 +36,7 @@ public class ProofEngineConstructionTests
     [Fact]
     public void ProofEngine_ConstructionRow_GuardExtractsConstraints()
     {
-        // `on Create initial when D != 0 -> set X = Y / D`
+        // `on Create when D != 0 -> set X = Y / D`
         // Guard D != 0 must discharge the divisor-nonzero obligation via GuardInPath.
         var (_, ledger) = ProveAllowingDiagnostics("""
             precept Widget
@@ -45,7 +45,7 @@ public class ProofEngineConstructionTests
             field D as number default 1 writable
             state Draft initial terminal
             event Create initial
-            on Create initial when D != 0 -> set X = Y / D
+            on Create when D != 0 -> set X = Y / D
             """);
 
         var obligation = ledger.Obligations.FirstOrDefault(o =>
@@ -81,7 +81,7 @@ public class ProofEngineConstructionTests
             field Result as integer min 1 max 100 writable
             state Draft initial terminal
             event Create initial
-            on Create initial when Amount >= 10 and Amount <= 100 -> set Result = Amount
+            on Create when Amount >= 10 and Amount <= 100 -> set Result = Amount
             """);
 
         // The interval-containment obligation (Result ← Amount) must be proved by interval
@@ -116,7 +116,7 @@ public class ProofEngineConstructionTests
             field D as number default 1 writable
             state Draft initial terminal
             event Create initial
-            on Create initial -> set X = Y / D
+            on Create -> set X = Y / D
             """);
 
         var obligation = ledger.Obligations.FirstOrDefault(o =>
@@ -150,7 +150,7 @@ public class ProofEngineConstructionTests
             field D as number default 1 writable
             state Draft initial terminal
             event Create initial
-            on Create initial when D != 0 -> set X = Y / D
+            on Create when D != 0 -> set X = Y / D
             """);
 
         // Full pipeline must produce: context=EventHandlerContext, disposition=Proved,
