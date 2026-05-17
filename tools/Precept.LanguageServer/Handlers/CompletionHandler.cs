@@ -1628,6 +1628,10 @@ internal sealed class CompletionHandler : ICompletionHandler
         return codes.Select(code => CreateItem(code, "ISO 4217 currency code", CompletionItemKind.Unit, CompletionSortGroup.TypedConstantSegment));
     }
 
+    private static IEnumerable<CompletionItem> GetAllCurrencyCodeItems() =>
+        CurrencyCatalog.All.Keys.Select(code =>
+            CreateItem(code, "ISO 4217 currency code", CompletionItemKind.Unit, CompletionSortGroup.TypedConstantSegment));
+
     private static IEnumerable<CompletionItem> GetUnitOfMeasureItems(TypedConstantContext tcContext)
     {
         return GetQuantitySlotItems(tcContext, string.Empty, TypedConstantPhase.AfterNumberSpace);
@@ -1798,6 +1802,36 @@ internal sealed class CompletionHandler : ICompletionHandler
         return match.Success && TemporalUnits.TryGet(match.Groups[2].Value, out _);
     }
 
+    private enum SlashDelimitedTypedConstantSlot
+    {
+        LeftComponent,
+        RightComponent,
+    }
+
+    private static bool TryGetSlashDelimitedTypedConstantSlot(
+        string textBeforeCursor,
+        out SlashDelimitedTypedConstantSlot slot)
+    {
+        slot = default;
+
+        var firstSpaceIndex = textBeforeCursor.IndexOf(' ');
+        if (firstSpaceIndex < 0)
+        {
+            return false;
+        }
+
+        var slotText = textBeforeCursor[(firstSpaceIndex + 1)..].TrimStart();
+        if (slotText.Length == 0)
+        {
+            return false;
+        }
+
+        slot = slotText.Contains('/')
+            ? SlashDelimitedTypedConstantSlot.RightComponent
+            : SlashDelimitedTypedConstantSlot.LeftComponent;
+        return true;
+    }
+
     // ── Slot-specific item generators ─────────────────────────────────────────
 
     private static IEnumerable<CompletionItem> GetTemporalSlotItems(
@@ -1890,6 +1924,16 @@ internal sealed class CompletionHandler : ICompletionHandler
         if (phase is not (TypedConstantPhase.AfterNumberSpace or TypedConstantPhase.UnitTyping))
             return [];
 
+        if (TryGetSlashDelimitedTypedConstantSlot(textBeforeCursor, out var slot))
+        {
+            return slot switch
+            {
+                SlashDelimitedTypedConstantSlot.LeftComponent => GetAllCurrencyCodeItems(),
+                SlashDelimitedTypedConstantSlot.RightComponent => GetQuantitySlotItems(tcContext, textBeforeCursor, phase),
+                _ => [],
+            };
+        }
+
         var compoundQualifier = tcContext.Qualifiers.OfType<DeclaredQualifierMeta.CompoundPrice>().FirstOrDefault();
         if (compoundQualifier is not null)
         {
@@ -1930,6 +1974,11 @@ internal sealed class CompletionHandler : ICompletionHandler
     {
         if (phase is not (TypedConstantPhase.AfterNumberSpace or TypedConstantPhase.UnitTyping))
             return [];
+
+        if (TryGetSlashDelimitedTypedConstantSlot(textBeforeCursor, out _))
+        {
+            return GetAllCurrencyCodeItems();
+        }
 
         var fromQualifier = tcContext.Qualifiers.OfType<DeclaredQualifierMeta.FromCurrency>().FirstOrDefault();
         var toQualifier = tcContext.Qualifiers.OfType<DeclaredQualifierMeta.ToCurrency>().FirstOrDefault();

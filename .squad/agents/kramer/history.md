@@ -110,3 +110,17 @@
 - **Updated consumers:** NameBinder.CollectEvent, RichHoverFactory.TryFindQualifierAt (iterates entries by evt.Name), SlotPositionResolver.IsExpressionPhase (EventEntryList case for default-value detection), OutlineSymbolProjector.ExtractName.
 - **Tests:** 15 existing tests updated; 3 new tests added (MultipleEventsOnOneLine, InitialWithMultiple, SingleEvent_Regression). Total: 5784 Precept.Tests, 365 LS.Tests, 46 Mcp.Tests — all passing.
 
+### 2026-05-17T00:15:05-04:00 — price-type completions wired (commit `2e4afc5a`)
+
+- **Root cause:** `TypeKind.Price` was absent from both the single-quote trigger switch (`GetTypedConstantItems`) and the space trigger switch in `GetCompletions`. Both dispatches fell through — `GetFreeFormItems` for the `'` trigger and `Enumerable.Empty` for the space trigger — producing no useful snippet templates for `price`-type fields.
+- **Side finding:** `price` is a reserved type keyword (`TokenKind.PriceType`), not a valid identifier. Declaring `field price as money` produces a parse error; completions are empty not because of a money-type bug but because of the invalid field name. The bug report's "(a money field)" was loose language for the monetary-domain `price` type.
+- **Fix:** Added `GetPriceLiteralItems`, `GetPriceSnippetItems`, and `GetPriceSlotItems`; wired `TypeKind.Price` into both switches. Snippets are qualifier-aware: `CompoundPrice` (from `in 'USD/each'`) prefills both currency and unit; separate `Currency` qualifier prefills currency with a unit tab stop; generic fallback uses three tab stops.
+- **Tests:** 6 new tests — unqualified snippet, compound-qualified prefill, template suppression, money-vs-price dispatch guard, space trigger bound code, space trigger unqualified examples. Total: 372 LS.Tests passing.
+- **Sample:** Added `field unitPrice as price in 'USD/each' default '0.00 USD/each'` to `samples/Test.precept` as a representative price-type field.
+
+### 2026-05-17T08:15:31-04:00 — invoked slash-slot completions for price/exchangerate
+
+- **Root cause:** the invoked typed-constant path already dispatched `price` and `exchangerate`, but `GetPriceSlotItems` / `GetExchangeRateSlotItems` only knew the after-amount slot and ignored caret position within the `currency/unit` or `from/to` suffix. Inside `USD/each` or `USD/EUR`, Ctrl+Space stayed in generic `UnitTyping` and returned whole-pair suffix items instead of the left/right component vocabulary.
+- **Fix:** added slash-slot detection from `textBeforeCursor`; before `/` now returns the ISO currency catalog, after `/` routes `price` to quantity-style UCUM unit items and `exchangerate` to the currency catalog. The old after-amount space behavior remains unchanged.
+- **Tests:** added 4 invoked-path regressions (price currency slot, price unit slot, exchangerate from slot, exchangerate to slot). Validation: 396 LS tests passing; full repo `dotnet test` green at 6517 tests.
+

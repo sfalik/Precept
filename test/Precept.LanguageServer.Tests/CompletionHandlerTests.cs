@@ -3150,6 +3150,86 @@ public class CompletionHandlerTests
         labels.Should().Contain("USD/GBP");
         labels.Should().Contain("USD/USD");
     }
+
+    [Fact]
+    public async Task Completions_TypedConstant_Price_InvokedCurrencySlot_ShowsCurrencyCodes()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept PricingTest
+            field UnitPrice as price in 'USD/each' default '0.00 U¦SD/each'
+            """, new CompletionContext
+            {
+                TriggerKind = CompletionTriggerKind.Invoked,
+                TriggerCharacter = string.Empty,
+            });
+
+        var labels = completions.Items.Select(i => i.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain(["USD", "EUR", "GBP"]);
+        labels.Should().NotContain("USD/each");
+        labels.Should().NotContain("kg");
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_Price_InvokedUnitSlot_ShowsUnits()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept PricingTest
+            field UnitPrice as price in 'USD/each' default '0.00 USD/e¦ach'
+            """, new CompletionContext
+            {
+                TriggerKind = CompletionTriggerKind.Invoked,
+                TriggerCharacter = string.Empty,
+            });
+
+        var labels = completions.Items.Select(i => i.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain(["kg", "m", "g"]);
+        labels.Should().NotContain("USD");
+        labels.Should().NotContain("USD/each");
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_ExchangeRate_InvokedFromCurrencySlot_ShowsCurrencyCodes()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept PricingTest
+            field Fx as exchangerate in 'USD' to 'EUR' default '1.08 U¦SD/EUR'
+            """, new CompletionContext
+            {
+                TriggerKind = CompletionTriggerKind.Invoked,
+                TriggerCharacter = string.Empty,
+            });
+
+        var labels = completions.Items.Select(i => i.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain(["USD", "EUR", "GBP"]);
+        labels.Should().NotContain("USD/EUR");
+        labels.Should().NotContain("kg");
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_ExchangeRate_InvokedToCurrencySlot_ShowsCurrencyCodes()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept PricingTest
+            field Fx as exchangerate in 'USD' to 'EUR' default '1.08 USD/E¦UR'
+            """, new CompletionContext
+            {
+                TriggerKind = CompletionTriggerKind.Invoked,
+                TriggerCharacter = string.Empty,
+            });
+
+        var labels = completions.Items.Select(i => i.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain(["USD", "EUR", "GBP"]);
+        labels.Should().NotContain("USD/EUR");
+        labels.Should().NotContain("kg");
+    }
 }
 
 internal static class LanguageClientTestExtensions
