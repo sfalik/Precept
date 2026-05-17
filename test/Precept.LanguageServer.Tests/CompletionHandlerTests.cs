@@ -2857,6 +2857,299 @@ public class CompletionHandlerTests
         labels.Should().NotBeEmpty("price code examples must be offered when no qualifier is set");
         labels.Should().AllSatisfy(l => l.Should().Contain("/", "each price code must be in currency/unit format"));
     }
+
+    [Fact]
+    public async Task Completions_TypedConstant_Price_CompoundLiteral_PrefillsBoth()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept PricingTest
+            field ListPrice as price in 'USD/kg' default ¦
+            """, "'");
+
+        var item = completions.Items.Single(i => i.Label == "price — USD/kg");
+
+        item.InsertTextFormat.Should().Be(InsertTextFormat.Snippet);
+        item.InsertText.Should().Be("${1:0.00} USD/kg'");
+        item.InsertText.Should().NotContain("${2:");
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_Price_CompoundField_PrefillsFieldName()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept PricingTest
+            field SomeField as currency
+            field ListPrice as price in '{SomeField}' default ¦
+            """, "'");
+
+        var item = completions.Items.Single(i => i.Label == "price — SomeField/unit");
+
+        item.InsertTextFormat.Should().Be(InsertTextFormat.Snippet);
+        item.InsertText.Should().Be("${1:0.00} {SomeField}/${2:each}'");
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_Price_CurrencyAndDimension_LiteralBoth_DimensionFilteredItems()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept PricingTest
+            field ShippingPrice as price in 'USD' of 'mass' default ¦
+            """, "'");
+
+        var labels = completions.Items.Select(i => i.Label).ToArray();
+        var items = completions.Items.Where(i => i.Label.StartsWith("price — USD/", StringComparison.Ordinal)).ToArray();
+
+        items.Should().NotBeEmpty();
+        labels.Should().Contain("price — USD/kg");
+        labels.Should().Contain("price — USD/g");
+        items.Should().AllSatisfy(i => i.InsertText.Should().StartWith("${1:0.00} USD/"));
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_Price_CurrencyAndDimension_LiteralBoth_NoLengthUnits()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept PricingTest
+            field ShippingPrice as price in 'USD' of 'mass' default ¦
+            """, "'");
+
+        var labels = completions.Items.Select(i => i.Label).ToArray();
+
+        labels.Should().NotContain("price — USD/m");
+        labels.Should().NotContain("price — USD/cm");
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_Price_CurrencyAndDimension_CurrencyField_DimensionLiteral()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept PricingTest
+            field CatalogCurrency as currency
+            field ShippingPrice as price in '{CatalogCurrency}' of 'mass' default ¦
+            """, "'");
+
+        var item = completions.Items.Single(i => i.Label == "price — CatalogCurrency/kg");
+
+        item.InsertTextFormat.Should().Be(InsertTextFormat.Snippet);
+        item.InsertText.Should().Be("${1:0.00} {CatalogCurrency}/kg'");
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_Price_CurrencyLiteral_DimensionField_InterpolatesUnit()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept PricingTest
+            field SaleUnit as unitofmeasure
+            field ShippingPrice as price in 'USD' of '{SaleUnit.dimension}' default ¦
+            """, "'");
+
+        var item = completions.Items.Single(i => i.Label == "price — USD/SaleUnit");
+
+        item.InsertTextFormat.Should().Be(InsertTextFormat.Snippet);
+        item.InsertText.Should().Be("${1:0.00} USD/{SaleUnit}'");
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_Price_CurrencyField_DimensionField_InterpolatesBoth()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept PricingTest
+            field CatalogCurrency as currency
+            field SaleUnit as unitofmeasure
+            field ShippingPrice as price in '{CatalogCurrency}' of '{SaleUnit.dimension}' default ¦
+            """, "'");
+
+        var item = completions.Items.Single(i => i.Label == "price — CatalogCurrency/SaleUnit");
+
+        item.InsertTextFormat.Should().Be(InsertTextFormat.Snippet);
+        item.InsertText.Should().Be("${1:0.00} {CatalogCurrency}/{SaleUnit}'");
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_Price_CurrencyOnlyLiteral_UnitTabStop()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept PricingTest
+            field ShippingPrice as price in 'USD' default ¦
+            """, "'");
+
+        var item = completions.Items.Single(i => i.Label == "price — USD/unit");
+
+        item.InsertTextFormat.Should().Be(InsertTextFormat.Snippet);
+        item.InsertText.Should().Be("${1:0.00} USD/${2:each}'");
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_Price_Unqualified_GenericTemplate()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept PricingTest
+            field ShippingPrice as price default ¦
+            """, "'");
+
+        var item = completions.Items.Single(i => i.Label == "price — amount + currency/unit");
+
+        item.InsertTextFormat.Should().Be(InsertTextFormat.Snippet);
+        item.InsertText.Should().Be("${1:0.00} ${2:USD}/${3:each}'");
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_Price_SlotPhase_CompoundLiteral_OffersPair()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept PricingTest
+            field ListPrice as price in 'USD/kg' default '10.00 ¦'
+            """, " ");
+
+        var labels = completions.Items.Select(i => i.Label).ToArray();
+
+        labels.Should().ContainSingle().Which.Should().Be("USD/kg");
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_Price_SlotPhase_CurrencyAndDimension_DimensionFiltered()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept PricingTest
+            field ShippingPrice as price in 'USD' of 'mass' default '10.00 ¦'
+            """, " ");
+
+        var labels = completions.Items.Select(i => i.Label).ToArray();
+
+        labels.Should().Contain("USD/kg");
+        labels.Should().Contain("USD/g");
+        labels.Should().NotContain("USD/m");
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_ExchangeRate_BothLiteral_PrefillsBoth()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept PricingTest
+            field Fx as exchangerate in 'USD' to 'EUR' default ¦
+            """, "'");
+
+        var item = completions.Items.Single(i => i.Label == "exchange rate — USD/EUR");
+
+        item.InsertTextFormat.Should().Be(InsertTextFormat.Snippet);
+        item.InsertText.Should().Be("${1:1.00} USD/EUR'");
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_ExchangeRate_FromField_ToLiteral()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept PricingTest
+            field SupplierCurrency as currency
+            field Fx as exchangerate in '{SupplierCurrency}' to 'USD' default ¦
+            """, "'");
+
+        var item = completions.Items.Single(i => i.Label == "exchange rate — SupplierCurrency/USD");
+
+        item.InsertTextFormat.Should().Be(InsertTextFormat.Snippet);
+        item.InsertText.Should().Be("${1:1.00} {SupplierCurrency}/USD'");
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_ExchangeRate_FromLiteral_ToField()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept PricingTest
+            field CatalogCurrency as currency
+            field Fx as exchangerate in 'USD' to '{CatalogCurrency}' default ¦
+            """, "'");
+
+        var item = completions.Items.Single(i => i.Label == "exchange rate — USD/CatalogCurrency");
+
+        item.InsertTextFormat.Should().Be(InsertTextFormat.Snippet);
+        item.InsertText.Should().Be("${1:1.00} USD/{CatalogCurrency}'");
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_ExchangeRate_BothFields()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept PricingTest
+            field SupplierCurrency as currency
+            field CatalogCurrency as currency
+            field Fx as exchangerate in '{SupplierCurrency}' to '{CatalogCurrency}' default ¦
+            """, "'");
+
+        var item = completions.Items.Single(i => i.Label == "exchange rate — SupplierCurrency/CatalogCurrency");
+
+        item.InsertTextFormat.Should().Be(InsertTextFormat.Snippet);
+        item.InsertText.Should().Be("${1:1.00} {SupplierCurrency}/{CatalogCurrency}'");
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_ExchangeRate_FromLiteralOnly_ToTabStop()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept PricingTest
+            field Fx as exchangerate in 'USD' default ¦
+            """, "'");
+
+        var item = completions.Items.Single(i => i.Label == "exchange rate — USD/target");
+
+        item.InsertTextFormat.Should().Be(InsertTextFormat.Snippet);
+        item.InsertText.Should().Be("${1:1.00} USD/${2:EUR}'");
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_ExchangeRate_ToLiteralOnly_FromTabStop()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept PricingTest
+            field Fx as exchangerate to 'EUR' default ¦
+            """, "'");
+
+        var item = completions.Items.Single(i => i.Label == "exchange rate — source/EUR");
+
+        item.InsertTextFormat.Should().Be(InsertTextFormat.Snippet);
+        item.InsertText.Should().Be("${1:1.00} ${2:USD}/EUR'");
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_ExchangeRate_Unqualified_GenericTemplate()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept PricingTest
+            field Fx as exchangerate default ¦
+            """, "'");
+
+        var item = completions.Items.Single(i => i.Label == "exchange rate — from/to");
+
+        item.InsertTextFormat.Should().Be(InsertTextFormat.Snippet);
+        item.InsertText.Should().Be("${1:1.00} ${2:USD}/${3:EUR}'");
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_ExchangeRate_SlotPhase_BothLiteral_OffersPair()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept PricingTest
+            field Fx as exchangerate in 'USD' to 'EUR' default '1.08 ¦'
+            """, " ");
+
+        var labels = completions.Items.Select(i => i.Label).ToArray();
+
+        labels.Should().ContainSingle().Which.Should().Be("USD/EUR");
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_ExchangeRate_SlotPhase_FromLiteralOnly_CurrencyCatalog()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept PricingTest
+            field Fx as exchangerate in 'USD' default '1.08 ¦'
+            """, " ");
+
+        var labels = completions.Items.Select(i => i.Label).ToArray();
+
+        labels.Should().Contain("USD/EUR");
+        labels.Should().Contain("USD/GBP");
+        labels.Should().Contain("USD/USD");
+    }
 }
 
 internal static class LanguageClientTestExtensions

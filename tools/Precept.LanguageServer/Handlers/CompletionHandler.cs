@@ -90,6 +90,7 @@ internal sealed class CompletionHandler : ICompletionHandler
                     TypeKind.Duration or TypeKind.Period => GetTemporalSlotItems(tcCtx, textBefore, phase),
                     TypeKind.Money => GetMoneySlotItems(tcCtx, textBefore, phase),
                     TypeKind.Price => GetPriceSlotItems(tcCtx, textBefore, phase),
+                    TypeKind.ExchangeRate => GetExchangeRateSlotItems(tcCtx, textBefore, phase),
                     TypeKind.Quantity => GetQuantitySlotItems(tcCtx, textBefore, phase),
                     _ => Enumerable.Empty<CompletionItem>(),
                 };
@@ -1032,6 +1033,7 @@ internal sealed class CompletionHandler : ICompletionHandler
             TypeKind.Duration or TypeKind.Period => GetTemporalLiteralItems(compilation, tcContext, position),
             TypeKind.Money => GetMoneyLiteralItems(compilation, tcContext, position),
             TypeKind.Price => GetPriceLiteralItems(compilation, tcContext, position),
+            TypeKind.ExchangeRate => GetExchangeRateLiteralItems(compilation, tcContext, position),
             TypeKind.Date or TypeKind.Time or TypeKind.Instant or TypeKind.DateTime => GetTemporalDateTimeSnippetItems(compilation, tcContext),
             TypeKind.ZonedDateTime => TryGetZonedDateTimeBracketPartial(compilation.Tokens.Tokens, position, out var bracketPartial, out var hasClosingBracket)
                 ? GetZonedDateTimeBracketTimezoneItems(bracketPartial, appendClosingBracket: !hasClosingBracket)
@@ -1124,6 +1126,23 @@ internal sealed class CompletionHandler : ICompletionHandler
         return DistinctByLabel(
             GetPriceSnippetItems(tcContext)
             .Concat(reused.Select(v => CreateItem(v, "price literal", CompletionItemKind.Value, CompletionSortGroup.TypedConstant)))
+            .Concat(examples.Select(e => CreateItem(e, "example format", CompletionItemKind.Snippet, CompletionSortGroup.TypedConstant))));
+    }
+
+    private static IEnumerable<CompletionItem> GetExchangeRateLiteralItems(Compilation compilation, TypedConstantContext tcContext, Position position)
+    {
+        if (TryGetTypedConstantSlotPhase(compilation.Tokens.Tokens, position, out var phase, out var textBefore)
+            && phase != TypedConstantPhase.Empty)
+        {
+            return GetExchangeRateSlotItems(tcContext, textBefore, phase);
+        }
+
+        var typeMeta = Types.GetMeta(tcContext.ExpectedType);
+        var examples = typeMeta.ContentValidation?.Examples ?? [];
+        var reused = TypedConstantCollector.CollectByType(compilation.Semantics, tcContext.ExpectedType);
+        return DistinctByLabel(
+            GetExchangeRateSnippetItems(tcContext)
+            .Concat(reused.Select(v => CreateItem(v, "exchange rate literal", CompletionItemKind.Value, CompletionSortGroup.TypedConstant)))
             .Concat(examples.Select(e => CreateItem(e, "example format", CompletionItemKind.Snippet, CompletionSortGroup.TypedConstant))));
     }
 
@@ -1328,17 +1347,52 @@ internal sealed class CompletionHandler : ICompletionHandler
                     sortGroup: CompletionSortGroup.TypedConstantSnippet,
                     snippetTemplate: $"${{1:0.00}} {compoundQualifier.CurrencyCode}/{compoundQualifier.UnitCode}");
             }
+
             yield break;
         }
 
-        // Separate currency qualifier (from interpolated PriceIn resolved as Currency)
         var currencyQualifier = tcContext.Qualifiers.OfType<DeclaredQualifierMeta.Currency>().FirstOrDefault();
+        var dimQualifier = tcContext.Qualifiers.OfType<DeclaredQualifierMeta.Dimension>().FirstOrDefault();
+        if (currencyQualifier is not null && dimQualifier is not null)
+        {
+            var currencyLabel = currencyQualifier.SourceFieldName ?? currencyQualifier.CurrencyCode;
+            var currencyInsert = currencyQualifier.SourceFieldName is not null
+                ? $"{{{currencyQualifier.SourceFieldName}}}"
+                : currencyQualifier.CurrencyCode;
+
+            if (dimQualifier.SourceFieldName is not null)
+            {
+                yield return CreateItem(
+                    label: $"price — {currencyLabel}/{dimQualifier.SourceFieldName}",
+                    detail: $"price in {currencyLabel} per {dimQualifier.SourceFieldName} field",
+                    kind: CompletionItemKind.Snippet,
+                    sortGroup: CompletionSortGroup.TypedConstantSnippet,
+                    snippetTemplate: $"${{1:0.00}} {currencyInsert}/{{{dimQualifier.SourceFieldName}}}");
+                yield break;
+            }
+
+            if (DimensionCatalog.All.TryGetValue(dimQualifier.DimensionName, out var dimAlias))
+            {
+                foreach (var atom in UcumCatalog.BrowseTier1().Where(a => a.Vector == dimAlias.Vector))
+                {
+                    yield return CreateItem(
+                        label: $"price — {currencyLabel}/{atom.Code}",
+                        detail: $"price in {currencyLabel} per {atom.Name}",
+                        kind: CompletionItemKind.Snippet,
+                        sortGroup: CompletionSortGroup.TypedConstantSnippet,
+                        snippetTemplate: $"${{1:0.00}} {currencyInsert}/{atom.Code}");
+                }
+
+                yield break;
+            }
+        }
+
         if (currencyQualifier is not null)
         {
             if (currencyQualifier.SourceFieldName is not null)
             {
                 yield return CreateItem(
-                    label: $"price — {currencyQualifier.SourceFieldName} currency",
+                    label: $"price — {currencyQualifier.SourceFieldName}/unit",
                     detail: "price with declared currency field",
                     kind: CompletionItemKind.Snippet,
                     sortGroup: CompletionSortGroup.TypedConstantSnippet,
@@ -1353,6 +1407,7 @@ internal sealed class CompletionHandler : ICompletionHandler
                     sortGroup: CompletionSortGroup.TypedConstantSnippet,
                     snippetTemplate: $"${{1:0.00}} {currencyQualifier.CurrencyCode}/${{2:each}}");
             }
+
             yield break;
         }
 
@@ -1362,6 +1417,67 @@ internal sealed class CompletionHandler : ICompletionHandler
             kind: CompletionItemKind.Snippet,
             sortGroup: CompletionSortGroup.TypedConstantSnippet,
             snippetTemplate: "${1:0.00} ${2:USD}/${3:each}");
+    }
+
+    private static IEnumerable<CompletionItem> GetExchangeRateSnippetItems(TypedConstantContext tcContext)
+    {
+        var fromQualifier = tcContext.Qualifiers.OfType<DeclaredQualifierMeta.FromCurrency>().FirstOrDefault();
+        var toQualifier = tcContext.Qualifiers.OfType<DeclaredQualifierMeta.ToCurrency>().FirstOrDefault();
+
+        static string GetLabelPart(string currencyCode, string? sourceFieldName) => sourceFieldName ?? currencyCode;
+        static string GetInsertPart(string currencyCode, string? sourceFieldName) =>
+            sourceFieldName is not null ? $"{{{sourceFieldName}}}" : currencyCode;
+
+        if (fromQualifier is not null && toQualifier is not null)
+        {
+            var fromLabel = GetLabelPart(fromQualifier.CurrencyCode, fromQualifier.SourceFieldName);
+            var toLabel = GetLabelPart(toQualifier.CurrencyCode, toQualifier.SourceFieldName);
+            var fromInsert = GetInsertPart(fromQualifier.CurrencyCode, fromQualifier.SourceFieldName);
+            var toInsert = GetInsertPart(toQualifier.CurrencyCode, toQualifier.SourceFieldName);
+
+            yield return CreateItem(
+                label: $"exchange rate — {fromLabel}/{toLabel}",
+                detail: $"exchange rate from {fromLabel} to {toLabel}",
+                kind: CompletionItemKind.Snippet,
+                sortGroup: CompletionSortGroup.TypedConstantSnippet,
+                snippetTemplate: $"${{1:1.00}} {fromInsert}/{toInsert}");
+            yield break;
+        }
+
+        if (fromQualifier is not null)
+        {
+            var fromLabel = GetLabelPart(fromQualifier.CurrencyCode, fromQualifier.SourceFieldName);
+            var fromInsert = GetInsertPart(fromQualifier.CurrencyCode, fromQualifier.SourceFieldName);
+
+            yield return CreateItem(
+                label: $"exchange rate — {fromLabel}/target",
+                detail: $"exchange rate from {fromLabel}",
+                kind: CompletionItemKind.Snippet,
+                sortGroup: CompletionSortGroup.TypedConstantSnippet,
+                snippetTemplate: $"${{1:1.00}} {fromInsert}/${{2:EUR}}");
+            yield break;
+        }
+
+        if (toQualifier is not null)
+        {
+            var toLabel = GetLabelPart(toQualifier.CurrencyCode, toQualifier.SourceFieldName);
+            var toInsert = GetInsertPart(toQualifier.CurrencyCode, toQualifier.SourceFieldName);
+
+            yield return CreateItem(
+                label: $"exchange rate — source/{toLabel}",
+                detail: $"exchange rate to {toLabel}",
+                kind: CompletionItemKind.Snippet,
+                sortGroup: CompletionSortGroup.TypedConstantSnippet,
+                snippetTemplate: $"${{1:1.00}} ${{2:USD}}/{toInsert}");
+            yield break;
+        }
+
+        yield return CreateItem(
+            label: "exchange rate — from/to",
+            detail: "exchange rate from one currency to another",
+            kind: CompletionItemKind.Snippet,
+            sortGroup: CompletionSortGroup.TypedConstantSnippet,
+            snippetTemplate: "${1:1.00} ${2:USD}/${3:EUR}");
     }
 
     // ── Qualifier-aware quantity snippet templates ──────────────────────────────
@@ -1774,7 +1890,6 @@ internal sealed class CompletionHandler : ICompletionHandler
         if (phase is not (TypedConstantPhase.AfterNumberSpace or TypedConstantPhase.UnitTyping))
             return [];
 
-        // CompoundPrice qualifier: offer exactly the bound currency/unit combination
         var compoundQualifier = tcContext.Qualifiers.OfType<DeclaredQualifierMeta.CompoundPrice>().FirstOrDefault();
         if (compoundQualifier is not null)
         {
@@ -1782,7 +1897,21 @@ internal sealed class CompletionHandler : ICompletionHandler
             return [CreateItem(code, $"price code: {compoundQualifier.CurrencyCode} per {compoundQualifier.UnitCode}", CompletionItemKind.Unit, CompletionSortGroup.TypedConstantSegment)];
         }
 
-        // No explicit qualifier — offer format examples with amount stripped
+        var currencyQualifier = tcContext.Qualifiers.OfType<DeclaredQualifierMeta.Currency>().FirstOrDefault();
+        var dimQualifier = tcContext.Qualifiers.OfType<DeclaredQualifierMeta.Dimension>().FirstOrDefault();
+        if (currencyQualifier is { SourceFieldName: null } && dimQualifier is { SourceFieldName: null, DimensionName: var dimName }
+            && DimensionCatalog.All.TryGetValue(dimName, out var dimAlias))
+        {
+            var currency = currencyQualifier.CurrencyCode;
+            return UcumCatalog.BrowseTier1()
+                .Where(a => a.Vector == dimAlias.Vector)
+                .Select(atom =>
+                {
+                    var code = $"{currency}/{atom.Code}";
+                    return CreateItem(code, $"price code: {currency} per {atom.Name}", CompletionItemKind.Unit, CompletionSortGroup.TypedConstantSegment);
+                });
+        }
+
         var examples = Types.GetMeta(TypeKind.Price).ContentValidation?.Examples ?? [];
         return examples
             .Select(e =>
@@ -1792,6 +1921,48 @@ internal sealed class CompletionHandler : ICompletionHandler
             })
             .Distinct(StringComparer.Ordinal)
             .Select(code => CreateItem(code, "price code", CompletionItemKind.Unit, CompletionSortGroup.TypedConstantSegment));
+    }
+
+    private static IEnumerable<CompletionItem> GetExchangeRateSlotItems(
+        TypedConstantContext tcContext,
+        string textBeforeCursor,
+        TypedConstantPhase phase)
+    {
+        if (phase is not (TypedConstantPhase.AfterNumberSpace or TypedConstantPhase.UnitTyping))
+            return [];
+
+        var fromQualifier = tcContext.Qualifiers.OfType<DeclaredQualifierMeta.FromCurrency>().FirstOrDefault();
+        var toQualifier = tcContext.Qualifiers.OfType<DeclaredQualifierMeta.ToCurrency>().FirstOrDefault();
+
+        if (fromQualifier is { SourceFieldName: null } && toQualifier is { SourceFieldName: null })
+        {
+            var code = $"{fromQualifier.CurrencyCode}/{toQualifier.CurrencyCode}";
+            return [CreateItem(code, $"exchange rate code: {fromQualifier.CurrencyCode} to {toQualifier.CurrencyCode}", CompletionItemKind.Unit, CompletionSortGroup.TypedConstantSegment)];
+        }
+
+        if (fromQualifier is { SourceFieldName: null })
+        {
+            var fromCurrency = fromQualifier.CurrencyCode;
+            return CurrencyCatalog.All.Keys
+                .Select(code => CreateItem($"{fromCurrency}/{code}", $"exchange rate code: {fromCurrency} to {code}", CompletionItemKind.Unit, CompletionSortGroup.TypedConstantSegment));
+        }
+
+        if (toQualifier is { SourceFieldName: null })
+        {
+            var toCurrency = toQualifier.CurrencyCode;
+            return CurrencyCatalog.All.Keys
+                .Select(code => CreateItem($"{code}/{toCurrency}", $"exchange rate code: {code} to {toCurrency}", CompletionItemKind.Unit, CompletionSortGroup.TypedConstantSegment));
+        }
+
+        var examples = Types.GetMeta(TypeKind.ExchangeRate).ContentValidation?.Examples ?? [];
+        return examples
+            .Select(e =>
+            {
+                var spaceIndex = e.IndexOf(' ');
+                return spaceIndex >= 0 ? e[(spaceIndex + 1)..] : e;
+            })
+            .Distinct(StringComparer.Ordinal)
+            .Select(code => CreateItem(code, "exchange rate code", CompletionItemKind.Unit, CompletionSortGroup.TypedConstantSegment));
     }
 
     private static IEnumerable<CompletionItem> GetQuantitySlotItems(
