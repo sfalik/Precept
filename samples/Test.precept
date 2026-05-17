@@ -3,30 +3,26 @@
 field counter as integer
 field events as log of string
 field test as timezone default 'America/Toronto'
-field test2 as instant default '2026-12-24T12:53:10Z'
-field test3 as quantity default '2.5 mg/dL'
+field test2 as instant default '2026-05-16T14:30:00Z'
+field test25 as zoneddatetime default '2026-05-16T14:30:00[America/Toronto]'
+field test3 as quantity default '25 km/h'
 field test4 as unitofmeasure default test3.unit
 
-
-
 state off initial, running
+event create initial, start, stop, reset
 
-event create initial
 on create
     -> set counter = 0
 
-event start
 from off on start
     -> set counter = counter + 1
     -> add events "{now()}:  started"
     -> transition running
 
-event stop  
 from running on stop
     -> add events "{now()}:  stopped"
     -> transition off
 
-event reset
 from off, running on reset
     -> set counter = 0
     -> clear events

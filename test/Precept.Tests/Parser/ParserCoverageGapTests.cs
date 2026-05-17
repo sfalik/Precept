@@ -474,16 +474,17 @@ public class ParserCoverageGapTests
     [Fact]
     public void EventDeclaration_MultipleArgs_BothArgsPreserved()
     {
-        // Multiple event arguments must all be captured
+        // Multiple event arguments must all be captured in the entry's Args
         var evt = ParseSingleEvent("event Submit(approver as string, amount as number)");
-        var argSlot = evt.Slots.OfType<ArgumentListSlot>().FirstOrDefault();
+        var entrySlot = evt.Slots.OfType<EventEntryListSlot>().FirstOrDefault();
 
-        argSlot.Should().NotBeNull("ArgumentListSlot must be present");
-        argSlot!.Args.Should().HaveCount(2,
+        entrySlot.Should().NotBeNull("EventEntryListSlot must be present");
+        entrySlot!.Entries.Should().ContainSingle();
+        entrySlot.Entries[0].Args.Should().HaveCount(2,
             "two arguments must be captured");
-        argSlot.Args.Should().Contain(a => a.Name == "approver",
+        entrySlot.Entries[0].Args.Should().Contain(a => a.Name == "approver",
             "first arg 'approver' must be present");
-        argSlot.Args.Should().Contain(a => a.Name == "amount",
+        entrySlot.Entries[0].Args.Should().Contain(a => a.Name == "amount",
             "second arg 'amount' must be present");
     }
 
@@ -491,12 +492,9 @@ public class ParserCoverageGapTests
     public void EventDeclaration_ArgWithOptionalModifier_ParsesCorrectly()
     {
         // Optional modifier on event arg
-        // Note: Samples use 'optional' (e.g., "Note as string optional notempty")
-        // but the parser may not yet support modifiers on event args.
         var manifest = Parse("event Submit(reason as string optional)");
 
         // If this fails, the parser doesn't yet support event arg modifiers.
-        // The test documents expected behavior per samples.
         if (manifest.Diagnostics.Any())
         {
             // Skip assertion - event arg modifiers not yet implemented
@@ -504,17 +502,16 @@ public class ParserCoverageGapTests
         }
 
         var evt = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.EventDeclaration);
-        var argSlot = evt.Slots.OfType<ArgumentListSlot>().Single();
+        var entrySlot = evt.Slots.OfType<EventEntryListSlot>().Single();
 
-        argSlot.Args.Should().ContainSingle(a => a.Name == "reason");
+        entrySlot.Entries.Should().ContainSingle(e => e.Name == "Submit");
+        entrySlot.Entries[0].Args.Should().ContainSingle(a => a.Name == "reason");
     }
 
     [Fact]
     public void EventDeclaration_ArgWithNotemptyModifier_ParsesCorrectly()
     {
         // Constraint modifier on event arg
-        // Note: Samples use 'optional notempty' on string args, but the parser
-        // may not yet support modifiers on event args.
         var manifest = Parse("event Submit(reason as string optional notempty)");
 
         // If this fails, the parser doesn't yet support event arg modifiers.
@@ -525,19 +522,21 @@ public class ParserCoverageGapTests
         }
 
         var evt = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.EventDeclaration);
-        var argSlot = evt.Slots.OfType<ArgumentListSlot>().Single();
+        var entrySlot = evt.Slots.OfType<EventEntryListSlot>().Single();
 
-        argSlot.Args.Should().ContainSingle(a => a.Name == "reason");
+        entrySlot.Entries[0].Args.Should().ContainSingle(a => a.Name == "reason");
     }
 
     [Fact]
     public void EventDeclaration_NoArgs_ArgumentListSlotAbsent()
     {
-        // No-arg event must not have ArgumentListSlot
+        // No-arg event has an EventEntryListSlot with empty Args on the entry
         var evt = ParseSingleEvent("event Submit");
 
-        evt.Slots.Should().NotContain(s => s.Kind == ConstructSlotKind.ArgumentList,
-            "no-arg event must not materialize ArgumentListSlot");
+        var entrySlot = evt.Slots.OfType<EventEntryListSlot>().FirstOrDefault();
+        entrySlot.Should().NotBeNull("EventEntryListSlot must always be present");
+        entrySlot!.Entries[0].Args.Should().BeEmpty(
+            "no-arg event must have empty Args in the entry");
     }
 
     [Fact]
@@ -549,10 +548,10 @@ public class ParserCoverageGapTests
         manifest.Diagnostics.Should().BeEmpty();
 
         var evt = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.EventDeclaration);
-        var argSlot = evt.Slots.OfType<ArgumentListSlot>().Single();
+        var entrySlot = evt.Slots.OfType<EventEntryListSlot>().Single();
 
-        argSlot.Args.Should().HaveCount(3, "three arguments must be captured");
-        argSlot.Args.Select(a => a.Name).Should().Contain(new[] { "name", "value", "active" });
+        entrySlot.Entries[0].Args.Should().HaveCount(3, "three arguments must be captured");
+        entrySlot.Entries[0].Args.Select(a => a.Name).Should().Contain(new[] { "name", "value", "active" });
     }
 
     // ════════════════════════════════════════════════════════════════════════════

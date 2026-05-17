@@ -247,7 +247,6 @@ public class ConstructsTests
 
     [Theory]
     [InlineData(ConstructKind.FieldDeclaration)]
-    [InlineData(ConstructKind.EventDeclaration)]
     [InlineData(ConstructKind.TransitionRow)]
     public void KeyConstructs_HaveMinimumSlotCount(ConstructKind kind)
     {
@@ -269,17 +268,17 @@ public class ConstructsTests
     }
 
     [Fact]
-    public void EventDeclaration_HasInitialMarkerSlot()
+    public void EventDeclaration_HasEventEntryListSlot()
     {
-        // R4: EventDeclaration gained SlotInitialMarker so the 'initial' keyword
-        // is parsed via slot machinery rather than a bespoke branch.
+        // R5: EventDeclaration uses a single compound EventEntryList slot — mirrors
+        // the StateEntryList pattern. Each entry carries its own name, optional arg
+        // list, and optional initial modifier, enabling comma-separated multi-event
+        // declarations with per-event modifiers: event Submit(x as number) initial, Cancel
         var slots = Constructs.GetMeta(ConstructKind.EventDeclaration).Slots;
-        slots.Should().HaveCount(3, "EventDeclaration: [IdentifierList, ArgumentList(opt), InitialMarker(opt)]");
-        slots[0].Kind.Should().Be(ConstructSlotKind.IdentifierList);
-        slots[1].Kind.Should().Be(ConstructSlotKind.ArgumentList);
-        slots[1].IsRequired.Should().BeFalse("event arguments are optional");
-        slots[2].Kind.Should().Be(ConstructSlotKind.InitialMarker);
-        slots[2].IsRequired.Should().BeFalse("the initial marker is optional");
+        slots.Should().HaveCount(1, "EventDeclaration uses exactly one compound EventEntryList slot");
+        slots[0].Kind.Should().Be(ConstructSlotKind.EventEntryList);
+        slots[0].IsRequired.Should().BeTrue("an event declaration must name at least one event");
+        slots[0].IsList.Should().BeTrue("multiple events can be declared on one line");
     }
 
     [Theory]

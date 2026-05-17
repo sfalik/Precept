@@ -18,6 +18,7 @@ public static class Constructs
     private static readonly ConstructSlot SlotTypeExpression    = new(ConstructSlotKind.TypeExpression,    Vocabulary: SlotVocabulary.TypeKeywords);
     private static readonly ConstructSlot SlotModifierList      = new(ConstructSlotKind.ModifierList,       IsRequired: false, Vocabulary: SlotVocabulary.Modifiers);
     private static readonly ConstructSlot SlotStateEntryList    = new(ConstructSlotKind.StateEntryList,    IsList: true, ItemIntroducerToken: TokenKind.Comma, Vocabulary: SlotVocabulary.StateEntryNames);
+    private static readonly ConstructSlot SlotEventEntryList    = new(ConstructSlotKind.EventEntryList,    IsList: true, ItemIntroducerToken: TokenKind.Comma, Vocabulary: SlotVocabulary.EventNames);
     private static readonly ConstructSlot SlotArgumentList      = new(ConstructSlotKind.ArgumentList,       IsRequired: false);
     private static readonly ConstructSlot SlotComputeExpression    = new(ConstructSlotKind.ComputeExpression,  IsRequired: false, TerminationTokens: [], Vocabulary: SlotVocabulary.Expression);
     private static readonly ConstructSlot SlotGuardClause          = new(ConstructSlotKind.GuardClause,        IsRequired: false, Description: "when expression", TerminationTokens: [TokenKind.Because, TokenKind.Arrow], Vocabulary: SlotVocabulary.Expression);
@@ -90,9 +91,9 @@ public static class Constructs
             kind,
             "event declaration",
             "Declares one or more named events with optional arguments and the initial modifier",
-            "event Submit(approver as string)",
+            "event Submit(approver as string) initial, Cancel",
             [],
-            [SlotIdentifierList, SlotArgumentList, SlotInitialMarker],
+            [SlotEventEntryList],
             [new(TokenKind.Event)],
             RoutingFamily.Direct,
             SnippetTemplate: "event ${1:Name}",

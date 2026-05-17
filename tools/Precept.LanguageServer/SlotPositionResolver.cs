@@ -242,6 +242,21 @@ internal static class SlotPositionResolver
                     && (modifier.Value is not null && Contains(modifier.Span, position))));
         }
 
+        if (owner.Meta.Kind == ConstructSlotKind.EventEntryList)
+        {
+            if (Modifiers.ByValueToken.TryGetValue(previousToken.Kind, out var modifierMeta)
+                && modifierMeta.Kind == ModifierKind.Default)
+            {
+                return true;
+            }
+
+            var entryList = construct.GetSlot<EventEntryListSlot>(ConstructSlotKind.EventEntryList);
+            return entryList is not null
+                && entryList.Entries.Any(e => e.Args.Any(arg => arg.ParsedModifiers.Any(modifier =>
+                    modifier.Kind == ModifierKind.Default
+                    && (modifier.Value is not null && Contains(modifier.Span, position)))));
+        }
+
         return false;
     }
 

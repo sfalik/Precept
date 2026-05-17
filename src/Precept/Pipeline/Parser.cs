@@ -435,6 +435,7 @@ public static partial class Parser
                 ConstructSlotKind.TypeExpression    => ParseTypeExpression(slot),
                 ConstructSlotKind.ModifierList      => ParseModifierList(slot, constructMeta),
                 ConstructSlotKind.StateEntryList    => ParseStateEntryList(slot),
+                ConstructSlotKind.EventEntryList    => ParseEventEntryList(slot),
                 ConstructSlotKind.ArgumentList      => ParseArgumentList(slot),
                 ConstructSlotKind.InitialMarker     => ParseInitialMarker(slot),
                 ConstructSlotKind.BecauseClause     => ParseBecauseClause(slot),
@@ -460,6 +461,7 @@ public static partial class Parser
             ConstructSlotKind.TypeExpression    => new TypeExpressionSlot(new MissingTypeReference(SourceSpan.Missing), SourceSpan.Missing),
             ConstructSlotKind.ModifierList      => new ModifierListSlot(ImmutableArray<ParsedModifier>.Empty, SourceSpan.Missing),
             ConstructSlotKind.StateEntryList    => new StateEntryListSlot(ImmutableArray<StateEntrySyntax>.Empty, SourceSpan.Missing),
+            ConstructSlotKind.EventEntryList    => new EventEntryListSlot(ImmutableArray<EventEntrySyntax>.Empty, SourceSpan.Missing),
             ConstructSlotKind.ArgumentList      => new ArgumentListSlot(ImmutableArray<ArgumentSyntax>.Empty, SourceSpan.Missing),
             ConstructSlotKind.InitialMarker     => new InitialMarkerSlot(false, SourceSpan.Missing),
             ConstructSlotKind.BecauseClause     => new BecauseClauseSlot("", SourceSpan.Missing),
@@ -618,6 +620,56 @@ public static partial class Parser
             return Modifiers.ByStateToken.TryGetValue(token, out var meta)
                 ? meta.Kind
                 : null;
+        }
+
+        // ── EventEntryList: "Name [(Args)] [initial], Name, ..." ────────────────
+
+        // Reusable optional-ArgumentList slot for entries inside EventEntryList
+        private static readonly ConstructSlot EventEntryArgSlot =
+            new(ConstructSlotKind.ArgumentList, IsRequired: false);
+
+        private SlotValue ParseEventEntryList(ConstructSlot slot)
+        {
+            var entries = new List<EventEntrySyntax>();
+            var startSpan = Peek().Span;
+
+            while (Peek().Kind == TokenKind.Identifier)
+            {
+                var nameToken = Advance();
+
+                // Optional argument list "(name as type, ...)"
+                var argsSlotValue = ParseArgumentList(EventEntryArgSlot);
+                var args = argsSlotValue is ArgumentListSlot argSlot
+                    ? argSlot.Args
+                    : ImmutableArray<ArgumentSyntax>.Empty;
+
+                // Optional initial modifier
+                var isInitial = false;
+                if (Peek().Kind == TokenKind.Initial)
+                {
+                    Advance();
+                    isInitial = true;
+                }
+
+                entries.Add(new EventEntrySyntax(nameToken.Text, args, isInitial, nameToken.Span));
+
+                // Comma separates entries
+                if (Peek().Kind == TokenKind.Comma)
+                    Advance();
+                else
+                    break;
+            }
+
+            if (entries.Count == 0 && slot.IsRequired)
+            {
+                _diagnostics.Add(DiagnosticsCatalog.Create(
+                    DiagnosticCode.ExpectedToken, Peek().Span, "event name", Peek().Text));
+                return new EventEntryListSlot(ImmutableArray<EventEntrySyntax>.Empty, startSpan);
+            }
+
+            var endSpan = LastSignificantConsumedSpan(startSpan);
+            return new EventEntryListSlot(entries.ToImmutableArray(),
+                SourceSpan.Covering(startSpan, endSpan));
         }
 
         // ── ArgumentList: "(name as type, ...)" ─────────────────────────────────

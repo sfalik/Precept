@@ -29,7 +29,7 @@ public class ParserDirectConstructTests
     [InlineData(ConstructKind.PreceptHeader,    1)]
     [InlineData(ConstructKind.FieldDeclaration, 4)]
     [InlineData(ConstructKind.StateDeclaration, 1)]
-    [InlineData(ConstructKind.EventDeclaration, 3)]
+    [InlineData(ConstructKind.EventDeclaration, 1)]
     [InlineData(ConstructKind.RuleDeclaration,  3)]
     public void DirectConstruct_CatalogSlotCount_MatchesExpectedCount(
         ConstructKind kind, int expectedCount)
@@ -98,23 +98,19 @@ public class ParserDirectConstructTests
     }
 
     [Fact]
-    public void EventDeclaration_CatalogSlotOrder_IsIdentifier_ArgumentList_InitialMarker()
+    public void EventDeclaration_CatalogSlotOrder_IsEventEntryList()
     {
-        // GREEN
+        // R5: EventDeclaration now uses a single compound EventEntryList slot.
         var slots = Constructs.GetMeta(ConstructKind.EventDeclaration).Slots;
-        slots[0].Kind.Should().Be(ConstructSlotKind.IdentifierList, "Slots[0]: event name(s)");
-        slots[1].Kind.Should().Be(ConstructSlotKind.ArgumentList,   "Slots[1]: optional parameter list");
-        slots[2].Kind.Should().Be(ConstructSlotKind.InitialMarker,  "Slots[2]: optional initial marker");
+        slots[0].Kind.Should().Be(ConstructSlotKind.EventEntryList, "Slots[0]: compound event entry list");
     }
 
     [Fact]
-    public void EventDeclaration_RequiredSlots_IsIdentifierOnly()
+    public void EventDeclaration_RequiredSlots_IsEventEntryListOnly()
     {
-        // GREEN
+        // R5: EventEntryList is required — must name at least one event.
         var slots = Constructs.GetMeta(ConstructKind.EventDeclaration).Slots;
-        slots[0].IsRequired.Should().BeTrue("event name is required");
-        slots[1].IsRequired.Should().BeFalse("argument list is optional");
-        slots[2].IsRequired.Should().BeFalse("initial marker is optional");
+        slots[0].IsRequired.Should().BeTrue("event entry list is required");
     }
 
     [Fact]
@@ -523,7 +519,7 @@ public class ParserDirectConstructTests
     [Fact]
     public void EventDeclaration_BareEvent_IdentifierSlot_ContainsEventName()
     {
-        // RED-P: Parser is a stub.
+        // R5: event name is inside EventEntryListSlot.Entries[0].Name
         var tokens = Lexer.Lex("event Submit");
         var manifest = Precept.Pipeline.Parser.Parse(tokens);
 
@@ -531,16 +527,16 @@ public class ParserDirectConstructTests
             .SingleOrDefault(c => c.Meta.Kind == ConstructKind.EventDeclaration);
         evt.Should().NotBeNull();
 
-        var idSlot = evt!.Slots.OfType<IdentifierListSlot>().FirstOrDefault();
-        idSlot.Should().NotBeNull("Slots[0] must be an IdentifierListSlot");
-        idSlot!.Names.Should().ContainSingle("Submit",
-            "the event name 'Submit' must appear in the identifier slot");
+        var entrySlot = evt!.Slots.OfType<EventEntryListSlot>().FirstOrDefault();
+        entrySlot.Should().NotBeNull("Slots[0] must be an EventEntryListSlot");
+        entrySlot!.Entries.Should().ContainSingle(e => e.Name == "Submit",
+            "the event name 'Submit' must appear in the entry slot");
     }
 
     [Fact]
     public void EventDeclaration_BareEvent_OptionalSlots_AreAbsent()
     {
-        // RED-P: A bare event has no argument list and no initial marker; optional slots must be absent.
+        // R5: A bare event uses EventEntryList; entry has no args and IsInitial = false.
         var tokens = Lexer.Lex("event Submit");
         var manifest = Precept.Pipeline.Parser.Parse(tokens);
 
@@ -548,18 +544,17 @@ public class ParserDirectConstructTests
             .SingleOrDefault(c => c.Meta.Kind == ConstructKind.EventDeclaration);
         evt.Should().NotBeNull();
 
-        evt!.Slots.Should().NotContain(
-            s => s.Kind == ConstructSlotKind.ArgumentList,
-            "ArgumentList slot must be absent when no parameter list is provided");
-        evt.Slots.Should().NotContain(
-            s => s.Kind == ConstructSlotKind.InitialMarker,
-            "InitialMarker slot must be absent when 'initial' keyword is not present");
+        var entrySlot = evt!.Slots.OfType<EventEntryListSlot>().FirstOrDefault();
+        entrySlot.Should().NotBeNull();
+        entrySlot!.Entries.Should().ContainSingle(e => e.Name == "Submit");
+        entrySlot.Entries[0].Args.Should().BeEmpty("no args on bare event");
+        entrySlot.Entries[0].IsInitial.Should().BeFalse("no initial keyword on bare event");
     }
 
     [Fact]
     public void EventDeclaration_WithArguments_ArgumentListSlot_IsPresent()
     {
-        // RED-P: ArgumentList slot is optional; it IS materialized when args are supplied.
+        // R5: args are in EventEntryListSlot.Entries[0].Args
         var tokens = Lexer.Lex("event Submit(approver as string)");
         var manifest = Precept.Pipeline.Parser.Parse(tokens);
 
@@ -569,15 +564,16 @@ public class ParserDirectConstructTests
             .SingleOrDefault(c => c.Meta.Kind == ConstructKind.EventDeclaration);
         evt.Should().NotBeNull();
 
-        evt!.Slots.Should().Contain(
-            s => s.Kind == ConstructSlotKind.ArgumentList,
-            "the optional ArgumentList slot must be materialized when a parameter list is present");
+        var entrySlot = evt!.Slots.OfType<EventEntryListSlot>().FirstOrDefault();
+        entrySlot.Should().NotBeNull();
+        entrySlot!.Entries.Should().ContainSingle();
+        entrySlot.Entries[0].Args.Should().NotBeEmpty("args must be captured when a parameter list is present");
     }
 
     [Fact]
     public void EventDeclaration_WithArguments_ArgumentListSlot_ContainsParameterName()
     {
-        // RED-P: Argument names must be captured in the ArgumentListSlot.
+        // R5: Argument names are in EventEntryListSlot.Entries[0].Args.
         var tokens = Lexer.Lex("event Submit(approver as string)");
         var manifest = Precept.Pipeline.Parser.Parse(tokens);
 
@@ -585,10 +581,10 @@ public class ParserDirectConstructTests
             .SingleOrDefault(c => c.Meta.Kind == ConstructKind.EventDeclaration);
         evt.Should().NotBeNull();
 
-        var argSlot = evt!.Slots.OfType<ArgumentListSlot>().FirstOrDefault();
-        argSlot.Should().NotBeNull("ArgumentListSlot must be present");
-        argSlot!.Args.Should().Contain(a => a.Name == "approver",
-            "the parameter name 'approver' must be captured in ArgumentListSlot.Args");
+        var entrySlot = evt!.Slots.OfType<EventEntryListSlot>().FirstOrDefault();
+        entrySlot.Should().NotBeNull("EventEntryListSlot must be present");
+        entrySlot!.Entries[0].Args.Should().Contain(a => a.Name == "approver",
+            "the parameter name 'approver' must be captured in the entry's Args");
     }
 
     [Fact]
@@ -600,10 +596,11 @@ public class ParserDirectConstructTests
         manifest.Diagnostics.Should().BeEmpty();
 
         var evt = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.EventDeclaration);
-        var argSlot = evt.Slots.OfType<ArgumentListSlot>().Single();
+        var entrySlot = evt.Slots.OfType<EventEntryListSlot>().Single();
+        var args = entrySlot.Entries[0].Args;
 
-        argSlot.Args.Select(a => a.Name).Should().Equal("amount", "note");
-        argSlot.Args.Select(a => a.Type.ResolvedKind).Should().Equal(TypeKind.Number, TypeKind.String);
+        args.Select(a => a.Name).Should().Equal("amount", "note");
+        args.Select(a => a.Type.ResolvedKind).Should().Equal(TypeKind.Number, TypeKind.String);
     }
 
     [Fact]
@@ -615,17 +612,18 @@ public class ParserDirectConstructTests
         manifest.Diagnostics.Should().BeEmpty();
 
         var evt = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.EventDeclaration);
-        var argSlot = evt.Slots.OfType<ArgumentListSlot>().Single();
+        var entrySlot = evt.Slots.OfType<EventEntryListSlot>().Single();
+        var args = entrySlot.Entries[0].Args;
 
-        argSlot.Args.Should().HaveCount(3);
-        argSlot.Args.Select(a => a.Name).Should().Equal("amount", "note", "approved");
-        argSlot.Args.Select(a => a.Type.ResolvedKind).Should().Equal(TypeKind.Number, TypeKind.String, TypeKind.Boolean);
+        args.Should().HaveCount(3);
+        args.Select(a => a.Name).Should().Equal("amount", "note", "approved");
+        args.Select(a => a.Type.ResolvedKind).Should().Equal(TypeKind.Number, TypeKind.String, TypeKind.Boolean);
     }
 
     [Fact]
     public void EventDeclaration_WithInitialKeyword_InitialMarkerSlot_IsPresent_AndTrue()
     {
-        // RED-P: The optional InitialMarker slot must be materialized and carry IsPresent = true.
+        // R5: The initial flag is per entry inside EventEntryListSlot.
         var tokens = Lexer.Lex("event Open initial");
         var manifest = Precept.Pipeline.Parser.Parse(tokens);
 
@@ -635,17 +633,17 @@ public class ParserDirectConstructTests
             .SingleOrDefault(c => c.Meta.Kind == ConstructKind.EventDeclaration);
         evt.Should().NotBeNull();
 
-        var markerSlot = evt!.Slots.OfType<InitialMarkerSlot>().FirstOrDefault();
-        markerSlot.Should().NotBeNull("InitialMarkerSlot must be present when 'initial' appears");
-        markerSlot!.IsPresent.Should().BeTrue(
-            "InitialMarkerSlot.IsPresent must be true when the 'initial' keyword is in source");
+        var entrySlot = evt!.Slots.OfType<EventEntryListSlot>().FirstOrDefault();
+        entrySlot.Should().NotBeNull("EventEntryListSlot must be present");
+        entrySlot!.Entries.Should().ContainSingle(e => e.Name == "Open");
+        entrySlot.Entries[0].IsInitial.Should().BeTrue(
+            "EventEntrySyntax.IsInitial must be true when the 'initial' keyword follows the event name");
     }
 
     [Fact]
     public void EventDeclaration_SlotOrdering_IdentifierIsSlot0()
     {
-        // RED-P: Catalog order: IdentifierList[0], ArgumentList[1], InitialMarker[2].
-        // With all optional slots present, indices must follow the catalog.
+        // R5: Catalog order: EventEntryList[0] — single compound slot.
         var tokens = Lexer.Lex("event Submit(approver as string)");
         var manifest = Precept.Pipeline.Parser.Parse(tokens);
 
@@ -670,6 +668,67 @@ public class ParserDirectConstructTests
         evt.Should().NotBeNull();
         evt!.Span.Should().NotBe(SourceSpan.Missing,
             "EventDeclaration span must reference real source positions");
+    }
+
+    // ════════════════════════════════════════════════════════════════════════════
+    //  §6b. EventDeclaration — multi-event parity with states
+    // ════════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Parser_EventDeclaration_MultipleEventsOnOneLine_Parsed()
+    {
+        // R5: "events Submit, Cancel, Approve" style — parity with multi-state declarations
+        var tokens = Lexer.Lex("event Submit, Cancel, Approve");
+        var manifest = Precept.Pipeline.Parser.Parse(tokens);
+
+        manifest.Diagnostics.Should().BeEmpty("comma-separated event names on one line must parse cleanly");
+
+        var evt = manifest.Constructs.SingleOrDefault(c => c.Meta.Kind == ConstructKind.EventDeclaration);
+        evt.Should().NotBeNull();
+
+        var entrySlot = evt!.Slots.OfType<EventEntryListSlot>().Single();
+        entrySlot.Entries.Should().HaveCount(3, "three event entries must be produced");
+        entrySlot.Entries.Select(e => e.Name).Should().Equal("Submit", "Cancel", "Approve");
+    }
+
+    [Fact]
+    public void Parser_EventDeclaration_InitialWithMultiple_ParsedCorrectly()
+    {
+        // R5: "event create initial, start, stop" — initial applies only to first entry
+        var tokens = Lexer.Lex("event create initial, start, stop");
+        var manifest = Precept.Pipeline.Parser.Parse(tokens);
+
+        manifest.Diagnostics.Should().BeEmpty("initial modifier with multiple events must parse cleanly");
+
+        var evt = manifest.Constructs.SingleOrDefault(c => c.Meta.Kind == ConstructKind.EventDeclaration);
+        evt.Should().NotBeNull();
+
+        var entrySlot = evt!.Slots.OfType<EventEntryListSlot>().Single();
+        entrySlot.Entries.Should().HaveCount(3);
+        entrySlot.Entries[0].Name.Should().Be("create");
+        entrySlot.Entries[0].IsInitial.Should().BeTrue("'create' has the initial modifier");
+        entrySlot.Entries[1].Name.Should().Be("start");
+        entrySlot.Entries[1].IsInitial.Should().BeFalse("'start' has no initial modifier");
+        entrySlot.Entries[2].Name.Should().Be("stop");
+        entrySlot.Entries[2].IsInitial.Should().BeFalse("'stop' has no initial modifier");
+    }
+
+    [Fact]
+    public void Parser_EventDeclaration_SingleEvent_Regression()
+    {
+        // Regression: existing single-event declarations still parse correctly
+        var tokens = Lexer.Lex("event Submit");
+        var manifest = Precept.Pipeline.Parser.Parse(tokens);
+
+        manifest.Diagnostics.Should().BeEmpty();
+
+        var evt = manifest.Constructs.SingleOrDefault(c => c.Meta.Kind == ConstructKind.EventDeclaration);
+        evt.Should().NotBeNull();
+
+        var entrySlot = evt!.Slots.OfType<EventEntryListSlot>().Single();
+        entrySlot.Entries.Should().ContainSingle(e => e.Name == "Submit");
+        entrySlot.Entries[0].IsInitial.Should().BeFalse();
+        entrySlot.Entries[0].Args.Should().BeEmpty();
     }
 
     // ════════════════════════════════════════════════════════════════════════════

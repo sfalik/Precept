@@ -36,6 +36,12 @@ public readonly record struct StateEntrySyntax(string Name, ImmutableArray<Modif
 public sealed record StateEntryListSlot(ImmutableArray<StateEntrySyntax> Entries, SourceSpan Span)
     : SlotValue(ConstructSlotKind.StateEntryList, Span);
 
+public readonly record struct EventEntrySyntax(string Name, ImmutableArray<ArgumentSyntax> Args, bool IsInitial, SourceSpan NameSpan);
+
+/// <summary>Comma-separated (name [(args)] [initial])* entries for event declarations.</summary>
+public sealed record EventEntryListSlot(ImmutableArray<EventEntrySyntax> Entries, SourceSpan Span)
+    : SlotValue(ConstructSlotKind.EventEntryList, Span);
+
 public readonly record struct ArgumentSyntax(
     string Name,
     ParsedTypeReference Type,

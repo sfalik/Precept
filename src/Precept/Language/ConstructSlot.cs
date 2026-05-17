@@ -25,6 +25,7 @@ public enum ConstructSlotKind
     InitialMarker     = 17, // optional "initial" keyword on event declarations
     RejectClause      = 18, // "reject "message"" refusal outcome
     SuccessOutcome    = 19, // success transition target (transition State | no transition)
+    EventEntryList    = 20, // comma-separated (name [(args)] [initial])* pairs for event declarations
 }
 
 /// <summary>

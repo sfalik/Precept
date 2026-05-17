@@ -2449,7 +2449,11 @@ internal static class RichHoverFactory
 
         foreach (var evt in compilation.Semantics.Events)
         {
-            var args = evt.Syntax.GetSlot<ArgumentListSlot>(ConstructSlotKind.ArgumentList)?.Args ?? ImmutableArray<ArgumentSyntax>.Empty;
+            var entryList = evt.Syntax.GetSlot<EventEntryListSlot>(ConstructSlotKind.EventEntryList);
+            ImmutableArray<ArgumentSyntax> args = ImmutableArray<ArgumentSyntax>.Empty;
+            if (entryList is not null)
+                foreach (var entry in entryList.Entries)
+                    if (entry.Name == evt.Name) { args = entry.Args; break; }
             for (var index = 0; index < args.Length && index < evt.Args.Length; index++)
             {
                 if (TryFindQualifierAt(args[index].Type, evt.Args[index].ResolvedType, evt.Args[index].DeclaredQualifiers, evt.Args[index].Name, false, compilation, position, out info))

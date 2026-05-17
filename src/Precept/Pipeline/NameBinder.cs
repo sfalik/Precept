@@ -143,19 +143,14 @@ public static class NameBinder
 
         private void CollectEvent(ParsedConstruct construct)
         {
-            var idSlot = construct.GetSlot<IdentifierListSlot>(ConstructSlotKind.IdentifierList);
-            var argSlot = construct.GetSlot<ArgumentListSlot>(ConstructSlotKind.ArgumentList);
-            var initialSlot = construct.GetSlot<InitialMarkerSlot>(ConstructSlotKind.InitialMarker);
+            var entrySlot = construct.GetSlot<EventEntryListSlot>(ConstructSlotKind.EventEntryList);
+            if (entrySlot is null) return;
 
-            if (idSlot is null) return;
-
-            bool isInitial = initialSlot?.IsPresent ?? false;
-            var argEntries = argSlot?.Args ?? ImmutableArray<ArgumentSyntax>.Empty;
-
-            for (var i = 0; i < idSlot.Names.Length; i++)
+            foreach (var entry in entrySlot.Entries)
             {
-                var eventName = idSlot.Names[i];
-                var nameSpan = idSlot.NameSpans.Length > i ? idSlot.NameSpans[i] : idSlot.Span;
+                var eventName = entry.Name;
+                var nameSpan = entry.NameSpan;
+
                 if (_eventsByName.ContainsKey(eventName))
                 {
                     _diagnostics.Add(Diagnostics.Create(
@@ -165,9 +160,9 @@ public static class NameBinder
                     continue;
                 }
 
-                // Build DeclaredArg array from argument tuples
-                var argsBuilder = ImmutableArray.CreateBuilder<DeclaredArg>(argEntries.Length);
-                foreach (var argEntry in argEntries)
+                // Build DeclaredArg array from per-entry argument list
+                var argsBuilder = ImmutableArray.CreateBuilder<DeclaredArg>(entry.Args.Length);
+                foreach (var argEntry in entry.Args)
                 {
                     argsBuilder.Add(new DeclaredArg(
                         Name: argEntry.Name,
@@ -181,7 +176,7 @@ public static class NameBinder
                 var evt = new DeclaredEvent(
                     Name: eventName,
                     Args: argsBuilder.ToImmutable(),
-                    IsInitial: isInitial,
+                    IsInitial: entry.IsInitial,
                     Syntax: construct,
                     NameSpan: nameSpan);
 

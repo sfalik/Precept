@@ -76,6 +76,11 @@ internal static class OutlineSymbolProjector
             return string.Join(", ", states.Entries.Select(static entry => entry.Name));
         }
 
+        if (construct.Slots.OfType<EventEntryListSlot>().FirstOrDefault() is { Entries.Length: > 0 } events)
+        {
+            return string.Join(", ", events.Entries.Select(static entry => entry.Name));
+        }
+
         return construct.Meta.Name;
     }
 
