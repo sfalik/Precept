@@ -52,6 +52,22 @@ public static partial class ProofEngine
         if (initialState is null)
             return ImmutableArray<InitialStateSatisfiabilityResult>.Empty;
 
+        // Collect StateResident ensures for initial state
+        var initialEnsures = semantics.EnsuresByState.TryGetValue(initialState.Name, out var ensures)
+            ? ensures.Where(e => e.Kind == ConstraintKind.StateResident).ToList()
+            : new List<TypedEnsure>();
+
+        if (HasConstructionHandler(semantics))
+        {
+            return
+            [
+                new InitialStateSatisfiabilityResult(
+                    initialState.Name,
+                    true,
+                    ImmutableArray<UnsatisfiedConstraint>.Empty)
+            ];
+        }
+
         // Build default value environment
         var defaults = new Dictionary<string, object?>(StringComparer.Ordinal);
         var unfoldable = new HashSet<string>(StringComparer.Ordinal);
@@ -86,11 +102,6 @@ public static partial class ProofEngine
                 defaults[field.Name] = GetTypeDefault(field.ResolvedType, unfoldable, field.Name);
         }
 
-        // Collect StateResident ensures for initial state
-        var initialEnsures = semantics.EnsuresByState.TryGetValue(initialState.Name, out var ensures)
-            ? ensures.Where(e => e.Kind == ConstraintKind.StateResident).ToList()
-            : new List<TypedEnsure>();
-
         var violations = new List<UnsatisfiedConstraint>();
 
         for (int i = 0; i < initialEnsures.Count; i++)
@@ -116,6 +127,24 @@ public static partial class ProofEngine
                 violations.Count == 0,
                 violations.ToImmutableArray())
         ];
+    }
+
+    private static bool HasConstructionHandler(SemanticIndex semantics)
+    {
+        foreach (var handler in semantics.EventHandlers)
+        {
+            if (handler.IsConstruction)
+                return true;
+
+            if (!string.IsNullOrWhiteSpace(handler.EventName)
+                && semantics.EventsByName.TryGetValue(handler.EventName, out var resolvedEvent)
+                && resolvedEvent.IsInitial)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static object? GetTypeDefault(TypeKind type, HashSet<string> unfoldable, string fieldName)

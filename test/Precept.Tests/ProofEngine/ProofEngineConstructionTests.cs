@@ -1,5 +1,6 @@
 using System.Linq;
 using FluentAssertions;
+using Precept;
 using Precept.Language;
 using Precept.Pipeline;
 using Precept.Tests.TypeChecker;
@@ -167,5 +168,40 @@ public class ProofEngineConstructionTests
         ledger.Diagnostics.Should().NotContain(
             d => d.Code == nameof(DiagnosticCode.DivisionByZero),
             "the guard fully proves the divisor constraint; no division-by-zero diagnostic should appear");
+    }
+
+    [Fact]
+    public void ProofEngine_ConstructionRow_ExemptsInitialStateSatisfiabilityFromDefaults()
+    {
+        var result = Compiler.Compile("""
+            precept ParcelLocker
+            field RecipientName as string optional
+            state AwaitingPickup initial terminal
+            in AwaitingPickup ensure RecipientName is set because "Loaded lockers must identify the recipient"
+            event LoadParcel(Recipient as string notempty) initial
+            on LoadParcel -> set RecipientName = LoadParcel.Recipient
+            """);
+
+        result.Diagnostics.Should().BeEmpty(
+            because: "construction rows populate the entity before the initial state can be evaluated against defaults");
+        result.Proof.InitialStateResults.Should().ContainSingle();
+        result.Proof.InitialStateResults.Single().IsSatisfiable.Should().BeTrue(
+            because: "Pattern A precepts are satisfiable by construction rather than by default-value folding");
+    }
+
+    [Fact]
+    public void ProofEngine_NoConstructionRow_StillChecksInitialStateDefaults()
+    {
+        var result = Compiler.Compile("""
+            precept ParcelLocker
+            field RecipientName as string optional
+            state AwaitingPickup initial terminal
+            in AwaitingPickup ensure RecipientName is set because "Loaded lockers must identify the recipient"
+            """);
+
+        result.Diagnostics.Should().ContainSingle(d => d.Code == nameof(DiagnosticCode.UnsatisfiableInitialState));
+        result.Proof.InitialStateResults.Should().ContainSingle();
+        result.Proof.InitialStateResults.Single().IsSatisfiable.Should().BeFalse(
+            because: "without a construction row the entity can inhabit the initial state with default values");
     }
 }

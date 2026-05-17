@@ -25,6 +25,12 @@
 - Commit `0c3018a1` updated SyntaxReference wording, added the `omit`, `entry ensures`, and construction-row self-read guidance entries, and accurately recorded the then-open compiler-gap notes.
 - Coordinator marked the compiler-gap and tooling slices done, then launched `george-8` and `george-9` to remove temporary gap notes now that the compiler fix exists.
 
+### 2026-05-17T09:00:00Z — Slice E closes PRE0115 construction-row false positives
+
+- `ProofEngine.Analysis.CheckInitialStateSatisfiability(...)` now short-circuits to a satisfiable result when the precept has a construction handler, with event metadata kept as the fallback source of truth for construction status.
+- Added proof regressions for the Pattern A lane (unguarded initial-state ensure + construction row stays clean) and the Pattern B lane (no construction row still emits PRE0115).
+- Validation closed green at `dotnet build src\Precept\Precept.csproj --nologo`, focused `ProofEngineConstructionTests|F5TempVerify`, and full `dotnet test test\Precept.Tests\ --no-build --nologo` (`5798/5798`).
+
 ## Learnings
 
 - A cached semantic flag like `TypedEventRow.IsConstruction` is a convenience, not the only truth; downstream validation should re-derive from event metadata when the language guarantee depends on it.
