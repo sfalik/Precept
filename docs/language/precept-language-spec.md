@@ -1918,6 +1918,17 @@ Construction rows are NOT transition rows. Key distinctions:
 
 The type checker classifies a row as a construction row when `resolvedEvent.IsInitial` is true. This is a semantic classification — the parser produces the same `EventRow` construct for both construction rows and stateless event handlers.
 
+#### Construction Idioms
+
+Precept has two first-class construction idioms. The choice is domain-driven: whether the entity has meaningful governed existence before the data that makes it fully identified or ready for activation is available.
+
+| Idiom | Shape | Appropriate when | Example |
+|-------|-------|------------------|---------|
+| **Constructor with existential fields** | Declare `event Create(...) initial` and populate birth-time data through `on Create` construction rows. | The entity cannot meaningfully exist without specific values at birth. Those values are existential requirements, not later enrichment. | `LoanApplication` is a natural fit when applicant identity and requested amount are constitutive at intake. |
+| **Free construction + governed draft state** | Omit an initial event, let parameterless `Create()` materialize the initial draft state, allow progressive enrichment through `editable` declarations, and enforce readiness on a later activation event such as `Publish` or `Submit`. | The domain has a real draft or pending phase in which data is accumulated progressively before activation. | `inventory-item.precept`, where `Unlisted` is initial and `Publish` is the activation gate. |
+
+Pattern B is not an ungoverned loophole. The entity is governed from birth by the same type constraints, rules, and state-scoped ensures that apply to its initial state; what changes is that the required truth is lifecycle-appropriate to a draft. Pattern B therefore requires birth-time-absent fields to be optional or defaulted, while Pattern A uses the initial event to make existential intake requirements structural.
+
 #### Construction semantics
 
 The `initial` modifier on an event designates it as the construction event. The runtime's `Create(args)` operation fires this event atomically as part of entity creation:

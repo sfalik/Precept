@@ -61,6 +61,7 @@
 
 ## Learnings
 
+- When a spec section already explains mechanics but the language supports multiple valid domain idioms, the spec must name those idioms explicitly and give a selection rubric. For construction, the durable pair is **Constructor with existential fields** versus **Free construction + governed draft state**; the distinction is existential-at-birth data versus lifecycle-appropriate progressive enrichment.
 - When a typed-constant domain has a validation data source (like NodaTime TZDB) but no completion handler, the fix is always CompletionHandler dispatch — never a catalog or SlotVocabulary change. The slot infrastructure correctly doesn't model typed-constant content domains.
 - Test quality for catalog-backed completions should always assert a count threshold that distinguishes "full catalog" from "hardcoded examples" — `BeGreaterThan(100)` against a ~590-entry catalog is the right shape.
 - The dot trigger is a separate dispatch path from Ctrl+Space expression completions — both must be checked independently. A passing Ctrl+Space test does NOT prove the trigger-character path works. Always test trigger-character paths with the `GetCompletionsAsync(source, triggerChar)` overload.
