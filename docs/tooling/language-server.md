@@ -355,7 +355,7 @@ If the type checker fails (compilation has errors), Pass 2 is skipped. The edito
 
 Completions are **catalog-driven** — the LS identifies the cursor context (slot kind), then queries the appropriate catalog for valid suggestions. There is no hardcoded completion list in LS code.
 
-Typed-constant completions also reuse declaration qualifier metadata from the type catalogs and content validators. That lets quote-trigger, space-trigger, and invoked completion requests prefill fixed currency/unit slots and dimension-filter unit vocabularies for `money`, `quantity`, `price`, and `exchangerate` without maintaining LS-local qualifier lists.
+Typed-constant completions also reuse declaration qualifier metadata from the type catalogs and content validators. That lets quote-trigger, space-trigger, and invoked completion requests prefill fixed currency/unit slots and dimension-filter unit vocabularies for `money`, `quantity`, `price`, and `exchangerate` without maintaining LS-local qualifier lists. When the cursor is already inside a typed-constant slot fragment, the returned completion items carry insert/replace edits so accepting a suggestion replaces the active fragment instead of inserting at the cursor.
 
 #### Step 1: Identify Cursor Context (SlotContext)
 

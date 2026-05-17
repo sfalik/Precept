@@ -11,6 +11,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using Precept.Language;
 using Precept.Pipeline;
+using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace Precept.LanguageServer.Handlers;
 
@@ -94,6 +95,12 @@ internal sealed class CompletionHandler : ICompletionHandler
                     TypeKind.Quantity => GetQuantitySlotItems(tcCtx, textBefore, phase),
                     _ => Enumerable.Empty<CompletionItem>(),
                 };
+
+                if (TryGetTypedConstantInsertReplaceRanges(compilation.Tokens.Tokens, position, tcCtx.ExpectedType, out var slotInsertRange, out var slotReplaceRange))
+                {
+                    slotItems = ApplyTypedConstantInsertReplaceEdits(slotItems, slotInsertRange, slotReplaceRange);
+                }
+
                 return CreateCompletionList(slotItems);
             }
 
@@ -125,7 +132,14 @@ internal sealed class CompletionHandler : ICompletionHandler
             if (!TryGetTypedConstantContext(compilation, position, slotPosition, out var zdtTcCtx)
                 || zdtTcCtx.ExpectedType != TypeKind.ZonedDateTime)
                 return new CompletionList([], false);
-            return CreateCompletionList(GetZonedDateTimeBracketTimezoneItems(string.Empty, appendClosingBracket: true));
+
+            var bracketItems = GetZonedDateTimeBracketTimezoneItems(string.Empty, appendClosingBracket: true);
+            if (TryGetTypedConstantInsertReplaceRanges(compilation.Tokens.Tokens, position, zdtTcCtx.ExpectedType, out var bracketInsertRange, out var bracketReplaceRange))
+            {
+                bracketItems = ApplyTypedConstantInsertReplaceEdits(bracketItems, bracketInsertRange, bracketReplaceRange);
+            }
+
+            return CreateCompletionList(bracketItems);
         }
 
         // Dot trigger: always attempt member access completions.
@@ -1028,27 +1042,129 @@ internal sealed class CompletionHandler : ICompletionHandler
             tcContext = TypedConstantContext.FromType(declaredType);
         }
 
-        var items = tcContext.ExpectedType switch
+        var applyInsertReplaceEdit = false;
+        IEnumerable<CompletionItem> items;
+
+        switch (tcContext.ExpectedType)
         {
-            TypeKind.Boolean => GetBooleanLiteralItems(tcContext),
-            TypeKind.Duration or TypeKind.Period => GetTemporalLiteralItems(compilation, tcContext, position),
-            TypeKind.Money => GetMoneyLiteralItems(compilation, tcContext, position),
-            TypeKind.Price => GetPriceLiteralItems(compilation, tcContext, position),
-            TypeKind.ExchangeRate => GetExchangeRateLiteralItems(compilation, tcContext, position),
-            TypeKind.Date or TypeKind.Time or TypeKind.Instant or TypeKind.DateTime => GetTemporalDateTimeSnippetItems(compilation, tcContext),
-            TypeKind.ZonedDateTime => TryGetZonedDateTimeBracketPartial(compilation.Tokens.Tokens, position, out var bracketPartial, out var hasClosingBracket)
-                ? GetZonedDateTimeBracketTimezoneItems(bracketPartial, appendClosingBracket: !hasClosingBracket)
-                : GetTemporalDateTimeSnippetItems(compilation, tcContext),
-            TypeKind.Timezone => GetTimezoneItems(compilation, tcContext),
-            TypeKind.Currency => GetCurrencyCodeItems(tcContext),
-            TypeKind.UnitOfMeasure => GetUnitOfMeasureItems(tcContext),
-            TypeKind.Dimension => GetDimensionItems(tcContext),
-            TypeKind.Quantity => GetQuantityLiteralItems(compilation, tcContext, position),
-            _ => GetFreeFormItems(compilation, tcContext),
-        };
+            case TypeKind.Boolean:
+                items = GetBooleanLiteralItems(tcContext);
+                break;
+
+            case TypeKind.Duration:
+            case TypeKind.Period:
+                if (TryGetTypedConstantSlotPhase(compilation.Tokens.Tokens, position, out var temporalPhase, out var temporalTextBefore)
+                    && temporalPhase != TypedConstantPhase.Empty)
+                {
+                    items = GetTemporalSlotItems(tcContext, temporalTextBefore, temporalPhase);
+                    applyInsertReplaceEdit = true;
+                    break;
+                }
+
+                items = GetTemporalLiteralItems(compilation, tcContext, position);
+                break;
+
+            case TypeKind.Money:
+                if (TryGetTypedConstantSlotPhase(compilation.Tokens.Tokens, position, out var moneyPhase, out var moneyTextBefore)
+                    && moneyPhase != TypedConstantPhase.Empty)
+                {
+                    items = GetMoneySlotItems(tcContext, moneyTextBefore, moneyPhase);
+                    applyInsertReplaceEdit = true;
+                    break;
+                }
+
+                items = GetMoneyLiteralItems(compilation, tcContext, position);
+                break;
+
+            case TypeKind.Price:
+                if (TryGetTypedConstantSlotPhase(compilation.Tokens.Tokens, position, out var pricePhase, out var priceTextBefore)
+                    && pricePhase != TypedConstantPhase.Empty)
+                {
+                    items = GetPriceSlotItems(tcContext, priceTextBefore, pricePhase);
+                    applyInsertReplaceEdit = true;
+                    break;
+                }
+
+                items = GetPriceLiteralItems(compilation, tcContext, position);
+                break;
+
+            case TypeKind.ExchangeRate:
+                if (TryGetTypedConstantSlotPhase(compilation.Tokens.Tokens, position, out var exchangeRatePhase, out var exchangeRateTextBefore)
+                    && exchangeRatePhase != TypedConstantPhase.Empty)
+                {
+                    items = GetExchangeRateSlotItems(tcContext, exchangeRateTextBefore, exchangeRatePhase);
+                    applyInsertReplaceEdit = true;
+                    break;
+                }
+
+                items = GetExchangeRateLiteralItems(compilation, tcContext, position);
+                break;
+
+            case TypeKind.Date:
+            case TypeKind.Time:
+            case TypeKind.Instant:
+            case TypeKind.DateTime:
+                items = GetTemporalDateTimeSnippetItems(compilation, tcContext);
+                break;
+
+            case TypeKind.ZonedDateTime:
+                if (TryGetZonedDateTimeBracketPartial(compilation.Tokens.Tokens, position, out var bracketPartial, out var hasClosingBracket))
+                {
+                    items = GetZonedDateTimeBracketTimezoneItems(bracketPartial, appendClosingBracket: !hasClosingBracket);
+                    applyInsertReplaceEdit = true;
+                    break;
+                }
+
+                items = GetTemporalDateTimeSnippetItems(compilation, tcContext);
+                break;
+
+            case TypeKind.Timezone:
+                items = GetTimezoneItems(compilation, tcContext);
+                applyInsertReplaceEdit = true;
+                break;
+
+            case TypeKind.Currency:
+                items = GetCurrencyCodeItems(tcContext);
+                applyInsertReplaceEdit = true;
+                break;
+
+            case TypeKind.UnitOfMeasure:
+                items = GetUnitOfMeasureItems(tcContext);
+                applyInsertReplaceEdit = true;
+                break;
+
+            case TypeKind.Dimension:
+                items = GetDimensionItems(tcContext);
+                applyInsertReplaceEdit = true;
+                break;
+
+            case TypeKind.Quantity:
+                if (TryGetTypedConstantSlotPhase(compilation.Tokens.Tokens, position, out var quantityPhase, out var quantityTextBefore)
+                    && quantityPhase != TypedConstantPhase.Empty)
+                {
+                    items = GetQuantitySlotItems(tcContext, quantityTextBefore, quantityPhase);
+                    applyInsertReplaceEdit = true;
+                    break;
+                }
+
+                items = GetQuantityLiteralItems(compilation, tcContext, position);
+                break;
+
+            default:
+                items = GetFreeFormItems(compilation, tcContext);
+                break;
+        }
 
         if (appendClosingQuote)
+        {
             items = items.Select(item => AppendToInsertText(item, "'"));
+        }
+
+        if (applyInsertReplaceEdit
+            && TryGetTypedConstantInsertReplaceRanges(compilation.Tokens.Tokens, position, tcContext.ExpectedType, out var insertRange, out var replaceRange))
+        {
+            items = ApplyTypedConstantInsertReplaceEdits(items, insertRange, replaceRange);
+        }
 
         return items;
     }
@@ -1647,6 +1763,183 @@ internal sealed class CompletionHandler : ICompletionHandler
                 insertText: insertText);
         });
     }
+
+    private static IEnumerable<CompletionItem> ApplyTypedConstantInsertReplaceEdits(
+        IEnumerable<CompletionItem> items,
+        LspRange insertRange,
+        LspRange replaceRange)
+    {
+        return items.Select(item => new CompletionItem
+        {
+            Label = item.Label,
+            LabelDetails = item.LabelDetails,
+            Kind = item.Kind,
+            Tags = item.Tags,
+            Detail = item.Detail,
+            Documentation = item.Documentation,
+            Deprecated = item.Deprecated,
+            Preselect = item.Preselect,
+            SortText = item.SortText,
+            FilterText = item.FilterText,
+            InsertText = item.InsertText,
+            InsertTextFormat = item.InsertTextFormat,
+            InsertTextMode = item.InsertTextMode,
+            TextEdit = new TextEditOrInsertReplaceEdit(new InsertReplaceEdit
+            {
+                NewText = item.InsertText ?? item.Label,
+                Insert = insertRange,
+                Replace = replaceRange,
+            }),
+            TextEditText = item.TextEditText,
+            AdditionalTextEdits = item.AdditionalTextEdits,
+            CommitCharacters = item.CommitCharacters,
+            Command = item.Command,
+            Data = item.Data,
+        });
+    }
+
+    private static bool TryGetTypedConstantInsertReplaceRanges(
+        ImmutableArray<Token> tokens,
+        Position position,
+        TypeKind expectedType,
+        out LspRange insertRange,
+        out LspRange replaceRange)
+    {
+        insertRange = default!;
+        replaceRange = default!;
+
+        if (!TryGetTypedConstantTokenContext(tokens, position, out var token, out var cursorContentOffset)
+            || !TryGetTypedConstantReplaceOffsets(token.Text, cursorContentOffset, expectedType, out var replaceStartOffset, out var replaceEndOffset))
+        {
+            return false;
+        }
+
+        insertRange = CreateTypedConstantRange(token.Span, replaceStartOffset, cursorContentOffset);
+        replaceRange = CreateTypedConstantRange(token.Span, replaceStartOffset, replaceEndOffset);
+        return true;
+    }
+
+    private static bool TryGetTypedConstantTokenContext(
+        ImmutableArray<Token> tokens,
+        Position position,
+        out Token token,
+        out int cursorContentOffset)
+    {
+        token = default;
+        cursorContentOffset = 0;
+
+        var tokenIndex = FindTokenAtOrBeforeCursor(tokens, position);
+        if (tokenIndex < 0)
+        {
+            return false;
+        }
+
+        token = tokens[tokenIndex];
+        if (!IsTypedConstantToken(token.Kind) || !Contains(token.Span, position))
+        {
+            token = default;
+            return false;
+        }
+
+        cursorContentOffset = Math.Clamp(
+            position.Character - token.Span.StartColumn,
+            0,
+            token.Text.Length);
+        return true;
+    }
+
+    private static bool TryGetTypedConstantReplaceOffsets(
+        string text,
+        int cursorContentOffset,
+        TypeKind expectedType,
+        out int replaceStartOffset,
+        out int replaceEndOffset)
+    {
+        switch (expectedType)
+        {
+            case TypeKind.ZonedDateTime:
+                return TryGetBracketTimezoneReplaceOffsets(text, cursorContentOffset, out replaceStartOffset, out replaceEndOffset);
+
+            case TypeKind.Duration:
+            case TypeKind.Period:
+                return TryGetDelimitedReplaceOffsets(text, cursorContentOffset, static ch => char.IsWhiteSpace(ch) || ch == '+', out replaceStartOffset, out replaceEndOffset);
+
+            case TypeKind.Money:
+            case TypeKind.Quantity:
+                return TryGetDelimitedReplaceOffsets(text, cursorContentOffset, static ch => char.IsWhiteSpace(ch), out replaceStartOffset, out replaceEndOffset);
+
+            case TypeKind.Price:
+            case TypeKind.ExchangeRate:
+                return TryGetDelimitedReplaceOffsets(text, cursorContentOffset, static ch => char.IsWhiteSpace(ch) || ch == '/', out replaceStartOffset, out replaceEndOffset);
+
+            case TypeKind.Timezone:
+            case TypeKind.Currency:
+            case TypeKind.UnitOfMeasure:
+            case TypeKind.Dimension:
+                replaceStartOffset = 0;
+                replaceEndOffset = text.Length;
+                return true;
+
+            default:
+                replaceStartOffset = 0;
+                replaceEndOffset = 0;
+                return false;
+        }
+    }
+
+    private static bool TryGetBracketTimezoneReplaceOffsets(
+        string text,
+        int cursorContentOffset,
+        out int replaceStartOffset,
+        out int replaceEndOffset)
+    {
+        var textBeforeCursor = text[..cursorContentOffset];
+        var openBracketIndex = textBeforeCursor.LastIndexOf('[');
+        if (openBracketIndex < 0 || textBeforeCursor.IndexOf(']', openBracketIndex + 1) >= 0)
+        {
+            replaceStartOffset = 0;
+            replaceEndOffset = 0;
+            return false;
+        }
+
+        replaceStartOffset = openBracketIndex + 1;
+        replaceEndOffset = text.IndexOf(']', replaceStartOffset);
+        if (replaceEndOffset < 0)
+        {
+            replaceEndOffset = text.Length;
+        }
+
+        return true;
+    }
+
+    private static bool TryGetDelimitedReplaceOffsets(
+        string text,
+        int cursorContentOffset,
+        Func<char, bool> isDelimiter,
+        out int replaceStartOffset,
+        out int replaceEndOffset)
+    {
+        replaceStartOffset = cursorContentOffset;
+        while (replaceStartOffset > 0 && !isDelimiter(text[replaceStartOffset - 1]))
+        {
+            replaceStartOffset--;
+        }
+
+        replaceEndOffset = cursorContentOffset;
+        while (replaceEndOffset < text.Length && !isDelimiter(text[replaceEndOffset]))
+        {
+            replaceEndOffset++;
+        }
+
+        return true;
+    }
+
+    private static LspRange CreateTypedConstantRange(SourceSpan span, int startOffset, int endOffset) =>
+        new()
+        {
+            Start = new Position(span.StartLine - 1, span.StartColumn + startOffset),
+            End = new Position(span.StartLine - 1, span.StartColumn + endOffset),
+        };
 
     private static IEnumerable<CompletionItem> GetCurrencyCodeItems(TypedConstantContext tcContext)
     {

@@ -18,6 +18,13 @@
 
 ## Recent Updates
 
+### 2026-05-17T18:08:58-04:00 — Typed-constant completion replace ranges repaired
+
+- Confirmed the root cause: typed-constant slot items only carried `InsertText`, so VS Code inserted at the cursor instead of replacing an in-progress slot fragment when completion was invoked inside existing text.
+- Added insert/replace edits to typed-constant slot completions in `CompletionHandler.cs` for timezone, currency, UCUM unit, and dimension lanes, covering both invoked and trigger-character routing while leaving snippet/example lanes unchanged.
+- Added 7 regression tests that assert `InsertReplaceEdit` ranges for zoneddatetime bracket timezones, money/price/exchangerate currency slots, quantity/price unit slots, and dimension slots.
+- Validation moved from 404 passing language-server tests at baseline to 411 passing after the fix; full repo validation also held at 6548 passing tests and a green `dotnet build`.
+
 ### 2026-05-17T12:46:26Z — Initial modifier tooling follow-through recorded
 
 - Commit `2373d8c7` aligned grammar generation and language-server behavior with declaration-level `initial` semantics, including regenerated TextMate output, completion routing after event arg lists, updated modifier hover text, and semantic-token stability.

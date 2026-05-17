@@ -2238,6 +2238,60 @@ public class CompletionHandlerTests
             string.Equals(item.Label, label, StringComparison.Ordinal)
             && string.Equals(item.Detail, detail, StringComparison.Ordinal));
 
+    private static void AssertInsertReplaceEdit(
+        CompletionItem item,
+        string expectedNewText,
+        Position expectedInsertStart,
+        Position expectedInsertEnd,
+        Position expectedReplaceEnd)
+    {
+        var edit = GetInsertReplaceEdit(item);
+
+        edit.NewText.Should().Be(expectedNewText);
+        edit.Insert.Start.Should().BeEquivalentTo(expectedInsertStart);
+        edit.Insert.End.Should().BeEquivalentTo(expectedInsertEnd);
+        edit.Replace.Start.Should().BeEquivalentTo(expectedInsertStart);
+        edit.Replace.End.Should().BeEquivalentTo(expectedReplaceEnd);
+    }
+
+    private static InsertReplaceEdit GetInsertReplaceEdit(CompletionItem item)
+    {
+        item.TextEdit.Should().NotBeNull();
+        item.TextEdit.IsInsertReplaceEdit.Should().BeTrue();
+        item.TextEdit.InsertReplaceEdit.Should().NotBeNull();
+        return item.TextEdit.InsertReplaceEdit!;
+    }
+
+    private static Position GetPositionInSource(string source, string needle, int offset = 0)
+    {
+        var index = source.IndexOf(needle, StringComparison.Ordinal);
+        index.Should().BeGreaterThanOrEqualTo(0, $"source must contain '{needle}'");
+        return GetPositionFromOffset(source, index + offset);
+    }
+
+    private static Position GetPositionFromOffset(string source, int offset)
+    {
+        offset.Should().BeGreaterThanOrEqualTo(0);
+        offset.Should().BeLessThanOrEqualTo(source.Length);
+
+        var line = 0;
+        var character = 0;
+        for (var index = 0; index < offset; index++)
+        {
+            if (source[index] == '\n')
+            {
+                line++;
+                character = 0;
+            }
+            else if (source[index] != '\r')
+            {
+                character++;
+            }
+        }
+
+        return new Position(line, character);
+    }
+
     private static CompletionItem AppendToInsertText(CompletionItem item, string suffix)
     {
         var method = typeof(CompletionHandler).GetMethod("AppendToInsertText", BindingFlags.NonPublic | BindingFlags.Static);
@@ -2826,6 +2880,155 @@ public class CompletionHandlerTests
         labels.Should().Contain("zoned date-time — explicit zone", "ZDT snippet must appear when cursor is outside the bracket");
         labels.Should().NotContain("America/New_York", "raw timezone IDs must not appear outside the bracket");
     }
+
+    [Fact]
+    public async Task Completions_ZonedDateTimeConstant_InsideBracket_InvokedItemsCarryInsertReplaceEdit()
+    {
+        var sourceWithCursor = """
+            precept EventLog
+            field MeetingAt as zoneddatetime default '2026-05-16T14:30:00[America/to¦r]'
+            state Open initial terminal
+            """;
+
+        var completions = await GetCompletionsAsync(sourceWithCursor);
+        var item = completions.Items.Single(i => i.Label == "America/Toronto");
+        var source = sourceWithCursor.Replace(CursorMarker, string.Empty, StringComparison.Ordinal);
+        var cursor = GetCursorPosition(sourceWithCursor);
+
+        AssertInsertReplaceEdit(
+            item,
+            expectedNewText: "America/Toronto]",
+            expectedInsertStart: GetPositionInSource(source, "America/tor"),
+            expectedInsertEnd: cursor,
+            expectedReplaceEnd: GetPositionInSource(source, "America/tor", "America/tor".Length));
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_MoneySlot_TriggerCharacterItemsCarryInsertReplaceEdit()
+    {
+        var sourceWithCursor = """
+            precept PaymentTest
+            field Cost as money default '100 U¦SD'
+            """;
+
+        var completions = await GetCompletionsAsync(sourceWithCursor, " ");
+        var item = completions.Items.Single(i => i.Label == "USD");
+        var source = sourceWithCursor.Replace(CursorMarker, string.Empty, StringComparison.Ordinal);
+        var cursor = GetCursorPosition(sourceWithCursor);
+
+        AssertInsertReplaceEdit(
+            item,
+            expectedNewText: "USD",
+            expectedInsertStart: GetPositionInSource(source, "USD"),
+            expectedInsertEnd: cursor,
+            expectedReplaceEnd: GetPositionInSource(source, "USD", "USD".Length));
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_PriceCurrencySlot_InvokedItemsCarryInsertReplaceEdit()
+    {
+        var sourceWithCursor = """
+            precept PricingTest
+            field UnitPrice as price default '100 U¦SD/kg'
+            """;
+
+        var completions = await GetCompletionsAsync(sourceWithCursor);
+        var item = completions.Items.Single(i => i.Label == "USD");
+        var source = sourceWithCursor.Replace(CursorMarker, string.Empty, StringComparison.Ordinal);
+        var cursor = GetCursorPosition(sourceWithCursor);
+
+        AssertInsertReplaceEdit(
+            item,
+            expectedNewText: "USD",
+            expectedInsertStart: GetPositionInSource(source, "USD/kg"),
+            expectedInsertEnd: cursor,
+            expectedReplaceEnd: GetPositionInSource(source, "USD/kg", "USD".Length));
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_ExchangeRateCurrencySlot_InvokedItemsCarryInsertReplaceEdit()
+    {
+        var sourceWithCursor = """
+            precept PricingTest
+            field Fx as exchangerate default '1.08 U¦SD/EUR'
+            """;
+
+        var completions = await GetCompletionsAsync(sourceWithCursor);
+        var item = completions.Items.Single(i => i.Label == "USD");
+        var source = sourceWithCursor.Replace(CursorMarker, string.Empty, StringComparison.Ordinal);
+        var cursor = GetCursorPosition(sourceWithCursor);
+
+        AssertInsertReplaceEdit(
+            item,
+            expectedNewText: "USD",
+            expectedInsertStart: GetPositionInSource(source, "USD/EUR"),
+            expectedInsertEnd: cursor,
+            expectedReplaceEnd: GetPositionInSource(source, "USD/EUR", "USD".Length));
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_QuantityUnitSlot_InvokedItemsCarryInsertReplaceEdit()
+    {
+        var sourceWithCursor = """
+            precept MeasurementTest
+            field Weight as quantity default '5 k¦g'
+            """;
+
+        var completions = await GetCompletionsAsync(sourceWithCursor);
+        var item = completions.Items.Single(i => i.Label == "kg");
+        var source = sourceWithCursor.Replace(CursorMarker, string.Empty, StringComparison.Ordinal);
+        var cursor = GetCursorPosition(sourceWithCursor);
+
+        AssertInsertReplaceEdit(
+            item,
+            expectedNewText: "kg",
+            expectedInsertStart: GetPositionInSource(source, "kg"),
+            expectedInsertEnd: cursor,
+            expectedReplaceEnd: GetPositionInSource(source, "kg", "kg".Length));
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_PriceUnitSlot_InvokedItemsCarryInsertReplaceEdit()
+    {
+        var sourceWithCursor = """
+            precept PricingTest
+            field UnitPrice as price default '100 USD/k¦g'
+            """;
+
+        var completions = await GetCompletionsAsync(sourceWithCursor);
+        var item = completions.Items.Single(i => i.Label == "kg");
+        var source = sourceWithCursor.Replace(CursorMarker, string.Empty, StringComparison.Ordinal);
+        var cursor = GetCursorPosition(sourceWithCursor);
+
+        AssertInsertReplaceEdit(
+            item,
+            expectedNewText: "kg",
+            expectedInsertStart: GetPositionInSource(source, "kg"),
+            expectedInsertEnd: cursor,
+            expectedReplaceEnd: GetPositionInSource(source, "kg", "kg".Length));
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_DimensionSlot_InvokedItemsCarryInsertReplaceEdit()
+    {
+        var sourceWithCursor = """
+            precept MeasurementTest
+            field Weight as quantity of 'ma¦ss'
+            """;
+
+        var completions = await GetCompletionsAsync(sourceWithCursor);
+        var item = completions.Items.Single(i => i.Label == "mass");
+        var source = sourceWithCursor.Replace(CursorMarker, string.Empty, StringComparison.Ordinal);
+        var cursor = GetCursorPosition(sourceWithCursor);
+
+        AssertInsertReplaceEdit(
+            item,
+            expectedNewText: "mass",
+            expectedInsertStart: GetPositionInSource(source, "mass"),
+            expectedInsertEnd: cursor,
+            expectedReplaceEnd: GetPositionInSource(source, "mass", "mass".Length));
+    }
+
     [Fact]
     public async Task Completions_TypedConstant_Price_Unqualified_ReturnsSnippetWithCurrencyAndUnitTabStops()
     {
