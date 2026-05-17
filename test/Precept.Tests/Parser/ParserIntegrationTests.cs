@@ -175,6 +175,23 @@ public class ParserIntegrationTests
             "trafficlight.precept must contain at least one EventDeclaration");
     }
 
+    [Fact]
+    public void TestSample_EventDeclaration_BindsInitialToCreateOnly()
+    {
+        var path = Path.Combine(SamplesRoot, "Test.precept");
+        var manifest = ParseFile(path);
+
+        manifest.Diagnostics.Should().BeEmpty("Test.precept should parse cleanly with the single-line event declaration restored");
+
+        var evt = manifest.Constructs.Single(c => c.Meta.Kind == ConstructKind.EventDeclaration);
+        var entrySlot = evt.Slots.OfType<EventEntryListSlot>().Single();
+
+        entrySlot.Entries.Select(entry => entry.Name).Should().Equal("create", "start", "stop", "reset");
+        entrySlot.Entries[0].IsInitial.Should().BeTrue();
+        entrySlot.Entries.Skip(1).Should().OnlyContain(entry => !entry.IsInitial,
+            "only the leading event in the comma-separated declaration should be marked initial");
+    }
+
     // ═══════════════════════════════════════════════════════════════════════════
     //  §6 — Diagnostic-only parse (no crash on malformed input)
     // ═══════════════════════════════════════════════════════════════════════════

@@ -694,8 +694,8 @@ public class ParserDirectConstructTests
     [Fact]
     public void Parser_EventDeclaration_InitialWithMultiple_ParsedCorrectly()
     {
-        // R5: "event create initial, start, stop" — initial applies only to first entry
-        var tokens = Lexer.Lex("event create initial, start, stop");
+        // R5: "event create initial, start, stop, reset" — initial applies only to the preceding entry.
+        var tokens = Lexer.Lex("event create initial, start, stop, reset");
         var manifest = Precept.Pipeline.Parser.Parse(tokens);
 
         manifest.Diagnostics.Should().BeEmpty("initial modifier with multiple events must parse cleanly");
@@ -704,13 +704,15 @@ public class ParserDirectConstructTests
         evt.Should().NotBeNull();
 
         var entrySlot = evt!.Slots.OfType<EventEntryListSlot>().Single();
-        entrySlot.Entries.Should().HaveCount(3);
+        entrySlot.Entries.Should().HaveCount(4);
         entrySlot.Entries[0].Name.Should().Be("create");
         entrySlot.Entries[0].IsInitial.Should().BeTrue("'create' has the initial modifier");
         entrySlot.Entries[1].Name.Should().Be("start");
         entrySlot.Entries[1].IsInitial.Should().BeFalse("'start' has no initial modifier");
         entrySlot.Entries[2].Name.Should().Be("stop");
         entrySlot.Entries[2].IsInitial.Should().BeFalse("'stop' has no initial modifier");
+        entrySlot.Entries[3].Name.Should().Be("reset");
+        entrySlot.Entries[3].IsInitial.Should().BeFalse("'reset' has no initial modifier");
     }
 
     [Fact]

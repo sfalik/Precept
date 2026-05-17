@@ -42,3 +42,9 @@
 - A cached semantic flag like `TypedEventRow.IsConstruction` is a convenience, not the only truth; downstream validation should re-derive from event metadata when the language guarantee depends on it.
 - Non-associative operator metadata still needs a parser recovery branch if the goal is a precise user-facing diagnostic instead of a later type error.
 - Structural guarantees that already exist in the language surface should be enforced as early as possible; defer only what truly requires later semantic knowledge.
+
+### 2026-05-17T18:12:43Z — Event declaration regression closeout
+
+- Verified the parser/source build accepts `event create initial, start, stop, reset` as four event entries with `initial` bound only to `create`; the remaining repo drift was the sample/test workaround rather than a fresh parser delta in `Parser.cs`.
+- Kept `samples\Test.precept` on the canonical single-line declaration, strengthened parser regression coverage to the exact four-event form, and added a sample-level parser assertion so the restored syntax stays locked.
+- Re-enabled `samples\Test.precept` in `F5TempVerify` so the temporary full-sample compiler sweep now exercises this case instead of silently excluding it.

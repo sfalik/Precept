@@ -12,8 +12,7 @@ field test5 as price default '12 CAD/[lb_av]'
 field test6 as quantity of 'mass' default '12 [oz_av]'
 
 state off initial, running
-event create initial
-event start, stop, reset
+event create initial, start, stop, reset
 
 on create
     -> set counter = 0
