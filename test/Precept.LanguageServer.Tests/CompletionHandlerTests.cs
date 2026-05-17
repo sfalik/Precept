@@ -2761,6 +2761,102 @@ public class CompletionHandlerTests
         labels.Should().Contain("zoned date-time — explicit zone", "ZDT snippet must appear when cursor is outside the bracket");
         labels.Should().NotContain("America/New_York", "raw timezone IDs must not appear outside the bracket");
     }
+    [Fact]
+    public async Task Completions_TypedConstant_Price_Unqualified_ReturnsSnippetWithCurrencyAndUnitTabStops()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept PricingTest
+            field UnitPrice as price default ¦
+            """, "'");
+
+        var item = completions.Items.Single(i => i.Label == "price — amount + currency/unit");
+
+        completions.IsIncomplete.Should().BeFalse();
+        item.InsertTextFormat.Should().Be(InsertTextFormat.Snippet);
+        item.InsertText.Should().Contain("${1:", "must have an amount tab stop");
+        item.InsertText.Should().Contain("${2:", "must have a currency tab stop");
+        item.InsertText.Should().Contain("${3:", "must have a unit tab stop");
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_Price_CompoundQualifier_PrefillsBothCurrencyAndUnit()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept PricingTest
+            field ListPrice as price in 'USD/each' default ¦
+            """, "'");
+
+        var item = completions.Items.Single(i => i.Label == "price — USD/each");
+
+        completions.IsIncomplete.Should().BeFalse();
+        item.InsertTextFormat.Should().Be(InsertTextFormat.Snippet);
+        item.InsertText.Should().Contain("USD/each", "both currency and unit must be prefilled");
+        item.InsertText.Should().NotContain("${2:", "no second tab stop — both currency and unit are fixed");
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_Price_CompoundQualified_NoGenericTemplate()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept PricingTest
+            field ListPrice as price in 'EUR/kg' default ¦
+            """, "'");
+
+        var labels = completions.Items.Select(i => i.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().NotContain("price — amount + currency/unit",
+            "when qualifier is fixed, generic template must not appear");
+        labels.Should().Contain("price — EUR/kg");
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_Price_NamedField_MoneyType_ReturnsMoneySnippets()
+    {
+        // Regression: a money-typed field with a price-related name must still dispatch to
+        // money completions (TypeKind.Money), never to price-type snippets (TypeKind.Price).
+        var completions = await GetCompletionsAsync("""
+            precept PaymentTest
+            field PriceAmount as money in 'USD' default ¦
+            """, "'");
+
+        var labels = completions.Items.Select(i => i.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain("money — USD", "USD money snippet must appear for money-typed field");
+        labels.Should().NotContain("price — amount + currency/unit",
+            "price-type snippets must not appear for a money-typed field");
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_Price_SpaceTrigger_CompoundQualified_ShowsBoundCode()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept PricingTest
+            field ListPrice as price in 'USD/each' default '10.00 ¦'
+            """, " ");
+
+        var labels = completions.Items.Select(i => i.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain("USD/each", "bound qualifier code must be offered after amount+space");
+        labels.Should().HaveCount(1, "only the bound price code is offered when qualifier is set");
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_Price_SpaceTrigger_Unqualified_ShowsExampleCodes()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept PricingTest
+            field ListPrice as price default '10.00 ¦'
+            """, " ");
+
+        var labels = completions.Items.Select(i => i.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().NotBeEmpty("price code examples must be offered when no qualifier is set");
+        labels.Should().AllSatisfy(l => l.Should().Contain("/", "each price code must be in currency/unit format"));
+    }
 }
 
 internal static class LanguageClientTestExtensions

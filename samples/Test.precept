@@ -5,8 +5,10 @@ field events as log of string
 field test as timezone default 'America/Toronto'
 field test2 as instant default '2026-05-16T14:30:00Z'
 field test25 as zoneddatetime default '2026-05-16T14:30:00[America/Toronto]'
-field test3 as quantity default '25 km/h'
+field test3 as quantity in 'km/h' default '25 km/h'
 field test4 as unitofmeasure default test3.unit
+field unitPrice as price in 'USD/each' default '0.00 USD/each'
+field test5 as price default '4.17 USD/lb-av'
 
 state off initial, running
 event create initial, start, stop, reset
