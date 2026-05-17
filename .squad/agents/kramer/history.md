@@ -98,3 +98,11 @@
 - **Condition 2 (column-zero guard test):** The `position.Character == 0` early return was already present in the guard at the top of the `"{"` trigger branch. Added `Completions_BraceTrigger_AtColumnZero_ReturnsEmpty` to lock the boundary — cursor at column 0 of any line, `{` trigger, expects empty list with no exception.
 - Total LS tests: 362 passing.
 
+### 2026-05-16T22:39:47-04:00 — Multi-event declaration parity fix (commit `013e08b7`)
+
+- **Root cause:** `EventDeclaration` used a flat `[IdentifierList, ArgumentList, InitialMarker]` slot triple. `ParseIdentifierList` stops at any non-identifier token, so `initial` (a keyword, not an identifier) terminated the name list. The remaining `, start, stop, reset` was silently dropped.
+- **Fix:** Introduced `EventEntryList` (ConstructSlotKind = 20), a compound slot mirroring `StateEntryList`. Each `EventEntrySyntax` entry carries its own name, `Args` list, and `IsInitial` flag. Parser method `ParseEventEntryList` loops `identifier → optional '(' args ')' → optional 'initial' → comma continues`.
+- **Per-entry initial:** `initial` is per-entry, not global. `event create initial, start` marks only `create` as initial.
+- **Updated consumers:** NameBinder.CollectEvent, RichHoverFactory.TryFindQualifierAt (iterates entries by evt.Name), SlotPositionResolver.IsExpressionPhase (EventEntryList case for default-value detection), OutlineSymbolProjector.ExtractName.
+- **Tests:** 15 existing tests updated; 3 new tests added (MultipleEventsOnOneLine, InitialWithMultiple, SingleEvent_Regression). Total: 5784 Precept.Tests, 365 LS.Tests, 46 Mcp.Tests — all passing.
+
