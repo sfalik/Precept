@@ -141,3 +141,7 @@
 - Regression coverage now locks the multi-state constructor pattern, the SyntaxReference constructor snippet, transition-row writes to computed fields, and chained-comparison parser behavior.
 - Targeted compiler-gap regressions are green; full `test\Precept.Tests` still stops on the pre-existing `F5TempVerify` `UnsatisfiableInitialState` cases for `parcel-locker-pickup.precept` and `clinic-appointment-scheduling.precept`.
 
+## Learnings
+
+- Slice 8b cleanup is safer when event-handler normalization drops the dead `ConstructionRow` success-path lane and reject detection keys off the emitted reject slot; the construction/non-construction split belongs to the bound event's `IsInitial` metadata, not parser-kind branching.
+

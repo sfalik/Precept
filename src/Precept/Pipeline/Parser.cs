@@ -277,7 +277,7 @@ public static partial class Parser
         }
 
         /// <summary>
-        /// After primary disambiguation resolves to ConstructionRow or TransitionRow,
+        /// After primary disambiguation resolves to EventRow or TransitionRow,
         /// performs secondary lookahead to detect reject-variant forms by finding
         /// the first Arrow token and checking if the next token is Reject.
         /// </summary>

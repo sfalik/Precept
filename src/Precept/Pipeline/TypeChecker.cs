@@ -1133,7 +1133,7 @@ internal static partial class TypeChecker
     /// <summary>Normalize an event handler construct into a <see cref="TypedEventRow"/>.</summary>
     private static TypedEventRow NormalizeEventHandler(ParsedConstruct construct, CheckContext ctx)
     {
-        bool isReject = construct.Meta.Kind == ConstructKind.ConstructionRowReject;
+        bool isReject = construct.GetSlot<RejectClauseSlot>(ConstructSlotKind.RejectClause) is not null;
 
         // —— Event resolution ——
         var eventTargetSlot = construct.GetRequiredSlot<EventTargetSlot>(ConstructSlotKind.EventTarget);

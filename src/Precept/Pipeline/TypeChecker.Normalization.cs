@@ -44,9 +44,10 @@ internal static partial class TypeChecker
     /// <summary>
     /// Iterate all <see cref="ConstructKind.EventRow"/> and <see cref="ConstructKind.ConstructionRowReject"/>
     /// constructs from the manifest, resolve each to a <see cref="TypedEventRow"/>, and accumulate into
-    /// <see cref="CheckContext.EventHandlers"/>. <see cref="ConstructKind.ConstructionRow"/> is no longer
-    /// produced by the parser (Slice 8b: all on-rows parse as EventRow; construction classification happens
-    /// via resolvedEvent.IsInitial in NormalizeEventHandler).
+    /// <see cref="CheckContext.EventHandlers"/>. Slice 8b removed parser production of
+    /// <see cref="ConstructKind.ConstructionRow"/> — success-path construction rows now arrive as
+    /// <see cref="ConstructKind.EventRow"/> and are classified semantically via the bound event's
+    /// <c>IsInitial</c> flag in <c>NormalizeEventHandler</c>.
     /// Records <see cref="EventReference"/> sites for LS navigation.
     /// </summary>
     private static void PopulateEventHandlers(ConstructManifest manifest, CheckContext ctx)
@@ -55,15 +56,6 @@ internal static partial class TypeChecker
         {
             var handler = NormalizeEventHandler(construct, ctx);
             ctx.EventHandlers.Add(handler);
-        }
-
-        if (manifest.ByKind.Contains(ConstructKind.ConstructionRow))
-        {
-            foreach (var construct in manifest.ByKind[ConstructKind.ConstructionRow])
-            {
-                var handler = NormalizeEventHandler(construct, ctx);
-                ctx.EventHandlers.Add(handler);
-            }
         }
 
         if (manifest.ByKind.Contains(ConstructKind.ConstructionRowReject))
