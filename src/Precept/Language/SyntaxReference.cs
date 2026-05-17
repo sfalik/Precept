@@ -208,6 +208,77 @@ public static class SyntaxReference
             """),
 
         new(
+            "Constructor Pattern (Existential Fields)",
+            "Use an initial event as the entity's constructor when specific fields must exist at birth. Declare 'event Create(...) initial', validate its inputs with event ensures, and populate required fields in 'on Create' construction rows. Choose this when the entity cannot meaningfully exist without intake data; for entities that can exist in a governed draft state, see Free-Construction Pattern (Governed Draft).",
+            """
+            precept LoanApplication
+
+            field ApplicantName as string
+            field RequestedAmount as money in 'USD'
+            field CreditScore as integer
+            field DecisionNote as string optional
+
+            state Pending initial
+            state UnderReview
+            state Approved terminal
+            state Declined terminal
+
+            event Create(Applicant as string notempty, Amount as money in 'USD', Score as integer) initial
+            on Create ensure Create.Amount > '0.00 USD' because "Loan amount must be positive"
+            on Create ensure Create.Score >= 300 because "Minimum credit score is 300"
+
+            on Create
+                -> set ApplicantName = Create.Applicant
+                -> set RequestedAmount = Create.Amount
+                -> set CreditScore = Create.Score
+
+            event Review
+            event Approve
+            event Decline(Note as string notempty)
+
+            from Pending on Review
+                -> transition UnderReview
+            from UnderReview on Approve
+                -> transition Approved
+            from UnderReview on Decline
+                -> set DecisionNote = Decline.Note
+                -> transition Declined
+            """),
+
+        new(
+            "Free-Construction Pattern (Governed Draft)",
+            "Use free construction when the entity should be governed from birth but can begin life as an incomplete draft. Leave the initial event undeclared so Create() is parameterless, start in an initial draft state, open selected fields with 'editable', and enforce readiness on a later activation transition. Choose this when data is enriched progressively; for entities that require fields at birth, see Constructor Pattern (Existential Fields).",
+            """
+            precept InventoryItem
+
+            field Sku as string optional
+            field Description as string optional
+            field ListPrice as money in 'USD' optional
+
+            state Unlisted initial
+            state Listed
+            state Delisted terminal
+
+            # No initial event is declared, so Create() is parameterless and always succeeds.
+            in Unlisted modify Sku, Description, ListPrice editable
+            in Listed ensure Sku is set because "A listed item must have a SKU"
+            in Listed ensure ListPrice is set because "A listed item must have a list price"
+
+            event Publish(Sku as string notempty, Desc as string optional, Price as money in 'USD')
+            on Publish ensure Publish.Price > '0.00 USD' because "Published items must have a positive list price"
+
+            event Delist
+
+            from Unlisted on Publish
+                -> set Sku = Publish.Sku
+                -> set Description = if Publish.Desc is set then Publish.Desc else Publish.Sku
+                -> set ListPrice = Publish.Price
+                -> transition Listed
+            from Listed on Delist
+                -> transition Delisted
+            """),
+
+        new(
             "Ensures invariant",
             "Using 'ensures' at the field level (rule) and state level (in State ensure) to enforce invariants that the runtime checks before and after every operation.",
             """

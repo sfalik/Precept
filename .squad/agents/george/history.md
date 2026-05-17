@@ -112,6 +112,8 @@
 - Typed-constant validator codes can safely promote to `DiagnosticCode` only when the declared qualifiers are concrete; interpolated qualifier text must keep the generic catalog fallback to avoid false `DimensionCategoryMismatch` emissions.
 - Slice 5 field-state work must keep the stateless initial-event handler lane (`event Start initial` + `on Start -> ...`) in the same construction-chain helper as stateful construction rows, or D94/D142/D144 regress immediately.
 - New emitted diagnostics still need a `Precept.Analyzers` Gate 2 allow-list entry even when the real coverage lives in `test/Precept.Tests/`; PRECEPT0028 cannot see cross-project test references.
+- `SyntaxReference.CommonPatterns` only carries `Name`, `Description`, and `DslSnippet`, so AI-facing "when to choose this" guidance for `precept_patterns` has to live in the description text rather than a separate metadata field.
+- Construction-pattern snippets need to show the post-Slice-8b split explicitly: constructor intake is `event Create(...) initial` plus `on Create` rows, while governed-draft construction is the no-initial-event path with an initial draft state, `editable` enrichment, and a later activation transition.
 
 ### 2026-05-16T13:08:43Z — Constructor semantics downstream closeout recorded
 
