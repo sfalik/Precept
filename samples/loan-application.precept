@@ -1,5 +1,6 @@
 precept LoanApplication
 
+# Pattern A showcase: Submit is the constructor, so the application arrives in UnderReview fully formed.
 # This sample keeps underwriting rules in the workflow itself instead of spreading them across services.
 # The approval guard combines document verification, credit policy, and affordability checks.
 # Money types enforce same-currency arithmetic and carry currency semantics throughout.
@@ -17,8 +18,7 @@ field DocumentsVerified as boolean default false
 rule ApprovedAmount <= RequestedAmount because "Approved amount {ApprovedAmount} exceeds the submitted request of {RequestedAmount}"
 rule ExistingDebt <= AnnualIncome * 3.0 when DocumentsVerified because "Debt {ExistingDebt} exceeds the 3x income ceiling — maximum is {AnnualIncome * 3.0}"
 
-state Draft initial
-state UnderReview
+state UnderReview initial
 state Approved
 state Funded terminal
 state Declined terminal
@@ -34,7 +34,7 @@ event Submit(
     Amount as money in 'USD',
     Score as integer,
     Income as money in 'USD',
-    Debt as money in 'USD')
+    Debt as money in 'USD') initial
 on Submit ensure Submit.Amount > '0.00 USD' because "Loan requests must be positive"
 on Submit ensure Submit.Score >= 0 because "Credit score cannot be negative"
 on Submit ensure Submit.Income >= '0.00 USD' because "Income cannot be negative"
@@ -47,13 +47,12 @@ on Approve ensure Approve.Amount > '0.00 USD' because "Approved amounts must be 
 event Decline(Note as string notempty)
 event FundLoan
 
-from Draft on Submit
+on Submit
     -> set ApplicantName = Submit.Applicant
     -> set RequestedAmount = Submit.Amount
     -> set CreditScore = Submit.Score
     -> set AnnualIncome = Submit.Income
     -> set ExistingDebt = Submit.Debt
-    -> transition UnderReview
 
 from UnderReview on VerifyDocuments
     -> set DocumentsVerified = true

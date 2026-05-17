@@ -120,4 +120,6 @@
 - Scribe recorded George's Slice 8b completion (commit `c72db9b0`) as the semantic cutover that made `initial` declaration-only and construction rows uniformly `on <Event> -> ...`.
 - Kramer finished the downstream language-server and grammar work at `ec5525d2` and `e19736f6`, Newman finished the MCP `isConstruction` surface, and Frank closed docs/sample verification.
 - Durable batch outcome: construction semantics are now aligned across parser/checker, graph analysis, tooling, MCP, docs, and the canonical sample.
+- When a sample's initial state has no editable surface and the first event atomically supplies all identity data, the sample should be modeled as Pattern A instead of preserving a hollow draft shell.
+- Pattern A sample conversions should move the first real working state to `initial` and use an `event ... initial` plus `on <Event>` construction row with no `from` prefix.
 
