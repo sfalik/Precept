@@ -1676,9 +1676,11 @@ Type errors: applying a set operation to a non-set field, a queue operation to a
 
 #### Stateless/stateful cross-validation
 
-A precept that contains both `EventHandlerDeclaration` nodes (`on Event -> actions`) and any `state` declarations is an error. In a stateful precept, event handlers are redundant with `from any on Event -> no transition` followed by rules. Mixing the two creates ambiguity about execution order.
+A precept that contains both `EventHandlerDeclaration` nodes (`on Event -> actions`) and any `state` declarations is an error (`PRE0092`). In a stateful precept, event handlers are redundant with `from any on Event -> no transition` followed by rules. Mixing the two creates ambiguity about execution order.
 
 This restriction is deliberate. `from any on Event -> no transition` already expresses the state-agnostic handling case in a stateful precept, so a bare handler would add only redundant surface. Allowing both forms would also invite pseudo-lifecycle designs where field mutation bypasses explicit state topology and weakens the lifecycle guarantee.
+
+**Construction row exemption:** Construction rows (`on <InitialEvent>`) share the `EventHandlerDeclaration` parse form but are exempt from `PRE0092`. The type checker identifies them as construction rows (via `resolvedEvent.IsInitial`) before the stateless-handler rule fires. A construction row in a stateful precept is correct — the entity does not yet exist in any state, so the `from`-less form is semantically honest rather than a stateless-handler violation.
 
 A stateless precept (no states, no `from`, no transitions) that uses only event hooks is valid.
 
@@ -1997,7 +1999,9 @@ This is not merely a tooling convenience. It is a language-level guarantee that 
 
 > **Status:** Implemented.
 
-Precept's proof system is the compile-time layer that prevents invalid qualifier and safety configurations from entering an accepted definition. Conceptually it runs in two passes: it first instantiates proof obligations from typed expressions and actions, then discharges those obligations from literals, declaration metadata, guards, simple flow facts, and qualifier compatibility. It also checks initial-state satisfiability against default values. See [`docs/compiler/proof-engine.md`](../compiler/proof-engine.md) for implementation detail and §7 there for qualifier-resolution mechanics.
+Precept's proof system is the compile-time layer that prevents invalid qualifier and safety configurations from entering an accepted definition. Conceptually it runs in two passes: it first instantiates proof obligations from typed expressions and actions, then discharges those obligations from literals, declaration metadata, guards, simple flow facts, and qualifier compatibility. It also checks initial-state satisfiability against default values (`PRE0115`). See [`docs/compiler/proof-engine.md`](../compiler/proof-engine.md) for implementation detail and §7 there for qualifier-resolution mechanics.
+
+**Construction exemption for initial-state satisfiability (`PRE0115`):** When a precept declares an initial event with at least one construction row (`IsConstruction == true`), the proof engine skips the default-value satisfiability check for the initial state. The rationale: an entity with a construction event never inhabits the initial state with only default values — the construction row's action chain establishes field values before any constraint is evaluated. Checking defaults against ensures would be a false positive for Pattern A precepts with unguarded ensures on the initial state.
 
 For authors, a **proved** qualifier constraint means the compiler established the required fact for every accepted execution reaching the proof site: the expression can rely on that qualifier relation at runtime without an additional author-supplied guard. The proof system is intentionally conservative. If the compiler cannot prove the required fact, the program is rejected with a diagnostic rather than accepted on a guess.
 
