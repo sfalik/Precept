@@ -1,7 +1,7 @@
 precept ParcelLockerPickup
 
-# This sample models a single locker bay from loading through pickup or return.
-# It introduces a stack-based reminder log and a few realistic timed guards.
+# Pattern A showcase: LoadParcel is the constructor — a locker pickup cannot exist without
+# a recipient and code. Introduces a stack-based reminder log and realistic timed guards.
 
 field LockerId as string optional
 field RecipientName as string optional
@@ -12,8 +12,7 @@ field LastReminderDay as number default 0 nonnegative
 field LastReminderNote as string optional
 field ReminderLog as stack of string
 
-state Empty initial
-state AwaitingPickup
+state AwaitingPickup initial
 state PickedUp terminal
 state Returned terminal
 
@@ -26,7 +25,7 @@ to Returned -> clear ReminderLog
 event LoadParcel(
     Locker as string notempty,
     Recipient as string notempty,
-    Code as string notempty)
+    Code as string notempty) initial
 event SendReminder(Note as string notempty)
 event PickUp(Code as string notempty)
 event AdvanceDay(DayNumber as number)
@@ -34,15 +33,14 @@ on AdvanceDay ensure AdvanceDay.DayNumber >= 0 because "Days cannot be negative"
 
 event ReturnParcel
 
-from Empty on LoadParcel
+on LoadParcel
     -> set LockerId = LoadParcel.Locker
     -> set RecipientName = LoadParcel.Recipient
     -> set PickupCode = LoadParcel.Code
     -> set ReminderCount = 0
     -> set LastReminderDay = CurrentDay
-    -> transition AwaitingPickup
 
-from AwaitingPickup on SendReminder when CurrentDay - LastReminderDay >= 1 
+from AwaitingPickup on SendReminder when CurrentDay - LastReminderDay >= 1
     -> push ReminderLog SendReminder.Note
     -> set ReminderCount = ReminderCount + 1
     -> set LastReminderDay = CurrentDay

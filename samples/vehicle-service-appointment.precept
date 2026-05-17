@@ -1,7 +1,8 @@
 precept VehicleServiceAppointment
 
-# A service advisor checks a vehicle in, recommends work, and waits for approval.
-# The request uses a set of recommended services so advisors can add and remove items safely.
+# Pattern B: Scheduled is a genuine enrichment phase — the customer books a slot and fills
+# in vehicle details before arriving. The advisor assigns themselves at check-in.
+# Uses a set of recommended services so advisors can add and remove items safely.
 
 field CustomerName as string optional
 field VehiclePlate as string optional
@@ -18,6 +19,7 @@ state InService
 state ReadyForPickup
 state Closed terminal
 
+in Scheduled modify CustomerName, VehiclePlate editable
 in CheckedIn modify AdvisorName editable
 in ReadyForPickup ensure PickupContacted because "Customers must be notified before pickup"
 
@@ -26,7 +28,7 @@ from AwaitingApproval ensure RecommendedServices.count > 0 because "Approval can
 
 to ReadyForPickup -> set PickupContacted = true
 
-event CheckIn(Customer as string notempty, Plate as string notempty, Advisor as string notempty)
+event CheckIn(Advisor as string notempty)
 event RecommendService(ServiceName as string notempty)
 event RemoveServiceRecommendation(ServiceName as string notempty)
 event ApproveEstimate(ApprovedCount as number, EstimateTotal as number)
@@ -36,11 +38,11 @@ on ApproveEstimate ensure ApproveEstimate.EstimateTotal >= 0 because "Estimate t
 event FinishService
 event PickUpVehicle
 
-from Scheduled on CheckIn
-    -> set CustomerName = CheckIn.Customer
-    -> set VehiclePlate = CheckIn.Plate
+from Scheduled on CheckIn when CustomerName is set and VehiclePlate is set
     -> set AdvisorName = CheckIn.Advisor
     -> transition CheckedIn
+from Scheduled on CheckIn
+    -> reject "Customer name and vehicle plate are required before check-in"
 
 from CheckedIn on RecommendService
     -> add RecommendedServices RecommendService.ServiceName

@@ -1,7 +1,7 @@
 precept RefundRequest
 
-# A customer refund request with a straightforward review and fulfillment path.
-# The example highlights optional fields, guarded approvals, and a return step.
+# Pattern B: Draft is a genuine enrichment phase — the customer fills in order details,
+# reason, and amount progressively before submitting. Highlights guarded approvals and a return step.
 
 field OrderId as string optional
 field CustomerEmail as string optional
@@ -18,16 +18,14 @@ state AwaitingReturn
 state Refunded terminal
 state Declined terminal
 
+in Draft modify OrderId, CustomerEmail, ReasonText, RequestedAmount editable
+
 in Submitted modify ReasonText editable
 in AwaitingReturn ensure ApprovedAmount > 0 because "A waiting return must already have an approved amount"
 in Refunded ensure ReturnReceived because "A refunded request must have the item marked as returned"
 
-event Submit(
-    OrderNumber as string notempty,
-    Email as string notempty,
-    Amount as number,
-    Reason as string notempty)
-on Submit ensure Submit.Amount > 0 because "The refund amount must be positive"
+event Submit
+on Submit ensure RequestedAmount > 0 because "The refund amount must be positive"
 
 event Approve(Amount as number, Note as string optional)
 on Approve ensure Approve.Amount > 0 because "The approved amount must be positive"
@@ -36,12 +34,10 @@ event Decline(Note as string notempty)
 event MarkReturnReceived
 event Cancel(Reason as string optional)
 
-from Draft on Submit
-    -> set OrderId = Submit.OrderNumber
-    -> set CustomerEmail = Submit.Email
-    -> set RequestedAmount = Submit.Amount
-    -> set ReasonText = Submit.Reason
+from Draft on Submit when OrderId is set and CustomerEmail is set and ReasonText is set
     -> transition Submitted
+from Draft on Submit
+    -> reject "Order ID, customer email, and reason are all required before submission"
 
 from Submitted on Approve when Approve.Amount <= RequestedAmount
     -> set ApprovedAmount = Approve.Amount

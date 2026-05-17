@@ -1,7 +1,8 @@
 precept WarrantyRepairRequest
 
-# A warranty repair captures the intake decision, the repair work itself, and the return process.
-# The repair step log uses a stack so the last entered step can be reversed cleanly.
+# Pattern B: Draft is a genuine enrichment phase — the customer fills in product details
+# progressively before submitting. The repair step log uses a stack so the last entered
+# step can be reversed cleanly.
 
 field CustomerName as string optional
 field ProductName as string optional
@@ -20,12 +21,14 @@ state ReadyToReturn
 state Closed terminal
 state Denied terminal
 
+in Draft modify CustomerName, ProductName, SerialNumber editable
+
 in ReadyToReturn ensure RepairComplete because "Ready-to-return cases must have finished repair work"
 in Closed ensure ShippingLabelSent because "Closed cases must have a return label on record"
 
 to ReadyToReturn -> set ShippingLabelSent = true
 
-event Submit(Customer as string notempty, Product as string notempty, Serial as string notempty)
+event Submit
 event Approve(Note as string optional)
 event Deny(Note as string notempty)
 event StartRepair
@@ -34,11 +37,10 @@ event UndoLastStep
 event FinishRepair
 event ConfirmReturn
 
-from Draft on Submit
-    -> set CustomerName = Submit.Customer
-    -> set ProductName = Submit.Product
-    -> set SerialNumber = Submit.Serial
+from Draft on Submit when CustomerName is set and ProductName is set and SerialNumber is set
     -> transition Submitted
+from Draft on Submit
+    -> reject "Customer name, product name, and serial number are all required before submission"
 
 from Submitted on Approve
     -> set ApprovalNote = Approve.Note

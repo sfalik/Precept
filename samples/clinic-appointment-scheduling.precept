@@ -1,8 +1,8 @@
 precept ClinicAppointmentScheduling
 
-# Appointment slots are kept intentionally simple: a day number and minute-of-day.
-# Demonstrates: integer + nonnegative modifiers on event args, notempty on a required
-# field, conditional actions (if/then/else), and the 15-minute boundary rule.
+# Pattern A showcase: Schedule is the constructor — an appointment cannot exist without
+# a patient and time slot. Demonstrates integer + nonnegative modifiers on event args,
+# notempty on a required field, conditional actions (if/then/else), and the 15-minute boundary rule.
 
 field PatientName as string optional
 field ScheduledDay as integer default 0 nonnegative
@@ -13,8 +13,7 @@ field CheckInNote as string optional
 field VisitCompleted as boolean default false
 field CancellationReason as string optional
 
-state Draft initial
-state Scheduled
+state Scheduled initial
 state CheckedIn
 state Completed terminal
 state Cancelled terminal
@@ -25,7 +24,7 @@ in Completed ensure VisitCompleted because "Completed visits must be marked comp
 
 to Scheduled -> set ConfirmationCode = "CONFIRMED" -> set ReminderSent = false
 
-event Schedule(Name as string notempty, DayNumber as integer nonnegative, MinuteOfDay as integer nonnegative)
+event Schedule(Name as string notempty, DayNumber as integer nonnegative, MinuteOfDay as integer nonnegative) initial
 on Schedule ensure Schedule.MinuteOfDay % 15 == 0 because "Appointments must start on a 15-minute boundary"
 
 event Reschedule(DayNumber as integer nonnegative, MinuteOfDay as integer nonnegative)
@@ -36,11 +35,11 @@ event CheckIn(Note as string optional)
 event CompleteVisit
 event Cancel(Reason as string optional)
 
-from Draft on Schedule
+on Schedule
     -> set PatientName = Schedule.Name
     -> set ScheduledDay = Schedule.DayNumber
     -> set ScheduledMinute = Schedule.MinuteOfDay
-    -> transition Scheduled
+    -> set ConfirmationCode = "CONFIRMED"
 
 from Scheduled on Reschedule
     -> set ScheduledDay = Reschedule.DayNumber
