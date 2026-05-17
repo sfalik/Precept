@@ -44,7 +44,7 @@ internal sealed class CompletionHandler : ICompletionHandler
         new()
         {
             DocumentSelector = TextDocumentSelector.ForPattern("**/*.precept"),
-            TriggerCharacters = new Container<string>(" ", "'", ".", ">", "~"),
+            TriggerCharacters = new Container<string>(" ", "'", ".", ">", "~", "{"),
             ResolveProvider = false,
         };
 
@@ -96,6 +96,20 @@ internal sealed class CompletionHandler : ICompletionHandler
             }
 
             return new CompletionList([], false);
+        }
+
+        // Brace trigger inside a typed constant: show interpolation hole completions.
+        // { is a common character — the span guard is mandatory to prevent it from firing outside
+        // typed-constant spans (guard expressions, state bodies, struct positions, etc.).
+        // Guard: check the { character itself (one column back) because the cursor position after
+        // typing { lands at the exclusive end of the TypedConstantStart span, which Contains()
+        // treats as outside. Stepping back one column lands on the { itself, which IS contained.
+        if (triggerCharacter == "{")
+        {
+            if (position.Character == 0 ||
+                !IsInsideTypedConstantToken(compilation.Tokens.Tokens, position with { Character = position.Character - 1 }))
+                return new CompletionList([], false);
+            return CreateCompletionList(GetBraceInterpolationItems(compilation, position));
         }
 
         // Dot trigger: always attempt member access completions.
@@ -3209,6 +3223,41 @@ internal sealed class CompletionHandler : ICompletionHandler
             .Select(field => CreateItem(field.Name, "Field", CompletionItemKind.Field, CompletionSortGroup.SemanticSymbol));
 
         return argItems.Concat(fieldItems);
+    }
+
+    // ── Brace-trigger interpolation items ─────────────────────────────────────
+
+    /// <summary>
+    /// Returns completion items for the <c>{</c> trigger inside a typed-constant span.
+    /// Each item represents an in-scope symbol (event arg or field) that can be referenced
+    /// as an interpolation hole. The insert text closes the hole: <c>FieldName}</c> (since
+    /// the opening <c>{</c> is already in the document).
+    /// </summary>
+    private static IEnumerable<CompletionItem> GetBraceInterpolationItems(Compilation compilation, Position position)
+    {
+        var eventName = CursorSemanticResolver.GetCurrentEventName(compilation, position);
+        if (eventName is not null && compilation.Semantics.EventsByName.TryGetValue(eventName, out var currentEvent))
+        {
+            foreach (var arg in currentEvent.Args)
+            {
+                yield return CreateItem(
+                    label: $"{{{arg.Name}}}",
+                    detail: "Event argument",
+                    kind: CompletionItemKind.Variable,
+                    sortGroup: CompletionSortGroup.SemanticArgument,
+                    snippetTemplate: $"{arg.Name}}}");
+            }
+        }
+
+        foreach (var field in compilation.Semantics.Fields)
+        {
+            yield return CreateItem(
+                label: $"{{{field.Name}}}",
+                detail: "Field",
+                kind: CompletionItemKind.Field,
+                sortGroup: CompletionSortGroup.SemanticSymbol,
+                snippetTemplate: $"{field.Name}}}");
+        }
     }
 
     private static string WithClosingQuote(string content) => content + "'";

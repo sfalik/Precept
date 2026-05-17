@@ -62,3 +62,20 @@
 - Added regression coverage in `CompletionHandlerTests` for both branches: plain-text items still append the closing quote without becoming snippets, and snippet items with `${1:...}` keep `InsertTextFormat.Snippet` after suffix append.
 - Validation: targeted `CompletionHandlerTests.Completions_TypedConstant_SingleQuoteTrigger*` passed, then full `dotnet test --nologo` passed. Slice A is unblocked.
 
+### 2026-05-16T18:59:08-04:00 — Slice A premium snippet templates landed
+
+- Added `TypedConstantSnippet = 2` sort group so snippet templates sort before plain examples/reused values (TypedConstant shifted to 3, TypedConstantSegment to 4).
+- `GetTemporalDateTimeSnippetItems` dispatches `date`/`time`/`instant`/`datetime`/`zoneddatetime` to per-type snippet helpers, then falls through to existing `GetStructuredExampleItems` so plain examples are preserved.
+- `GetTemporalBuilderSnippets` prepends `duration`/`period` builder snippets; when a `TemporalUnit` qualifier is declared, shows a unit-specific single-template instead of the full builder set.
+- `GetMoneySnippetItems`: qualifier-aware — prefills currency literal, interpolated field name, or generic `${1:0.00} ${2:USD}` based on `DeclaredQualifierMeta.Currency`.
+- `GetQuantitySnippetItems`: qualifier-aware — prefills unit literal, interpolated field name, dimension-filtered `UcumCatalog.BrowseTier1()` items when `quantity of <dimension>`, or generic `${1:0} ${2:each}`. Dimension-filtering reuses the `atom.Vector == dimAlias.Vector` pattern from `GetQuantitySlotItems`.
+- 24 new tests covering all types and sort ordering. Full test suite: 6,179 passing. Commit `365674a2`.
+- **Frank review needed:** ZDT UTC item uses `[UTC]` bracket; confirm that is valid syntax. Also confirm `quantity — amount + unit` default (`${1:0} ${2:each}`) is the right generic fallback or should be `${2:unit}`.
+
+### 2026-05-16T18:59:08-04:00 — Slice A Frank review conditions addressed
+
+- **Condition 1 (test count):** Actual new test count is 16, not 24 as stated in the task description. Count confirmed, no missing tests.
+- **Condition 2 (qualifier-aware duration/period):** `TypeKind.Duration` has no `QualifierShape` in `Types.cs`, so `duration in 'hours'` is not valid DSL — the `unitQualifier is not null` branch for Duration is unreachable via field declarations. `TypeKind.Period` does have `QualifierShape: QS_TemporalUnitOrDimension`, so `period in 'days'` works. Added two tests: one for `period in 'days'` (verifies `period — days` label and suppression of generic set) and one for `period in 'weeks'` (verifies `period — weeks` label, suppression of `period — days` and `period — years + months`).
+- **Condition 3 (SourceFieldName interpolation):** Added test for `field Cost as money in '{CatalogCurrency}'`. Verifies label is `money — CatalogCurrency currency` and InsertText contains literal `{CatalogCurrency}` brace interpolation, with no `${2:` tab stop.
+- Total LS tests: 354 passing. Commit `343a1fd3`.
+

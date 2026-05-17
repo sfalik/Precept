@@ -28,6 +28,11 @@
 - Field-state diagnostics need Problems-panel copy that names the field, the relevant state or state change, and the repair action in plain DSL terms; compiler shorthand like `omit→non-omit` is not shippable user text.
 - Diagnostic IDs should use subject-first, plain-English condition names; `MustSetOmitToNonOmit` is a naming smell because it encodes compiler shorthand instead of the user-visible failure.
 
+- Typed-constant interpolation is already real language surface, not a hypothetical. The spec allows `{expr}` inside `'...'`, the samples use it for money and quantity (`'0.00 {CatalogCurrency}'`, `'1 {StockingUnit}/{PurchaseUnit}'`), and the language server already has typed hole completions for currency/unit/magnitude/whole-value slots. The UX gap is authoring flow, not missing DSL capability.
+- Temporal typed constants are still mostly example-driven. `date`, `time`, `instant`, `datetime`, and `zoneddatetime` route through plain example completions today even though the LS already supports snippet insertion. The biggest opportunity is to replace lookup-heavy examples with template-first snippets that teach `T`, `Z`, brackets, and segment order by insertion.
+- Business-unit literals should collapse around qualifier truth. If a field is `money in 'USD'` or `quantity in '{StockingUnit}'`, the completion should prefill that suffix instead of forcing the author to reconstruct it. The premium move is qualifier-aware snippet templates plus immediate `{`-triggered interpolation help.
+- Proposed direction: template-first premium completions for `date`, `time`, `instant`, `datetime`, `zoneddatetime`, `duration`, `period`, `money`, and `quantity`; keep current slot completions as the second layer; add interpolation-bearing snippets and likely a `{` trigger as the V2 polish layer.
+
 ## Historical Summary
 
 - 2026-05-07 through early 2026-05-12 locked the current visual-system posture: `<-` for computed fields, Data-family `--field` / `--arg` expansion, typed-value tone stability, and hover-doc organization centered on rendered examples first.

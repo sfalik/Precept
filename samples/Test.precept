@@ -2,6 +2,12 @@
 
 field counter as integer
 field events as log of string
+field test as timezone default 'America/Toronto'
+field test2 as instant default '2026-12-24T12:53:10Z'
+field test3 as quantity default '2.5 mg/dL'
+field test4 as unitofmeasure default test3.unit
+
+
 
 state off initial, running
 

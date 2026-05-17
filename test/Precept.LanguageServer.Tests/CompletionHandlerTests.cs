@@ -18,12 +18,12 @@ namespace Precept.LanguageServer.Tests;
 public class CompletionHandlerTests
 {
     [Fact]
-    public void GetRegistrationOptions_AdvertisesSpaceQuoteDotArrowAndTildeTriggers()
+    public void GetRegistrationOptions_AdvertisesExpectedTriggerCharacters()
     {
         var handler = new CompletionHandler(new DocumentStore());
         var options = handler.GetRegistrationOptions(new CompletionCapability(), new ClientCapabilities());
 
-        options.TriggerCharacters.Should().BeEquivalentTo([" ", "'", ".", ">", "~"]);
+        options.TriggerCharacters.Should().BeEquivalentTo([" ", "'", ".", ">", "~", "{"]);
     }
 
     [Fact]
@@ -1992,6 +1992,149 @@ public class CompletionHandlerTests
         labels.Should().Contain("Amount", "field name must appear in expression completions");
         labels.Should().Contain("Code", "field name must appear in expression completions");
     }
+
+    // ─── Slice B — { trigger + span-guarded interpolation completions ─────────────
+
+    [Fact]
+    public async Task Completions_BraceTrigger_OutsideTypedConstant_ReturnsEmpty()
+    {
+        // { typed in a guard expression — must NOT produce typed-constant interpolation items.
+        var completions = await GetCompletionsAsync("""
+            precept BraceGuardTest
+            field Amount as decimal default 0.0
+            state Draft initial terminal
+            event Submit
+            from Draft on Submit when ¦Amount > 0
+                -> no transition
+            """, "{");
+
+        completions.Items.Should().BeEmpty("{ outside a typed-constant span must not fire interpolation completions");
+    }
+
+    [Fact]
+    public async Task Completions_BraceTrigger_InsideTypedConstant_ReturnsInScopeFields()
+    {
+        // { typed inside a typed constant — must return field interpolation items.
+        var completions = await GetCompletionsAsync("""
+            precept BraceFieldTest
+            field Cost as money default '0.00 USD'
+            field Code as currency default 'USD'
+            state Draft initial terminal
+            event Pay
+            from Draft on Pay
+                -> set Cost = '0.00 {¦'
+            """, "{");
+
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain("{Cost}", "Cost field must appear as an interpolation option");
+        labels.Should().Contain("{Code}", "Code field must appear as an interpolation option");
+    }
+
+    [Fact]
+    public async Task Completions_BraceTrigger_InsideTypedConstant_ItemsHaveSnippetFormat()
+    {
+        // All items returned by the { trigger must use InsertTextFormat.Snippet.
+        var completions = await GetCompletionsAsync("""
+            precept BraceSnippetTest
+            field Price as money default '0.00 USD'
+            field Code as currency default 'USD'
+            state Draft initial terminal
+            event Pay
+            from Draft on Pay
+                -> set Price = '0.00 {¦'
+            """, "{");
+
+        completions.Items.Should().NotBeEmpty("{ inside a typed constant should yield items");
+        completions.Items
+            .Should().AllSatisfy(item =>
+                item.InsertTextFormat.Should().Be(InsertTextFormat.Snippet,
+                    $"item '{item.Label}' must use Snippet format so the closing brace is inserted correctly"));
+    }
+
+    [Fact]
+    public async Task Completions_BraceTrigger_InsideTypedConstant_MultipleFields_AllReturned()
+    {
+        // When multiple in-scope fields exist, all should appear — enumeration must be complete.
+        var completions = await GetCompletionsAsync("""
+            precept MultiFieldTest
+            field Alpha as currency default 'USD'
+            field Beta as unitofmeasure default 'kg'
+            field Gamma as text
+            state Open initial terminal
+            event Act
+            from Open on Act
+                -> set Gamma = '¦hello {'
+            """, "{");
+
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        labels.Should().Contain("{Alpha}", "Alpha field must be in interpolation list");
+        labels.Should().Contain("{Beta}", "Beta field must be in interpolation list");
+        labels.Should().Contain("{Gamma}", "Gamma field must be in interpolation list");
+    }
+
+    [Fact]
+    public async Task Completions_BraceTrigger_InsideTypedConstant_InsertTextClosesHole()
+    {
+        // InsertText for each item must end with } so selecting the item closes the interpolation hole.
+        var completions = await GetCompletionsAsync("""
+            precept HoleCloseTest
+            field CatalogCurrency as currency default 'USD'
+            state Draft initial terminal
+            event Set
+            from Draft on Set
+                -> set CatalogCurrency = '0.00 {¦'
+            """, "{");
+
+        var item = completions.Items.Single(i => i.Label == "{CatalogCurrency}");
+
+        item.InsertText.Should().NotBeNull();
+        item.InsertText.Should().EndWith("}", "the insert text must supply the closing brace");
+        item.InsertText.Should().StartWith("CatalogCurrency", "the field name comes first, { is already in the document");
+    }
+
+    [Fact]
+    public async Task Completions_BraceTrigger_WithEventArg_ReturnsArgItem()
+    {
+        // Event args in scope must also appear as interpolation candidates.
+        var completions = await GetCompletionsAsync("""
+            precept ArgInterpolTest
+            field Total as money default '0.00 USD'
+            state Draft initial terminal
+            event Pay(PaymentCode as currency)
+            from Draft on Pay
+                -> set Total = '0.00 {¦'
+            """, "{");
+
+        var labels = completions.Items.Select(item => item.Label).ToArray();
+
+        labels.Should().Contain("{PaymentCode}", "event arg must appear as an interpolation option");
+        labels.Should().Contain("{Total}", "Total field must also appear");
+    }
+
+    // Regression: existing ' trigger tests are exercised by the full suite —
+    // verify that the typed-constant snippet-format preservation from Slice 0 still holds.
+    [Fact]
+    public void Completions_BraceTrigger_Regression_SingleQuoteTrigger_SnippetFormatPreserved()
+    {
+        var item = new CompletionItem
+        {
+            Label = "date — YYYY-MM-DD",
+            InsertText = "${1:2026}-${2:05}-${3:16}",
+            InsertTextFormat = InsertTextFormat.Snippet,
+            Detail = "date literal",
+            Kind = CompletionItemKind.Snippet,
+        };
+
+        var appended = AppendToInsertText(item, "'");
+
+        appended.InsertTextFormat.Should().Be(InsertTextFormat.Snippet,
+            "AppendToInsertText must preserve Snippet format (Slice 0 regression)");
+        appended.InsertText.Should().EndWith("'");
+    }
+
 
     private static async Task<CompletionList> GetCompletionsAsync(string source, Position position)
     {
