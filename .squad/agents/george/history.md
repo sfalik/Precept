@@ -31,6 +31,12 @@
 - Added proof regressions for the Pattern A lane (unguarded initial-state ensure + construction row stays clean) and the Pattern B lane (no construction row still emits PRE0115).
 - Validation closed green at `dotnet build src\Precept\Precept.csproj --nologo`, focused `ProofEngineConstructionTests|F5TempVerify`, and full `dotnet test test\Precept.Tests\ --no-build --nologo` (`5798/5798`).
 
+### 2026-05-17T18:06:33Z — Constructor semantics finish line recorded
+
+- Commit `6635ec95` removed row-level `initial`, keeping construction classification on event metadata and type checking.
+- Commit `e2b1c375` removed the stale PRE0092 gap notes from `SyntaxReference.cs`.
+- Commit `ce16e69b` closed Slice E by exempting construction rows from PRE0115; proof regressions and the full `Precept.Tests` suite finished green at `5798/5798`.
+
 ## Learnings
 
 - A cached semantic flag like `TypedEventRow.IsConstruction` is a convenience, not the only truth; downstream validation should re-derive from event metadata when the language guarantee depends on it.

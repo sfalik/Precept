@@ -2408,3 +2408,90 @@ Pattern: When a doc has a code block and a prose "pending" note about the same f
 - `Tokens.cs` already classifies `reject` correctly (`ValidAfter: VA_AfterArrow`, `IsMessagePosition: true`). The problem is not token identity; it is construct shape.
 - `docs/language/precept-language-spec.md` still models transition rows as `("->" ActionStatement)* "->" Outcome`, which means the grammar presently allows `mutate then reject` even though the samples already author reject as separate fallback rows.
 - Durable rule: whenever Precept offers a "do work OR reject" surface, the grammar must split it into mutation/success and reject constructs. Do not make hybrid rows writable and then clean them up with type-checker diagnostics. Mirror the split in semantic-model DU shapes.
+
+---
+
+## Archive Batch — 2026-05-17T18:06:33Z
+
+---
+
+### 2026-05-16T18:25:58Z — Timezone completions bug diagnosed
+
+- Root cause: `TypeKind.Timezone` in `GetTypedConstantItems` routes to generic `GetStructuredExampleItems`, which only yields 2 hardcoded examples (`America/New_York`, `UTC`) plus reused file values.
+- Unlike currencies/dimensions/units, timezones have no dedicated completion handler that queries the full IANA zone database (`DateTimeZoneProviders.Tzdb.Ids`).
+- The slot infrastructure (SlotPositionResolver, SlotVocabulary, trigger detection) all work correctly — this is purely a CompletionHandler dispatch gap.
+- Fix: add `GetTimezoneItems` method using `DateTimeZoneProviders.Tzdb.Ids` and route `TypeKind.Timezone` to it instead of the generic handler.
+- Assigned to Kramer (tooling). No runtime catalog change needed.
+- Diagnosis written to `.squad/decisions/inbox/frank-timezone-completions-bug.md`.
+
+---
+
+### 2026-05-16T13:08:43Z — Constructor semantics batch closed end-to-end
+
+- Frank's graph-analyzer passes locked the durable analyzer model: construction handlers live in `EventHandlers`, do not create topology edges, and require semantic handling for PRE0081 and `GraphEvent.IsInitial`.
+- George completed Slice 8b at commit `c72db9b0`, removing row-level `initial` and making construction classification metadata/type-check driven.
+- Kramer completed Slices 9+10 at commits `ec5525d2` and `e19736f6`, aligning hover and grammar generation with declaration-level `initial` semantics.
+- Newman completed Slice 11, adding `isConstruction` to the MCP compile event-handler DTO surface without duplicating core logic.
+- Frank completed Slice 12 docs/sample closeout: the language spec and constructor-semantics tracker are current, `CHANGELOG.md` records the shipped surface, and `samples/Test.precept` was locally verified while the stale MCP result was correctly treated as deployment drift.
+
+---
+
+### 2026-05-17T08:02:37Z — Constructor vs. free construction assessment
+
+- Analyzed `samples/inventory-item.precept` against Pattern A (constructor semantics) and Pattern B (parameterless + governed initial state).
+- Verdict: complementary patterns, not competitors. Pattern A for existential requirements; Pattern B for progressive-enrichment lifecycles. Neither is a gap or workaround.
+- `inventory-item.precept` correctly uses Pattern B — its domain has no existential construction requirements and legitimately needs a configuration phase.
+- Confirmed Pattern B IS governed from construction onward — global rules, type constraints, and editable declarations all enforce during `Unlisted`. The entity is never "ungoverned."
+- No language surface changes needed — §3A.5 already handles both cases cleanly.
+- Decision written to `.squad/decisions/inbox/frank-constructor-vs-free-construction.md`.
+
+---
+
+### 2026-05-17T08:29:45Z — Hollow-draft sample fixes (batch)
+
+- Fixed 6 hollow-draft anti-patterns across `samples/`.
+- Pattern A (2): `clinic-appointment-scheduling` (appointment needs patient+time at birth), `parcel-locker-pickup` (locker needs recipient+code at birth).
+- Pattern B (4): `warranty-repair-request`, `travel-reimbursement`, `refund-request`, `vehicle-service-appointment` — all have genuine progressive-enrichment phases where the initial state is meaningfully inhabited.
+- Pattern B conversions: removed event args from Submit/CheckIn, added `in Draft modify ... editable`, added activation-gate guards with fallback rejects.
+- Pattern A conversions: removed hollow initial state, promoted first real state to `initial`, added `initial` to event declaration, converted transition rows to construction rows.
+- MCP `precept_compile` is stale (PRE0092 on construction rows) — Pattern A validated against loan-application reference.
+- Final sample distribution: 3 Pattern A + 11 Pattern B = 14 healthy lifecycle samples.
+- Decision written to `.squad/decisions/inbox/frank-hollow-draft-samples.md`.
+
+---
+
+### 2026-05-17T07:49:17Z — Price and exchangerate completion spec authored
+
+- Researched `QS_CurrencyAndDimension` (price) and `QS_ExchangeRate` (exchangerate) qualifier shapes in `Types.cs`.
+- Confirmed `DeclaredQualifierMeta` subtypes: `CompoundPrice` (compound literal/field), `Currency` (currency-only literal/field), `Dimension` (dimension literal/field) for price; `FromCurrency` + `ToCurrency` (each literal or field) for exchangerate.
+- Confirmed literal formats: price = `<decimal> <ISO-4217>/<UCUM-unit>`, exchangerate = `<decimal> <from-ISO-4217>/<to-ISO-4217>`.
+- Assessed Kramer's `GetPriceSnippetItems`: structurally sound; missing the `Currency + Dimension` combination branch. `GetPriceSlotItems` missing dimension-filtered slot items.
+- Confirmed `exchangerate` had no handler at all — fell through to `GetFreeFormItems`; no slot-phase registration.
+- Confirmed `AppendToInsertText` already preserves `InsertTextFormat` (Slice 0 already shipped).
+- Added spec to `docs/Working/temporal-businessunit-completions-proposal.md`: §3.3.3, §5.1 rows, §6 rows, Q6 closed, Slices A5/A6 in §9 with full method-level logic and named test cases.
+- Decisions written to `.squad/decisions/inbox/frank-price-exchangerate-spec.md`.
+
+
+
+- Reviewed Kramer's commit `c35e6032`. Implementation follows the diagnosis exactly: `GetTimezoneItems` queries `DateTimeZoneProviders.Tzdb.Ids`, routing cleanly split from `ZonedDateTime`, test proves full TZDB exposure (>100 zones, specific IANA IDs asserted). 328/328 tests pass. No catalog or runtime changes — CompletionHandler-only, as prescribed.
+
+---
+
+### 2026-05-16T18:30:48Z — Dot-accessor completions bug diagnosed
+
+- Root cause: the `.` trigger handler (CompletionHandler.cs:108–119) has one code path: resolve receiver TYPE → show type accessors. When the receiver is an EVENT NAME, `TryGetReceiverTypeForDotTrigger` fails because `EventsByName` is never checked (only `FieldsByName`), and the handler returns empty completions.
+- Two-part gap: (1) `CursorSemanticResolver` doesn't resolve event names for single-dot access, (2) `CompletionHandler` dot trigger only dispatches to type accessors, never event args.
+- The Ctrl+Space path (`GetExpressionItems`) has the same blind spot — falls through to generic expression items instead of contextual event-arg completions.
+- No existing test covers the `.` trigger character for dot access — the passing test `Completions_MemberAccess_UsesTypeAccessors` uses Ctrl+Space, not the dot trigger.
+- Fix: add `TryGetEventForDotTrigger` to `CursorSemanticResolver`, add event-arg branch to dot trigger handler, add 4 tests.
+- Assigned to Kramer (tooling). No runtime catalog change needed — `EventsByName` and `TypedEvent.Args` already exist in `Compilation.Semantics`.
+- Diagnosis written to `.squad/decisions/inbox/frank-dot-accessor-completions-bug.md`.
+
+---
+
+### 2026-05-17T18:06:33Z — Constructor semantics fully closed
+
+- `frank-30` traced the `F5TempVerify` `UnsatisfiableInitialState` failures to a PRE0115 ProofEngine false positive and added Slice E to the plan.
+- Commit `ce16e69b` then exempted construction-row precepts from PRE0115 and restored the full `test\Precept.Tests` suite to `5798/5798` green.
+- Commit `8a2bae37` finished the docs/samples closeout, syncing `samples\Test.precept` plus the language-spec PRE0092 and PRE0115 exemption notes.
+- Constructor semantics is now end-to-end closed across syntax, checker, proof, tooling, docs, and samples.
