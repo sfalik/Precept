@@ -124,3 +124,9 @@
 - **Fix:** added slash-slot detection from `textBeforeCursor`; before `/` now returns the ISO currency catalog, after `/` routes `price` to quantity-style UCUM unit items and `exchangerate` to the currency catalog. The old after-amount space behavior remains unchanged.
 - **Tests:** added 4 invoked-path regressions (price currency slot, price unit slot, exchangerate from slot, exchangerate to slot). Validation: 396 LS tests passing; full repo `dotnet test` green at 6517 tests.
 
+### 2026-05-17T08:16:44-04:00 — qualifier-aware typed-constant completion audit
+
+- **Audit result:** `money` and `quantity` already consumed declared qualifiers correctly, but `price` and `exchangerate` still dropped qualifier values on slash-slot completion paths. `price` also had no dimension-only branch for quote/space completions, so `price of 'mass'` fell back to generic currency/unit suggestions.
+- **Fix:** reused `DeclaredQualifierMeta` across `GetPriceSnippetItems`, `GetPriceSlotItems`, and `GetExchangeRateSlotItems` so quote-trigger, space-trigger, and invoked completions all honor fixed currency/unit values and dimension filters. Added invoked-path regression coverage for the previously-correct money/quantity cases so the audit is locked end-to-end.
+- **Tests:** 8 new regressions plus 4 updated invoked-path assertions. Validation: `dotnet test test\Precept.LanguageServer.Tests\ --nologo` -> 404/404 passing; `dotnet test --nologo` -> 6525/6525 passing.
+

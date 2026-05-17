@@ -2583,6 +2583,24 @@ public class CompletionHandlerTests
     }
 
     [Fact]
+    public async Task Completions_TypedConstant_Money_InvokedCurrencySlot_ShowsBoundCurrencyOnly()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept PaymentTest
+            field Cost as money in 'USD' default '10.00 U¦SD'
+            """, new CompletionContext
+            {
+                TriggerKind = CompletionTriggerKind.Invoked,
+                TriggerCharacter = string.Empty,
+            });
+
+        var labels = completions.Items.Select(i => i.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().ContainSingle().Which.Should().Be("USD");
+    }
+
+    [Fact]
     public async Task Completions_TypedConstant_Quantity_Unqualified_ReturnsSnippetWithUnitTabStop()
     {
         var completions = await GetCompletionsAsync("""
@@ -2645,6 +2663,43 @@ public class CompletionHandlerTests
         completions.IsIncomplete.Should().BeFalse();
         snippetLabels.Should().NotContain("quantity — m", "m is a length unit, not mass");
         snippetLabels.Should().NotContain("quantity — L", "L is a volume unit, not mass");
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_Quantity_InKmPerHour_InvokedUnitSlot_ShowsBoundUnitOnly()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept MeasurementTest
+            field Speed as quantity in 'km/h' default '25 km¦/h'
+            """, new CompletionContext
+            {
+                TriggerKind = CompletionTriggerKind.Invoked,
+                TriggerCharacter = string.Empty,
+            });
+
+        var item = completions.Items.Single();
+
+        completions.IsIncomplete.Should().BeFalse();
+        item.InsertText.Should().Be("km/h");
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_Quantity_OfMass_InvokedUnitSlot_FiltersToMassUnits()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept MeasurementTest
+            field Weight as quantity of 'mass' default '12 k¦g'
+            """, new CompletionContext
+            {
+                TriggerKind = CompletionTriggerKind.Invoked,
+                TriggerCharacter = string.Empty,
+            });
+
+        var labels = completions.Items.Select(i => i.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain(["kg", "g"]);
+        labels.Should().NotContain(["m", "L"]);
     }
 
     [Fact]
@@ -2994,6 +3049,54 @@ public class CompletionHandlerTests
     }
 
     [Fact]
+    public async Task Completions_TypedConstant_Price_OfMass_QuoteTrigger_FiltersUnits()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept PricingTest
+            field ShippingPrice as price of 'mass' default ¦
+            """, "'");
+
+        var labels = completions.Items.Select(i => i.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain(["price — currency/kg", "price — currency/g"]);
+        labels.Should().NotContain("price — amount + currency/unit");
+        labels.Should().NotContain("price — currency/m");
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_Price_InUsd_SpaceTrigger_FixesCurrencyAcrossUnitItems()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept PricingTest
+            field ShippingPrice as price in 'USD' default '10.00 ¦'
+            """, " ");
+
+        var labels = completions.Items.Select(i => i.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain(["USD/kg", "USD/m"]);
+        labels.Should().NotContain("EUR/kg");
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_Price_OfMass_SpaceTrigger_FiltersUnits()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept PricingTest
+            field ShippingPrice as price of 'mass' default '10.00 ¦'
+            """, " ");
+
+        var labels = completions.Items.Select(i => i.Label).ToArray();
+        var items = completions.Items.Where(i => i.Label.StartsWith("currency/", StringComparison.Ordinal)).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain(["currency/kg", "currency/g"]);
+        labels.Should().NotContain("currency/m");
+        items.Should().AllSatisfy(item => item.InsertTextFormat.Should().Be(InsertTextFormat.Snippet));
+    }
+
+    [Fact]
     public async Task Completions_TypedConstant_Price_SlotPhase_CompoundLiteral_OffersPair()
     {
         var completions = await GetCompletionsAsync("""
@@ -3152,11 +3255,11 @@ public class CompletionHandlerTests
     }
 
     [Fact]
-    public async Task Completions_TypedConstant_Price_InvokedCurrencySlot_ShowsCurrencyCodes()
+    public async Task Completions_TypedConstant_Price_InvokedCurrencySlot_ShowsBoundCurrencyOnly()
     {
         var completions = await GetCompletionsAsync("""
             precept PricingTest
-            field UnitPrice as price in 'USD/each' default '0.00 U¦SD/each'
+            field UnitPrice as price in 'USD/kg' default '0.00 U¦SD/kg'
             """, new CompletionContext
             {
                 TriggerKind = CompletionTriggerKind.Invoked,
@@ -3166,17 +3269,33 @@ public class CompletionHandlerTests
         var labels = completions.Items.Select(i => i.Label).ToArray();
 
         completions.IsIncomplete.Should().BeFalse();
-        labels.Should().Contain(["USD", "EUR", "GBP"]);
-        labels.Should().NotContain("USD/each");
-        labels.Should().NotContain("kg");
+        labels.Should().ContainSingle().Which.Should().Be("USD");
     }
 
     [Fact]
-    public async Task Completions_TypedConstant_Price_InvokedUnitSlot_ShowsUnits()
+    public async Task Completions_TypedConstant_Price_InvokedUnitSlot_ShowsBoundUnitOnly()
     {
         var completions = await GetCompletionsAsync("""
             precept PricingTest
-            field UnitPrice as price in 'USD/each' default '0.00 USD/e¦ach'
+            field UnitPrice as price in 'USD/kg' default '0.00 USD/k¦g'
+            """, new CompletionContext
+            {
+                TriggerKind = CompletionTriggerKind.Invoked,
+                TriggerCharacter = string.Empty,
+            });
+
+        var item = completions.Items.Single();
+
+        completions.IsIncomplete.Should().BeFalse();
+        item.InsertText.Should().Be("kg");
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_Price_CurrencyAndDimension_InvokedCurrencySlot_ShowsBoundCurrencyOnly()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept PricingTest
+            field ShippingPrice as price in 'USD' of 'mass' default '10.00 U¦SD/kg'
             """, new CompletionContext
             {
                 TriggerKind = CompletionTriggerKind.Invoked,
@@ -3186,13 +3305,30 @@ public class CompletionHandlerTests
         var labels = completions.Items.Select(i => i.Label).ToArray();
 
         completions.IsIncomplete.Should().BeFalse();
-        labels.Should().Contain(["kg", "m", "g"]);
-        labels.Should().NotContain("USD");
-        labels.Should().NotContain("USD/each");
+        labels.Should().ContainSingle().Which.Should().Be("USD");
     }
 
     [Fact]
-    public async Task Completions_TypedConstant_ExchangeRate_InvokedFromCurrencySlot_ShowsCurrencyCodes()
+    public async Task Completions_TypedConstant_Price_CurrencyAndDimension_InvokedUnitSlot_FiltersToDimension()
+    {
+        var completions = await GetCompletionsAsync("""
+            precept PricingTest
+            field ShippingPrice as price in 'USD' of 'mass' default '10.00 USD/k¦g'
+            """, new CompletionContext
+            {
+                TriggerKind = CompletionTriggerKind.Invoked,
+                TriggerCharacter = string.Empty,
+            });
+
+        var labels = completions.Items.Select(i => i.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain(["kg", "g"]);
+        labels.Should().NotContain(["m", "cm"]);
+    }
+
+    [Fact]
+    public async Task Completions_TypedConstant_ExchangeRate_InvokedFromCurrencySlot_ShowsBoundCurrencyOnly()
     {
         var completions = await GetCompletionsAsync("""
             precept PricingTest
@@ -3206,13 +3342,11 @@ public class CompletionHandlerTests
         var labels = completions.Items.Select(i => i.Label).ToArray();
 
         completions.IsIncomplete.Should().BeFalse();
-        labels.Should().Contain(["USD", "EUR", "GBP"]);
-        labels.Should().NotContain("USD/EUR");
-        labels.Should().NotContain("kg");
+        labels.Should().ContainSingle().Which.Should().Be("USD");
     }
 
     [Fact]
-    public async Task Completions_TypedConstant_ExchangeRate_InvokedToCurrencySlot_ShowsCurrencyCodes()
+    public async Task Completions_TypedConstant_ExchangeRate_InvokedToCurrencySlot_ShowsBoundCurrencyOnly()
     {
         var completions = await GetCompletionsAsync("""
             precept PricingTest
@@ -3226,9 +3360,7 @@ public class CompletionHandlerTests
         var labels = completions.Items.Select(i => i.Label).ToArray();
 
         completions.IsIncomplete.Should().BeFalse();
-        labels.Should().Contain(["USD", "EUR", "GBP"]);
-        labels.Should().NotContain("USD/EUR");
-        labels.Should().NotContain("kg");
+        labels.Should().ContainSingle().Which.Should().Be("EUR");
     }
 }
 

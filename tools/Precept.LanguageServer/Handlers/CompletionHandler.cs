@@ -1411,6 +1411,35 @@ internal sealed class CompletionHandler : ICompletionHandler
             yield break;
         }
 
+        if (dimQualifier is not null)
+        {
+            if (dimQualifier.SourceFieldName is not null)
+            {
+                yield return CreateItem(
+                    label: $"price — currency/{dimQualifier.SourceFieldName}",
+                    detail: $"price per {dimQualifier.SourceFieldName} field",
+                    kind: CompletionItemKind.Snippet,
+                    sortGroup: CompletionSortGroup.TypedConstantSnippet,
+                    snippetTemplate: $"${{1:0.00}} ${{2:USD}}/{{{dimQualifier.SourceFieldName}}}");
+                yield break;
+            }
+
+            if (DimensionCatalog.All.TryGetValue(dimQualifier.DimensionName, out var dimAlias))
+            {
+                foreach (var atom in UcumCatalog.BrowseTier1().Where(a => a.Vector == dimAlias.Vector))
+                {
+                    yield return CreateItem(
+                        label: $"price — currency/{atom.Code}",
+                        detail: $"price per {atom.Name}",
+                        kind: CompletionItemKind.Snippet,
+                        sortGroup: CompletionSortGroup.TypedConstantSnippet,
+                        snippetTemplate: $"${{1:0.00}} ${{2:USD}}/{atom.Code}");
+                }
+
+                yield break;
+            }
+        }
+
         yield return CreateItem(
             label: "price — amount + currency/unit",
             detail: "price amount with currency and unit",
@@ -1928,8 +1957,8 @@ internal sealed class CompletionHandler : ICompletionHandler
         {
             return slot switch
             {
-                SlashDelimitedTypedConstantSlot.LeftComponent => GetAllCurrencyCodeItems(),
-                SlashDelimitedTypedConstantSlot.RightComponent => GetQuantitySlotItems(tcContext, textBeforeCursor, phase),
+                SlashDelimitedTypedConstantSlot.LeftComponent => GetPriceCurrencySlotItems(tcContext),
+                SlashDelimitedTypedConstantSlot.RightComponent => GetPriceUnitSlotItems(tcContext, textBeforeCursor, phase),
                 _ => [],
             };
         }
@@ -1943,17 +1972,56 @@ internal sealed class CompletionHandler : ICompletionHandler
 
         var currencyQualifier = tcContext.Qualifiers.OfType<DeclaredQualifierMeta.Currency>().FirstOrDefault();
         var dimQualifier = tcContext.Qualifiers.OfType<DeclaredQualifierMeta.Dimension>().FirstOrDefault();
-        if (currencyQualifier is { SourceFieldName: null } && dimQualifier is { SourceFieldName: null, DimensionName: var dimName }
-            && DimensionCatalog.All.TryGetValue(dimName, out var dimAlias))
+        if (currencyQualifier is not null)
         {
-            var currency = currencyQualifier.CurrencyCode;
-            return UcumCatalog.BrowseTier1()
-                .Where(a => a.Vector == dimAlias.Vector)
-                .Select(atom =>
-                {
-                    var code = $"{currency}/{atom.Code}";
-                    return CreateItem(code, $"price code: {currency} per {atom.Name}", CompletionItemKind.Unit, CompletionSortGroup.TypedConstantSegment);
-                });
+            var currencyLabel = currencyQualifier.SourceFieldName ?? currencyQualifier.CurrencyCode;
+            var currencyInsert = currencyQualifier.SourceFieldName is not null
+                ? $"{{{currencyQualifier.SourceFieldName}}}"
+                : currencyQualifier.CurrencyCode;
+
+            if (dimQualifier?.SourceFieldName is not null)
+            {
+                return
+                [
+                    CreateItem(
+                        $"{currencyLabel}/{dimQualifier.SourceFieldName}",
+                        $"price code: {currencyLabel} per {dimQualifier.SourceFieldName} field",
+                        CompletionItemKind.Unit,
+                        CompletionSortGroup.TypedConstantSegment,
+                        insertText: $"{currencyInsert}/{{{dimQualifier.SourceFieldName}}}")
+                ];
+            }
+
+            var units = GetPriceUnits(tcContext);
+            return units.Select(atom =>
+            {
+                var code = $"{currencyLabel}/{atom.Code}";
+                return CreateItem(code, $"price code: {currencyLabel} per {atom.Name}", CompletionItemKind.Unit, CompletionSortGroup.TypedConstantSegment, insertText: $"{currencyInsert}/{atom.Code}");
+            });
+        }
+
+        if (dimQualifier?.SourceFieldName is not null)
+        {
+            return
+            [
+                CreateItem(
+                    $"currency/{dimQualifier.SourceFieldName}",
+                    $"price code: currency per {dimQualifier.SourceFieldName} field",
+                    CompletionItemKind.Snippet,
+                    CompletionSortGroup.TypedConstantSegment,
+                    snippetTemplate: $"${{1:USD}}/{{{dimQualifier.SourceFieldName}}}")
+            ];
+        }
+
+        if (dimQualifier is not null)
+        {
+            return GetPriceUnits(tcContext)
+                .Select(atom => CreateItem(
+                    $"currency/{atom.Code}",
+                    $"price code: currency per {atom.Name}",
+                    CompletionItemKind.Snippet,
+                    CompletionSortGroup.TypedConstantSegment,
+                    snippetTemplate: $"${{1:USD}}/{atom.Code}"));
         }
 
         var examples = Types.GetMeta(TypeKind.Price).ContentValidation?.Examples ?? [];
@@ -1967,6 +2035,55 @@ internal sealed class CompletionHandler : ICompletionHandler
             .Select(code => CreateItem(code, "price code", CompletionItemKind.Unit, CompletionSortGroup.TypedConstantSegment));
     }
 
+    private static IEnumerable<CompletionItem> GetPriceCurrencySlotItems(TypedConstantContext tcContext)
+    {
+        var compoundQualifier = tcContext.Qualifiers.OfType<DeclaredQualifierMeta.CompoundPrice>().FirstOrDefault();
+        if (compoundQualifier is { SourceFieldName: null })
+        {
+            return [CreateItem(compoundQualifier.CurrencyCode, "ISO 4217 currency code", CompletionItemKind.Unit, CompletionSortGroup.TypedConstantSegment)];
+        }
+
+        var currencyQualifier = tcContext.Qualifiers.OfType<DeclaredQualifierMeta.Currency>().FirstOrDefault();
+        if (currencyQualifier is { SourceFieldName: null })
+        {
+            return [CreateItem(currencyQualifier.CurrencyCode, "ISO 4217 currency code", CompletionItemKind.Unit, CompletionSortGroup.TypedConstantSegment)];
+        }
+
+        return GetAllCurrencyCodeItems();
+    }
+
+    private static IEnumerable<CompletionItem> GetPriceUnitSlotItems(
+        TypedConstantContext tcContext,
+        string textBeforeCursor,
+        TypedConstantPhase phase)
+    {
+        var compoundQualifier = tcContext.Qualifiers.OfType<DeclaredQualifierMeta.CompoundPrice>().FirstOrDefault();
+        if (compoundQualifier is { SourceFieldName: null })
+        {
+            var atom = UcumCatalog.LookupAtom(compoundQualifier.UnitCode);
+            var label = atom?.PrintSymbol ?? compoundQualifier.UnitCode;
+            var detail = atom?.Name ?? "price unit";
+            return [CreateItem(label, detail, CompletionItemKind.Unit, CompletionSortGroup.TypedConstantSegment, insertText: compoundQualifier.UnitCode)];
+        }
+
+        return GetQuantitySlotItems(tcContext, textBeforeCursor, phase);
+    }
+
+    private static IEnumerable<UcumAtom> GetPriceUnits(TypedConstantContext tcContext)
+    {
+        IEnumerable<UcumAtom> units = UcumCatalog.BrowseTier1();
+
+        var dimQualifier = tcContext.Qualifiers.OfType<DeclaredQualifierMeta.Dimension>().FirstOrDefault();
+        if (dimQualifier is not null
+            && dimQualifier.SourceFieldName is null
+            && DimensionCatalog.All.TryGetValue(dimQualifier.DimensionName, out var dimAlias))
+        {
+            units = units.Where(atom => atom.Vector == dimAlias.Vector);
+        }
+
+        return units;
+    }
+
     private static IEnumerable<CompletionItem> GetExchangeRateSlotItems(
         TypedConstantContext tcContext,
         string textBeforeCursor,
@@ -1975,9 +2092,14 @@ internal sealed class CompletionHandler : ICompletionHandler
         if (phase is not (TypedConstantPhase.AfterNumberSpace or TypedConstantPhase.UnitTyping))
             return [];
 
-        if (TryGetSlashDelimitedTypedConstantSlot(textBeforeCursor, out _))
+        if (TryGetSlashDelimitedTypedConstantSlot(textBeforeCursor, out var slot))
         {
-            return GetAllCurrencyCodeItems();
+            return slot switch
+            {
+                SlashDelimitedTypedConstantSlot.LeftComponent => GetExchangeRateFromCurrencySlotItems(tcContext),
+                SlashDelimitedTypedConstantSlot.RightComponent => GetExchangeRateToCurrencySlotItems(tcContext),
+                _ => [],
+            };
         }
 
         var fromQualifier = tcContext.Qualifiers.OfType<DeclaredQualifierMeta.FromCurrency>().FirstOrDefault();
@@ -2012,6 +2134,28 @@ internal sealed class CompletionHandler : ICompletionHandler
             })
             .Distinct(StringComparer.Ordinal)
             .Select(code => CreateItem(code, "exchange rate code", CompletionItemKind.Unit, CompletionSortGroup.TypedConstantSegment));
+    }
+
+    private static IEnumerable<CompletionItem> GetExchangeRateFromCurrencySlotItems(TypedConstantContext tcContext)
+    {
+        var fromQualifier = tcContext.Qualifiers.OfType<DeclaredQualifierMeta.FromCurrency>().FirstOrDefault();
+        if (fromQualifier is { SourceFieldName: null })
+        {
+            return [CreateItem(fromQualifier.CurrencyCode, "ISO 4217 currency code", CompletionItemKind.Unit, CompletionSortGroup.TypedConstantSegment)];
+        }
+
+        return GetAllCurrencyCodeItems();
+    }
+
+    private static IEnumerable<CompletionItem> GetExchangeRateToCurrencySlotItems(TypedConstantContext tcContext)
+    {
+        var toQualifier = tcContext.Qualifiers.OfType<DeclaredQualifierMeta.ToCurrency>().FirstOrDefault();
+        if (toQualifier is { SourceFieldName: null })
+        {
+            return [CreateItem(toQualifier.CurrencyCode, "ISO 4217 currency code", CompletionItemKind.Unit, CompletionSortGroup.TypedConstantSegment)];
+        }
+
+        return GetAllCurrencyCodeItems();
     }
 
     private static IEnumerable<CompletionItem> GetQuantitySlotItems(
