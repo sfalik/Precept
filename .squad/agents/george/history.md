@@ -114,6 +114,7 @@
 - New emitted diagnostics still need a `Precept.Analyzers` Gate 2 allow-list entry even when the real coverage lives in `test/Precept.Tests/`; PRECEPT0028 cannot see cross-project test references.
 - `SyntaxReference.CommonPatterns` only carries `Name`, `Description`, and `DslSnippet`, so AI-facing "when to choose this" guidance for `precept_patterns` has to live in the description text rather than a separate metadata field.
 - Construction-pattern snippets need to show the post-Slice-8b split explicitly: constructor intake is `event Create(...) initial` plus `on Create` rows, while governed-draft construction is the no-initial-event path with an initial draft state, `editable` enrichment, and a later activation transition.
+- Temporary SyntaxReference caveats tied to a specific compiler gap should be removed as soon as the matching regression tests are green; otherwise the AI-facing guidance drifts behind shipped behavior.
 
 ### 2026-05-16T13:08:43Z — Constructor semantics downstream closeout recorded
 

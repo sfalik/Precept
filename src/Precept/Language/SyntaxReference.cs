@@ -209,7 +209,7 @@ public static class SyntaxReference
 
         new(
             "Constructor Pattern (Existential Fields)",
-            "Use an initial event as the entity's constructor when specific fields must exist at birth. Declare 'event Create(...) initial', validate its inputs with event ensures, and populate required fields in 'on Create' construction rows. Choose this when the entity cannot meaningfully exist without intake data; for entities that can exist in a governed draft state, see Free-Construction Pattern (Governed Draft). Note: precept_compile may emit PRE0092 on this snippet due to a known compiler gap — the syntax is correct per §3A.5 of the language spec.",
+            "Use an initial event as the entity's constructor when specific fields must exist at birth. Declare 'event Create(...) initial', validate its inputs with event ensures, and populate required fields in 'on Create' construction rows. Choose this when the entity cannot meaningfully exist without intake data; for entities that can exist in a governed draft state, see Free-Construction Pattern (Governed Draft).",
             """
             precept LoanApplication
 
@@ -645,7 +645,7 @@ public static class SyntaxReference
 
         new(
             "Hollow draft state",
-            "Declaring a `state X initial` when the entity has no `editable` fields in that state and the first event provides all field values atomically as parameters. The initial state adds no governance — the entity does not meaningfully exist there. Note: precept_compile may emit PRE0092 on this snippet due to a known compiler gap — the syntax is correct per §3A.5 of the language spec.",
+            "Declaring a `state X initial` when the entity has no `editable` fields in that state and the first event provides all field values atomically as parameters. The initial state adds no governance — the entity does not meaningfully exist there.",
             """
             precept LoanApplication
 
