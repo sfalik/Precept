@@ -124,3 +124,11 @@
 - Pattern A sample conversions should move the first real working state to `initial` and use an `event ... initial` plus `on <Event>` construction row with no `from` prefix.
 - The durable tell for the hollow-draft anti-pattern is: zero `editable` declarations in the initial state plus a first event that atomically supplies every meaningful field. That shape should be documented as Pattern A in disguise, not treated as governed free construction.
 
+### 2026-05-17T08:36:29-04:00 — SyntaxReference wording + entries sync
+
+- `precept_compile` still emits PRE0092/PRE0094 on the Pattern A constructor snippet and the hollow-draft anti-pattern's good snippet, so SyntaxReference descriptions need a temporary compiler-gap note instead of implying the authored syntax is wrong.
+- The chaining-comparisons anti-pattern must describe actual current behavior: `0 <= Amount` becomes a boolean, then `boolean <= 1000` type-errors as PRE0018. PRE0010 remains the intended future parser-side diagnostic.
+- The new `omit` and `to State ensure` entries both compile clean through `precept_compile`; the `omit` example needs a state-exit clear (`from State -> clear Field`) rather than a transition action into an omitted target state.
+- `precept_compile` currently accepts `on Create -> set Counter = Counter + 1` with no PRE-code, so the new construction-row self-read anti-pattern must document the semantic trap and the missing enforcement rather than claiming PRE0142/PRE0144 are live on that exact snippet.
+- Targeted `dotnet build test\Precept.Tests\Precept.Tests.csproj --nologo` succeeded, while `dotnet test test\Precept.Tests\ --no-build -q` still fails on the pre-existing `F5TempVerify` `UnsatisfiableInitialState` cases for `parcel-locker-pickup.precept` and `clinic-appointment-scheduling.precept`.
+

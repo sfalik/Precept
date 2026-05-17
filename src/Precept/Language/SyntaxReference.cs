@@ -209,7 +209,7 @@ public static class SyntaxReference
 
         new(
             "Constructor Pattern (Existential Fields)",
-            "Use an initial event as the entity's constructor when specific fields must exist at birth. Declare 'event Create(...) initial', validate its inputs with event ensures, and populate required fields in 'on Create' construction rows. Choose this when the entity cannot meaningfully exist without intake data; for entities that can exist in a governed draft state, see Free-Construction Pattern (Governed Draft).",
+            "Use an initial event as the entity's constructor when specific fields must exist at birth. Declare 'event Create(...) initial', validate its inputs with event ensures, and populate required fields in 'on Create' construction rows. Choose this when the entity cannot meaningfully exist without intake data; for entities that can exist in a governed draft state, see Free-Construction Pattern (Governed Draft). Note: precept_compile may emit PRE0092 on this snippet due to a known compiler gap — the syntax is correct per §3A.5 of the language spec.",
             """
             precept LoanApplication
 
@@ -276,6 +276,72 @@ public static class SyntaxReference
                 -> transition Listed
             from Listed on Delist
                 -> transition Delisted
+            """),
+
+        new(
+            "Lifecycle-absent fields (`omit`)",
+            "Use `in State omit Field` when a field is meaningful through most of the lifecycle but should not exist in one or more specific states. Omitted fields cannot be read or written there, so pair the omission with a state-exit clear before the lifecycle enters the omitted state.",
+            """
+            precept SupportTicket
+
+            field Title as string optional
+            field CurrentHandler as string optional
+
+            state Draft initial
+            state Investigating
+            state WaitingOnCustomer
+            state Closed terminal
+
+            in Closed omit CurrentHandler
+            from Investigating, WaitingOnCustomer -> clear CurrentHandler
+
+            event Submit(Title as string notempty, Handler as string notempty)
+            event RequestCustomerInfo
+            event Resume(Handler as string notempty)
+            event Close
+
+            from Draft on Submit
+                -> set Title = Submit.Title
+                -> set CurrentHandler = Submit.Handler
+                -> transition Investigating
+            from Investigating on RequestCustomerInfo
+                -> transition WaitingOnCustomer
+            from WaitingOnCustomer on Resume
+                -> set CurrentHandler = Resume.Handler
+                -> transition Investigating
+            from Investigating, WaitingOnCustomer on Close
+                -> transition Closed
+            """),
+
+        new(
+            "Entry ensures as construction gate",
+            "Use `to State ensure ... because ...` to declare the invariant that must already hold when a transition enters that state. This gates progression at the state boundary and, when paired with constructor-style intake, becomes the first real-state admission check.",
+            """
+            precept TenantApplication
+
+            field MonthlyIncome as money in 'USD' default '0.00 USD'
+            field RequestedRent as money in 'USD' default '0.00 USD'
+            field CreditScore as integer default 0
+            field DocumentsVerified as boolean default false
+
+            state Draft initial
+            state Approved terminal
+            state Denied terminal
+
+            to Approved ensure DocumentsVerified and MonthlyIncome >= RequestedRent * 3.0 and CreditScore >= 680 because "Approved tenants need verified documents, credit score 680+, and income at least 3x rent"
+
+            event Submit(Income as money in 'USD', Rent as money in 'USD', Score as integer, Verified as boolean)
+            on Submit ensure Submit.Rent > '0.00 USD' because "Requested rent must be positive"
+            event Deny
+
+            from Draft on Submit
+                -> set MonthlyIncome = Submit.Income
+                -> set RequestedRent = Submit.Rent
+                -> set CreditScore = Submit.Score
+                -> set DocumentsVerified = Submit.Verified
+                -> transition Approved
+            from Draft on Deny
+                -> transition Denied
             """),
 
         new(
@@ -478,7 +544,7 @@ public static class SyntaxReference
             rule Amount >= 0 because "must be nonnegative"
             rule Amount <= 1000 because "must be in range"
             """,
-            "Precept comparison operators (==, !=, <, >, <=, >=) are non-associative. Chaining them produces a parse error (NonAssociativeComparison). Use 'and' to combine two separate comparison conditions."),
+            "Today the parser accepts the first comparison and produces a boolean (`0 <= Amount`), then the second comparison type-errors as `boolean <= 1000`, so precept_compile currently emits PRE0018 rather than a parser diagnostic. PRE0010 (NonAssociativeComparison) is the intended diagnostic and should fire once the parser detects chained comparisons directly. Use 'and' to combine two separate comparison conditions."),
 
         new(
             "Assigning a computed field",
@@ -579,7 +645,7 @@ public static class SyntaxReference
 
         new(
             "Hollow draft state",
-            "Declaring a `state X initial` when the entity has no `editable` fields in that state and the first event provides all field values atomically as parameters. The initial state adds no governance — the entity does not meaningfully exist there.",
+            "Declaring a `state X initial` when the entity has no `editable` fields in that state and the first event provides all field values atomically as parameters. The initial state adds no governance — the entity does not meaningfully exist there. Note: precept_compile may emit PRE0092 on this snippet due to a known compiler gap — the syntax is correct per §3A.5 of the language spec.",
             """
             precept LoanApplication
 
@@ -619,5 +685,30 @@ public static class SyntaxReference
                 -> set CreditScore = Submit.Score
             """,
             "The hollow draft state contributes no governance. A draft implies the entity exists with progressive enrichment — fields being set over time, rules applying, editability windows governing what is allowed. When the initial state has zero `editable` declarations and the first event fills everything atomically, the \"draft\" is structurally identical to not existing at all. Use the constructor pattern (Pattern A): mark the initial event with `initial`, write a construction row with `on EventName { }`, and let the entity arrive in its first real state fully formed. The tell: if your initial state has zero `editable` declarations and the first event provides all field values as parameters, it is a hollow draft. Either add `editable` fields with real governance to the initial state (Pattern B), or drop the hollow state and mark the event `initial` (Pattern A)."),
+
+        new(
+            "Reading uninitialized field in construction row",
+            "Using a field's current value on the right-hand side of its first construction assignment, as though construction were incrementally updating an already-existing entity. Construction is the first write — there is no prior business value to read.",
+            """
+            precept CounterExample
+
+            field Counter as integer
+
+            event Create(InitialCount as integer) initial
+
+            on Create
+                -> set Counter = Counter + 1
+            """,
+            """
+            precept CounterExample
+
+            field Counter as integer
+
+            event Create(InitialCount as integer) initial
+
+            on Create
+                -> set Counter = Create.InitialCount
+            """,
+            "`Counter` on the right-hand side is not reading a meaningful prior business value — construction is the first write. In today's precept_compile behavior, this exact integer example is accepted with no PRE-code and reads the field's pre-write default instead of reporting a dedicated undefined-read diagnostic, so the bug is semantic rather than compiler-blocked. Use the event payload (or a value established earlier in the same action chain) for the field's first assignment."),
     ];
 }
