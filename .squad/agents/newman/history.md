@@ -16,6 +16,7 @@
 - **Stale MustSetOmitToNonOmit test assertion:** `NewToolTests.Patterns_DefaultCall_ReturnsMarkdown` previously asserted `result.Should().Contain("MustSetOmitToNonOmit")`. That diagnostic code was renamed as part of the v3 field-state design; `SyntaxReferenceTests` explicitly asserts it is NOT in `WhyItFails`. The MCP test assertion was stale and was updated (2026-05-12) to check for `"omit ApprovedAmount"` (text from the good snippet) and the 6 new pattern headings instead.
 
 - **Slice 11 pattern:** When the core DU has `IsConstruction` on the abstract base, the DTO maps from the base directly — no per-subtype dispatch. `TypedEventRowSuccess` and `TypedEventRowReject` both inherit the flag, keeping the MCP mapping to a single-line expression.
+- When a requested MCP contract file is absent, confirm the live contract surface before editing; for `precept_compile`, `docs/tooling/mcp.md` is the active contract and `docs/McpServerDesign.md` status should be recorded explicitly instead of reviving a dead doc.
 
 - PRECEPT0024 anti-mirroring enforcement: `RegisterOperationAction` on `OperationKind.PropertyReference` is the cleanest Roslyn hook for guarding member access. Namespace-qualified type resolution prevents false positives on unrelated types sharing a property name. Walking `ContainingSymbol` up through nested types handles lambdas, local functions, and inner classes correctly.
 

@@ -308,7 +308,7 @@ Event handler row entry shape:
 }
 ```
 
-`isConstruction` is `true` when the event row handles an `initial` event (a construction row that runs when the entity is first created). It is `false` for regular stateless event rows (`on Event -> actions`).
+`isConstruction`: boolean — True if this row handles the construction event (event marked `initial`).
 
 `summary` is a compact prose description, not a projected definition graph.
 

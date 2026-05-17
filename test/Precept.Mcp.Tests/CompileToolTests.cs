@@ -108,7 +108,7 @@ public class CompileToolTests
     }
 
     [Fact]
-    public void CompileTool_EventRow_IsConstruction_True()
+    public void CompileTool_EventRow_IsConstruction_True_ForInitialEvent()
     {
         var result = CompileTool.Compile(ConstructionRowSource);
 
@@ -118,7 +118,7 @@ public class CompileToolTests
     }
 
     [Fact]
-    public void CompileTool_EventRow_IsConstruction_False()
+    public void CompileTool_EventRow_IsConstruction_False_ForNonInitialEvent()
     {
         var result = CompileTool.Compile(RegularEventRowSource);
 
