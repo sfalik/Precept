@@ -409,10 +409,25 @@ public static partial class Parser
             Advance(); // consume operator token
             var (_, rightBp) = GetLedBindingPower(opToken.Kind);
             var right = ParseExpression(rightBp, terminates);
+
+            if (meta.Family == OperatorFamily.Comparison && IsComparisonExpression(left))
+            {
+                _diagnostics.Add(Language.Diagnostics.Create(
+                    DiagnosticCode.NonAssociativeComparison,
+                    SourceSpan.Covering(left.Span, right.Span),
+                    "split the comparison into two conditions joined with 'and'"));
+                return left;
+            }
+
             return new BinaryOperationExpression(
                 left, opToken.Kind, right,
                 SourceSpan.Covering(left.Span, right.Span));
         }
+
+        private static bool IsComparisonExpression(ParsedExpression expression)
+            => expression is BinaryOperationExpression binary
+               && Operators.ByToken.TryGetValue((binary.Operator, Arity.Binary), out var meta)
+               && meta.Family == OperatorFamily.Comparison;
 
         // ── Interpolated string handling ────────────────────────────────────────
 

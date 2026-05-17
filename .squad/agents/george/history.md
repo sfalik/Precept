@@ -132,3 +132,11 @@
 - `precept_compile` currently accepts `on Create -> set Counter = Counter + 1` with no PRE-code, so the new construction-row self-read anti-pattern must document the semantic trap and the missing enforcement rather than claiming PRE0142/PRE0144 are live on that exact snippet.
 - Targeted `dotnet build test\Precept.Tests\Precept.Tests.csproj --nologo` succeeded, while `dotnet test test\Precept.Tests\ --no-build -q` still fails on the pre-existing `F5TempVerify` `UnsatisfiableInitialState` cases for `parcel-locker-pickup.precept` and `clinic-appointment-scheduling.precept`.
 
+### 2026-05-17T08:36:29-04:00 — Compiler gaps audit closeout
+
+- PRE0092/PRE0094 gap: structural and construction-guarantee validation now treat `on <InitialEvent>` rows as construction via event metadata, so multi-state Pattern A snippets no longer depend on `TypedEventRow.IsConstruction` being pre-populated perfectly.
+- PRE0038 gap: `ResolveAction` now emits `ComputedFieldNotWritable` for `set` targets whose field metadata is computed; computed fields remain readable in expressions.
+- PRE0010 gap: the Pratt parser now detects a second comparison operator against an already-comparison left operand, emits `NonAssociativeComparison`, consumes the chained tail for recovery, and avoids the misleading PRE0018 path.
+- Regression coverage now locks the multi-state constructor pattern, the SyntaxReference constructor snippet, transition-row writes to computed fields, and chained-comparison parser behavior.
+- Targeted compiler-gap regressions are green; full `test\Precept.Tests` still stops on the pre-existing `F5TempVerify` `UnsatisfiableInitialState` cases for `parcel-locker-pickup.precept` and `clinic-appointment-scheduling.precept`.
+

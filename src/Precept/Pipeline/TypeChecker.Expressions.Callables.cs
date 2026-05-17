@@ -124,6 +124,12 @@ internal static partial class TypeChecker
                     fieldQualifiers);
 
                 // B9: Post-resolution type check — verify resolved value is assignable to target field.
+                if (targetFieldMeta?.IsComputed == true)
+                {
+                    ctx.Diagnostics.Add(
+                        Diagnostics.Create(DiagnosticCode.ComputedFieldNotWritable, assign.Target.Span, targetFieldMeta.Name));
+                }
+ 
                 if (value is not TypedErrorExpression
                     && fieldType != TypeKind.Error
                     && !IsAssignable(value.ResultType, fieldType))

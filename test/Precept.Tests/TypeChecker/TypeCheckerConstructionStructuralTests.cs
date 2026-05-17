@@ -1,3 +1,4 @@
+using System.Linq;
 using FluentAssertions;
 using Precept.Language;
 using Xunit;
@@ -18,6 +19,68 @@ public class TypeCheckerConstructionStructuralTests
             """;
 
         TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void PRE0092_AllowsInitialEventConstructionRow_OnMultiStatePrecept()
+    {
+        var precept = """
+            precept LoanApplication
+            field ApplicantName as string
+            field RequestedAmount as money in 'USD'
+            field CreditScore as integer
+            field DecisionNote as string optional
+
+            state Pending initial
+            state UnderReview
+            state Approved terminal
+            state Declined terminal
+
+            event Create(Applicant as string notempty, Amount as money in 'USD', Score as integer) initial
+            on Create ensure Create.Amount > '0.00 USD' because "Loan amount must be positive"
+            on Create ensure Create.Score >= 300 because "Minimum credit score is 300"
+
+            on Create
+                -> set ApplicantName = Create.Applicant
+                -> set RequestedAmount = Create.Amount
+                -> set CreditScore = Create.Score
+
+            event Review
+            event Approve
+            event Decline(Note as string notempty)
+
+            from Pending on Review
+                -> transition UnderReview
+            from UnderReview on Approve
+                -> transition Approved
+            from UnderReview on Decline
+                -> set DecisionNote = Decline.Note
+                -> transition Declined
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    [Fact]
+    public void PRE0092_StillEmitted_ForNonInitialEventHandlerInStatefulPrecept()
+    {
+        var precept = """
+            precept Widget
+            field Count as integer default 0
+            state Draft initial
+            state Done terminal
+            event Start initial
+            event Ping
+            event Finish
+            on Start -> set Count = 1
+            on Ping -> set Count = Count + 1
+            from Draft on Finish -> transition Done
+            """;
+
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check(precept);
+
+        diagnostics.Where(d => d.Code == nameof(DiagnosticCode.EventHandlerInStatefulPrecept))
+            .Should().ContainSingle(d => d.Args.Contains("Ping"));
     }
 
     [Fact]

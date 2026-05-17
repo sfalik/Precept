@@ -391,7 +391,7 @@ internal static partial class TypeChecker
     {
         var fieldRefs = new List<TypedFieldRef>();
 
-        foreach (var row in ctx.EventHandlers.Where(handler => handler.IsConstruction))
+        foreach (var row in ctx.EventHandlers.Where(handler => IsConstructionHandler(ctx, handler)))
         {
             if (row.Guard is null)
                 continue;
@@ -505,7 +505,7 @@ internal static partial class TypeChecker
         var constructionHandlers = ctx.EventHandlers
             .OfType<TypedEventRowSuccess>()
             .Where(handler =>
-                handler.IsConstruction &&
+                IsConstructionHandler(ctx, handler) &&
                 string.Equals(handler.EventName, initialEvent.Name, StringComparison.Ordinal))
             .ToImmutableArray();
 

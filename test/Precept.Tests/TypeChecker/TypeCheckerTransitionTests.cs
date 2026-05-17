@@ -220,6 +220,59 @@ public class TypeCheckerTransitionTests
     }
 
     [Fact]
+    public void TransitionRow_SetComputedField_EmitsComputedFieldNotWritable()
+    {
+        var precept = """
+            precept Widget
+            field Base as number default 1
+            field Total as number <- Base + 1
+            state Draft initial
+            state Done terminal
+            event Submit
+            from Draft on Submit -> set Total = Base -> transition Done
+            """;
+
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.ComputedFieldNotWritable);
+    }
+
+    [Fact]
+    public void TransitionRow_SetRegularField_DoesNotEmitComputedFieldNotWritable()
+    {
+        var precept = """
+            precept Widget
+            field Base as number default 1
+            field Total as number <- Base + 1
+            field Manual as number default 0
+            state Draft initial
+            state Done terminal
+            event Submit
+            from Draft on Submit -> set Manual = Total -> transition Done
+            """;
+
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check(precept);
+
+        diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.ComputedFieldNotWritable));
+    }
+
+    [Fact]
+    public void TransitionRow_ReadComputedField_DoesNotEmitComputedFieldNotWritable()
+    {
+        var precept = """
+            precept Widget
+            field Base as number default 1
+            field Total as number <- Base + 1
+            state Draft initial
+            state Done terminal
+            event Submit
+            from Draft on Submit -> set Base = Total -> transition Done
+            """;
+
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check(precept);
+
+        diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.ComputedFieldNotWritable));
+    }
+
+    [Fact]
     public void UnknownToState_EmitsUndeclaredState()
     {
         var precept = """

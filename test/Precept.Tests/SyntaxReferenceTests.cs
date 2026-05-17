@@ -154,6 +154,15 @@ public class SyntaxReferenceTests
     }
 
     [Fact]
+    public void ConstructorPattern_ExistentialFields_DslSnippet_CompilesClean()
+    {
+        var constructorPattern = SyntaxReference.CommonPatterns.Single(pattern => pattern.Name == "Constructor Pattern (Existential Fields)");
+        var compilation = Compiler.Compile(constructorPattern.DslSnippet);
+
+        compilation.HasErrors.Should().BeFalse();
+    }
+
+    [Fact]
     public void AntiPatterns_SentinelDefaults_RecommendOmitAndTransitionSet()
     {
         var sentinelDefaults = SyntaxReference.AntiPatterns.Single(pattern => pattern.Name == "Sentinel defaults for not-yet-meaningful fields");

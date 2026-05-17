@@ -1,5 +1,6 @@
 using System.Linq;
 using FluentAssertions;
+using Precept;
 using Precept.Language;
 using Precept.Pipeline;
 using Xunit;
@@ -55,5 +56,43 @@ public class Track2PhaseAParserTests
         var comparison = expr.Should().BeOfType<BinaryOperationExpression>().Subject;
         comparison.Left.Should().BeOfType<MethodCallExpression>()
             .Which.MemberTokenKind.Should().Be(TokenKind.At);
+    }
+
+    [Fact]
+    public void ChainedComparison_InRule_EmitsNonAssociativeComparison_NotTypeMismatch()
+    {
+        var compilation = Compiler.Compile("""
+            precept Widget
+            field Amount as integer default 0
+            rule 0 <= Amount <= 1000 because "range"
+            """);
+
+        compilation.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.NonAssociativeComparison));
+        compilation.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.TypeMismatch));
+    }
+
+    [Fact]
+    public void SingleBoundComparison_DoesNotEmitNonAssociativeComparison()
+    {
+        var compilation = Compiler.Compile("""
+            precept Widget
+            field Amount as integer default 0
+            rule 0 <= Amount because "range"
+            """);
+
+        compilation.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.NonAssociativeComparison));
+    }
+
+    [Fact]
+    public void FieldToFieldComparison_DoesNotEmitNonAssociativeComparison()
+    {
+        var compilation = Compiler.Compile("""
+            precept Widget
+            field Amount as integer default 0
+            field MaxAmount as integer default 1000
+            rule Amount <= MaxAmount because "range"
+            """);
+
+        compilation.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.NonAssociativeComparison));
     }
 }

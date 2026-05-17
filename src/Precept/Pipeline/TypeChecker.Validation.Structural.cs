@@ -127,7 +127,7 @@ internal static partial class TypeChecker
 
         foreach (var handler in ctx.EventHandlers)
         {
-            if (handler.IsConstruction)
+            if (IsConstructionHandler(ctx, handler))
                 continue;
 
             ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.EventHandlerInStatefulPrecept,
@@ -141,7 +141,7 @@ internal static partial class TypeChecker
             return;
 
         var constructionRows = ctx.EventHandlers
-            .Where(handler => handler.IsConstruction)
+            .Where(handler => IsConstructionHandler(ctx, handler))
             .ToList();
 
         var initialStateNames = ctx.States
@@ -201,6 +201,16 @@ internal static partial class TypeChecker
         }
     }
 
+    private static bool IsConstructionHandler(CheckContext ctx, TypedEventRow handler)
+    {
+        if (handler.IsConstruction)
+            return true;
+ 
+        return !string.IsNullOrWhiteSpace(handler.EventName)
+            && ctx.EventLookup.TryGetValue(handler.EventName, out var resolvedEvent)
+            && resolvedEvent.IsInitial;
+    }
+ 
     private static SourceSpan GetEventNameSpan(ParsedConstruct syntax, SourceSpan fallbackSpan)
     {
         var eventTarget = syntax.GetSlot<EventTargetSlot>(ConstructSlotKind.EventTarget);
