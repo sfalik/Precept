@@ -2012,6 +2012,20 @@ public class CompletionHandlerTests
     }
 
     [Fact]
+    public async Task Completions_BraceTrigger_AtColumnZero_ReturnsEmpty()
+    {
+        // Guard: position.Character == 0 causes early return before the column-subtraction.
+        // A { typed at column 0 can never be inside a typed constant — must return empty without error.
+        var completions = await GetCompletionsAsync("""
+            precept ColumnZeroTest
+            ¦field Amount as decimal default 0.0
+            state Draft initial terminal
+            """, "{");
+
+        completions.Items.Should().BeEmpty("{ at column 0 must short-circuit the span guard without underflow");
+    }
+
+    [Fact]
     public async Task Completions_BraceTrigger_InsideTypedConstant_ReturnsInScopeFields()
     {
         // { typed inside a typed constant — must return field interpolation items.
@@ -2033,9 +2047,11 @@ public class CompletionHandlerTests
     }
 
     [Fact]
-    public async Task Completions_BraceTrigger_InsideTypedConstant_ItemsHaveSnippetFormat()
+    public async Task Completions_BraceTrigger_InsideTypedConstant_ItemsHavePlainTextFormat()
     {
-        // All items returned by the { trigger must use InsertTextFormat.Snippet.
+        // All items returned by the { trigger must use InsertTextFormat.PlainText.
+        // There are no tab stops in the insert text — using Snippet would make the unescaped }
+        // a grammar violation per the LSP snippet grammar.
         var completions = await GetCompletionsAsync("""
             precept BraceSnippetTest
             field Price as money default '0.00 USD'
@@ -2049,8 +2065,8 @@ public class CompletionHandlerTests
         completions.Items.Should().NotBeEmpty("{ inside a typed constant should yield items");
         completions.Items
             .Should().AllSatisfy(item =>
-                item.InsertTextFormat.Should().Be(InsertTextFormat.Snippet,
-                    $"item '{item.Label}' must use Snippet format so the closing brace is inserted correctly"));
+                item.InsertTextFormat.Should().Be(InsertTextFormat.PlainText,
+                    $"item '{item.Label}' must use PlainText format — no tab stops, Snippet would make }} a grammar violation"));
     }
 
     [Fact]

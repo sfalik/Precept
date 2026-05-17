@@ -3245,7 +3245,7 @@ internal sealed class CompletionHandler : ICompletionHandler
                     detail: "Event argument",
                     kind: CompletionItemKind.Variable,
                     sortGroup: CompletionSortGroup.SemanticArgument,
-                    snippetTemplate: $"{arg.Name}}}");
+                    insertText: $"{arg.Name}}}");
             }
         }
 
@@ -3256,7 +3256,7 @@ internal sealed class CompletionHandler : ICompletionHandler
                 detail: "Field",
                 kind: CompletionItemKind.Field,
                 sortGroup: CompletionSortGroup.SemanticSymbol,
-                snippetTemplate: $"{field.Name}}}");
+                insertText: $"{field.Name}}}");
         }
     }
 
