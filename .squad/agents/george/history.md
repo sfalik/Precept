@@ -122,4 +122,5 @@
 - Durable batch outcome: construction semantics are now aligned across parser/checker, graph analysis, tooling, MCP, docs, and the canonical sample.
 - When a sample's initial state has no editable surface and the first event atomically supplies all identity data, the sample should be modeled as Pattern A instead of preserving a hollow draft shell.
 - Pattern A sample conversions should move the first real working state to `initial` and use an `event ... initial` plus `on <Event>` construction row with no `from` prefix.
+- The durable tell for the hollow-draft anti-pattern is: zero `editable` declarations in the initial state plus a first event that atomically supplies every meaningful field. That shape should be documented as Pattern A in disguise, not treated as governed free construction.
 

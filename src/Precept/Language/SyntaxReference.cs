@@ -576,5 +576,48 @@ public static class SyntaxReference
                 -> reject "Approval requires strong income coverage and acceptable credit"
             """,
             "Approve from Draft and from Approved adds rows for events with no meaning in those states — no UI should offer an Approve button there, and no row is the correct way to say so. The only reject that belongs here is the fallback from Submitted when the applicant fails the income and credit check — that is a condition the applicant could potentially remedy. Structurally inapplicable events need no row."),
+
+        new(
+            "Hollow draft state",
+            "Declaring a `state X initial` when the entity has no `editable` fields in that state and the first event provides all field values atomically as parameters. The initial state adds no governance — the entity does not meaningfully exist there.",
+            """
+            precept LoanApplication
+
+            field ApplicantName as string optional
+            field RequestedAmount as money in 'USD' optional
+            field CreditScore as integer optional
+
+            state Draft initial
+            state UnderReview
+            state Approved terminal
+
+            event Submit(Applicant as string notempty, Amount as money in 'USD', Score as integer)
+            on Submit ensure Submit.Amount > '0.00 USD' because "Loan amount must be positive"
+
+            from Draft on Submit
+                -> set ApplicantName = Submit.Applicant
+                -> set RequestedAmount = Submit.Amount
+                -> set CreditScore = Submit.Score
+                -> transition UnderReview
+            """,
+            """
+            precept LoanApplication
+
+            field ApplicantName as string
+            field RequestedAmount as money in 'USD'
+            field CreditScore as integer
+
+            state UnderReview initial
+            state Approved terminal
+
+            event Submit(Applicant as string notempty, Amount as money in 'USD', Score as integer) initial
+            on Submit ensure Submit.Amount > '0.00 USD' because "Loan amount must be positive"
+
+            on Submit
+                -> set ApplicantName = Submit.Applicant
+                -> set RequestedAmount = Submit.Amount
+                -> set CreditScore = Submit.Score
+            """,
+            "The hollow draft state contributes no governance. A draft implies the entity exists with progressive enrichment — fields being set over time, rules applying, editability windows governing what is allowed. When the initial state has zero `editable` declarations and the first event fills everything atomically, the \"draft\" is structurally identical to not existing at all. Use the constructor pattern (Pattern A): mark the initial event with `initial`, write a construction row with `on EventName { }`, and let the entity arrive in its first real state fully formed. The tell: if your initial state has zero `editable` declarations and the first event provides all field values as parameters, it is a hollow draft. Either add `editable` fields with real governance to the initial state (Pattern B), or drop the hollow state and mark the event `initial` (Pattern A)."),
     ];
 }
