@@ -44,7 +44,7 @@ internal sealed class CompletionHandler : ICompletionHandler
         new()
         {
             DocumentSelector = TextDocumentSelector.ForPattern("**/*.precept"),
-            TriggerCharacters = new Container<string>(" ", "'", ".", ">", "~", "{"),
+            TriggerCharacters = new Container<string>(" ", "'", ".", ">", "~", "{", "["),
             ResolveProvider = false,
         };
 
@@ -110,6 +110,20 @@ internal sealed class CompletionHandler : ICompletionHandler
                 !IsInsideTypedConstantToken(compilation.Tokens.Tokens, position with { Character = position.Character - 1 }))
                 return new CompletionList([], false);
             return CreateCompletionList(GetBraceInterpolationItems(compilation, position));
+        }
+
+        // Open-bracket trigger inside a zoneddatetime typed constant: show full timezone catalog.
+        // Same one-column-back guard as the { trigger — after typing [ the cursor lands at the
+        // exclusive end of the typed-constant token, so check the [ character itself (one column back).
+        if (triggerCharacter == "[")
+        {
+            if (position.Character == 0 ||
+                !IsInsideTypedConstantToken(compilation.Tokens.Tokens, position with { Character = position.Character - 1 }))
+                return new CompletionList([], false);
+            if (!TryGetTypedConstantContext(compilation, position, slotPosition, out var zdtTcCtx)
+                || zdtTcCtx.ExpectedType != TypeKind.ZonedDateTime)
+                return new CompletionList([], false);
+            return CreateCompletionList(GetZonedDateTimeBracketTimezoneItems(string.Empty, appendClosingBracket: true));
         }
 
         // Dot trigger: always attempt member access completions.
@@ -1014,8 +1028,10 @@ internal sealed class CompletionHandler : ICompletionHandler
             TypeKind.Boolean => GetBooleanLiteralItems(tcContext),
             TypeKind.Duration or TypeKind.Period => GetTemporalLiteralItems(compilation, tcContext, position),
             TypeKind.Money => GetMoneyLiteralItems(compilation, tcContext, position),
-            TypeKind.Date or TypeKind.Time or TypeKind.Instant or TypeKind.DateTime
-                or TypeKind.ZonedDateTime => GetTemporalDateTimeSnippetItems(compilation, tcContext),
+            TypeKind.Date or TypeKind.Time or TypeKind.Instant or TypeKind.DateTime => GetTemporalDateTimeSnippetItems(compilation, tcContext),
+            TypeKind.ZonedDateTime => TryGetZonedDateTimeBracketPartial(compilation.Tokens.Tokens, position, out var bracketPartial, out var hasClosingBracket)
+                ? GetZonedDateTimeBracketTimezoneItems(bracketPartial, appendClosingBracket: !hasClosingBracket)
+                : GetTemporalDateTimeSnippetItems(compilation, tcContext),
             TypeKind.Timezone => GetTimezoneItems(compilation, tcContext),
             TypeKind.Currency => GetCurrencyCodeItems(tcContext),
             TypeKind.UnitOfMeasure => GetUnitOfMeasureItems(tcContext),
@@ -1327,6 +1343,81 @@ internal sealed class CompletionHandler : ICompletionHandler
         return DistinctByLabel(
             reused.Select(v => CreateItem(v, "IANA timezone", CompletionItemKind.Value, CompletionSortGroup.TypedConstant))
                 .Concat(allZoneIds.Select(id => CreateItem(id, "IANA timezone", CompletionItemKind.Unit, CompletionSortGroup.TypedConstantSegment))));
+    }
+
+    // ── ZonedDateTime bracket timezone completions ─────────────────────────────
+
+    /// <summary>
+    /// Returns true when the cursor is inside the <c>[…]</c> bracket of a zoneddatetime literal,
+    /// providing the partial timezone text typed so far and whether a closing <c>]</c> is already present.
+    /// </summary>
+    private static bool TryGetZonedDateTimeBracketPartial(
+        ImmutableArray<Token> tokens,
+        Position position,
+        out string partialText,
+        out bool hasClosingBracket)
+    {
+        partialText = string.Empty;
+        hasClosingBracket = false;
+
+        var tokenIndex = FindTokenAtOrBeforeCursor(tokens, position);
+        if (tokenIndex < 0)
+            return false;
+
+        var token = tokens[tokenIndex];
+        if (!IsTypedConstantToken(token.Kind) || !Contains(token.Span, position))
+            return false;
+
+        // token.Span.StartColumn is 1-based (the opening quote position).
+        // position.Character is 0-based. Content starts one column after the opening quote.
+        var cursorContentOffset = Math.Clamp(
+            position.Character - token.Span.StartColumn,
+            0,
+            token.Text.Length);
+
+        var textBeforeCursor = token.Text[..cursorContentOffset];
+
+        // Find the last '[' before the cursor that has no matching ']' after it.
+        var lastOpenBracket = textBeforeCursor.LastIndexOf('[');
+        if (lastOpenBracket < 0)
+            return false;
+
+        // If there's a ']' between the '[' and the cursor, we're after the bracket, not inside it.
+        if (textBeforeCursor.IndexOf(']', lastOpenBracket) >= 0)
+            return false;
+
+        partialText = textBeforeCursor[(lastOpenBracket + 1)..];
+
+        // Check whether a closing ']' is already in the token text immediately after the cursor.
+        hasClosingBracket = cursorContentOffset < token.Text.Length
+            && token.Text[cursorContentOffset] == ']';
+
+        return true;
+    }
+
+    /// <summary>
+    /// Returns NodaTime TZDB timezone completion items for use inside a <c>[…]</c> bracket
+    /// within a zoneddatetime literal, filtered by the partial text typed so far.
+    /// </summary>
+    private static IEnumerable<CompletionItem> GetZonedDateTimeBracketTimezoneItems(
+        string partial,
+        bool appendClosingBracket = false)
+    {
+        var allZoneIds = DateTimeZoneProviders.Tzdb.Ids;
+        var matching = string.IsNullOrEmpty(partial)
+            ? allZoneIds
+            : allZoneIds.Where(id => id.Contains(partial, StringComparison.OrdinalIgnoreCase));
+
+        return matching.Select(id =>
+        {
+            var insertText = appendClosingBracket ? id + "]" : id;
+            return CreateItem(
+                label: id,
+                detail: "IANA timezone",
+                kind: CompletionItemKind.Unit,
+                sortGroup: CompletionSortGroup.TypedConstantSegment,
+                insertText: insertText);
+        });
     }
 
     private static IEnumerable<CompletionItem> GetCurrencyCodeItems(TypedConstantContext tcContext)

@@ -23,7 +23,7 @@ public class CompletionHandlerTests
         var handler = new CompletionHandler(new DocumentStore());
         var options = handler.GetRegistrationOptions(new CompletionCapability(), new ClientCapabilities());
 
-        options.TriggerCharacters.Should().BeEquivalentTo([" ", "'", ".", ">", "~", "{"]);
+        options.TriggerCharacters.Should().BeEquivalentTo([" ", "'", ".", ">", "~", "{", "["]);
     }
 
     [Fact]
@@ -2679,6 +2679,63 @@ public class CompletionHandlerTests
         item.InsertTextFormat.Should().Be(InsertTextFormat.Snippet);
         item.InsertText.Should().Contain("{CatalogCurrency}", "template must use literal brace interpolation for the field name");
         item.InsertText.Should().NotContain("${2:", "no second tab stop — currency is provided by field reference");
+    }
+
+    [Fact]
+    public async Task Completions_ZonedDateTimeConstant_InsideBracket_ReturnsTimezoneCompletions()
+    {
+        // Cursor inside the [...] bracket of a zoneddatetime literal — invoked completions
+        // should return timezone items from the TZDB catalog, not ZDT date/time snippets.
+        var completions = await GetCompletionsAsync("""
+            precept EventLog
+            field MeetingAt as zoneddatetime default '2026-05-16T14:30:00[America/tor¦]'
+            state Open initial terminal
+            """);
+
+        var labels = completions.Items.Select(i => i.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain("America/Toronto", "timezone completions must be shown inside the bracket");
+        labels.Should().Contain("America/Tortola", "America/Tortola also contains 'tor' and must appear");
+        labels.Should().NotContain("zoned date-time — explicit zone", "date/time snippets must not appear inside the bracket");
+        labels.Should().NotContain(["field", "state", "event", "rule"], "DSL keywords must not appear");
+        labels.Should().NotContain("America/New_York", "timezone not matching 'tor' must be filtered out");
+    }
+
+    [Fact]
+    public async Task Completions_ZonedDateTimeConstant_InsideBracket_FiltersByPartialText()
+    {
+        // Only timezone IDs containing the partial text should be returned.
+        var completions = await GetCompletionsAsync("""
+            precept EventLog
+            field MeetingAt as zoneddatetime default '2026-05-16T14:30:00[Europe/¦]'
+            state Open initial terminal
+            """);
+
+        var labels = completions.Items.Select(i => i.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain("Europe/London");
+        labels.Should().Contain("Europe/Paris");
+        labels.Should().NotContain("America/New_York", "non-matching timezone must be filtered out");
+    }
+
+    [Fact]
+    public async Task Completions_ZonedDateTimeConstant_OutsideBracket_NoTimezoneCompletions()
+    {
+        // Cursor in the date portion of the literal (before any '[') — ZDT snippet items
+        // must be offered, not raw timezone IDs.
+        var completions = await GetCompletionsAsync("""
+            precept EventLog
+            field MeetingAt as zoneddatetime default '2026-05-16¦'
+            state Open initial terminal
+            """);
+
+        var labels = completions.Items.Select(i => i.Label).ToArray();
+
+        completions.IsIncomplete.Should().BeFalse();
+        labels.Should().Contain("zoned date-time — explicit zone", "ZDT snippet must appear when cursor is outside the bracket");
+        labels.Should().NotContain("America/New_York", "raw timezone IDs must not appear outside the bracket");
     }
 }
 

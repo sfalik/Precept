@@ -27,7 +27,7 @@ public class ServerCapabilityTests
         capabilities.SemanticTokensProvider!.Legend.TokenTypes.Should().Contain("preceptName");
 
         capabilities.CompletionProvider.Should().NotBeNull();
-        capabilities.CompletionProvider!.TriggerCharacters.Should().BeEquivalentTo([" ", "'", ".", ">", "~", "{"]);
+        capabilities.CompletionProvider!.TriggerCharacters.Should().BeEquivalentTo([" ", "'", ".", ">", "~", "{", "["]);
 
         capabilities.HoverProvider.Should().NotBeNull();
         capabilities.HoverProvider!.RawValue.Should().NotBeNull();
