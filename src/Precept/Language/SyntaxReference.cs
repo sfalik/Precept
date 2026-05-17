@@ -150,11 +150,11 @@ public static class SyntaxReference
             "Collection state gate",
             "A transition that branches on collection state such as element count before deciding whether to advance or remain in place.",
             """
-            from InterviewLoop on RecordFeedback when PendingInterviewers.count == 1
+            from InterviewLoop on RecordFeedback when PendingInterviewers.count == 1 and CurrentInterviewer is set
                 -> remove PendingInterviewers CurrentInterviewer
                 -> set FeedbackCount = FeedbackCount + 1
                 -> transition Decision
-            from InterviewLoop on RecordFeedback when PendingInterviewers.count > 1
+            from InterviewLoop on RecordFeedback when PendingInterviewers.count > 1 and CurrentInterviewer is set
                 -> remove PendingInterviewers CurrentInterviewer
                 -> set FeedbackCount = FeedbackCount + 1
                 -> no transition
