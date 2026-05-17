@@ -288,7 +288,7 @@ public static class Modifiers
         // ── Event modifiers ─────────────────────────────────────────────────────
         ModifierKind.InitialEvent => new EventModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Initial),
-            "Construction mechanism — fires once at entity creation",
+            "Marks this event as the construction event. Can only be fired via Precept.Create(). Only one event per precept may be marked initial.",
             ModifierCategory.Structural, GraphAnalysisKind.InitialEventCompatibility),
 
         // ── Access modifiers ────────────────────────────────────────────────────

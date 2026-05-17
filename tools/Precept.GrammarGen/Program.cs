@@ -309,32 +309,17 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
 
     repo["eventDeclaration"] = new JsonObject
     {
-        ["comment"] = "event Name[, Name, ...] [modifier] or event Name [modifier](Arg as type, ...)",
+        ["comment"] = "event Name[(Args)] [modifier][, ...] with resilient trailing guard highlighting",
         ["patterns"] = new JsonArray
         {
             new JsonObject
             {
                 ["name"] = "meta.declaration.event.precept",
-                ["match"] = $"^(\\s*)(event)(\\s+)((?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)(\\s+(?:{eventModifierAlt})\\b)?(\\s*\\(.*)?",
+                ["match"] = $"^(\\s*)(event)(\\s+)(.+?)(\\s+when\\b.*)?$",
                 ["captures"] = new JsonObject
                 {
                     ["2"] = new JsonObject { ["name"] = "keyword.declaration.precept" },
                     ["4"] = new JsonObject
-                    {
-                        ["patterns"] = new JsonArray
-                        {
-                            new JsonObject { ["name"] = "entity.name.function.event.precept", ["match"] = "\\b[A-Za-z_][A-Za-z0-9_]*\\b" },
-                            new JsonObject { ["name"] = "punctuation.separator.comma.precept", ["match"] = "," }
-                        }
-                    },
-                    ["5"] = new JsonObject
-                    {
-                        ["patterns"] = new JsonArray
-                        {
-                            new JsonObject { ["name"] = eventModifierScope, ["match"] = $"\\b(?:{eventModifierAlt})\\b" }
-                        }
-                    },
-                    ["6"] = new JsonObject
                     {
                         ["patterns"] = new JsonArray
                         {
@@ -343,6 +328,12 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
                             {
                                 ["match"] = "\\b([A-Za-z_][A-Za-z0-9_]*)(?=\\s+as\\b)",
                                 ["captures"] = new JsonObject { ["1"] = new JsonObject { ["name"] = "variable.parameter.precept" } }
+                            },
+                            new JsonObject { ["name"] = eventModifierScope, ["match"] = $"\\b(?:{eventModifierAlt})\\b" },
+                            new JsonObject
+                            {
+                                ["match"] = $"\\b([A-Za-z_][A-Za-z0-9_]*)(?=\\s*(?:\\(|,|\\b(?:{eventModifierAlt}|when)\\b|$))",
+                                ["captures"] = new JsonObject { ["1"] = new JsonObject { ["name"] = "entity.name.function.event.precept" } }
                             },
                             new JsonObject { ["include"] = "#semanticKeywords" },
                             new JsonObject { ["include"] = "#grammarKeywords" },
@@ -354,6 +345,24 @@ static void AddStructuralPatterns(JsonObject repo, Dictionary<string, List<Token
                             new JsonObject { ["include"] = "#booleanLiterals" },
                             new JsonObject { ["name"] = "punctuation.precept", ["match"] = "[()]" },
                             new JsonObject { ["name"] = "punctuation.separator.comma.precept", ["match"] = "," },
+                            new JsonObject { ["include"] = "#identifierReference" }
+                        }
+                    },
+                    ["5"] = new JsonObject
+                    {
+                        ["patterns"] = new JsonArray
+                        {
+                            new JsonObject { ["include"] = "#symbolOperators" },
+                            new JsonObject { ["include"] = "#ruleDesugaringModifiers" },
+                            new JsonObject { ["include"] = "#grammarKeywords" },
+                            new JsonObject { ["include"] = "#semanticKeywords" },
+                            new JsonObject { ["include"] = "#typeKeywords" },
+                            new JsonObject { ["include"] = "#numbers" },
+                            new JsonObject { ["include"] = "#strings" },
+                            new JsonObject { ["include"] = "#booleanLiterals" },
+                            new JsonObject { ["include"] = "#functionCalls" },
+                            new JsonObject { ["include"] = "#fieldReference" },
+                            new JsonObject { ["include"] = "#eventArgReference" },
                             new JsonObject { ["include"] = "#identifierReference" }
                         }
                     }

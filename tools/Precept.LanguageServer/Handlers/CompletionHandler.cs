@@ -457,6 +457,7 @@ internal sealed class CompletionHandler : ICompletionHandler
         ParsedConstruct construct)
     {
         if (construct.Meta.Kind == ConstructKind.EventDeclaration
+            && !IsAfterEventArgumentList(compilation, position)
             && TryGetCurrentEventArg(compilation, position, out _))
         {
             return ModifierDomain.Field;
@@ -2976,6 +2977,21 @@ internal sealed class CompletionHandler : ICompletionHandler
         return true;
     }
 
+    private static bool IsAfterEventArgumentList(Compilation compilation, Position position)
+    {
+        var tokens = compilation.Tokens.Tokens;
+        var tokenIndex = FindTokenAtOrBeforeCursor(tokens, position);
+        if (tokenIndex < 0)
+        {
+            return false;
+        }
+
+        tokenIndex = AdjustTokenIndexForBoundary(tokens, tokenIndex, position);
+        return tokenIndex >= 0
+            && tokens[tokenIndex].Kind == TokenKind.RightParen
+            && !Contains(tokens[tokenIndex].Span, position);
+    }
+
     private static string? TryGetCurrentEventArgName(Compilation compilation, Position position)
     {
         var tokens = compilation.Tokens.Tokens;
@@ -3284,8 +3300,10 @@ internal sealed class CompletionHandler : ICompletionHandler
             || Modifiers.All.Any(modifier => modifier.Token.Kind == token.Kind);
         var isDeclarationTypeToken = tokenMeta.Categories.Contains(TokenCategory.Type)
             && construct.Meta.Kind is ConstructKind.FieldDeclaration or ConstructKind.EventDeclaration;
+        var isEventArgumentListClose = construct.Meta.Kind == ConstructKind.EventDeclaration
+            && token.Kind == TokenKind.RightParen;
 
-        if (!isDeclarationName && !isModifierToken && !isDeclarationTypeToken)
+        if (!isDeclarationName && !isModifierToken && !isDeclarationTypeToken && !isEventArgumentListClose)
         {
             items = [];
             return false;

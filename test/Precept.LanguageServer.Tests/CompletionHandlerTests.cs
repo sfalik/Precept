@@ -568,12 +568,9 @@ public class CompletionHandlerTests
     }
 
     [Fact]
-    public async Task Completions_EventDeclarationName_OffersEventModifiers()
+    public async Task CompletionProvider_EventDeclaration_OffersInitialModifier()
     {
-        // Regression: cursor after 'event EventName ' (space after event name) was falling through
-        // to SlotContext.TopLevel because no specialized check handled the event name Identifier,
-        // causing top-level keyword completions (precept, field, state, etc.) to appear.
-        var completions = await GetCompletionsAsync("""
+        var afterName = await GetCompletionsAsync("""
             precept Test
             field test as integer
             state offState initial
@@ -582,12 +579,25 @@ public class CompletionHandlerTests
             from offState on toggle
                 -> transition onState
             """, " ");
-        var labels = completions.Items.Select(item => item.Label).ToArray();
+        var afterArgs = await GetCompletionsAsync("""
+            precept Test
+            field test as integer
+            state offState initial
+            state onState
+            event toggle(Value as integer) ¦
+            from offState on toggle
+                -> transition onState
+            """, " ");
 
-        labels.Should().NotContain(["precept", "field", "state", "event", "from", "rule"],
+        var afterNameLabels = afterName.Items.Select(item => item.Label).ToArray();
+        var afterArgsLabels = afterArgs.Items.Select(item => item.Label).ToArray();
+
+        afterNameLabels.Should().NotContain(["precept", "field", "state", "event", "from", "rule"],
             "top-level construct keywords must not appear after an event name");
-        labels.Should().Contain("initial",
+        afterNameLabels.Should().Contain("initial",
             "'initial' modifier must be offered after an event name");
+        afterArgsLabels.Should().Contain("initial",
+            "'initial' modifier must be offered after an event parameter list");
     }
 
     [Fact]

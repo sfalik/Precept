@@ -258,11 +258,11 @@
       ]
     },
     "eventDeclaration": {
-      "comment": "event Name[, Name, ...] [modifier] or event Name [modifier](Arg as type, ...)",
+      "comment": "event Name[(Args)] [modifier][, ...] with resilient trailing guard highlighting",
       "patterns": [
         {
           "name": "meta.declaration.event.precept",
-          "match": "^(\\s*)(event)(\\s\u002B)((?:[A-Za-z_][A-Za-z0-9_]*\\s*,\\s*)*[A-Za-z_][A-Za-z0-9_]*)(\\s\u002B(?:initial)\\b)?(\\s*\\(.*)?",
+          "match": "^(\\s*)(event)(\\s\u002B)(.\u002B?)(\\s\u002Bwhen\\b.*)?$",
           "captures": {
             "2": {
               "name": "keyword.declaration.precept"
@@ -270,30 +270,22 @@
             "4": {
               "patterns": [
                 {
-                  "name": "entity.name.function.event.precept",
-                  "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b"
-                },
-                {
-                  "name": "punctuation.separator.comma.precept",
-                  "match": ","
-                }
-              ]
-            },
-            "5": {
-              "patterns": [
-                {
-                  "name": "keyword.other.semantic.precept",
-                  "match": "\\b(?:initial)\\b"
-                }
-              ]
-            },
-            "6": {
-              "patterns": [
-                {
                   "match": "\\b([A-Za-z_][A-Za-z0-9_]*)(?=\\s\u002Bas\\b)",
                   "captures": {
                     "1": {
                       "name": "variable.parameter.precept"
+                    }
+                  }
+                },
+                {
+                  "name": "keyword.other.semantic.precept",
+                  "match": "\\b(?:initial)\\b"
+                },
+                {
+                  "match": "\\b([A-Za-z_][A-Za-z0-9_]*)(?=\\s*(?:\\(|,|\\b(?:initial|when)\\b|$))",
+                  "captures": {
+                    "1": {
+                      "name": "entity.name.function.event.precept"
                     }
                   }
                 },
@@ -328,6 +320,46 @@
                 {
                   "name": "punctuation.separator.comma.precept",
                   "match": ","
+                },
+                {
+                  "include": "#identifierReference"
+                }
+              ]
+            },
+            "5": {
+              "patterns": [
+                {
+                  "include": "#symbolOperators"
+                },
+                {
+                  "include": "#ruleDesugaringModifiers"
+                },
+                {
+                  "include": "#grammarKeywords"
+                },
+                {
+                  "include": "#semanticKeywords"
+                },
+                {
+                  "include": "#typeKeywords"
+                },
+                {
+                  "include": "#numbers"
+                },
+                {
+                  "include": "#strings"
+                },
+                {
+                  "include": "#booleanLiterals"
+                },
+                {
+                  "include": "#functionCalls"
+                },
+                {
+                  "include": "#fieldReference"
+                },
+                {
+                  "include": "#eventArgReference"
                 },
                 {
                   "include": "#identifierReference"

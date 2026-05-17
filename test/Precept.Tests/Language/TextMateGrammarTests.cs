@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using FluentAssertions;
 using Xunit;
 
@@ -66,20 +67,26 @@ public sealed class TextMateGrammarTests
         GetCapture("functionCallsCI", "1")["name"]!.GetValue<string>().Should().Be("support.function.precept");
     }
 
-    [Fact]
-    public void Grammar_EventInitial_Highlighted()
+    [Theory]
+    [InlineData("event Create initial")]
+    [InlineData("event Create(Name as string) initial")]
+    public void Grammar_EventDeclaration_InitialModifierMatchesNameAndArgsVariants(string source)
     {
-        // Slice 10: The grammar generator must emit an explicit capture group for the
-        // `initial` modifier in event declarations so it gets the correct scope even
-        // when there are no parenthesized args (e.g. `event Create initial`).
-        var capture5 = GetCapture("eventDeclaration", "5");
-        var patterns = capture5["patterns"]!.AsArray();
-
-        // group 5 must have a pattern that matches the event modifier keyword
+        var patterns = GetCapture("eventDeclaration", "4")["patterns"]!.AsArray();
         var initialIndex = FindPatternIndex(patterns, "keyword.other.semantic.precept", "\\b(?:initial)\\b");
+
         initialIndex.Should().BeGreaterThanOrEqualTo(0,
-            because: "initial modifier must be captured with keyword.other.semantic.precept scope in event declaration group 5");
+            because: "initial modifier must be highlighted inside the event entry capture regardless of whether args are present");
+        GetRepositoryRegex("eventDeclaration").IsMatch(source).Should().BeTrue(
+            because: $"the generated event declaration regex must match '{source}'");
     }
+
+    [Theory]
+    [InlineData("event Create initial when Name != \"\"")]
+    [InlineData("event Create(Name as string) initial when Name != \"\"")]
+    public void Grammar_EventDeclaration_InitialModifierMatchesWhenVariants(string source)
+        => GetRepositoryRegex("eventDeclaration").IsMatch(source).Should().BeTrue(
+            because: $"the generated event declaration regex must keep the initial modifier highlighted in '{source}'");
 
     [Fact]
     public void DoubleQuotedStringEscapes_UseEscapeScope()
@@ -114,6 +121,9 @@ public sealed class TextMateGrammarTests
         => GetRepositoryPattern(repositoryKey)["captures"]!
             .AsObject()[captureKey]!
             .AsObject();
+
+    private static Regex GetRepositoryRegex(string repositoryKey)
+        => new(GetRepositoryPattern(repositoryKey)["match"]!.GetValue<string>(), RegexOptions.Compiled);
 
     private static int FindPatternIndex(JsonArray patterns, string name, string match)
     {
