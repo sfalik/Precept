@@ -160,10 +160,12 @@ internal sealed class CompletionHandler : ICompletionHandler
         // so normalize null/empty the same way here.
         // SlotPositionResolver may return null if the parse tree doesn't cover the literal span,
         // so detect by inspecting the raw token under the cursor instead.
+        // Never append a closing quote here: the cursor is inside an existing typed-constant token,
+        // which always has a closing ' present (auto-close or explicit). Appending would produce
+        // 'content''.
         if (string.IsNullOrEmpty(triggerCharacter) && IsInsideTypedConstantToken(compilation.Tokens.Tokens, position))
         {
-            var appendQuote = IsEmptyTypedConstantToken(compilation.Tokens.Tokens, position);
-            return CreateCompletionList(GetTypedConstantItems(compilation, position, slotPosition, appendQuote));
+            return CreateCompletionList(GetTypedConstantItems(compilation, position, slotPosition, appendClosingQuote: false));
         }
 
         // Ctrl+Space / invoked completion inside a {hole} in an interpolated typed constant.

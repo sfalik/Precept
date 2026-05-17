@@ -1679,6 +1679,30 @@ public class CompletionHandlerTests
         }
     }
 
+    [Fact]
+    public async Task TypedConstant_Invoked_InsideEmptyAutoClose_DoesNotAppendClosingQuote()
+    {
+        // Regression: when VS Code auto-close produces '' and the user presses Ctrl+Space,
+        // the invoked path must NOT append a closing quote — it is already in the document.
+        // The pre-fix code used appendQuote = IsEmptyTypedConstantToken(...) = true for '',
+        // which produced 'date-snippet'' (double closing quote).
+        var completions = await GetCompletionsAsync("""
+            precept ScheduleTest
+            field SubmittedOn as date default '¦'
+            state Open initial terminal
+            """, new CompletionContext
+            {
+                TriggerKind = CompletionTriggerKind.Invoked,
+                TriggerCharacter = string.Empty,
+            });
+
+        var item = completions.Items.Single(i => i.Label == "date — YYYY-MM-DD");
+
+        item.InsertTextFormat.Should().Be(InsertTextFormat.Snippet);
+        item.InsertText.Should().NotEndWith("'",
+            "closing quote already exists in the document; appending it would yield 'date''");
+    }
+
     // ─── Deferred: Singular vs Plural Temporal Preference ────────────────────────
 
     [Fact]
