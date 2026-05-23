@@ -218,6 +218,126 @@ For cases like the inventory sample, offer explicit dynamic templates:
 | `quantity — numerator / denominator fields` | `'${1:1} {${2:StockingUnit}}/{${3:PurchaseUnit}}'` | Matches sample authoring pattern |
 | `quantity — whole value field` | `'{${1:Qty}}'` | Reuse existing quantity value |
 
+### Price and exchange rate
+
+#### Price
+
+The `price` type represents a monetary amount per unit of measure. Its literal format is:
+
+```
+<decimal> <ISO-4217>/<UCUM-unit>
+```
+
+Examples from catalog: `4.17 USD/each`, `10.00 EUR/kg`.
+
+The qualifier shape `QS_CurrencyAndDimension` has two axes:
+- `in` → `QualifierAxis.PriceIn`: a compound or currency-only value. Resolves to `DeclaredQualifierMeta.CompoundPrice` when the value contains a `/` (e.g. `in 'USD/kg'`, `in '{CatalogCurrency}/{SaleUnit}'`); resolves to `DeclaredQualifierMeta.Currency` when currency-only (e.g. `in 'USD'`, `in '{CatalogCurrency}'`).
+- `of` → `QualifierAxis.Dimension`: a dimension family. Resolves to `DeclaredQualifierMeta.Dimension`. Only valid when `in` is also present (`OfRequiresCurrencyIn: true`). The `of` dimension value is often an accessor expression like `'{SaleUnit.dimension}'` — in that case `Dimension.SourceFieldName` is the receiver field name (e.g. `SaleUnit`), which is the unit field to interpolate in the literal.
+
+**Completion templates — initial phase (Empty):**
+
+| `in` qualifier | `of` qualifier | Completion label | `snippetTemplate` |
+|---|---|---|---|
+| `CompoundPrice` literal: `'USD/kg'` | — | `price — USD/kg` | `${1:0.00} USD/kg` |
+| `CompoundPrice` field: `'{SomeField}'` | — | `price — SomeField rate` | `${1:0.00} {SomeField}` |
+| `Currency` literal: `'USD'` + `Dimension` literal: `'mass'` | (dimension known) | one item per `BrowseTier1` unit in dimension | `${1:0.00} USD/kg`, `${1:0.00} USD/g`, … |
+| `Currency` field: `'{CatalogCurrency}'` + `Dimension` literal: `'mass'` | (dimension known) | one item per `BrowseTier1` unit in dimension | `${1:0.00} {CatalogCurrency}/kg`, … |
+| `Currency` literal: `'USD'` + `Dimension` field: `'{SaleUnit}'` | (dimension dynamic) | `price — USD/SaleUnit` | `${1:0.00} USD/{SaleUnit}` |
+| `Currency` field: `'{CatalogCurrency}'` + `Dimension` field: `'{SaleUnit}'` | (dimension dynamic) | `price — CatalogCurrency/SaleUnit` | `${1:0.00} {CatalogCurrency}/{SaleUnit}` |
+| `Currency` literal: `'USD'`, no `of` | — | `price — USD/unit` | `${1:0.00} USD/${2:each}` |
+| `Currency` field: `'{CatalogCurrency}'`, no `of` | — | `price — CatalogCurrency/unit` | `${1:0.00} {CatalogCurrency}/${2:each}` |
+| none | — | `price — amount + currency/unit` | `${1:0.00} ${2:USD}/${3:each}` |
+
+Dimension-filtered items (rows 3 and 4) use `UcumCatalog.BrowseTier1().Where(atom => atom.Vector == dimAlias.Vector)` — the same pattern proven in `GetQuantitySlotItems`. Each qualifying atom produces one snippet item. Full filtered catalog, ranked (no hardcoded shortlists).
+
+**Completion items — slot phase (AfterNumberSpace, UnitTyping):**
+
+After the user types `<number><space>`, offer the currency/unit suffix:
+
+| Qualifier state | Slot item(s) |
+|---|---|
+| `CompoundPrice` literal | `USD/kg` — the bound currency/unit pair |
+| `CompoundPrice` field | Fall through to example-based stripping (value is runtime-dynamic) |
+| `Currency` literal + `Dimension` literal | Dimension-filtered: `USD/kg`, `USD/g`, … (currency code prefixed to each unit) |
+| `Currency` field + `Dimension` literal | Fall through to examples (currency is runtime-dynamic; cannot prefix) |
+| `Currency` literal, no `of` | `USD/` prefix + example-based unit suffixes (strip amount from examples, reattach currency prefix) |
+| `Currency` field, no `of` | Fall through to examples |
+| none | Example-based: strip amount prefix, offer remaining `currency/unit` tokens |
+
+**Test cases:**
+
+| Test name | What it verifies |
+|---|---|
+| `Completions_TypedConstant_Price_CompoundLiteral_PrefillsBoth` | `price in 'USD/kg'` → `CompoundPrice` → `${1:0.00} USD/kg` with both locked |
+| `Completions_TypedConstant_Price_CompoundField_PrefillsFieldName` | `price in '{SomeField}'` → `CompoundPrice(SourceFieldName)` → `${1:0.00} {SomeField}` |
+| `Completions_TypedConstant_Price_CurrencyAndDimension_LiteralBoth_DimensionFilteredItems` | `price in 'USD' of 'mass'` → multiple snippets, all `USD/<unit>`, units from `BrowseTier1` mass-family |
+| `Completions_TypedConstant_Price_CurrencyAndDimension_LiteralBoth_NoLengthUnits` | Same context — NO length-family units appear |
+| `Completions_TypedConstant_Price_CurrencyAndDimension_CurrencyField_DimensionLiteral` | `price in '{CatalogCurrency}' of 'mass'` → items use `{CatalogCurrency}` interpolation prefix |
+| `Completions_TypedConstant_Price_CurrencyLiteral_DimensionField_InterpolatesUnit` | `price in 'USD' of '{SaleUnit.dimension}'` → `${1:0.00} USD/{SaleUnit}` |
+| `Completions_TypedConstant_Price_CurrencyField_DimensionField_InterpolatesBoth` | `price in '{CatalogCurrency}' of '{SaleUnit.dimension}'` → `${1:0.00} {CatalogCurrency}/{SaleUnit}` |
+| `Completions_TypedConstant_Price_CurrencyOnlyLiteral_UnitTabStop` | `price in 'USD'` (no `of`) → `${1:0.00} USD/${2:each}` |
+| `Completions_TypedConstant_Price_Unqualified_GenericTemplate` | No qualifiers → `${1:0.00} ${2:USD}/${3:each}` |
+| `Completions_TypedConstant_Price_SlotPhase_CompoundLiteral_OffersPair` | Slot after amount: `CompoundPrice in 'USD/kg'` → slot offers `USD/kg` |
+| `Completions_TypedConstant_Price_SlotPhase_CurrencyAndDimension_DimensionFiltered` | Slot after amount: `in 'USD' of 'mass'` → dimension-filtered slot items |
+
+---
+
+#### Exchange rate
+
+The `exchangerate` type represents a currency conversion ratio. Its literal format is:
+
+```
+<decimal> <from-ISO-4217>/<to-ISO-4217>
+```
+
+Examples from catalog: `1.08 USD/EUR`. Semantics: 1 unit of the `in` (from) currency equals `<decimal>` units of the `to` currency.
+
+The qualifier shape `QS_ExchangeRate` has two **independent** axes (no `InOfExclusive`, no `OfRequiresCurrencyIn`):
+- `in` → `QualifierAxis.FromCurrency`: the source currency. Resolves to `DeclaredQualifierMeta.FromCurrency(CurrencyCode)` for literals or `FromCurrency(SourceFieldName)` for interpolated fields.
+- `to` → `QualifierAxis.ToCurrency`: the target currency. Resolves to `DeclaredQualifierMeta.ToCurrency(CurrencyCode)` or `ToCurrency(SourceFieldName)`.
+
+**Completion templates — initial phase (Empty):**
+
+| `in` (FromCurrency) | `to` (ToCurrency) | Completion label | `snippetTemplate` |
+|---|---|---|---|
+| literal: `'USD'` | literal: `'EUR'` | `exchange rate — USD/EUR` | `${1:1.00} USD/EUR` |
+| field: `'{SupplierCurrency}'` | literal: `'EUR'` | `exchange rate — SupplierCurrency/EUR` | `${1:1.00} {SupplierCurrency}/EUR` |
+| literal: `'USD'` | field: `'{CatalogCurrency}'` | `exchange rate — USD/CatalogCurrency` | `${1:1.00} USD/{CatalogCurrency}` |
+| field: `'{SupplierCurrency}'` | field: `'{CatalogCurrency}'` | `exchange rate — SupplierCurrency/CatalogCurrency` | `${1:1.00} {SupplierCurrency}/{CatalogCurrency}` |
+| literal: `'USD'` | none | `exchange rate — USD/target` | `${1:1.00} USD/${2:EUR}` |
+| field: `'{SupplierCurrency}'` | none | `exchange rate — SupplierCurrency/target` | `${1:1.00} {SupplierCurrency}/${2:EUR}` |
+| none | literal: `'EUR'` | `exchange rate — source/EUR` | `${1:1.00} ${2:USD}/EUR` |
+| none | field: `'{CatalogCurrency}'` | `exchange rate — source/CatalogCurrency` | `${1:1.00} ${2:USD}/{CatalogCurrency}` |
+| none | none | `exchange rate — from/to` | `${1:1.00} ${2:USD}/${3:EUR}` |
+
+**Completion items — slot phase (AfterNumberSpace, UnitTyping):**
+
+After the user types `<decimal><space>`, offer the from/to currency pair:
+
+| Qualifier state | Slot item(s) |
+|---|---|
+| Both `FromCurrency` literal + `ToCurrency` literal | Single item: `USD/EUR` |
+| `FromCurrency` literal, `ToCurrency` none | Currency catalog items in `USD/<code>` form |
+| `ToCurrency` literal, `FromCurrency` none | Currency catalog items in `<code>/EUR` form |
+| Either or both are fields | Fall through to examples |
+| none | Example-based: strip amount, offer `from/to` suffix tokens |
+
+**Test cases:**
+
+| Test name | What it verifies |
+|---|---|
+| `Completions_TypedConstant_ExchangeRate_BothLiteral_PrefillsBoth` | `exchangerate in 'USD' to 'EUR'` → `${1:1.00} USD/EUR` |
+| `Completions_TypedConstant_ExchangeRate_FromField_ToLiteral` | `exchangerate in '{SupplierCurrency}' to 'USD'` → `${1:1.00} {SupplierCurrency}/USD` |
+| `Completions_TypedConstant_ExchangeRate_FromLiteral_ToField` | `exchangerate in 'USD' to '{CatalogCurrency}'` → `${1:1.00} USD/{CatalogCurrency}` |
+| `Completions_TypedConstant_ExchangeRate_BothFields` | `exchangerate in '{SupplierCurrency}' to '{CatalogCurrency}'` → `${1:1.00} {SupplierCurrency}/{CatalogCurrency}` |
+| `Completions_TypedConstant_ExchangeRate_FromLiteralOnly_ToTabStop` | `exchangerate in 'USD'` (no `to`) → `${1:1.00} USD/${2:EUR}` |
+| `Completions_TypedConstant_ExchangeRate_ToLiteralOnly_FromTabStop` | `exchangerate to 'EUR'` (no `in`) → `${1:1.00} ${2:USD}/EUR` |
+| `Completions_TypedConstant_ExchangeRate_Unqualified_GenericTemplate` | No qualifiers → `${1:1.00} ${2:USD}/${3:EUR}` |
+| `Completions_TypedConstant_ExchangeRate_SlotPhase_BothLiteral_OffersPair` | Slot after amount with `in 'USD' to 'EUR'` → offers `USD/EUR` |
+| `Completions_TypedConstant_ExchangeRate_SlotPhase_FromLiteralOnly_CurrencyCatalog` | Slot after amount with `in 'USD'` only → offers `USD/<code>` for all currencies |
+
+---
+
 ### 3.4 Interpolation recommendation
 
 ### Recommendation
@@ -316,6 +436,13 @@ The completion surface should adapt to qualifier shape before ranking anything e
 | `quantity of 'mass'` | filter starter units to mass-family UCUM units only |
 | `period in 'days'` | show day-based templates first; keep unit slot filtered to `day` / `days` |
 | `duration` | show time-based builders only; no calendar-unit templates |
+| `price in 'USD/kg'` | prefill both; primary template is `'${1:0.00} USD/kg'` |
+| `price in '{CatalogCurrency}' of '{SaleUnit.dimension}'` | interpolate both fields; primary template is `'${1:0.00} {CatalogCurrency}/{SaleUnit}'` |
+| `price in 'USD' of 'mass'` | currency prefilled; offer dimension-filtered unit snippets: `'${1:0.00} USD/kg'`, `'${1:0.00} USD/g'`, … |
+| `price in 'USD'` (no `of`) | currency prefilled; unit tab stop: `'${1:0.00} USD/${2:each}'` |
+| `exchangerate in 'USD' to 'EUR'` | prefill both; primary template is `'${1:1.00} USD/EUR'` |
+| `exchangerate in '{SupplierCurrency}' to '{CatalogCurrency}'` | interpolate both; primary template is `'${1:1.00} {SupplierCurrency}/{CatalogCurrency}'` |
+| `exchangerate in 'USD'` (no `to`) | from-currency prefilled; to-currency tab stop: `'${1:1.00} USD/${2:EUR}'` |
 
 ### 5.2 Scope-aware interpolation
 
@@ -347,6 +474,8 @@ The runtime has a `Timezone` qualifier axis, but `Types.cs` does not currently a
 | Scope-aware interpolation templates (`{CatalogCurrency}`, `{StockingUnit}`) | needs symbol/qualifier-aware ranking logic in completion handler | none | medium follow-up |
 | Dimension-filtered quantity starters | likely reuse existing catalog/dimension metadata; ranking/curation work in LS | none if catalog can already support the shortlist; otherwise policy question, not parser work | maybe second PR |
 | ZonedDateTime qualifier-aware prefills | depends on whether that qualifier surface is already intended | maybe none, maybe language-surface clarification | gated |
+| Qualifier-aware price snippets (A5) | extend `GetPriceSnippetItems` with `Currency+Dimension` branch; extend `GetPriceSlotItems` with dimension-filtered suffix items | none | follow-up to A4 |
+| Exchange-rate snippets and slot phase (A6) | new `GetExchangeRateLiteralItems` + `GetExchangeRateSnippetItems` + `GetExchangeRateSlotItems`; register `TypeKind.ExchangeRate` in both the `'` trigger switch and the space-trigger switch | none | follow-up to A5 |
 
 ### Tooling notes
 
@@ -391,7 +520,7 @@ That keeps the first PR valuable even if the interpolation polish follows immedi
 5. **Should `{` become an automatic completion trigger inside typed constants?** ~~I think yes — it is the premium interpolation move — but it does change trigger behavior globally for the LS registration.~~
    **OPEN — deferred to Shane.** Frank: architecturally fine. The `{` trigger must be guarded via `IsInsideTypedConstantToken` to fire only inside typed-constant spans. Implementation is Slice B, not Slice A. But adding `{` to `TriggerCharacters` (line 47) affects all completion contexts globally — Shane must confirm scope.
 6. **Do Shane and Frank want this first implementation limited to `date`, `time`, `instant`, `datetime`, `zoneddatetime`, `duration`, `period`, `money`, and `quantity`, or should `price` / `exchangerate` join the same pass?** ~~I would keep V1 focused unless Kramer says the incremental cost is trivial.~~
-   **OPEN — deferred to Shane.** Frank recommends deferring `price`/`exchangerate` to V2. Their compound qualifier shapes (`In`+`Of` and `In`+`To`) are more complex. Get the simpler types right first, then extend.
+   **CLOSED (Frank, 2026-05-17):** Deferred to V2 as recommended — `price` and `exchangerate` are now fully specified in §3.3.3 above and in Slices A5/A6 of §9. The compound qualifier shapes (`QS_CurrencyAndDimension` with `CompoundPrice` / `Currency` / `Dimension` meta subtypes, `QS_ExchangeRate` with `FromCurrency` / `ToCurrency`) are correctly understood and the spec is complete. Kramer's existing rough `GetPriceSnippetItems` is structurally sound but incomplete — see §9 Sub-slice A5 for the gap analysis and required extensions. `exchangerate` has no handler at all and needs to be built from scratch — see §9 Sub-slice A6.
 
 ---
 
@@ -701,6 +830,256 @@ This is the same pattern already proven in `GetQuantitySlotItems` (lines 1377–
 | `Completions_TypedConstant_Quantity_OfMass_ShowsDimensionFiltered` | `quantity of 'mass'` shows dimension-filtered units (kg, g, etc.) from `BrowseTier1` |
 | `Completions_TypedConstant_Quantity_OfMass_NoLengthUnits` | `quantity of 'mass'` does NOT include length units (m, cm, etc.) |
 | `Completions_TypedConstant_Quantity_Unqualified_ShowsGenericTemplate` | Unqualified quantity shows `${1:0} ${2:each}` or similar generic template |
+
+---
+
+#### Sub-slice A5: Qualifier-aware price templates + slot-phase dimension filtering
+
+**Depends on:** Slice 0.
+
+**File:** `tools/Precept.LanguageServer/Handlers/CompletionHandler.cs`
+
+**Assessment of Kramer's existing `GetPriceSnippetItems`:**
+
+Kramer's implementation (`GetPriceSnippetItems`, lines 1308–1365) is **structurally sound but incomplete**. It correctly handles `CompoundPrice` (both literal and field) and `Currency`-alone (both literal and field). It is **missing the `Currency + Dimension` combination** — when `Dimension` is also declared, the unit tab stop should be dimension-filtered, not a generic `${2:each}`.
+
+`GetPriceSlotItems` (lines 1769–1795) correctly handles `CompoundPrice` but ignores the `Dimension` qualifier entirely, falling to example-based stripping for all other cases. It must be extended to apply dimension-filtered slot items when `Currency` + `Dimension` are both present.
+
+`AppendToInsertText` (line 1053) already preserves `InsertTextFormat` — Slice 0 is already shipped. No blocker.
+
+**Changes needed:**
+
+**`GetPriceSnippetItems` — add `Currency + Dimension` branch:**
+
+After the `Currency`-alone case, before the generic fallback, add:
+
+```csharp
+// Currency + Dimension: dimension-filtered per-unit snippets
+var currencyQualifier = tcContext.Qualifiers.OfType<DeclaredQualifierMeta.Currency>().FirstOrDefault();
+var dimQualifier      = tcContext.Qualifiers.OfType<DeclaredQualifierMeta.Dimension>().FirstOrDefault();
+
+if (currencyQualifier is not null && dimQualifier is not null)
+{
+    var currencyPrefix = currencyQualifier.SourceFieldName is not null
+        ? $"{{{currencyQualifier.SourceFieldName}}}"
+        : currencyQualifier.CurrencyCode;
+
+    if (dimQualifier.SourceFieldName is not null)
+    {
+        // Dimension is a dynamic field reference — interpolate the unit field directly
+        yield return CreateItem(
+            label: $"price — {currencyPrefix}/{dimQualifier.SourceFieldName}",
+            detail: $"price in {currencyPrefix} per {dimQualifier.SourceFieldName} field",
+            kind: CompletionItemKind.Snippet,
+            sortGroup: CompletionSortGroup.TypedConstantSnippet,
+            snippetTemplate: $"${{1:0.00}} {currencyPrefix}/{{{dimQualifier.SourceFieldName}}}");
+    }
+    else if (DimensionCatalog.All.TryGetValue(dimQualifier.DimensionName, out var dimAlias))
+    {
+        // Dimension is a literal name — emit one snippet per Tier1 unit in the dimension family
+        foreach (var atom in UcumCatalog.BrowseTier1().Where(a => a.Vector == dimAlias.Vector))
+        {
+            yield return CreateItem(
+                label: $"price — {currencyPrefix}/{atom.Code}",
+                detail: $"price in {currencyPrefix} per {atom.Name}",
+                kind: CompletionItemKind.Snippet,
+                sortGroup: CompletionSortGroup.TypedConstantSnippet,
+                snippetTemplate: $"${{1:0.00}} {currencyPrefix}/{atom.Code}");
+        }
+    }
+    yield break;
+}
+```
+
+This branch must run **before** the `Currency`-alone check in the existing code. Restructure the existing method so the priority order is:
+1. `CompoundPrice` (compound literal or compound field) — existing, keep
+2. `Currency + Dimension` (new) — dimension-filtered or unit-field interpolation
+3. `Currency` alone (literal or field) — existing, keep but only reached when no `Dimension` qualifier
+4. Generic fallback — existing, keep
+
+**`GetPriceSlotItems` — add `Currency + Dimension` dimension-filtered suffix:**
+
+After the `compoundQualifier` check, before the example-based fallback, add:
+
+```csharp
+var currencyQualifier = tcContext.Qualifiers.OfType<DeclaredQualifierMeta.Currency>().FirstOrDefault();
+var dimQualifier      = tcContext.Qualifiers.OfType<DeclaredQualifierMeta.Dimension>().FirstOrDefault();
+
+if (currencyQualifier is { SourceFieldName: null } && dimQualifier is { SourceFieldName: null, DimensionName: var dimName }
+    && DimensionCatalog.All.TryGetValue(dimName, out var dimAlias))
+{
+    var currency = currencyQualifier.CurrencyCode;
+    return UcumCatalog.BrowseTier1()
+        .Where(a => a.Vector == dimAlias.Vector)
+        .Select(atom =>
+        {
+            var code = $"{currency}/{atom.Code}";
+            return CreateItem(code, $"price code: {currency} per {atom.Name}", CompletionItemKind.Unit, CompletionSortGroup.TypedConstantSegment);
+        });
+}
+```
+
+Only fires when both currency and dimension are literal (not field) — field-qualified slot items remain example-based.
+
+**Tests (file: `test/Precept.LanguageServer.Tests/CompletionHandlerTests.cs`):**
+
+| Test | What it verifies |
+|---|---|
+| `Completions_TypedConstant_Price_CompoundLiteral_PrefillsBoth` | `price in 'USD/kg'` → `CompoundPrice` → `${1:0.00} USD/kg` with both locked |
+| `Completions_TypedConstant_Price_CompoundField_PrefillsFieldName` | `price in '{SomeField}'` → `CompoundPrice(SourceFieldName)` → `${1:0.00} {SomeField}` |
+| `Completions_TypedConstant_Price_CurrencyAndDimension_LiteralBoth_DimensionFilteredItems` | `price in 'USD' of 'mass'` → multiple snippets, all `USD/<unit>`, units from `BrowseTier1` mass-family |
+| `Completions_TypedConstant_Price_CurrencyAndDimension_LiteralBoth_NoLengthUnits` | Same context — NO length-family units appear |
+| `Completions_TypedConstant_Price_CurrencyAndDimension_CurrencyField_DimensionLiteral` | `price in '{CatalogCurrency}' of 'mass'` → items use `{CatalogCurrency}` interpolation prefix |
+| `Completions_TypedConstant_Price_CurrencyLiteral_DimensionField_InterpolatesUnit` | `price in 'USD' of '{SaleUnit.dimension}'` → `${1:0.00} USD/{SaleUnit}` |
+| `Completions_TypedConstant_Price_CurrencyField_DimensionField_InterpolatesBoth` | `price in '{CatalogCurrency}' of '{SaleUnit.dimension}'` → `${1:0.00} {CatalogCurrency}/{SaleUnit}` |
+| `Completions_TypedConstant_Price_CurrencyOnlyLiteral_UnitTabStop` | `price in 'USD'` (no `of`) → `${1:0.00} USD/${2:each}` — Currency-alone path unchanged |
+| `Completions_TypedConstant_Price_Unqualified_GenericTemplate` | No qualifiers → `${1:0.00} ${2:USD}/${3:each}` |
+| `Completions_TypedConstant_Price_SlotPhase_CompoundLiteral_OffersPair` | Slot after amount: `in 'USD/kg'` → slot offers `USD/kg` |
+| `Completions_TypedConstant_Price_SlotPhase_CurrencyAndDimension_DimensionFiltered` | Slot after amount: `in 'USD' of 'mass'` → dimension-filtered slot items, all `USD/<unit>` |
+
+**Regression anchors:**
+
+Kramer's existing `CompoundPrice` and `Currency`-alone paths must continue to pass. The `GetPriceSnippetItems` restructuring must not break them.
+
+---
+
+#### Sub-slice A6: Exchange-rate qualifier-aware templates + slot phase
+
+**Depends on:** Slice 0. No dependency on A5 (can ship in parallel).
+
+**File:** `tools/Precept.LanguageServer/Handlers/CompletionHandler.cs`
+
+**Current state:** `TypeKind.ExchangeRate` has no handler. It falls through to `GetFreeFormItems` in the `'` trigger switch (line 1029–1045). The space-trigger slot dispatch (line 88–94) has no `TypeKind.ExchangeRate` case. Both gaps must be closed.
+
+**Changes needed:**
+
+**1. Add `GetExchangeRateLiteralItems` method:**
+
+```csharp
+private static IEnumerable<CompletionItem> GetExchangeRateLiteralItems(
+    Compilation compilation, TypedConstantContext tcContext, Position position)
+{
+    if (TryGetTypedConstantSlotPhase(compilation.Tokens.Tokens, position, out var phase, out var textBefore)
+        && phase != TypedConstantPhase.Empty)
+    {
+        return GetExchangeRateSlotItems(tcContext, textBefore, phase);
+    }
+
+    var typeMeta = Types.GetMeta(TypeKind.ExchangeRate);
+    var examples = typeMeta.ContentValidation?.Examples ?? [];
+    var reused   = TypedConstantCollector.CollectByType(compilation.Semantics, TypeKind.ExchangeRate);
+    return DistinctByLabel(
+        GetExchangeRateSnippetItems(tcContext)
+        .Concat(reused.Select(v => CreateItem(v, "exchange rate literal", CompletionItemKind.Value, CompletionSortGroup.TypedConstant)))
+        .Concat(examples.Select(e => CreateItem(e, "example format", CompletionItemKind.Snippet, CompletionSortGroup.TypedConstant))));
+}
+```
+
+**2. Add `GetExchangeRateSnippetItems` method:**
+
+```csharp
+private static IEnumerable<CompletionItem> GetExchangeRateSnippetItems(TypedConstantContext tcContext)
+{
+    var fromQualifier = tcContext.Qualifiers.OfType<DeclaredQualifierMeta.FromCurrency>().FirstOrDefault();
+    var toQualifier   = tcContext.Qualifiers.OfType<DeclaredQualifierMeta.ToCurrency>().FirstOrDefault();
+
+    var fromPart = fromQualifier switch
+    {
+        { SourceFieldName: not null } q => $"{{{q.SourceFieldName}}}",
+        { CurrencyCode: var code }      => code,
+        null                            => "${2:USD}",
+    };
+    var toPart = toQualifier switch
+    {
+        { SourceFieldName: not null } q => $"{{{q.SourceFieldName}}}",
+        { CurrencyCode: var code }      => code,
+        null                            => (fromQualifier is null ? "${3:EUR}" : "${2:EUR}"),
+    };
+
+    var label = $"exchange rate — {fromPart.TrimStart('{').TrimEnd('}')}/{toPart.TrimStart('{').TrimEnd('}')}";
+    yield return CreateItem(
+        label: label,
+        detail: "currency exchange rate",
+        kind: CompletionItemKind.Snippet,
+        sortGroup: CompletionSortGroup.TypedConstantSnippet,
+        snippetTemplate: $"${{1:1.00}} {fromPart}/{toPart}");
+}
+```
+
+Note: the tab-stop numbering follows the snippet spec — `${1:1.00}` is always the amount, `${2:...}` is the first unknown currency, `${3:...}` the second (only when both are unknown). When a currency is locked (literal or field), it becomes a literal string in the template, not a tab stop.
+
+**3. Add `GetExchangeRateSlotItems` method:**
+
+```csharp
+private static IEnumerable<CompletionItem> GetExchangeRateSlotItems(
+    TypedConstantContext tcContext,
+    string textBeforeCursor,
+    TypedConstantPhase phase)
+{
+    if (phase is not (TypedConstantPhase.AfterNumberSpace or TypedConstantPhase.UnitTyping))
+        return [];
+
+    var fromQualifier = tcContext.Qualifiers.OfType<DeclaredQualifierMeta.FromCurrency>().FirstOrDefault();
+    var toQualifier   = tcContext.Qualifiers.OfType<DeclaredQualifierMeta.ToCurrency>().FirstOrDefault();
+
+    // Both literal — offer the single bound pair
+    if (fromQualifier is { SourceFieldName: null, CurrencyCode: var fromCode }
+     && toQualifier   is { SourceFieldName: null, CurrencyCode: var toCode })
+    {
+        var code = $"{fromCode}/{toCode}";
+        return [CreateItem(code, $"exchange rate: {fromCode} to {toCode}", CompletionItemKind.Unit, CompletionSortGroup.TypedConstantSegment)];
+    }
+
+    // From literal only — offer currency catalog as from/X
+    if (fromQualifier is { SourceFieldName: null, CurrencyCode: var fromOnly } && toQualifier is null)
+    {
+        return CurrencyCatalog.All
+            .Select(c => CreateItem($"{fromOnly}/{c.Code}", $"from {fromOnly} to {c.Code}", CompletionItemKind.Unit, CompletionSortGroup.TypedConstantSegment));
+    }
+
+    // To literal only — offer currency catalog as X/to
+    if (toQualifier is { SourceFieldName: null, CurrencyCode: var toOnly } && fromQualifier is null)
+    {
+        return CurrencyCatalog.All
+            .Select(c => CreateItem($"{c.Code}/{toOnly}", $"from {c.Code} to {toOnly}", CompletionItemKind.Unit, CompletionSortGroup.TypedConstantSegment));
+    }
+
+    // Any field qualifier or no qualifier — fall through to examples
+    var examples = Types.GetMeta(TypeKind.ExchangeRate).ContentValidation?.Examples ?? [];
+    return examples
+        .Select(e => { var sp = e.IndexOf(' '); return sp >= 0 ? e[(sp + 1)..] : e; })
+        .Distinct(StringComparer.Ordinal)
+        .Select(code => CreateItem(code, "exchange rate code", CompletionItemKind.Unit, CompletionSortGroup.TypedConstantSegment));
+}
+```
+
+**4. Wire up the handlers:**
+
+In the `'` trigger switch at line 1029–1045, add the new dispatch case:
+```csharp
+TypeKind.ExchangeRate => GetExchangeRateLiteralItems(compilation, tcContext, position),
+```
+
+In the space-trigger slot dispatch at line 88–94, add:
+```csharp
+TypeKind.ExchangeRate => GetExchangeRateSlotItems(tcCtx, textBefore, phase),
+```
+
+**Tests (file: `test/Precept.LanguageServer.Tests/CompletionHandlerTests.cs`):**
+
+| Test | What it verifies |
+|---|---|
+| `Completions_TypedConstant_ExchangeRate_BothLiteral_PrefillsBoth` | `exchangerate in 'USD' to 'EUR'` → `${1:1.00} USD/EUR` |
+| `Completions_TypedConstant_ExchangeRate_FromField_ToLiteral` | `exchangerate in '{SupplierCurrency}' to 'USD'` → `${1:1.00} {SupplierCurrency}/USD` |
+| `Completions_TypedConstant_ExchangeRate_FromLiteral_ToField` | `exchangerate in 'USD' to '{CatalogCurrency}'` → `${1:1.00} USD/{CatalogCurrency}` |
+| `Completions_TypedConstant_ExchangeRate_BothFields` | `exchangerate in '{SupplierCurrency}' to '{CatalogCurrency}'` → `${1:1.00} {SupplierCurrency}/{CatalogCurrency}` |
+| `Completions_TypedConstant_ExchangeRate_FromLiteralOnly_ToTabStop` | `exchangerate in 'USD'` (no `to`) → `${1:1.00} USD/${2:EUR}` |
+| `Completions_TypedConstant_ExchangeRate_ToLiteralOnly_FromTabStop` | `exchangerate to 'EUR'` (no `in`) → `${1:1.00} ${2:USD}/EUR` |
+| `Completions_TypedConstant_ExchangeRate_Unqualified_GenericTemplate` | No qualifiers → `${1:1.00} ${2:USD}/${3:EUR}` |
+| `Completions_TypedConstant_ExchangeRate_SlotPhase_BothLiteral_OffersPair` | Slot after amount with `in 'USD' to 'EUR'` → single item `USD/EUR` |
+| `Completions_TypedConstant_ExchangeRate_SlotPhase_FromLiteralOnly_CurrencyCatalog` | Slot after amount with `in 'USD'` only → items in `USD/<code>` form for all currencies |
+| `Completions_TypedConstant_ExchangeRate_SlotPhase_ToLiteralOnly_CurrencyCatalog` | Slot after amount with `to 'EUR'` only → items in `<code>/EUR` form |
+| `Completions_TypedConstant_ExchangeRate_NoHandler_PreviouslyFreeForm_NowSnippet` | Before this slice, `exchangerate` produced freeform items; after, it produces snippet templates (regression boundary) |
 
 ---
 

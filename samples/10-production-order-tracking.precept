@@ -1,0 +1,319 @@
+precept ProductionOrder
+
+# ============================================================================
+# DOMAIN: Manufacturing — Production Order Tracking
+# ============================================================================
+# Demonstrates: manufacturing domain lifecycle, bill of materials (BOM) with
+# quantity tracking via lookup, quality inspection with conditional outcomes,
+# material consumption, duration arithmetic, choice-typed routing stages,
+# and production yield tracking.
+#
+# Lifecycle: Created → Planned → Released → InProduction → QualityCheck →
+#   Completed (terminal) | Scraped (terminal)
+#
+# Collection types demonstrated:
+#   - list    (RoutingStages) — ordered production routing stages
+#   - lookup  (BOMItems, MaterialConsumed) — key-value maps for BOM and usage
+#   - log     (QualityLog) — append-only audit trails
+# ============================================================================
+
+# ============================================================================
+# ORDER IDENTITY & METADATA
+# ============================================================================
+field OrderNumber as string
+field ProductName as string optional
+field ProductSku as string optional
+field WorkCenter as string optional
+field Priority as choice of string("Low", "Medium", "High", "Critical") default "Medium"
+field StandardLeadTime as duration optional
+
+# ============================================================================
+# QUANTITY & YIELD METRICS
+# ============================================================================
+field PlannedQuantity as integer default 0 nonnegative
+field ProducedQuantity as integer default 0 nonnegative
+field ScrapQuantity as integer default 0 nonnegative
+field YieldPercent as decimal default 0.0 nonnegative
+
+# ============================================================================
+# BILL OF MATERIALS — per-component requirements
+# Demonstrates: lookup of string to integer for BOM entries keyed by material ID.
+# ============================================================================
+field BOMItems as lookup of string to integer
+field BomTotalComponents as integer default 0 nonnegative
+
+# ============================================================================
+# MATERIAL CONSUMPTION TRACKING
+# Tracks actual materials consumed at each production batch.
+# ============================================================================
+field MaterialConsumed as lookup of string to integer
+field TotalMaterialsUsed as integer default 0 nonnegative
+
+# ============================================================================
+# QUALITY INSPECTION
+# Track inspection results with append-only log.
+# ============================================================================
+field QualityStatus as choice of string("NotInspected", "Pass", "Fail", "Conditional") default "NotInspected"
+field QualityLog as log of string
+
+# ============================================================================
+# TIMESTAMPS
+# ============================================================================
+field CreatedAt as instant
+field PlannedAt as instant optional
+field ReleasedAt as instant optional
+field ProductionStartedAt as instant optional
+field ProductionCompletedAt as instant optional
+field QualityCheckedAt as instant optional
+field CompletedAt as instant optional
+field ScrapedAt as instant optional
+
+# ============================================================================
+# PRODUCTION NOTES & REJECTION TRACKING
+# ============================================================================
+field ProductionNotes as string optional
+field ScrapReason as string optional
+
+# ============================================================================
+# ROUTING — ordered list of manufacturing stages
+# Demonstrates: list for ordered routing with indexed operations.
+# ============================================================================
+field RoutingStages as list of string
+field CurrentRoutingIndex as integer default 0 nonnegative
+
+# ============================================================================
+# RULES — Domain Invariants
+# ============================================================================
+rule ProducedQuantity + ScrapQuantity <= PlannedQuantity
+    because "Total produced and scrapped must not exceed planned quantity"
+
+rule YieldPercent >= 0.0 and YieldPercent <= 100.0
+    because "Yield percentage must be between 0% and 100%"
+
+# ============================================================================
+# STATES — 7 total lifecycle positions
+# ============================================================================
+state Created initial
+state Planned
+state Released
+state InProduction
+state QualityCheck
+state Completed terminal
+state Scraped terminal
+
+# ============================================================================
+# EVENT ENSURE — Construction validation
+# ============================================================================
+on Create ensure Create.PlannedQty > 0
+    because "Planned quantity must be positive"
+
+# ============================================================================
+# EVENT DECLARATIONS
+# ============================================================================
+
+# Initial entity construction
+event Create(
+    OrderNumber as string notempty,
+    ProductName as string optional,
+    ProductSku as string optional,
+    WorkCenter as string optional,
+    PlannedQty as integer,
+    Priority as choice of string("Low", "Medium", "High", "Critical") default "Medium") initial
+
+# Planning phase
+event PlanOrder(
+    LeadTime as duration optional,
+    FirstStage as string notempty,
+    BomMaterial as string notempty,
+    BomQty as integer)
+
+# Release to production floor
+event Release
+
+# Batch production events
+event StartProduction
+event ProduceBatch(Quantity as integer)
+event RecordScrap(Quantity as integer, Reason as string notempty)
+
+# Routing stage progression
+event CompleteRoutingStage
+
+# Quality inspection
+event InspectQuality(Status as choice of string("Pass", "Fail", "Conditional"))
+
+# Completion or scrap
+event MarkComplete(Note as string notempty)
+event MarkScrap(Reason as string notempty)
+
+# ============================================================================
+# STATE CONSTRAINTS
+# ============================================================================
+in Planned ensure RoutingStages.count > 0
+    because "Planned orders must have a defined routing"
+in Planned ensure BOMItems.count > 0
+    because "Planned orders must have a defined bill of materials"
+
+in Released ensure ReleasedAt is set
+    because "Released orders must have a release timestamp"
+
+in InProduction ensure ProductionStartedAt is set
+    because "In-production orders must have a start timestamp"
+
+in QualityCheck ensure QualityCheckedAt is set
+    because "Quality-checked orders must have an inspection timestamp"
+
+in Completed ensure ProductionNotes is set
+    because "Completed orders must have production notes"
+
+# ============================================================================
+# TRANSITIONS
+# ============================================================================
+
+# --------------------------------------------------------------------------
+# CONSTRUCTION — Created state setup
+# --------------------------------------------------------------------------
+from Created on Create
+    -> set OrderNumber = Create.OrderNumber
+    -> set ProductName = Create.ProductName
+    -> set ProductSku = Create.ProductSku
+    -> set WorkCenter = Create.WorkCenter
+    -> set PlannedQuantity = Create.PlannedQty
+    -> set Priority = Create.Priority
+    -> set CreatedAt = now()
+    -> transition Created
+
+# --------------------------------------------------------------------------
+# PLANNING — Created → Planned
+# --------------------------------------------------------------------------
+from Created on PlanOrder
+    -> set StandardLeadTime = PlanOrder.LeadTime
+    -> clear RoutingStages
+    -> clear BOMItems
+    -> append RoutingStages PlanOrder.FirstStage
+    -> set CurrentRoutingIndex = 0
+    -> put BOMItems PlanOrder.BomMaterial = PlanOrder.BomQty
+    -> set PlannedAt = now()
+    -> transition Planned
+
+# --------------------------------------------------------------------------
+# RELEASE — Planned → Released
+# --------------------------------------------------------------------------
+from Planned on Release
+    -> set ReleasedAt = now()
+    -> transition Released
+
+# --------------------------------------------------------------------------
+# PRODUCTION — Released → InProduction
+# --------------------------------------------------------------------------
+from Released on StartProduction
+    -> set ProductionStartedAt = now()
+    -> transition InProduction
+
+# --------------------------------------------------------------------------
+# BATCH PRODUCTION — track output against plan
+# --------------------------------------------------------------------------
+from InProduction on ProduceBatch when ProduceBatch.Quantity <= 0
+    -> reject "Batch quantity must be positive"
+from InProduction on ProduceBatch when ProducedQuantity + ProduceBatch.Quantity > PlannedQuantity
+    -> reject "Batch would exceed planned quantity"
+from InProduction on ProduceBatch when PlannedQuantity == 0
+    -> reject "Planned quantity must be positive"
+from InProduction on ProduceBatch when PlannedQuantity > 0
+    -> set ProducedQuantity = ProducedQuantity + ProduceBatch.Quantity
+    -> set YieldPercent = ProducedQuantity * 100.0 / PlannedQuantity
+    -> set ProductionCompletedAt = now()
+    -> no transition
+
+# --------------------------------------------------------------------------
+# SCRAP RECORDING — track losses during production
+# --------------------------------------------------------------------------
+from InProduction on RecordScrap when RecordScrap.Quantity <= 0
+    -> reject "Scrap quantity must be positive"
+from InProduction on RecordScrap when ProducedQuantity + ScrapQuantity + RecordScrap.Quantity > PlannedQuantity
+    -> reject "Scrap would exceed planned quantity"
+from InProduction on RecordScrap when PlannedQuantity > 0 and ProductionNotes is set
+    -> set ScrapQuantity = ScrapQuantity + RecordScrap.Quantity
+    -> set ProductionNotes = ProductionNotes + " Scrap recorded: " + RecordScrap.Reason
+    -> set YieldPercent = ProducedQuantity * 100.0 / PlannedQuantity
+    -> no transition
+
+# --------------------------------------------------------------------------
+# ROUTING STAGES — progress through defined manufacturing stages
+# --------------------------------------------------------------------------
+from Released on CompleteRoutingStage when CurrentRoutingIndex + 1 >= RoutingStages.count
+    -> reject "No more routing stages to complete"
+from Released on CompleteRoutingStage
+    -> set CurrentRoutingIndex = CurrentRoutingIndex + 1
+    -> no transition
+
+# --------------------------------------------------------------------------
+# QUALITY INSPECTION — InProduction → QualityCheck (Pass)
+# --------------------------------------------------------------------------
+from InProduction on InspectQuality when InspectQuality.Status == "Pass"
+    -> set QualityStatus = InspectQuality.Status
+    -> set QualityCheckedAt = now()
+    -> append QualityLog "Quality inspection: PASS"
+    -> transition QualityCheck
+
+# --------------------------------------------------------------------------
+# QUALITY INSPECTION — InProduction → Scraped (Fail)
+# --------------------------------------------------------------------------
+from InProduction on InspectQuality when InspectQuality.Status == "Fail"
+    -> set QualityStatus = InspectQuality.Status
+    -> set QualityCheckedAt = now()
+    -> append QualityLog "Quality inspection: FAIL"
+    -> transition Scraped
+
+# --------------------------------------------------------------------------
+# QUALITY INSPECTION — InProduction → stays InProduction (Conditional)
+# --------------------------------------------------------------------------
+from InProduction on InspectQuality when InspectQuality.Status == "Conditional"
+    -> set QualityStatus = InspectQuality.Status
+    -> set QualityCheckedAt = now()
+    -> append QualityLog "Quality inspection: CONDITIONAL — rework required"
+    -> no transition
+
+# --------------------------------------------------------------------------
+# QUALITY DECISION — conditional resolution (QualityCheck state)
+# --------------------------------------------------------------------------
+from QualityCheck on InspectQuality when QualityStatus == "Pass"
+    -> reject "Order already passed quality inspection"
+from QualityCheck on InspectQuality when QualityStatus == "Fail"
+    -> reject "Order already failed quality inspection"
+from QualityCheck on InspectQuality when InspectQuality.Status == "Pass"
+    -> set QualityStatus = InspectQuality.Status
+    -> set QualityCheckedAt = now()
+    -> append QualityLog "Conditional reworked — inspection: PASS"
+    -> transition Completed
+from QualityCheck on InspectQuality when InspectQuality.Status == "Fail"
+    -> set QualityStatus = InspectQuality.Status
+    -> set QualityCheckedAt = now()
+    -> append QualityLog "Conditional reworked — inspection: FAIL"
+    -> transition Scraped
+from QualityCheck on InspectQuality
+    -> reject "Only Pass or Fail outcomes allowed for conditional orders"
+
+# --------------------------------------------------------------------------
+# MARK COMPLETE — manual completion path (from InProduction)
+# --------------------------------------------------------------------------
+from InProduction on MarkComplete when PlannedQuantity > 0
+    -> set ProductionCompletedAt = now()
+    -> set ProductionNotes = MarkComplete.Note
+    -> set YieldPercent = ProducedQuantity * 100.0 / PlannedQuantity
+    -> transition Completed
+
+# --------------------------------------------------------------------------
+# SCRAP PATH — manual scrap from production (bypasses quality)
+# --------------------------------------------------------------------------
+from InProduction on MarkScrap when PlannedQuantity > 0 and not (ProductionNotes is set)
+    -> set ScrapQuantity = PlannedQuantity - ProducedQuantity
+    -> set ScrapReason = MarkScrap.Reason
+    -> set ProductionNotes = "Full order scrapped — " + MarkScrap.Reason
+    -> set YieldPercent = 0.0
+    -> transition Scraped
+from InProduction on MarkScrap when PlannedQuantity > 0 and ProductionNotes is set
+    -> set ScrapQuantity = PlannedQuantity - ProducedQuantity
+    -> set ScrapReason = MarkScrap.Reason
+    -> set ProductionNotes = ProductionNotes + " Full order scrapped — " + MarkScrap.Reason
+    -> set YieldPercent = 0.0
+    -> transition Scraped

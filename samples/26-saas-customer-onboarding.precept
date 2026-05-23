@@ -1,0 +1,319 @@
+precept SaasCustomerOnboardingAndMilestones
+
+# ============================================================================
+# DOMAIN: SaaS Customer Onboarding — Milestone Tracking
+# ============================================================================
+# Demonstrates: milestone tracking with completion percentages, lookup for
+# training modules, conditional rules for success criteria, choice-typed
+# onboarding stages, guarded transitions, log for activity history, and a
+# lifecycle covering the full onboarding journey from kickoff to success.
+#
+# Lifecycle:
+#   Kickoff → Configuration → Training → Active → Success/AtRisk
+#
+# Key Precept features demonstrated:
+#   - Choice-typed onboarding stages
+#   - Numeric milestone tracking with percentages
+#   - Lookup for training module progress
+#   - Log for onboarding activity
+#   - Conditional rules (success criteria enforcement)
+#   - Guarded transitions with specific-before-general ordering
+#   - State constraints (stage requirements)
+#   - Event ensure constraints on milestone completion
+
+# ============================================================================
+# CUSTOMER IDENTIFICATION
+# ============================================================================
+field CustomerId as string
+field CustomerName as string
+field CustomerEmail as string
+field AccountTier as choice of string("Startup", "Growth", "Enterprise")
+
+# ============================================================================
+# ONBOARDING STAGE
+# ============================================================================
+field OnboardingStage as choice of string(
+    "Kickoff",
+    "Configuration",
+    "Training",
+    "Active",
+    "Success",
+    "AtRisk"
+) default "Kickoff"
+field OnboardingStartDate as instant optional
+field ExpectedCompletionDate as instant optional
+field ActualCompletionDate as instant optional
+
+# ============================================================================
+# MILESTONE TRACKING
+# ============================================================================
+field TotalMilestones as integer default 0 nonnegative
+field CompletedMilestones as integer default 0 nonnegative
+field MilestonePercentage as integer default 0 nonnegative
+field DaysSinceKickoff as integer default 0 nonnegative
+
+# ============================================================================
+# TRAINING PROGRESS — lookup of module name to completion status
+# ============================================================================
+field TrainingModules as lookup of string to boolean
+field TrainingCompletionPercentage as integer default 0 nonnegative
+
+# ============================================================================
+# ACTIVATION METRICS
+# ============================================================================
+field FeaturesActivated as set of string
+field FirstLoginDate as instant optional
+field DailyActiveUsers as integer default 0 nonnegative
+field WeeklyActiveUsers as integer default 0 nonnegative
+
+# ============================================================================
+# SUCCESS CRITERIA
+# ============================================================================
+field SuccessThreshold as integer default 80 nonnegative
+field DaysToFirstLogin as integer default 0 nonnegative
+field DaysToFirstFeature as integer default 0 nonnegative
+field DaysToFirstDataImport as integer default 0 nonnegative
+field DaysToFirstIntegration as integer default 0 nonnegative
+
+# ============================================================================
+# SUPPORT TRACKING
+# ============================================================================
+field SupportTicketsCreated as integer default 0 nonnegative
+field SupportTicketsResolved as integer default 0 nonnegative
+field AverageResolutionTime as integer default 0 nonnegative
+
+# ============================================================================
+# ACTIVITY LOG
+# ============================================================================
+field OnboardingActivity as log of string
+field OnboardingManager as string optional
+
+# ============================================================================
+# TIMESTAMPS
+# ============================================================================
+field LastActivityDate as instant optional
+field LastCheckpointDate as instant optional
+
+# ============================================================================
+# STATES
+# ============================================================================
+state Kickoff initial
+state Configuration
+state Training
+state Active
+state Success terminal
+state AtRisk terminal
+
+# ============================================================================
+# STATE CONSTRAINTS
+# ============================================================================
+in Configuration ensure OnboardingStartDate is set
+    because "Configuration stage requires a start date"
+in Training ensure TrainingModules.count > 0
+    because "Training stage must have assigned training modules"
+in Active ensure FirstLoginDate is set
+    because "Active stage requires a first login date"
+in Success ensure ActualCompletionDate is set
+    because "Success state requires a completion date"
+in AtRisk ensure LastActivityDate is set
+    because "AtRisk state requires an activity timestamp"
+
+# ============================================================================
+# EVENTS
+# ============================================================================
+
+# Entity construction
+event Create(
+    CustomerId as string notempty,
+    CustomerName as string notempty,
+    CustomerEmail as string notempty,
+    AccountTier as choice of string("Startup", "Growth", "Enterprise"),
+    OnboardingManager as string) initial
+
+# Set onboarding plan
+event SetOnboardingPlan(
+    TotalMilestones as integer,
+    ExpectedCompletionDays as integer,
+    SuccessThreshold as integer)
+on SetOnboardingPlan ensure SetOnboardingPlan.TotalMilestones > 0
+    because "Onboarding plan must have at least one milestone"
+on SetOnboardingPlan ensure SetOnboardingPlan.SuccessThreshold >= 50 and SetOnboardingPlan.SuccessThreshold <= 100
+    because "Success threshold must be between 50 and 100"
+
+# Complete a milestone
+event CompleteMilestone(MilestoneName as string notempty)
+
+# Assign training module
+event AssignTrainingModule(ModuleName as string notempty)
+
+# Complete training module
+event CompleteTrainingModule(ModuleName as string notempty)
+
+# Record first login
+event RecordFirstLogin(LoginDate as instant)
+on RecordFirstLogin ensure RecordFirstLogin.LoginDate > now() - '30 days'
+    because "First login must be within 30 days of kickoff"
+
+# Activate a feature
+event ActivateFeature(FeatureName as string notempty, ActivatedAt as instant)
+
+# Import data
+event ImportData(DataSourceName as string notempty, ImportedAt as instant)
+
+# Configure integration
+event ConfigureIntegration(IntegrationName as string notempty, ConfiguredAt as instant)
+
+# Create support ticket
+event CreateSupportTicket(TicketDescription as string notempty)
+
+# Resolve support ticket
+event ResolveSupportTicket(AverageResolutionTime as integer)
+on ResolveSupportTicket ensure ResolveSupportTicket.AverageResolutionTime >= 0
+    because "Resolution time must be non-negative"
+
+# Escalate to at-risk
+event EscalateToAtRisk(Reason as string notempty)
+
+# Mark as successful
+event MarkAsSuccessful(CompletionDate as instant)
+on MarkAsSuccessful ensure MarkAsSuccessful.CompletionDate >= now()
+    because "Completion date must be in the future or today"
+
+# ============================================================================
+# RULES
+# ============================================================================
+rule MilestonePercentage == (CompletedMilestones * 100 / TotalMilestones) when TotalMilestones > 0
+    because "Milestone percentage must reflect completed milestones"
+rule TrainingCompletionPercentage == (TrainingModules.count * 100 / TotalMilestones) when TotalMilestones > 0
+    because "Training percentage must reflect completed modules"
+rule SupportTicketsResolved <= SupportTicketsCreated
+    because "Resolved tickets cannot exceed created tickets"
+
+# ============================================================================
+# TRANSITIONS
+# ============================================================================
+
+# CONSTRUCTION — Kickoff → Kickoff
+from Kickoff on Create
+    -> set CustomerId = Create.CustomerId
+    -> set CustomerName = Create.CustomerName
+    -> set CustomerEmail = Create.CustomerEmail
+    -> set AccountTier = Create.AccountTier
+    -> set OnboardingManager = Create.OnboardingManager
+    -> set OnboardingStage = "Kickoff"
+    -> set OnboardingStartDate = now()
+    -> set FirstLoginDate = none()
+    -> append OnboardingActivity "Onboarding initiated for " + Create.CustomerName
+    -> transition Kickoff
+
+# Set onboarding plan — Kickoff → Configuration
+from Kickoff on SetOnboardingPlan
+    -> set TotalMilestones = SetOnboardingPlan.TotalMilestones
+    -> set SuccessThreshold = SetOnboardingPlan.SuccessThreshold
+    -> set ExpectedCompletionDate = now() + '30 days'
+    -> set OnboardingStage = "Configuration"
+    -> set LastCheckpointDate = now()
+    -> append OnboardingActivity "Onboarding plan established: " + SetOnboardingPlan.TotalMilestones + " milestones"
+    -> transition Configuration
+
+# Complete milestone — stay in Configuration
+from Configuration on CompleteMilestone
+    -> add CompletedMilestones 1
+    -> set MilestonePercentage = CompletedMilestones * 100 / TotalMilestones
+    -> set LastActivityDate = now()
+    -> append OnboardingActivity "Milestone completed: " + CompleteMilestone.MilestoneName
+    -> no transition
+
+# Assign training module — Configuration → Training
+from Configuration on AssignTrainingModule
+    -> append OnboardingActivity "Training module assigned: " + AssignTrainingModule.ModuleName
+    -> transition Training
+
+# Complete training module — Training
+from Training on CompleteTrainingModule
+    -> append OnboardingActivity "Training module completed: " + CompleteTrainingModule.ModuleName
+    -> set TrainingCompletionPercentage = TrainingModules.count * 100 / TotalMilestones
+    -> set LastActivityDate = now()
+    -> no transition
+
+# Record first login — Training → Active
+from Training on RecordFirstLogin
+    -> set FirstLoginDate = RecordFirstLogin.LoginDate
+    -> set DaysToFirstLogin = 7
+    -> set FeaturesActivated = set {"Dashboard"}
+    -> set OnboardingStage = "Active"
+    -> set LastActivityDate = now()
+    -> append OnboardingActivity "Customer first login recorded"
+    -> transition Active
+
+# Activate feature — Active
+from Active on ActivateFeature
+    -> add FeaturesActivated ActivateFeature.FeatureName
+    -> set LastActivityDate = now()
+    -> append OnboardingActivity "Feature activated: " + ActivateFeature.FeatureName
+    -> no transition
+
+# Import data — Active
+from Active on ImportData
+    -> add FeaturesActivated "DataImport"
+    -> set LastActivityDate = now()
+    -> set DaysToFirstDataImport = 14
+    -> append OnboardingActivity "Data imported: " + ImportData.DataSourceName
+    -> no transition
+
+# Configure integration — Active
+from Active on ConfigureIntegration
+    -> add FeaturesActivated "Integration"
+    -> set LastActivityDate = now()
+    -> set DaysToFirstIntegration = 21
+    -> append OnboardingActivity "Integration configured: " + ConfigureIntegration.IntegrationName
+    -> no transition
+
+# Create support ticket — Active
+from Active on CreateSupportTicket
+    -> add SupportTicketsCreated 1
+    -> set LastActivityDate = now()
+    -> append OnboardingActivity "Support ticket created: " + CreateSupportTicket.TicketDescription
+    -> no transition
+
+# Resolve support ticket — Active
+from Active on ResolveSupportTicket
+    -> add SupportTicketsResolved 1
+    -> set AverageResolutionTime = ResolveSupportTicket.AverageResolutionTime
+    -> set LastActivityDate = now()
+    -> append OnboardingActivity "Support ticket resolved"
+    -> no transition
+
+# Complete milestones toward success — Active → Success
+from Active on CompleteMilestone when CompletedMilestones >= TotalMilestones * 80 / 100
+    -> add CompletedMilestones 1
+    -> set MilestonePercentage = CompletedMilestones * 100 / TotalMilestones
+    -> set OnboardingStage = "Success"
+    -> set ActualCompletionDate = now()
+    -> set LastActivityDate = now()
+    -> append OnboardingActivity "Onboarding completed — customer marked as success"
+    -> transition Success
+
+# Complete milestone — Active (not yet at threshold)
+from Active on CompleteMilestone when CompletedMilestones < TotalMilestones * 80 / 100
+    -> add CompletedMilestones 1
+    -> set MilestonePercentage = CompletedMilestones * 100 / TotalMilestones
+    -> set LastActivityDate = now()
+    -> append OnboardingActivity "Milestone completed: " + CompleteMilestone.MilestoneName
+    -> no transition
+
+# Escalate to at-risk — Active → AtRisk
+from Active on EscalateToAtRisk
+    -> set OnboardingStage = "AtRisk"
+    -> set LastActivityDate = now()
+    -> set ActualCompletionDate = now()
+    -> append OnboardingActivity "Customer escalated to at-risk: " + EscalateToAtRisk.Reason
+    -> transition AtRisk
+
+# Mark as successful — Training → Success
+from Training on MarkAsSuccessful
+    -> set OnboardingStage = "Success"
+    -> set ActualCompletionDate = MarkAsSuccessful.CompletionDate
+    -> set LastActivityDate = now()
+    -> append OnboardingActivity "Customer marked as successful early"
+    -> transition Success

@@ -248,8 +248,10 @@ from Listed, LowStock on UpdateListPrice
     -> set PriceChangeCount = PriceChangeCount + 1
     -> no transition
 
+from Listed, LowStock on Delist when Delist.Reason is set
+    -> set Description = Delist.Reason
+    -> transition Delisted
 from Listed, LowStock on Delist
-    -> set Description = if Delist.Reason is set then Delist.Reason else Description
     -> transition Delisted
 
 from Delisted on Relist when QuantityOnHand > RestockThreshold

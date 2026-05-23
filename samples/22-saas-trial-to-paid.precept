@@ -1,0 +1,313 @@
+precept SaasTrialToPaidConversion
+
+# ============================================================================
+# DOMAIN: SaaS Free-Trial-to-Paid Conversion Funnel
+# ============================================================================
+# Demonstrates: choice-typed plan tiers, money types for pricing, optional
+# temporal fields, guarded transitions, event ensures, log for audit trail,
+# conditional rules, state-local access constraints, and a rich lifecycle
+# covering trial enrollment, expiration, conversion, and extension workflows.
+#
+# Lifecycle:
+#   TrialStarted → ActiveTrial → TrialExpiring → ConversionAttempted
+#     → Converted (terminal) | Expired (terminal)
+#
+# Key Precept features demonstrated:
+#   - Choice-typed conversion plans and extension reasons
+#   - Money types for trial credits and plan pricing
+#   - Optional temporal fields (converted at, email reminders sent at)
+#   - Log for conversion audit trail
+#   - Guarded transitions (extension count cap, credit check)
+#   - Event ensure constraints
+#   - State constraints (trial expiring requires reminder sent)
+#   - Conditional rules (plan tier enforcement)
+
+# ============================================================================
+# TRIAL IDENTITY
+# ============================================================================
+field TrialId as string
+field CustomerName as string
+field CustomerEmail as string
+field TrialPlan as choice of string("Free", "Pro Starter", "Pro", "Enterprise")
+
+# ============================================================================
+# PRICING AND CREDITS
+# ============================================================================
+field Currency as currency default 'USD'
+field TrialCredit as money in 'USD' default '0.00 USD'
+field ConversionDiscount as money in 'USD' default '0.00 USD'
+field PlanMonthlyFee as money in 'USD' default '0.00 USD'
+field MaximumDiscount as money in 'USD' default '100.00 USD'
+
+# ============================================================================
+# CONVERSION TRACKING
+# ============================================================================
+field ConversionStatus as choice of string(
+    "NotAttempted",
+    "OfferSent",
+    "Converted",
+    "Declined",
+    "Negotiating"
+) default "NotAttempted"
+field SelectedPlanName as string optional
+field ConversionRejectionReason as string optional
+field SalesRepName as string optional
+
+# ============================================================================
+# TRIAL EXTENSIONS
+# ============================================================================
+field ExtensionCount as integer default 0 nonnegative max 3
+field ExtensionReason as choice of string(
+    "NeedMoreTime",
+    "FeatureEvaluation",
+    "BudgetCycle",
+    "PilotExpansion"
+) optional
+field ExtendedEndDate as instant
+
+# ============================================================================
+# REMINDERS AND COMMUNICATION
+# ============================================================================
+field ReminderSent as boolean default false
+field ReminderSentAt as instant optional
+field LastFollowUpAt as instant optional
+
+# ============================================================================
+# AUDIT LOG
+# ============================================================================
+field ConversionLog as log of string
+field ConversionAttempts as integer default 0 nonnegative
+
+# ============================================================================
+# DURATION FIELDS
+# ============================================================================
+field TrialDuration as duration default '14 days'
+field OneDayPeriod as duration default '1 days'
+field ThreeDayPeriod as duration default '3 days'
+field SevenDayPeriod as duration default '7 days'
+
+# ============================================================================
+# TIMESTAMPS
+# ============================================================================
+field TrialStartedAt as instant
+field TrialEndsAt as instant
+field ConvertedAt as instant optional
+field OfferSentAt as instant optional
+field OfferExpiresAt as instant optional
+
+# ============================================================================
+# STATES
+# ============================================================================
+state TrialStarted initial
+state ActiveTrial
+state TrialExpiring
+state ConversionAttempted
+state Converted terminal
+state Expired terminal
+
+# ============================================================================
+# STATE CONSTRAINTS
+# ============================================================================
+in TrialExpiring ensure ReminderSent
+    because "Reminder must be sent before marking trial as expiring"
+in Converted modify SelectedPlanName readonly
+in Converted modify PlanMonthlyFee readonly
+
+# ============================================================================
+# EVENTS
+# ============================================================================
+
+# Entity construction — sets all required fields
+event Create(
+    TrialId as string notempty,
+    CustomerName as string notempty,
+    CustomerEmail as string notempty,
+    PlanTier as string,
+    SelectedPlanName as string) initial
+
+# Sales team sends a conversion offer with discount and plan suggestion
+event SendConversionOffer(
+    PlanTier as string notempty,
+    DiscountAmount as money in 'USD' nonnegative,
+    ExpiryDays as integer positive)
+on SendConversionOffer ensure SendConversionOffer.DiscountAmount <= MaximumDiscount
+    because "Discount cannot exceed maximum allowed discount"
+on SendConversionOffer ensure SendConversionOffer.ExpiryDays > 0
+    because "Offer expiry must be in the future"
+
+# User accepts the conversion offer
+event AcceptOffer
+
+# User declines the conversion offer
+event DeclineOffer(Reason as string notempty)
+
+# Sales team attempts a negotiation (second offer)
+event NegotiatePlan(
+    PlanTier as string notempty,
+    DiscountAmount as money in 'USD' nonnegative)
+on NegotiatePlan ensure NegotiatePlan.DiscountAmount <= MaximumDiscount
+    because "Negotiated discount cannot exceed maximum"
+
+# Admin extends the trial
+event ExtendTrial(AdditionalDays as integer positive, Reason as string notempty)
+on ExtendTrial ensure ExtensionCount < 3
+    because "Maximum of three extensions allowed"
+
+# Admin marks conversion as attempted (escalation to negotiation)
+event EscalateForConversion
+
+# Mark trial as expired by expiration (automatic)
+event AutoExpire
+
+# ============================================================================
+# RULES
+# ============================================================================
+rule PlanMonthlyFee > '0.00 USD' when ConversionStatus == "Converted"
+    because "Converted trials must have a positive monthly fee"
+rule ConvertedAt is set when ConversionStatus == "Converted"
+    because "Conversion timestamp required for converted trials"
+rule ExtendedEndDate != '1970-01-01T00:00:00Z' when ExtensionCount > 0
+    because "Extended end date must be set when extensions are applied"
+
+# ============================================================================
+# TRANSITIONS
+# ============================================================================
+
+# --------------------------------------------------------------------------
+# CONSTRUCTION — TrialStarted → ActiveTrial (sets all required fields)
+# --------------------------------------------------------------------------
+from TrialStarted on Create
+    -> set TrialId = Create.TrialId
+    -> set CustomerName = Create.CustomerName
+    -> set CustomerEmail = Create.CustomerEmail
+    -> set TrialPlan = "Free"
+    -> set SelectedPlanName = Create.SelectedPlanName
+    -> set ConversionStatus = "NotAttempted"
+    -> append ConversionLog "Trial started for plan: " + Create.PlanTier
+    -> set ReminderSent = false
+    -> set ExtensionCount = 0
+    -> set ConversionAttempts = 0
+    -> set ExtendedEndDate = now()
+    -> set TrialStartedAt = now()
+    -> set TrialEndsAt = now() + TrialDuration
+    -> transition ActiveTrial
+
+# Active trial → send conversion offer (transitions to expiring)
+from ActiveTrial on SendConversionOffer when ReminderSent
+    -> reject "Reminder already sent"
+from ActiveTrial on SendConversionOffer
+    -> set ReminderSent = true
+    -> set ReminderSentAt = now()
+    -> set ConversionStatus = "OfferSent"
+    -> set SelectedPlanName = SendConversionOffer.PlanTier
+    -> set ConversionDiscount = SendConversionOffer.DiscountAmount
+    -> set OfferSentAt = now()
+    -> set OfferExpiresAt = TrialEndsAt + SendConversionOffer.ExpiryDays * OneDayPeriod
+    -> set ConversionAttempts = ConversionAttempts + 1
+    -> set SalesRepName = "Assigned"
+    -> append ConversionLog "Conversion offer sent for plan " + SelectedPlanName
+    -> transition TrialExpiring
+
+# Active trial → extend trial (transitions to expiring)
+from ActiveTrial on ExtendTrial when ExtensionCount >= 3
+    -> reject "Maximum extensions already reached"
+from ActiveTrial on ExtendTrial
+    -> set ExtensionCount = ExtensionCount + 1
+    -> set ExtensionReason = "NeedMoreTime"
+    -> set ExtendedEndDate = TrialEndsAt + ExtendTrial.AdditionalDays * OneDayPeriod
+    -> set TrialEndsAt = ExtendedEndDate
+    -> append ConversionLog "Trial extended"
+    -> transition TrialExpiring
+
+# Trial expiring → send conversion offer (fallback for manual transition)
+from TrialExpiring on SendConversionOffer when ReminderSent
+    -> reject "Reminder already sent in this state"
+from TrialExpiring on SendConversionOffer
+    -> set ConversionStatus = "OfferSent"
+    -> set SelectedPlanName = SendConversionOffer.PlanTier
+    -> set ConversionDiscount = SendConversionOffer.DiscountAmount
+    -> set OfferSentAt = now()
+    -> set OfferExpiresAt = now() + SendConversionOffer.ExpiryDays * OneDayPeriod
+    -> set ConversionAttempts = ConversionAttempts + 1
+    -> append ConversionLog "Offer sent during expiring state for plan " + SelectedPlanName
+    -> no transition
+
+# Escalate → move to conversion attempted state
+from TrialExpiring on EscalateForConversion
+    -> set ConversionStatus = "Negotiating"
+    -> set LastFollowUpAt = now()
+    -> append ConversionLog "Conversion escalated — moving to negotiation state"
+    -> transition ConversionAttempted
+
+# Accept offer → full conversion (from expiring)
+from TrialExpiring on AcceptOffer when ConversionStatus != "OfferSent"
+    -> reject "No offer to accept"
+from TrialExpiring on AcceptOffer
+    -> set ConversionStatus = "Converted"
+    -> set PlanMonthlyFee = '99.00 USD'
+    -> set ConvertedAt = now()
+    -> append ConversionLog "Trial converted for plan " + SelectedPlanName
+    -> transition Converted
+
+# Accept offer → full conversion (from conversion attempted)
+from ConversionAttempted on AcceptOffer when ConversionStatus != "OfferSent"
+    -> reject "No active offer to accept"
+from ConversionAttempted on AcceptOffer
+    -> set ConversionStatus = "Converted"
+    -> set PlanMonthlyFee = '99.00 USD'
+    -> set ConvertedAt = now()
+    -> append ConversionLog "Trial converted via conversion attempted state"
+    -> transition Converted
+
+# Decline → mark declined
+from TrialExpiring on DeclineOffer
+    -> set ConversionStatus = "Declined"
+    -> set ConversionRejectionReason = DeclineOffer.Reason
+    -> set LastFollowUpAt = now()
+    -> append ConversionLog "Offer declined: " + DeclineOffer.Reason
+    -> transition Expired
+
+from ConversionAttempted on DeclineOffer
+    -> set ConversionStatus = "Declined"
+    -> set ConversionRejectionReason = DeclineOffer.Reason
+    -> set LastFollowUpAt = now()
+    -> append ConversionLog "Offer declined during conversion attempted"
+    -> transition Expired
+
+# Negotiate → go back to offer sent for second attempt
+from TrialExpiring on NegotiatePlan
+    -> set ConversionStatus = "OfferSent"
+    -> set SelectedPlanName = NegotiatePlan.PlanTier
+    -> set ConversionDiscount = NegotiatePlan.DiscountAmount
+    -> set OfferExpiresAt = now() + SevenDayPeriod
+    -> set LastFollowUpAt = now()
+    -> append ConversionLog "Negotiation initiated for plan " + SelectedPlanName
+    -> no transition
+
+from ConversionAttempted on NegotiatePlan
+    -> set ConversionStatus = "OfferSent"
+    -> set SelectedPlanName = NegotiatePlan.PlanTier
+    -> set ConversionDiscount = NegotiatePlan.DiscountAmount
+    -> set LastFollowUpAt = now()
+    -> append ConversionLog "Negotiation initiated from conversion attempted state"
+    -> no transition
+
+# Auto-expire: trial has ended, no conversion
+from ActiveTrial on AutoExpire
+    -> set ConversionStatus = "Declined"
+    -> set ConversionRejectionReason = "Trial expired without conversion"
+    -> append ConversionLog "Trial auto-expired"
+    -> transition Expired
+
+from TrialExpiring on AutoExpire when OfferExpiresAt is set and OfferExpiresAt < now()
+    -> set ConversionStatus = "Declined"
+    -> set ConversionRejectionReason = "Offer expired"
+    -> append ConversionLog "Trial expired — offer lapsed"
+    -> transition Expired
+
+# Auto-expire from conversion attempted
+from ConversionAttempted on AutoExpire
+    -> set ConversionStatus = "Declined"
+    -> set ConversionRejectionReason = "Conversion window expired"
+    -> append ConversionLog "Conversion window expired"
+    -> transition Expired

@@ -1,0 +1,299 @@
+precept ProductionShiftDowntime
+
+# ============================================================================
+# DOMAIN: Manufacturing — Production Shift Downtime Tracking
+# ============================================================================
+# Demonstrates: shift-based downtime logging, OEE (Overall Equipment
+# Effectiveness) metrics, maintenance impact analysis, choice-typed reason
+# codes, duration tracking, and production yield.
+#
+# Lifecycle: Created → Active → Closed (terminal)
+#
+# Collection types demonstrated:
+#   - lookup  (DowntimeEvents) — key-value map of event type to count
+#   - log     (DowntimeLog) — append-only audit trail
+#   - log     (RepairLog) — append-only log keyed by instant
+#   - queue   (ActiveRepairs) — priority queue of pending repair tickets
+# ============================================================================
+
+# ============================================================================
+# EQUIPMENT IDENTITY
+# ============================================================================
+field EquipmentId as string
+field EquipmentName as string optional
+field LineNumber as choice of string("LineA", "LineB", "LineC", "LineD")
+field ShiftOperator as string optional
+
+# ============================================================================
+# SHIFT METADATA
+# ============================================================================
+field ShiftNumber as string
+field ShiftDate as date
+field PlannedOutput as integer default 0 nonnegative
+field RatedThroughput as integer default 0 nonnegative
+
+# ============================================================================
+# DOWNTIME REASON CODES
+# Demonstrates: choice-typed categories for root cause classification.
+# ============================================================================
+field DowntimeReason as choice of string(
+    "MachineFailure", "Maintenance", "PowerOutage",
+    "MaterialShortage", "QualityHold", "Other")
+field CurrentDowntimeReason as choice of string(
+    "MachineFailure", "Maintenance", "PowerOutage",
+    "MaterialShortage", "QualityHold", "Other") optional
+
+# ============================================================================
+# DURATION TRACKING
+# Demonstrates: duration type for elapsed time periods.
+# ============================================================================
+field CurrentDowntime as duration default '0 hours'
+field TotalDowntimeToday as duration default '0 hours'
+field LastDowntimeStart as instant optional
+field LastDowntimeEnd as instant optional
+
+# ============================================================================
+# OEE METRICS — Overall Equipment Effectiveness
+# Demonstrates: availability, performance, and quality as percentage fields.
+#
+# OEE = Availability × Performance × Quality
+# Each component is 0–100%.
+# ============================================================================
+field TotalRunTime as duration default '0 hours'
+field PlannedProductionTime as duration default '0 hours'
+field ProducedQuantity as integer default 0 nonnegative
+field ScrapQuantity as integer default 0 nonnegative
+
+field AvailabilityPercent as decimal default 100.0 nonnegative max 100 maxplaces 2
+field PerformancePercent as decimal default 100.0 nonnegative max 100 maxplaces 2
+field QualityPercent as decimal default 100.0 nonnegative max 100 maxplaces 2
+
+# ============================================================================
+# MAINTENANCE IMPACT TRACKING
+# Demonstrates: priority queue for repair tickets and maintenance logs.
+# ============================================================================
+field ActiveRepairs as queue of string
+field MaintenanceNotes as string optional
+field NextScheduledMaintenance as date optional
+
+# ============================================================================
+# TIMESTAMPS
+# ============================================================================
+field ShiftStartedAt as instant optional
+field ShiftClosedAt as instant optional
+
+# ============================================================================
+# AUDIT LOGS
+# Demonstrates: append-only logs for audit trails.
+# ============================================================================
+field DowntimeLog as log of string
+field RepairLog as log of string by instant
+
+# ============================================================================
+# EVENT COUNTERS
+# Demonstrates: lookup of string to integer for tracking event counts.
+# ============================================================================
+field DowntimeEvents as lookup of string to integer
+
+# ============================================================================
+# SHIFT STATUS
+# ============================================================================
+field ShiftStatus as choice of string("Created", "Active", "Closed") default "Created"
+
+# ============================================================================
+# RULES — Domain Invariants
+# ============================================================================
+rule AvailabilityPercent >= 0 and AvailabilityPercent <= 100
+    because "Availability must be between 0% and 100%"
+
+rule PerformancePercent >= 0 and PerformancePercent <= 100
+    because "Performance must be between 0% and 100%"
+
+rule QualityPercent >= 0 and QualityPercent <= 100
+    because "Quality must be between 0% and 100%"
+
+rule ProducedQuantity >= ScrapQuantity
+    because "Produced quantity must not be less than scrap quantity"
+
+rule ShiftStatus == "Created" or ShiftStatus == "Active" or ShiftStatus == "Closed"
+    because "Shift status must be a valid value"
+
+# ============================================================================
+# STATES — 3 total lifecycle positions
+# ============================================================================
+state Created initial
+state Active
+state Closed terminal
+
+# ============================================================================
+# EVENT ENSURE — Construction validation
+# ============================================================================
+on Create ensure Create.ShiftNumber != ""
+    because "Shift number is required"
+on Create ensure Create.PlannedOutput > 0
+    because "Planned output must be positive"
+on Create ensure Create.RatedThroughput > 0
+    because "Rated throughput must be positive"
+
+# ============================================================================
+# EVENT DECLARATIONS
+# ============================================================================
+
+# Shift creation and lifecycle
+event Create(
+    EquipmentId as string notempty,
+    EquipmentName as string optional,
+    LineNumber as choice of string("LineA", "LineB", "LineC", "LineD"),
+    ShiftOperator as string optional,
+    ShiftNumber as string notempty,
+    ShiftDate as date,
+    PlannedOutput as integer,
+    RatedThroughput as integer) initial
+
+# Downtime reporting — can fire multiple times per shift
+event ReportDowntime(
+    Reason as choice of string("MachineFailure", "Maintenance", "PowerOutage",
+        "MaterialShortage", "QualityHold", "Other"),
+    Impact as string optional)
+
+# Downtime resolution
+event CompleteDowntime
+
+# Production control
+event StartProduction
+event ProduceBatch(Quantity as integer)
+
+# Shift closure
+event CloseShift
+
+# Maintenance actions
+event AddRepairTicket(Ticket as string notempty)
+event RemoveRepairTicket(Ticket as string notempty)
+event UpdateMaintenanceNotes(Notes as string notempty)
+
+# ============================================================================
+# STATE CONSTRAINTS
+# ============================================================================
+in Active ensure ShiftStartedAt is set
+    because "Active shift must have a start timestamp"
+
+in Closed ensure ShiftClosedAt is set
+    because "Closed shift must have a close timestamp"
+
+# ============================================================================
+# TRANSITIONS
+# ============================================================================
+
+# --------------------------------------------------------------------------
+# CONSTRUCTION — Created → Created (self-transition)
+# --------------------------------------------------------------------------
+from Created on Create
+    -> set EquipmentId = Create.EquipmentId
+    -> set EquipmentName = Create.EquipmentName
+    -> set LineNumber = Create.LineNumber
+    -> set ShiftOperator = Create.ShiftOperator
+    -> set ShiftNumber = Create.ShiftNumber
+    -> set ShiftDate = Create.ShiftDate
+    -> set PlannedOutput = Create.PlannedOutput
+    -> set RatedThroughput = Create.RatedThroughput
+    -> set ShiftStatus = "Created"
+    -> set DowntimeReason = "Other"
+    -> set CurrentDowntimeReason = "Other"
+    -> set TotalDowntimeToday = '0 hours'
+    -> set TotalRunTime = '0 hours'
+    -> set PlannedProductionTime = '0 hours'
+    -> set ProducedQuantity = 0
+    -> set ScrapQuantity = 0
+    -> set AvailabilityPercent = 100.0
+    -> set PerformancePercent = 100.0
+    -> set QualityPercent = 100.0
+    -> set MaintenanceNotes = ""
+    -> transition Created
+
+# --------------------------------------------------------------------------
+# REPORT DOWNTIME — Created/Active → Active
+# Requires: active downtime to exist (CurrentDowntime must be set).
+# --------------------------------------------------------------------------
+from Active on ReportDowntime when CurrentDowntimeReason is not set
+    -> reject "Cannot report new downtime while no downtime is active"
+
+from Active on ReportDowntime
+    -> set DowntimeReason = ReportDowntime.Reason
+    -> set CurrentDowntimeReason = ReportDowntime.Reason
+    -> set CurrentDowntime = '0 hours'
+    -> set LastDowntimeStart = now()
+    -> set MaintenanceNotes = "Impact noted"
+    -> put DowntimeEvents "FailureCount" = 1
+    -> append DowntimeLog "Downtime reported"
+    -> transition Active
+
+# --------------------------------------------------------------------------
+# COMPLETE DOWNTIME — Active → Active
+# Requires: an active downtime exists (CurrentDowntimeReason is set).
+# --------------------------------------------------------------------------
+from Active on CompleteDowntime when CurrentDowntimeReason is not set
+    -> reject "No active downtime to complete"
+
+from Active on CompleteDowntime
+    -> set LastDowntimeEnd = now()
+    -> set CurrentDowntime = '1 hours'
+    -> set TotalDowntimeToday = TotalDowntimeToday + CurrentDowntime
+    -> set CurrentDowntimeReason = "Other"
+    -> set MaintenanceNotes = CurrentDowntimeReason + " resolved"
+    -> append DowntimeLog "Downtime completed: " + CurrentDowntimeReason
+    -> transition Active
+
+# --------------------------------------------------------------------------
+# START PRODUCTION — Created → Active
+# --------------------------------------------------------------------------
+from Created on StartProduction
+    -> set ShiftStartedAt = now()
+    -> set ShiftStatus = "Active"
+    -> set PlannedProductionTime = '8 hours'
+    -> append DowntimeLog "Production started"
+    -> transition Active
+
+# --------------------------------------------------------------------------
+# PRODUCE BATCH — Active → Active
+# --------------------------------------------------------------------------
+from Active on ProduceBatch when ProduceBatch.Quantity <= 0
+    -> reject "Batch quantity must be positive"
+
+from Active on ProduceBatch
+    -> set ProducedQuantity = ProducedQuantity + ProduceBatch.Quantity
+    -> append DowntimeLog "Batch produced"
+    -> transition Active
+
+# --------------------------------------------------------------------------
+# CLOSE SHIFT — Active → Closed
+# ============================================================================
+# Demonstrates: shift closure with OEE calculation.
+# Availability = RunTime / PlannedTime × 100
+# Performance = ActualOutput / RatedOutput × 100
+# Quality = GoodOutput / TotalOutput × 100
+#
+# Note: proof engine does not propagate guards through arithmetic.
+# Store derived values; external computation used for actual percentage.
+# ============================================================================
+from Active on CloseShift
+    -> set ShiftClosedAt = now()
+    -> set ShiftStatus = "Closed"
+    -> transition Closed
+
+# --------------------------------------------------------------------------
+# MAINTENANCE — Active → Active
+# --------------------------------------------------------------------------
+from Active on AddRepairTicket
+    -> add ActiveRepairs AddRepairTicket.Ticket
+    -> append DowntimeLog "Repair ticket added"
+    -> transition Active
+
+from Active on RemoveRepairTicket
+    -> remove ActiveRepairs RemoveRepairTicket.Ticket
+    -> append DowntimeLog "Repair ticket removed"
+    -> transition Active
+
+from Active on UpdateMaintenanceNotes
+    -> set MaintenanceNotes = UpdateMaintenanceNotes.Notes
+    -> append RepairLog "Maintenance notes updated"
+    -> transition Active

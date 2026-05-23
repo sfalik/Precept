@@ -1,0 +1,265 @@
+precept SaasUsageMeteringAndBilling
+
+# ============================================================================
+# DOMAIN: SaaS Usage-Based Metering & Billing
+# ============================================================================
+# Demonstrates: lookup collection for meter readings, money types for charges,
+# choice-typed meter categories and billing statuses, log for audit trail,
+# event ensures for validation, guarded transitions, state constraints,
+# conditional rules for rate calculations, and a rich state machine
+# covering metering, aggregation, billing, dispute, and resolution workflows.
+#
+# Lifecycle:
+#   MeteringActive → Aggregated → Billed → Paid/Overdue → Disputed → Resolved
+#
+# Key Precept features demonstrated:
+#   - Lookup for per-meter usage tracking
+#   - Money types for usage charges and overage
+#   - Choice-typed meter types and billing statuses
+#   - Log for billing audit trail
+#   - Guarded transitions with specific-before-general ordering
+#   - Event ensure constraints
+#   - State constraints (billing state rules)
+#   - Conditional rules (rate enforcement)
+
+# ============================================================================
+# CUSTOMER IDENTIFICATION
+# ============================================================================
+field CustomerId as string
+field CustomerName as string
+field CustomerEmail as string
+field MeterType as choice of string("ApiCalls", "Storage", "Compute", "Bandwidth", "Seats")
+field MeterCategory as choice of string("Compute", "Storage", "Network", "User")
+
+# ============================================================================
+# BILLING CONFIGURATION
+# ============================================================================
+field Currency as currency default 'USD'
+field BillingCycle as choice of string("monthly", "quarterly", "annual") default "monthly"
+field NextBillingDate as instant optional
+field OneMonthPeriod as duration default '30 days'
+
+# ============================================================================
+# USAGE METRICS — lookup of meter name to usage count
+# ============================================================================
+field MeterReadings as lookup of string to integer
+field MeterLimits as lookup of string to integer
+
+# ============================================================================
+# BILLING AMOUNTS
+# ============================================================================
+field UsageCharge as money in 'USD' default '0.00 USD'
+field OverageCharge as money in 'USD' default '0.00 USD'
+field BaseSubscriptionFee as money in 'USD' default '0.00 USD'
+field TotalInvoiceAmount as money in 'USD' default '0.00 USD'
+field CreditsApplied as money in 'USD' default '0.00 USD'
+field AmountPaid as money in 'USD' default '0.00 USD'
+field RatePerUnit as money in 'USD' default '0.00 USD'
+
+# ============================================================================
+# BILLING STATUS
+# ============================================================================
+field BillingStatus as choice of string(
+    "MeteringActive",
+    "Aggregated",
+    "Billed",
+    "Paid",
+    "Overdue",
+    "Disputed",
+    "Resolved"
+) default "MeteringActive"
+field DisputeReason as string optional
+field DisputeAmount as money in 'USD' default '0.00 USD'
+field ResolutionNotes as string optional
+
+# ============================================================================
+# ALERT THRESHOLDS
+# ============================================================================
+field AlertThresholdPercent as integer default 80 nonnegative max 100
+field AlertTriggered as boolean default false
+field AlertTriggeredAt as instant optional
+field OverUsage as boolean default false
+
+# ============================================================================
+# AUDIT LOG
+# ============================================================================
+field BillingLog as log of string
+field BillingCycleNumber as integer default 0 nonnegative
+
+# ============================================================================
+# TIMESTAMPS
+# ============================================================================
+field MeteringStartedAt as instant
+field AggregationDate as instant optional
+field InvoicedAt as instant optional
+field PaidAt as instant optional
+field OverdueAt as instant optional
+field DisputedAt as instant optional
+field ResolvedAt as instant optional
+
+# ============================================================================
+# STATES
+# ============================================================================
+state MeteringActive initial
+state Aggregated
+state Billed
+state Paid terminal
+state Overdue
+state Disputed
+state Resolved terminal
+
+# ============================================================================
+# STATE CONSTRAINTS
+# ============================================================================
+in Aggregated ensure AggregationDate is set
+    because "Aggregated state requires an aggregation timestamp"
+in Billed ensure InvoicedAt is set
+    because "Billed state requires an invoice timestamp"
+in Paid ensure AmountPaid >= BaseSubscriptionFee
+    because "Paid amount must cover at least the base fee"
+in Overdue ensure OverdueAt is set
+    because "Overdue state requires an overdue timestamp"
+
+# ============================================================================
+# EVENTS
+# ============================================================================
+
+# Entity construction — sets all required fields
+event Create(
+    CustomerId as string notempty,
+    CustomerName as string notempty,
+    CustomerEmail as string notempty,
+    BaseFee as money in 'USD',
+    MeterType as choice of string("ApiCalls", "Storage", "Compute", "Bandwidth", "Seats"),
+    MeterCategory as choice of string("Compute", "Storage", "Network", "User")) initial
+
+# Record a meter reading
+event RecordReading(MeterName as string notempty, Count as integer nonnegative)
+
+# Trigger alert
+event TriggerAlert
+
+# Finalize usage — stop metering, trigger aggregation
+event FinalizeUsage
+
+# Generate invoice
+event GenerateInvoice(RatePerUnit as money in 'USD' nonnegative)
+on GenerateInvoice ensure GenerateInvoice.RatePerUnit > '0.00 USD'
+    because "Rate per unit must be positive"
+
+# Record payment
+event RecordPayment(Amount as money in 'USD' nonnegative)
+
+# Mark as overdue
+event MarkOverdue
+
+# Initiate dispute
+event DisputeInvoice(Reason as string notempty, ClaimAmount as money in 'USD' nonnegative)
+
+# Resolve dispute
+event ResolveDispute(Outcome as string notempty, CreditsAmount as money in 'USD' nonnegative)
+
+# ============================================================================
+# RULES
+# ============================================================================
+rule UsageCharge >= '0.00 USD'
+    because "Usage charge cannot be negative"
+rule TotalInvoiceAmount >= '0.00 USD'
+    because "Total invoice amount cannot be negative"
+rule CreditsApplied <= TotalInvoiceAmount
+    because "Credits cannot exceed invoice amount"
+
+# ============================================================================
+# TRANSITIONS
+# ============================================================================
+
+# CONSTRUCTION — MeteringActive → MeteringActive
+from MeteringActive on Create
+    -> set CustomerId = Create.CustomerId
+    -> set CustomerName = Create.CustomerName
+    -> set CustomerEmail = Create.CustomerEmail
+    -> set MeterType = Create.MeterType
+    -> set MeterCategory = Create.MeterCategory
+    -> set BaseSubscriptionFee = Create.BaseFee
+    -> append BillingLog "Customer created: " + Create.CustomerId
+    -> set MeteringStartedAt = now()
+    -> transition MeteringActive
+
+# Record meter reading — stay in MeteringActive
+from MeteringActive on RecordReading when (MeterReadings for RecordReading.MeterName) > 0
+    -> put MeterReadings RecordReading.MeterName = (MeterReadings for RecordReading.MeterName) + RecordReading.Count
+    -> append BillingLog "Meter reading recorded: " + RecordReading.MeterName
+    -> no transition
+from MeteringActive on RecordReading
+    -> put MeterReadings RecordReading.MeterName = RecordReading.Count
+    -> append BillingLog "Meter reading recorded: " + RecordReading.MeterName
+    -> no transition
+
+# Alert at threshold
+from MeteringActive on TriggerAlert
+    -> set AlertTriggered = true
+    -> set AlertTriggeredAt = now()
+    -> append BillingLog "Alert triggered"
+    -> no transition
+
+# Finalize usage — transition to Aggregated
+from MeteringActive on FinalizeUsage
+    -> set BillingStatus = "Aggregated"
+    -> set AggregationDate = now()
+    -> set BillingCycleNumber = BillingCycleNumber + 1
+    -> set NextBillingDate = now() + OneMonthPeriod
+    -> append BillingLog "Usage finalized"
+    -> transition Aggregated
+
+# Generate invoice — transition to Billed
+from Aggregated on GenerateInvoice
+    -> set RatePerUnit = GenerateInvoice.RatePerUnit
+    -> set UsageCharge = '0.00 USD'
+    -> set TotalInvoiceAmount = BaseSubscriptionFee + UsageCharge
+    -> set InvoicedAt = now()
+    -> set BillingStatus = "Billed"
+    -> append BillingLog "Invoice generated"
+    -> transition Billed
+
+# Record payment — transition to Paid
+from Billed on RecordPayment
+    -> set AmountPaid = AmountPaid + RecordPayment.Amount
+    -> set TotalInvoiceAmount = TotalInvoiceAmount - RecordPayment.Amount
+    -> set BillingStatus = "Paid"
+    -> set PaidAt = now()
+    -> append BillingLog "Payment received"
+    -> transition Paid
+
+# Mark overdue — transition to Overdue
+from Billed on MarkOverdue
+    -> set BillingStatus = "Overdue"
+    -> set OverdueAt = now()
+    -> append BillingLog "Invoice marked overdue"
+    -> transition Overdue
+
+# Dispute — transition to Disputed
+from Billed on DisputeInvoice
+    -> set BillingStatus = "Disputed"
+    -> set DisputeReason = DisputeInvoice.Reason
+    -> set DisputeAmount = DisputeInvoice.ClaimAmount
+    -> set DisputedAt = now()
+    -> append BillingLog "Invoice disputed"
+    -> transition Disputed
+
+from Overdue on DisputeInvoice
+    -> set BillingStatus = "Disputed"
+    -> set DisputeReason = DisputeInvoice.Reason
+    -> set DisputeAmount = DisputeInvoice.ClaimAmount
+    -> set DisputedAt = now()
+    -> append BillingLog "Overdue invoice disputed"
+    -> transition Disputed
+
+# Resolve dispute — transition to Resolved
+from Disputed on ResolveDispute
+    -> set ResolutionNotes = ResolveDispute.Outcome
+    -> set CreditsApplied = ResolveDispute.CreditsAmount
+    -> set TotalInvoiceAmount = TotalInvoiceAmount - ResolveDispute.CreditsAmount
+    -> set BillingStatus = "Resolved"
+    -> set ResolvedAt = now()
+    -> append BillingLog "Dispute resolved"
+    -> transition Resolved

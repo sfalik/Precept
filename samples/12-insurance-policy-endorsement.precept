@@ -1,0 +1,271 @@
+precept InsurancePolicyEndorsement
+
+# ============================================================================
+# DOMAIN: Insurance — Policy Endorsement (ACORD-aligned)
+# ============================================================================
+# Demonstrates: policy modification lifecycle, effective dating, premium
+# adjustment calculations, lookup for prior term snapshots, choice-typed
+# endorsement types, conditional approval routing, and temporal constraints.
+#
+# Lifecycle: Requested → Under Review → Approved → Pending Effective Date →
+#   Issued (terminal) | Rejected (terminal)
+#
+# Collection types demonstrated:
+#   - lookup  (PriorTerms) — snapshot of policy terms before modification
+#   - log     (EndorsementLog) — append-only audit trail
+# ============================================================================
+
+# ============================================================================
+# POLICY IDENTITY & ENDORSEMENT DATA
+# ============================================================================
+field PolicyNumber as string
+field EndorsementNumber as string
+field EndorsementType as choice of string("CoverageIncrease","CoverageDecrease",
+    "AddressChange","NamedDriverAdded","NamedDriverRemoved","DeductibleChange",
+    "PaymentMethodChange","AdditionalCoverage","LiabilityAdjustment","Other")
+field EndorsementDate as date
+
+# ============================================================================
+# EFFECTIVE DATING — temporal fields for when changes take effect
+# ============================================================================
+field EffectiveDate as date
+field ExpirationDate as date
+field CurrentEffectiveDate as date
+field CurrentExpirationDate as date
+
+# ============================================================================
+# FINANCIAL AMOUNTS — premium and coverage changes
+# ============================================================================
+field CurrentPremium as money in 'USD'
+field NewPremium as money in 'USD'
+field PremiumAdjustment as money in 'USD'
+field ProrationDays as integer default 0 nonnegative
+
+# ============================================================================
+# PRIOR TERMS SNAPSHOT — key-value map of original policy terms
+# Demonstrates: lookup for historical tracking with string to string mapping.
+# ============================================================================
+field PriorTerms as lookup of string to string optional
+
+# ============================================================================
+# ENDORSEMENT LOG — append-only audit trail
+# Demonstrates: log of string with append operations.
+# ============================================================================
+field EndorsementLog as log of string
+
+# ============================================================================
+# COVERAGE DETAILS — per-coverage limits
+# Demonstrates: lookup of string to integer for coverage limits.
+# ============================================================================
+field CoverageLimits as lookup of string to integer
+
+# ============================================================================
+# APPROVAL STATE — conditional routing
+# ============================================================================
+field ApprovalRequired as boolean default false
+field ApprovedBy as string optional
+field ApprovalDate as instant optional
+
+# ============================================================================
+# NOTES & REASONS
+# ============================================================================
+field Reason as string optional
+field AdditionalNotes as string optional
+field RejectionReason as string optional
+
+# ============================================================================
+# TIMESTAMPS
+# ============================================================================
+field RequestedAt as instant
+field ReviewedAt as instant optional
+field ApprovedAt as instant optional
+field EffectiveFrom as instant optional
+field IssuedAt as instant optional
+field RejectedAt as instant optional
+
+# ============================================================================
+# RULES — Domain Invariants
+# ============================================================================
+rule EffectiveDate >= EndorsementDate
+    because "Endorsement effective date must not precede request date"
+
+rule ProrationDays >= 0 and ProrationDays <= 365
+    because "Proration days must be between 0 and 365"
+
+# ============================================================================
+# STATES — 6 total lifecycle positions
+# ============================================================================
+state Requested initial
+state UnderReview
+state Approved
+state PendingEffectiveDate
+state Issued terminal
+state Rejected terminal
+
+# ============================================================================
+# EVENT ENSURE — Construction validation
+# ============================================================================
+on Create ensure Create.PolicyNumber != ""
+    because "Policy number is required for endorsement creation"
+
+# ============================================================================
+# EVENT DECLARATIONS
+# ============================================================================
+event Create(
+    PolicyNumber as string notempty,
+    EndorsementNumber as string notempty,
+    EndorsementType as choice of string("CoverageIncrease","CoverageDecrease",
+        "AddressChange","NamedDriverAdded","NamedDriverRemoved","DeductibleChange",
+        "PaymentMethodChange","AdditionalCoverage","LiabilityAdjustment","Other"),
+    EndorsementDate as date,
+    CurrentPremium as money in 'USD',
+    EffectiveDate as date,
+    ExpirationDate as date,
+    CurrentEffectiveDate as date,
+    CurrentExpirationDate as date) initial
+
+event RequestReason(Reason as string notempty)
+event AssignReviewer(ReviewerName as string notempty)
+
+event BeginReview
+event RequestAdditionalInfo(InfoRequest as string notempty)
+
+event Approve
+event Reject(Reason as string notempty)
+
+event SetEffectiveDate(NewEffectiveDate as date)
+event MakeEffective
+
+event Issue
+event CancelRequest
+
+# ============================================================================
+# STATE CONSTRAINTS
+# ============================================================================
+in UnderReview ensure ReviewedAt is set
+    because "Under-review endorsements must have a review timestamp"
+
+in Approved ensure ApprovedAt is set
+    because "Approved endorsements must have an approval timestamp"
+
+in PendingEffectiveDate ensure EffectiveFrom is set
+    because "Pending-effective endorsements must have an effective timestamp"
+
+in Issued ensure IssuedAt is set
+    because "Issued endorsements must have an issuance timestamp"
+
+in Rejected ensure RejectedAt is set
+    because "Rejected endorsements must have a rejection timestamp"
+
+# ============================================================================
+# TRANSITIONS
+# ============================================================================
+
+# --------------------------------------------------------------------------
+# CONSTRUCTION — Requested state setup
+# --------------------------------------------------------------------------
+from Requested on Create
+    -> set PolicyNumber = Create.PolicyNumber
+    -> set EndorsementNumber = Create.EndorsementNumber
+    -> set EndorsementType = Create.EndorsementType
+    -> set EndorsementDate = Create.EndorsementDate
+    -> set CurrentPremium = Create.CurrentPremium
+    -> set EffectiveDate = Create.EffectiveDate
+    -> set ExpirationDate = Create.ExpirationDate
+    -> set CurrentEffectiveDate = Create.CurrentEffectiveDate
+    -> set CurrentExpirationDate = Create.CurrentExpirationDate
+    -> set NewPremium = Create.CurrentPremium
+    -> set PremiumAdjustment = '0.00 USD'
+    -> set RequestedAt = now()
+    -> transition Requested
+
+# --------------------------------------------------------------------------
+# REQUEST REASON — add reason for endorsement
+# --------------------------------------------------------------------------
+from Requested on RequestReason
+    -> set Reason = RequestReason.Reason
+    -> append EndorsementLog "Reason requested: " + RequestReason.Reason
+    -> no transition
+
+# --------------------------------------------------------------------------
+# ASSIGN REVIEWER — add reviewer assignment
+# --------------------------------------------------------------------------
+from Requested on AssignReviewer
+    -> append EndorsementLog "Reviewer assigned"
+    -> no transition
+
+# --------------------------------------------------------------------------
+# BEGIN REVIEW — Requested → UnderReview
+# --------------------------------------------------------------------------
+from Requested on BeginReview
+    -> set ReviewedAt = now()
+    -> append EndorsementLog "Review begun"
+    -> transition UnderReview
+
+# --------------------------------------------------------------------------
+# REQUEST INFO — stay in UnderReview
+# --------------------------------------------------------------------------
+from UnderReview on RequestAdditionalInfo
+    -> append EndorsementLog "Additional info requested: " + RequestAdditionalInfo.InfoRequest
+    -> no transition
+
+# --------------------------------------------------------------------------
+# APPROVE — UnderReview → Approved
+# --------------------------------------------------------------------------
+from UnderReview on Approve
+    -> set ApprovedBy = "Underwriter"
+    -> set ApprovedAt = now()
+    -> set PremiumAdjustment = NewPremium - CurrentPremium
+    -> append EndorsementLog "Endorsement approved"
+    -> transition Approved
+
+# --------------------------------------------------------------------------
+# REJECT — UnderReview → Rejected
+# --------------------------------------------------------------------------
+from UnderReview on Reject
+    -> set RejectionReason = Reject.Reason
+    -> set RejectedAt = now()
+    -> append EndorsementLog "Endorsement rejected: " + Reject.Reason
+    -> transition Rejected
+
+# --------------------------------------------------------------------------
+# SET EFFECTIVE DATE — Approved state modification
+# --------------------------------------------------------------------------
+from Approved on SetEffectiveDate when SetEffectiveDate.NewEffectiveDate < EndorsementDate
+    -> reject "Effective date must not precede endorsement date"
+from Approved on SetEffectiveDate
+    -> set EffectiveDate = SetEffectiveDate.NewEffectiveDate
+    -> append EndorsementLog "Effective date set"
+    -> no transition
+
+# --------------------------------------------------------------------------
+# MAKE EFFECTIVE — Approved → PendingEffectiveDate
+# --------------------------------------------------------------------------
+from Approved on MakeEffective
+    -> set EffectiveFrom = now()
+    -> set ApprovalRequired = false
+    -> append EndorsementLog "Made effective"
+    -> transition PendingEffectiveDate
+
+# --------------------------------------------------------------------------
+# ISSUE — PendingEffectiveDate → Issued
+# --------------------------------------------------------------------------
+from PendingEffectiveDate on Issue
+    -> set IssuedAt = now()
+    -> set CurrentEffectiveDate = EffectiveDate
+    -> set CurrentExpirationDate = ExpirationDate
+    -> set CurrentPremium = NewPremium
+    -> put PriorTerms "OldPremium" = CurrentPremium.amount
+    -> put PriorTerms "EffectiveDate" = CurrentEffectiveDate.day
+    -> put PriorTerms "ExpirationDate" = CurrentExpirationDate.day
+    -> append EndorsementLog "Endorsement issued"
+    -> transition Issued
+
+# --------------------------------------------------------------------------
+# CANCEL REQUEST — Requested terminal exit
+# --------------------------------------------------------------------------
+from Requested on CancelRequest
+    -> set RejectedAt = now()
+    -> set RejectionReason = "Cancelled by requester"
+    -> append EndorsementLog "Endorsement request cancelled"
+    -> transition Rejected

@@ -1,0 +1,87 @@
+precept SubscriptionCancellationRetention
+
+# Retention teams often make one last save attempt before a subscription is closed.
+# Demonstrates: field defaults as creation-time data, guarded event rejection,
+# optional temporal fields with expiration logic, and state-local events.
+
+# ============================================================================
+# SUBSCRIPTION DATA — set at creation time via field defaults
+# ============================================================================
+field SubscriberName as string default ""
+field PlanName as string default ""
+field MonthlyPrice as number default 0 nonnegative
+field CreatedAt as instant default '2024-01-01T00:00:00Z'
+
+# ============================================================================
+# RETENTION STATE
+# ============================================================================
+field SaveOfferAccepted as boolean default false
+field RetentionDiscount as number default 0 nonnegative max 100
+field RetentionDaysToExpiry as integer default 0 nonnegative
+field CancellationReason as string optional
+field LastAgentNote as string optional
+
+# ============================================================================
+# STATES
+# ============================================================================
+state Active initial
+state RetentionReview
+state Cancelled terminal
+
+# ============================================================================
+# STATE CONSTRAINTS
+# ============================================================================
+in RetentionReview modify LastAgentNote editable
+
+# ============================================================================
+# EVENTS
+# ============================================================================
+
+# Cancellation request — only carries cancellation-specific data.
+# Subscriber data (name, plan, price) are set at creation via field defaults.
+event RequestCancellation(Reason as string notempty)
+
+# Retention team makes a save offer.
+event MakeSaveOffer(DiscountPercent as number min 0 max 100 default 10)
+on MakeSaveOffer ensure MakeSaveOffer.DiscountPercent > 0
+    because "Save offers must include a positive discount"
+on MakeSaveOffer ensure MakeSaveOffer.DiscountPercent <= 100
+    because "Save offers cannot exceed 100 percent"
+
+# Customer decides on the retention offer.
+event AcceptOffer
+event DeclineOffer(Note as string optional)
+
+# ============================================================================
+# TRANSITIONS
+# ============================================================================
+
+from Active on RequestCancellation
+    -> set CancellationReason = RequestCancellation.Reason
+    -> set SaveOfferAccepted = false
+    -> transition RetentionReview
+
+# Guard: only one outstanding save offer at a time.
+# SaveOfferAccepted=true means the customer already accepted (not yet resolved).
+from RetentionReview on MakeSaveOffer when SaveOfferAccepted
+    -> reject "No save offer to modify — customer already accepted"
+from RetentionReview on MakeSaveOffer when RetentionDiscount > 0
+    -> reject "Save offer already exists"
+from RetentionReview on MakeSaveOffer
+    -> set RetentionDiscount = MakeSaveOffer.DiscountPercent
+    -> set RetentionDaysToExpiry = 2
+    -> set LastAgentNote = if MonthlyPrice >= 50 then "Premium plan retention" else "Standard plan retention"
+    -> no transition
+
+from RetentionReview on AcceptOffer when RetentionDaysToExpiry <= 0
+    -> reject "Cannot accept — offer expired"
+from RetentionReview on AcceptOffer when SaveOfferAccepted
+    -> reject "Already accepted"
+from RetentionReview on AcceptOffer
+    -> set SaveOfferAccepted = true
+    -> transition Active
+
+from RetentionReview on DeclineOffer
+    -> set LastAgentNote = DeclineOffer.Note
+    -> set SaveOfferAccepted = false
+    -> transition Cancelled

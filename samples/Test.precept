@@ -9,7 +9,7 @@ field test3 as quantity in 'km/h' default '25 km/h'
 field test4 as unitofmeasure default test3.unit
 field unitPrice as price in 'USD/each' default '0.00 USD/each'
 field test5 as price default '12 CAD/[lb_av]'
-field test6 as quantity of 'mass' default '12 [oz_av]'
+field test6 as quantity of 'mass' default '12 kg' 
 
 state off initial, running
 event create initial, start, stop, reset

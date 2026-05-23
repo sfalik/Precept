@@ -1,0 +1,419 @@
+precept SupplierQualityManagement
+
+# ============================================================================
+# DOMAIN: Manufacturing — Supplier Quality Management
+# ============================================================================
+# Demonstrates: supplier evaluation lifecycle, quality scoring, temporal
+# certifications, conditional status based on performance metrics, choice-
+# typed certification tracking, and lookup for supplier documentation.
+#
+# Lifecycle: Registered → Under Review → Approved → Monitored →
+#   Suspended (terminal) | Qualified (terminal)
+#
+# Collection types demonstrated:
+#   - lookup  (DefectRecords) — key-value map of defect types to counts
+#   - log     (QualityLog) — append-only audit trail
+# ============================================================================
+
+# ============================================================================
+# SUPPLIER IDENTITY
+# ============================================================================
+field SupplierNumber as string
+field SupplierName as string
+field ContactName as string optional
+field ContactEmail as string optional
+field PrimaryCategory as choice of string("RawMaterials","Components","SubAssembly","Packaging","Logistics","Other")
+field RegistrationDate as date
+field Country as string optional
+
+# ============================================================================
+# QUALITY SCORES — numeric evaluation system
+# ============================================================================
+field QualityScore as decimal default 0.0 nonnegative
+field DeliveryScore as decimal default 0.0 nonnegative
+field OverallScore as decimal default 0.0 nonnegative
+field LastReviewScore as decimal default 0.0 nonnegative
+
+# ============================================================================
+# DEFECT TRACKING — key-value map of defect types to counts
+# ============================================================================
+field DefectRecords as lookup of string to integer
+field TotalDefects as integer default 0 nonnegative
+field DefectRate as decimal default 0.0 nonnegative
+
+# ============================================================================
+# CERTIFICATIONS & COMPLIANCE
+# Demonstrates: choice-typed certification status tracking.
+# ============================================================================
+field Certifications as choice of string(
+    "None","ISO9001","IATF16949","AS9100","ISO14001","ISO45001","Other")
+field CertificationExpiry as date optional
+field CertValid as boolean default false
+field InternalAuditPassed as boolean default false
+field LastAuditDate as date optional
+
+# ============================================================================
+# PERFORMANCE METRICS
+# ============================================================================
+field OnTimeDeliveryRate as decimal default 100.0 nonnegative
+field FirstPassYield as decimal default 100.0 nonnegative
+field OpenNonconformances as integer default 0 nonnegative
+field ClosedNonconformances as integer default 0 nonnegative
+
+# ============================================================================
+# STATUS TRACKING
+# ============================================================================
+field SupplierStatus as choice of string("Registered","UnderReview","Approved","Monitored","Suspended","Qualified") default "Registered"
+field SuspensionReason as string optional
+field ReinstatementDate as date optional
+
+# ============================================================================
+# QUALITY LOG — append-only audit trail
+# ============================================================================
+field QualityLog as log of string
+
+# ============================================================================
+# TIMESTAMPS
+# ============================================================================
+field RegisteredAt as instant
+field LastReviewAt as instant optional
+field LastAuditAt as instant optional
+field SuspendedAt as instant optional
+field QualifiedAt as instant optional
+
+# ============================================================================
+# NOTES
+# ============================================================================
+field ReviewNotes as string optional
+field ImprovementPlan as string optional
+
+# ============================================================================
+# RULES — Domain Invariants
+# ============================================================================
+rule QualityScore >= 0.0 and QualityScore <= 100.0
+    because "Quality score must be between 0 and 100"
+
+rule DeliveryScore >= 0.0 and DeliveryScore <= 100.0
+    because "Delivery score must be between 0 and 100"
+
+rule OverallScore >= 0.0 and OverallScore <= 100.0
+    because "Overall score must be between 0 and 100"
+
+# ============================================================================
+# STATES — 6 total lifecycle positions
+# ============================================================================
+state Registered initial
+state UnderReview
+state Approved
+state Monitored
+state Suspended
+state Qualified terminal
+
+# ============================================================================
+# EVENT ENSURE — Construction validation
+# ============================================================================
+on Create ensure Create.SupplierNumber != ""
+    because "Supplier number is required for registration"
+
+# ============================================================================
+# EVENT DECLARATIONS
+# ============================================================================
+event Create(
+    SupplierNumber as string notempty,
+    SupplierName as string notempty,
+    PrimaryCategory as choice of string("RawMaterials","Components","SubAssembly","Packaging","Logistics","Other"),
+    RegistrationDate as date) initial
+
+event AddContact(ContactName as string, ContactEmail as string optional)
+event SubmitDocumentation(DocumentType as string notempty, DocumentContent as string notempty)
+
+event BeginReview
+event CompleteReview(
+    QualityScore as decimal,
+    DeliveryScore as decimal,
+    ReviewNotes as string optional)
+
+event Approve
+event Suspend(Reason as string notempty)
+event Reinstate
+
+event Monitor
+event RecordDefect(DefectType as string notempty, Quantity as integer)
+event UpdateScores(
+    OnTimeDeliveryRate as decimal,
+    FirstPassYield as decimal,
+    OpenNonconformances as integer,
+    ClosedNonconformances as integer)
+
+event PassAudit
+event FailAudit(Reason as string notempty)
+event SetCertification(CertType as choice of string("ISO9001","IATF16949","AS9100","ISO14001","ISO45001","Other"), ExpiryDate as date)
+
+event DeclareQualified
+
+# ============================================================================
+# STATE CONSTRAINTS
+# ============================================================================
+in UnderReview ensure LastReviewAt is set
+    because "Under-review suppliers must have a review timestamp"
+
+in Approved ensure OverallScore >= 70.0
+    because "Approved suppliers must have an overall score of at least 70"
+
+in Monitored ensure LastReviewAt is set
+    because "Monitored suppliers must have a review timestamp"
+
+in Suspended ensure SuspendedAt is set
+    because "Suspended suppliers must have a suspension timestamp"
+
+in Qualified ensure QualifiedAt is set
+    because "Qualified suppliers must have a qualification timestamp"
+
+# ============================================================================
+# TRANSITIONS
+# ============================================================================
+
+# --------------------------------------------------------------------------
+# CONSTRUCTION — Registered state setup
+# --------------------------------------------------------------------------
+from Registered on Create
+    -> set SupplierNumber = Create.SupplierNumber
+    -> set SupplierName = Create.SupplierName
+    -> set PrimaryCategory = Create.PrimaryCategory
+    -> set RegistrationDate = Create.RegistrationDate
+    -> set QualityScore = 0.0
+    -> set DeliveryScore = 0.0
+    -> set OverallScore = 0.0
+    -> set LastReviewScore = 0.0
+    -> set SupplierStatus = "Registered"
+    -> set TotalDefects = 0
+    -> set DefectRate = 0.0
+    -> set Certifications = "None"
+    -> set CertValid = false
+    -> set InternalAuditPassed = false
+    -> set RegisteredAt = now()
+    -> transition Registered
+
+# --------------------------------------------------------------------------
+# ADD CONTACT — register supplier contact info
+# --------------------------------------------------------------------------
+from Registered on AddContact
+    -> set ContactName = AddContact.ContactName
+    -> set ContactEmail = AddContact.ContactEmail
+    -> no transition
+
+from UnderReview on AddContact
+    -> set ContactName = AddContact.ContactName
+    -> set ContactEmail = AddContact.ContactEmail
+    -> no transition
+
+from Approved on AddContact
+    -> set ContactName = AddContact.ContactName
+    -> set ContactEmail = AddContact.ContactEmail
+    -> no transition
+
+# --------------------------------------------------------------------------
+# SUBMIT DOCUMENTATION — for initial review
+# --------------------------------------------------------------------------
+from Registered on SubmitDocumentation
+    -> append QualityLog "Documentation submitted: " + SubmitDocumentation.DocumentType
+    -> no transition
+
+# --------------------------------------------------------------------------
+# BEGIN REVIEW — Registered → UnderReview
+# --------------------------------------------------------------------------
+from Registered on BeginReview
+    -> set LastReviewAt = now()
+    -> set SupplierStatus = "UnderReview"
+    -> append QualityLog "Supplier review initiated"
+    -> transition UnderReview
+
+# --------------------------------------------------------------------------
+# COMPLETE REVIEW — evaluate supplier (score >= 85 → Qualified)
+# More specific guard first: exceptional performance.
+# --------------------------------------------------------------------------
+from UnderReview on CompleteReview when OverallScore >= 85.0
+    -> set QualityScore = CompleteReview.QualityScore
+    -> set DeliveryScore = CompleteReview.DeliveryScore
+    -> set OverallScore = (QualityScore + DeliveryScore) / 2.0
+    -> set LastReviewScore = OverallScore
+    -> set ReviewNotes = CompleteReview.ReviewNotes
+    -> set SupplierStatus = "Qualified"
+    -> append QualityLog "Review completed — Qualified supplier"
+    -> transition Qualified
+
+# --------------------------------------------------------------------------
+# COMPLETE REVIEW — evaluate supplier (general case)
+# --------------------------------------------------------------------------
+from UnderReview on CompleteReview
+    -> set QualityScore = CompleteReview.QualityScore
+    -> set DeliveryScore = CompleteReview.DeliveryScore
+    -> set OverallScore = (QualityScore + DeliveryScore) / 2.0
+    -> set LastReviewScore = OverallScore
+    -> set ReviewNotes = CompleteReview.ReviewNotes
+    -> set SupplierStatus = "Approved"
+    -> append QualityLog "Review completed — Approved supplier"
+    -> transition Approved
+
+# --------------------------------------------------------------------------
+# APPROVE — move to Approved state
+# --------------------------------------------------------------------------
+from UnderReview on Approve when OverallScore < 70.0
+    -> reject "Overall score must be at least 70"
+from UnderReview on Approve
+    -> set SupplierStatus = "Approved"
+    -> append QualityLog "Supplier approved"
+    -> transition Approved
+
+# --------------------------------------------------------------------------
+# SUSPEND — from Approved or Monitored
+# --------------------------------------------------------------------------
+from Approved on Suspend when SuspendedAt is set
+    -> reject "Supplier already suspended"
+from Approved on Suspend
+    -> set SuspensionReason = Suspend.Reason
+    -> set SupplierStatus = "Suspended"
+    -> set SuspendedAt = now()
+    -> append QualityLog "Supplier suspended: " + Suspend.Reason
+    -> transition Suspended
+
+from Monitored on Suspend
+    -> set SuspensionReason = Suspend.Reason
+    -> set SupplierStatus = "Suspended"
+    -> set SuspendedAt = now()
+    -> append QualityLog "Supplier suspended: " + Suspend.Reason
+    -> transition Suspended
+
+# --------------------------------------------------------------------------
+# REINSTATE — Suspended → Approved (via review)
+# --------------------------------------------------------------------------
+from Suspended on Reinstate when not (SuspendedAt is set)
+    -> reject "Supplier is not currently suspended"
+from Suspended on Reinstate
+    -> set SuspendedAt = now()
+    -> set SuspensionReason = ""
+    -> set SupplierStatus = "Approved"
+    -> append QualityLog "Supplier reinstated"
+    -> transition Approved
+
+# --------------------------------------------------------------------------
+# MONITOR — Approved → Monitored (performance decline)
+# --------------------------------------------------------------------------
+from Approved on Monitor when OverallScore >= 80.0
+    -> reject "Supplier must have performance issues to monitor"
+from Approved on Monitor
+    -> set SupplierStatus = "Monitored"
+    -> append QualityLog "Supplier moved to monitored status"
+    -> transition Monitored
+
+# --------------------------------------------------------------------------
+# RECORD DEFECT — track quality issues
+# --------------------------------------------------------------------------
+from Approved on RecordDefect
+    -> put DefectRecords RecordDefect.DefectType = RecordDefect.Quantity
+    -> set TotalDefects = TotalDefects + RecordDefect.Quantity
+    -> set DefectRate = TotalDefects * 100.0 / 1000.0
+    -> append QualityLog "Defect recorded: " + RecordDefect.DefectType
+    -> no transition
+
+from Monitored on RecordDefect when TotalDefects + RecordDefect.Quantity > 10
+    -> put DefectRecords RecordDefect.DefectType = RecordDefect.Quantity
+    -> set TotalDefects = TotalDefects + RecordDefect.Quantity
+    -> set DefectRate = TotalDefects * 100.0 / 1000.0
+    -> set SupplierStatus = "Suspended"
+    -> set SuspendedAt = now()
+    -> set SuspensionReason = "Excessive defects"
+    -> append QualityLog "Excessive defects — supplier suspended"
+    -> transition Suspended
+
+from Monitored on RecordDefect
+    -> put DefectRecords RecordDefect.DefectType = RecordDefect.Quantity
+    -> set TotalDefects = TotalDefects + RecordDefect.Quantity
+    -> set DefectRate = TotalDefects * 100.0 / 1000.0
+    -> append QualityLog "Defect recorded: " + RecordDefect.DefectType
+    -> no transition
+
+# --------------------------------------------------------------------------
+# UPDATE SCORES — track performance metrics
+# --------------------------------------------------------------------------
+from Approved on UpdateScores when FirstPassYield < 90.0
+    -> set OnTimeDeliveryRate = UpdateScores.OnTimeDeliveryRate
+    -> set FirstPassYield = UpdateScores.FirstPassYield
+    -> set OpenNonconformances = UpdateScores.OpenNonconformances
+    -> set ClosedNonconformances = UpdateScores.ClosedNonconformances
+    -> set LastReviewScore = FirstPassYield
+    -> set SupplierStatus = "Monitored"
+    -> append QualityLog "Scores updated — moved to monitored"
+    -> transition Monitored
+
+from Approved on UpdateScores
+    -> set OnTimeDeliveryRate = UpdateScores.OnTimeDeliveryRate
+    -> set FirstPassYield = UpdateScores.FirstPassYield
+    -> set OpenNonconformances = UpdateScores.OpenNonconformances
+    -> set ClosedNonconformances = UpdateScores.ClosedNonconformances
+    -> set LastReviewScore = FirstPassYield
+    -> append QualityLog "Scores updated"
+    -> no transition
+
+from Monitored on UpdateScores
+    -> set OnTimeDeliveryRate = UpdateScores.OnTimeDeliveryRate
+    -> set FirstPassYield = UpdateScores.FirstPassYield
+    -> set OpenNonconformances = UpdateScores.OpenNonconformances
+    -> set ClosedNonconformances = UpdateScores.ClosedNonconformances
+    -> set LastReviewScore = FirstPassYield
+    -> append QualityLog "Scores updated"
+    -> if FirstPassYield >= 95.0 and OpenNonconformances == 0 then
+        -> set SupplierStatus = "Approved"
+        -> transition Approved
+    else
+        -> no transition
+    end
+
+# --------------------------------------------------------------------------
+# PASS AUDIT — compliance verified
+# --------------------------------------------------------------------------
+from Approved on PassAudit when CertValid
+    -> set InternalAuditPassed = true
+    -> set LastAuditDate = RegistrationDate
+    -> append QualityLog "Audit passed"
+    -> no transition
+
+# --------------------------------------------------------------------------
+# FAIL AUDIT — compliance failure
+# --------------------------------------------------------------------------
+from Approved on FailAudit when SuspendedAt is set
+    -> reject "Supplier already suspended"
+from Approved on FailAudit
+    -> set SupplierStatus = "Suspended"
+    -> set SuspendedAt = now()
+    -> set SuspensionReason = "Audit failure: " + FailAudit.Reason
+    -> append QualityLog "Audit failed: " + FailAudit.Reason
+    -> transition Suspended
+
+# --------------------------------------------------------------------------
+# SET CERTIFICATION — register or update certification
+# --------------------------------------------------------------------------
+from Registered on SetCertification
+    -> set Certifications = SetCertification.CertType
+    -> set CertificationExpiry = SetCertification.ExpiryDate
+    -> set CertValid = true
+    -> append QualityLog "Certification set"
+    -> no transition
+
+from Approved on SetCertification
+    -> set Certifications = SetCertification.CertType
+    -> set CertificationExpiry = SetCertification.ExpiryDate
+    -> set CertValid = true
+    -> append QualityLog "Certification set"
+    -> no transition
+
+# --------------------------------------------------------------------------
+# DECLARE QUALIFIED — exceptional supplier recognition
+# --------------------------------------------------------------------------
+from Approved on DeclareQualified when OverallScore < 85.0
+    -> reject "Overall score must be at least 85 for qualification"
+from Approved on DeclareQualified
+    -> set SupplierStatus = "Qualified"
+    -> set QualifiedAt = now()
+    -> append QualityLog "Supplier declared qualified"
+    -> transition Qualified

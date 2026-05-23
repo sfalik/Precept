@@ -1,0 +1,309 @@
+precept PrescriptionRefillRequest
+
+# ============================================================================
+# DOMAIN: Healthcare Pharmacy — Prescription Refill Workflow
+# ============================================================================
+# Demonstrates: choice types with ordering, complex guard conditions (conjunctions),
+# multiple approval paths from a single state, conditional outcomes based on data,
+# approval tracking that enforces pharmacist OR physician approval records,
+# and physician override decisions via a dedicated event.
+# ============================================================================
+
+# ============================================================================
+# PATIENT INFORMATION
+# ============================================================================
+field PatientId as string notempty maxlength 50
+field PatientName as string notempty maxlength 200
+field DateOfBirth as date
+field Medication as string notempty maxlength 200
+field Dosage as string notempty maxlength 100
+
+# ============================================================================
+# PRESCRIPTION DETAILS
+# Default values for non-critical fields keep construction lightweight.
+# RefillsRemaining defaults to 0 — the CreateRefill event sets the actual value.
+# RefillsRemaining represents the number of remaining refill authorizations on
+# the prescription, not related to quantity at all.
+# ============================================================================
+field QuantityRequested as integer nonnegative
+field DaysSupply as integer nonnegative
+field RefillsRemaining as integer nonnegative default 0
+field NextFillDate as date
+field PrescribingPhysician as string notempty maxlength 200
+
+# ============================================================================
+# INTERACTION TRACKING
+# Demonstrates: structured interaction fields (source/target/severity) and
+# an ordered choice type for tracking the highest severity found.
+# ============================================================================
+field DrugInteractionSource as string optional maxlength 200
+field DrugInteractionTarget as string optional maxlength 200
+field DrugInteractionSeverity as choice of string("None", "Mild", "Moderate", "Severe") optional
+field HighestInteractionSeverity as choice of string("None", "Mild", "Moderate", "Severe") ordered default "None"
+
+# ============================================================================
+# PRIORITY AND REVIEW
+# ============================================================================
+field Priority as choice of string("Routine", "Standard", "Urgent", "Stat") ordered default "Standard"
+field ReviewNotes as string optional maxlength 2000
+field ReviewedBy as string optional maxlength 200
+
+# ============================================================================
+# APPROVAL TRACKING
+# State machine ensures: Approved states (PendingPharmacistApproval,
+# PendingPhysicianApproval, ApprovedByOverride) each record the approver's ID
+# and timestamp at transition time. Terminal Approved→Filled states carry
+# one of ApprovedByPharmacistId, ApprovedByPhysicianId, or OverrideReason.
+# ============================================================================
+field ApprovedByPharmacistId as string optional maxlength 50
+field ApprovedByPharmacistAt as instant optional
+field ApprovedByPhysicianId as string optional maxlength 50
+field ApprovedByPhysicianAt as instant optional
+field OverrideReason as string optional maxlength 1000
+
+# ============================================================================
+# INSURANCE INFORMATION
+# ============================================================================
+field InsuranceProvider as string maxlength 200
+field InsuranceBin as string optional maxlength 10
+field InsurancePcn as string optional maxlength 10
+field InsuranceGroup as string optional maxlength 50
+field InsurancePolicyNumber as string optional maxlength 50
+
+# ============================================================================
+# FILL LOCATION
+# ============================================================================
+field FillLocation as string maxlength 200
+field FillPharmacyId as string maxlength 50
+
+# ============================================================================
+# REJECTION
+# ============================================================================
+field RejectionReason as string optional maxlength 1000
+field RejectedAt as instant optional
+
+# ============================================================================
+# INTERACTION DETAILS — stores the FlagInteraction text for reference in later transitions
+# ============================================================================
+field FlagInteractionDetails as string optional maxlength 2000
+
+# ============================================================================
+# TIMESTAMPS
+# ============================================================================
+field CreatedAt as instant
+field ReviewStartedAt as instant optional
+field ApprovalDecisionAt as instant optional
+field FilledAt as instant optional
+
+# ============================================================================
+# RULES — Domain Invariants (7 rules)
+# ============================================================================
+
+# Identity and presence rules
+rule PatientName != "" because "Patient name is required"
+rule Medication != "" because "Medication must be identified"
+rule Dosage != "" because "Dosage must be specified"
+
+# Quantity and supply constraints (B1: DaysSupply > 0 + per-fill cap)
+rule QuantityRequested > 0 because "Quantity must be positive"
+rule DaysSupply > 0 because "Days supply must be positive"
+rule QuantityRequested <= DaysSupply because "Requested quantity cannot exceed prescribed days supply per fill"
+
+# Insurance and pharmacy identification
+rule InsuranceProvider != "" because "Insurance provider must be identified"
+rule FillPharmacyId != "" because "Fill pharmacy must be identified"
+
+# ============================================================================
+# STATES — 8 total (New → UnderReview → InteractionCheck → approval states → Filled/Rejected)
+# ============================================================================
+state New initial
+state UnderReview
+state InteractionCheck
+state PendingPharmacistApproval
+state PendingPhysicianApproval
+state ApprovedByOverride
+state Filled terminal
+state Rejected terminal
+
+# ============================================================================
+# EVENTS — 10 total
+# ============================================================================
+
+# Initial entity creation — carries all required construction data.
+event CreateRefill(
+    PatientId as string,
+    PatientName as string,
+    DateOfBirth as date,
+    Medication as string,
+    Dosage as string,
+    QuantityRequested as integer,
+    DaysSupply as integer,
+    RefillsRemaining as integer,
+    NextFillDate as date,
+    PrescribingPhysician as string,
+    InsuranceProvider as string,
+    InsuranceBin as string,
+    InsurancePcn as string,
+    InsuranceGroup as string,
+    InsurancePolicyNumber as string,
+    FillLocation as string,
+    FillPharmacyId as string) initial
+
+# Workflow progression
+event SubmitForReview
+
+# Drug interaction flag with structured source/target/severity (B2)
+event FlagInteraction(
+    SourceMedication as string notempty,
+    TargetMedication as string notempty,
+    Severity as choice of string("None", "Mild", "Moderate", "Severe"),
+    Details as string notempty)
+
+# Escalation events — each targets a specific approver type
+event EscalateToPharmacist(PharmacistId as string)
+event EscalateToPhysician(PhysicianId as string)
+event ApproveOverride(Reason as string)
+
+# Terminal actions from approval states
+event RejectRequest(Reason as string)
+event ApproveRefill(ApproverId as string)
+
+# Physician review decision for severe interactions (B3)
+event PhysicianReviewDecision(Decision as choice of string("Override", "Reject", "Substitute"))
+
+# ============================================================================
+# TRANSITIONS — 17 total
+# ============================================================================
+
+# --- Entity creation: New → UnderReview ---
+from New on CreateRefill
+    -> set PatientId = CreateRefill.PatientId
+    -> set PatientName = CreateRefill.PatientName
+    -> set DateOfBirth = CreateRefill.DateOfBirth
+    -> set Medication = CreateRefill.Medication
+    -> set Dosage = CreateRefill.Dosage
+    -> set QuantityRequested = CreateRefill.QuantityRequested
+    -> set DaysSupply = CreateRefill.DaysSupply
+    -> set RefillsRemaining = CreateRefill.RefillsRemaining
+    -> set NextFillDate = CreateRefill.NextFillDate
+    -> set PrescribingPhysician = CreateRefill.PrescribingPhysician
+    -> set InsuranceProvider = CreateRefill.InsuranceProvider
+    -> set InsuranceBin = CreateRefill.InsuranceBin
+    -> set InsurancePcn = CreateRefill.InsurancePcn
+    -> set InsuranceGroup = CreateRefill.InsuranceGroup
+    -> set InsurancePolicyNumber = CreateRefill.InsurancePolicyNumber
+    -> set FillLocation = CreateRefill.FillLocation
+    -> set FillPharmacyId = CreateRefill.FillPharmacyId
+    -> set CreatedAt = now()
+    -> set Priority = "Standard"
+    -> transition UnderReview
+
+# --- UnderReview → InteractionCheck ---
+# Submitting for review triggers automated drug-interaction scanning.
+from UnderReview on SubmitForReview
+    -> set ReviewStartedAt = now()
+    -> set ReviewedBy = "System"
+    -> set ReviewNotes = "Submitted for automated interaction check"
+    -> transition InteractionCheck
+
+# --- InteractionCheck → four approval paths ---
+# The interaction check result determines the escalation path:
+#   Severe        → FlagInteraction → PendingPhysicianApproval (B3)
+#   Moderate      → EscalateToPhysician (with guard) (F6)
+#   Mild          → EscalateToPharmacist (with guard) (F6)
+#   Override      → EscalateToPhysician or ApproveOverride
+# ============================================================================
+
+# Severe interaction → physician review path (B3: was RequiresManualFill)
+from InteractionCheck on FlagInteraction
+    -> set DrugInteractionSource = FlagInteraction.SourceMedication
+    -> set DrugInteractionTarget = FlagInteraction.TargetMedication
+    -> set DrugInteractionSeverity = FlagInteraction.Severity
+    -> set HighestInteractionSeverity = FlagInteraction.Severity
+    -> set FlagInteractionDetails = FlagInteraction.Details
+    -> set ReviewNotes = "Severe interaction flagged: " + FlagInteraction.Details
+    -> transition PendingPhysicianApproval
+
+# Physician review path — moderate interaction (F6: guard added)
+# Placed before EscalateToPharmacist so Moderate matches Physician first.
+from InteractionCheck on EscalateToPhysician when HighestInteractionSeverity == "Moderate"
+    -> set ReviewedBy = EscalateToPhysician.PhysicianId
+    -> set ApprovedByPhysicianId = EscalateToPhysician.PhysicianId
+    -> set ApprovedByPhysicianAt = now()
+    -> set ReviewNotes = "Escalated to physician for moderate interaction review"
+    -> transition PendingPhysicianApproval
+
+# Pharmacist review path — mild or moderate interaction (F6: guard added)
+from InteractionCheck on EscalateToPharmacist when HighestInteractionSeverity == "Mild" or HighestInteractionSeverity == "Moderate"
+    -> set ReviewedBy = EscalateToPharmacist.PharmacistId
+    -> set ApprovedByPharmacistId = EscalateToPharmacist.PharmacistId
+    -> set ApprovedByPharmacistAt = now()
+    -> set ReviewNotes = "Escalated to pharmacist for interaction review"
+    -> transition PendingPharmacistApproval
+
+# Override path — pre-approved exception
+from InteractionCheck on ApproveOverride
+    -> set OverrideReason = ApproveOverride.Reason
+    -> set ReviewNotes = "Approved by override: " + ApproveOverride.Reason
+    -> transition ApprovedByOverride
+
+# --- PendingPharmacistApproval → Filled | Rejected ---
+from PendingPharmacistApproval on ApproveRefill
+    -> set ApprovedByPharmacistId = ApproveRefill.ApproverId
+    -> set ApprovalDecisionAt = now()
+    -> set ReviewNotes = "Refill approved by pharmacist " + ApproveRefill.ApproverId
+    -> transition Filled
+
+from PendingPharmacistApproval on RejectRequest
+    -> set RejectionReason = RejectRequest.Reason
+    -> set ApprovalDecisionAt = now()
+    -> set RejectedAt = now()
+    -> set ReviewNotes = "Rejected by pharmacist: " + RejectRequest.Reason
+    -> transition Rejected
+
+# --- PendingPhysicianApproval → Filled | Rejected ---
+from PendingPhysicianApproval on ApproveRefill
+    -> set ApprovedByPhysicianId = ApproveRefill.ApproverId
+    -> set ApprovedByPhysicianAt = now()
+    -> set ApprovalDecisionAt = now()
+    -> set ReviewNotes = "Refill approved by physician " + ApproveRefill.ApproverId
+    -> transition Filled
+
+from PendingPhysicianApproval on RejectRequest
+    -> set RejectionReason = RejectRequest.Reason
+    -> set ApprovalDecisionAt = now()
+    -> set RejectedAt = now()
+    -> set ReviewNotes = "Rejected by physician: " + RejectRequest.Reason
+    -> transition Rejected
+
+# --- ApprovedByOverride → Filled | Rejected ---
+# Override is already approved; ApproveRefill finalizes, RejectRequest rescinds.
+from ApprovedByOverride on ApproveRefill when OverrideReason is set
+    -> set ApprovalDecisionAt = now()
+    -> set ReviewNotes = "Override fill authorized — " + OverrideReason
+    -> transition Filled
+
+from ApprovedByOverride on RejectRequest
+    -> set RejectionReason = RejectRequest.Reason
+    -> set ApprovalDecisionAt = now()
+    -> set RejectedAt = now()
+    -> set ReviewNotes = "Override rescinded: " + RejectRequest.Reason
+    -> transition Rejected
+
+# --- PendingPhysicianApproval → ApprovedByOverride | Rejected (B3: physician review decision) ---
+from PendingPhysicianApproval on PhysicianReviewDecision when Decision == "Override" and FlagInteractionDetails is set
+    -> set OverrideReason = "Physician approved override for severe interaction: " + FlagInteractionDetails
+    -> set ApprovalDecisionAt = now()
+    -> transition ApprovedByOverride
+
+from PendingPhysicianApproval on PhysicianReviewDecision when Decision == "Reject" and FlagInteractionDetails is set
+    -> set RejectionReason = "Physician rejected due to severe drug interaction: " + FlagInteractionDetails
+    -> set ApprovalDecisionAt = now()
+    -> set RejectedAt = now()
+    -> transition Rejected
+
+from PendingPhysicianApproval on PhysicianReviewDecision when Decision == "Substitute" and FlagInteractionDetails is set
+    -> set RejectionReason = "Physician recommended substitute medication: " + FlagInteractionDetails
+    -> set ApprovalDecisionAt = now()
+    -> set RejectedAt = now()
+    -> transition Rejected

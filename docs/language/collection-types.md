@@ -7,7 +7,6 @@
 | Property | Value |
 |---|---|
 | Doc maturity | Canonical Design |
-| Implementation state | Partially implemented — `set`/`queue`/`stack` surface shipped; `log of T`, `log of T by P`, `bag of T`, `list of T`, `queue of T by P`, and `lookup of K to V` approved and locked on `spike/Precept-V2`; `quantifier predicates` (`each`/`any`/`no`) and `notempty` on collections approved and locked on `spike/Precept-V2`, not yet implemented |
 | Scope | Nine collection kinds: `set of T`, `queue of T`, `stack of T`, `log of T`, `log of T by P`, `bag of T`, `list of T`, `queue of T by P`, `lookup of K to V`; actions, accessors, constraints, emptiness safety, membership, inner type system; quantifier predicates (`each`/`any`/`no`) |
 | Related | [Primitive Types](primitive-types.md) · [Language Spec](precept-language-spec.md) §§2.3, 3.6, 3.8 · [Type Checker](../compiler/type-checker.md) |
 

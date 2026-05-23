@@ -1,0 +1,167 @@
+precept LabTestOrder
+
+# ============================================================================
+# DOMAIN: Healthcare Diagnostics — Lab Test Order & Results Workflow
+# ============================================================================
+# Demonstrates: set/collection types, optional temporal fields, guarded
+# transitions with rejection paths, state-local events (no transition),
+# and multi-branch event handling (three outcomes from one event).
+# ============================================================================
+
+# ============================================================================
+# ORDER IDENTIFICATION
+# ============================================================================
+field OrderId as string default ""
+field PatientId as string default ""
+field OrderingProvider as string default ""
+
+# ============================================================================
+# TEST & SPECIMEN INFORMATION
+# ============================================================================
+field Tests as set of string
+field SpecimenType as choice of string("Blood", "Urine", "Saliva", "Tissue", "Swab") default "Blood"
+
+# ============================================================================
+# TEMPORAL FIELDS
+# ============================================================================
+field OrderedAt as instant
+field CollectionDueBy as instant optional
+field CollectedAt as instant optional
+field ResultsEnteredAt as instant optional
+field VerifiedAt as instant optional
+
+# ============================================================================
+# RESULTS & CRITICAL FLAGS
+# ============================================================================
+field Results as string default ""
+field ReferenceRanges as string default ""
+field CriticalFlags as set of string
+field VerifiedBy as string optional
+
+# ============================================================================
+# REVIEW & REJECTION TRACKING
+# ============================================================================
+field RejectionReason as string optional
+field StatusReason as string optional
+
+# ============================================================================
+# STATES — 6 total (Ordered → Collected → Processing → ResultsEntered →
+#                    Verified → Reviewed)
+# ============================================================================
+state Ordered initial
+state Collected
+state Processing
+state ResultsEntered
+state Verified
+state Reviewed terminal
+
+# ============================================================================
+# EVENTS
+# ============================================================================
+
+# Initial order creation
+event CreateOrder(
+    OrderId as string,
+    PatientId as string,
+    OrderingProvider as string,
+    Tests as set of string,
+    SpecimenType as choice of string("Blood", "Urine", "Saliva", "Tissue", "Swab"),
+    CollectionDueBy as instant) initial
+
+# Workflow progression events
+event CollectSpecimen
+event StartProcessing
+event EnterResults(ResultText as string, Ranges as string)
+event FlagCritical(TestCode as string, ValueDescription as string)
+event VerifyResults(VerifiedByProvider as string)
+event ReviewResults(Outcome as choice of string("Accept", "Request Clarification", "Send For Retest"))
+
+# ============================================================================
+# TRANSITIONS
+# ============================================================================
+
+# From Ordered — CollectSpecimen: guarded deadline checks
+from Ordered on CollectSpecimen when CollectionDueBy is not set
+    -> reject "Cannot collect — collection deadline not set"
+from Ordered on CollectSpecimen when CollectionDueBy is set and now() > CollectionDueBy
+    -> reject "Cannot collect — overdue"
+from Ordered on CollectSpecimen when CollectionDueBy is set and now() <= CollectionDueBy
+    -> set CollectedAt = now()
+    -> set StatusReason = "Specimen collected"
+    -> transition Collected
+
+# From Collected — StartProcessing
+from Collected on StartProcessing
+    -> set StatusReason = "Processing started"
+    -> transition Processing
+
+# From Processing — EnterResults
+from Processing on EnterResults when Results == ""
+    -> reject "No results to enter"
+from Processing on EnterResults
+    -> clear Results
+    -> set Results = EnterResults.ResultText
+    -> set ReferenceRanges = EnterResults.Ranges
+    -> set ResultsEnteredAt = now()
+    -> transition ResultsEntered
+
+# From ResultsEntered — FlagCritical (state-local, no transition)
+from ResultsEntered on FlagCritical when not (Tests contains FlagCritical.TestCode)
+    -> reject "TestCode not in order"
+from ResultsEntered on FlagCritical
+    -> add CriticalFlags FlagCritical.TestCode
+    -> set StatusReason = "Critical value flagged: " + FlagCritical.TestCode
+    -> no transition
+
+# From ResultsEntered — VerifyResults
+from ResultsEntered on VerifyResults when VerifiedByProvider == ""
+    -> reject "Provider name required"
+from ResultsEntered on VerifyResults
+    -> set VerifiedBy = VerifiedByProvider
+    -> set VerifiedAt = now()
+    -> set StatusReason = "Results verified by " + VerifiedByProvider
+    -> transition Verified
+
+# From Verified — ReviewResults (three branches)
+from Verified on ReviewResults when Outcome == "Accept"
+    -> set StatusReason = "Results accepted"
+    -> transition Reviewed
+from Verified on ReviewResults when Outcome == "Request Clarification"
+    -> clear VerifiedAt
+    -> set ResultsEnteredAt = now()
+    -> set StatusReason = "Clarification requested — re-entering results"
+    -> transition ResultsEntered
+from Verified on ReviewResults when Outcome == "Send For Retest"
+    -> clear VerifiedAt
+    -> set CollectedAt = now()
+    -> set StatusReason = "Retest ordered"
+    -> transition Collected
+
+# ============================================================================
+# RULES — Domain Invariants (2 rules)
+# ============================================================================
+rule Tests.count > 0 because "At least one test must be ordered"
+rule CriticalFlags.count <= Tests.count because "Cannot flag more critical values than tests ordered"
+
+# ============================================================================
+# STATE CONSTRAINTS
+# ============================================================================
+in Ordered modify OrderingProvider, Tests, SpecimenType, CollectionDueBy editable
+in Collected modify StatusReason editable
+in ResultsEntered modify StatusReason, CriticalFlags editable
+in Verified modify StatusReason editable
+in Verified ensure VerifiedBy is set because "Results must be verified in Verified state"
+
+# ============================================================================
+# CONSTRUCTION ROW
+# ============================================================================
+from Ordered on CreateOrder
+    -> set OrderId = CreateOrder.OrderId
+    -> set PatientId = CreateOrder.PatientId
+    -> set OrderingProvider = CreateOrder.OrderingProvider
+    -> set Tests = CreateOrder.Tests
+    -> set SpecimenType = CreateOrder.SpecimenType
+    -> set OrderedAt = now()
+    -> set CollectionDueBy = CreateOrder.CollectionDueBy
+    -> set StatusReason = "Order created"
+    -> transition Ordered

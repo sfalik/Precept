@@ -1,0 +1,198 @@
+precept InsuranceClaimProcessing
+
+# ============================================================================
+# DOMAIN: Insurance � Claim Processing Workflow
+# ============================================================================
+# Demonstrates: optional temporal fields, lookup type for document tracking,
+# money type for claim amounts, guarded transitions with specific-before-
+# general ordering, state-local events (submitInfo only in UnderReview),
+# state constraints with ensure and access modes, and event ensures.
+#
+# State diagram:
+#   Filed -> UnderReview -> Approved  -> Paid (terminal)
+#                    -> PartiallyApproved -> Paid (terminal)
+#                    -> Rejected -> Paid (appeal)
+#                    -> Denied (terminal)
+# ============================================================================
+
+# ============================================================================
+# CLAIM IDENTIFICATION
+# ============================================================================
+field PolicyNumber as string default ""
+field InsuredName as string default ""
+field ClaimType as choice of string("Auto", "Property", "Liability", "Health") default "Auto"
+
+# ============================================================================
+# MONETARY FIELDS
+# ============================================================================
+field ClaimAmount as money in 'USD' default '0.00 USD'
+field ApprovedAmount as money in 'USD' default '0.00 USD'
+field Deductible as money in 'USD' default '0.00 USD'
+field PaidAmount as money in 'USD' default '0.00 USD'
+
+# ============================================================================
+# DOCUMENT TRACKING (lookup type)
+# Demonstrates: key-value map with `put` for upsert and `clear` for removal.
+# Mapping document name -> status ("Received", "Reviewed", "Rejected").
+# ============================================================================
+field SupportingDocuments as lookup of string to string
+
+# ============================================================================
+# OPTIONAL TEMPORAL FIELDS
+# ============================================================================
+field ClaimDate as instant optional
+field PaidDate as instant optional
+
+# ============================================================================
+# REVIEW & REJECTION TRACKING
+# ============================================================================
+field ReviewNotes as string optional
+field DenialReason as string optional
+field ApprovedAll as boolean default true
+
+# ============================================================================
+# STATES � 8 total (Filed -> UnderReview -> Approved / PartiallyApproved /
+#                    Rejected -> Appealed -> Paid (terminal) / Denied (terminal))
+# ============================================================================
+state Filed initial
+state UnderReview
+state Approved
+state PartiallyApproved
+state Rejected
+state Appealed
+state Paid terminal
+state Denied terminal
+
+# ============================================================================
+# EVENTS
+# ============================================================================
+
+# Initial claim filing
+event FileClaim(
+    PolicyNum as string notempty,
+    Insured as string notempty,
+    Type as choice of string("Auto", "Property", "Liability", "Health"),
+    Amount as money in 'USD',
+    DeductibleAmt as money in 'USD') initial
+on FileClaim ensure FileClaim.Amount > '0.00 USD' because "Claim amount must be positive"
+on FileClaim ensure FileClaim.DeductibleAmt >= '0.00 USD' because "Deductible cannot be negative"
+
+# Claimant responds to information requests (state-local in UnderReview)
+event SubmitInfo(DocName as string notempty)
+
+# Examiner reviews and decides - Approve.All determines full vs partial
+event Approve(Notes as string optional, All as boolean)
+event Deny(Reason as string notempty)
+event IssuePayment
+
+# Examiner requests more information from the claimant
+event RequestInfo(DocName as string notempty)
+
+# ============================================================================
+# TRANSITIONS
+# ============================================================================
+
+# --- Construction: Filed -> UnderReview ---
+from Filed on FileClaim
+    -> set PolicyNumber = FileClaim.PolicyNum
+    -> set InsuredName = FileClaim.Insured
+    -> set ClaimType = FileClaim.Type
+    -> set ClaimAmount = FileClaim.Amount
+    -> set Deductible = FileClaim.DeductibleAmt
+    -> set ClaimDate = now()
+    -> set ApprovedAmount = '0.00 USD'
+    -> set PaidAmount = '0.00 USD'
+    -> set ReviewNotes = ""
+    -> set DenialReason = ""
+    -> set ApprovedAll = true
+    -> transition UnderReview
+
+# --- From Filed - RequestInfo (request docs early) ---
+from Filed on RequestInfo
+    -> put SupportingDocuments RequestInfo.DocName = "Requested"
+    -> set ReviewNotes = "Additional documents requested before review"
+    -> transition UnderReview
+
+# --- From UnderReview - SubmitInfo (state-local, no transition) ---
+from UnderReview on SubmitInfo when SupportingDocuments for SubmitInfo.DocName == "Received"
+    -> reject "Document {SubmitInfo.DocName} already received"
+from UnderReview on SubmitInfo
+    -> put SupportingDocuments SubmitInfo.DocName = "Received"
+    -> no transition
+
+# --- From UnderReview - Approve: full approval (claim > deductible, all) ---
+from UnderReview on Approve when ClaimAmount > Deductible and Approve.All
+    -> set ApprovedAmount = ClaimAmount - Deductible
+    -> set ApprovedAll = true
+    -> set ReviewNotes = if Approve.Notes is set then Approve.Notes else "Full approval granted"
+    -> set DenialReason = ""
+    -> transition Approved
+
+# --- From UnderReview - Approve: partial approval (claim > deductible, partial) ---
+from UnderReview on Approve when ClaimAmount > Deductible and not Approve.All
+    -> set ApprovedAmount = ClaimAmount / 2.0 - Deductible / 2.0
+    -> set ApprovedAll = false
+    -> set ReviewNotes = if Approve.Notes is set then Approve.Notes else "Partial approval granted"
+    -> set DenialReason = ""
+    -> transition PartiallyApproved
+
+# --- From UnderReview - Approve: insufficient coverage (deductible too high) ---
+from UnderReview on Approve when ClaimAmount <= Deductible
+    -> set DenialReason = "Claim amount does not exceed deductible"
+    -> transition Rejected
+
+# --- From UnderReview - Deny: active denial by examiner ---
+from UnderReview on Deny
+    -> set DenialReason = Deny.Reason
+    -> set ReviewNotes = "Claim denied"
+    -> transition Denied
+
+# --- From Approved - IssuePayment (terminal) ---
+from Approved on IssuePayment when ApprovedAmount <= '0.00 USD'
+    -> reject "Approved amount must be positive for payment"
+from Approved on IssuePayment
+    -> set PaidAmount = ApprovedAmount
+    -> set PaidDate = now()
+    -> set ReviewNotes = "Payment issued"
+    -> transition Paid
+
+# --- From PartiallyApproved - IssuePayment (terminal) ---
+from PartiallyApproved on IssuePayment when ApprovedAmount <= '0.00 USD'
+    -> reject "Partial approved amount must be positive for payment"
+from PartiallyApproved on IssuePayment
+    -> set PaidAmount = ApprovedAmount
+    -> set PaidDate = now()
+    -> set ReviewNotes = "Partial payment issued"
+    -> transition Paid
+
+# --- From Rejected - Appeal (claimant appeals rejection) ---
+event Appeal
+from Rejected on Appeal
+    -> set ReviewNotes = "Claim appealed by claimant"
+    -> transition Appealed
+
+# --- From Appealed - IssuePayment (appeal approved) ---
+from Appealed on IssuePayment when ApprovedAmount <= '0.00 USD' and ClaimAmount <= '0.00 USD'
+    -> reject "No approved or claim amount for payment"
+from Appealed on IssuePayment
+    -> set PaidAmount = if ApprovedAmount > '0.00 USD' then ApprovedAmount else ClaimAmount
+    -> set PaidDate = now()
+    -> set ReviewNotes = "Appeal granted - payment issued"
+    -> transition Paid
+
+# ============================================================================
+# RULES - Domain Invariants (2 rules)
+# ============================================================================
+rule ApprovedAmount <= ClaimAmount because "Approved amount cannot exceed claim amount"
+rule PaidAmount <= ApprovedAmount because "Paid amount cannot exceed approved amount"
+
+# ============================================================================
+# STATE CONSTRAINTS
+# ============================================================================
+in UnderReview modify ReviewNotes, SupportingDocuments editable
+in Approved modify ReviewNotes editable
+in PartiallyApproved modify ReviewNotes editable
+in Rejected modify ReviewNotes editable
+in Approved ensure ClaimDate is set because "Approved claims must have a claim date"
+in Paid ensure PaidDate is set because "Paid claims must have a payment date"
+in Paid ensure PaidAmount > '0.00 USD' because "Paid claims must have a positive payment"
