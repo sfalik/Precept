@@ -1,0 +1,212 @@
+precept HotelReservationManagement
+
+# A hotel reservation moves through booking, confirmation, check-in, check-out,
+# and closure. A guest builds the reservation in Draft — picking dates, room type,
+# occupancy, and extras — then books. The hotel confirms (typically once payment
+# is authorized), then check-in/check-out advance through the stay. Cancellations
+# are governed by the per-reservation cancellation policy: a free-cancellation
+# window expires some days before check-in, after which cancellation incurs a fee.
+#
+# Free-Construction: the guest enriches a Draft over time. Required-at-book
+# fields are declared optional and gated by the Book event's ensures.
+
+# Identity
+field ReservationId as string optional maxlength 50
+field GuestName as string optional maxlength 100
+field GuestEmail as string optional maxlength 200
+field LoyaltyTier as choice of string("None","Silver","Gold","Platinum","Diamond") default "None"
+
+# Reservation dates and stay length
+field CheckInDate as date optional
+field CheckOutDate as date optional
+field NightsBooked as integer default 0 nonnegative
+field LeadTimeDays as integer default 0 nonnegative
+
+# Room and occupancy
+field RoomType as choice of string("Standard","Deluxe","Suite","Presidential","Accessible") optional
+field BedConfiguration as choice of string("King","Queen","TwoQueens","TwoTwins") optional
+field AdultCount as integer default 1 positive max 6
+field ChildCount as integer default 0 nonnegative max 6
+
+# Rate, fees, and totals — exact money, no approximation
+field NightlyRate as money in 'USD' optional
+field RoomSubtotal as money in 'USD' default '0.00 USD'
+field TaxesAndFees as money in 'USD' default '0.00 USD'
+field TotalAmount as money in 'USD' default '0.00 USD'
+field DepositAmount as money in 'USD' default '0.00 USD'
+field DepositPaid as boolean default false
+
+# Cancellation policy and outcomes
+field CancellationWindow as period optional
+field FreeCancellationDeadline as date optional
+field CancellationFee as money in 'USD' default '0.00 USD'
+field CancellationReason as string optional maxlength 500
+
+# Stay logistics
+field SpecialRequest as string optional maxlength 500
+field AssignedRoomNumber as string optional maxlength 20
+field NoShowMarked as boolean default false
+
+# Audit log
+field ReservationLog as log of string
+
+# Timestamps
+field BookedAt as instant optional
+field ConfirmedAt as instant optional
+field CheckedInAt as instant optional
+field CheckedOutAt as instant optional
+field ClosedAt as instant optional
+field CancelledAt as instant optional
+
+# Rules
+rule CheckOutDate > CheckInDate when CheckInDate is set and CheckOutDate is set because "Check-out date {CheckOutDate} must be after check-in date {CheckInDate}"
+rule FreeCancellationDeadline <= CheckInDate when CheckInDate is set and FreeCancellationDeadline is set because "Free-cancellation deadline {FreeCancellationDeadline} must be on or before check-in date {CheckInDate}"
+rule AdultCount + ChildCount <= 8 because "Total occupancy ({AdultCount} adults + {ChildCount} children) cannot exceed 8 per reservation"
+rule DepositAmount <= TotalAmount because "Deposit {DepositAmount} cannot exceed total amount {TotalAmount}"
+rule CancellationFee <= TotalAmount because "Cancellation fee {CancellationFee} cannot exceed total amount {TotalAmount}"
+
+# Suite and Presidential require at least one adult; the AdultCount default of 1
+# satisfies that — the rule is here to make the requirement structural.
+rule AdultCount >= 1 because "At least one adult must be on every reservation"
+
+# States
+state Draft initial
+state Booked
+state Confirmed
+state CheckedIn
+state CheckedOut
+state Closed terminal
+state NoShow terminal
+state Cancelled terminal
+
+# State ensures
+in Booked ensure BookedAt is set because "A booked reservation must carry a booking timestamp"
+in Confirmed ensure ConfirmedAt is set because "A confirmed reservation must carry a confirmation timestamp"
+in Confirmed ensure DepositPaid because "A confirmed reservation must have its deposit paid"
+in CheckedIn ensure CheckedInAt is set because "A checked-in reservation must carry a check-in timestamp"
+in CheckedIn ensure AssignedRoomNumber is set because "A checked-in guest must have an assigned room"
+in CheckedOut ensure CheckedOutAt is set because "A checked-out reservation must carry a check-out timestamp"
+in Closed ensure ClosedAt is set because "A closed reservation must carry a closure timestamp"
+in NoShow ensure NoShowMarked because "A no-show reservation must be marked as such"
+in Cancelled ensure CancellationReason is set because "A cancelled reservation must record a reason"
+in Cancelled ensure CancelledAt is set because "A cancelled reservation must carry a cancellation timestamp"
+
+# Editable windows
+in Draft modify ReservationId, GuestName, GuestEmail, LoyaltyTier, CheckInDate, CheckOutDate, RoomType, BedConfiguration, AdultCount, ChildCount, NightlyRate, CancellationWindow, FreeCancellationDeadline, SpecialRequest editable
+in Booked modify SpecialRequest editable
+in Confirmed modify SpecialRequest, AssignedRoomNumber editable
+
+# Events
+event Book(NightsCount as integer positive, LeadTime as integer nonnegative, Subtotal as money in 'USD', Taxes as money in 'USD', Deposit as money in 'USD')
+event Confirm
+event PayDeposit
+event AssignRoom(RoomNumber as string notempty)
+event CheckIn
+event CheckOut
+event Close
+event MarkNoShow
+event CancelWithinFreeWindow(Reason as string notempty)
+event CancelOutsideFreeWindow(Reason as string notempty, Fee as money in 'USD')
+
+on Book ensure Book.Subtotal > '0.00 USD' because "Room subtotal must be positive when booking"
+on Book ensure Book.Taxes >= '0.00 USD' because "Taxes and fees cannot be negative"
+on Book ensure Book.Deposit >= '0.00 USD' because "Deposit cannot be negative"
+on Book ensure Book.NightsCount > 0 because "Booking must cover at least one night"
+
+on CancelOutsideFreeWindow ensure CancelOutsideFreeWindow.Fee > '0.00 USD' because "Cancellation outside the free window must carry a positive fee"
+
+# Transitions
+
+# Booking — requires the full intake to be present. The host computes nights and
+# lead time from the calendar dates (Precept does not expose date arithmetic), and
+# passes them through as event arguments. The precept validates internal consistency.
+from Draft on Book when CheckInDate is not set or CheckOutDate is not set
+    -> reject "Check-in and check-out dates must be set before booking"
+from Draft on Book when GuestName is not set or GuestEmail is not set
+    -> reject "Guest name and email are required before booking"
+from Draft on Book when RoomType is not set or BedConfiguration is not set
+    -> reject "Room type and bed configuration are required before booking"
+from Draft on Book when NightlyRate is not set
+    -> reject "Nightly rate must be set before booking"
+from Draft on Book when Book.Subtotal != NightlyRate * Book.NightsCount
+    -> reject "Subtotal {Book.Subtotal} does not match nightly rate {NightlyRate} x {Book.NightsCount} nights"
+from Draft on Book
+    -> set NightsBooked = Book.NightsCount
+    -> set LeadTimeDays = Book.LeadTime
+    -> set RoomSubtotal = Book.Subtotal
+    -> set TaxesAndFees = Book.Taxes
+    -> set TotalAmount = Book.Subtotal + Book.Taxes
+    -> set DepositAmount = Book.Deposit
+    -> set BookedAt = now()
+    -> append ReservationLog "Booked"
+    -> transition Booked
+
+# Deposit payment — required before confirmation. Can be paid from Booked.
+from Booked on PayDeposit
+    -> set DepositPaid = true
+    -> append ReservationLog "Deposit paid"
+    -> no transition
+
+# Confirmation — only allowed once the deposit is paid (or the policy requires no deposit).
+from Booked on Confirm when DepositAmount > '0.00 USD' and not DepositPaid
+    -> reject "Deposit of {DepositAmount} must be paid before confirmation"
+from Booked on Confirm
+    -> set ConfirmedAt = now()
+    -> set DepositPaid = true
+    -> append ReservationLog "Confirmed"
+    -> transition Confirmed
+
+# Room assignment is required before check-in. Hotels typically assign at check-in
+# time, but suite/Presidential reservations may be assigned earlier on request.
+from Confirmed on AssignRoom
+    -> set AssignedRoomNumber = AssignRoom.RoomNumber
+    -> append ReservationLog AssignRoom.RoomNumber
+    -> no transition
+
+# Check-in. Requires an assigned room — the AssignRoom event must have fired first.
+from Confirmed on CheckIn when AssignedRoomNumber is not set
+    -> reject "Cannot check in without an assigned room — call AssignRoom first"
+from Confirmed on CheckIn
+    -> set CheckedInAt = now()
+    -> append ReservationLog "Checked in"
+    -> transition CheckedIn
+
+# Check-out — the standard end of stay.
+from CheckedIn on CheckOut
+    -> set CheckedOutAt = now()
+    -> append ReservationLog "Checked out"
+    -> transition CheckedOut
+
+# Closure — folio reconciled, all charges posted.
+from CheckedOut on Close
+    -> set ClosedAt = now()
+    -> append ReservationLog "Closed"
+    -> transition Closed
+
+# No-show — the guest never arrived. From Confirmed only (a Booked reservation
+# that was never confirmed cannot be a no-show; it should be cancelled instead).
+from Confirmed on MarkNoShow
+    -> set NoShowMarked = true
+    -> set CancelledAt = now()
+    -> append ReservationLog "No-show"
+    -> transition NoShow
+
+# Cancellation — free window vs. outside window. The host determines which event
+# to fire by comparing the current date against FreeCancellationDeadline; the
+# precept records the fee and reason. Cancellation is allowed from Draft, Booked,
+# or Confirmed (once CheckedIn the reservation is in progress).
+from Draft, Booked, Confirmed on CancelWithinFreeWindow
+    -> set CancellationReason = CancelWithinFreeWindow.Reason
+    -> set CancellationFee = '0.00 USD'
+    -> set CancelledAt = now()
+    -> append ReservationLog "Cancelled (free window)"
+    -> transition Cancelled
+
+from Draft, Booked, Confirmed on CancelOutsideFreeWindow when CancelOutsideFreeWindow.Fee > TotalAmount
+    -> reject "Cancellation fee {CancelOutsideFreeWindow.Fee} exceeds total amount {TotalAmount}"
+from Draft, Booked, Confirmed on CancelOutsideFreeWindow
+    -> set CancellationReason = CancelOutsideFreeWindow.Reason
+    -> set CancellationFee = CancelOutsideFreeWindow.Fee
+    -> set CancelledAt = now()
+    -> append ReservationLog "Cancelled (fee applied)"
+    -> transition Cancelled

@@ -1,0 +1,192 @@
+precept FinalProductInspection
+
+# Final QA gate on a completed production batch before it ships.
+# Production hands off the batch with identity, quantity, work order, and
+# completion timestamp fixed at creation — those are atomic facts from the
+# production system, so this uses the Constructor pattern for intake. The
+# inspection itself is progressive: a QA inspector records visual, packaging,
+# label, and functional checks, then certifies and releases for shipment.
+# A batch failing any check goes to Quarantine and is dispositioned for
+# rework, scrap, or use-as-is concession.
+
+# Fields
+field ProductId as string notempty maxlength 50
+field BatchNumber as string notempty maxlength 50
+field WorkOrderNumber as string notempty maxlength 50
+field QuantityProduced as integer positive
+field ProductionCompletedAt as instant
+
+field InspectorName as string optional maxlength 100
+field SampleSize as integer optional
+field VisualInspectionPassed as boolean default false
+field PackagingInspectionPassed as boolean default false
+field LabelVerificationPassed as boolean default false
+field FunctionalTestsPassed as boolean default false
+field DefectsFound as integer default 0 nonnegative
+field DefectNotes as string optional maxlength 500
+
+field CertificateNumber as string optional maxlength 50
+field CertifyingAuthority as string optional maxlength 100
+field CertifiedAt as instant optional
+
+field QuarantineReason as string optional maxlength 500
+field DispositionAfterQuarantine as choice of string("PendingDecision","ReleasedForRework","Scrapped","UseAsIsConcession") default "PendingDecision"
+field ShipmentDestination as string optional maxlength 200
+field ShippedAt as instant optional
+
+field InspectionStartedAt as instant optional
+field InspectionCompletedAt as instant optional
+
+# Rules
+rule DefectsFound <= SampleSize when SampleSize is set because "Defect count {DefectsFound} cannot exceed sample size {SampleSize}"
+
+# States
+state PendingInspection initial
+state Inspecting
+state Certified
+state Shipped terminal
+state Quarantined
+state Reworking
+state Scrapped terminal
+
+# State ensures
+in Inspecting ensure InspectorName is set because "An inspector must be assigned before checks begin"
+in Inspecting ensure SampleSize is set because "Sample size must be set before inspection begins"
+in Inspecting ensure InspectionStartedAt is set because "Inspections in progress must record a start time"
+
+in Certified ensure VisualInspectionPassed because "Certified product must pass visual inspection"
+in Certified ensure PackagingInspectionPassed because "Certified product must pass packaging inspection"
+in Certified ensure LabelVerificationPassed because "Certified product must pass label verification"
+in Certified ensure FunctionalTestsPassed because "Certified product must pass functional tests"
+in Certified ensure DefectsFound == 0 because "Certified product must have zero recorded defects (found {DefectsFound})"
+in Certified ensure CertificateNumber is set because "A certified batch must carry a certificate number"
+in Certified ensure CertifyingAuthority is set because "A certified batch must record the certifying authority"
+in Certified ensure CertifiedAt is set because "A certified batch must record the certification timestamp"
+
+in Shipped ensure ShipmentDestination is set because "A shipped batch must record its destination"
+in Shipped ensure ShippedAt is set because "A shipped batch must record the shipment timestamp"
+
+in Quarantined ensure QuarantineReason is set because "A quarantined batch must record the reason"
+in Reworking ensure DispositionAfterQuarantine == "ReleasedForRework" because "Reworking batches must have been released for rework"
+in Scrapped ensure DispositionAfterQuarantine == "Scrapped" because "Scrapped batches must have been dispositioned for scrap"
+
+# Events
+
+# Constructor — production system delivers the batch with identity and quantity fixed.
+event ReceiveFromProduction(
+    Product as string notempty,
+    Batch as string notempty,
+    WorkOrder as string notempty,
+    Quantity as integer positive,
+    CompletedAt as instant) initial
+on ReceiveFromProduction ensure ReceiveFromProduction.Quantity > 0 because "Production quantity must be positive"
+
+on ReceiveFromProduction
+    -> set ProductId = ReceiveFromProduction.Product
+    -> set BatchNumber = ReceiveFromProduction.Batch
+    -> set WorkOrderNumber = ReceiveFromProduction.WorkOrder
+    -> set QuantityProduced = ReceiveFromProduction.Quantity
+    -> set ProductionCompletedAt = ReceiveFromProduction.CompletedAt
+
+event BeginInspection(Inspector as string notempty, Sample as integer positive)
+on BeginInspection ensure BeginInspection.Sample > 0 because "Sample size must be positive"
+
+event RecordVisualCheck(Passed as boolean, DefectCount as integer default 0)
+on RecordVisualCheck ensure RecordVisualCheck.DefectCount >= 0 because "Defect count cannot be negative"
+
+event RecordPackagingCheck(Passed as boolean)
+event RecordLabelCheck(Passed as boolean)
+event RecordFunctionalTests(Passed as boolean, DefectCount as integer default 0, Notes as string optional)
+on RecordFunctionalTests ensure RecordFunctionalTests.DefectCount >= 0 because "Defect count cannot be negative"
+
+event CompleteInspection
+event Certify(CertNumber as string notempty, Authority as string notempty)
+event SendToQuarantine(Reason as string notempty)
+event Disposition(Decision as choice of string("ReleasedForRework","Scrapped","UseAsIsConcession"))
+event Ship(Destination as string notempty)
+
+# Transitions
+
+# QA picks up the batch and begins inspecting; checks are progressive self-loops.
+from PendingInspection on BeginInspection
+    -> set InspectorName = BeginInspection.Inspector
+    -> set SampleSize = BeginInspection.Sample
+    -> set InspectionStartedAt = now()
+    -> transition Inspecting
+
+from Inspecting on RecordVisualCheck
+    -> set VisualInspectionPassed = RecordVisualCheck.Passed
+    -> set DefectsFound = DefectsFound + RecordVisualCheck.DefectCount
+    -> no transition
+
+from Inspecting on RecordPackagingCheck
+    -> set PackagingInspectionPassed = RecordPackagingCheck.Passed
+    -> no transition
+
+from Inspecting on RecordLabelCheck
+    -> set LabelVerificationPassed = RecordLabelCheck.Passed
+    -> no transition
+
+from Inspecting on RecordFunctionalTests when RecordFunctionalTests.Notes is set
+    -> set FunctionalTestsPassed = RecordFunctionalTests.Passed
+    -> set DefectsFound = DefectsFound + RecordFunctionalTests.DefectCount
+    -> set DefectNotes = RecordFunctionalTests.Notes
+    -> no transition
+from Inspecting on RecordFunctionalTests
+    -> set FunctionalTestsPassed = RecordFunctionalTests.Passed
+    -> set DefectsFound = DefectsFound + RecordFunctionalTests.DefectCount
+    -> no transition
+
+# Completion records the timestamp once every check passes; failing checks must divert to quarantine.
+from Inspecting on CompleteInspection when VisualInspectionPassed and PackagingInspectionPassed and LabelVerificationPassed and FunctionalTestsPassed and DefectsFound == 0
+    -> set InspectionCompletedAt = now()
+    -> no transition
+from Inspecting on CompleteInspection
+    -> reject "Cannot complete inspection — failing checks remain (visual: {VisualInspectionPassed}, packaging: {PackagingInspectionPassed}, label: {LabelVerificationPassed}, functional: {FunctionalTestsPassed}, defects: {DefectsFound}). Send to quarantine instead."
+
+# Certification — only allowed once every check passes with zero defects.
+from Inspecting on Certify when VisualInspectionPassed and PackagingInspectionPassed and LabelVerificationPassed and FunctionalTestsPassed and DefectsFound == 0 and InspectionCompletedAt is set
+    -> set CertificateNumber = Certify.CertNumber
+    -> set CertifyingAuthority = Certify.Authority
+    -> set CertifiedAt = now()
+    -> transition Certified
+from Inspecting on Certify when VisualInspectionPassed and PackagingInspectionPassed and LabelVerificationPassed and FunctionalTestsPassed and DefectsFound == 0
+    -> reject "Complete the inspection first — CompleteInspection must be called before Certify"
+from Inspecting on Certify
+    -> reject "Cannot certify — all four checks must pass with zero defects (visual: {VisualInspectionPassed}, packaging: {PackagingInspectionPassed}, label: {LabelVerificationPassed}, functional: {FunctionalTestsPassed}, defects: {DefectsFound})"
+
+# Quarantine — any inspection failure diverts here.
+from Inspecting on SendToQuarantine
+    -> set QuarantineReason = SendToQuarantine.Reason
+    -> transition Quarantined
+
+# Disposition out of quarantine — concession routes back to Certified, rework restarts inspection.
+from Quarantined on Disposition when Disposition.Decision == "ReleasedForRework"
+    -> set DispositionAfterQuarantine = Disposition.Decision
+    -> transition Reworking
+from Quarantined on Disposition when Disposition.Decision == "Scrapped"
+    -> set DispositionAfterQuarantine = Disposition.Decision
+    -> transition Scrapped
+from Quarantined on Disposition when Disposition.Decision == "UseAsIsConcession" and CertificateNumber is set and CertifyingAuthority is set and CertifiedAt is set
+    -> set DispositionAfterQuarantine = Disposition.Decision
+    -> transition Certified
+from Quarantined on Disposition when Disposition.Decision == "UseAsIsConcession"
+    -> reject "Use-as-is concession requires prior certification — none on record. Choose ReleasedForRework or Scrapped instead."
+
+# Reworked batches restart inspection — checks reset, defects cleared.
+from Reworking on BeginInspection
+    -> set InspectorName = BeginInspection.Inspector
+    -> set SampleSize = BeginInspection.Sample
+    -> set InspectionStartedAt = now()
+    -> set VisualInspectionPassed = false
+    -> set PackagingInspectionPassed = false
+    -> set LabelVerificationPassed = false
+    -> set FunctionalTestsPassed = false
+    -> set DefectsFound = 0
+    -> transition Inspecting
+
+# Shipment — terminal step for certified product.
+from Certified on Ship
+    -> set ShipmentDestination = Ship.Destination
+    -> set ShippedAt = now()
+    -> transition Shipped

@@ -1,45 +1,53 @@
 precept ParcelLockerPickup
 
-# Pattern A showcase: LoadParcel is the constructor — a locker pickup cannot exist without
-# a recipient and code. Introduces a stack-based reminder log and realistic timed guards.
+# A parcel waiting in a locker bank: loaded with a recipient and access code, picked
+# up by the recipient, or returned to the sender after the holding period lapses.
+# Constructor Pattern: the locker entry cannot exist without a parcel, recipient,
+# and code — LoadParcel is the initial event and the entity arrives in AwaitingPickup
+# fully formed. Reminders are throttled to once per day; after 3 days without pickup,
+# the next AdvanceDay returns the parcel automatically.
 
-field LockerId as string optional
-field RecipientName as string optional
-field PickupCode as string optional
-field ReminderCount as number default 0 nonnegative
-field CurrentDay as number default 0 nonnegative
-field LastReminderDay as number default 0 nonnegative
-field LastReminderNote as string optional
+# Locker identity, recipient, and access code — established at load.
+field LockerId as string notempty maxlength 50
+field RecipientName as string notempty maxlength 200
+field PickupCode as string notempty maxlength 20
+
+# Reminder accounting — counts up as reminders fire; throttled by LastReminderDay.
+field ReminderCount as integer default 0 nonnegative
+field CurrentDay as integer default 0 nonnegative
+field LastReminderDay as integer default 0 nonnegative
+field LastReminderNote as string optional maxlength 500
 field ReminderLog as stack of string
 
+# States
 state AwaitingPickup initial
 state PickedUp terminal
 state Returned terminal
 
-in AwaitingPickup ensure RecipientName is set because "Loaded lockers must identify the recipient"
-in AwaitingPickup ensure PickupCode is set because "Loaded lockers must store a pickup code"
-
+# Entry actions — clear the reminder log on terminal entry so the locker can be reused.
 to PickedUp -> clear ReminderLog
 to Returned -> clear ReminderLog
 
+# Events
 event LoadParcel(
-    Locker as string notempty,
-    Recipient as string notempty,
-    Code as string notempty) initial
-event SendReminder(Note as string notempty)
-event PickUp(Code as string notempty)
-event AdvanceDay(DayNumber as number)
-on AdvanceDay ensure AdvanceDay.DayNumber >= 0 because "Days cannot be negative"
+    Locker as string notempty maxlength 50,
+    Recipient as string notempty maxlength 200,
+    Code as string notempty maxlength 20) initial
 
+event SendReminder(Note as string notempty maxlength 500)
+event PickUp(Code as string notempty maxlength 20)
+event AdvanceDay(DayNumber as integer nonnegative)
 event ReturnParcel
 
+# Construction
 on LoadParcel
     -> set LockerId = LoadParcel.Locker
     -> set RecipientName = LoadParcel.Recipient
     -> set PickupCode = LoadParcel.Code
-    -> set ReminderCount = 0
     -> set LastReminderDay = CurrentDay
 
+# Reminders — at most once per day. The throttle prevents reminder spam that would
+# desensitize recipients and obscure the eventual return notice.
 from AwaitingPickup on SendReminder when CurrentDay - LastReminderDay >= 1
     -> push ReminderLog SendReminder.Note
     -> set ReminderCount = ReminderCount + 1
@@ -47,13 +55,16 @@ from AwaitingPickup on SendReminder when CurrentDay - LastReminderDay >= 1
     -> set LastReminderNote = SendReminder.Note
     -> no transition
 from AwaitingPickup on SendReminder
-    -> reject "Reminders can only be sent once per day"
+    -> reject "A reminder has already been sent on day {CurrentDay} — reminders are throttled to once per day to avoid notification spam"
 
+# Pickup — the recipient enters the locker code. Mismatched codes leave the parcel in place.
 from AwaitingPickup on PickUp when PickUp.Code == PickupCode
     -> transition PickedUp
 from AwaitingPickup on PickUp
-    -> reject "The pickup code does not match"
+    -> reject "Pickup code {PickUp.Code} does not match the locker's access code — verify the code from the delivery notification"
 
+# Day advancement — drives the automatic return after 3 days of holding. The host
+# advances the clock; the precept enforces forward-only motion and the return rule.
 from AwaitingPickup on AdvanceDay when AdvanceDay.DayNumber > CurrentDay and AdvanceDay.DayNumber - LastReminderDay >= 3
     -> set CurrentDay = AdvanceDay.DayNumber
     -> transition Returned
@@ -61,7 +72,8 @@ from AwaitingPickup on AdvanceDay when AdvanceDay.DayNumber > CurrentDay
     -> set CurrentDay = AdvanceDay.DayNumber
     -> no transition
 from AwaitingPickup on AdvanceDay
-    -> reject "Days must advance forward"
+    -> reject "Day {AdvanceDay.DayNumber} is not after the current day {CurrentDay} — time advances forward only"
 
+# Manual return — sender or carrier reclaims the parcel without waiting for the timeout.
 from AwaitingPickup on ReturnParcel
     -> transition Returned

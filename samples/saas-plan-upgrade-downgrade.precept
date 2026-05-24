@@ -1,0 +1,142 @@
+precept SaasPlanUpgradeAndDowngrade
+
+# A SaaS plan-change request — upgrade or downgrade between subscription
+# tiers. The request arrives Requested from the billing system, is validated
+# (target plan and effective date checked), is approved into Processing where
+# proration is calculated, and either activates immediately (Active) or
+# defers to the next billing cycle (EffectiveDatePending → Active). A
+# rejection at any review stage ends the request in Rejected.
+
+# Subscription identification — fixed at construction.
+field SubscriptionId as string notempty maxlength 50
+field CustomerName as string notempty maxlength 200
+field CustomerEmail as string notempty maxlength 200
+
+# Plan configuration
+field CurrentPlan as choice of string("Free", "Pro Starter", "Pro", "Enterprise")
+field TargetPlan as choice of string("Free", "Pro Starter", "Pro", "Enterprise")
+field ChangeType as choice of string("Upgrade", "Downgrade")
+field ChangeDescription as string optional maxlength 1000
+
+# Lifecycle timestamps
+field RequestedAt as instant
+field ValidatedAt as instant optional
+field EffectiveDate as instant optional
+field CompletedAt as instant optional
+
+# Pricing and proration — money in 'USD' for exactness.
+field CurrentMonthlyFee as money in 'USD' positive
+field NewMonthlyFee as money in 'USD' default '0.00 USD' nonnegative
+field ProrationAmount as money in 'USD' default '0.00 USD' nonnegative
+field ProrationCredit as money in 'USD' default '0.00 USD' nonnegative
+field TotalDue as money in 'USD' default '0.00 USD' nonnegative
+field DaysInPeriod as integer default 30 positive max 31
+field RemainingDays as integer default 0 nonnegative max 31
+field BillingCycleStart as instant optional
+
+# Usage limits — per-metric limit lookups for current and target plan.
+field CurrentLimits as lookup of string to integer
+field TargetLimits as lookup of string to integer
+
+# Feature access — per-feature boolean lookups for current and pending.
+field FeatureAccess as lookup of string to boolean
+field PendingFeatureAccess as lookup of string to boolean
+
+# Rejection
+field RejectionReason as string optional maxlength 500
+
+# Audit trail
+field ChangeLog as log of string
+field ChangeRequestNumber as integer default 1 positive
+
+# States — review → processing → activation lifecycle.
+state Requested initial
+state Validated
+state Processing
+state EffectiveDatePending
+state Active terminal
+state Rejected terminal
+
+# State ensures
+in Validated ensure ValidatedAt is set because "Validated state requires the validation timestamp"
+in Processing ensure NewMonthlyFee > '0.00 USD' because "Processing requires a calculated new fee — proration needs a target price"
+in EffectiveDatePending ensure EffectiveDate is set because "Deferred changes must record when they take effect"
+in Active ensure CompletedAt is set because "Active state requires the completion timestamp"
+in Active ensure CurrentPlan == TargetPlan because "Once activated, the customer's current plan must be the requested target plan"
+in Rejected ensure RejectionReason is set because "A rejected change must record why — required for audit and customer communication"
+
+# Construction — request opens when the customer submits a plan change.
+event Create(
+    SubscriptionId as string notempty maxlength 50,
+    CustomerName as string notempty maxlength 200,
+    CustomerEmail as string notempty maxlength 200,
+    CurrentPlan as choice of string("Free", "Pro Starter", "Pro", "Enterprise"),
+    CurrentMonthlyFee as money in 'USD' positive,
+    TargetPlan as choice of string("Free", "Pro Starter", "Pro", "Enterprise"),
+    ChangeType as choice of string("Upgrade", "Downgrade"),
+    ChangeDescription as string optional maxlength 1000) initial
+on Create ensure Create.TargetPlan != Create.CurrentPlan because "A plan change request requires a target plan different from the current plan — same-plan changes are no-ops"
+
+# Lifecycle events
+event ValidateChange
+event RejectChange(Reason as string notempty maxlength 500)
+event ApproveChange(NewMonthlyFee as money in 'USD' positive)
+event ApplyProration(DaysRemaining as integer nonnegative max 31)
+event DeferToNextCycle(EffectiveDate as instant)
+event ActivateChange
+
+# Construction row — request opens in Requested.
+on Create
+    -> set SubscriptionId = Create.SubscriptionId
+    -> set CustomerName = Create.CustomerName
+    -> set CustomerEmail = Create.CustomerEmail
+    -> set CurrentPlan = Create.CurrentPlan
+    -> set CurrentMonthlyFee = Create.CurrentMonthlyFee
+    -> set TargetPlan = Create.TargetPlan
+    -> set ChangeType = Create.ChangeType
+    -> set ChangeDescription = Create.ChangeDescription
+    -> set RequestedAt = now()
+    -> append ChangeLog "Plan change requested: {Create.CurrentPlan} -> {Create.TargetPlan}"
+
+# Validate — Requested → Validated.
+from Requested on ValidateChange
+    -> set ValidatedAt = now()
+    -> append ChangeLog "Change validated"
+    -> transition Validated
+
+# Reject — Requested or Validated → Rejected.
+from Requested, Validated on RejectChange
+    -> set RejectionReason = RejectChange.Reason
+    -> set CompletedAt = now()
+    -> append ChangeLog "Change rejected: {RejectChange.Reason}"
+    -> transition Rejected
+
+# Approve — Validated → Processing. Caller supplies the calculated fee.
+from Validated on ApproveChange
+    -> set NewMonthlyFee = ApproveChange.NewMonthlyFee
+    -> append ChangeLog "Change approved — entering processing"
+    -> transition Processing
+
+# Apply proration immediately — Processing → Active.
+from Processing on ApplyProration
+    -> set RemainingDays = ApplyProration.DaysRemaining
+    -> set ProrationCredit = CurrentMonthlyFee * ApplyProration.DaysRemaining / DaysInPeriod
+    -> set CurrentPlan = TargetPlan
+    -> set CurrentMonthlyFee = NewMonthlyFee
+    -> set CompletedAt = now()
+    -> append ChangeLog "Proration applied: credit {ProrationCredit}"
+    -> transition Active
+
+# Defer — Processing → EffectiveDatePending (downgrade typically waits).
+from Processing on DeferToNextCycle
+    -> set EffectiveDate = DeferToNextCycle.EffectiveDate
+    -> append ChangeLog "Change deferred to {DeferToNextCycle.EffectiveDate}"
+    -> transition EffectiveDatePending
+
+# Activate deferred change — EffectiveDatePending → Active.
+from EffectiveDatePending on ActivateChange
+    -> set CurrentPlan = TargetPlan
+    -> set CurrentMonthlyFee = NewMonthlyFee
+    -> set CompletedAt = now()
+    -> append ChangeLog "Deferred change activated on effective date"
+    -> transition Active

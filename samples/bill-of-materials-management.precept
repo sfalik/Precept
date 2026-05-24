@@ -1,0 +1,185 @@
+precept BillOfMaterialsManagement
+
+# A manufacturing engineer builds out the bill of materials for a finished
+# product over time — adding components and their per-assembly quantities,
+# referencing sub-assemblies, and assigning a revision letter. Once the BOM is
+# complete it goes through engineering review, gets released to production
+# (Active), and eventually is superseded by a newer revision (Replaced) or
+# retired without successor (Obsolete).
+#
+# Free-Construction: the engineer enriches a Draft over time. Required-at-
+# release fields are declared optional and gated by the Submit event's ensures.
+# Components are modeled as a parallel pair — ComponentPartNumbers (set) for
+# membership tests, Components (lookup) for per-part quantities. The set is
+# the source of truth for membership; the lookup carries quantity. The two are
+# kept consistent by the AddComponent/UpdateComponentQuantity/RemoveComponent
+# rows. This mirrors the canonical shopping-cart pattern.
+
+# Identity and ownership
+field BomId as string optional maxlength 50
+field ProductCode as string optional maxlength 50
+field ProductDescription as string optional maxlength 200
+field Revision as string optional maxlength 10
+field EngineerName as string optional maxlength 100
+
+# Effective dating
+field EffectiveFrom as date optional
+field EffectiveTo as date optional
+
+# Components — distinct part numbers (set, for membership testing) and the
+# per-assembly quantity required (lookup, for value lookup). Kept consistent
+# by the component transition rows. TotalComponentUnits accumulates units across
+# all components so guards can reason about BOM size without iterating.
+field ComponentPartNumbers as set of string
+field Components as lookup of string to integer
+field TotalComponentUnits as integer default 0 nonnegative
+
+# Sub-assembly references — a separate set of child-BOM IDs this BOM depends on.
+field SubAssemblies as set of string
+
+# Approval and supersession audit
+field ApproverName as string optional maxlength 100
+field SupersededByBomId as string optional maxlength 50
+field ObsoleteReason as string optional maxlength 500
+field ChangeLog as log of string
+
+# Timestamps
+field SubmittedAt as instant optional
+field ApprovedAt as instant optional
+field ActivatedAt as instant optional
+field ReplacedAt as instant optional
+field ObsoletedAt as instant optional
+
+# Rules
+rule EffectiveTo > EffectiveFrom when EffectiveFrom is set and EffectiveTo is set because "Effective end {EffectiveTo} must be after effective start {EffectiveFrom}"
+rule TotalComponentUnits >= ComponentPartNumbers.count because "Total component units ({TotalComponentUnits}) cannot be less than distinct component count ({ComponentPartNumbers.count}) — every component contributes at least one unit"
+
+# States
+state Draft initial
+state UnderReview
+state Approved
+state Active
+state Replaced terminal
+state Obsolete terminal
+
+# State ensures
+in UnderReview ensure SubmittedAt is set because "A BOM under review must carry a submission timestamp"
+in Approved ensure ApproverName is set because "An approved BOM must record the approver"
+in Approved ensure ApprovedAt is set because "An approved BOM must carry an approval timestamp"
+in Active ensure ActivatedAt is set because "An active BOM must record when it was released to production"
+in Active ensure EffectiveFrom is set because "An active BOM must have an effective-from date on file"
+in Replaced ensure SupersededByBomId is set because "Replaced BOMs must reference their successor"
+in Obsolete ensure ObsoleteReason is set because "Obsoleted BOMs must record a retirement reason"
+
+# Editable windows — full planning in Draft; engineer can correct metadata while
+# the BOM is still under review (e.g., to address review feedback).
+in Draft modify BomId, ProductCode, ProductDescription, Revision, EngineerName, EffectiveFrom, EffectiveTo editable
+in UnderReview modify ProductDescription, EffectiveFrom, EffectiveTo editable
+
+# Events
+event AddComponent(PartNumber as string notempty, Quantity as integer positive)
+event UpdateComponentQuantity(PartNumber as string notempty, NewQuantity as integer positive)
+event RemoveComponent(PartNumber as string notempty)
+event AddSubAssembly(SubBomId as string notempty)
+event RemoveSubAssembly(SubBomId as string notempty)
+event Submit
+event Approve(Approver as string notempty)
+event RequestRevisions(Reason as string notempty)
+event Activate
+event Supersede(SuccessorBomId as string notempty)
+event Obsolete(Reason as string notempty)
+
+on Submit ensure BomId is set because "BOM ID is required before submission"
+on Submit ensure ProductCode is set because "Product code is required before submission"
+on Submit ensure ProductDescription is set because "Product description is required before submission"
+on Submit ensure Revision is set because "Revision letter is required before submission"
+on Submit ensure EngineerName is set because "Owning engineer must be on record before submission"
+on Submit ensure EffectiveFrom is set because "Effective-from date is required before submission"
+
+# Transitions
+
+# Draft component management — add, update, remove.
+# A duplicate add is rejected — the engineer should use UpdateComponentQuantity
+# instead so the audit trail captures the change as an update, not a re-add.
+from Draft on AddComponent when ComponentPartNumbers contains AddComponent.PartNumber
+    -> reject "Component {AddComponent.PartNumber} already in BOM — use UpdateComponentQuantity to change its quantity"
+from Draft on AddComponent
+    -> add ComponentPartNumbers AddComponent.PartNumber
+    -> put Components AddComponent.PartNumber = AddComponent.Quantity
+    -> set TotalComponentUnits = TotalComponentUnits + AddComponent.Quantity
+    -> append ChangeLog AddComponent.PartNumber
+    -> no transition
+
+from Draft on UpdateComponentQuantity when ComponentPartNumbers contains UpdateComponentQuantity.PartNumber
+    -> set TotalComponentUnits = TotalComponentUnits - (Components for UpdateComponentQuantity.PartNumber) + UpdateComponentQuantity.NewQuantity
+    -> put Components UpdateComponentQuantity.PartNumber = UpdateComponentQuantity.NewQuantity
+    -> append ChangeLog UpdateComponentQuantity.PartNumber
+    -> no transition
+from Draft on UpdateComponentQuantity
+    -> reject "Component {UpdateComponentQuantity.PartNumber} not in BOM — use AddComponent to add it"
+
+# Remove a component: drop membership from the set and zero the lookup entry.
+# BUG-002: `remove Components Key` does not type-check (the type checker expects
+# the lookup's value type, not the key type), so we zero-out the lookup entry
+# via `put Components Key = 0` instead. ComponentPartNumbers is the source of
+# truth for membership; the orphan zero-valued lookup entry is harmless because
+# every Components access flows through a `ComponentPartNumbers contains` guard.
+from Draft on RemoveComponent when ComponentPartNumbers contains RemoveComponent.PartNumber
+    -> set TotalComponentUnits = TotalComponentUnits - (Components for RemoveComponent.PartNumber)
+    -> put Components RemoveComponent.PartNumber = 0
+    -> remove ComponentPartNumbers RemoveComponent.PartNumber
+    -> append ChangeLog RemoveComponent.PartNumber
+    -> no transition
+from Draft on RemoveComponent
+    -> reject "Component {RemoveComponent.PartNumber} not in BOM — nothing to remove"
+
+# Sub-assembly references — a BOM can depend on other BOMs as sub-assemblies.
+from Draft on AddSubAssembly when SubAssemblies contains AddSubAssembly.SubBomId
+    -> reject "Sub-assembly {AddSubAssembly.SubBomId} already referenced"
+from Draft on AddSubAssembly when AddSubAssembly.SubBomId == BomId
+    -> reject "A BOM cannot reference itself as a sub-assembly"
+from Draft on AddSubAssembly
+    -> add SubAssemblies AddSubAssembly.SubBomId
+    -> append ChangeLog AddSubAssembly.SubBomId
+    -> no transition
+
+from Draft on RemoveSubAssembly when SubAssemblies contains RemoveSubAssembly.SubBomId
+    -> remove SubAssemblies RemoveSubAssembly.SubBomId
+    -> append ChangeLog RemoveSubAssembly.SubBomId
+    -> no transition
+from Draft on RemoveSubAssembly
+    -> reject "Sub-assembly {RemoveSubAssembly.SubBomId} not referenced — nothing to remove"
+
+# Submission — requires at least one component so the BOM is meaningful.
+from Draft on Submit when ComponentPartNumbers.count == 0
+    -> reject "Cannot submit an empty BOM — add at least one component first"
+from Draft on Submit
+    -> set SubmittedAt = now()
+    -> transition UnderReview
+
+# Approval and request-for-revisions
+from UnderReview on Approve
+    -> set ApproverName = Approve.Approver
+    -> set ApprovedAt = now()
+    -> transition Approved
+
+from UnderReview on RequestRevisions
+    -> append ChangeLog RequestRevisions.Reason
+    -> transition Draft
+
+# Activation — the BOM is released to production.
+from Approved on Activate
+    -> set ActivatedAt = now()
+    -> transition Active
+
+# Supersession — a successor BOM (typically a new revision) takes over.
+from Active on Supersede
+    -> set SupersededByBomId = Supersede.SuccessorBomId
+    -> set ReplacedAt = now()
+    -> transition Replaced
+
+# Obsolescence — the product is retired with no successor.
+from Active on Obsolete
+    -> set ObsoleteReason = Obsolete.Reason
+    -> set ObsoletedAt = now()
+    -> transition Obsolete

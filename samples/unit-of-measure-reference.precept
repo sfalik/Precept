@@ -1,0 +1,63 @@
+precept UnitOfMeasureReference
+
+# A stateless data-only precept governing a single unit-of-measure definition.
+# Each record describes one unit — its identifier, the dimension family it
+# belongs to, the base unit of that family, and the conversion factor needed
+# to express one of this unit in terms of the base.
+#
+# Units of measure are reference data — workflow precepts that carry physical
+# quantities (shipments, dosages, lab results) use UCUM-aligned unit codes
+# directly through the `quantity` and `price` types. This precept exists for
+# host applications that need to govern a custom unit catalog alongside the
+# built-in UCUM tier-1 units the runtime already knows.
+#
+# UCUM (Unified Code for Units of Measure) is the reference standard. The
+# Dimension choice mirrors UCUM's seven base dimensions plus the dimensionless
+# "count" family used for discrete things (each, dozen, gross), and a few
+# named compound dimensions commonly governed alongside the base ones.
+#
+# ConversionFactor expresses how many of the base unit equal one of this unit:
+#   gram (base = gram)        — ConversionFactor = 1
+#   kilogram (base = gram)    — ConversionFactor = 1000
+#   pound (base = gram)       — ConversionFactor = 453.59237
+#   ounce (base = gram)       — ConversionFactor = 28.349523125
+#
+# IsBaseUnit marks the canonical unit of its dimension (the one with factor 1).
+
+# Identity
+field Code as string optional maxlength 32 writable
+field DisplayName as string optional maxlength 100 writable
+field Symbol as string optional maxlength 16 writable
+
+# Dimension classification — what the unit measures.
+field Dimension as choice of string("Length","Mass","Time","ElectricCurrent","Temperature","Substance","Luminosity","Count","Area","Volume","Speed","Acceleration","Force","Energy","Power","Pressure","Frequency","Angle") default "Count" writable
+
+# BaseUnitCode references the canonical unit of the dimension. For SI Mass
+# that's 'g' (gram); for SI Length that's 'm' (metre). When IsBaseUnit is true
+# BaseUnitCode and Code refer to the same unit.
+field BaseUnitCode as string optional maxlength 32 writable
+
+# ConversionFactor — how many of the base unit equal one of this unit.
+field ConversionFactor as decimal default 1 positive maxplaces 12 writable
+
+field IsBaseUnit as boolean default false writable
+
+# UcumExpression is the formal UCUM syntax for this unit (e.g. 'kg', 'm/s2').
+# The runtime accepts UCUM-compatible expressions directly in quantity types;
+# this field exists so a host UI can render the canonical UCUM string.
+field UcumExpression as string optional maxlength 64 writable
+
+# System classifies which measurement system this unit belongs to.
+#   SI            — International System of Units (kg, m, s, ...)
+#   USCustomary   — US customary (lb, ft, gal, ...)
+#   Imperial      — British Imperial (stone, mile, pint, ...)
+#   CGS           — centimetre-gram-second (cm, g, dyne, erg, ...)
+#   UCUM          — UCUM-only convention (e.g. unified codes)
+#   Custom        — application-defined (case, pallet, batch)
+field System as choice of string("SI","USCustomary","Imperial","CGS","UCUM","Custom") default "UCUM" writable
+
+field Active as boolean default true writable
+field Notes as string optional maxlength 500 writable
+
+rule ConversionFactor == 1 when IsBaseUnit because "A base unit must have a conversion factor of exactly 1 — the base unit is the reference point of its dimension and converts to itself"
+rule ConversionFactor != 1 when IsBaseUnit == false because "A non-base unit must have a conversion factor different from 1 — a factor of 1 would make it indistinguishable from the base unit of the same dimension"

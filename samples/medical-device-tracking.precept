@@ -1,0 +1,190 @@
+precept MedicalDeviceTracking
+
+# A tracked medical device moves through its inventory lifecycle: registered
+# into inventory, assigned to a patient, brought into use, accumulating
+# usage hours that drive maintenance, returned and serviced, and eventually
+# retired. A regulatory recall (FDA Class I, II, or III) is an override that
+# can fire from any non-terminal state and immediately transitions to the
+# terminal Recalled state. UDI (Unique Device Identifier), serial number,
+# and manufacturer are required at registration for traceability and recall
+# propagation (21 CFR Part 821). Assignment fields are omit in Available
+# and MaintenanceRequired so they are structurally absent when the device
+# is not assigned — no explicit clear actions are needed on the return
+# transitions.
+
+# Device identification — fixed at registration; required by FDA UDI rules.
+field DeviceId as string notempty maxlength 50
+field UdiDeviceIdentifier as string notempty maxlength 100
+field SerialNumber as string notempty maxlength 100
+field Manufacturer as string notempty maxlength 200
+field ModelNumber as string optional maxlength 100
+field DeviceCategory as choice of string("Infusion", "Monitor", "Ventilator", "Imaging", "Implantable", "WearableSensor", "Diagnostic")
+
+# Assignment — set when transitioning to Assigned/InUse; omit in Available
+# and MaintenanceRequired so the fields are structurally absent there.
+field AssignedPatientId as string optional maxlength 50
+field AssignedPatientName as string optional maxlength 200
+field PrescribingProvider as string optional maxlength 200
+field PrescriptionDate as date optional
+field AssignedAt as instant optional
+
+# Usage tracking — TotalUsageHours accumulates across all assignments;
+# UsageHoursAtLastService captures the reading at the last service event.
+field TotalUsageHours as integer nonnegative default 0
+field UsageHoursAtLastService as integer nonnegative default 0
+field UsageCycles as integer nonnegative default 0
+
+# Maintenance — manufacturer-defined service interval; next-due date is
+# tracked so an external scheduler can issue FlagForMaintenance.
+field MaintenanceIntervalHours as integer positive default 500
+field LastServiceDate as date optional
+field NextServiceDueOn as date optional
+field ServicedBy as string optional maxlength 200
+
+# Recall — populated only on the terminal Recalled state. RecallClass uses
+# FDA convention: Class1 = serious adverse health consequences/death;
+# Class2 = temporary or reversible; Class3 = unlikely to cause harm.
+field RecallClass as choice of string("Class1", "Class2", "Class3") optional
+field RecallNoticeDate as date optional
+field RecallReason as string optional maxlength 1000
+
+# Retirement — populated only on the terminal Retired state.
+field RetirementReason as string optional maxlength 500
+field RetiredAt as instant optional
+
+# Audit trail.
+field DeviceLog as log of string
+
+# Invariants.
+rule UsageHoursAtLastService <= TotalUsageHours because "Usage at last service ({UsageHoursAtLastService}h) cannot exceed total accumulated usage ({TotalUsageHours}h)"
+
+# States — Available → Assigned → InUse → (MaintenanceRequired → Available)
+# | Retired. Recalled is the terminal regulatory off-ramp from any
+# non-terminal state.
+state Available initial
+state Assigned
+state InUse
+state MaintenanceRequired
+state Retired terminal
+state Recalled terminal
+
+# Fields with no meaning outside assignment / outcome states.
+in Available, MaintenanceRequired omit AssignedPatientId, AssignedPatientName, PrescribingProvider, PrescriptionDate, AssignedAt
+in Available, Assigned, InUse, MaintenanceRequired omit RecallClass, RecallNoticeDate, RecallReason
+in Available, Assigned, InUse, MaintenanceRequired, Recalled omit RetirementReason, RetiredAt
+
+# State ensures.
+in Assigned ensure AssignedPatientId is set because "An assigned device must record the patient it is assigned to"
+in Assigned ensure PrescribingProvider is set because "An assigned device must record the prescribing provider"
+in InUse ensure AssignedPatientId is set because "A device in use must remain associated with its patient"
+in Retired ensure RetirementReason is set because "A retired device must record why it was taken out of service"
+in Retired ensure RetiredAt is set because "A retired device must record when it was retired"
+in Recalled ensure RecallReason is set because "A recalled device must record the manufacturer or FDA recall reason"
+in Recalled ensure RecallClass is set because "A recalled device must record the FDA recall class"
+
+# Construction — device is registered from the device-registration system.
+event Create(
+    DeviceId as string notempty maxlength 50,
+    UdiDeviceIdentifier as string notempty maxlength 100,
+    SerialNumber as string notempty maxlength 100,
+    Manufacturer as string notempty maxlength 200,
+    ModelNumber as string optional maxlength 100,
+    DeviceCategory as choice of string("Infusion", "Monitor", "Ventilator", "Imaging", "Implantable", "WearableSensor", "Diagnostic"),
+    MaintenanceIntervalHours as integer positive) initial
+
+# Assignment.
+event AssignToPatient(PatientId as string notempty maxlength 50, PatientName as string notempty maxlength 200, PrescribingProvider as string notempty maxlength 200, PrescriptionDate as date)
+event ReturnFromPatient(Reason as string notempty maxlength 500)
+
+# Usage lifecycle.
+event StartUse
+event LogUsage(AdditionalHours as integer positive)
+event EndUse
+
+# Maintenance.
+event FlagForMaintenance(Reason as string notempty maxlength 500)
+event CompleteMaintenance(Technician as string notempty maxlength 200, NextServiceDueOn as date, ServiceDate as date)
+
+# Recall and retirement.
+event IssueRecall(RecallClass as choice of string("Class1", "Class2", "Class3"), NoticeDate as date, Reason as string notempty maxlength 1000)
+event RetireDevice(Reason as string notempty maxlength 500)
+
+# Construction row — opens in Available.
+on Create
+    -> set DeviceId = Create.DeviceId
+    -> set UdiDeviceIdentifier = Create.UdiDeviceIdentifier
+    -> set SerialNumber = Create.SerialNumber
+    -> set Manufacturer = Create.Manufacturer
+    -> set ModelNumber = Create.ModelNumber
+    -> set DeviceCategory = Create.DeviceCategory
+    -> set MaintenanceIntervalHours = Create.MaintenanceIntervalHours
+    -> append DeviceLog "Device {Create.DeviceId} registered ({Create.Manufacturer} {Create.DeviceCategory})"
+
+# Transitions
+
+# Available → Assigned.
+from Available on AssignToPatient
+    -> set AssignedPatientId = AssignToPatient.PatientId
+    -> set AssignedPatientName = AssignToPatient.PatientName
+    -> set PrescribingProvider = AssignToPatient.PrescribingProvider
+    -> set PrescriptionDate = AssignToPatient.PrescriptionDate
+    -> set AssignedAt = now()
+    -> append DeviceLog "Assigned to patient {AssignToPatient.PatientName} by {AssignToPatient.PrescribingProvider}"
+    -> transition Assigned
+
+# Assigned → InUse.
+from Assigned on StartUse
+    -> set UsageCycles = UsageCycles + 1
+    -> append DeviceLog "Use started (cycle {UsageCycles})"
+    -> transition InUse
+
+# Assigned → Available — return without use. Assignment fields are omit in
+# Available, so they become structurally absent on transition.
+from Assigned on ReturnFromPatient
+    -> append DeviceLog "Returned to inventory unused: {ReturnFromPatient.Reason}"
+    -> transition Available
+
+# InUse — same-state usage logging.
+from InUse on LogUsage
+    -> set TotalUsageHours = TotalUsageHours + LogUsage.AdditionalHours
+    -> append DeviceLog "Usage logged: +{LogUsage.AdditionalHours}h (total {TotalUsageHours}h)"
+    -> no transition
+
+# InUse → MaintenanceRequired — explicit flag.
+from InUse on FlagForMaintenance
+    -> append DeviceLog "Flagged for maintenance: {FlagForMaintenance.Reason}"
+    -> transition MaintenanceRequired
+
+# InUse → MaintenanceRequired — usage threshold crossed.
+from InUse on EndUse when TotalUsageHours - UsageHoursAtLastService >= MaintenanceIntervalHours
+    -> append DeviceLog "Use ended; maintenance due ({TotalUsageHours}h total, {UsageHoursAtLastService}h at last service)"
+    -> transition MaintenanceRequired
+
+# InUse → Available — end of use, no maintenance required.
+from InUse on EndUse
+    -> append DeviceLog "Use ended; returned to inventory"
+    -> transition Available
+
+# MaintenanceRequired → Available.
+from MaintenanceRequired on CompleteMaintenance
+    -> set ServicedBy = CompleteMaintenance.Technician
+    -> set LastServiceDate = CompleteMaintenance.ServiceDate
+    -> set NextServiceDueOn = CompleteMaintenance.NextServiceDueOn
+    -> set UsageHoursAtLastService = TotalUsageHours
+    -> append DeviceLog "Maintenance completed by {CompleteMaintenance.Technician} on {CompleteMaintenance.ServiceDate}"
+    -> transition Available
+
+# Recall — regulatory override from any non-terminal state.
+from Available, Assigned, InUse, MaintenanceRequired on IssueRecall
+    -> set RecallClass = IssueRecall.RecallClass
+    -> set RecallNoticeDate = IssueRecall.NoticeDate
+    -> set RecallReason = IssueRecall.Reason
+    -> append DeviceLog "Recall issued ({IssueRecall.RecallClass}): {IssueRecall.Reason}"
+    -> transition Recalled
+
+# Retirement — from inventory states only (Available or MaintenanceRequired).
+from Available, MaintenanceRequired on RetireDevice
+    -> set RetirementReason = RetireDevice.Reason
+    -> set RetiredAt = now()
+    -> append DeviceLog "Device retired: {RetireDevice.Reason}"
+    -> transition Retired

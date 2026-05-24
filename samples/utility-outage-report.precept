@@ -1,72 +1,107 @@
 precept UtilityOutageReport
 
-# Operations teams verify outage reports, assemble the affected area, and then dispatch the next available crew.
-# The workflow uses both a set of affected blocks and a shared crew queue.
+# A utility outage report from filing through restoration. Operations files the
+# initial report, assembles the affected service area block by block, dispatches
+# a crew from the on-call pool, and closes the incident once power is restored.
+#
+# Constructor Pattern: an outage report cannot exist without a reporter, region,
+# and customer-impact estimate — FileReport is the initial event and the report
+# arrives in Filed fully formed. Crews join the on-call queue from any active
+# state; the next-available crew is dispatched once the affected-block list is
+# assembled and the report is verified.
 
-field ReporterName as string optional
-field RegionName as string optional
-field EstimatedCustomers as number default 0 nonnegative
-field Verified as boolean default false
-field AssignedCrew as string optional
-field RestorationNote as string optional
-field DispatchRound as number default 0 nonnegative
+# Reporter and impact — established at filing.
+field ReporterName as string notempty maxlength 200
+field RegionName as string notempty maxlength 100
+field EstimatedCustomers as integer nonnegative
+
+# Dispatch and restoration data — meaningful only after the report enters the
+# operational workflow.
+field AssignedCrew as string optional maxlength 200
+field RestorationNote as string optional maxlength 2000
+field DispatchRound as integer default 0 nonnegative
+
+# Affected service area — assembled block by block during triage.
 field AffectedBlocks as set of string
+
+# Shared on-call crew pool — crews register themselves; Dispatch dequeues the next.
 field CrewQueue as queue of string
 
-state Reported initial
-state VerifiedState
+# States
+state Filed initial
+state Verified
 state Dispatched
 state Restored
 state Closed terminal
 
-in VerifiedState modify EstimatedCustomers editable
-in Dispatched ensure AssignedCrew is set because "Dispatched outages must name a crew"
+# AssignedCrew has no meaning until dispatch; RestorationNote until restoration.
+in Filed, Verified omit AssignedCrew
+in Filed, Verified, Dispatched omit RestorationNote
 
-event FileReport(Reporter as string notempty, Region as string notempty, Customers as number)
-on FileReport ensure FileReport.Customers >= 0 because "Estimated customers cannot be negative"
+# Editable windows — the customer impact may be revised once the affected area
+# is mapped out and field intel improves the estimate.
+in Verified modify EstimatedCustomers editable
 
-event AddBlock(BlockName as string notempty)
-event RemoveBlock(BlockName as string notempty)
-event RegisterCrew(CrewName as string notempty)
+# State ensures
+in Dispatched ensure AssignedCrew is set because "A dispatched outage must name the responding crew — operations needs to know who's on scene for status calls and crew-safety check-ins"
+
+# Events
+event FileReport(
+    Reporter as string notempty maxlength 200,
+    Region as string notempty maxlength 100,
+    Customers as integer nonnegative) initial
+
+event AddBlock(BlockName as string notempty maxlength 100)
+event RemoveBlock(BlockName as string notempty maxlength 100)
+event RegisterCrew(CrewName as string notempty maxlength 200)
 event VerifyReport
 event DispatchCrew
-event MarkRestored(Note as string notempty)
+event MarkRestored(Note as string notempty maxlength 2000)
 event CloseIncident
 
-from Reported on FileReport
+# Construction
+on FileReport
     -> set ReporterName = FileReport.Reporter
     -> set RegionName = FileReport.Region
     -> set EstimatedCustomers = FileReport.Customers
-    -> no transition
-from Reported on AddBlock
+
+# Affected area assembly — blocks are added and removed during triage.
+from Filed on AddBlock
     -> add AffectedBlocks AddBlock.BlockName
     -> no transition
-from Reported on RemoveBlock when AffectedBlocks contains RemoveBlock.BlockName
+from Filed on RemoveBlock when AffectedBlocks contains RemoveBlock.BlockName
     -> remove AffectedBlocks RemoveBlock.BlockName
     -> no transition
-from Reported on RemoveBlock
-    -> reject "That block is not currently on the outage map"
-from Reported on VerifyReport when AffectedBlocks.count > 0
-    -> set Verified = true
-    -> transition VerifiedState
-from Reported on VerifyReport
-    -> reject "At least one affected block must be recorded before verification"
+from Filed on RemoveBlock
+    -> reject "Block {RemoveBlock.BlockName} is not on the outage map — cannot remove what was never added"
 
-from Reported, VerifiedState, Dispatched, Restored on RegisterCrew
+# Verification — requires at least one affected block on the map. Dispatching a
+# crew to an empty service area would waste a truck roll.
+from Filed on VerifyReport when AffectedBlocks.count > 0
+    -> transition Verified
+from Filed on VerifyReport
+    -> reject "At least one affected block must be on the outage map before verification — operations needs a service area to dispatch a crew to"
+
+# Crew registration — cross-cutting. Any active state can grow the on-call pool.
+from Filed, Verified, Dispatched, Restored on RegisterCrew
     -> enqueue CrewQueue RegisterCrew.CrewName
     -> no transition
 
-from VerifiedState on DispatchCrew when CrewQueue.count > 0
+# Dispatch — the next on-call crew picks up the report.
+from Verified on DispatchCrew when CrewQueue.count > 0
     -> set AssignedCrew = CrewQueue.peek
     -> dequeue CrewQueue
     -> set DispatchRound = DispatchRound + 1
     -> transition Dispatched
-from VerifiedState on DispatchCrew
-    -> reject "No crew is available for dispatch"
+from Verified on DispatchCrew
+    -> reject "No crew is currently in the on-call pool — RegisterCrew first or wait for a crew to come on shift"
 
 from Dispatched on MarkRestored
     -> set RestorationNote = MarkRestored.Note
     -> transition Restored
+
+# Closure — clear the affected-blocks map so the service area is freed for
+# any future report on the same lines.
 from Restored on CloseIncident
     -> clear AffectedBlocks
     -> transition Closed

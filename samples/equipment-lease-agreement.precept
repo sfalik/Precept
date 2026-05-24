@@ -1,0 +1,217 @@
+precept EquipmentLeaseAgreement
+
+# An equipment lease moves through quotation, signature, activation, periodic
+# payments, and end-of-term return. A lease officer drafts the lease — identifying
+# the lessee, the equipment, the lease term, the monthly payment, and the
+# classification (operating vs. capital, under ASC 842 / IFRS 16). Once the lessor
+# issues a Quote, the lessee either signs (advancing to Signed) or rejects. After
+# signature, Activate kicks off the lease at commencement; payments accumulate
+# against the contract until end of term, when the lessee returns the equipment.
+# A missed payment can push the lease into Default, which is a terminal failure
+# distinct from a normal Returned outcome.
+#
+# Free-Construction: the lease officer enriches a Draft over time. Required-at-quote
+# fields are declared optional and gated by the Quote event's ensures.
+
+# Identity
+field LeaseId as string optional maxlength 50
+field LesseeName as string optional maxlength 200
+field LessorName as string optional maxlength 200
+field LeaseOfficer as string optional maxlength 100
+
+# Equipment
+field EquipmentDescription as string optional maxlength 500
+field EquipmentSerialNumber as string optional maxlength 100
+field EquipmentCategory as choice of string("Vehicle","HeavyMachinery","ITHardware","MedicalDevice","OfficeEquipment","Other") optional
+field EquipmentValueAtCommencement as money in 'USD' optional
+
+# Lease classification — ASC 842 / IFRS 16 distinguishes operating from finance
+# (capital) leases. The classification drives accounting treatment downstream.
+field LeaseClassification as choice of string("Operating","Finance","ShortTerm") optional
+
+# Lease term and dates
+field LeaseTerm as period optional
+field CommencementDate as date optional
+field ExpirationDate as date optional
+# BUG-003: `period default '<literal>'` crashes the MCP compiler (unhandled
+# exception, no diagnostic emitted). Until that's fixed, this lease's grace
+# period stays optional and the host fills it in. See docs/Working/bugs.md.
+field GracePeriod as period optional
+
+# Payments
+field MonthlyPayment as money in 'USD' optional
+field SecurityDeposit as money in 'USD' default '0.00 USD'
+field SecurityDepositPaid as boolean default false
+
+# Payment tracking
+field PaymentsScheduled as integer default 0 nonnegative
+field PaymentsMade as integer default 0 nonnegative
+field PaymentsMissed as integer default 0 nonnegative
+field TotalPaid as money in 'USD' default '0.00 USD'
+field TotalScheduledValue as money in 'USD' default '0.00 USD'
+
+# Return / default
+field ReturnedAt as instant optional
+field ReturnConditionNote as string optional maxlength 500
+field DefaultReason as string optional maxlength 500
+
+# Audit log
+field PaymentLog as log of string
+field LeaseLog as log of string
+
+# Timestamps
+field QuotedAt as instant optional
+field SignedAt as instant optional
+field ActivatedAt as instant optional
+field DefaultedAt as instant optional
+
+# Rules
+rule ExpirationDate > CommencementDate when CommencementDate is set and ExpirationDate is set because "Expiration date {ExpirationDate} must be after commencement date {CommencementDate}"
+rule SecurityDeposit <= MonthlyPayment * 3 when MonthlyPayment is set because "Security deposit {SecurityDeposit} cannot exceed three months of payment ({MonthlyPayment} x 3)"
+rule PaymentsMade + PaymentsMissed <= PaymentsScheduled because "Payments made ({PaymentsMade}) plus missed ({PaymentsMissed}) cannot exceed scheduled ({PaymentsScheduled})"
+rule TotalPaid <= TotalScheduledValue because "Total paid {TotalPaid} cannot exceed the scheduled lease value {TotalScheduledValue}"
+
+# A finance/capital lease must transfer substantially all value — the present-value
+# minimum used by the lease officer's UI is captured here as a simple total floor.
+# (The real ASC 842 test is more nuanced; this guards against obvious misclassification.)
+rule TotalScheduledValue >= EquipmentValueAtCommencement * 0.9 when LeaseClassification == "Finance" and EquipmentValueAtCommencement is set because "Finance leases must transfer substantially all value — scheduled value {TotalScheduledValue} is below the 90% threshold of equipment value {EquipmentValueAtCommencement}"
+
+# States
+state Draft initial
+state Quoted
+state Signed
+state Active
+state Returned terminal
+state Defaulted terminal
+state Withdrawn terminal
+
+# State ensures
+in Quoted ensure QuotedAt is set because "A quoted lease must carry a quotation timestamp"
+in Signed ensure SignedAt is set because "A signed lease must carry a signature timestamp"
+in Signed ensure SecurityDepositPaid because "The security deposit must be paid before signature"
+in Active ensure ActivatedAt is set because "An active lease must record its activation timestamp"
+in Active ensure CommencementDate is set because "An active lease must have a commencement date on file"
+in Returned ensure ReturnedAt is set because "A returned lease must record the return timestamp"
+in Returned ensure ReturnConditionNote is set because "A returned lease must record the return condition"
+in Defaulted ensure DefaultReason is set because "A defaulted lease must record the default reason"
+in Defaulted ensure DefaultedAt is set because "A defaulted lease must carry a default timestamp"
+
+# Editable windows — broad in Draft; narrower in Quoted to address lessee questions.
+in Draft modify LeaseId, LesseeName, LessorName, LeaseOfficer, EquipmentDescription, EquipmentSerialNumber, EquipmentCategory, EquipmentValueAtCommencement, LeaseClassification, LeaseTerm, CommencementDate, ExpirationDate, MonthlyPayment, SecurityDeposit, PaymentsScheduled, TotalScheduledValue editable
+in Quoted modify EquipmentDescription, MonthlyPayment, SecurityDeposit editable
+
+# Events
+event Quote
+event PaySecurityDeposit
+event Sign
+event Activate
+event RecordPayment(Amount as money in 'USD', Note as string optional)
+event RecordMissedPayment(Note as string notempty)
+event CureDefault(Amount as money in 'USD', Note as string notempty)
+event ReturnEquipment(ConditionNote as string notempty)
+event Default(Reason as string notempty)
+event Withdraw(Reason as string notempty)
+
+on Quote ensure LeaseId is set because "Lease ID is required before quotation"
+on Quote ensure LesseeName is set because "Lessee name is required before quotation"
+on Quote ensure EquipmentDescription is set because "Equipment description is required before quotation"
+on Quote ensure EquipmentCategory is set because "Equipment category is required before quotation"
+on Quote ensure LeaseClassification is set because "Lease classification (operating/finance/short-term) is required before quotation"
+on Quote ensure LeaseTerm is set because "Lease term is required before quotation"
+on Quote ensure CommencementDate is set because "Commencement date is required before quotation"
+on Quote ensure ExpirationDate is set because "Expiration date is required before quotation"
+on Quote ensure MonthlyPayment is set because "Monthly payment is required before quotation"
+on Quote ensure PaymentsScheduled > 0 because "At least one scheduled payment is required before quotation"
+
+on RecordPayment ensure RecordPayment.Amount > '0.00 USD' because "Recorded payments must be positive"
+on CureDefault ensure CureDefault.Amount > '0.00 USD' because "Cure-default payment must be positive"
+
+# Transitions
+
+# Quotation — the lease officer issues a binding quote to the lessee.
+# BUG-004: the event ensure `on Quote ensure MonthlyPayment is set` above provably
+# establishes presence before the row body runs, but the proof engine does not
+# credit event ensures for transition-row body narrowing (only `when` guards on
+# the row itself, and rule/ensure guards). The row carries a redundant
+# `when MonthlyPayment is set` guard to satisfy presence narrowing.
+from Draft on Quote when MonthlyPayment is set
+    -> set QuotedAt = now()
+    -> set TotalScheduledValue = MonthlyPayment * PaymentsScheduled
+    -> append LeaseLog "Quoted"
+    -> transition Quoted
+
+# Security deposit — collected before signature.
+from Quoted on PaySecurityDeposit
+    -> set SecurityDepositPaid = true
+    -> append LeaseLog "Security deposit paid"
+    -> no transition
+
+# Signature — only after the deposit is paid (or zero).
+from Quoted on Sign when SecurityDeposit > '0.00 USD' and not SecurityDepositPaid
+    -> reject "Security deposit of {SecurityDeposit} must be paid before signing"
+from Quoted on Sign
+    -> set SignedAt = now()
+    -> set SecurityDepositPaid = true
+    -> append LeaseLog "Signed"
+    -> transition Signed
+
+# Activation — the equipment is delivered and the lease commences.
+from Signed on Activate
+    -> set ActivatedAt = now()
+    -> append LeaseLog "Activated"
+    -> transition Active
+
+# Payments — recorded against the lease while active. The host enforces the
+# calendar schedule; the precept tracks counts and totals so accounting can
+# reconcile and the default guard can fire correctly.
+from Active on RecordPayment when TotalPaid + RecordPayment.Amount > TotalScheduledValue
+    -> reject "Payment of {RecordPayment.Amount} would exceed scheduled lease value ({TotalScheduledValue} total, {TotalPaid} already paid)"
+from Active on RecordPayment
+    -> set PaymentsMade = PaymentsMade + 1
+    -> set TotalPaid = TotalPaid + RecordPayment.Amount
+    -> append PaymentLog if RecordPayment.Note is set then RecordPayment.Note else "Payment"
+    -> no transition
+
+# Missed payment — recorded but does not (yet) terminate the lease. After
+# three missed payments the lessor typically issues a Default event.
+from Active on RecordMissedPayment when PaymentsMade + PaymentsMissed + 1 > PaymentsScheduled
+    -> reject "Cannot record a missed payment beyond the scheduled count ({PaymentsScheduled})"
+from Active on RecordMissedPayment
+    -> set PaymentsMissed = PaymentsMissed + 1
+    -> append PaymentLog RecordMissedPayment.Note
+    -> no transition
+
+# Cure default — the lessee makes a catch-up payment that resolves one missed
+# payment. Reduces PaymentsMissed and credits TotalPaid.
+from Active on CureDefault when PaymentsMissed == 0
+    -> reject "No missed payments to cure"
+from Active on CureDefault when TotalPaid + CureDefault.Amount > TotalScheduledValue
+    -> reject "Cure payment of {CureDefault.Amount} would exceed scheduled lease value"
+from Active on CureDefault
+    -> set PaymentsMissed = PaymentsMissed - 1
+    -> set PaymentsMade = PaymentsMade + 1
+    -> set TotalPaid = TotalPaid + CureDefault.Amount
+    -> append PaymentLog CureDefault.Note
+    -> no transition
+
+# End-of-term return — the standard exit. The lessee returns the equipment
+# and the lessor records its condition.
+from Active on ReturnEquipment
+    -> set ReturnedAt = now()
+    -> set ReturnConditionNote = ReturnEquipment.ConditionNote
+    -> append LeaseLog "Returned"
+    -> transition Returned
+
+# Default — terminal failure. Issued by the lessor when payments fall too far behind
+# or another material breach occurs.
+from Active on Default
+    -> set DefaultedAt = now()
+    -> set DefaultReason = Default.Reason
+    -> append LeaseLog "Defaulted"
+    -> transition Defaulted
+
+# Withdraw — pre-signature only. The lessor or lessee can pull the quote.
+from Draft, Quoted on Withdraw
+    -> set DefaultReason = Withdraw.Reason
+    -> append LeaseLog "Withdrawn"
+    -> transition Withdrawn

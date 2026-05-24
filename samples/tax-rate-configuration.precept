@@ -1,0 +1,42 @@
+precept TaxRateConfiguration
+
+# A stateless data-only precept governing a tax rate configuration record for a
+# single jurisdiction. Holds the headline rate plus optional surtax components,
+# the effective window in which the configuration is active, and a derived
+# combined rate the host application reads when computing tax on an invoice.
+#
+# Tax rates are administrative reference data — they are written by tax
+# governance workflows in the host application. This precept focuses on the
+# structural invariants every tax record must satisfy: rates are bounded
+# between 0% and 100% (stored as decimal fractions, so 0.0875 == 8.75%), the
+# effective window is well-formed, and only specific jurisdictions and tax
+# categories are accepted.
+#
+# Compounding governs how the combined rate is derived:
+#   Compounding == false (additive) — Combined = StateRate + LocalRate + SurchargeRate
+#   Compounding == true (multiplicative) — apply each rate in sequence, so a
+#     subtotal of 100 with State 5% then Local 2% yields 100*1.05*1.02 = 107.10
+#     instead of 100*1.07 = 107.00. Host applications inspect the Compounding
+#     flag and use whichever derivation matches the jurisdiction's tax law.
+
+field Jurisdiction as string optional maxlength 50 writable
+field TaxCategory as choice of string("Sales","VAT","GST","Excise","Use","Withholding") default "Sales" writable
+field CurrencyCode as currency default 'USD' writable
+
+# Rate components — each stored as a decimal fraction in [0, 1].
+field StateRate as decimal default 0 nonnegative max 1 maxplaces 6 writable
+field LocalRate as decimal default 0 nonnegative max 1 maxplaces 6 writable
+field SurchargeRate as decimal default 0 nonnegative max 1 maxplaces 6 writable
+
+# Additive combined rate — the natural reading when Compounding is false.
+field CombinedRateAdditive as decimal nonnegative <- StateRate + LocalRate + SurchargeRate
+
+field EffectiveFrom as date optional writable
+field EffectiveTo as date optional writable
+
+field Description as string optional maxlength 200 writable
+field Compounding as boolean default false writable
+field Active as boolean default true writable
+
+rule EffectiveTo >= EffectiveFrom when EffectiveFrom is set and EffectiveTo is set because "Effective window end {EffectiveTo} cannot precede the start {EffectiveFrom}"
+rule CombinedRateAdditive <= 1 because "Combined tax rate {CombinedRateAdditive} cannot exceed 100% — check the component rates"

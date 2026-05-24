@@ -1,0 +1,115 @@
+precept ManufacturingQualityInspection
+
+# An ISO-9001 style inspection record for a single product batch.
+# The inspector receives a draft, fills in planning data, schedules
+# the inspection, then records measurements, defects, and observations
+# in-progress. A failed inspection requires a corrective action narrative
+# before the record can close out. Create() is parameterless — the entity
+# arrives as a Draft and is enriched by the inspector over time.
+
+# Fields
+field ProductId as string optional maxlength 50
+field BatchNumber as string optional maxlength 50
+field InspectorName as string optional maxlength 100
+field SampleSize as integer optional
+field NominalDimension as quantity in 'mm' optional
+field UpperTolerance as quantity in 'mm' optional
+field LowerTolerance as quantity in 'mm' optional
+field MeasuredDimension as quantity in 'mm' optional
+field DefectsFound as integer default 0 nonnegative
+field DefectLog as lookup of string to integer
+field CorrectiveAction as string optional maxlength 500
+field DispositionNote as string optional maxlength 500
+field ScheduledAt as instant optional
+field InspectionStartedAt as instant optional
+field InspectionCompletedAt as instant optional
+
+# Rules
+rule UpperTolerance >= NominalDimension when UpperTolerance is set and NominalDimension is set because "Upper tolerance {UpperTolerance} cannot be below nominal {NominalDimension}"
+rule LowerTolerance <= NominalDimension when LowerTolerance is set and NominalDimension is set because "Lower tolerance {LowerTolerance} cannot be above nominal {NominalDimension}"
+rule DefectsFound <= SampleSize when SampleSize is set because "Defect count {DefectsFound} cannot exceed sample size {SampleSize}"
+
+# States
+state Draft initial
+state Scheduled
+state InProgress
+state Passed
+state Failed
+state UnderCorrectiveAction
+state Closed terminal
+
+# State ensures
+in Scheduled ensure ScheduledAt is set because "A scheduled inspection must carry a schedule timestamp"
+in InProgress ensure InspectionStartedAt is set because "Inspections in progress must record a start time"
+in InProgress ensure InspectorName is set because "An inspector must be on record during measurement"
+in Passed ensure DefectsFound == 0 because "Passed inspections must have zero recorded defects (found {DefectsFound})"
+in Failed ensure DefectsFound > 0 because "Failed inspections must have at least one recorded defect"
+in UnderCorrectiveAction ensure CorrectiveAction is set because "Corrective action narrative is required once corrective action is opened"
+
+# Editable windows
+in Draft modify ProductId, BatchNumber, InspectorName, SampleSize, NominalDimension, UpperTolerance, LowerTolerance editable
+in InProgress modify InspectorName editable
+
+# Events
+event ScheduleInspection
+on ScheduleInspection ensure ProductId is set because "Product ID is required before scheduling"
+on ScheduleInspection ensure BatchNumber is set because "Batch number is required before scheduling"
+on ScheduleInspection ensure InspectorName is set because "An inspector must be assigned before scheduling"
+on ScheduleInspection ensure SampleSize is set because "Sample size must be planned before scheduling"
+on ScheduleInspection ensure NominalDimension is set because "Nominal dimension must be specified before scheduling"
+on ScheduleInspection ensure UpperTolerance is set because "Upper tolerance must be specified before scheduling"
+on ScheduleInspection ensure LowerTolerance is set because "Lower tolerance must be specified before scheduling"
+
+event BeginInspection
+event RecordMeasurement(Measured as quantity in 'mm')
+event RecordDefect(DefectCode as string notempty, Count as integer positive)
+event CompleteInspection
+event OpenCorrectiveAction(Action as string notempty)
+event ReleaseAfterCorrection(Note as string notempty)
+event Close(Note as string notempty)
+
+on RecordDefect ensure RecordDefect.Count > 0 because "Defect count must be positive — record a separate event per defect type"
+
+# Transitions
+from Draft on ScheduleInspection
+    -> set ScheduledAt = now()
+    -> transition Scheduled
+
+from Scheduled on BeginInspection
+    -> set InspectionStartedAt = now()
+    -> transition InProgress
+
+from InProgress on RecordMeasurement
+    -> set MeasuredDimension = RecordMeasurement.Measured
+    -> no transition
+
+from InProgress on RecordDefect
+    -> put DefectLog RecordDefect.DefectCode = RecordDefect.Count
+    -> set DefectsFound = DefectsFound + RecordDefect.Count
+    -> no transition
+
+from InProgress on CompleteInspection when MeasuredDimension is set and LowerTolerance is set and UpperTolerance is set and DefectsFound == 0 and MeasuredDimension >= LowerTolerance and MeasuredDimension <= UpperTolerance
+    -> set InspectionCompletedAt = now()
+    -> transition Passed
+from InProgress on CompleteInspection when MeasuredDimension is set and LowerTolerance is set and UpperTolerance is set and DefectsFound == 0 and (MeasuredDimension < LowerTolerance or MeasuredDimension > UpperTolerance)
+    -> set DefectsFound = 1
+    -> put DefectLog "OUT_OF_TOLERANCE" = 1
+    -> set InspectionCompletedAt = now()
+    -> transition Failed
+from InProgress on CompleteInspection when DefectsFound > 0
+    -> set InspectionCompletedAt = now()
+    -> transition Failed
+from InProgress on CompleteInspection
+    -> reject "Cannot complete inspection — record at least one measurement before completing"
+
+from Failed on OpenCorrectiveAction
+    -> set CorrectiveAction = OpenCorrectiveAction.Action
+    -> transition UnderCorrectiveAction
+
+from UnderCorrectiveAction on ReleaseAfterCorrection
+    -> set DispositionNote = ReleaseAfterCorrection.Note
+    -> transition Closed
+
+from Passed, Failed on Close
+    -> set DispositionNote = Close.Note
+    -> transition Closed

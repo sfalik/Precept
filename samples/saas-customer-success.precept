@@ -1,0 +1,238 @@
+precept SaasCustomerSuccessAndHealthScoring
+
+# A SaaS customer-success health record. The customer is onboarded, becomes
+# Active once health scores stabilize, can drift to AtRisk when health
+# declines, and reaches Intervention when CSM proactive outreach is
+# required. From Intervention the customer either Recovered (terminal) or
+# Churned (terminal). Add/remove risk factors trigger AtRisk transitions
+# proactively; score updates trigger transitions based on the new average.
+# Health status is encoded as the state itself — no parallel field needed.
+
+# Customer identification — fixed at construction.
+field CustomerId as string notempty maxlength 50
+field CustomerName as string notempty maxlength 200
+field CustomerEmail as string notempty maxlength 200
+field AccountTier as choice of string("Startup", "Growth", "Enterprise")
+
+# Health metrics — each component is 0-100; the overall score is the average.
+# BUG-006: would prefer `integer default 50 nonnegative max 100` on
+# OverallHealthScore but the proof engine can't prove
+# `(Usage + Engagement + Satisfaction) / 3` stays in [0,100] even when each
+# component is bounded. Dropped `max 100`; runtime rule below.
+field OverallHealthScore as integer default 50 nonnegative
+rule OverallHealthScore <= 100 because "Health score is a 0-100 composite — values above 100 indicate a calculation error"
+field UsageScore as integer default 50 nonnegative max 100
+field EngagementScore as integer default 50 nonnegative max 100
+field SatisfactionScore as integer default 50 nonnegative max 100
+
+# Risk tracking
+field RiskFactors as set of string
+field RiskLevel as choice of string("Low", "Medium", "High") default "Low"
+field LastRiskAssessmentAt as instant optional
+
+# Engagement tracking
+field LastContactAt as instant optional
+field LastLoginDate as instant optional
+field DaysSinceLastLogin as integer default 0 nonnegative
+field LoginCountThisMonth as integer default 0 nonnegative
+field SupportTicketsOpen as integer default 0 nonnegative
+
+# Success plan
+field SuccessPlan as string optional maxlength 1000
+field KeyMetricsTracked as set of string
+field MilestonesCompleted as integer default 0 nonnegative
+field TotalMilestones as integer default 0 nonnegative
+
+# Outreach history
+field OutreachHistory as log of string
+field OutreachCount as integer default 0 nonnegative
+field LastOutreachType as choice of string("Email", "Call", "QBR", "Onboarding") optional
+field NextOutreachScheduled as instant optional
+
+# Account data
+field ContractValue as money in 'USD' positive
+field RenewalDate as instant optional
+field RenewalRisk as choice of string("Low", "Medium", "High") default "Low"
+field ChurnReason as string optional maxlength 500
+field CompletedAt as instant optional
+
+# Feature usage — last-used timestamp keyed by feature name.
+field FeaturesUsed as lookup of string to string
+
+# Risk-level derivation — compile-time consistency between the level and the
+# count of contributing factors.
+rule RiskLevel == "High" when RiskFactors.count >= 3 because "Three or more risk factors indicate high renewal risk"
+rule RiskLevel == "Medium" when RiskFactors.count == 2 because "Two risk factors indicate medium renewal risk"
+rule RiskLevel == "Low" when RiskFactors.count <= 1 because "Fewer than two risk factors indicate low renewal risk"
+
+# States — customer-success lifecycle. The state itself encodes health
+# status; no parallel field is needed.
+state Onboarded initial
+state Active
+state AtRisk
+state Intervention
+state Recovered terminal
+state Churned terminal
+
+# State ensures — each state activates a distinct rule set.
+in Active ensure OverallHealthScore >= 50 because "Active customers must have a health score of at least 50"
+in AtRisk ensure OverallHealthScore < 50 because "At-risk customers must have a health score below 50"
+in Intervention ensure OutreachCount > 0 because "Intervention requires at least one CSM outreach action — otherwise the entity hasn't actually entered intervention"
+in Recovered ensure LastContactAt is set because "Recovered customers must record the final contact timestamp"
+in Recovered ensure SuccessPlan is set because "Recovered customers must have a documented success plan"
+in Churned ensure ChurnReason is set because "Churned customers must record the churn reason"
+in Churned ensure LastContactAt is set because "Churned customers must record the final contact timestamp"
+
+# Construction — customer onboarding begins.
+event Create(
+    CustomerId as string notempty maxlength 50,
+    CustomerName as string notempty maxlength 200,
+    CustomerEmail as string notempty maxlength 200,
+    AccountTier as choice of string("Startup", "Growth", "Enterprise"),
+    ContractValue as money in 'USD' positive) initial
+
+# Health-score update — single event handles every score change.
+event UpdateHealthScores(
+    Usage as integer nonnegative max 100,
+    Engagement as integer nonnegative max 100,
+    Satisfaction as integer nonnegative max 100)
+
+# Risk-factor management
+event AddRiskFactor(Factor as string notempty maxlength 200)
+event RemoveRiskFactor(Factor as string notempty maxlength 200)
+
+# Outreach
+event InitiateOutreach(
+    OutreachType as choice of string("Email", "Call", "QBR", "Onboarding"),
+    ScheduledDate as instant)
+on InitiateOutreach ensure InitiateOutreach.ScheduledDate > now() because "Scheduled outreach must be in the future"
+
+event LogFeatureUsage(FeatureName as string notempty maxlength 100, LastUsedDate as string notempty maxlength 50)
+
+# Escalation and resolution
+event EscalateToIntervention
+event RecoverCustomer(SuccessPlan as string notempty maxlength 1000)
+event ChurnCustomer(Reason as string notempty maxlength 500)
+
+# Construction row — opens in Onboarded.
+on Create
+    -> set CustomerId = Create.CustomerId
+    -> set CustomerName = Create.CustomerName
+    -> set CustomerEmail = Create.CustomerEmail
+    -> set AccountTier = Create.AccountTier
+    -> set ContractValue = Create.ContractValue
+    -> append OutreachHistory "Customer onboarded: {Create.CustomerId}"
+
+# Score updates — guarded transitions on the computed average.
+# Specific-before-general: the low-score guard first routes to AtRisk; the
+# unguarded rows below promote to Active for recovering customers and stay
+# in place otherwise. Row order matters.
+from Onboarded, Active, AtRisk, Intervention on UpdateHealthScores when (UpdateHealthScores.Usage + UpdateHealthScores.Engagement + UpdateHealthScores.Satisfaction) / 3 < 50
+    -> set UsageScore = UpdateHealthScores.Usage
+    -> set EngagementScore = UpdateHealthScores.Engagement
+    -> set SatisfactionScore = UpdateHealthScores.Satisfaction
+    -> set OverallHealthScore = (UpdateHealthScores.Usage + UpdateHealthScores.Engagement + UpdateHealthScores.Satisfaction) / 3
+    -> set LastRiskAssessmentAt = now()
+    -> append OutreachHistory "Scores updated — health below 50, moving to AtRisk"
+    -> transition AtRisk
+
+from Onboarded, AtRisk on UpdateHealthScores
+    -> set UsageScore = UpdateHealthScores.Usage
+    -> set EngagementScore = UpdateHealthScores.Engagement
+    -> set SatisfactionScore = UpdateHealthScores.Satisfaction
+    -> set OverallHealthScore = (UpdateHealthScores.Usage + UpdateHealthScores.Engagement + UpdateHealthScores.Satisfaction) / 3
+    -> set LastRiskAssessmentAt = now()
+    -> append OutreachHistory "Scores updated — health recovered, moving to Active"
+    -> transition Active
+
+from Active, Intervention on UpdateHealthScores
+    -> set UsageScore = UpdateHealthScores.Usage
+    -> set EngagementScore = UpdateHealthScores.Engagement
+    -> set SatisfactionScore = UpdateHealthScores.Satisfaction
+    -> set OverallHealthScore = (UpdateHealthScores.Usage + UpdateHealthScores.Engagement + UpdateHealthScores.Satisfaction) / 3
+    -> set LastRiskAssessmentAt = now()
+    -> append OutreachHistory "Scores updated — health stable"
+    -> no transition
+
+# Add risk factor — Onboarded or Active drives the entity to AtRisk; further
+# additions accumulate within AtRisk or Intervention.
+from Onboarded, Active on AddRiskFactor
+    -> add RiskFactors AddRiskFactor.Factor
+    -> set LastRiskAssessmentAt = now()
+    -> append OutreachHistory "Risk factor added: {AddRiskFactor.Factor}"
+    -> transition AtRisk
+
+from AtRisk, Intervention on AddRiskFactor
+    -> add RiskFactors AddRiskFactor.Factor
+    -> set LastRiskAssessmentAt = now()
+    -> append OutreachHistory "Risk factor added: {AddRiskFactor.Factor}"
+    -> no transition
+
+# Remove risk factor — stays in the current state; score updates drive
+# transitions back to Active.
+from AtRisk on RemoveRiskFactor
+    -> remove RiskFactors RemoveRiskFactor.Factor
+    -> set LastRiskAssessmentAt = now()
+    -> append OutreachHistory "Risk factor removed: {RemoveRiskFactor.Factor}"
+    -> no transition
+from Intervention on RemoveRiskFactor
+    -> remove RiskFactors RemoveRiskFactor.Factor
+    -> set LastRiskAssessmentAt = now()
+    -> append OutreachHistory "Risk factor removed: {RemoveRiskFactor.Factor}"
+    -> no transition
+
+# Outreach — Active stays; AtRisk drives to Intervention (real outreach
+# escalates the engagement); Intervention follow-up stays in Intervention.
+from Active on InitiateOutreach
+    -> set NextOutreachScheduled = InitiateOutreach.ScheduledDate
+    -> set LastOutreachType = InitiateOutreach.OutreachType
+    -> set OutreachCount = OutreachCount + 1
+    -> set LastContactAt = now()
+    -> append OutreachHistory "Outreach initiated: {InitiateOutreach.OutreachType}"
+    -> no transition
+
+from AtRisk on InitiateOutreach
+    -> set NextOutreachScheduled = InitiateOutreach.ScheduledDate
+    -> set LastOutreachType = InitiateOutreach.OutreachType
+    -> set OutreachCount = OutreachCount + 1
+    -> set LastContactAt = now()
+    -> append OutreachHistory "Intervention outreach: {InitiateOutreach.OutreachType}"
+    -> transition Intervention
+
+from Intervention on InitiateOutreach
+    -> set NextOutreachScheduled = InitiateOutreach.ScheduledDate
+    -> set LastOutreachType = InitiateOutreach.OutreachType
+    -> set OutreachCount = OutreachCount + 1
+    -> set LastContactAt = now()
+    -> append OutreachHistory "Intervention follow-up: {InitiateOutreach.OutreachType}"
+    -> no transition
+
+# Feature usage logging — available from any non-terminal state.
+from Onboarded, Active, AtRisk, Intervention on LogFeatureUsage
+    -> put FeaturesUsed LogFeatureUsage.FeatureName = LogFeatureUsage.LastUsedDate
+    -> append OutreachHistory "Feature used: {LogFeatureUsage.FeatureName}"
+    -> no transition
+
+# Escalation — AtRisk → Intervention without an outreach action (CSM
+# decision based on contract value, renewal proximity, etc.).
+from AtRisk on EscalateToIntervention
+    -> set OutreachCount = OutreachCount + 1
+    -> set LastContactAt = now()
+    -> append OutreachHistory "Escalated to intervention by CSM"
+    -> transition Intervention
+
+# Recover — Intervention → Recovered with a documented success plan.
+from Intervention on RecoverCustomer
+    -> set SuccessPlan = RecoverCustomer.SuccessPlan
+    -> set LastContactAt = now()
+    -> set CompletedAt = now()
+    -> append OutreachHistory "Customer recovered with plan: {RecoverCustomer.SuccessPlan}"
+    -> transition Recovered
+
+# Churn — AtRisk or Intervention → Churned.
+from AtRisk, Intervention on ChurnCustomer
+    -> set ChurnReason = ChurnCustomer.Reason
+    -> set LastContactAt = now()
+    -> set CompletedAt = now()
+    -> append OutreachHistory "Customer churned: {ChurnCustomer.Reason}"
+    -> transition Churned

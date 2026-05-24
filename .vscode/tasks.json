@@ -50,12 +50,22 @@
             "problemMatcher": []
         },
         {
+            "label": "agents: build",
+            "type": "shell",
+            "command": "node",
+            "args": [
+                "${workspaceFolder}/tools/scripts/build-agents.js"
+            ],
+            "problemMatcher": []
+        },
+        {
             "label": "plugin: sync payload",
             "type": "shell",
             "command": "node",
             "args": [
                 "${workspaceFolder}/tools/scripts/sync-precept-plugin-assets.js"
             ],
+            "dependsOn": ["agents: build"],
             "problemMatcher": []
         },
         {

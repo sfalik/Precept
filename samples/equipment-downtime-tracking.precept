@@ -1,0 +1,156 @@
+precept EquipmentDowntimeTracking
+
+# A production-equipment downtime record. The equipment is registered
+# with identity data and runs in production until a downtime event is
+# reported. Diagnosis pinpoints the failure mode; repair restores the
+# equipment; the unit returns to Running. Each incident accumulates
+# duration into a running total and lands in the downtime log.
+
+# Equipment identity
+field EquipmentId as string notempty maxlength 50
+field EquipmentName as string optional maxlength 200
+field EquipmentType as choice of string("CNC", "Laser", "Assembly", "Packaging", "Conveyor", "Other")
+field Location as string optional maxlength 200
+field InstalledDate as date optional
+
+# Downtime reason and category — set when a Down event begins.
+field CurrentReason as choice of string("PlannedMaintenance", "UnplannedFailure", "Changeover", "MaterialShortage", "QualityIssue", "ToolFailure", "PowerOutage", "Other") optional
+field CurrentCategory as choice of string("Availability", "Performance", "Quality", "Other") optional
+field FailureRootCause as string optional maxlength 500
+
+# Downtime timing — captured per incident.
+field DowntimeStartedAt as instant optional
+field DiagnosisStartedAt as instant optional
+field RepairStartedAt as instant optional
+field RestoredAt as instant optional
+
+# Impact tracking
+field EstimatedImpact as string optional maxlength 500
+field ScrapQuantity as integer default 0 nonnegative
+field RepairCost as money in 'USD' default '0.00 USD' nonnegative
+
+# Repair ownership
+field AssignedTechnician as string optional maxlength 200
+
+# Cumulative production metrics across all incidents.
+field TotalRunTime as duration optional
+field TotalDowntime as duration optional
+field PlannedProductionTime as duration optional
+field DowntimeEvents as lookup of string to integer
+field DowntimeLog as log of string
+
+# Timestamps
+field RegisteredAt as instant
+
+# States — production-vs-downtime lifecycle.
+state Running initial
+state Down
+state Diagnosing
+state Repairing
+
+# Fields that have no meaning until a downtime incident begins.
+in Running omit CurrentReason, CurrentCategory, DowntimeStartedAt, DiagnosisStartedAt, RepairStartedAt, FailureRootCause, EstimatedImpact
+in Down omit DiagnosisStartedAt, RepairStartedAt, FailureRootCause
+in Diagnosing omit RepairStartedAt
+
+# State ensures
+in Down ensure DowntimeStartedAt is set because "Down state must record when the incident began"
+in Down ensure CurrentReason is set because "Down state must record the downtime reason"
+in Diagnosing ensure DiagnosisStartedAt is set because "Diagnosing state must record when diagnosis began"
+in Repairing ensure RepairStartedAt is set because "Repairing state must record when repair began"
+in Repairing ensure FailureRootCause is set because "Repairing state requires a documented root cause from diagnosis"
+
+# Construction — equipment registers with identity, type, and (optionally) location.
+event Create(
+    EquipmentId as string notempty maxlength 50,
+    EquipmentName as string optional maxlength 200,
+    EquipmentType as choice of string("CNC", "Laser", "Assembly", "Packaging", "Conveyor", "Other"),
+    Location as string optional maxlength 200,
+    InstalledDate as date optional) initial
+
+# Equipment-record events.
+event ReportDowntime(
+    Reason as choice of string("PlannedMaintenance", "UnplannedFailure", "Changeover", "MaterialShortage", "QualityIssue", "ToolFailure", "PowerOutage", "Other"),
+    Category as choice of string("Availability", "Performance", "Quality", "Other"),
+    Impact as string optional maxlength 500)
+event AssignTechnician(TechnicianName as string notempty maxlength 200)
+event StartDiagnosis
+event CompleteDiagnosis(RootCause as string notempty maxlength 500)
+event CompleteRepair(
+    Description as string notempty maxlength 500,
+    Cost as money in 'USD' nonnegative)
+event RestoreEquipment
+event LogScrap(Quantity as integer positive)
+event RecordProduction(
+    RunTime as duration,
+    Downtime as duration,
+    PlannedTime as duration)
+
+# Construction row — populate fields and arrive in Running.
+on Create
+    -> set EquipmentId = Create.EquipmentId
+    -> set EquipmentName = Create.EquipmentName
+    -> set EquipmentType = Create.EquipmentType
+    -> set Location = Create.Location
+    -> set InstalledDate = Create.InstalledDate
+    -> set RegisteredAt = now()
+    -> append DowntimeLog "Equipment registered: {Create.EquipmentId}"
+
+# Report downtime — Running → Down.
+from Running on ReportDowntime
+    -> set CurrentReason = ReportDowntime.Reason
+    -> set CurrentCategory = ReportDowntime.Category
+    -> set EstimatedImpact = ReportDowntime.Impact
+    -> set DowntimeStartedAt = now()
+    -> put DowntimeEvents "FailureCount" = 1
+    -> append DowntimeLog "Downtime reported: {ReportDowntime.Reason}"
+    -> transition Down
+
+# Assign technician — captured in Down or after.
+from Down, Diagnosing, Repairing on AssignTechnician
+    -> set AssignedTechnician = AssignTechnician.TechnicianName
+    -> append DowntimeLog "Technician assigned: {AssignTechnician.TechnicianName}"
+    -> no transition
+
+# Start diagnosis — Down → Diagnosing.
+from Down on StartDiagnosis
+    -> set DiagnosisStartedAt = now()
+    -> append DowntimeLog "Diagnosis started"
+    -> transition Diagnosing
+
+# Complete diagnosis — Diagnosing → Repairing (root cause captured).
+from Diagnosing on CompleteDiagnosis
+    -> set FailureRootCause = CompleteDiagnosis.RootCause
+    -> set RepairStartedAt = now()
+    -> append DowntimeLog "Diagnosis complete: {CompleteDiagnosis.RootCause}"
+    -> transition Repairing
+
+# Complete repair — Repairing → Running (incident closed). The per-incident
+# fields are omitted from Running and clear automatically; the repair narrative
+# and parts used go to the persistent audit log.
+from Repairing on CompleteRepair
+    -> set RepairCost = RepairCost + CompleteRepair.Cost
+    -> set RestoredAt = now()
+    -> append DowntimeLog "Repair completed: {CompleteRepair.Description} ({CompleteRepair.Cost})"
+    -> transition Running
+
+# Restore equipment — from any downtime state, jump back to Running. Used when
+# the incident resolved without a documented repair (e.g. transient fault).
+from Down on RestoreEquipment
+    -> set RestoredAt = now()
+    -> append DowntimeLog "Equipment restored without repair"
+    -> transition Running
+
+# Scrap logging — during Down only. Production scrap caused by the incident.
+from Down on LogScrap
+    -> set ScrapQuantity = ScrapQuantity + LogScrap.Quantity
+    -> append DowntimeLog "Scrap logged: {LogScrap.Quantity} units"
+    -> no transition
+
+# Record production — periodic update to cumulative OEE-relevant durations.
+from Running on RecordProduction
+    -> set TotalRunTime = RecordProduction.RunTime
+    -> set TotalDowntime = RecordProduction.Downtime
+    -> set PlannedProductionTime = RecordProduction.PlannedTime
+    -> append DowntimeLog "Production metrics updated"
+    -> no transition

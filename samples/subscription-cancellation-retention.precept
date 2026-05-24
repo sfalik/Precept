@@ -1,0 +1,87 @@
+precept SubscriptionCancellationRetention
+
+# A subscription's cancellation flow gives the retention team one last save
+# attempt before the customer is lost. The customer requests cancellation; the
+# subscription enters retention review; the agent can extend a discount offer
+# (one at a time, with a 2-day window); the customer either accepts (returning
+# to Active) or declines (cancelling for real). The subscription's identity
+# data (name, plan, price) is fixed at construction and not editable during
+# retention.
+
+# Subscription data — set at construction.
+field SubscriberName as string notempty maxlength 200
+field PlanName as string notempty maxlength 100
+field MonthlyPrice as money in 'USD' positive
+field CreatedAt as instant
+
+# Retention state
+field SaveOfferAccepted as boolean default false
+field RetentionDiscount as decimal default 0 nonnegative max 100 maxplaces 2
+field RetentionDaysToExpiry as integer default 0 nonnegative max 30
+field CancellationReason as string optional maxlength 500
+field LastAgentNote as string optional maxlength 500
+
+# States
+state Active initial
+state RetentionReview
+state Cancelled terminal
+
+# Editable window — only the agent's note while in retention.
+in RetentionReview modify LastAgentNote editable
+
+# Events
+event Create(
+    Subscriber as string notempty,
+    Plan as string notempty,
+    Price as money in 'USD' positive) initial
+
+# Customer-initiated cancellation request.
+event RequestCancellation(Reason as string notempty)
+
+# Retention agent extends a save offer. DiscountPercent must be positive so the
+# customer actually has something to consider.
+event MakeSaveOffer(DiscountPercent as decimal positive max 100 maxplaces 2)
+
+# Customer decides on the retention offer.
+event AcceptOffer
+event DeclineOffer(Note as string optional)
+
+# Construction
+on Create
+    -> set SubscriberName = Create.Subscriber
+    -> set PlanName = Create.Plan
+    -> set MonthlyPrice = Create.Price
+    -> set CreatedAt = now()
+
+# Cancellation request — enter retention review.
+from Active on RequestCancellation
+    -> set CancellationReason = RequestCancellation.Reason
+    -> set SaveOfferAccepted = false
+    -> transition RetentionReview
+
+# Save offer — one at a time. If the customer already accepted, the matter
+# is closed; if an offer is currently outstanding, the agent must wait.
+from RetentionReview on MakeSaveOffer when SaveOfferAccepted
+    -> reject "Customer has already accepted a save offer — no further offers to make"
+from RetentionReview on MakeSaveOffer when RetentionDiscount > 0
+    -> reject "A save offer is already outstanding — wait for the customer to respond"
+from RetentionReview on MakeSaveOffer
+    -> set RetentionDiscount = MakeSaveOffer.DiscountPercent
+    -> set RetentionDaysToExpiry = 2
+    -> set LastAgentNote = if MonthlyPrice >= '50.00 USD' then "Premium plan retention" else "Standard plan retention"
+    -> no transition
+
+# Accept offer — must still be within the expiry window.
+from RetentionReview on AcceptOffer when RetentionDaysToExpiry <= 0
+    -> reject "Save offer has expired — request a fresh offer from the agent"
+from RetentionReview on AcceptOffer when SaveOfferAccepted
+    -> reject "Save offer already accepted"
+from RetentionReview on AcceptOffer
+    -> set SaveOfferAccepted = true
+    -> transition Active
+
+# Decline offer — cancellation proceeds.
+from RetentionReview on DeclineOffer
+    -> set LastAgentNote = DeclineOffer.Note
+    -> set SaveOfferAccepted = false
+    -> transition Cancelled

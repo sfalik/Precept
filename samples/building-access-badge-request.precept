@@ -1,41 +1,58 @@
 precept BuildingAccessBadgeRequest
 
-# A practical approval workflow that uses a numeric set for requested floors.
-# Demonstrates: integer type, positive/nonnegative modifiers, minlength constraint,
-# conditional action (if/then/else), add/remove, contains, .min, .max, and editable fields.
+# A building-access badge request — the requester enriches their identifying
+# details and the set of floors they need access to in Draft, then submits for
+# security review. Approved requests print a badge; the entry hook resets the
+# print flag so that re-approvals start fresh. Free-Construction Pattern: the
+# requested-floors set is filled progressively via AddFloor / RemoveFloor.
 
-field EmployeeName as string optional
-field Department as string optional
+# Identity and justification — enriched in Draft.
+field EmployeeName as string optional maxlength 200
+field Department as string optional maxlength 100
 field AccessReason as string optional maxlength 200 minlength 5
-field ReviewerNote as string optional
-field LowestRequestedFloor as integer default 0 nonnegative
-field HighestRequestedFloor as integer default 0 nonnegative
-field BadgePrinted as boolean default false
+
+# Requested-floor set — enriched in Draft via AddFloor / RemoveFloor.
 field RequestedFloors as set of integer
 
+# Captured floor bounds — set on the Submit transition once the set is finalized.
+# Omitted before Submit so they cannot be read as sentinel zeros.
+field LowestRequestedFloor as integer default 0 nonnegative
+field HighestRequestedFloor as integer default 0 nonnegative
+
+# Decision and issuance
+field ReviewerNote as string optional maxlength 2000
+field BadgePrinted as boolean default false
+
+# States
 state Draft initial
 state Submitted
 state Approved
 state Issued terminal
 state Rejected terminal
 
-# Requesters can revise the request while it is still being prepared.
+# Bounded floors are not yet meaningful in Draft.
+in Draft omit LowestRequestedFloor, HighestRequestedFloor
+
+# Editable window — requester revises identity and the floor set while in Draft.
 in Draft modify EmployeeName, Department, AccessReason, RequestedFloors editable
 
-in Approved ensure LowestRequestedFloor > 0 because "Approved badges must grant at least one floor"
-in Approved ensure HighestRequestedFloor >= LowestRequestedFloor because "Approved floor bounds must stay ordered"
-in Issued ensure BadgePrinted because "Issued badges must be printed"
+# State ensures
+in Approved ensure LowestRequestedFloor > 0 because "An approved badge must grant access to at least one floor — empty grants are not issuable"
+in Approved ensure HighestRequestedFloor >= LowestRequestedFloor because "Approved floor bounds must stay ordered — the highest floor cannot fall below the lowest"
+in Issued ensure BadgePrinted because "An issued badge must be physically printed — security cannot release an unprinted badge"
 
+# Entry hook — re-approval after rejection-revision resets the printed flag.
 to Approved -> set BadgePrinted = false
 
+# Events
 event AddFloor(Floor as integer positive)
 event RemoveFloor(Floor as integer positive)
-
 event Submit
-event Approve(Note as string optional)
-event Reject(Reason as string notempty)
+event Approve(Note as string optional maxlength 2000)
+event Reject(Reason as string notempty maxlength 2000)
 event PrintBadge
 
+# Floor-set editing — guards prevent removing a floor that isn't currently in the set.
 from Draft on AddFloor
     -> add RequestedFloors AddFloor.Floor
     -> no transition
@@ -43,15 +60,17 @@ from Draft on RemoveFloor when RequestedFloors contains RemoveFloor.Floor
     -> remove RequestedFloors RemoveFloor.Floor
     -> no transition
 from Draft on RemoveFloor
-    -> reject "That floor is not currently requested"
+    -> reject "Floor {RemoveFloor.Floor} is not currently in the requested set — nothing to remove"
 
+# Submit — full intake must be on record and at least one floor must be requested.
 from Draft on Submit when EmployeeName is set and Department is set and AccessReason is set and RequestedFloors.count > 0
     -> set LowestRequestedFloor = RequestedFloors.min
     -> set HighestRequestedFloor = RequestedFloors.max
     -> transition Submitted
 from Draft on Submit
-    -> reject "A complete request needs employee details, a reason (at least 5 characters), and at least one floor"
+    -> reject "A complete request needs employee name, department, an access reason (at least 5 characters), and at least one floor"
 
+# Security decision — Approve carries an optional note; Reject requires a reason.
 from Submitted on Approve
     -> set ReviewerNote = if Approve.Note is set then Approve.Note else "Approved without comment"
     -> transition Approved
@@ -59,6 +78,7 @@ from Submitted on Reject
     -> set ReviewerNote = Reject.Reason
     -> transition Rejected
 
+# Issuance — printing the badge closes the workflow.
 from Approved on PrintBadge
     -> set BadgePrinted = true
     -> transition Issued

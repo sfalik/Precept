@@ -1,0 +1,373 @@
+precept PriorAuthorizationAppeal
+
+# An appeal of a previously decided prior-authorization request. The appeal
+# proceeds through internal clinical review (with optional peer-to-peer and
+# information-gathering loops). A clinical decision lands in DecisionPending,
+# from which the appellant may either accept the outcome (routing to the
+# matching terminal state) or escalate a denial to an Independent Review
+# Organization (IRO). Regulatory deadlines (CMS) bound how long each tier
+# may take.
+
+# Fields — original authorization being appealed
+field OriginalAuthId as string notempty maxlength 50
+field OriginalAuthDate as date
+field OriginalProcedureCode as string notempty maxlength 20
+field OriginalProcedureDescription as string notempty maxlength 500
+field OriginalAuthorizedUnits as integer nonnegative
+field OriginalAuthorizedAmount as money in 'USD'
+
+# Patient (FHIR Patient reference)
+field PatientId as string notempty maxlength 50
+field PatientName as string notempty maxlength 200
+field DateOfBirth as date
+field Gender as choice of string("Male", "Female", "Other")
+
+# Appeal identification
+field AppealId as string optional maxlength 50
+field AppealType as choice of string("Internal", "External") ordered default "Internal"
+field AppealReason as choice of string(
+    "Denied", "PartialDenial", "InsufficientAmount",
+    "ProcedureNotCovered", "MedicalNecessityQuestion", "CodingError", "TimelyFiling",
+    "OutOfNetwork", "StepTherapyNotMet", "PriorAuthorizationRequired",
+    "FrequencyLimitExceeded", "ExperimentalInvestigational"
+) ordered
+field AppealDescription as string optional maxlength 2000
+
+# Pending decision — captured at MakeDecision, finalized at acceptance.
+field PendingDecision as choice of string("Approved", "PartiallyApproved", "Denied") optional
+
+# Clinical evidence
+field MedicalNecessityJustification as string optional maxlength 3000
+field NewClinicalData as string optional maxlength 5000
+field PeerToPeerNotes as string optional maxlength 2000
+field ClinicalNotes as string optional maxlength 2000
+
+# Temporal tracking — CMS deadlines depend on urgency tier
+field AppealFiledDate as instant
+field AppealDeadline as instant
+field ResponseDeadline as instant
+field UrgencyLevel as choice of string("Critical", "Urgent", "Standard", "Routine") ordered default "Standard"
+field ReviewStartDate as instant optional
+field ClinicalReviewDate as instant optional
+field ClinicalReviewStartedAt as instant optional
+field PeerToPeerCompletedAt as instant optional
+field InformationRequestSentAt as instant optional
+field InformationReceivedAt as instant optional
+field DecisionDate as instant optional
+field AppealCompletedAt as instant optional
+field EffectiveDate as date optional
+field ExpirationDate as date optional
+field ServiceDate as date optional
+
+# Review process tracking
+field AssignedReviewer as string optional maxlength 200
+field ClinicalReviewer as string optional maxlength 200
+field ReviewLevel as integer positive default 1
+
+# Independent Review Organization (IRO) tracking
+field IROCaseNumber as string optional maxlength 100
+field ExternalReviewRequestedAt as instant optional
+field IRODecisionDate as instant optional
+field IROUpheldOriginalDecision as boolean optional
+
+# Peer-to-peer physician details
+field PeerToPeerPhysicianNPI as string optional maxlength 20
+field PeerToPeerSpecialty as string optional maxlength 100
+
+# Retroactive approval
+field RetroactiveApprovalIndicator as boolean default false
+field RetroactiveEffectiveDate as date optional
+field RetroactiveAuthorizedUnits as integer nonnegative optional
+
+# Outcome
+field AppealDecisionCode as choice of string("AU01", "AU02", "AD01", "AD02", "AD03", "AD04", "AD05", "WR01") optional
+field DecisionRationale as string optional maxlength 3000
+field ApprovedUnits as integer nonnegative default 0
+field ApprovedAmount as money in 'USD' default '0.00 USD'
+
+# Requested (what the appellant is seeking)
+field RequestedUnits as integer nonnegative optional
+field RequestedAmount as money in 'USD' optional
+field ICD10Codes as set of string
+
+# Rules — basic temporal ordering
+rule AppealFiledDate <= AppealDeadline because "Appeal filed date {AppealFiledDate} cannot fall after the appeal deadline {AppealDeadline}"
+rule ResponseDeadline >= AppealFiledDate because "Response deadline {ResponseDeadline} cannot precede the appeal filing date {AppealFiledDate}"
+
+# CMS regulatory timeframes — each urgency tier carries its own bound.
+rule AppealDeadline - AppealFiledDate <= '72 hours' when UrgencyLevel == "Critical" or UrgencyLevel == "Urgent" because "Urgent appeals must be decided within 72 hours per CMS"
+rule AppealDeadline - AppealFiledDate <= '15 days' when UrgencyLevel == "Standard" because "Standard appeals must be decided within 15 calendar days per CMS MA"
+rule AppealDeadline - AppealFiledDate <= '14 days' when UrgencyLevel == "Routine" because "Routine appeals must be decided within 14 calendar days per CMS Part D"
+
+# IRO must render decision within 45 calendar days once requested.
+rule IRODecisionDate - ExternalReviewRequestedAt <= '45 days' when IROCaseNumber is set and IRODecisionDate is set and ExternalReviewRequestedAt is set because "IRO must render decision within 45 calendar days per CMS"
+
+# States
+state Filed initial
+state UnderReview
+state ClinicalReview
+state PeerToPeerReview
+state InformationRequested
+state DecisionPending
+state ExternalReview
+state Approved terminal success
+state PartiallyApproved terminal success
+state Denied terminal
+state Withdrawn terminal
+
+# State ensures
+in DecisionPending ensure PendingDecision is set because "A pending decision must be recorded before the outcome can be finalized"
+in Approved ensure ApprovedUnits > 0 because "An approved appeal must record at least one approved unit"
+in PartiallyApproved ensure ApprovedUnits > 0 because "A partially approved appeal must record at least one approved unit"
+in PartiallyApproved ensure DecisionRationale is set because "Partial approvals must record the rationale explaining the reduction"
+
+# Editable windows
+in Filed modify AppealDescription editable
+in UnderReview modify ClinicalNotes editable
+in ClinicalReview modify MedicalNecessityJustification, NewClinicalData editable
+
+# Events
+event FileAppeal(
+    OriginalAuthId as string notempty,
+    OriginalAuthDate as date,
+    OriginalProcedureCode as string notempty,
+    OriginalProcedureDescription as string notempty,
+    OriginalAuthorizedUnits as integer nonnegative,
+    OriginalAuthorizedAmount as money in 'USD',
+    PatientId as string notempty,
+    PatientName as string notempty,
+    DateOfBirth as date,
+    Gender as choice of string("Male", "Female", "Other"),
+    AppealType as choice of string("Internal", "External"),
+    AppealReason as choice of string("Denied", "PartialDenial", "InsufficientAmount", "ProcedureNotCovered", "MedicalNecessityQuestion", "CodingError", "TimelyFiling", "OutOfNetwork", "StepTherapyNotMet", "PriorAuthorizationRequired", "FrequencyLimitExceeded", "ExperimentalInvestigational") ordered,
+    AppealDescription as string optional,
+    ResponseDeadline as instant,
+    AppealDeadline as instant,
+    UrgencyLevel as choice of string("Critical", "Urgent", "Standard", "Routine"),
+    RequestedUnits as integer nonnegative optional,
+    RequestedAmount as money in 'USD' optional,
+    ServiceDate as date optional,
+    ICD10Codes as set of string) initial
+
+on FileAppeal ensure FileAppeal.ResponseDeadline >= FileAppeal.AppealDeadline because "Response deadline must allow at least until the appeal deadline"
+
+on FileAppeal
+    -> set OriginalAuthId = FileAppeal.OriginalAuthId
+    -> set OriginalAuthDate = FileAppeal.OriginalAuthDate
+    -> set OriginalProcedureCode = FileAppeal.OriginalProcedureCode
+    -> set OriginalProcedureDescription = FileAppeal.OriginalProcedureDescription
+    -> set OriginalAuthorizedUnits = FileAppeal.OriginalAuthorizedUnits
+    -> set OriginalAuthorizedAmount = FileAppeal.OriginalAuthorizedAmount
+    -> set PatientId = FileAppeal.PatientId
+    -> set PatientName = FileAppeal.PatientName
+    -> set DateOfBirth = FileAppeal.DateOfBirth
+    -> set Gender = FileAppeal.Gender
+    -> set AppealType = FileAppeal.AppealType
+    -> set AppealReason = FileAppeal.AppealReason
+    -> set AppealDescription = FileAppeal.AppealDescription
+    -> set ResponseDeadline = FileAppeal.ResponseDeadline
+    -> set AppealDeadline = FileAppeal.AppealDeadline
+    -> set UrgencyLevel = FileAppeal.UrgencyLevel
+    -> set RequestedUnits = FileAppeal.RequestedUnits
+    -> set RequestedAmount = FileAppeal.RequestedAmount
+    -> set ServiceDate = FileAppeal.ServiceDate
+    -> set ICD10Codes = FileAppeal.ICD10Codes
+    -> set AppealFiledDate = now()
+    -> set ReviewLevel = 1
+
+# Review progression
+event AssignReviewer(ReviewerName as string notempty)
+event StartClinicalReview(ReviewerName as string notempty)
+event SubmitClinicalEvidence(ClinicalNotes as string notempty)
+event SchedulePeerToPeer(PhysicianNPI as string notempty, Specialty as string notempty)
+event CompletePeerToPeerReview(PhysicianName as string notempty, Notes as string notempty)
+
+# Information loop
+event RequestAdditionalInformation(InformationNeeded as string notempty)
+event ReceiveAdditionalInformation(DocumentContent as string notempty)
+
+# Decision events — each records the pending decision and supporting data.
+event ProposeApprove(
+    Rationale as string notempty,
+    ApprovedUnits as integer positive,
+    ApprovedAmount as money in 'USD',
+    DecisionCode as choice of string("AU01", "AU02"),
+    EffectiveDate as date optional,
+    RetroactiveApprovalIndicator as boolean,
+    RetroactiveEffectiveDate as date optional,
+    RetroactiveAuthorizedUnits as integer nonnegative optional)
+
+event ProposePartialApprove(
+    Rationale as string notempty,
+    ApprovedUnits as integer positive,
+    ApprovedAmount as money in 'USD',
+    DecisionCode as choice of string("AU01", "AU02"),
+    EffectiveDate as date optional)
+on ProposePartialApprove ensure ProposePartialApprove.ApprovedAmount < OriginalAuthorizedAmount or ProposePartialApprove.ApprovedUnits < OriginalAuthorizedUnits because "A partial approval must reduce either approved units or approved amount relative to the original authorization"
+
+event ProposeDeny(
+    Rationale as string notempty,
+    DecisionCode as choice of string("AD01", "AD02", "AD03", "AD04", "AD05"))
+
+# Acceptance / IRO escalation from DecisionPending
+event AcceptDecision
+event EscalateToIRO(IROCaseNumber as string notempty)
+event RecordIRODecision(DecisionDate as instant, UpheldOriginalDecision as boolean)
+
+event WithdrawAppeal(Reason as string notempty)
+
+# Transitions
+
+# Filed: review must be assigned before clinical work begins.
+from Filed on AssignReviewer
+    -> set AssignedReviewer = AssignReviewer.ReviewerName
+    -> set AppealId = "APL-" + OriginalAuthId
+    -> set ReviewStartDate = now()
+    -> transition UnderReview
+
+from Filed on WithdrawAppeal
+    -> set AppealDecisionCode = "WR01"
+    -> set DecisionRationale = WithdrawAppeal.Reason
+    -> set DecisionDate = now()
+    -> transition Withdrawn
+
+# UnderReview routes to clinical or peer-to-peer review.
+from UnderReview on StartClinicalReview
+    -> set ClinicalReviewer = StartClinicalReview.ReviewerName
+    -> set ClinicalReviewDate = now()
+    -> set ClinicalReviewStartedAt = now()
+    -> transition ClinicalReview
+
+from UnderReview on SchedulePeerToPeer
+    -> set PeerToPeerPhysicianNPI = SchedulePeerToPeer.PhysicianNPI
+    -> set PeerToPeerSpecialty = SchedulePeerToPeer.Specialty
+    -> set ReviewLevel = ReviewLevel + 1
+    -> transition PeerToPeerReview
+
+from UnderReview on WithdrawAppeal
+    -> set AppealDecisionCode = "WR01"
+    -> set DecisionRationale = WithdrawAppeal.Reason
+    -> set DecisionDate = now()
+    -> transition Withdrawn
+
+# ClinicalReview is the main review loop — evidence can be added, peer-to-peer
+# can be scheduled, information can be requested, or a decision can be proposed.
+from ClinicalReview on SubmitClinicalEvidence
+    -> set MedicalNecessityJustification = SubmitClinicalEvidence.ClinicalNotes
+    -> no transition
+
+from ClinicalReview on SchedulePeerToPeer
+    -> set PeerToPeerPhysicianNPI = SchedulePeerToPeer.PhysicianNPI
+    -> set PeerToPeerSpecialty = SchedulePeerToPeer.Specialty
+    -> set ReviewLevel = ReviewLevel + 1
+    -> transition PeerToPeerReview
+
+from ClinicalReview on RequestAdditionalInformation
+    -> set InformationRequestSentAt = now()
+    -> set ClinicalNotes = RequestAdditionalInformation.InformationNeeded
+    -> transition InformationRequested
+
+from ClinicalReview on ProposeApprove
+    -> set PendingDecision = "Approved"
+    -> set DecisionRationale = ProposeApprove.Rationale
+    -> set ApprovedUnits = ProposeApprove.ApprovedUnits
+    -> set ApprovedAmount = ProposeApprove.ApprovedAmount
+    -> set AppealDecisionCode = ProposeApprove.DecisionCode
+    -> set EffectiveDate = ProposeApprove.EffectiveDate
+    -> set RetroactiveApprovalIndicator = ProposeApprove.RetroactiveApprovalIndicator
+    -> set RetroactiveEffectiveDate = ProposeApprove.RetroactiveEffectiveDate
+    -> set RetroactiveAuthorizedUnits = ProposeApprove.RetroactiveAuthorizedUnits
+    -> set DecisionDate = now()
+    -> transition DecisionPending
+
+from ClinicalReview on ProposePartialApprove
+    -> set PendingDecision = "PartiallyApproved"
+    -> set DecisionRationale = ProposePartialApprove.Rationale
+    -> set ApprovedUnits = ProposePartialApprove.ApprovedUnits
+    -> set ApprovedAmount = ProposePartialApprove.ApprovedAmount
+    -> set AppealDecisionCode = ProposePartialApprove.DecisionCode
+    -> set EffectiveDate = ProposePartialApprove.EffectiveDate
+    -> set DecisionDate = now()
+    -> transition DecisionPending
+
+from ClinicalReview on ProposeDeny
+    -> set PendingDecision = "Denied"
+    -> set DecisionRationale = ProposeDeny.Rationale
+    -> set AppealDecisionCode = ProposeDeny.DecisionCode
+    -> set DecisionDate = now()
+    -> transition DecisionPending
+
+from ClinicalReview on WithdrawAppeal
+    -> set AppealDecisionCode = "WR01"
+    -> set DecisionRationale = WithdrawAppeal.Reason
+    -> set DecisionDate = now()
+    -> transition Withdrawn
+
+# PeerToPeerReview — completion returns to ClinicalReview with notes captured.
+from PeerToPeerReview on CompletePeerToPeerReview
+    -> set PeerToPeerNotes = CompletePeerToPeerReview.Notes
+    -> set ClinicalReviewer = CompletePeerToPeerReview.PhysicianName
+    -> set PeerToPeerCompletedAt = now()
+    -> set ReviewLevel = ReviewLevel + 1
+    -> transition ClinicalReview
+
+from PeerToPeerReview on WithdrawAppeal
+    -> set AppealDecisionCode = "WR01"
+    -> set DecisionRationale = WithdrawAppeal.Reason
+    -> set DecisionDate = now()
+    -> transition Withdrawn
+
+# InformationRequested — receiving the requested information returns to clinical review.
+from InformationRequested on ReceiveAdditionalInformation
+    -> set ClinicalNotes = ReceiveAdditionalInformation.DocumentContent
+    -> set InformationReceivedAt = now()
+    -> transition ClinicalReview
+
+from InformationRequested on WithdrawAppeal
+    -> set AppealDecisionCode = "WR01"
+    -> set DecisionRationale = WithdrawAppeal.Reason
+    -> set DecisionDate = now()
+    -> transition Withdrawn
+
+# DecisionPending — accept routes to the proposed terminal; deny outcomes
+# may also be escalated to an Independent Review Organization.
+from DecisionPending on AcceptDecision when PendingDecision == "Approved"
+    -> set AppealCompletedAt = now()
+    -> transition Approved
+from DecisionPending on AcceptDecision when PendingDecision == "PartiallyApproved"
+    -> set AppealCompletedAt = now()
+    -> transition PartiallyApproved
+from DecisionPending on AcceptDecision when PendingDecision == "Denied"
+    -> set AppealCompletedAt = now()
+    -> transition Denied
+
+from DecisionPending on EscalateToIRO when PendingDecision == "Denied" or PendingDecision == "PartiallyApproved"
+    -> set IROCaseNumber = EscalateToIRO.IROCaseNumber
+    -> set ExternalReviewRequestedAt = now()
+    -> transition ExternalReview
+from DecisionPending on EscalateToIRO
+    -> reject "Only denied or partially approved decisions may be escalated to IRO — current pending decision is {PendingDecision}"
+
+from DecisionPending on WithdrawAppeal
+    -> set AppealDecisionCode = "WR01"
+    -> set DecisionRationale = WithdrawAppeal.Reason
+    -> set DecisionDate = now()
+    -> transition Withdrawn
+
+# ExternalReview — IRO decision either upholds the internal outcome or overturns
+# it to a full approval. The IRO is final for the appeal lifecycle.
+from ExternalReview on RecordIRODecision when RecordIRODecision.UpheldOriginalDecision
+    -> set IRODecisionDate = RecordIRODecision.DecisionDate
+    -> set IROUpheldOriginalDecision = true
+    -> set AppealCompletedAt = now()
+    -> transition Denied
+
+from ExternalReview on RecordIRODecision
+    -> set IRODecisionDate = RecordIRODecision.DecisionDate
+    -> set IROUpheldOriginalDecision = false
+    -> set ApprovedUnits = OriginalAuthorizedUnits
+    -> set ApprovedAmount = OriginalAuthorizedAmount
+    -> set DecisionRationale = "IRO overturned the original denial — approval per CMS external review"
+    -> set AppealDecisionCode = "AU01"
+    -> set AppealCompletedAt = now()
+    -> transition Approved

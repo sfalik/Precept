@@ -1,0 +1,151 @@
+precept ProductionShiftDowntime
+
+# A production-shift downtime record. The shift is created with its
+# equipment, schedule, and planned output, started by a production
+# operator, accumulates downtime events while active, and closes when
+# the shift ends. Each shift carries the running totals: produced
+# units, scrap, accumulated downtime, and OEE-relevant metrics.
+
+# Shift identity and plan
+field ShiftNumber as string notempty maxlength 50
+field EquipmentId as string notempty maxlength 50
+field ShiftDate as date
+field PlannedOutput as integer positive
+field RatedThroughput as integer positive
+
+# Downtime currently in progress — populated when a downtime event starts.
+field CurrentDowntimeReason as choice of string("MachineFailure", "Maintenance", "PowerOutage", "MaterialShortage", "QualityHold", "Other") optional
+field LastDowntimeStart as instant optional
+field LastDowntimeEnd as instant optional
+
+# Cumulative downtime totals across the shift. Optional rather than
+# defaulted because the duration-typed default crashes the compiler
+# (BUG-008); the host can carry the zero baseline outside the precept,
+# or initialize on the first downtime completion.
+field TotalDowntimeToday as duration optional
+
+# Production results — cumulative across the shift.
+field ProducedQuantity as integer default 0 nonnegative
+field ScrapQuantity as integer default 0 nonnegative
+
+# OEE — Availability x Performance x Quality. All 0..100, exact decimal.
+field AvailabilityPercent as decimal default 100 nonnegative max 100 maxplaces 2
+field PerformancePercent as decimal default 100 nonnegative max 100 maxplaces 2
+field QualityPercent as decimal default 100 nonnegative max 100 maxplaces 2
+
+# Audit trail and event-type counts.
+field DowntimeLog as log of string
+field DowntimeEvents as lookup of string to integer
+
+# Notes
+field MaintenanceNotes as string optional maxlength 2000
+
+# Timestamps
+field ShiftStartedAt as instant optional
+field ShiftClosedAt as instant optional
+
+# Rules — structural invariants the proof engine enforces.
+rule ProducedQuantity >= ScrapQuantity because "Produced quantity {ProducedQuantity} cannot be less than scrap quantity {ScrapQuantity} — scrap is a subset of production"
+
+# States
+state Created initial
+state Active
+state Closed terminal
+
+# Per-incident fields have no meaning before the shift starts or after closure.
+in Created omit CurrentDowntimeReason, LastDowntimeStart, LastDowntimeEnd
+in Closed omit CurrentDowntimeReason
+
+# State ensures
+in Active ensure ShiftStartedAt is set because "An active shift must record when it started"
+in Closed ensure ShiftClosedAt is set because "A closed shift must record when it ended"
+in Closed ensure ShiftStartedAt is set because "A closed shift must have a recorded start time — a shift cannot close without having begun"
+
+# Construction — shift opens with equipment, date, and plan.
+event Create(
+    ShiftNumber as string notempty maxlength 50,
+    EquipmentId as string notempty maxlength 50,
+    ShiftDate as date,
+    PlannedOutput as integer positive,
+    RatedThroughput as integer positive) initial
+
+# Shift events.
+event StartShift
+event ReportDowntime(
+    Reason as choice of string("MachineFailure", "Maintenance", "PowerOutage", "MaterialShortage", "QualityHold", "Other"))
+event CompleteDowntime(IncidentDuration as duration)
+event ProduceBatch(Quantity as integer positive, Scrap as integer nonnegative)
+event RecordMaintenanceNote(Note as string notempty maxlength 2000)
+event CloseShift(
+    Availability as decimal nonnegative max 100,
+    Performance as decimal nonnegative max 100,
+    Quality as decimal nonnegative max 100)
+
+on ProduceBatch ensure ProduceBatch.Scrap <= ProduceBatch.Quantity because "Scrap in a batch ({ProduceBatch.Scrap}) cannot exceed the batch's produced quantity ({ProduceBatch.Quantity})"
+
+# Construction row — populate fields and arrive in Created.
+on Create
+    -> set ShiftNumber = Create.ShiftNumber
+    -> set EquipmentId = Create.EquipmentId
+    -> set ShiftDate = Create.ShiftDate
+    -> set PlannedOutput = Create.PlannedOutput
+    -> set RatedThroughput = Create.RatedThroughput
+    -> append DowntimeLog "Shift created: {Create.ShiftNumber}"
+
+# Start shift — Created → Active.
+from Created on StartShift
+    -> set ShiftStartedAt = now()
+    -> append DowntimeLog "Shift started"
+    -> transition Active
+
+# Report downtime — only while Active and only when no incident is in progress.
+from Active on ReportDowntime when CurrentDowntimeReason is set
+    -> reject "A downtime incident is already in progress — complete it before reporting another"
+from Active on ReportDowntime
+    -> set CurrentDowntimeReason = ReportDowntime.Reason
+    -> set LastDowntimeStart = now()
+    -> put DowntimeEvents "FailureCount" = 1
+    -> append DowntimeLog "Downtime reported: {ReportDowntime.Reason}"
+    -> no transition
+
+# Complete downtime — only with an incident in progress. The host calculates
+# the incident duration (from LastDowntimeStart to now) and supplies it; the
+# event arg keeps the precept side fully deterministic.
+from Active on CompleteDowntime when CurrentDowntimeReason is not set
+    -> reject "No active downtime to complete"
+from Active on CompleteDowntime when TotalDowntimeToday is set
+    -> set LastDowntimeEnd = now()
+    -> set TotalDowntimeToday = TotalDowntimeToday + CompleteDowntime.IncidentDuration
+    -> clear CurrentDowntimeReason
+    -> append DowntimeLog "Downtime completed: {CompleteDowntime.IncidentDuration}"
+    -> no transition
+from Active on CompleteDowntime
+    -> set LastDowntimeEnd = now()
+    -> set TotalDowntimeToday = CompleteDowntime.IncidentDuration
+    -> clear CurrentDowntimeReason
+    -> append DowntimeLog "Downtime completed: {CompleteDowntime.IncidentDuration}"
+    -> no transition
+
+# Produce batch — track production and scrap during the shift.
+from Active on ProduceBatch
+    -> set ProducedQuantity = ProducedQuantity + ProduceBatch.Quantity
+    -> set ScrapQuantity = ScrapQuantity + ProduceBatch.Scrap
+    -> append DowntimeLog "Batch produced: {ProduceBatch.Quantity} units ({ProduceBatch.Scrap} scrap)"
+    -> no transition
+
+# Maintenance note — captured during the shift.
+from Active on RecordMaintenanceNote
+    -> set MaintenanceNotes = RecordMaintenanceNote.Note
+    -> append DowntimeLog "Maintenance note recorded"
+    -> no transition
+
+# Close shift — Active → Closed. Cannot close with an incident still in progress.
+from Active on CloseShift when CurrentDowntimeReason is set
+    -> reject "Cannot close shift — a downtime incident is still in progress"
+from Active on CloseShift
+    -> set AvailabilityPercent = CloseShift.Availability
+    -> set PerformancePercent = CloseShift.Performance
+    -> set QualityPercent = CloseShift.Quality
+    -> set ShiftClosedAt = now()
+    -> append DowntimeLog "Shift closed — OEE A={CloseShift.Availability}% P={CloseShift.Performance}% Q={CloseShift.Quality}%"
+    -> transition Closed

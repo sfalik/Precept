@@ -1,0 +1,348 @@
+precept EventVenueBooking
+
+# An event venue books a private event — wedding, corporate gathering, concert,
+# conference, gala, or other. The booker (client representative) inquires; the
+# venue coordinator quotes a price; the booker pays a deposit to lock the date;
+# the venue moves through setup, the event itself, and cleanup before closing
+# the booking. Cancellation policies vary by lead time: full refund well in
+# advance, partial refund inside a deposit-forfeit window, and no refund within
+# the late-cancellation cutoff. The host fires CloseRefundWindow and
+# CloseFullRefundWindow as those calendar boundaries pass — Precept does not
+# expose today().
+#
+# Free-Construction: the venue coordinator enriches a Draft over time.
+# Required-at-inquiry fields are declared optional and gated by SubmitInquiry's
+# event ensures. Add-on services are tracked as a `set of string` for
+# membership; the per-service fee lookup that the canonical pattern would pair
+# alongside is omitted because of BUG-005 (`lookup of string to money in 'USD'`
+# crashes the compiler). Instead, RemoveService takes the fee back as an event
+# argument so AddOnTotal can be decremented directly.
+
+# Identity
+field BookingId as string optional maxlength 50
+field BookerName as string optional maxlength 200
+field BookerEmail as string optional maxlength 200
+field BookerPhone as string optional maxlength 50
+field OrganizationName as string optional maxlength 200
+field VenueCoordinator as string optional maxlength 100
+
+# Event classification
+field EventType as choice of string("Wedding","Corporate","Conference","Concert","Gala","Birthday","Anniversary","Other") optional
+field EventName as string optional maxlength 200
+field ExpectedGuestCount as integer optional positive max 5000
+field VenueSpace as choice of string("MainHall","Ballroom","OutdoorTerrace","ConferenceRoom","Theater","CourtyardGarden","FullVenue") optional
+field SeatingStyle as choice of string("Banquet","Theater","Classroom","UShape","Cocktail","Mixed") optional
+
+# Calendar
+field InquiryDate as date optional
+field EventDate as date optional
+field EventStartTime as time optional
+field EventEndTime as time optional
+field SetupStartTime as time optional
+field CleanupEndTime as time optional
+
+# Fee structure — exact money. Venue rental is a flat rate; per-guest may apply.
+field BaseVenueFee as money in 'USD' optional
+field PerGuestFee as money in 'USD' default '0.00 USD'
+field GuestFeeSubtotal as money in 'USD' default '0.00 USD'
+field AddOnTotal as money in 'USD' default '0.00 USD'
+field QuotedTotal as money in 'USD' default '0.00 USD'
+field RequiredDeposit as money in 'USD' default '0.00 USD'
+field DepositPaid as money in 'USD' default '0.00 USD'
+field FinalPayment as money in 'USD' default '0.00 USD'
+field AmountPaid as money in 'USD' <- DepositPaid + FinalPayment
+field OutstandingBalance as money in 'USD' <- QuotedTotal - AmountPaid
+
+# Add-on services — set tracks membership. The companion per-service fee
+# lookup that this pattern usually pairs alongside is omitted because of
+# BUG-005 (lookup of K to qualified-money crashes the compiler). RemoveService
+# takes the fee back as an event argument so the row can decrement AddOnTotal
+# without consulting a per-key table.
+field AddOnServices as set of string
+field AddOnCount as integer default 0 nonnegative
+
+# Refund-window state — flipped by host events when calendar boundaries pass.
+# FullRefundWindow open: full refund on cancel. RefundWindow open (when
+# FullRefundWindow has closed): deposit-forfeit on cancel. Both closed: no
+# refund at all.
+field FullRefundWindowOpen as boolean default true
+field RefundWindowOpen as boolean default true
+
+# Outcomes
+field RejectionReason as string optional maxlength 500
+field CancellationReason as string optional maxlength 500
+field RefundAmount as money in 'USD' default '0.00 USD'
+field ForfeitAmount as money in 'USD' default '0.00 USD'
+
+# Audit log
+field BookingLog as log of string
+
+# Timestamps
+field InquiredAt as instant optional
+field QuotedAt as instant optional
+field BookedAt as instant optional
+field SetupStartedAt as instant optional
+field EventStartedAt as instant optional
+field EventEndedAt as instant optional
+field CleanupCompletedAt as instant optional
+field ClosedAt as instant optional
+field CancelledAt as instant optional
+
+# Rules
+rule EventEndTime > EventStartTime when EventStartTime is set and EventEndTime is set because "Event end time {EventEndTime} must be after start time {EventStartTime}"
+rule EventDate > InquiryDate when InquiryDate is set and EventDate is set because "Event date {EventDate} must be after inquiry date {InquiryDate}"
+rule RequiredDeposit <= QuotedTotal because "Required deposit {RequiredDeposit} cannot exceed quoted total {QuotedTotal}"
+rule AmountPaid <= QuotedTotal because "Amount paid {AmountPaid} cannot exceed quoted total {QuotedTotal} — credit balances should not arise"
+rule RefundAmount + ForfeitAmount <= AmountPaid because "Refund {RefundAmount} plus forfeit {ForfeitAmount} cannot exceed amount paid {AmountPaid}"
+
+# Large events require larger deposits — 25% of quoted total for 500+ guests.
+rule RequiredDeposit >= QuotedTotal * 0.25 when ExpectedGuestCount is set and ExpectedGuestCount >= 500 and QuotedTotal > '0.00 USD' because "Events with 500+ guests ({ExpectedGuestCount}) require at least 25% of total ({QuotedTotal * 0.25}) as deposit — currently {RequiredDeposit}"
+
+# Full-venue bookings: minimum 100 guests.
+rule ExpectedGuestCount >= 100 when VenueSpace == "FullVenue" and ExpectedGuestCount is set because "Full-venue bookings require at least 100 expected guests (currently {ExpectedGuestCount})"
+
+# States
+state Draft initial
+state Inquiry
+state Quoted
+state Booked
+state SetupInProgress
+state EventInProgress
+state Cleanup
+state Closed terminal
+state Cancelled terminal
+state Declined terminal
+
+# State ensures
+in Inquiry ensure InquiredAt is set because "An inquiry must carry an inquiry timestamp"
+in Inquiry ensure EventDate is set because "An inquiry must have a target event date"
+in Quoted ensure QuotedAt is set because "A quoted booking must carry a quote timestamp"
+in Quoted ensure QuotedTotal > '0.00 USD' because "A quoted booking must have a positive quoted total"
+in Booked ensure BookedAt is set because "A booked event must carry a booking timestamp"
+in Booked ensure DepositPaid >= RequiredDeposit because "A booked event must have its deposit paid in full"
+in SetupInProgress ensure SetupStartedAt is set because "Setup-in-progress requires a setup-start timestamp"
+in EventInProgress ensure EventStartedAt is set because "An in-progress event must record its start"
+in Cleanup ensure EventEndedAt is set because "Cleanup must follow an ended event"
+in Closed ensure ClosedAt is set because "A closed booking must carry a closure timestamp"
+in Closed ensure CleanupCompletedAt is set because "A closed booking must have cleanup completed"
+in Cancelled ensure CancellationReason is set because "A cancelled booking must record the reason"
+in Cancelled ensure CancelledAt is set because "A cancelled booking must carry a cancellation timestamp"
+in Declined ensure RejectionReason is set because "A declined inquiry must record the rejection reason"
+
+# Editable windows — broad intake in Draft; small touch-ups thereafter.
+in Draft modify BookingId, BookerName, BookerEmail, BookerPhone, OrganizationName, VenueCoordinator, EventType, EventName, ExpectedGuestCount, VenueSpace, SeatingStyle, InquiryDate, EventDate, EventStartTime, EventEndTime, SetupStartTime, CleanupEndTime editable
+in Inquiry modify BookerEmail, BookerPhone, ExpectedGuestCount, SeatingStyle editable
+in Quoted modify BookerEmail, BookerPhone editable
+in Booked modify SetupStartTime, CleanupEndTime editable
+
+# Events
+event SubmitInquiry
+event DeclineInquiry(Reason as string notempty)
+event AddService(ServiceName as string notempty, Fee as money in 'USD')
+event RemoveService(ServiceName as string notempty, Fee as money in 'USD')
+event Quote(BaseFee as money in 'USD', PerGuest as money in 'USD', Deposit as money in 'USD')
+event PayDeposit(Amount as money in 'USD')
+event ConfirmBooking
+event StartSetup
+event StartEvent
+event EndEvent
+event CompleteCleanup
+event PayFinalBalance(Amount as money in 'USD')
+event CloseBooking
+event CloseFullRefundWindow
+event CloseRefundWindow
+event CancelWithFullRefund(Reason as string notempty)
+event CancelWithPartialRefund(Reason as string notempty, Refund as money in 'USD', Forfeit as money in 'USD')
+event CancelNoRefund(Reason as string notempty)
+
+on SubmitInquiry ensure BookerName is set because "Booker name is required before inquiry"
+on SubmitInquiry ensure BookerEmail is set because "Booker email is required before inquiry"
+on SubmitInquiry ensure EventType is set because "Event type must be chosen before inquiry"
+on SubmitInquiry ensure EventDate is set because "Event date must be set before inquiry"
+on SubmitInquiry ensure ExpectedGuestCount is set because "Expected guest count is required before inquiry"
+on SubmitInquiry ensure VenueSpace is set because "Venue space must be chosen before inquiry"
+
+on AddService ensure AddService.Fee >= '0.00 USD' because "Add-on service fee cannot be negative"
+on RemoveService ensure RemoveService.Fee >= '0.00 USD' because "Removed-service fee cannot be negative"
+
+on Quote ensure Quote.BaseFee > '0.00 USD' because "Base venue fee must be positive"
+on Quote ensure Quote.PerGuest >= '0.00 USD' because "Per-guest fee cannot be negative"
+on Quote ensure Quote.Deposit > '0.00 USD' because "Deposit must be positive"
+
+on PayDeposit ensure PayDeposit.Amount > '0.00 USD' because "Deposit payment must be positive"
+on PayFinalBalance ensure PayFinalBalance.Amount > '0.00 USD' because "Final payment must be positive"
+
+on CancelWithPartialRefund ensure CancelWithPartialRefund.Refund >= '0.00 USD' because "Partial refund amount cannot be negative"
+on CancelWithPartialRefund ensure CancelWithPartialRefund.Forfeit >= '0.00 USD' because "Forfeit amount cannot be negative"
+
+# Transitions
+
+# Inquiry intake — booker submits the initial request. The inquiry timestamp
+# is recorded; the host is expected to set InquiryDate during Draft enrichment
+# (it's not required by the event ensures, but Inquiry's state ensure on
+# InquiredAt + EventDate together establishes the picture). BUG-004 prevents
+# the row from defaulting InquiryDate from EventDate inline because the
+# `on SubmitInquiry ensure EventDate is set` doesn't narrow the row body.
+from Draft on SubmitInquiry
+    -> set InquiredAt = now()
+    -> append BookingLog "Inquiry submitted"
+    -> transition Inquiry
+
+# Decline — venue refuses the inquiry (date unavailable, capacity mismatch, etc.).
+from Inquiry on DeclineInquiry
+    -> set RejectionReason = DeclineInquiry.Reason
+    -> append BookingLog "Inquiry declined"
+    -> transition Declined
+
+# Add-on services — orderable during Inquiry and Quoted. Duplicate add is
+# rejected; the host must remove first if the fee needs to change.
+from Inquiry, Quoted on AddService when AddOnServices contains AddService.ServiceName
+    -> reject "Service {AddService.ServiceName} already added — remove it first if the fee needs to change"
+from Inquiry, Quoted on AddService
+    -> add AddOnServices AddService.ServiceName
+    -> set AddOnTotal = AddOnTotal + AddService.Fee
+    -> set AddOnCount = AddOnCount + 1
+    -> append BookingLog AddService.ServiceName
+    -> no transition
+
+# Remove a service — host supplies the original fee so AddOnTotal can be
+# decremented without a per-service fee lookup (see BUG-005 note at top of file).
+from Inquiry, Quoted on RemoveService when not (AddOnServices contains RemoveService.ServiceName)
+    -> reject "Service {RemoveService.ServiceName} not on this booking — nothing to remove"
+from Inquiry, Quoted on RemoveService when RemoveService.Fee > AddOnTotal
+    -> reject "Removed-service fee {RemoveService.Fee} exceeds current add-on total {AddOnTotal} — supplied fee doesn't match the original add"
+from Inquiry, Quoted on RemoveService
+    -> set AddOnTotal = AddOnTotal - RemoveService.Fee
+    -> set AddOnCount = AddOnCount - 1
+    -> remove AddOnServices RemoveService.ServiceName
+    -> append BookingLog RemoveService.ServiceName
+    -> no transition
+
+# Quote — venue coordinator prices the inquiry. The full quoted total includes
+# per-guest pricing and accumulated add-ons; deposit is set on the same event.
+# BUG-004 workaround: redundant `when ExpectedGuestCount is set` because event
+# ensures don't narrow transition rows. Inquiry's state ensure does not cover it.
+from Inquiry on Quote when ExpectedGuestCount is set
+    -> set BaseVenueFee = Quote.BaseFee
+    -> set PerGuestFee = Quote.PerGuest
+    -> set GuestFeeSubtotal = Quote.PerGuest * ExpectedGuestCount
+    -> set QuotedTotal = Quote.BaseFee + (Quote.PerGuest * ExpectedGuestCount) + AddOnTotal
+    -> set RequiredDeposit = Quote.Deposit
+    -> set QuotedAt = now()
+    -> append BookingLog "Quoted"
+    -> transition Quoted
+from Inquiry on Quote
+    -> reject "Expected guest count must be set before quoting"
+
+# Deposit payment — booker pays toward the required deposit.
+from Quoted on PayDeposit when DepositPaid + PayDeposit.Amount > RequiredDeposit
+    -> reject "Deposit payment {PayDeposit.Amount} would exceed required deposit (need {RequiredDeposit}, already paid {DepositPaid})"
+from Quoted on PayDeposit
+    -> set DepositPaid = DepositPaid + PayDeposit.Amount
+    -> append BookingLog "Deposit payment received"
+    -> no transition
+
+# Confirmation — locks the booking once the deposit is fully paid.
+from Quoted on ConfirmBooking when DepositPaid < RequiredDeposit
+    -> reject "Cannot confirm — deposit of {RequiredDeposit} is not fully paid (only {DepositPaid} received)"
+from Quoted on ConfirmBooking
+    -> set BookedAt = now()
+    -> append BookingLog "Booking confirmed"
+    -> transition Booked
+
+# Setup begins — typically the day of the event, hours before start.
+from Booked on StartSetup
+    -> set SetupStartedAt = now()
+    -> append BookingLog "Setup started"
+    -> transition SetupInProgress
+
+# Event starts — guests arrive.
+from SetupInProgress on StartEvent
+    -> set EventStartedAt = now()
+    -> append BookingLog "Event started"
+    -> transition EventInProgress
+
+# Event ends — guests depart, cleanup begins.
+from EventInProgress on EndEvent
+    -> set EventEndedAt = now()
+    -> append BookingLog "Event ended"
+    -> transition Cleanup
+
+# Cleanup complete — venue restored.
+from Cleanup on CompleteCleanup
+    -> set CleanupCompletedAt = now()
+    -> append BookingLog "Cleanup complete"
+    -> no transition
+
+# Final balance — can be paid anytime after confirmation, before closure.
+from Booked, SetupInProgress, EventInProgress, Cleanup on PayFinalBalance when AmountPaid + PayFinalBalance.Amount > QuotedTotal
+    -> reject "Final payment {PayFinalBalance.Amount} would exceed quoted total (need {OutstandingBalance} more)"
+from Booked, SetupInProgress, EventInProgress, Cleanup on PayFinalBalance
+    -> set FinalPayment = FinalPayment + PayFinalBalance.Amount
+    -> append BookingLog "Final payment received"
+    -> no transition
+
+# Closure — balance must be paid in full and cleanup completed.
+from Cleanup on CloseBooking when CleanupCompletedAt is not set
+    -> reject "Cannot close booking — cleanup is not yet complete"
+from Cleanup on CloseBooking when OutstandingBalance > '0.00 USD'
+    -> reject "Cannot close booking — outstanding balance of {OutstandingBalance} remains"
+from Cleanup on CloseBooking
+    -> set ClosedAt = now()
+    -> append BookingLog "Booking closed"
+    -> transition Closed
+
+# Refund-window calendar boundaries — host fires these as deadlines pass. The
+# full-refund window closes first (typically 60-90 days out); the refund
+# window closes next (typically 14-30 days out). After both, no refund applies.
+from Quoted, Booked on CloseFullRefundWindow
+    -> set FullRefundWindowOpen = false
+    -> append BookingLog "Full-refund window closed"
+    -> no transition
+
+from Quoted, Booked on CloseRefundWindow
+    -> set RefundWindowOpen = false
+    -> append BookingLog "Refund window closed"
+    -> no transition
+
+# Cancellation — three windows, three events. Host picks the right event based
+# on FullRefundWindowOpen and RefundWindowOpen state.
+#
+# Full refund — host fires when FullRefundWindowOpen is true. Reachable from
+# Inquiry too (no money yet collected — RefundAmount/ForfeitAmount stay zero).
+from Inquiry, Quoted, Booked on CancelWithFullRefund when not FullRefundWindowOpen
+    -> reject "Full-refund window has closed — use CancelWithPartialRefund or CancelNoRefund"
+from Inquiry, Quoted, Booked on CancelWithFullRefund
+    -> set CancellationReason = CancelWithFullRefund.Reason
+    -> set RefundAmount = AmountPaid
+    -> set ForfeitAmount = '0.00 USD'
+    -> set CancelledAt = now()
+    -> append BookingLog "Cancelled (full refund)"
+    -> transition Cancelled
+
+# Partial refund — host fires when FullRefundWindowOpen is false but
+# RefundWindowOpen is true. Host supplies the refund/forfeit split.
+from Quoted, Booked on CancelWithPartialRefund when FullRefundWindowOpen
+    -> reject "Full-refund window is still open — use CancelWithFullRefund"
+from Quoted, Booked on CancelWithPartialRefund when not RefundWindowOpen
+    -> reject "Refund window has closed — use CancelNoRefund"
+from Quoted, Booked on CancelWithPartialRefund when CancelWithPartialRefund.Refund + CancelWithPartialRefund.Forfeit > AmountPaid
+    -> reject "Refund {CancelWithPartialRefund.Refund} plus forfeit {CancelWithPartialRefund.Forfeit} exceeds amount paid {AmountPaid}"
+from Quoted, Booked on CancelWithPartialRefund
+    -> set CancellationReason = CancelWithPartialRefund.Reason
+    -> set RefundAmount = CancelWithPartialRefund.Refund
+    -> set ForfeitAmount = CancelWithPartialRefund.Forfeit
+    -> set CancelledAt = now()
+    -> append BookingLog "Cancelled (partial refund)"
+    -> transition Cancelled
+
+# No refund — host fires when both windows have closed.
+from Quoted, Booked on CancelNoRefund when RefundWindowOpen
+    -> reject "Refund window is still open — use CancelWithPartialRefund"
+from Quoted, Booked on CancelNoRefund
+    -> set CancellationReason = CancelNoRefund.Reason
+    -> set RefundAmount = '0.00 USD'
+    -> set ForfeitAmount = AmountPaid
+    -> set CancelledAt = now()
+    -> append BookingLog "Cancelled (no refund)"
+    -> transition Cancelled

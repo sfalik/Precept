@@ -1,0 +1,361 @@
+precept MedicalPriorAuthorization
+
+# A health insurance prior-authorization request — the carrier's decision on
+# whether a specific service for a specific patient is covered before the
+# service is delivered. The request progresses through clinical review,
+# optional peer-to-peer consultation, optional information requests, payer
+# review, and a final decision (approval, denial, or escalation). SLA
+# response times are bounded by the urgency tier on each request.
+
+# Fields — patient identification
+field PatientId as string notempty maxlength 50
+field PatientName as string notempty maxlength 200
+field DateOfBirth as date
+field Gender as string optional maxlength 20
+
+# Service request
+field ServiceRequestId as string notempty maxlength 50
+field ProcedureCode as string notempty maxlength 20
+field ProcedureDescription as string notempty maxlength 500
+field RequestingProviderNpi as string notempty maxlength 10
+field RequestDate as instant
+field AttendingProviderNpi as string optional maxlength 20
+field PlaceOfService as string optional maxlength 50
+field ServiceFrequency as string optional maxlength 50
+
+# Temporal — service window and authorization validity
+field ServiceDate as date
+field ValidFrom as date
+field ValidUntil as date
+
+# SLA — urgency tier drives the response deadline
+field ResponseDeadline as instant
+field UrgencyLevel as choice of string("Critical", "Urgent", "Standard", "Routine") ordered default "Standard"
+
+# Diagnosis
+field PrimaryDiagnosisCode as string notempty maxlength 7
+field SecondaryDiagnosisCodes as set of string
+field DiagnosisDescription as string optional maxlength 500
+
+# Coverage
+field CoverageId as string notempty maxlength 50
+field PayerName as string notempty maxlength 200
+field PlanType as string optional maxlength 100
+field CoverageStartDate as date
+field CoverageEndDate as date optional
+
+# Authorization result
+field AuthorizationNumber as string optional maxlength 50
+field AuthorizationStatus as string optional maxlength 30
+field ApprovedProcedureCodes as set of string
+field ApprovedUnits as integer nonnegative default 0
+field ApprovedAmount as money in 'USD' default '0.00 USD'
+field CoverageLimit as money in 'USD'
+field DeductibleRemaining as money in 'USD' default '0.00 USD' nonnegative
+field CoInsurancePercent as decimal default 0 nonnegative max 100 maxplaces 4
+
+# Clinical review information
+field ClinicalNotes as string optional maxlength 2000
+field ClinicalReviewDate as instant optional
+field ClinicalReviewer as string optional maxlength 200
+field ClinicalDecision as string optional maxlength 50
+
+# Timestamps tracking each review tier
+field SubmittedAt as instant
+field ReviewStartedAt as instant optional
+field ClinicalReviewStartedAt as instant optional
+field PayerReviewStartedAt as instant optional
+field DecisionAt as instant optional
+field PeerToPeerScheduledAt as instant optional
+field PeerToPeerCompletedAt as instant optional
+field InformationRequestSentAt as instant optional
+field InformationReceivedAt as instant optional
+
+# Audit and history
+field PriorAuthHistory as log of string
+field PriorAuthorizationCount as integer nonnegative default 0
+field PreviousAuthorizationNumber as string optional maxlength 50
+
+# Case management
+field CaseManager as string optional maxlength 200
+field AssignedReviewer as string optional maxlength 200
+field EscalationReason as string optional maxlength 1000
+
+# Denial tracking — code drawn from the carrier's denial-reason taxonomy.
+field DenialReason as string optional maxlength 1000
+field DenialCode as choice of string("MN01", "IC01", "NC01", "ST01", "FR01", "ED01", "DU01", "PR01") optional
+
+# Rules — coverage and ordering invariants that apply across the lifecycle.
+rule ApprovedAmount <= CoverageLimit because "Approved amount {ApprovedAmount} cannot exceed the coverage limit of {CoverageLimit}"
+rule ValidFrom <= ValidUntil because "Authorization validity start {ValidFrom} cannot fall after the end date {ValidUntil}"
+rule ServiceDate >= CoverageStartDate because "Service date {ServiceDate} cannot precede coverage start date {CoverageStartDate} — coverage was not yet active"
+
+# Urgency-driven SLA bounds — carriers must respond within the tier's window.
+rule ResponseDeadline - RequestDate <= '24 hours' when UrgencyLevel == "Critical" because "Critical prior auths must be responded to within 24 hours"
+rule ResponseDeadline - RequestDate <= '72 hours' when UrgencyLevel == "Urgent" because "Urgent prior auths must be responded to within 72 hours"
+rule ResponseDeadline - RequestDate <= '7 days' when UrgencyLevel == "Standard" because "Standard prior auths must be responded to within 7 days"
+rule ResponseDeadline - RequestDate <= '14 days' when UrgencyLevel == "Routine" because "Routine prior auths must be responded to within 14 days"
+
+# Denial codes (carrier-standardized):
+#   MN01 — Medical Necessity not met
+#   IC01 — Incomplete Information
+#   NC01 — Not Covered by plan
+#   ST01 — Duplicate / statistical issue
+#   FR01 — Suspected fraud
+#   ED01 — Patient not eligible
+#   DU01 — Insufficient documentation
+#   PR01 — Provider-related issue
+
+# States
+state Submitted initial
+state UnderReview
+state ClinicalReview
+state PeerToPeerReview
+state InformationRequested
+state PayerReview
+state Approved terminal
+state Denied terminal
+state Escalated
+state Withdrawn terminal
+
+# State ensures
+in Approved ensure AuthorizationNumber is set because "An approved authorization must carry an authorization number"
+in Approved ensure ApprovedUnits > 0 because "An approved authorization must record at least one approved unit"
+in Denied ensure DenialReason is set because "A denied authorization must carry a stated denial reason"
+in Denied ensure DenialCode is set because "A denied authorization must carry a standardized denial code"
+in Escalated ensure EscalationReason is set because "An escalated case must carry a stated escalation reason"
+
+# Events
+event Submit(
+    PatientId as string notempty,
+    PatientName as string notempty,
+    DateOfBirth as date,
+    Gender as string optional,
+    ServiceRequestId as string notempty,
+    ProcedureCode as string notempty,
+    ProcedureDescription as string notempty,
+    RequestingProviderNpi as string notempty,
+    PrimaryDiagnosisCode as string notempty,
+    SecondaryDiagnosisCodes as set of string,
+    CoverageId as string notempty,
+    PayerName as string notempty,
+    PlanType as string optional,
+    CoverageStartDate as date,
+    CoverageEndDate as date optional,
+    CoverageLimit as money in 'USD',
+    DeductibleRemaining as money in 'USD',
+    CoInsurancePercent as decimal nonnegative max 100,
+    RequestDate as instant,
+    ServiceDate as date,
+    ValidFrom as date,
+    ValidUntil as date,
+    ResponseDeadline as instant,
+    UrgencyLevel as choice of string("Critical", "Urgent", "Standard", "Routine"),
+    AttendingProviderNpi as string optional,
+    PlaceOfService as string optional,
+    ServiceFrequency as string optional) initial
+
+on Submit ensure Submit.ValidFrom <= Submit.ValidUntil because "Authorization validity start {Submit.ValidFrom} cannot fall after the end date {Submit.ValidUntil}"
+on Submit ensure Submit.ServiceDate >= Submit.CoverageStartDate because "Service date {Submit.ServiceDate} cannot precede coverage start date {Submit.CoverageStartDate}"
+on Submit ensure Submit.CoverageLimit >= '0.00 USD' because "Coverage limit {Submit.CoverageLimit} cannot be negative"
+
+on Submit
+    -> set PatientId = Submit.PatientId
+    -> set PatientName = Submit.PatientName
+    -> set DateOfBirth = Submit.DateOfBirth
+    -> set Gender = Submit.Gender
+    -> set ServiceRequestId = Submit.ServiceRequestId
+    -> set ProcedureCode = Submit.ProcedureCode
+    -> set ProcedureDescription = Submit.ProcedureDescription
+    -> set RequestingProviderNpi = Submit.RequestingProviderNpi
+    -> set PrimaryDiagnosisCode = Submit.PrimaryDiagnosisCode
+    -> set SecondaryDiagnosisCodes = Submit.SecondaryDiagnosisCodes
+    -> set CoverageId = Submit.CoverageId
+    -> set PayerName = Submit.PayerName
+    -> set PlanType = Submit.PlanType
+    -> set CoverageStartDate = Submit.CoverageStartDate
+    -> set CoverageEndDate = Submit.CoverageEndDate
+    -> set CoverageLimit = Submit.CoverageLimit
+    -> set DeductibleRemaining = Submit.DeductibleRemaining
+    -> set CoInsurancePercent = Submit.CoInsurancePercent
+    -> set RequestDate = Submit.RequestDate
+    -> set ServiceDate = Submit.ServiceDate
+    -> set ValidFrom = Submit.ValidFrom
+    -> set ValidUntil = Submit.ValidUntil
+    -> set ResponseDeadline = Submit.ResponseDeadline
+    -> set UrgencyLevel = Submit.UrgencyLevel
+    -> set AttendingProviderNpi = Submit.AttendingProviderNpi
+    -> set PlaceOfService = Submit.PlaceOfService
+    -> set ServiceFrequency = Submit.ServiceFrequency
+    -> set DiagnosisDescription = Submit.ProcedureDescription
+    -> set ClinicalNotes = "Initial submission received"
+    -> set SubmittedAt = now()
+    -> set AuthorizationStatus = "Submitted"
+
+event StartReview(CaseManager as string notempty)
+event StartClinicalReview(Reviewer as string notempty)
+event SchedulePeerToPeerReview(PhysicianName as string notempty)
+event CompletePeerToPeerReview(Outcome as string notempty, Notes as string notempty)
+event RequestAdditionalInformation(InformationNeeded as string notempty)
+event ReceiveAdditionalInformation(InformationReceived as string notempty)
+event StartPayerReview
+event SubmitClinicalEvidence(ClinicalNotes as string notempty)
+event MakeClinicalDecision(Decision as string notempty)
+event Approve(AuthorizationNumber as string notempty, ApprovedUnits as integer positive, ApprovedAmount as money in 'USD')
+event Denial(Reason as string notempty, Code as choice of string("MN01", "IC01", "NC01", "ST01", "FR01", "ED01", "DU01", "PR01"))
+event Escalate(Reason as string notempty)
+event Withdraw
+
+on Approve ensure Approve.ApprovedAmount <= CoverageLimit because "Approved amount {Approve.ApprovedAmount} cannot exceed coverage limit {CoverageLimit}"
+
+# Transitions
+
+# Submitted: triage by the case manager opens internal review.
+from Submitted on StartReview
+    -> set CaseManager = StartReview.CaseManager
+    -> set ReviewStartedAt = now()
+    -> set AuthorizationStatus = "Under Review"
+    -> transition UnderReview
+
+from Submitted on Withdraw
+    -> set AuthorizationStatus = "Withdrawn"
+    -> transition Withdrawn
+
+# UnderReview: clinical review opens, or the case is denied outright,
+# or the requester withdraws.
+from UnderReview on StartClinicalReview
+    -> set ClinicalReviewer = StartClinicalReview.Reviewer
+    -> set ClinicalReviewStartedAt = now()
+    -> set AuthorizationStatus = "Clinical Review"
+    -> transition ClinicalReview
+
+from UnderReview on Denial
+    -> set DenialReason = Denial.Reason
+    -> set DenialCode = Denial.Code
+    -> set DecisionAt = now()
+    -> set AuthorizationStatus = "Denied"
+    -> transition Denied
+
+from UnderReview on Withdraw
+    -> set AuthorizationStatus = "Withdrawn"
+    -> transition Withdrawn
+
+# ClinicalReview: the main review loop. Evidence can be added, peer-to-peer
+# scheduled, information requested, or the case advanced to payer review,
+# denied, or escalated.
+from ClinicalReview on SubmitClinicalEvidence
+    -> set ClinicalNotes = SubmitClinicalEvidence.ClinicalNotes
+    -> no transition
+
+from ClinicalReview on MakeClinicalDecision
+    -> set ClinicalReviewDate = now()
+    -> set ClinicalDecision = MakeClinicalDecision.Decision
+    -> no transition
+
+from ClinicalReview on SchedulePeerToPeerReview
+    -> set PeerToPeerScheduledAt = now()
+    -> set AssignedReviewer = SchedulePeerToPeerReview.PhysicianName
+    -> set AuthorizationStatus = "Peer-to-Peer Review Scheduled"
+    -> transition PeerToPeerReview
+
+from ClinicalReview on RequestAdditionalInformation
+    -> set InformationRequestSentAt = now()
+    -> set ClinicalNotes = RequestAdditionalInformation.InformationNeeded
+    -> set AuthorizationStatus = "Information Requested"
+    -> transition InformationRequested
+
+from ClinicalReview on StartPayerReview
+    -> set PayerReviewStartedAt = now()
+    -> set AuthorizationStatus = "Payer Review"
+    -> transition PayerReview
+
+from ClinicalReview on Denial
+    -> set DenialReason = Denial.Reason
+    -> set DenialCode = Denial.Code
+    -> set DecisionAt = now()
+    -> set AuthorizationStatus = "Denied"
+    -> transition Denied
+
+from ClinicalReview on Escalate
+    -> set EscalationReason = Escalate.Reason
+    -> set AuthorizationStatus = "Escalated"
+    -> transition Escalated
+
+# PeerToPeerReview: the peer-to-peer consult completes and the case returns
+# to clinical review; or information is requested; or it is denied.
+from PeerToPeerReview on CompletePeerToPeerReview
+    -> set PeerToPeerCompletedAt = now()
+    -> set ClinicalNotes = CompletePeerToPeerReview.Notes
+    -> set ClinicalDecision = CompletePeerToPeerReview.Outcome
+    -> set AuthorizationStatus = "Peer-to-Peer Review Complete"
+    -> transition ClinicalReview
+
+from PeerToPeerReview on RequestAdditionalInformation
+    -> set InformationRequestSentAt = now()
+    -> set ClinicalNotes = RequestAdditionalInformation.InformationNeeded
+    -> set AuthorizationStatus = "Information Requested"
+    -> transition InformationRequested
+
+from PeerToPeerReview on Denial
+    -> set DenialReason = Denial.Reason
+    -> set DenialCode = Denial.Code
+    -> set DecisionAt = now()
+    -> set AuthorizationStatus = "Denied"
+    -> transition Denied
+
+from PeerToPeerReview on Withdraw
+    -> set AuthorizationStatus = "Withdrawn"
+    -> transition Withdrawn
+
+# InformationRequested: information arrives and the case returns to clinical
+# review; or the case is denied for non-response or withdrawn.
+from InformationRequested on ReceiveAdditionalInformation
+    -> set InformationReceivedAt = now()
+    -> set ClinicalNotes = ReceiveAdditionalInformation.InformationReceived
+    -> set AuthorizationStatus = "Awaiting Clinical Review"
+    -> transition ClinicalReview
+
+from InformationRequested on Denial
+    -> set DenialReason = Denial.Reason
+    -> set DenialCode = Denial.Code
+    -> set DecisionAt = now()
+    -> set AuthorizationStatus = "Denied"
+    -> transition Denied
+
+from InformationRequested on Withdraw
+    -> set AuthorizationStatus = "Withdrawn"
+    -> transition Withdrawn
+
+# PayerReview: the payer makes the final coverage decision.
+from PayerReview on Approve
+    -> set AuthorizationNumber = Approve.AuthorizationNumber
+    -> add ApprovedProcedureCodes ProcedureCode
+    -> set ApprovedUnits = Approve.ApprovedUnits
+    -> set ApprovedAmount = Approve.ApprovedAmount
+    -> set DecisionAt = now()
+    -> set AuthorizationStatus = "Approved"
+    -> transition Approved
+
+from PayerReview on Denial
+    -> set DenialReason = Denial.Reason
+    -> set DenialCode = Denial.Code
+    -> set DecisionAt = now()
+    -> set AuthorizationStatus = "Denied"
+    -> transition Denied
+
+from PayerReview on Withdraw
+    -> set AuthorizationStatus = "Withdrawn"
+    -> transition Withdrawn
+
+# Escalated: only denial or withdrawal closes an escalated case. Escalation
+# is a hold pattern — resolution happens out of band.
+from Escalated on Denial
+    -> set DenialReason = Denial.Reason
+    -> set DenialCode = Denial.Code
+    -> set DecisionAt = now()
+    -> set AuthorizationStatus = "Denied"
+    -> transition Denied
+
+from Escalated on Withdraw
+    -> set AuthorizationStatus = "Withdrawn"
+    -> transition Withdrawn

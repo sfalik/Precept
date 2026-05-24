@@ -1,0 +1,246 @@
+precept SaasLicenseManagement
+
+# A SaaS license pool fed by the procurement system. The pool is purchased
+# with a total seat count, cost, and billing cycle (Purchased). Licenses
+# are allocated to users (Allocated → InUse) and may be reassigned or
+# returned. As the renewal date approaches, the pool transitions to
+# Expiring; it either renews (back to Active) or expires (terminal). Pool
+# lifecycle is encoded by the state; license-status enumerations are not
+# carried as a parallel field.
+
+# Pool identity — fixed at construction.
+field LicenseId as string notempty maxlength 50
+field CustomerId as string notempty maxlength 50
+field ProductName as string notempty maxlength 200
+
+# License configuration — established at purchase.
+field LicenseType as choice of string("Perpetual", "Subscription", "Trial", "Named", "Concurrent") default "Subscription"
+field LicenseCategory as choice of string("FullAccess", "LimitedAccess", "Readonly", "Developer") default "FullAccess"
+field BillingCycle as choice of string("Monthly", "Annual") default "Annual"
+
+# Pool capacity and utilization — totals carry the integrity invariants.
+field TotalLicensesPurchased as integer default 0 nonnegative
+field LicensesAllocated as integer default 0 nonnegative
+field LicensesInUse as integer default 0 nonnegative
+field LicensesAvailable as integer default 0 nonnegative
+
+# Utilization metrics — derived from counts.
+# BUG-006: would prefer `integer default 0 nonnegative max 100` but the
+# proof engine can't compose the guard `LicensesAllocated > 0` with the
+# field bound to prove `(LicensesInUse * 100) / LicensesAllocated <= 100`.
+# Dropped `max 100`; runtime rule below.
+field UtilizationPercentage as integer default 0 nonnegative
+rule UtilizationPercentage <= 100 because "Utilization is a 0-100 ratio — values above 100 indicate a calculation error"
+field MaxUtilizationThreshold as integer default 90 nonnegative max 100
+field PeakUsageCount as integer default 0 nonnegative
+field PeakUsageDate as instant optional
+
+# License assignment table — user email to access category.
+field LicenseAssignments as lookup of string to string
+field ReassignmentHistory as log of string
+
+# Cost — money in 'USD' for exactness; renewal accumulates discount.
+field TotalLicenseCost as money in 'USD' default '0.00 USD' nonnegative
+field CostPerLicense as money in 'USD' default '0.00 USD' nonnegative
+field NextRenewalAmount as money in 'USD' default '0.00 USD' nonnegative
+field RenewalDiscountApplied as money in 'USD' default '0.00 USD' nonnegative
+
+# Lifecycle timestamps. Renewal and expiration dates are supplied by the
+# procurement system at the appropriate event (BUG-010 currently blocks
+# `now() + '<duration>'`, so we carry these as event-args).
+field PurchaseDate as instant
+field ActivationDate as instant optional
+field ExpirationDate as instant optional
+field RenewalDate as instant optional
+field LastRenewalDate as instant optional
+field LastAuditDate as instant optional
+
+# Renewal counter
+field RenewalCount as integer default 0 nonnegative
+
+# Audit trail
+field LicenseAuditLog as log of string
+
+# Pool-level invariants — must hold whenever they apply.
+rule LicensesInUse <= LicensesAllocated because "In-use licenses cannot exceed allocated licenses — usage is bounded by allocation"
+rule LicensesAllocated <= TotalLicensesPurchased because "Allocated licenses cannot exceed purchased licenses — allocation is bounded by capacity"
+rule LicensesAvailable + LicensesAllocated == TotalLicensesPurchased because "Available and allocated licenses must sum to the total — every purchased seat is either available or allocated"
+
+# States — license-pool lifecycle.
+state Purchased initial
+state Allocated
+state InUse
+state Expiring
+state Expired terminal
+
+# State ensures — each state activates a distinct rule set.
+in Allocated ensure LicensesAllocated > 0 because "Allocated state requires at least one allocated license — without allocations the pool is back to Purchased"
+in InUse ensure LicensesInUse > 0 because "InUse state requires at least one active license — without active use the pool falls back to Allocated"
+in InUse ensure LicensesAllocated > 0 because "InUse implies allocated > 0 — license usage requires prior allocation"
+in Expiring ensure ExpirationDate is set because "Expiring state requires an expiration date — that's what the warning window is anchored to"
+in Expired ensure ExpirationDate is set because "Expired state requires the expiration date — required for renewal eligibility and audit"
+
+# Construction — procurement provisions the pool.
+event Create(
+    LicenseId as string notempty maxlength 50,
+    CustomerId as string notempty maxlength 50,
+    ProductName as string notempty maxlength 200,
+    TotalLicensesPurchased as integer positive,
+    TotalLicenseCost as money in 'USD' positive,
+    CostPerLicense as money in 'USD' positive,
+    BillingCycle as choice of string("Monthly", "Annual")) initial
+
+# Pool lifecycle events
+event AllocateLicense(UserEmail as string notempty maxlength 200, AccessCategory as choice of string("FullAccess", "LimitedAccess", "Readonly", "Developer"))
+on AllocateLicense ensure AllocateLicense.UserEmail != "" because "Cannot allocate a license to an empty user email"
+
+event ActivateLicense(UserEmail as string notempty maxlength 200)
+event ReassignLicense(OldUserEmail as string notempty maxlength 200, NewUserEmail as string notempty maxlength 200, NewAccessCategory as choice of string("FullAccess", "LimitedAccess", "Readonly", "Developer"))
+event ReturnLicense(UserEmail as string notempty maxlength 200, Reason as string notempty maxlength 500)
+event MonitorUtilization(CurrentInUse as integer nonnegative)
+on MonitorUtilization ensure MonitorUtilization.CurrentInUse <= LicensesAllocated because "Reported in-use count {MonitorUtilization.CurrentInUse} cannot exceed allocated count {LicensesAllocated}"
+
+# Renewal events — host supplies the new expiration date.
+event MarkAsExpiring(ExpirationDate as instant)
+on MarkAsExpiring ensure MarkAsExpiring.ExpirationDate > now() because "Expiration date {MarkAsExpiring.ExpirationDate} must be in the future when entering Expiring"
+
+event RenewLicense(NewExpirationDate as instant, RenewalAmount as money in 'USD' positive, DiscountAmount as money in 'USD' nonnegative)
+on RenewLicense ensure RenewLicense.NewExpirationDate > now() because "Renewed expiration {RenewLicense.NewExpirationDate} must be in the future"
+on RenewLicense ensure RenewLicense.DiscountAmount <= RenewLicense.RenewalAmount because "Discount of {RenewLicense.DiscountAmount} cannot exceed the renewal amount of {RenewLicense.RenewalAmount}"
+
+event ProcessExpiration(Reason as string notempty maxlength 500)
+
+# Construction row — opens in Purchased.
+on Create
+    -> set LicenseId = Create.LicenseId
+    -> set CustomerId = Create.CustomerId
+    -> set ProductName = Create.ProductName
+    -> set TotalLicensesPurchased = Create.TotalLicensesPurchased
+    -> set LicensesAvailable = Create.TotalLicensesPurchased
+    -> set TotalLicenseCost = Create.TotalLicenseCost
+    -> set CostPerLicense = Create.CostPerLicense
+    -> set BillingCycle = Create.BillingCycle
+    -> set PurchaseDate = now()
+    -> append LicenseAuditLog "License pool created: {Create.TotalLicensesPurchased} licenses for {Create.ProductName}"
+
+# Allocation — Purchased → Allocated; further allocations stay in Allocated
+# until the capacity is reached, then reject.
+from Purchased on AllocateLicense
+    -> set LicensesAllocated = LicensesAllocated + 1
+    -> set LicensesAvailable = LicensesAvailable - 1
+    -> put LicenseAssignments AllocateLicense.UserEmail = AllocateLicense.AccessCategory
+    -> set ActivationDate = now()
+    -> set LastAuditDate = now()
+    -> append LicenseAuditLog "License allocated to {AllocateLicense.UserEmail} ({AllocateLicense.AccessCategory})"
+    -> transition Allocated
+
+from Allocated on AllocateLicense when LicensesAllocated >= TotalLicensesPurchased
+    -> reject "All {TotalLicensesPurchased} licenses are allocated — no available seats to allocate"
+from Allocated on AllocateLicense
+    -> set LicensesAllocated = LicensesAllocated + 1
+    -> set LicensesAvailable = LicensesAvailable - 1
+    -> put LicenseAssignments AllocateLicense.UserEmail = AllocateLicense.AccessCategory
+    -> set LastAuditDate = now()
+    -> append LicenseAuditLog "Additional license allocated to {AllocateLicense.UserEmail}"
+    -> no transition
+
+from InUse on AllocateLicense when LicensesAllocated >= TotalLicensesPurchased
+    -> reject "All {TotalLicensesPurchased} licenses are allocated — no available seats to allocate"
+from InUse on AllocateLicense
+    -> set LicensesAllocated = LicensesAllocated + 1
+    -> set LicensesAvailable = LicensesAvailable - 1
+    -> put LicenseAssignments AllocateLicense.UserEmail = AllocateLicense.AccessCategory
+    -> set LastAuditDate = now()
+    -> append LicenseAuditLog "Additional license allocated to {AllocateLicense.UserEmail}"
+    -> no transition
+
+# Activation — Allocated → InUse; further activations stay in InUse and
+# update peak usage.
+from Allocated on ActivateLicense
+    -> set LicensesInUse = LicensesInUse + 1
+    -> set PeakUsageCount = LicensesInUse + 1
+    -> set PeakUsageDate = now()
+    -> set LastAuditDate = now()
+    -> append LicenseAuditLog "License activated by {ActivateLicense.UserEmail}"
+    -> transition InUse
+
+from InUse on ActivateLicense when LicensesInUse >= LicensesAllocated
+    -> reject "All {LicensesAllocated} allocated licenses are already in use — cannot activate further"
+from InUse on ActivateLicense
+    -> set LicensesInUse = LicensesInUse + 1
+    -> set PeakUsageCount = LicensesInUse + 1
+    -> set PeakUsageDate = now()
+    -> set LastAuditDate = now()
+    -> append LicenseAuditLog "License activated by {ActivateLicense.UserEmail}"
+    -> no transition
+
+# Reassignment — InUse only; transfers the seat from one user to another.
+from InUse on ReassignLicense
+    -> put LicenseAssignments ReassignLicense.OldUserEmail = ""
+    -> put LicenseAssignments ReassignLicense.NewUserEmail = ReassignLicense.NewAccessCategory
+    -> set LastAuditDate = now()
+    -> append ReassignmentHistory "Reassigned from {ReassignLicense.OldUserEmail} to {ReassignLicense.NewUserEmail}"
+    -> append LicenseAuditLog "License reassigned"
+    -> no transition
+
+# Return — Allocated or InUse; reduces allocation count. When the last
+# license is returned from Allocated, the pool falls back to Purchased.
+from Allocated on ReturnLicense when LicensesAllocated <= 1
+    -> set LicensesAllocated = LicensesAllocated - 1
+    -> set LicensesAvailable = LicensesAvailable + 1
+    -> put LicenseAssignments ReturnLicense.UserEmail = ""
+    -> set LastAuditDate = now()
+    -> append LicenseAuditLog "Last allocated license returned by {ReturnLicense.UserEmail}: {ReturnLicense.Reason}"
+    -> transition Purchased
+
+from Allocated on ReturnLicense
+    -> set LicensesAllocated = LicensesAllocated - 1
+    -> set LicensesAvailable = LicensesAvailable + 1
+    -> put LicenseAssignments ReturnLicense.UserEmail = ""
+    -> set LastAuditDate = now()
+    -> append LicenseAuditLog "License returned by {ReturnLicense.UserEmail}: {ReturnLicense.Reason}"
+    -> no transition
+
+from InUse on ReturnLicense
+    -> set LicensesAllocated = LicensesAllocated - 1
+    -> set LicensesAvailable = LicensesAvailable + 1
+    -> put LicenseAssignments ReturnLicense.UserEmail = ""
+    -> set LastAuditDate = now()
+    -> append LicenseAuditLog "Active license returned by {ReturnLicense.UserEmail}: {ReturnLicense.Reason}"
+    -> no transition
+
+# Utilization monitoring — InUse only; updates the in-use count and
+# percentage based on the current allocation.
+from InUse on MonitorUtilization
+    -> set LicensesInUse = MonitorUtilization.CurrentInUse
+    -> set UtilizationPercentage = (MonitorUtilization.CurrentInUse * 100) / LicensesAllocated
+    -> set LastAuditDate = now()
+    -> append LicenseAuditLog "Utilization monitored: {MonitorUtilization.CurrentInUse} in use"
+    -> no transition
+
+# Mark as expiring — Allocated or InUse → Expiring.
+from Allocated, InUse on MarkAsExpiring
+    -> set ExpirationDate = MarkAsExpiring.ExpirationDate
+    -> set LastAuditDate = now()
+    -> append LicenseAuditLog "License pool marked as expiring on {MarkAsExpiring.ExpirationDate}"
+    -> transition Expiring
+
+# Renewal — Expiring → InUse; restores the pool for a fresh billing period.
+from Expiring on RenewLicense
+    -> set RenewalCount = RenewalCount + 1
+    -> set LastRenewalDate = now()
+    -> set RenewalDate = RenewLicense.NewExpirationDate
+    -> set ExpirationDate = RenewLicense.NewExpirationDate
+    -> set NextRenewalAmount = RenewLicense.RenewalAmount
+    -> set RenewalDiscountApplied = RenewLicense.DiscountAmount
+    -> set TotalLicenseCost = TotalLicenseCost + RenewLicense.RenewalAmount - RenewLicense.DiscountAmount
+    -> set LastAuditDate = now()
+    -> append LicenseAuditLog "License pool renewed through {RenewLicense.NewExpirationDate} (discount: {RenewLicense.DiscountAmount})"
+    -> transition InUse
+
+# Expiration — from Expiring, Allocated, or InUse → Expired.
+from Expiring, Allocated, InUse on ProcessExpiration
+    -> set ExpirationDate = now()
+    -> set LastAuditDate = now()
+    -> append LicenseAuditLog "License pool expired: {ProcessExpiration.Reason}"
+    -> transition Expired

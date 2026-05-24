@@ -1,0 +1,126 @@
+precept IncomingMaterialInspection
+
+# Receiving inspection for a single lot of raw material against an open
+# purchase order. The receiver records lot identity in a Draft, then confirms
+# receipt to lock the intake. From there the lot is sent to quarantine, or —
+# for certified suppliers with a certificate of analysis on file — routed
+# straight to inspection. Approved lots can only be released to production;
+# rejected lots require a return-to-supplier, scrap, or use-as-is concession
+# before closing out. Create() is parameterless; the receiver enriches the
+# Draft over time.
+
+# Fields
+field MaterialId as string optional maxlength 50
+field LotNumber as string optional maxlength 50
+field SupplierName as string optional maxlength 100
+field PurchaseOrderNumber as string optional maxlength 50
+field QuantityReceived as quantity in 'kg' optional
+field QuantitySampled as quantity in 'kg' optional
+field CertificateOfAnalysisOnFile as boolean default false
+field SupplierIsCertified as boolean default false
+field InspectorName as string optional maxlength 100
+field VisualInspectionPassed as boolean default false
+field DimensionalCheckPassed as boolean default false
+field ChemistryCheckPassed as boolean default false
+field RejectionReason as string optional maxlength 500
+field Disposition as choice of string("PendingDecision","ReturnToSupplier","Scrap","UseAsIs","ReleasedToProduction") default "PendingDecision"
+field ReleaseAuthorizer as string optional maxlength 100
+field ReceivedAt as instant optional
+field ReleasedAt as instant optional
+
+# Rules
+rule QuantitySampled <= QuantityReceived when QuantitySampled is set and QuantityReceived is set because "Sample quantity {QuantitySampled} cannot exceed received quantity {QuantityReceived}"
+
+# States
+state Draft initial
+state Received
+state Quarantined
+state Inspecting
+state Approved
+state Rejected
+state Released terminal
+
+# State ensures
+in Received ensure ReceivedAt is set because "A confirmed receipt must carry a receipt timestamp"
+in Inspecting ensure InspectorName is set because "An inspector must be assigned before performing checks"
+in Approved ensure VisualInspectionPassed and DimensionalCheckPassed and ChemistryCheckPassed because "Approved lots must pass visual, dimensional, and chemistry checks"
+in Rejected ensure RejectionReason is set because "Rejected lots must record a reason"
+in Released ensure Disposition != "PendingDecision" because "Released lots must have a final disposition recorded"
+in Released ensure ReleaseAuthorizer is set because "Release requires the authorizing inspector or QA manager on record"
+
+# Editable windows
+in Draft modify MaterialId, LotNumber, SupplierName, PurchaseOrderNumber, QuantityReceived, CertificateOfAnalysisOnFile, SupplierIsCertified editable
+
+# Events
+event ConfirmReceipt
+on ConfirmReceipt ensure MaterialId is set because "Material ID is required to confirm receipt"
+on ConfirmReceipt ensure LotNumber is set because "Lot number is required to confirm receipt"
+on ConfirmReceipt ensure SupplierName is set because "Supplier name is required to confirm receipt"
+on ConfirmReceipt ensure PurchaseOrderNumber is set because "Purchase order number is required to confirm receipt"
+on ConfirmReceipt ensure QuantityReceived is set because "Received quantity is required to confirm receipt"
+
+event SendToQuarantine
+event BeginInspection(Inspector as string notempty, Sample as quantity in 'kg' positive)
+event RecordChecks(Visual as boolean, Dimensional as boolean, Chemistry as boolean)
+event Approve
+event Reject(Reason as string notempty)
+event AuthorizeRelease(Authorizer as string notempty, FinalDisposition as choice of string("ReturnToSupplier","Scrap","UseAsIs","ReleasedToProduction"))
+
+on BeginInspection ensure BeginInspection.Sample > '0 kg' because "Sample size must be positive"
+
+# Transitions
+from Draft on ConfirmReceipt
+    -> set ReceivedAt = now()
+    -> transition Received
+
+# Certified suppliers with a complete COA bypass quarantine entirely.
+from Received on SendToQuarantine when SupplierIsCertified and CertificateOfAnalysisOnFile
+    -> reject "Lot from certified supplier {SupplierName} with COA on file does not require quarantine"
+from Received on SendToQuarantine
+    -> transition Quarantined
+
+# Certified-with-COA lots go straight to inspection.
+from Received on BeginInspection when SupplierIsCertified and CertificateOfAnalysisOnFile
+    -> set InspectorName = BeginInspection.Inspector
+    -> set QuantitySampled = BeginInspection.Sample
+    -> transition Inspecting
+from Received on BeginInspection
+    -> reject "Lot must be moved to quarantine first — supplier certified: {SupplierIsCertified}, COA on file: {CertificateOfAnalysisOnFile}"
+
+from Quarantined on BeginInspection
+    -> set InspectorName = BeginInspection.Inspector
+    -> set QuantitySampled = BeginInspection.Sample
+    -> transition Inspecting
+
+from Inspecting on RecordChecks
+    -> set VisualInspectionPassed = RecordChecks.Visual
+    -> set DimensionalCheckPassed = RecordChecks.Dimensional
+    -> set ChemistryCheckPassed = RecordChecks.Chemistry
+    -> no transition
+
+from Inspecting on Approve when VisualInspectionPassed and DimensionalCheckPassed and ChemistryCheckPassed
+    -> transition Approved
+from Inspecting on Approve
+    -> reject "Approval requires all three checks to pass — visual: {VisualInspectionPassed}, dimensional: {DimensionalCheckPassed}, chemistry: {ChemistryCheckPassed}"
+
+from Inspecting on Reject
+    -> set RejectionReason = Reject.Reason
+    -> transition Rejected
+
+# Release authorization — approved lots can only be released to production;
+# rejected lots can be returned, scrapped, or accepted as a concession.
+from Approved on AuthorizeRelease when AuthorizeRelease.FinalDisposition == "ReleasedToProduction"
+    -> set ReleaseAuthorizer = AuthorizeRelease.Authorizer
+    -> set Disposition = AuthorizeRelease.FinalDisposition
+    -> set ReleasedAt = now()
+    -> transition Released
+from Approved on AuthorizeRelease
+    -> reject "Approved lots can only be released to production — requested {AuthorizeRelease.FinalDisposition}"
+
+from Rejected on AuthorizeRelease when AuthorizeRelease.FinalDisposition != "ReleasedToProduction"
+    -> set ReleaseAuthorizer = AuthorizeRelease.Authorizer
+    -> set Disposition = AuthorizeRelease.FinalDisposition
+    -> set ReleasedAt = now()
+    -> transition Released
+from Rejected on AuthorizeRelease
+    -> reject "Rejected lots cannot be released to production — choose ReturnToSupplier, Scrap, or UseAsIs"

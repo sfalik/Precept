@@ -536,10 +536,10 @@
     "watch": "tsc -watch -p ./",
     "dev:watch": "tsc -watch -p ./ --preserveWatchOutput",
     "bundle": "npm run compile && node ./esbuild.js",
-    "package:local": "npx @vscode/vsce package --allow-missing-repository",
+    "package:local": "npm run bundle && npx @vscode/vsce package --allow-missing-repository",
     "package:marketplace": "npx @vscode/vsce package --allow-missing-repository",
-    "loop:local": "powershell -ExecutionPolicy Bypass -File ./scripts/install-local.ps1",
-    "loop:local:uninstall": "powershell -ExecutionPolicy Bypass -File ./scripts/uninstall-local.ps1",
+    "loop:local": "node ./scripts/install-local.js",
+    "loop:local:uninstall": "node ./scripts/uninstall-local.js",
     "vscode:prepublish": "npm run bundle && dotnet publish ../../tools/Precept.LanguageServer/Precept.LanguageServer.csproj -c Release -o ./server --no-self-contained"
   },
   "dependencies": {

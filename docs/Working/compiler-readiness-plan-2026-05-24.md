@@ -1,0 +1,841 @@
+# Compiler Readiness Plan — 2026-05-24
+
+**Status**: Draft — Phases 1-2 planned in detail; Phases 3-10 stubbed pending decisions and Phase 1-2 completion.
+**Companion docs**:
+- [`compiler-readiness-review-2026-05-24.md`](compiler-readiness-review-2026-05-24.md) — audit findings (the "what we found")
+- This doc — phased execution plan (the "what we'll do")
+- [`compiler-readiness-review-2026-05-24-appendices/`](compiler-readiness-review-2026-05-24-appendices/) — full sub-agent reports
+**Scope gate**: blocks runtime implementation
+**Owner-decision policy**: each phase opens only when its listed upstream decisions are settled. Triage is just-in-time, not all-up-front.
+**Sample-edit constraint**: do NOT modify `samples/*.precept` from this workstream — parallel session owns samples; cross-reference via [`bugs.md`](bugs.md).
+
+---
+
+## Phase summary
+
+| Phase | Goal | F-count | Decisions required | Effort | Status |
+|---|---|---|---|---|---|
+| 1 | Doc foundation truthful + lifecycle skills + 16 Archive promotions | ~55 | 8 (✅ all settled 2026-05-24) | XL (~5-7 days) | Planned, ready to execute |
+| 2 | Green baseline + no crashes + Operations.Resolve + MCP-crash family | **11+** | 2 | **L (~4-5 days)** | Planned |
+| 3 | Type system completeness | ~15 | 3 | L | Stub — TBD |
+| 4 | Collection completeness + BUG-002 | **~16** | 2 | L | Stub — TBD |
+| 5 | Proof engine satisfiability + BUG-004 + BUG-006 | **~12** | 2 | XL | Stub — TBD |
+| 6 | `units` block + composite basis | 2 | 0 | L | Stub — TBD |
+| 7 | API surface solidity (typed descriptors) | ~6 | 1 | M-L | Stub — TBD |
+| 8 | Diagnostic completeness | ~7 | 3 | M | Stub — TBD |
+| 9 | Polish + cleanup + `/lifecycle-7-audit` skill | ~20 | 4 | M | Stub — TBD |
+| 10 | Runtime gate verification | — | 0 | S | Stub — TBD |
+
+**Overall estimate**: 7-11 weeks of focused work (was 6-10; Phase 2 grew). Phase 1 includes (a) 5 lifecycle skill builds + rename, (b) 16 Archive promotion obligations, (c) CONTRIBUTING.md lifecycle updates. Phase 2 grew from ~2-3 days to ~4-5 days after integrating 9 active bugs from `bugs.md` (parallel sample-remediation session, 2026-05-24): 5 MCP-crash family bugs (BUG-003, -005 symptom, -007, -008, -010), 1 MCP transport bug (BUG-009 payload limit), plus the original F-LANG-SPEC-10. Coordinated MCP-layer instrumentation pass catches the whole family in one fix. Phase 5 (proof engine satisfiability) remains the highest variance.
+
+**`bugs.md` as ongoing source**: parallel sample-authoring sessions continue to discover bugs that surface in real authoring workflows (not in code-vs-doc audits). Plan integrates bugs.md as a standing input. Phase-kickoff protocol includes "re-read bugs.md for new entries since last integration."
+
+---
+
+## Decisions captured so far (Wave 0)
+
+From 2026-05-24 triage — **all 8 Phase-1-gating decisions settled**:
+
+**Project-level**:
+- **MVP scope** = all 98 findings except graph-analyzer modifier extensions
+- **Graph-analyzer modifiers (F-LANG-SPEC-08)** = defer 10, drop `milestone` entirely
+- **Drop `milestone`** from spec § 0.5 #5 — undocumented synonym of shipped `required`
+- **Doc lifecycle framework adopted**: 7-stage lifecycle (Research, Design, Plan, Execute, Promote, Review, Maintain) with 5 lifecycle skills (`/lifecycle-1-research` through `/lifecycle-7-audit`)
+- **Pointer-philosophy for canonical docs**: enumerable content goes to pointers + code; only conceptual why-content is hand-written in canonical
+- **`precept-reviewer` agent stays as agent**, spawned by lifecycle skills at key transitions; `/lifecycle-6-review` is the user-explicit end-of-lifecycle completion check
+
+**Phase 1 decisions** (full per-decision rationale in `compiler-readiness-review-2026-05-24.md § 1a`):
+1. F-LANG-CAT-01 (HoverDescription) — Rewrite CC#19: shipped to 5 catalogs, deliberately not Token; promote hover-design + interval-hover-design to language-server.md
+2. F-LANG-CAT-02 (AmbiguousDispatch) — **Drop entirely**; concept obsoleted by 3 architectural decisions
+3. F-LANG-CAT-20 (IsUserFacing) — Rewrite CC#16: shipped via `Token != null` structural equivalence
+4. F-LANG-CAT-15 (Operations.Resolve) — **Implement** in Phase 2 (4-line wrapper + move DisambiguateCandidates)
+5. F-LANG-CAT-06 (Construct Slot Model) — Pointer-philosophy rewrite; point to grammar-generator.md
+6. F-LANG-CAT-23 (Roslyn rules) — Categorized table (10 rows) + lift why from diagnostic-enforcement.md
+7. F-LANG-CAT-26 (SemanticTokenTypes) — **14th catalog**; add § + resolve 13-vs-14 inconsistency
+8. F-LEX-02 (Four-leg rationale) — Prospective only via `/lifecycle-2-design`; grandfather existing; no required backfill
+
+### Still open — gating Phase 2
+
+- F-LANG-04 — failing `SyntaxReferenceTests` references non-existent pattern: rename test or re-add pattern?
+- F-X-01 — `F5TempVerify.cs` dev-only test in committed tree: delete or promote to permanent?
+
+### Still open — gating Phase 3+
+
+- F-LANG-SPEC-01 (`because` on ensures): enforce or amend Principle 9?
+- F-LANG-TEMP-08 (`zoneddatetime ± period`): catalog or doc authoritative?
+- 15 additional decisions listed in `compiler-readiness-review-2026-05-24.md` § 6 (cited per-phase as work approaches).
+
+---
+
+# Phase 1: Doc foundation truthful
+
+## Goal
+Every doc in `docs/language/`, `docs/compiler/`, and load-bearing per-stage docs accurately describes what the implementation does. No stale Status fields. No false "✅ Resolved" claims. Spec § 0.5 cleanly separates shipped from forward-looking. `catalog-system.md` count discrepancies eliminated. Add an institutional check so this kind of drift doesn't recur.
+
+This phase is doc-only (with the exception of any CC# items the owner decides to *implement* rather than *revert* — those become Phase 1.5 work). No code changes to pipeline / runtime / language server.
+
+## Findings in scope (~40)
+
+**Catalog-system.md rewrite** (single biggest item — ~26 findings, one focused day):
+- F-LANG-CAT-01 — `TokenMeta.HoverDescription` (status flip OR implement)
+- F-LANG-CAT-02 — `FaultCode.AmbiguousDispatch` (status flip OR implement)
+- F-LANG-CAT-03 — `ConstructKind` count 12→15
+- F-LANG-CAT-04 — `ConstructSlotKind` count 17→20
+- F-LANG-CAT-05 — `ConstructSlot` 4 undocumented fields + `SlotVocabulary` enum (13 members) undocumented
+- F-LANG-CAT-06 — stale "Construct Slot Model" § (decision-dependent)
+- F-LANG-CAT-07 — `ExpressionFormKind` count 14→15
+- F-LANG-CAT-08 — `ProofRequirementKind` count 5→10 + meta + instance + satisfaction subtypes
+- F-LANG-CAT-09 — `ProofRequirementMeta.DiagnosticCode` field undocumented
+- F-LANG-CAT-10 — `ProofSatisfaction` DU shape drift
+- F-LANG-CAT-11 — `DiagnosticCode` count 78/106→148
+- F-LANG-CAT-12 — `DiagnosticMeta` 5 undocumented fields + `SuggestionSource` enum
+- F-LANG-CAT-13 — `FaultCode` count 13→15
+- F-LANG-CAT-14 — `FaultMeta` undocumented `Severity`/`RecoveryHint`
+- F-LANG-CAT-15 — `Operations.Resolve` (decision-dependent)
+- F-LANG-CAT-16 — `OperationKind` count 198→203
+- F-LANG-CAT-17 — `BinaryOperationMeta` 3 undocumented fields + `ResultQualifierPolicy` enum
+- F-LANG-CAT-18 — `ModifierMeta.DesugarsToRule` undocumented
+- F-LANG-CAT-19 — aspirational event modifiers flagged as catalog members (consistency with § 0.5 deferral)
+- F-LANG-CAT-20 — `TypeMeta.IsUserFacing` (status flip OR implement)
+- F-LANG-CAT-21 — `TypeMeta` 2 undocumented fields (`ImpliedQualifiers`, `RequiredBoundQualifierAxes`)
+- F-LANG-CAT-22 — `QualifierAxis` 9→10 (adds `PriceIn`) + `QualifierShape.OfRequiresCurrencyIn`
+- F-LANG-CAT-23 — Roslyn rules (decision-dependent)
+- F-LANG-CAT-24 — `ActionMeta.DynamicObligationGenerator` undocumented
+- F-LANG-CAT-25 — `Diagnostic` struct undocumented `Args`/`RelatedSpans`
+- F-LANG-CAT-26 — `SemanticTokenTypes` catalog status (decision-dependent)
+
+**Stage doc Status truth-ups** (one paragraph each):
+- F-PAR-03 — `parser.md` Status: "Implementation: Complete — Slices 1–4" → actual (Slices 1-26)
+- F-PAR-02 — `parser.md` 3-week-stale Open Question on Implemented stage (trace code, resolve)
+- F-PAR-01 — `Parser.cs:370, 396` stale Slice-0 TODOs for PRE0015/PRE0013
+- F-TC-01 — `type-checker.md` "Gap 1 pending" → resolved (ContentValidation shipped)
+- F-LANG-01 — `primitive-types.md` Status: "Designed — type checker implementation pending" → "Implemented"
+- F-LANG-02 — `business-domain-types.md` Status: "Proposal — not yet implemented" → "Implemented (with documented gaps)"
+- F-LANG-03 — `temporal-type-system.md` doc maturity "Draft" + status "Implemented" inconsistency
+- F-LS-01 — `tooling-surface.md` status table 4 stale rows (semantic tokens Pass 2 "blocked on TypeChecker", completions/hover "partially implemented", preview "placeholder")
+- F-LEX-01 — `lexer.md` 2 broken cross-references (`pipeline-overview.md`, `type-system.md`)
+- F-LEX-03 — `lexer.md` "(~687 lines)" parenthetical drift
+
+**Spec § 0.5 rewrite** (defer + drop `milestone`):
+- F-LANG-SPEC-08 — implement the deferral decision: shrink § 0.5 to what's implemented (BFS reachability, terminal, dead-end, required dominator, irreversible reverse-reachability) and move the 10 deferred modifiers (`guarded`, `entry`, `isolated`, `universal`, `sealed after`, `writeonce`, `advancing`, `settling`, `completing`, `absorbing`) to a "Future Graph Analyzer Roadmap" section or sibling doc
+- Drop `milestone` reference at `precept-language-spec.md:186` — rewrite § 0.5 #5 to "Dominator analysis. Required for `required`"
+- Sweep `docs/language/` and `docs/compiler/` for any other `milestone` modifier references
+
+**Spec § 1.1 / § 1.5 / § 2.1 — `<-` BackArrow**:
+- F-LANG-SPEC-11 — add "Computed field arrow" row to spec § 1.1 Operators; add `<-` to § 1.5 scan priority list; note in § 2.1 that `<-` is a structural separator (not in expression precedence)
+
+**Grammar doc enumeration corrections**:
+- F-LANG-GRAM-03 — "18 ConstructSlotKind values" → 20 (add `SuccessOutcome`, `EventEntryList`)
+- F-LANG-GRAM-04 — EventDeclaration slot decomposition: rewrite from `IdentifierList + ArgumentList + InitialMarker` to single `EventEntryList`
+- F-LANG-GRAM-05 — split appendix `Outcome / ActionChain` row into three (`Outcome`, `RejectClause`, `SuccessOutcome`)
+- F-LANG-GRAM-06 — "14 ExpressionFormKind values" → 15 (add `InterpolatedTypedConstant`)
+- F-LANG-GRAM-07 — remove "expression tree representation is deferred" framing (it's implemented in `ParsedExpression.cs`)
+- F-LANG-GRAM-08 — "13 catalogs" → ≥14 (add `Outcomes` to § 9 catalog list)
+
+**Type-system doc fixes**:
+- F-LANG-PRIM-02 — `maxplaces` "decimal-only" → "applies to decimal AND money/quantity/price/exchangerate"
+- F-LANG-PRIM-03 — `min`/`max` cross-lane signature wording clarification
+- F-LANG-TEMP-06/07 — timezone error message specifics (could land in this phase OR Phase 3 with temporal extensions — recommend Phase 3 to bundle with other temporal work)
+
+**Collection doc fix**:
+- F-LANG-COLL-10 — `notempty` on `lookup`: remove from doc (lookup uses `KeyPresenceSafety` instead) — assumes catalog-correct ruling; alternative ruling moves this to Phase 4
+
+**Spec § 0.6 status note**:
+- Add explicit "Implementation status" sub-section under § 0.6 listing the 5 unimplemented obligations (F-LANG-SPEC-02/03/04/05 + dependent §0.6 #12) — fold into Phase 5 when shipped, but flag now so readers don't assume those guarantees are live.
+
+**Institutional fix (drift prevention)**:
+- F-X-02 — add to `CONTRIBUTING.md`:
+  - Rule: "If you ship work that changes a doc's Status field or implementation state, update the Status in the same PR."
+  - PR checklist item: "Doc Status fields touched by this PR (or N/A)"
+  - Consider a periodic audit script that greps for `Status: Draft|Designed|Pending|Planned` on docs whose linked code paths look implemented.
+
+## Decisions required before Phase 1 starts
+
+**All 8 Phase-1 gating decisions are resolved as of 2026-05-24.** See the plan-level "Decisions captured so far (Wave 0)" section above and the per-decision detail in `compiler-readiness-review-2026-05-24.md § 1a`. Phase 1 is unblocked.
+
+## Step-by-step execution
+
+Phase 1 has 6 parallelizable workstreams. Skills enable later workstreams (build them first); the rest can run in parallel.
+
+### Workstream A — Lifecycle skills + CONTRIBUTING.md (enables others — build first)
+
+**Effort**: ~2-3 days (build sequence + CONTRIBUTING)
+
+#### Step A.1 — Rename `/research` → `/lifecycle-1-research` (~30 min)
+- Rename directory: `.claude/skills/research/` → `.claude/skills/lifecycle-1-research/`
+- Update `SKILL.md` frontmatter `name:` field
+- Sweep references: `grep -rn "/research" CLAUDE.md docs/ .claude/ tools/`
+- Update description per `docs/Working/lifecycle-skill-drafts.md`
+
+#### Step A.2 — Build `/lifecycle-5-promote` (~3-4 hr, LOAD-BEARING)
+- Create `.claude/skills/lifecycle-5-promote/SKILL.md` from `docs/Working/lifecycle-skill-drafts.md` § `/lifecycle-5-promote`
+- Implement `--backfill` mode (used for Archive promotion in Workstream E)
+- Implement archive-header enforcement
+- Test against one trivial Archive doc (e.g., one of the simpler promotions like `frank-bounds-qualifier-audit.md`)
+
+#### Step A.3 — Build `/lifecycle-2-design` (~3-4 hr)
+- Create `.claude/skills/lifecycle-2-design/SKILL.md` from draft
+- Implement four-leg enforcement
+- Implement doc-touch enumeration auto-fill from CLAUDE.md routing table
+- Internally spawns `precept-reviewer` at lock-time
+
+#### Step A.4 — Build `/lifecycle-3-plan` (~3-4 hr)
+- Create `.claude/skills/lifecycle-3-plan/SKILL.md` from draft
+- Implement heavyweight-current+next / lightweight-stubs-later structure enforcement
+- Implement decisions-as-gates surfacing
+- Internally spawns `precept-reviewer` against plan
+
+#### Step A.5 — Build `/lifecycle-6-review` (~3-4 hr)
+- Create `.claude/skills/lifecycle-6-review/SKILL.md` from draft
+- Implement 7-step verification workflow
+- Implement `--strict` and `--accept-debt` flags
+- Used to verify Phase 1 itself at end (meta-consistent)
+
+#### Step A.6 — Apply CONTRIBUTING.md updates (~30-45 min)
+- Apply `docs/Working/contributing-updates-draft.md` per its embedded "Implementation notes for Phase 1"
+- Cross-link from CLAUDE.md "Documentation Sync (Non-Negotiable)" section
+- Verify all 5 lifecycle skill names appear in CONTRIBUTING.md
+
+### Workstream B — Catalog-system.md rewrite
+
+**Effort**: ~1-2 days (single longest doc-side item)
+
+Apply Decisions 1, 2, 3, 5, 6, 7 to `docs/language/catalog-system.md`:
+- **Decision 1**: rewrite CC#19 (HoverDescription) per the resolved entry
+- **Decision 2**: drop CC#13 (AmbiguousDispatch) entirely from 3 locations (lines 1871, 2442, 2447-2451)
+- **Decision 3**: rewrite CC#16 (IsUserFacing) per the resolved entry
+- **Decision 5**: pointer-philosophy rewrite of Construct Slot Model § (lines 2041-2070)
+- **Decision 6**: pointer-philosophy rewrite of Roslyn Enforcement Layer § (10-row categorized table + lifted why from `diagnostic-enforcement.md`)
+- **Decision 7**: add new § for SemanticTokenTypes as 14th catalog; resolve 13-vs-14 inconsistency
+
+Plus the broader F-LANG-CAT-AGGREGATE rewrite (count corrections across all 14 catalogs, metadata-record shape corrections, undocumented-enum surfaces from the audit appendix).
+
+### Workstream C — Stage doc Status truth-ups (parallelizable)
+
+**Effort**: ~½ day total (each is S, parallelizable)
+
+Files: `parser.md` (F-PAR-01, -02, -03), `type-checker.md` (F-TC-01), `lexer.md` (F-LEX-01, -03), `tooling-surface.md` (F-LS-01), `primitive-types.md` (F-LANG-01), `business-domain-types.md` (F-LANG-02), `temporal-type-system.md` (F-LANG-03). Per-file: update Status fields; fix broken cross-references; resolve unresolved Open Questions.
+
+### Workstream D — Spec § 0.5 + § 1.1/§ 1.5/§ 2.1 + grammar doc
+
+**Effort**: ~1 day
+
+- **§ 0.5 rewrite**: shrink to shipped capabilities; move 10 deferred modifiers (`guarded`, `entry`, `isolated`, `universal`, `sealed after`, `writeonce`, `advancing`, `settling`, `completing`, `absorbing`) to `docs/language/graph-analyzer-roadmap.md` (new file); rewrite § 0.5 #5 to drop `milestone`
+- **§ 1.1 / § 1.5 / § 2.1**: add `<-` BackArrow to Operators table, scan-priority list, and structural-separator note (F-LANG-SPEC-11)
+- **`precept-grammar.md` enumeration corrections**: F-LANG-GRAM-01, -03, -04, -05, -06, -07, -08
+- **`precept-language-spec.md` § 0.6**: add Implementation Status sub-section listing the 5 unimplemented obligations (F-LANG-SPEC-02..05)
+
+### Workstream E — 16 Archive promotions (parallelizable, needs Workstream A.2 first)
+
+**Effort**: ~3-4 days if parallelized; ~5-7 days sequential
+
+After `/lifecycle-5-promote` is built (Workstream A.2), use `--backfill` mode for each:
+
+**4 already-known promotions** (from Decisions 1, 2, 6, 7):
+1. `hover-design.md` + `interval-hover-design.md` → `docs/tooling/language-server.md § 7.4` (M)
+2. `constructor-semantics.md` → spec § Grammar + `parser.md` + `type-checker.md` (M; drop AmbiguousDispatch story across docs)
+3. `diagnostic-enforcement.md` + `diagnostic-enforcement-implementation-notes.md` → `catalog-system.md § Roslyn Enforcement Layer` (overlaps with Workstream B)
+4. `language-server-implementation-plan.md` Slice 10 → `catalog-system.md § SemanticTokenTypes` (overlaps with Workstream B)
+
+**12 new promotions** (from Archive scan, full detail in [appendix](compiler-readiness-review-2026-05-24-appendices/audit-archive-promotion-backlog.md)):
+
+Shipped-with-why-stranded (7):
+5. `catalog-compliance-audit.md` → `catalog-system.md` + per-stage docs (M)
+6. `frank-bounds-qualifier-audit.md` → `business-domain-types.md` + `type-checker.md` + `diagnostic-system.md` (S)
+7. `frank-qualifier-deferred-scoping.md` → `proof-engine.md § 5` + `type-checker.md` + `catalog-system.md` (M)
+8. `pipeline-audit-fix-plan.md` → `CONTRIBUTING.md § Build & Test` (S) — "Release-Only Builds (Non-Negotiable)"
+9. `research-conditional-construction.md` → relocate to `research/language/` + cite from spec § 1880 (S)
+10. `typed-constants-and-proof-coverage-plan.md` → `literal-system.md` + `type-checker.md` + `business-domain-types.md` + `temporal-type-system.md` (L) — **single largest stranded design**
+11. `elaine-typed-literal-autocomplete-ux.md` + `kramer-typed-literal-impl-plan.md` → `language-server.md § 7.3` (M, paired)
+
+Partially-promoted (5):
+12. `completions-bugs.md` → `language-server.md § 7.3` + `type-checker.md` (M)
+13. `frank-catalog-obligation-audit.md` → `proof-engine.md § Obligation Generation Contract` (new heading) + `catalog-system.md` (S)
+14. `mcp-dto-free-design.md` → `docs/tooling/mcp.md § Design Rationale` (S)
+15. `quantity-normalization-design.md` → `runtime/evaluator.md` + `proof-engine.md` + `business-domain-types.md` + new `runtime/` content (L)
+16. `syntax-coloring-fix-design.md` → `language-server.md § 7.2` (S)
+
+### Workstream F — Verification (~½ day, runs last)
+
+Run `/lifecycle-6-review --strict` against Phase 1 deliverables:
+- All 16 Archive docs have `**Promoted to:** ...` headers
+- All 8 Phase 1 decisions reflected in canonical docs
+- All catalog-system.md count claims match `grep -c` of corresponding `*Kind.cs` files
+- All metadata-record shape claims match actual C# records
+- No "✅ Resolved" claim references code that doesn't exist
+- All Stage doc Status fields reflect actual state
+- `grep -rn "milestone" docs/language/precept-language-spec.md docs/compiler/` returns zero modifier-context results
+- Spec § 0.5 enumerates only shipped capabilities; roadmap doc covers deferred
+- Grammar doc enumeration counts match enum member counts
+- All 4 lifecycle skill SKILL.md files created and validated
+- CONTRIBUTING.md has lifecycle section + four-leg policy + routing table
+
+Output: completion report. If clean: Phase 1 complete. If 🔴: remediate before proceeding to Phase 2.
+
+### Step 1.2 — Catalog-system.md rewrite (single focused day)
+**Files**:
+- `docs/language/catalog-system.md` (2,481 lines — substantial edit)
+**Approach**:
+1. Open the catalog audit appendix (`audit-catalog-system.md`) alongside.
+2. For each catalog section (Tokens through Faults), update counts, member lists, metadata field shapes per the appendix table.
+3. Apply each decision from Step 1.1:
+   - HoverDescription: revert "✅ Resolved" status OR (if implement) add field to `Token.cs` and update all `Tokens.GetMeta` entries (the latter pushes this out of Phase 1).
+   - AmbiguousDispatch: revert OR implement (similar split).
+   - IsUserFacing: revert OR implement.
+   - Operations.Resolve: rewrite § 5 "Resolution" sub-section to describe actual `FindUnary`/`FindCandidates` API, OR implement Resolve method (the latter pushes out).
+   - Construct Slot Model section: rewrite to describe actual `ConstructSlotKind` and `ConstructSlot` shape, OR label as TextMate-grammar abstraction.
+   - Roslyn rules: either delegate to `diagnostic-system.md` (small link section) OR write per-rule entries here (larger).
+   - SemanticTokenTypes: add as 15th catalog with full section OR document as registry subordinate to Tokens.
+4. Rewrite § Modifiers' event-modifier table (line 1518-1535) to clearly mark all but `InitialEvent` as "Future — see Graph Analyzer Roadmap" (consistency with F-LANG-SPEC-08 decision).
+5. Resolve catalog-count narrative inconsistency (13 vs 14 — F-LANG-CAT-26 ruling settles this).
+**Validation**:
+- For every catalog section, count claim matches `grep -c` of the corresponding `*Kind.cs` file members.
+- For every metadata record claim, fields match the `Token.cs` / `Type.cs` / etc. record definition.
+- For every "✅ Resolved" remaining in the doc, verify the named code feature actually exists.
+**Effort**: L (1 focused day).
+
+### Step 1.3 — Per-stage doc Status truth-ups
+**Files**:
+- `docs/compiler/parser.md` — F-PAR-01, F-PAR-02, F-PAR-03
+- `docs/compiler/type-checker.md` — F-TC-01
+- `docs/compiler/lexer.md` — F-LEX-01, F-LEX-03
+- `docs/compiler/tooling-surface.md` — F-LS-01
+- `docs/language/primitive-types.md` — F-LANG-01
+- `docs/language/business-domain-types.md` — F-LANG-02
+- `docs/language/temporal-type-system.md` — F-LANG-03
+- `src/Precept/Pipeline/Parser.cs:370, 396` — F-PAR-01 (TODO comment cleanup; also document the permanent guard-gate behavior in `parser.md` § Failure Modes)
+**Approach**: parallelizable across the 8 files. Each is S effort.
+**Validation**: each Status field matches the actual code state. Each `parser.md` Open Question that was 3 weeks stale is either resolved or restated. No broken cross-references.
+**Effort**: M (half-day total).
+
+### Step 1.4 — Spec § 0.5 rewrite
+**Files**:
+- `docs/language/precept-language-spec.md` § 0.5 (lines ~176-220)
+- New file `docs/language/graph-analyzer-roadmap.md` (or sub-section in language spec — owner preference)
+- Sweep: `grep -rn "milestone" docs/language/ docs/compiler/` — every modifier-context occurrence handled
+**Approach**:
+1. Rewrite § 0.5 to enumerate only shipped capabilities (5 items: BFS reachability, terminal identification, dead-end detection, required dominator analysis, irreversible reverse-reachability). Drop § 0.5 #4, #7, #8 entirely from this section (those are roadmap).
+2. Rewrite § 0.5 #5 to "Dominator analysis. Required for `required` — the modifier asserts that all initial→terminal paths must visit this state."
+3. Rewrite § 0.5 #6 to remove `sealed after` (keep only `irreversible`).
+4. Create `graph-analyzer-roadmap.md` listing the 10 deferred modifiers with their intended semantics, "Status: Future" header, explicit "Not implemented in MVP" note.
+5. Update spec § 0.5 header to point to the roadmap doc.
+**Validation**:
+- No modifier appears in § 0.5 that doesn't have a corresponding `ModifierKind` entry.
+- `grep -n "milestone" docs/language/precept-language-spec.md` returns zero results.
+- Roadmap doc lists exactly the 10 deferred modifiers.
+**Effort**: M (half-day).
+
+### Step 1.5 — Spec § 1.1 / § 1.5 / § 2.1 — `<-` BackArrow
+**File**: `docs/language/precept-language-spec.md`
+**Approach**: add `<-` (BackArrow) to § 1.1 Operators table with role "Computed field derivation"; add to § 1.5 scan-priority list with appropriate position; add note in § 2.1 that `<-` is a structural separator (not in expression precedence table).
+**Validation**: every token in `TokenKind.cs` that has a literal text representation appears in § 1.1 or § 1.5.
+**Effort**: S.
+
+### Step 1.6 — Grammar doc enumeration corrections
+**File**: `docs/language/precept-grammar.md`
+**Approach**: per F-LANG-GRAM-03/04/05/06/07/08 — update counts, fix EventDeclaration slot decomposition, split appendix Outcome row, add `InterpolatedTypedConstant`, remove expression-tree "deferred" framing, add `Outcomes` to catalog list.
+**Validation**: every count in the doc matches the `*Kind.cs` enum member count.
+**Effort**: M.
+
+### Step 1.7 — Type-system doc fixes (small)
+**Files**: `docs/language/primitive-types.md` — F-LANG-PRIM-02, F-LANG-PRIM-03.
+**Approach**: 2 small edits to § decimal § Constraints and § min/max function signature.
+**Effort**: S.
+
+### Step 1.8 — Collection doc fix (small)
+**File**: `docs/language/collection-types.md` — F-LANG-COLL-10 (if catalog-correct ruling).
+**Approach**: remove `lookup` from the `notempty` row in § Constraint Catalog; add note pointing to `KeyPresenceSafety` as lookup's safety model.
+**Effort**: S.
+
+### Step 1.9 — Spec § 0.6 implementation-status sub-section
+**File**: `docs/language/precept-language-spec.md` § 0.6.
+**Approach**: add a new sub-section "Implementation Status" near the end of § 0.6 listing the 5 unimplemented obligations (F-LANG-SPEC-02/03/04/05 + dependent § 0.6 #12) with "Phase 5 of [`compiler-readiness-plan-2026-05-24.md`](../Working/compiler-readiness-plan-2026-05-24.md)" reference. Mark as "In progress per readiness plan."
+**Effort**: S.
+
+### Step 1.10 — Institutional drift-prevention fix
+**Files**:
+- `CONTRIBUTING.md` (add rule + checklist item)
+- Optional: `tools/scripts/doc-status-audit.js` (script that greps for stale Status markers)
+**Approach**: see F-X-02 description.
+**Effort**: S.
+
+## Dependencies
+- Sample-edit constraint: do not touch `samples/*.precept` from this workstream.
+- Parallel session continues to own samples; if catalog rewrite surfaces a sample-side issue, route to `bugs.md`.
+- Step 1.1 (decision triage) gates everything else.
+
+## Exit criteria
+- [ ] All 8 Phase-1 decisions recorded in this doc's § "Decisions captured" and in the remediation doc § 1a.
+- [ ] `catalog-system.md` count claims match `grep -c` of corresponding `*Kind.cs` files (Tokens, Types, Operators, Functions, Actions, Modifiers, Constructs, ConstructSlots, ExpressionForms, Constraints, ProofRequirements, Outcomes, Diagnostics, Faults — 14 catalogs).
+- [ ] Every metadata-record shape claim in `catalog-system.md` matches the actual C# record definition (`Token.cs`, `Type.cs`, etc.).
+- [ ] No "✅ Resolved" claim in `catalog-system.md` references code that doesn't exist (revert any that the owner decided not to implement; implement the rest in Phase 7 as part of API solidity work).
+- [ ] All per-stage Status fields (`parser.md`, `type-checker.md`, `lexer.md`, `tooling-surface.md`, `primitive-types.md`, `business-domain-types.md`, `temporal-type-system.md`) reflect actual implementation state.
+- [ ] `grep -rn "milestone" docs/language/precept-language-spec.md docs/compiler/` returns zero results in modifier context.
+- [ ] Spec § 0.5 enumerates only shipped capabilities; roadmap doc (or sub-section) covers the 10 deferred modifiers.
+- [ ] Grammar doc enumeration counts match `*Kind.cs` enum member counts.
+- [ ] `CONTRIBUTING.md` has the doc-Status-update rule and PR checklist item.
+- [ ] No new sample-side changes in this phase.
+
+## Estimated effort
+
+By workstream:
+- **Workstream A** (lifecycle skills + CONTRIBUTING): ~2-3 days (sequential — each skill is M)
+- **Workstream B** (catalog-system.md rewrite): ~1-2 days (single longest doc-side item)
+- **Workstream C** (stage doc Status truth-ups): ~½ day (parallelizable)
+- **Workstream D** (spec § 0.5 + grammar + § 1.1/1.5/2.1): ~1 day
+- **Workstream E** (16 Archive promotions): ~3-4 days if parallelized; ~5-7 days sequential
+- **Workstream F** (verification): ~½ day
+
+**Phase 1 total**: ~5-7 days if Workstreams B, C, D, E run in parallel after Workstream A completes the skills; ~7-10 days if more sequential.
+
+Workstream A.2 (`/lifecycle-5-promote`) is the critical-path dependency for Workstream E. Build it first, then E can start in parallel with B/C/D.
+
+---
+
+# Phase 2: Green baseline + no crashes
+
+## Goal
+`dotnet test` passes 100% across all four test projects. The MCP server does not crash on invalid input. No dev-only files in the committed test tree. The compiler can be invoked from any consumer (LS, MCP, CLI) without throwing unhandled exceptions on author-error inputs. **The compile-path robustness sweep catches all MCP-layer crashes systematically, not just temporal validation.**
+
+This phase is small in finding count but high in confidence yield: it removes the noise that masks real regressions and clears 5+ MCP-crash production bugs that have accumulated.
+
+## Findings in scope (11+ items, expanded from 6 after bugs.md integration 2026-05-24)
+
+### Original compiler-readiness findings (6)
+- **F-LANG-SPEC-10 (P0)** — Temporal-content validation diagnostics unwired; invalid date inputs crash the MCP server via unhandled exception path. Production bug.
+- **F-LS-02 (P1)** — 3 `DiagnosticPublishIntegrationTests` fail with `TaskCanceledException`, correlated with `VSTHRD003` deadlock-risk warning at the same file.
+- **F-X-01 (P1)** — `F5TempVerify.cs` dev-only test file in committed tree (causes 7 of 11 baseline failures by running against samples).
+- **F-LANG-04 (P1)** — `SyntaxReferenceTests.ConstructorPattern_ExistentialFields_DslSnippet_CompilesClean` references non-existent `SyntaxReference` pattern (1 of 11 baseline failures).
+- **F-LANG-CAT-15 (P1)** — `Operations.Resolve` decision was **implement** — 4-line wrapper + move `DisambiguateCandidates` from `TypeChecker.Expressions.cs:922` to `Operations.cs`; update 5 TC call sites at lines 885, 891, 898, 907, 986.
+- **F-LANG-SPEC-13 partial** — `NonOrderableCollectionExtreme` (PRE0065) emission audit; the related `CollectionOperationOnScalar` (PRE0047) lands in Phase 4 (F-LANG-COLL-08).
+
+### bugs.md MCP-crash family (5) — coordinated fix pass
+All five share the same symptom: `precept_compile` (or `precept_domains` for BUG-007) returns `"An error occurred invoking ..."` with no PRE-code, no diagnostic. Different code paths, same MCP-layer leakage. **Fix as a coordinated sweep**: instrument the MCP tool wrappers to never return raw "An error occurred invoking" — every exception path must be caught and converted to a structured diagnostic.
+
+- **BUG-003** — `period` field with typed-constant default crashes (`field G as period default '1 year'`). Root: typed-constant resolution path in period-default normalization.
+- **BUG-005** — `lookup of K to money in '<Currency>'` crashes at compile time. Root: parser accepts the type then mis-handles the trailing qualifier, crashing downstream. (Symptom fix here in Phase 2 — surface a clean diagnostic; root-cause fix in Phase 4 — actually support qualified-money lookup values.)
+- **BUG-007** — `precept_domains` MCP tool crashes on any scope. Root: server-side fault inside `tools/Precept.Mcp/Tools/DomainsTool.cs` or its DTO assembly. This means the MCP tool review (Stage 11 of the audit) was wrong to call MCP "0 findings, healthy" — there's a P1 bug in the tool.
+- **BUG-008** — `duration` field with typed-constant default crashes. Same code-path family as BUG-003.
+- **BUG-010** — `now() + '<duration>'` expression crashes. Same code-path family — temporal-literal evaluation in arithmetic context.
+
+### bugs.md MCP transport (1)
+- **BUG-009** — `precept_compile` has an undocumented payload-size limit at ~12-15 KB. Files >14 KB crash with the same MCP-layer symptom. Likely buffer size in MCP stdio transport, JSON serialization limit, or compiler memory limit. Needs investigation in `tools/Precept.Mcp/Tools/CompileTool.cs` and the MCP wrapper config.
+
+## Decisions required before Phase 2 starts
+
+2 from the gating list above (unchanged):
+- **F-LANG-04**: was the pattern renamed (recommend: rename test method to match `"Constructor Pattern (Atomic Creation)"`), or deliberately separate and lost (re-add an "Existential Fields" pattern)?
+- **F-X-01**: delete `F5TempVerify.cs` outright (parallel session's `SampleFieldStateRegressionTests.cs` already covers samples) OR promote to permanent `SampleCompilesCleanTests.cs` (drop the "TEMPORARY" docstring, update file count from "30" to "all `samples/*.precept`", remove dev-only language)?
+
+## Step-by-step execution
+
+### Step 2.1 — Settle the 2 Phase-2 decisions
+**Effort**: 15 minutes.
+
+### Step 2.2 — Compile-path robustness sweep (REPLACES the original temporal-only fix)
+**Files**:
+- `tools/Precept.Mcp/Tools/CompileTool.cs` — wrap entry point with try/catch that converts unhandled to structured `MCP error response with diagnostic context`
+- `tools/Precept.Mcp/Tools/DomainsTool.cs` — investigate BUG-007 root cause (likely DTO assembly issue or missing catalog dependency); same try/catch wrapper
+- `tools/Precept.Mcp/` other tools — apply same try/catch wrapper pattern preventively
+- `src/Precept/Language/Time/TemporalParser.cs` — fix the underlying throw (F-LANG-SPEC-10, BUG-003, BUG-008, BUG-010 all likely share this code path); wrap with try/catch that emits structured diagnostic
+- `src/Precept/Pipeline/TypeChecker.Expressions.TypedConstants.cs` — validator dispatch
+- `src/Precept/Language/TypedConstantValidation.cs` — validator infrastructure
+- `src/Precept/Language/Diagnostics.cs` — wire diagnostic emission paths
+- `src/Precept.Analyzers/DiagnosticCoverageAllowLists.cs` — remove the 5 temporal diagnostic codes from "no emission site wired" list (lines 68-72)
+**Approach**:
+1. **MCP wrapper instrumentation first** — every tool entry point gets a try/catch that translates raw exceptions into structured MCP error responses with the exception type, message, and where-it-happened context. Even if root-cause fixes lag, no consumer sees "An error occurred invoking" again.
+2. **Root-cause fix for the temporal literal family** (F-LANG-SPEC-10, BUG-003, BUG-008, BUG-010): trace where the exception originates (likely NodaTime parser throws on invalid input, OR a normalizer path); wrap with try/catch and translate to structured diagnostic. Cover invalid-date (`'2026-13-01'`), invalid-time (`'25:00:00'`), invalid-instant, period default (`'1 year'`), duration default (`'14 days'`), `now() + '<duration>'` arithmetic.
+3. **Root-cause fix for qualified-money-in-lookup symptom** (BUG-005 symptom): emit a clean `PRE0009`-style diagnostic when the parser hits `lookup of K to money in '<Currency>'` instead of crashing. (Full support for the construct lands in Phase 4.)
+4. **Root-cause fix for `precept_domains`** (BUG-007): investigate and fix the underlying tool failure.
+5. **Payload-size investigation** (BUG-009): identify the ~12-15 KB threshold; either remove the limit, raise it substantially, or document it explicitly with a clean error message when exceeded.
+6. **Add scenario tests** for every fixed bug in the appropriate test project.
+**Validation**:
+- No input to any MCP tool returns `An error occurred invoking ...`. Verified via `mcp__precept__precept_compile` probe battery (the 10+ inputs from F-LANG-SPEC-10, BUG-003, BUG-005, BUG-008, BUG-009 (large file), BUG-010).
+- `precept_domains` returns valid JSON for all scope arguments.
+- Allow list updated; analyzer (`Precept0027DiagnosticEmissionCoverage`) doesn't regress.
+- bugs.md entries for BUG-003, BUG-005 (symptom only), BUG-007, BUG-008, BUG-009, BUG-010 move from Active to Fixed with "Fixed by" notes.
+**Effort**: L (2-3 days — was M when scoped to F-LANG-SPEC-10 only; expanded for the bug family)
+
+### Step 2.3 — Investigate and fix LS publish-integration test failures (F-LS-02)
+*(unchanged from prior scoping)*
+**Effort**: M (1 day)
+
+### Step 2.4 — Resolve F5TempVerify (F-X-01)
+*(unchanged from prior scoping)*
+**Effort**: S (1-2 hours)
+
+### Step 2.5 — Fix SyntaxReferenceTests (F-LANG-04)
+*(unchanged from prior scoping)*
+**Effort**: S (30 min)
+
+### Step 2.6 — Implement Operations.Resolve (F-LANG-CAT-15)
+Decision 4 in Wave 0 was **implement**. Files:
+- `src/Precept/Language/Operations.cs` — add `public static BinaryOperationMeta? Resolve(OperatorKind op, TypeKind lhs, TypeKind rhs)` wrapper
+- Move `DisambiguateCandidates` from `TypeChecker.Expressions.cs:922` (currently private) to `Operations.cs` (public static)
+- Update 5 TC call sites at lines 885, 891, 898, 907, 986 to use `Operations.Resolve(...)` instead of `DisambiguateCandidates(Operations.FindCandidates(...))`
+- Add `Operations.ResolveTests` in `test/Precept.Tests/Language/OperationsTests.cs` — couple of basic cases (exact match, qualifier-disambiguation fallback)
+- Verify spec § 5 code sample now compiles and works
+**Effort**: S-M (~3-4 hours)
+
+### Step 2.7 — Verify the baseline is green
+**Approach**:
+- Run `dotnet test --no-build` from repo root. Verify all 4 test projects pass.
+- Run 10× to catch flakes.
+- Run `dotnet build` and verify 0 warnings.
+- Run `mcp__precept__precept_compile` against a battery of inputs from bugs.md repros to verify no crashes (including large files for BUG-009).
+- Run `mcp__precept__precept_domains` against all scopes to verify BUG-007 fix.
+**Validation**: clean baseline confirmed; recorded in remediation doc Appendix A.
+
+## Decisions required before Phase 2 starts
+
+2 from the gating list above:
+- **F-LANG-04**: was the pattern renamed (recommend: rename test method to match `"Constructor Pattern (Atomic Creation)"`), or deliberately separate and lost (re-add an "Existential Fields" pattern)? Need to inspect git history if owner doesn't recall — `git log -p src/Precept/Language/SyntaxReference.cs` may reveal.
+- **F-X-01**: delete `F5TempVerify.cs` outright (parallel session's `SampleFieldStateRegressionTests.cs` already covers samples) OR promote to permanent `SampleCompilesCleanTests.cs` (drop the "TEMPORARY" docstring, update file count from "30" to "all `samples/*.precept`", remove dev-only language)?
+
+Plus, if Phase 1's F-LANG-CAT-15 decision was "implement Resolve," that becomes a Phase 2 sub-task.
+
+## Step-by-step execution
+
+### Step 2.1 — Settle the 2 Phase-2 decisions
+**Effort**: 15 minutes.
+
+### Step 2.2 — Fix temporal validation crash (F-LANG-SPEC-10)
+**Files**:
+- `src/Precept/Language/Time/TemporalParser.cs` (likely throw site)
+- `src/Precept/Pipeline/TypeChecker.Expressions.TypedConstants.cs` (validator dispatch)
+- `src/Precept/Language/TypedConstantValidation.cs` (validator infrastructure — already exists)
+- `src/Precept/Language/Diagnostics.cs` (wire `InvalidDateValue` / `InvalidDateFormat` / `InvalidTimeValue` / `InvalidInstantFormat` / `InvalidTypedConstantContent` emission paths)
+- `src/Precept.Analyzers/DiagnosticCoverageAllowLists.cs` (remove `InvalidDateValue`, `InvalidDateFormat`, `InvalidTimeValue`, `InvalidInstantFormat`, `InvalidTypedConstantContent` from the "no emission site wired" list — lines 68-72)
+**Approach**:
+1. Trace where the exception originates. Likely `NodaTime` parser throws on invalid input; wrap with try/catch and translate to structured diagnostic.
+2. For each invalid-input shape, emit the appropriate `DiagnosticCode` via `Diagnostics.Create(...)` rather than throwing.
+3. Add scenario tests in `test/Precept.Tests/Language/Time/` covering each invalid form:
+   - `'2026-13-01'` → `InvalidDateValue`
+   - `'2026-02-31'` → `InvalidDateValue`
+   - `'bad-date'` → `InvalidDateFormat`
+   - `'25:00:00'` → `InvalidTimeValue`
+   - `'2026-01-01T10:00:00'` for `instant` → `InvalidInstantFormat` (missing timezone/UTC marker)
+4. Verify via `mcp__precept__precept_compile` that no input now returns `An error occurred invoking 'precept_compile'`.
+**Validation**:
+- All 5 sample inputs above return structured diagnostics (severity Error, code matches expected).
+- MCP server returns valid JSON response for every input — no `An error occurred invoking` shape.
+- Allow list updated; analyzer (`Precept0027DiagnosticEmissionCoverage`) doesn't regress.
+**Effort**: M (1 day — validators exist, need hookup and exception path closure).
+
+### Step 2.3 — Investigate and fix LS publish-integration test failures (F-LS-02)
+**Files**:
+- `test/Precept.LanguageServer.Tests/DiagnosticPublishIntegrationTests.cs` (3 failing tests around lines 134-175)
+- Likely also `tools/Precept.LanguageServer/Handlers/TextDocumentSync*.cs` or `DiagnosticPublisher.cs`
+**Approach**:
+1. Read the failing tests and the VSTHRD003 warning at line 162.
+2. Decide whether the failure is in test infrastructure (await pattern flagged by analyzer) or in production code (LS races on out-of-order publishes).
+   - Hypothesis A (test bug): the `await stalePublishTask` at line 162 is awaiting a Task whose context is the same as the awaiter — fine — but the cancellation token wiring may not actually trigger as expected.
+   - Hypothesis B (real bug): the LS publishes diagnostics for version 2 after version 3 is requested, producing an out-of-order publish that the test correctly detects but in an unreliable way.
+3. Fix the root cause. If Hypothesis B, the LS publishing path needs version-comparison logic. If Hypothesis A, the test needs restructuring.
+4. Eliminate the `VSTHRD003` warning by restructuring the await pattern.
+**Validation**:
+- All 3 tests pass reliably (run 10 times, no flake).
+- Build is 0 warnings (down from the current 2 — `VSTHRD003` and `VSTHRD200`).
+**Effort**: M (1 day — investigation + fix).
+
+### Step 2.4 — Resolve F5TempVerify (F-X-01)
+**Files**:
+- `test/Precept.Tests/F5TempVerify.cs`
+- Possibly `test/Precept.Tests/SampleFieldStateRegressionTests.cs` (if promote path)
+- Possibly new `test/Precept.Tests/SampleCompilesCleanTests.cs`
+**Approach** depending on Phase-2 decision:
+- **Delete path**: remove `F5TempVerify.cs`. Verify the existing `SampleFieldStateRegressionTests.cs` covers compile-clean assertion. If gap, extend that file.
+- **Promote path**: rename file to `SampleCompilesCleanTests.cs`. Remove "TEMPORARY" docstring and `// Remove this file after F5 verification` comment. Update file count from "30" reference to count `samples/*.precept` dynamically. Add a class-level docstring explaining its permanent role.
+**Validation**:
+- The 7 sample compilation failures are no longer reported as `F5TempVerify` failures (either gone or moved to the renamed/extended test class).
+- Sample regressions still tracked (they don't disappear silently — they should still fail until the parallel session fixes the underlying samples).
+- Doc note added pointing readers to `bugs.md` for sample-side issues.
+**Effort**: S (1-2 hours).
+
+### Step 2.5 — Fix SyntaxReferenceTests (F-LANG-04)
+**Files**:
+- `test/Precept.Tests/SyntaxReferenceTests.cs:157-163`
+- Possibly `src/Precept/Language/SyntaxReference.cs` (if restore path)
+**Approach**:
+- **Rename test path** (recommended unless owner says pattern was deliberately separate): change `pattern.Name == "Constructor Pattern (Existential Fields)"` to `"Constructor Pattern (Atomic Creation)"` to match the actual pattern at `SyntaxReference.cs:230`.
+- **Restore pattern path**: add back an "Existential Fields" pattern to `SyntaxReference.CommonPatterns` with a meaningful snippet and description.
+**Validation**: test passes; full test suite is 0 failures across all 4 projects.
+**Effort**: S (30 min).
+
+### Step 2.6 — Operations.Resolve resolution (if Phase 1 decision was "implement")
+**Files**:
+- `src/Precept/Language/Operations.cs`
+- Tests in `test/Precept.Tests/Language/OperationsTests.cs`
+**Approach**: implement `Operations.Resolve(OperatorKind op, Type lhs, Type rhs) → OperationMeta?` per the spec § 5 sample. Existing `FindUnary` / `FindCandidates` provide the implementation building blocks.
+**Validation**: spec § 5 code sample compiles and works as documented.
+**Effort**: S-M.
+
+### Step 2.7 — Verify the baseline is green
+**Approach**:
+- Run `dotnet test --no-build` from repo root. Verify all 4 test projects pass.
+- Run 10× to catch flakes.
+- Run `dotnet build` and verify 0 warnings.
+- Run `mcp__precept__precept_compile` against a battery of invalid temporal inputs to verify no crashes.
+**Validation**: clean baseline confirmed; recorded in remediation doc Appendix A.
+
+## Dependencies
+- Phase 1 must complete first (docs need to be truthful before code work — otherwise the temporal validation fix might add code that contradicts a still-stale `temporal-type-system.md` claim).
+- Sample-edit constraint: do not touch `samples/*.precept`. Sample failures persist after Phase 2 if they're sample-side bugs.
+
+## Exit criteria
+- [ ] `dotnet test` returns 0 failures across all 4 projects: `Precept.Tests`, `Precept.LanguageServer.Tests`, `Precept.Mcp.Tests`, `Precept.Analyzers.Tests`. Run 10× without flake.
+- [ ] `dotnet build` returns 0 warnings.
+- [ ] **No MCP tool returns `An error occurred invoking ...` for any input.** Verified via probe battery covering F-LANG-SPEC-10 (5 invalid temporal inputs) + BUG-003 + BUG-005 + BUG-007 + BUG-008 + BUG-009 (large file) + BUG-010.
+- [ ] `precept_domains` returns valid JSON for all scope arguments (BUG-007 fixed).
+- [ ] Files >14 KB compile via `precept_compile` without crashing (BUG-009 fixed or threshold raised + documented).
+- [ ] `F5TempVerify.cs` either deleted or renamed with permanent docstring.
+- [ ] `SyntaxReferenceTests.cs:157` passes (no more `InvalidOperationException` from `.Single(...)`).
+- [ ] `src/Precept.Analyzers/DiagnosticCoverageAllowLists.cs` updated: 5 temporal diagnostic codes removed from the "no emission site wired" list.
+- [ ] `Operations.Resolve` shipped; 5 TC call sites updated; spec § 5 code sample compiles.
+- [ ] `bugs.md` entries for BUG-003, BUG-005 (symptom only — full fix in Phase 4), BUG-007, BUG-008, BUG-009, BUG-010 moved from Active to Fixed with "Fixed by" notes citing commits.
+- [ ] Sample-side failures, if any remain, are routed to `bugs.md` (not modified from this workstream).
+
+## Estimated effort
+- Step 2.1 (decisions): 15 min
+- Step 2.2 (compile-path robustness sweep — F-LANG-SPEC-10 + BUG-003 + BUG-005 symptom + BUG-007 + BUG-008 + BUG-009 + BUG-010): 2-3 days
+- Step 2.3 (LS test investigation + fix): 1 day
+- Step 2.4 (F5TempVerify): 1-2 hours
+- Step 2.5 (SyntaxReferenceTests): 30 min
+- Step 2.6 (Operations.Resolve implementation): 3-4 hours
+- Step 2.7 (verification): 30 min
+
+**Phase 2 total**: **4-5 days** (was 2-3 days when scoped to F-LANG-SPEC-10 only; expanded after bugs.md integration to cover the full MCP-crash family).
+
+---
+
+# Phase 3: Type system completeness
+
+**Goal**: Every documented capability of the primitive, temporal, and business-domain type systems is exercised by tests and works as the spec claims. Remove the per-`TypeKind` dispatch in `TypeChecker.Expressions.TypedConstants.cs` in favor of catalog-driven dispatch (catalog discipline).
+
+**Findings in scope** (~15):
+- F-LANG-PRIM-01 (string ordering — if "add ordering" decision)
+- F-LANG-PRIM-04 (RedundantModifier warning vs error)
+- F-LANG-TEMP-01/02 (context-aware `'3 days'`/`'2 weeks'` parser)
+- F-LANG-TEMP-03 (nonzero/nonnegative on duration)
+- F-LANG-TEMP-05 (mixed temporal quantities — option a: relax parser)
+- F-LANG-TEMP-06/07 (timezone error messages)
+- F-LANG-TEMP-08 (zoneddatetime ± period — pick authoritative side)
+- F-LANG-BIZ-02 (ISO 4217 implicit `maxplaces` D10)
+- F-LANG-BIZ-03 (currency accessors `.name`/`.minorUnit`/`.numericCode`/`.symbol`)
+- F-LANG-BIZ-04 (`CurrencyCatalog` public API: `Default`, `Get`, `TryGet`, `GetByNumericCode`, `IsValid`, `DataVersion`)
+- F-LANG-BIZ-05 (quantity × quantity non-cancelling rejection verification)
+- F-LANG-BIZ-06 (exchangerate implicit `positive`)
+- F-LANG-BIZ-08 (discrete equality narrowing infrastructure verification)
+- F-TC-04 (per-`TypeKind` dispatch `GetFormsForType` → catalog-driven)
+
+**Decisions required**:
+- F-LANG-PRIM-01: add `<`/`>`/`<=`/`>=` to `string` (and add `TypeTrait.Orderable`) OR drop ordering claim from doc?
+- F-LANG-PRIM-04: which severity for `nonnegative` + `positive` combination — warning (per doc, requires `Subsumes` mechanism) or error (per current catalog mutex)?
+- F-LANG-TEMP-08: catalog or doc authoritative for `zoneddatetime ± period`?
+
+**Status**: Stub — detailed execution plan TBD pending Phase 2 completion and the 3 listed decisions.
+**Estimated effort**: L (~1 week — substantial catalog and parser work, especially F-LANG-TEMP-01/02 context-aware parsing and F-LANG-BIZ-04 CurrencyCatalog API).
+
+---
+
+# Phase 4: Collection completeness
+
+**Goal**: Every documented capability of the 9 collection types works as specified. The catalog's action-applicability metadata is actually enforced. Two-field quantifier bindings for ordered collections work. Qualified inner types parse. The grammar doc's vocabulary matches code.
+
+**Findings in scope** (~16, expanded after bugs.md integration):
+- F-LANG-COLL-04 (.at(N) index-bounds proof obligation)
+- F-LANG-COLL-05 (log-by append uniqueness proof obligation)
+- F-LANG-COLL-06 (qualified inner types `set of money in 'USD'`, `set of quantity of 'length'`, etc.) — **root-cause fix for BUG-005 symptom** (Phase 2 ships clean diagnostic; Phase 4 actually supports the construct)
+- F-LANG-COLL-07 (queue of T by P two-field quantifier binding `.value`/`.by`)
+- F-LANG-COLL-08 (action `ApplicableTo` enforcement — emit PRE0047/0048)
+- F-LANG-COLL-09 (insert/remove-at index-bounds proof obligations)
+- F-LANG-COLL-11 (MissingOrderingKey rename + allocation)
+- F-LANG-COLL-02 (choice-in-collection-inner targeted diagnostic)
+- F-LANG-COLL-03 (ordered-choice trait propagation verification)
+- F-LANG-COLL-12 (Countof/Peekby inert tokens — remove or wire per decision)
+- F-LANG-GRAM-01 (vestigial `ConstructionRow` enum value — delete or document)
+- F-LANG-GRAM-02 (rename `ConstructionRowReject` → `EventRowReject`)
+- F-LANG-CAT-08 partial (`ProofRequirementKind` rewrite — the doc side; this phase ships new proof requirement code that the rewrite reflects)
+- **BUG-002** — `remove` on lookup expects value type instead of key. Fix: extend action catalog with key-removal shape for lookups, OR change `remove` dispatch on lookup to expect key type. Quality bar; worth fixing before lookup becomes more visible in tutorials. Workaround in samples uses `put k = 0` (orphan zero-valued entries).
+
+**Decisions required**:
+- F-LANG-COLL-11: rename PRE0104 to `RequiredTraitViolation` and allocate fresh code for missing-`by`, OR route missing-`by` through the new `CollectionOperationOnScalar` enforcement (Wave 4 from F-LANG-COLL-08)?
+- F-LANG-COLL-12: wire `Countof`/`Peekby` as keywords or remove from `TokenKind.cs`/`Tokens.cs`?
+
+**Status**: Stub — detailed execution plan TBD pending Phase 3 completion and the 2 listed decisions.
+**Estimated effort**: L (~1-1.5 weeks — F-LANG-COLL-06 is itself multi-day; F-LANG-COLL-08 needs a regression matrix test; F-LANG-COLL-07 needs new binding-shape infrastructure).
+
+---
+
+# Phase 5: Proof engine satisfiability extensions
+
+**Goal**: Close § 0.6 of the spec — the proof engine delivers all 13 documented obligation types. Dead/contradictory/vacuous/tautological detection ships. Collection proof obligations (.at bounds, log-by uniqueness, insert/remove-at bounds) ship.
+
+**Findings in scope** (~12, expanded after bugs.md integration):
+- F-LANG-SPEC-02 (dead-guard detection — `UnsatisfiableGuard` PRE0082)
+- F-LANG-SPEC-03 (contradictory rule detection — new diagnostic)
+- F-LANG-SPEC-04 (vacuous rule detection)
+- F-LANG-SPEC-05 (tautological guard detection)
+- F-LANG-SPEC-12 (sharpened routing diagnostics — depends on F-LANG-SPEC-02 + -05)
+- F-LANG-COLL-04/05/09 (collection proof obligations — could land in Phase 4 alongside the relevant collection feature; bundling depends on team preference)
+- F-LANG-BIZ-01 (money/price cancellation — proof for qualifier chain)
+- F-LANG-BIZ-05 (quantity × quantity policy enforcement verification)
+- F-LANG-TEMP-04 (always-false period literal comparison — small constant-folding analyzer)
+- **BUG-004** — Proof engine ignores event ensures for transition-row body narrowing. Fix: extend guard-extraction switch in `ProofEngine.Strategies.cs` so event ensures on the row's event contribute their `is set` predicates to body narrowing. Mirrors the BUG-001 fix shape. Trivial-to-small.
+- **BUG-006** — Proof engine doesn't combine guard narrowing with field-level `max` for arithmetic interval inference. Fix: extend the interval-narrowing strategy to compose guard-derived field bounds with field-modifier-derived bounds across rows. Design-required; same architectural family as the new dead-guard / contradictory-rule machinery.
+
+**Decisions required**:
+- F-LANG-TEMP-04: implement always-false period comparison warning or drop spec promise?
+- F-LANG-BIZ-01: add `MoneyDividePrice → Quantity` to catalog or accept asymmetric algebra?
+
+**Status**: Stub — detailed execution plan TBD pending Phase 4 completion. **This is the highest-variance phase** — each new proof obligation involves design questions about completeness, soundness, and counterexample reporting. May spawn additional Phase 5.1, 5.2 work.
+**Estimated effort**: XL (~2-3 weeks — proof engine extensions are intrinsically design-heavy).
+
+---
+
+# Phase 6: `units` block + composite period basis
+
+**Goal**: Two new declarative features ship: entity-scoped `units` block (F-LANG-BIZ-09) and composite period basis with `&` separator (F-LANG-BIZ-07).
+
+**Findings in scope** (2):
+- F-LANG-BIZ-07 (composite period basis `'years&months'` — parser + qualifier-value handling)
+- F-LANG-BIZ-09 (entity-scoped `units` block — new declarative construct: catalog entry, parser, name binder integration, type checker integration, doc updates)
+
+**Decisions required**: None — both auto-decided by "build everything in MVP."
+
+**Status**: Stub — detailed execution plan TBD pending Phase 5 completion. F-LANG-BIZ-09 is a meaningful new construct — full Construct catalog entry, parser dispatch, slot model, samples needed.
+**Estimated effort**: L (~1 week — `units` block is the most "new feature"-shaped item in MVP).
+
+---
+
+# Phase 7: API surface solidity (typed descriptors + analyzer extensions)
+
+**Goal**: The compile-time public API surface uses typed descriptors, not string-keyed field references. Defensive-throw pattern removed in favor of compile-time enforcement via extended `[HandlesCatalogExhaustively]` coverage.
+
+**Findings in scope** (~6):
+- F-API-01 (typed field descriptor refactor — D8/R4 + G1/G9 milestones — affects `Inspection.cs`, `SharedTypes.cs`, `UpdateOutcome.cs`, `SemanticIndex.TypedFieldRef`)
+- F-X-03 (extend `[HandlesCatalogExhaustively]` analyzer coverage)
+- F-PAR-04 (defensive `InvalidOperationException` in Parser dispatch — becomes unreachable after F-X-03)
+- F-TC-02 (D26 invariant runtime throws → factory-enforced construction)
+- F-TC-03 (D5 SecondaryExpression invariant → DU subtype split)
+- F-LEX-02 (per-decision rationale policy enforcement — if owner ruled "all four legs required even retroactively," this phase backfills the rationale across stage docs)
+
+**Decisions required**:
+- F-API-01: ship as standalone refactor before runtime (this phase), or open the runtime phase with it? Owner ruling needed at planning time.
+
+**Status**: Stub — detailed execution plan TBD pending Phase 6 completion and F-API-01 sequencing decision.
+**Estimated effort**: M-L (~3-5 days — F-API-01 alone is a broad public-API change; the analyzer extensions are smaller).
+
+---
+
+# Phase 8: Diagnostic completeness
+
+**Goal**: Every diagnostic code declared in `DiagnosticCode.cs` is either emitted from a real code path, has scenario-test coverage that asserts it fires, or is explicitly retired. CI enforcement is bidirectional.
+
+**Findings in scope** (~7):
+- F-LANG-SPEC-06 (~startsWith/~endsWith first-arg-must-be-~string enforcement)
+- F-LANG-SPEC-09 (ChoiceElementTypeMismatch / ChoiceMissingElementType emission OR retirement)
+- F-LANG-SPEC-12 (OutOfRange constant-literal bounds check emission OR retirement)
+- F-LANG-SPEC-13 (NonOrderableCollectionExtreme emission OR consolidation with TypeMismatch)
+- Diagnostic scenario-coverage matrix completion (all 148 codes have scenario tests beyond just structural reflection)
+
+**Decisions required**:
+- F-LANG-SPEC-09: wire or retire ChoiceElementTypeMismatch / ChoiceMissingElementType?
+- F-LANG-SPEC-12: wire OutOfRange constant-literal check or remove from spec § 3.10?
+- F-LANG-SPEC-13: NonOrderableCollectionExtreme distinct emission or consolidate?
+
+**Status**: Stub — detailed execution plan TBD pending Phase 7 completion and the 3 listed decisions.
+**Estimated effort**: M (~3 days — each diagnostic is small, but scenario-coverage matrix completion is broad).
+
+---
+
+# Phase 9: Polish + cleanup
+
+**Goal**: Burn down the remaining P2 polish items. Remove dead code, defensive cleanups, doc cosmetics, deprecated tokens.
+
+**Findings in scope** (~20):
+- F-NB-01 (empty BuildDictionaries placeholder — delete or repurpose)
+- F-LEX-03 (lexer.md "(~687 lines)" parenthetical — already in Phase 1, but flagged here if not)
+- F-PRF-01 (proof-engine.md sample-count reference stale "20 → 64")
+- F-LS-03 (2 small LS TODOs)
+- All remaining P2 findings from per-stage reviews (defensive-throw cleanup, minor doc fixes, terminology cleanup)
+- F-CAT-01 (re-verify Frank's 2026-05-09 catalog audit — produce Fixed/Partial/Persists/Reopened delta for every one of the 27 violations; lift any Persists/Partial to new F-CAT findings)
+
+**Decisions required** (4):
+- F-NB-01: delete BuildDictionaries() or repurpose to materialize immutable dictionaries?
+- F-LANG-CAT-23: Roslyn rules doc location (Phase 1 may have settled this — re-check)
+- F-X-03 cleanup of removed defensive throws (Phase 7 may have settled — re-check)
+- Any P2s where the implementer needs guidance.
+
+**Status**: Stub — detailed execution plan TBD pending Phase 8 completion.
+**Estimated effort**: M (~3 days — many small items, parallelizable).
+
+---
+
+# Phase 10: Runtime gate verification
+
+**Goal**: Confirm the compiler is production-ready. Open the runtime gate.
+
+**Findings in scope**: None new — this phase is verification only.
+
+**Decisions required**: None.
+
+**Steps** (preview):
+1. Full test suite green across all 4 projects, 10 runs without flake.
+2. `dotnet build` zero warnings.
+3. MCP server smoke-test battery (compile a representative sample of `.precept` files, verify each returns valid JSON).
+4. Doc/code reconciliation pass: every Status field on every doc reflects actual implementation state.
+5. Catalog discipline final sweep: catalog count tests pass; no parallel keyword lists; no hand-edited `tmLanguage.json`.
+6. Diagnostic scenario-coverage matrix is complete (every code has both structural and scenario tests).
+7. F-CAT-01 delta confirms zero P0/P1 catalog discipline violations remain.
+8. Owner sign-off — runtime gate opens.
+
+**Status**: Stub — detailed verification plan TBD pending Phase 9 completion.
+**Estimated effort**: S (~1 day verification work).
+
+---
+
+## Definition of "compiler production-ready" (runtime gate exit criteria)
+
+The compiler is declared production-ready when **all** of the following hold:
+
+- All 98 review findings closed (status updated in this plan and in remediation doc).
+- `dotnet test`: 0 failures across all 4 projects.
+- `dotnet build`: 0 warnings.
+- MCP server: 0 unhandled exceptions on any input.
+- Every doc in `docs/language/` and `docs/compiler/` declared "Implemented" matches code at the section level.
+- Catalog discipline sweep (F-CAT-01 delta): zero violations.
+- Diagnostic scenario-coverage: every `DiagnosticCode` enum member has both structural test (reflection-based, already covered by `DiagnosticCatalogTests`) AND at least one scenario test asserting fire-conditions.
+- No `NotImplementedException` in compile-time paths (Runtime/Evaluator.cs Fire/Update/Restore stubs are now the runtime work — not "compile-time").
+- No `TODO`/`FIXME`/`HACK`/`XXX` in compile-time paths without a tracked issue link.
+- MCP wrappers all ≤ ~30 LOC of non-serialization logic.
+- `tmLanguage.json` regenerated and verified not hand-edited.
+- All spec § 0.6 obligations documented as implemented in the spec are actually implemented.
+- Spec § 0.5 cleanly separates shipped from forward-looking.
+- F-API-01 typed descriptor refactor shipped (so runtime builds against the final API shape).
+- Owner sign-off: "ready to start runtime work."
+
+---
+
+## Companion artifacts
+
+- [`compiler-readiness-review-2026-05-24.md`](compiler-readiness-review-2026-05-24.md) — the audit (what we found).
+- [`compiler-readiness-review-2026-05-24-appendices/audit-precept-language-spec.md`](compiler-readiness-review-2026-05-24-appendices/audit-precept-language-spec.md) — sub-agent: language spec.
+- [`compiler-readiness-review-2026-05-24-appendices/audit-type-system-docs.md`](compiler-readiness-review-2026-05-24-appendices/audit-type-system-docs.md) — sub-agent: primitive/temporal/business-domain.
+- [`compiler-readiness-review-2026-05-24-appendices/audit-collections-grammar-docs.md`](compiler-readiness-review-2026-05-24-appendices/audit-collections-grammar-docs.md) — sub-agent: collections + grammar.
+- [`compiler-readiness-review-2026-05-24-appendices/audit-catalog-system.md`](compiler-readiness-review-2026-05-24-appendices/audit-catalog-system.md) — sub-agent: catalog system.
+- [`bugs.md`](bugs.md) — sample-side bugs (parallel session).
+
+---
+
+## Plan update protocol
+
+When a phase completes:
+1. Update the Phase summary table: change Status to "Complete" with date.
+2. Update the relevant findings in `compiler-readiness-review-2026-05-24.md` to mark closed.
+3. If new findings surfaced during execution, add to the appropriate later phase.
+
+When a Phase 3-10 phase is about to kick off:
+1. Promote the stub to a detailed heavyweight section (matching Phase 1-2 shape).
+2. Confirm all upstream decisions are settled.
+3. Re-verify scope against the current finding state (some items may have been addressed incidentally).

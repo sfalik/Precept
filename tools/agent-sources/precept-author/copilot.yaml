@@ -1,0 +1,10 @@
+name: Precept Author
+description: Author, edit, validate, and debug Precept DSL definitions — designs from domain requirements, modifies states/events/fields/rules/transitions, diagnoses compile errors, debugs transition behavior, generates state diagrams
+icon: ./precept-author-icon.svg
+tools:
+  - read
+  - edit
+  - run_in_terminal
+  - search
+  - fetch
+  - precept/*

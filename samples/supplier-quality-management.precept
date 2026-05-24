@@ -1,0 +1,259 @@
+precept SupplierQualityManagement
+
+# A supplier qualification and ongoing-quality record. The supplier
+# registers with identity data, moves through a documentation review,
+# and either qualifies as an approved vendor or is rejected. Once
+# Approved, ongoing performance scoring keeps the supplier governed:
+# poor performance drops them into Monitored; sustained recovery
+# restores Approved; severe defects suspend the relationship.
+# Exceptional sustained performance promotes Approved → Qualified.
+
+# Supplier identity
+field SupplierNumber as string notempty maxlength 50
+field SupplierName as string notempty maxlength 200
+field ContactName as string optional maxlength 200
+field ContactEmail as string optional maxlength 200
+field PrimaryCategory as choice of string("RawMaterials", "Components", "SubAssembly", "Packaging", "Logistics", "Other")
+field RegistrationDate as date
+field Country as string optional maxlength 100
+
+# Quality and delivery scores — 0..100 normalised, exact decimal.
+field QualityScore as decimal default 0 nonnegative max 100 maxplaces 2
+field DeliveryScore as decimal default 0 nonnegative max 100 maxplaces 2
+field OverallScore as decimal nonnegative max 100 maxplaces 2 <- (QualityScore + DeliveryScore) / 2
+
+# Defect tracking — per-defect-type counts plus aggregate.
+field DefectRecords as lookup of string to integer
+field TotalDefects as integer default 0 nonnegative
+field UnitsInspected as integer default 0 nonnegative
+field DefectRate as decimal default 0 nonnegative max 100 maxplaces 4
+
+# Certifications — optional until established; expiry tracked.
+field Certification as choice of string("ISO9001", "IATF16949", "AS9100", "ISO14001", "ISO45001", "Other") optional
+field CertificationExpiry as date optional
+field InternalAuditPassed as boolean default false
+field LastAuditDate as date optional
+
+# Ongoing performance metrics
+field OnTimeDeliveryRate as decimal default 100 nonnegative max 100 maxplaces 2
+field FirstPassYield as decimal default 100 nonnegative max 100 maxplaces 2
+field OpenNonconformances as integer default 0 nonnegative
+field ClosedNonconformances as integer default 0 nonnegative
+
+# Suspension and reinstatement
+field SuspensionReason as string optional maxlength 500
+field ReinstatementDate as date optional
+
+# Audit trail
+field QualityLog as log of string
+
+# Timestamps tracking each lifecycle phase
+field RegisteredAt as instant
+field LastReviewAt as instant optional
+field LastAuditAt as instant optional
+field SuspendedAt as instant optional
+field QualifiedAt as instant optional
+field ClosedAt as instant optional
+
+# Review notes, improvement plan, closure reason
+field ReviewNotes as string optional maxlength 2000
+field ImprovementPlan as string optional maxlength 2000
+field ClosureReason as string optional maxlength 500
+
+# Rules — structural invariants the proof engine enforces.
+rule DefectRate <= 100 because "Defect rate {DefectRate}% cannot exceed 100% — a rate above 100% would mean more defects than units inspected"
+
+# States
+state Registered initial
+state UnderReview
+state Approved
+state Monitored
+state Suspended
+state Qualified
+state Rejected terminal
+state Discontinued terminal
+
+# State ensures
+in UnderReview ensure LastReviewAt is set because "A supplier under review must record when review began"
+in Approved ensure OverallScore >= 70 because "Approved suppliers must maintain an overall score of at least 70 (current {OverallScore})"
+in Monitored ensure LastReviewAt is set because "A monitored supplier must have an on-record review"
+in Suspended ensure SuspendedAt is set because "Suspended suppliers must record when suspension took effect"
+in Suspended ensure SuspensionReason is set because "Suspended suppliers must document the suspension reason — required for reinstatement review"
+in Qualified ensure QualifiedAt is set because "Qualified suppliers must record when qualification was granted"
+in Qualified ensure OverallScore >= 85 because "Qualified status requires an overall score of at least 85 (current {OverallScore})"
+in Discontinued ensure ClosedAt is set because "Discontinued suppliers must record when the relationship ended"
+in Discontinued ensure ClosureReason is set because "Discontinued suppliers must document why the relationship ended — required for audit"
+
+# Construction — supplier registers with identity, category, and date.
+event Create(
+    SupplierNumber as string notempty maxlength 50,
+    SupplierName as string notempty maxlength 200,
+    PrimaryCategory as choice of string("RawMaterials", "Components", "SubAssembly", "Packaging", "Logistics", "Other"),
+    RegistrationDate as date,
+    Country as string optional maxlength 100) initial
+
+# Supplier-record events
+event SetContact(ContactName as string notempty maxlength 200, ContactEmail as string notempty maxlength 200)
+event SubmitDocumentation(DocumentType as string notempty maxlength 100)
+event SetCertification(
+    CertType as choice of string("ISO9001", "IATF16949", "AS9100", "ISO14001", "ISO45001", "Other"),
+    ExpiryDate as date)
+event BeginReview
+event CompleteReview(
+    QualityScore as decimal nonnegative max 100,
+    DeliveryScore as decimal nonnegative max 100,
+    ReviewNotes as string optional maxlength 2000)
+event RejectSupplier(Reason as string notempty maxlength 500)
+event RecordDefect(
+    DefectType as string notempty maxlength 100,
+    Quantity as integer positive,
+    UnitsInspected as integer positive)
+event UpdatePerformance(
+    OnTimeDeliveryRate as decimal nonnegative max 100,
+    FirstPassYield as decimal nonnegative max 100,
+    OpenNonconformances as integer nonnegative,
+    ClosedNonconformances as integer nonnegative)
+event PassAudit
+event FailAudit(Reason as string notempty maxlength 500)
+event Suspend(Reason as string notempty maxlength 500)
+event Reinstate
+event PromoteToApproved
+event DeclareQualified
+event Discontinue(Reason as string notempty maxlength 500)
+
+on CompleteReview ensure CompleteReview.QualityScore + CompleteReview.DeliveryScore <= 200 because "Composite review scores cannot exceed the maximum of 200 (quality + delivery, each 0..100)"
+
+# Construction row — populate fields and arrive in Registered.
+on Create
+    -> set SupplierNumber = Create.SupplierNumber
+    -> set SupplierName = Create.SupplierName
+    -> set PrimaryCategory = Create.PrimaryCategory
+    -> set RegistrationDate = Create.RegistrationDate
+    -> set Country = Create.Country
+    -> set RegisteredAt = now()
+    -> append QualityLog "Supplier registered: {Create.SupplierNumber}"
+
+# Contact and documentation — captured during onboarding and after.
+from Registered, UnderReview, Approved, Monitored on SetContact
+    -> set ContactName = SetContact.ContactName
+    -> set ContactEmail = SetContact.ContactEmail
+    -> append QualityLog "Contact updated: {SetContact.ContactName}"
+    -> no transition
+
+from Registered on SubmitDocumentation
+    -> append QualityLog "Documentation submitted: {SubmitDocumentation.DocumentType}"
+    -> no transition
+
+# Certification can be set or refreshed any time before suspension.
+from Registered, UnderReview, Approved, Monitored, Qualified on SetCertification
+    -> set Certification = SetCertification.CertType
+    -> set CertificationExpiry = SetCertification.ExpiryDate
+    -> append QualityLog "Certification recorded: {SetCertification.CertType}"
+    -> no transition
+
+# Begin review — Registered → UnderReview.
+from Registered on BeginReview
+    -> set LastReviewAt = now()
+    -> append QualityLog "Supplier review initiated"
+    -> transition UnderReview
+
+# Complete review — score-driven outcome funnel. Order: most stringent first.
+from UnderReview on CompleteReview when CompleteReview.QualityScore + CompleteReview.DeliveryScore < 140
+    -> reject "Composite score of {(CompleteReview.QualityScore + CompleteReview.DeliveryScore) / 2} is below the 70 minimum required for approval"
+from UnderReview on CompleteReview when (CompleteReview.QualityScore + CompleteReview.DeliveryScore) / 2 >= 85
+    -> set QualityScore = CompleteReview.QualityScore
+    -> set DeliveryScore = CompleteReview.DeliveryScore
+    -> set ReviewNotes = CompleteReview.ReviewNotes
+    -> set LastReviewAt = now()
+    -> set QualifiedAt = now()
+    -> append QualityLog "Review complete — qualified supplier"
+    -> transition Qualified
+from UnderReview on CompleteReview
+    -> set QualityScore = CompleteReview.QualityScore
+    -> set DeliveryScore = CompleteReview.DeliveryScore
+    -> set ReviewNotes = CompleteReview.ReviewNotes
+    -> set LastReviewAt = now()
+    -> append QualityLog "Review complete — supplier approved"
+    -> transition Approved
+
+# Reject — terminal outcome from review.
+from UnderReview on RejectSupplier
+    -> append QualityLog "Supplier rejected: {RejectSupplier.Reason}"
+    -> transition Rejected
+
+# Record defect — accumulate per-type and aggregate counts.
+from Approved, Monitored on RecordDefect
+    -> put DefectRecords RecordDefect.DefectType = RecordDefect.Quantity
+    -> set TotalDefects = TotalDefects + RecordDefect.Quantity
+    -> set UnitsInspected = UnitsInspected + RecordDefect.UnitsInspected
+    -> append QualityLog "Defect recorded: {RecordDefect.DefectType} ({RecordDefect.Quantity})"
+    -> no transition
+
+# Update performance — scores update, then assess against thresholds.
+from Approved on UpdatePerformance when UpdatePerformance.FirstPassYield < 90 or UpdatePerformance.OpenNonconformances > 5
+    -> set OnTimeDeliveryRate = UpdatePerformance.OnTimeDeliveryRate
+    -> set FirstPassYield = UpdatePerformance.FirstPassYield
+    -> set OpenNonconformances = UpdatePerformance.OpenNonconformances
+    -> set ClosedNonconformances = UpdatePerformance.ClosedNonconformances
+    -> append QualityLog "Performance update — moved to monitored (FPY {UpdatePerformance.FirstPassYield}%, open NCRs {UpdatePerformance.OpenNonconformances})"
+    -> transition Monitored
+from Approved, Monitored on UpdatePerformance
+    -> set OnTimeDeliveryRate = UpdatePerformance.OnTimeDeliveryRate
+    -> set FirstPassYield = UpdatePerformance.FirstPassYield
+    -> set OpenNonconformances = UpdatePerformance.OpenNonconformances
+    -> set ClosedNonconformances = UpdatePerformance.ClosedNonconformances
+    -> append QualityLog "Performance metrics updated"
+    -> no transition
+
+# Promote Monitored → Approved when sustained recovery.
+from Monitored on PromoteToApproved when FirstPassYield >= 95 and OpenNonconformances == 0
+    -> set LastReviewAt = now()
+    -> append QualityLog "Sustained recovery — supplier returned to approved"
+    -> transition Approved
+from Monitored on PromoteToApproved
+    -> reject "Recovery threshold not met — requires FPY {FirstPassYield}% to be at least 95% and open NCRs {OpenNonconformances} to be zero"
+
+# Audit outcomes
+from Approved, Monitored, Qualified on PassAudit
+    -> set InternalAuditPassed = true
+    -> set LastAuditAt = now()
+    -> set LastAuditDate = RegistrationDate
+    -> append QualityLog "Audit passed"
+    -> no transition
+
+from Approved, Monitored, Qualified on FailAudit
+    -> set InternalAuditPassed = false
+    -> set LastAuditAt = now()
+    -> set SuspensionReason = "Audit failure: {FailAudit.Reason}"
+    -> set SuspendedAt = now()
+    -> append QualityLog "Audit failed — supplier suspended: {FailAudit.Reason}"
+    -> transition Suspended
+
+# Suspend — from any active state.
+from Approved, Monitored, Qualified on Suspend
+    -> set SuspensionReason = Suspend.Reason
+    -> set SuspendedAt = now()
+    -> append QualityLog "Supplier suspended: {Suspend.Reason}"
+    -> transition Suspended
+
+# Reinstate — Suspended → Approved (returns to standard governance).
+from Suspended on Reinstate
+    -> set ReinstatementDate = RegistrationDate
+    -> set LastReviewAt = now()
+    -> append QualityLog "Supplier reinstated"
+    -> transition Approved
+
+# Declare qualified — Approved → Qualified when exceptional sustained performance.
+from Approved on DeclareQualified when OverallScore >= 85
+    -> set QualifiedAt = now()
+    -> append QualityLog "Supplier declared qualified"
+    -> transition Qualified
+from Approved on DeclareQualified
+    -> reject "Qualification requires an overall score of at least 85 (current {OverallScore})"
+
+# Discontinue — end the supplier relationship from any active or suspended state.
+from Approved, Monitored, Suspended, Qualified on Discontinue
+    -> set ClosureReason = Discontinue.Reason
+    -> set ClosedAt = now()
+    -> append QualityLog "Supplier relationship discontinued: {Discontinue.Reason}"
+    -> transition Discontinued

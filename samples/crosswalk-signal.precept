@@ -1,8 +1,14 @@
 precept CrosswalkSignal
 
-# A pedestrian crosswalk signal. Pedestrians press a request button to
-# trigger a Walk phase. The signal cycles through Walk and FlashingDontWalk
-# with a decreasing countdown before returning to DontWalk.
+# A pedestrian crosswalk signal. A pedestrian presses the request button at
+# any time; the signal honors the request on the next Advance from DontWalk,
+# runs a Walk phase, flashes a decreasing don't-walk countdown, and returns
+# to DontWalk. Without a pending request, an Advance from DontWalk is a no-op
+# — the signal does not interrupt vehicle traffic without demand.
+#
+# Demonstrates: cross-cutting event (`from any on PedestrianRequest`), guard
+# branching on a flag (RequestPending), and a decrementing countdown across
+# successive Advance events.
 
 field RequestPending as boolean default false
 field CycleCount as integer default 0 nonnegative
@@ -12,17 +18,29 @@ state DontWalk initial
 state Walk
 state FlashingDontWalk
 
-in Walk ensure CountdownSeconds > 0 because "Walk phase requires a positive countdown"
+# State ensures — the field-level `nonnegative` modifier already prevents
+# a negative countdown; the Walk-state floor here is stricter: zero is not
+# enough to give the pedestrian time to cross.
+in Walk ensure CountdownSeconds > 0 because "Walk phase must carry a positive countdown — a zero-second walk gives the pedestrian no time to cross before the signal flips"
 
+# Editable window — the operator may pre-queue a request (e.g. a sensor sync
+# or accessibility-button calibration) while the signal is in DontWalk.
 in DontWalk modify RequestPending editable
 
+# Events
 event PedestrianRequest
 event Advance
 
+# ── Transitions ───────────────────────────────────────────────────────────────
+
+# Pedestrian requests can arrive in any phase; they latch until honored.
 from any on PedestrianRequest
     -> set RequestPending = true
     -> no transition
 
+# DontWalk — Advance with a pending request opens the Walk phase with a
+# 20-second countdown. Without a request, Advance is a no-op: the signal
+# stays put and continues to favor vehicle traffic.
 from DontWalk on Advance when RequestPending
     -> set RequestPending = false
     -> set CountdownSeconds = 20
@@ -31,11 +49,14 @@ from DontWalk on Advance when RequestPending
 from DontWalk on Advance
     -> no transition
 
+# Walk → FlashingDontWalk with a 7-second flashing countdown.
 from Walk on Advance
     -> set CountdownSeconds = 7
     -> set CycleCount = CycleCount + 1
     -> transition FlashingDontWalk
 
+# FlashingDontWalk — each Advance decrements the countdown; when the counter
+# would reach zero, the signal transitions back to DontWalk.
 from FlashingDontWalk on Advance when CountdownSeconds <= 1
     -> set CountdownSeconds = 0
     -> set CycleCount = CycleCount + 1

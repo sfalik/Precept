@@ -1,0 +1,231 @@
+precept SaasCustomerOnboarding
+
+# A SaaS customer onboarding record fed by the post-sale CRM. The customer
+# arrives in Kickoff with identity, account tier, and an assigned onboarding
+# manager. An onboarding plan moves the entity to Configuration, where
+# milestones are completed; assigning a training module advances to Training,
+# where the first login arrives. Active customers activate features, import
+# data, configure integrations, and resolve support tickets. Reaching the
+# milestone threshold transitions to Success (terminal); persistent
+# disengagement transitions to AtRisk (terminal). Stage is encoded by the
+# state — no parallel field needed.
+
+# Customer identity — fixed at construction.
+field CustomerId as string notempty maxlength 50
+field CustomerName as string notempty maxlength 200
+field CustomerEmail as string notempty maxlength 200
+field AccountTier as choice of string("Startup", "Growth", "Enterprise")
+field OnboardingManager as string notempty maxlength 200
+
+# Onboarding plan — established when leaving Kickoff.
+field TotalMilestones as integer default 0 nonnegative
+field CompletedMilestones as integer default 0 nonnegative
+field SuccessThreshold as integer default 80 nonnegative max 100
+
+# Milestone progress percentage — computed from milestone counts.
+# BUG-006: would prefer `integer default 0 nonnegative max 100` but the
+# proof engine can't compose the guard `TotalMilestones > 0` with field
+# bounds to prove `(CompletedMilestones * 100) / TotalMilestones <= 100`.
+# Dropped `max 100`; runtime rule below.
+field MilestonePercentage as integer default 0 nonnegative
+rule MilestonePercentage <= 100 because "Milestone percentage is a 0-100 ratio — values above 100 indicate a calculation error"
+
+# Training progress — module name to completion flag, and a derived count.
+field TrainingModules as lookup of string to boolean
+field TrainingModulesCompleted as integer default 0 nonnegative
+
+# Activation metrics — features turned on by the customer.
+field FeaturesActivated as set of string
+field FirstLoginDate as instant optional
+
+# Support tracking — open and resolved ticket counts.
+field SupportTicketsCreated as integer default 0 nonnegative
+field SupportTicketsResolved as integer default 0 nonnegative
+field AverageResolutionMinutes as integer default 0 nonnegative
+
+# Activity audit
+field OnboardingActivity as log of string
+field OnboardingStartedAt as instant
+field LastActivityAt as instant optional
+field CompletedAt as instant optional
+
+# Invariants — must hold whenever they apply, regardless of state.
+rule SupportTicketsResolved <= SupportTicketsCreated because "Resolved tickets cannot exceed created tickets — resolution is bounded by creation"
+rule CompletedMilestones <= TotalMilestones because "Completed milestones cannot exceed planned milestones — completion is bounded by the plan"
+
+# States — onboarding lifecycle. State encodes stage; no parallel field.
+state Kickoff initial
+state Configuration
+state Training
+state Active
+state Success terminal
+state AtRisk terminal
+
+# State ensures — each state activates a distinct rule set.
+in Configuration ensure TotalMilestones > 0 because "Configuration requires an onboarding plan — TotalMilestones must be set when the plan is established"
+in Training ensure TrainingModules.count > 0 because "Training requires at least one assigned training module — without modules there is nothing to train on"
+in Active ensure FirstLoginDate is set because "Active customers must have logged in at least once — the first-login event drives the transition into Active"
+in Active ensure TotalMilestones > 0 because "Active customers must have an onboarding plan with at least one milestone — the plan is established when leaving Kickoff"
+in Success ensure CompletedAt is set because "A successful onboarding must record when success was reached — required for retention reporting"
+in Success ensure MilestonePercentage >= SuccessThreshold because "Success requires reaching the milestone-completion threshold — otherwise the entity hasn't actually completed onboarding"
+in AtRisk ensure LastActivityAt is set because "AtRisk customers must record their last engagement — required for CSM follow-up"
+
+# Construction — CRM kicks off onboarding.
+event Create(
+    CustomerId as string notempty maxlength 50,
+    CustomerName as string notempty maxlength 200,
+    CustomerEmail as string notempty maxlength 200,
+    AccountTier as choice of string("Startup", "Growth", "Enterprise"),
+    OnboardingManager as string notempty maxlength 200) initial
+
+# Plan setup — milestones and the success threshold are declared.
+event SetOnboardingPlan(
+    TotalMilestones as integer positive,
+    SuccessThreshold as integer nonnegative max 100)
+on SetOnboardingPlan ensure SetOnboardingPlan.SuccessThreshold >= 50 because "Success threshold of {SetOnboardingPlan.SuccessThreshold}% is below the 50% floor — onboarding success requires meaningful milestone progress"
+
+# Milestone progress
+event CompleteMilestone(MilestoneName as string notempty maxlength 200)
+
+# Training
+event AssignTrainingModule(ModuleName as string notempty maxlength 200)
+event CompleteTrainingModule(ModuleName as string notempty maxlength 200)
+
+# Activation
+event RecordFirstLogin(LoginDate as instant)
+on RecordFirstLogin ensure RecordFirstLogin.LoginDate <= now() because "First login of {RecordFirstLogin.LoginDate} is in the future — login dates cannot be future-dated"
+
+event ActivateFeature(FeatureName as string notempty maxlength 200)
+event ImportData(DataSourceName as string notempty maxlength 200)
+event ConfigureIntegration(IntegrationName as string notempty maxlength 200)
+
+# Support
+event CreateSupportTicket(TicketDescription as string notempty maxlength 500)
+event ResolveSupportTicket(ResolutionMinutes as integer nonnegative)
+
+# Outcomes
+event MarkAsSuccessful
+event EscalateToAtRisk(Reason as string notempty maxlength 500)
+
+# Construction row — opens in Kickoff.
+on Create
+    -> set CustomerId = Create.CustomerId
+    -> set CustomerName = Create.CustomerName
+    -> set CustomerEmail = Create.CustomerEmail
+    -> set AccountTier = Create.AccountTier
+    -> set OnboardingManager = Create.OnboardingManager
+    -> set OnboardingStartedAt = now()
+    -> append OnboardingActivity "Onboarding initiated for {Create.CustomerName} ({Create.AccountTier})"
+
+# Plan setup — Kickoff → Configuration.
+from Kickoff on SetOnboardingPlan
+    -> set TotalMilestones = SetOnboardingPlan.TotalMilestones
+    -> set SuccessThreshold = SetOnboardingPlan.SuccessThreshold
+    -> set LastActivityAt = now()
+    -> append OnboardingActivity "Onboarding plan established: {SetOnboardingPlan.TotalMilestones} milestones, {SetOnboardingPlan.SuccessThreshold}% threshold"
+    -> transition Configuration
+
+# Milestone completion — Configuration and Active accumulate; threshold guard
+# at the top transitions Active customers into Success when reached.
+from Active on CompleteMilestone when CompletedMilestones + 1 >= (TotalMilestones * SuccessThreshold) / 100
+    -> set CompletedMilestones = CompletedMilestones + 1
+    -> set MilestonePercentage = ((CompletedMilestones + 1) * 100) / TotalMilestones
+    -> set CompletedAt = now()
+    -> set LastActivityAt = now()
+    -> append OnboardingActivity "Milestone completed: {CompleteMilestone.MilestoneName} — success threshold reached"
+    -> transition Success
+
+from Configuration on CompleteMilestone
+    -> set CompletedMilestones = CompletedMilestones + 1
+    -> set MilestonePercentage = ((CompletedMilestones + 1) * 100) / TotalMilestones
+    -> set LastActivityAt = now()
+    -> append OnboardingActivity "Milestone completed: {CompleteMilestone.MilestoneName}"
+    -> no transition
+
+from Active on CompleteMilestone
+    -> set CompletedMilestones = CompletedMilestones + 1
+    -> set MilestonePercentage = ((CompletedMilestones + 1) * 100) / TotalMilestones
+    -> set LastActivityAt = now()
+    -> append OnboardingActivity "Milestone completed: {CompleteMilestone.MilestoneName}"
+    -> no transition
+
+# Training module assignment — Configuration → Training; further assignments
+# stay in Training.
+from Configuration on AssignTrainingModule
+    -> put TrainingModules AssignTrainingModule.ModuleName = false
+    -> set LastActivityAt = now()
+    -> append OnboardingActivity "Training module assigned: {AssignTrainingModule.ModuleName}"
+    -> transition Training
+
+from Training on AssignTrainingModule
+    -> put TrainingModules AssignTrainingModule.ModuleName = false
+    -> set LastActivityAt = now()
+    -> append OnboardingActivity "Additional training module assigned: {AssignTrainingModule.ModuleName}"
+    -> no transition
+
+# Training completion
+from Training on CompleteTrainingModule
+    -> put TrainingModules CompleteTrainingModule.ModuleName = true
+    -> set TrainingModulesCompleted = TrainingModulesCompleted + 1
+    -> set LastActivityAt = now()
+    -> append OnboardingActivity "Training module completed: {CompleteTrainingModule.ModuleName}"
+    -> no transition
+
+# First login — Training → Active.
+from Training on RecordFirstLogin
+    -> set FirstLoginDate = RecordFirstLogin.LoginDate
+    -> add FeaturesActivated "Dashboard"
+    -> set LastActivityAt = now()
+    -> append OnboardingActivity "First login recorded at {RecordFirstLogin.LoginDate}"
+    -> transition Active
+
+# Feature activation, data import, integration configuration — stay Active.
+from Active on ActivateFeature
+    -> add FeaturesActivated ActivateFeature.FeatureName
+    -> set LastActivityAt = now()
+    -> append OnboardingActivity "Feature activated: {ActivateFeature.FeatureName}"
+    -> no transition
+
+from Active on ImportData
+    -> add FeaturesActivated "DataImport"
+    -> set LastActivityAt = now()
+    -> append OnboardingActivity "Data imported from {ImportData.DataSourceName}"
+    -> no transition
+
+from Active on ConfigureIntegration
+    -> add FeaturesActivated "Integration"
+    -> set LastActivityAt = now()
+    -> append OnboardingActivity "Integration configured: {ConfigureIntegration.IntegrationName}"
+    -> no transition
+
+# Support tickets — open from Configuration, Training, or Active.
+from Configuration, Training, Active on CreateSupportTicket
+    -> set SupportTicketsCreated = SupportTicketsCreated + 1
+    -> set LastActivityAt = now()
+    -> append OnboardingActivity "Support ticket opened: {CreateSupportTicket.TicketDescription}"
+    -> no transition
+
+from Configuration, Training, Active on ResolveSupportTicket when SupportTicketsResolved >= SupportTicketsCreated
+    -> reject "No outstanding support tickets to resolve — all {SupportTicketsCreated} tickets already resolved"
+from Configuration, Training, Active on ResolveSupportTicket
+    -> set SupportTicketsResolved = SupportTicketsResolved + 1
+    -> set AverageResolutionMinutes = ResolveSupportTicket.ResolutionMinutes
+    -> set LastActivityAt = now()
+    -> append OnboardingActivity "Support ticket resolved in {ResolveSupportTicket.ResolutionMinutes} minutes"
+    -> no transition
+
+# Manual success — Active only; rejects when threshold not yet met.
+from Active on MarkAsSuccessful when MilestonePercentage < SuccessThreshold
+    -> reject "Cannot mark successful at {MilestonePercentage}% — success threshold is {SuccessThreshold}%"
+from Active on MarkAsSuccessful
+    -> set CompletedAt = now()
+    -> set LastActivityAt = now()
+    -> append OnboardingActivity "Onboarding marked successful by CSM"
+    -> transition Success
+
+# Escalation — any non-terminal state → AtRisk.
+from Kickoff, Configuration, Training, Active on EscalateToAtRisk
+    -> set CompletedAt = now()
+    -> set LastActivityAt = now()
+    -> append OnboardingActivity "Customer escalated to at-risk: {EscalateToAtRisk.Reason}"
+    -> transition AtRisk

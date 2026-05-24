@@ -318,6 +318,83 @@ from Draft on Complete -> no transition";
     }
 
     // ════════════════════════════════════════════════════════════════════════
+    //  Rule / ensure guard narrowing (ConstraintContext)
+    //
+    //  Strategies 3 and 4 must read guards from ConstraintContext, not only from
+    //  transition rows / state hooks / event handlers. A rule's `when` clause is
+    //  the rule's own activation predicate — the body runs under its truth, so
+    //  presence narrowing through it is sound.
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void OptionalField_InRuleBody_WithIsSetGuard_DischargesPresenceObligation()
+    {
+        // A rule's `when X is set` guard must narrow X to guaranteed-present in the body.
+        const string precept = @"
+precept GuardedRule
+field MinScore as integer optional
+state Active initial
+rule MinScore >= 0 when MinScore is set because ""Minimum score, when configured, must be non-negative""";
+
+        var result = Compiler.Compile(precept);
+
+        result.Diagnostics.Should().NotContain(
+            d => d.Code == DiagnosticCode.UnprovedPresenceRequirement.ToString(),
+            "a rule's `when X is set` guard must discharge the presence obligation on X in the rule body");
+
+        result.Proof.Obligations
+            .Where(o => o.Requirement is PresenceProofRequirement && o.Context is ConstraintContext)
+            .All(o => o.Disposition == ProofDisposition.Proved)
+            .Should().BeTrue("all presence obligations under ConstraintContext must be proved by the rule's guard");
+    }
+
+    [Fact]
+    public void OptionalFields_InRuleBody_WithCompoundIsSetGuard_DischargePresenceObligations()
+    {
+        // `when A is set and B is set` must narrow both A and B in the body.
+        const string precept = @"
+precept GuardedRangeRule
+field Lower as integer optional
+field Upper as integer optional
+state Active initial
+rule Lower <= Upper when Lower is set and Upper is set because ""Lower bound must not exceed upper bound when both are configured""";
+
+        var result = Compiler.Compile(precept);
+
+        result.Diagnostics.Should().NotContain(
+            d => d.Code == DiagnosticCode.UnprovedPresenceRequirement.ToString(),
+            "a compound `is set` guard must discharge presence obligations on every guarded field");
+
+        result.Proof.Obligations
+            .Where(o => o.Requirement is PresenceProofRequirement && o.Context is ConstraintContext)
+            .All(o => o.Disposition == ProofDisposition.Proved)
+            .Should().BeTrue("every presence obligation in the rule body must reach Proved disposition under the compound guard — not merely escape the diagnostic check");
+    }
+
+    [Fact]
+    public void OptionalField_InEnsureBody_WithIsSetGuard_DischargesPresenceObligation()
+    {
+        // The same fix applies to state-scoped ensures with `when` guards (EnsureIdentity path).
+        const string precept = @"
+precept GuardedEnsure
+field StartDate as date optional
+field EndDate as date optional
+state Active initial
+in Active when StartDate is set and EndDate is set ensure StartDate <= EndDate because ""Start must not be after end when both dates are present""";
+
+        var result = Compiler.Compile(precept);
+
+        result.Diagnostics.Should().NotContain(
+            d => d.Code == DiagnosticCode.UnprovedPresenceRequirement.ToString(),
+            "an ensure's `when X is set` guard must discharge presence obligations on X in the ensure body");
+
+        result.Proof.Obligations
+            .Where(o => o.Requirement is PresenceProofRequirement && o.Context is ConstraintContext)
+            .All(o => o.Disposition == ProofDisposition.Proved)
+            .Should().BeTrue("every presence obligation in the ensure body must reach Proved disposition — exercises the EnsureIdentity arm of the ConstraintContext switch");
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
     //  TypedPostfixOp (`X is set`) is a presence CHECK — not a value usage
     // ════════════════════════════════════════════════════════════════════════
 

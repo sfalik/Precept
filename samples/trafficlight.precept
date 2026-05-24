@@ -1,13 +1,22 @@
 precept TrafficLight
 
-# A traffic-light controller with emergency-flashing mode. Vehicles queue up,
-# the light cycles through standard phases, and an authorized Emergency event
-# forces flashing red until explicitly cleared.
+# A four-way intersection traffic light. The signal cycles Red → Green →
+# Yellow → Red under normal demand, with a left-turn phase (FlashingGreen)
+# that runs when a left-turn request is pending and a flashing-red emergency
+# mode that overrides everything until cleared by an authorized operator.
+#
+# Vehicles arrive and queue up while the light is red; an Advance event drives
+# the cycle. The light refuses to leave red without demand — a side street
+# with no waiting vehicles does not interrupt the main flow.
+#
+# Demonstrates: cross-cutting events (`from any on …`), per-state Advance
+# branching, an emergency override that interrupts the normal cycle, and a
+# clear-on-exit hook for the emergency reason field.
 
-field VehiclesWaiting as number default 0 nonnegative
-field CycleCount as number default 0 nonnegative
+field VehiclesWaiting as integer default 0 nonnegative
+field CycleCount as integer default 0 nonnegative
 field LeftTurnQueued as boolean default false
-field EmergencyReason as string optional
+field EmergencyReason as string optional maxlength 500
 
 state Red initial
 state FlashingGreen
@@ -15,16 +24,25 @@ state Green
 state Yellow
 state FlashingRed
 
+# EmergencyReason is meaningful only while the emergency override is active.
+in Red, FlashingGreen, Green, Yellow omit EmergencyReason
+from FlashingRed -> clear EmergencyReason
+
+# Editable window — the operator can adjust the waiting count and queue a
+# left-turn while the light is red (e.g. a sensor sync or manual override).
 in Red modify VehiclesWaiting, LeftTurnQueued editable
 
+# Events
 event Advance
-event Emergency(AuthorizedBy as string notempty, Reason as string notempty)
-event VehiclesArrive(Count as number default 5)
-on VehiclesArrive ensure VehiclesArrive.Count > 0 because "Vehicle count must be positive"
-
+event Emergency(AuthorizedBy as string notempty maxlength 100, Reason as string notempty maxlength 500)
+event VehiclesArrive(Count as integer default 1 positive)
 event LeftTurnRequest
 event ClearEmergency
 
+# ── Transitions ───────────────────────────────────────────────────────────────
+
+# Cross-cutting signals — vehicle arrivals and left-turn requests can happen
+# in any state without changing the current phase.
 from any on VehiclesArrive
     -> set VehiclesWaiting = VehiclesWaiting + VehiclesArrive.Count
     -> no transition
@@ -32,6 +50,14 @@ from any on LeftTurnRequest
     -> set LeftTurnQueued = true
     -> no transition
 
+# Emergency override — flips the signal to FlashingRed regardless of state.
+from any on Emergency
+    -> set EmergencyReason = Emergency.AuthorizedBy + ": " + Emergency.Reason
+    -> transition FlashingRed
+
+# Red — advance only when there is demand. A left-turn request takes priority
+# over straight-through traffic. With no demand at all, Advance is rejected:
+# the signal does not cycle unnecessarily.
 from Red on Advance when LeftTurnQueued
     -> set LeftTurnQueued = false
     -> set CycleCount = CycleCount + 1
@@ -41,8 +67,9 @@ from Red on Advance when VehiclesWaiting > 0
     -> set CycleCount = CycleCount + 1
     -> transition Green
 from Red on Advance
-    -> reject "No demand detected at red"
+    -> reject "No demand detected — the signal does not advance without queued vehicles or a pending left-turn request"
 
+# Normal cycle through green and yellow back to red.
 from FlashingGreen on Advance
     -> set VehiclesWaiting = 0
     -> set CycleCount = CycleCount + 1
@@ -53,13 +80,11 @@ from Green on Advance
 from Yellow on Advance
     -> transition Red
 
-from any on Emergency
-    -> set EmergencyReason = Emergency.AuthorizedBy + ": " + Emergency.Reason
-    -> transition FlashingRed
-
+# FlashingRed — Advance ticks the cycle counter without leaving the override.
+# Only ClearEmergency restores normal operation, dropping EmergencyReason via
+# the exit-clear hook above.
 from FlashingRed on Advance
     -> set CycleCount = CycleCount + 1
     -> no transition
 from FlashingRed on ClearEmergency
-    -> clear EmergencyReason
     -> transition Red

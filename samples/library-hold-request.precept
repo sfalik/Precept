@@ -1,52 +1,90 @@
 precept LibraryHoldRequest
 
-# This sample demonstrates queue and stack collections in a familiar library flow.
-# A book can circulate normally, accumulate holds, and promote the next patron.
+# A library item moving between three positions: on the shelf, checked out, or
+# held ready for a named patron to pick up. While checked out, additional patrons
+# can place holds — the system queues them and promotes the next one when the
+# item returns. Each held-ready patron has a three-day pickup window; if they
+# don't collect, the next patron in line is promoted.
+#
+# Free-Construction: the item exists as a long-lived artifact on a shelf;
+# patrons flow through via Checkout/PlaceHold events. The queue and stack
+# fields demonstrate Precept's collection types in a familiar flow.
 
-field BookTitle as string optional
-field CurrentBorrower as string optional
-field PromotedPatron as string optional
-field ReadyPatron as string optional
-field PickupCode as string optional
-field PickupExpiryDay as number default 0 nonnegative
-field CurrentDay as number default 0 nonnegative
+# Current borrower — set on Checkout, cleared on ReturnBook.
+field CurrentBorrower as string optional maxlength 100
+
+# Held-ready staging — meaningful only in HoldReady.
+# PromotedPatron is the inbound handoff field used by the entry hook to set the
+# pickup details when the state is (re-)entered.
+field PromotedPatron as string optional maxlength 100
+field ReadyPatron as string optional maxlength 100
+field PickupCode as string optional maxlength 32
+field PickupExpiryDay as integer default 0 nonnegative
+
+# Monotone day counter — advances forward only.
+field CurrentDay as integer default 0 nonnegative
+
+# Waiting line — FIFO queue of patron identifiers.
 field HoldQueue as queue of string
+
+# Append-only history of every patron who has checked the item out.
 field BorrowerHistory as stack of string
 
+# States
 state OnShelf initial
 state CheckedOut
 state HoldReady
 
-in HoldReady ensure ReadyPatron is set because "A ready hold must name the patron"
-in HoldReady ensure PickupCode is set because "A ready hold must have a pickup code"
+# Held-ready scaffolding is meaningful only in HoldReady — every transition
+# into and out of HoldReady manages these fields via the entry/exit hooks.
+in OnShelf, CheckedOut omit ReadyPatron
+in OnShelf, CheckedOut omit PickupCode
+in OnShelf, CheckedOut omit PromotedPatron
 
-# Entering HoldReady sets the temporary pickup details for the promoted patron.
-to HoldReady when PromotedPatron is set -> set ReadyPatron = PromotedPatron -> set PickupCode = "READY" -> set PickupExpiryDay = CurrentDay + 3
+# State ensures
+in HoldReady ensure ReadyPatron is set because "A ready hold must name the patron in line for pickup — without it the desk has no record of who to release the item to"
+in HoldReady ensure PickupCode is set because "A ready hold must carry a pickup code — patrons present the code at the desk to claim the held copy"
 
-# Leaving HoldReady clears the temporary handoff fields.
+# Entry hook — every inbound edge to HoldReady (including the self-transition
+# used for queue rotation on pickup expiry) promotes the staged patron into the
+# ready slot, mints a pickup code, and arms the three-day pickup window.
+to HoldReady when PromotedPatron is set
+    -> set ReadyPatron = PromotedPatron
+    -> set PickupCode = "READY"
+    -> set PickupExpiryDay = CurrentDay + 3
+
+# Exit hook — leaving HoldReady drops the held-ready scaffolding so the omits
+# on OnShelf/CheckedOut hold cleanly.
 from HoldReady -> clear PromotedPatron -> clear ReadyPatron -> clear PickupCode
 
-event Checkout(PatronId as string notempty)
+# Events
+event Checkout(PatronId as string notempty maxlength 100)
 event ReturnBook
-event PlaceHold(PatronId as string notempty)
+event PlaceHold(PatronId as string notempty maxlength 100)
 event ProcessNextHold
-event CollectHold(PatronId as string notempty)
-event AdvanceDay(DayNumber as number)
-on AdvanceDay ensure AdvanceDay.DayNumber >= 0 because "The day counter cannot be negative"
+event CollectHold(PatronId as string notempty maxlength 100)
+event AdvanceDay(DayNumber as integer nonnegative)
 
+# ── Transitions ───────────────────────────────────────────────────────────────
+
+# Checkout from the shelf — no hold queue to worry about.
 from OnShelf on Checkout
     -> set CurrentBorrower = Checkout.PatronId
     -> push BorrowerHistory Checkout.PatronId
     -> transition CheckedOut
 
-# When the item is available, the first hold can be promoted immediately.
+# When the item is available, the first hold promotes immediately to ready.
 from OnShelf on PlaceHold
     -> set PromotedPatron = PlaceHold.PatronId
     -> transition HoldReady
 
+# Subsequent holds while checked out queue behind the current borrower.
 from CheckedOut on PlaceHold
     -> enqueue HoldQueue PlaceHold.PatronId
     -> no transition
+
+# Return — if anyone is waiting, the next patron is promoted; otherwise the
+# item goes back to the shelf.
 from CheckedOut on ReturnBook when HoldQueue.count > 0
     -> dequeue HoldQueue into PromotedPatron
     -> clear CurrentBorrower
@@ -55,43 +93,51 @@ from CheckedOut on ReturnBook
     -> clear CurrentBorrower
     -> transition OnShelf
 
+# Manual promotion — staff trigger from the shelf state if a held-ready slot
+# is empty but holds are waiting (e.g. after an admin clear).
 from OnShelf on ProcessNextHold when HoldQueue.count > 0
     -> dequeue HoldQueue into PromotedPatron
     -> transition HoldReady
 from OnShelf on ProcessNextHold
-    -> reject "There is no waiting patron to promote"
+    -> reject "No patron is waiting on hold — the queue is empty"
 
+# Collection — only the ready patron can claim. The exit hook clears the
+# held-ready scaffolding as we leave HoldReady toward CheckedOut.
 from HoldReady on CollectHold when CollectHold.PatronId == ReadyPatron
     -> set CurrentBorrower = CollectHold.PatronId
     -> push BorrowerHistory CollectHold.PatronId
     -> transition CheckedOut
 from HoldReady on CollectHold
-    -> reject "Only the ready patron can collect this hold"
+    -> reject "Only the named ready patron {ReadyPatron} can collect this hold — caller {CollectHold.PatronId} does not match"
 
+# AdvanceDay handlers — monotone day counter, no-op while within the current
+# state's pickup window or while no expiry applies.
 from OnShelf on AdvanceDay when AdvanceDay.DayNumber > CurrentDay
     -> set CurrentDay = AdvanceDay.DayNumber
     -> no transition
 from OnShelf on AdvanceDay
-    -> reject "The day counter must move forward"
+    -> reject "Day counter must move forward — AdvanceDay.DayNumber {AdvanceDay.DayNumber} is not after CurrentDay {CurrentDay}"
 
 from CheckedOut on AdvanceDay when AdvanceDay.DayNumber > CurrentDay
     -> set CurrentDay = AdvanceDay.DayNumber
     -> no transition
 from CheckedOut on AdvanceDay
-    -> reject "The day counter must move forward"
+    -> reject "Day counter must move forward — AdvanceDay.DayNumber {AdvanceDay.DayNumber} is not after CurrentDay {CurrentDay}"
 
+# HoldReady AdvanceDay branches:
+#   1. Within pickup window — advance the day, no state change.
+#   2. Pickup window passed, another patron waiting — promote the next via a
+#      self-transition so the entry hook re-arms the ready slot for the new patron.
+#   3. Pickup window passed, no one else waiting — drop back to OnShelf.
 from HoldReady on AdvanceDay when AdvanceDay.DayNumber > CurrentDay and AdvanceDay.DayNumber <= PickupExpiryDay
     -> set CurrentDay = AdvanceDay.DayNumber
     -> no transition
 from HoldReady on AdvanceDay when AdvanceDay.DayNumber > CurrentDay and HoldQueue.count > 0
     -> set CurrentDay = AdvanceDay.DayNumber
-    -> set ReadyPatron = HoldQueue.peek
     -> dequeue HoldQueue into PromotedPatron
-    -> set PickupCode = "READY"
-    -> set PickupExpiryDay = AdvanceDay.DayNumber + 3
-    -> no transition
+    -> transition HoldReady
 from HoldReady on AdvanceDay when AdvanceDay.DayNumber > CurrentDay
     -> set CurrentDay = AdvanceDay.DayNumber
     -> transition OnShelf
 from HoldReady on AdvanceDay
-    -> reject "The day counter must move forward"
+    -> reject "Day counter must move forward — AdvanceDay.DayNumber {AdvanceDay.DayNumber} is not after CurrentDay {CurrentDay}"

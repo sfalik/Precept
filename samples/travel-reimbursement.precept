@@ -1,55 +1,80 @@
 precept TravelReimbursement
 
-# Pattern B: Draft is a genuine enrichment phase — the employee fills in trip details
-# progressively. Finance reviews by checking totals and policy ratios.
-# Built-in functions (min) keep arithmetic readable.
-# RequestedTotal is a computed field — always equal to the sum of its components.
+# A travel expense reimbursement — the employee enriches lodging, meals, and
+# mileage totals in Draft, submits to finance for review, and finance approves
+# (with cap policy applied) or rejects. Free-Construction Pattern: the trip
+# expense is filled in progressively as the trip wraps up. Computed RequestedTotal
+# is always the sum of its components.
 
-field EmployeeName as string optional
+# Identity
+field EmployeeName as string optional maxlength 200
+
+# Trip parameters — TripDays is decimal so partial-day trips are exact.
 field TripDays as decimal default 1 positive
-field LodgingTotal as decimal default 0 nonnegative
-field MealsTotal as decimal default 0 nonnegative
-field MileageTotal as decimal default 0 nonnegative maxplaces 2
-field MileageRate as number default 0.67 nonnegative
-field RequestedTotal as number nonnegative <- LodgingTotal + MealsTotal + MileageTotal
-field ApprovedTotal as number default 0 nonnegative
-field FinanceNote as string optional
+
+# Expense components — money in 'USD' for exactness.
+field LodgingTotal as money in 'USD' default '0.00 USD'
+field MealsTotal as money in 'USD' default '0.00 USD'
+field MileageTotal as money in 'USD' default '0.00 USD'
+
+# Computed total — always equal to the sum of its components.
+field RequestedTotal as money in 'USD' <- LodgingTotal + MealsTotal + MileageTotal
+
+# Approved total — meaningful only after finance reviews. Omitted in Draft / Submitted
+# so the cross-state rule doesn't read a not-yet-meaningful value.
+field ApprovedTotal as money in 'USD' default '0.00 USD'
+
+# Finance decision note
+field FinanceNote as string optional maxlength 2000
+
+# Rules — approved cannot exceed requested.
 rule ApprovedTotal <= RequestedTotal because "Approved total {ApprovedTotal} exceeds the submitted request of {RequestedTotal}"
 
+# States
 state Draft initial
 state Submitted
 state Approved
 state Paid terminal
 state Rejected terminal
 
-in Draft modify EmployeeName, TripDays, LodgingTotal, MealsTotal, MileageTotal, MileageRate editable
+# ApprovedTotal has no meaning before finance review.
+in Draft, Submitted omit ApprovedTotal
 
-in Paid ensure ApprovedTotal > 0 because "Paid reimbursements must have an approved amount"
+# Editable window — the employee fills the form in Draft.
+in Draft modify EmployeeName, TripDays, LodgingTotal, MealsTotal, MileageTotal editable
 
+# State ensures
+in Paid ensure ApprovedTotal > '0.00 USD' because "Paid reimbursements must have a positive approved amount on record"
+
+# Events
 event Submit
-event Approve(Amount as number, Note as string optional)
-on Approve ensure Approve.Amount > 0 because "Approved amounts must be positive"
+event Approve(Amount as money in 'USD', Note as string optional maxlength 2000)
+on Approve ensure Approve.Amount > '0.00 USD' because "Approved amounts must be positive — rejections have their own event"
 
-event Reject(Note as string notempty)
+event Reject(Note as string notempty maxlength 2000)
 event Pay
 
-# Average lodging per day is checked with division to keep the example realistic.
-from Draft on Submit when EmployeeName is set and LodgingTotal / TripDays <= 350
+# Submit — employee identity and the $350/day lodging cap are checked at submission.
+from Draft on Submit when EmployeeName is set and LodgingTotal / TripDays <= '350.00 USD'
     -> transition Submitted
 from Draft on Submit when EmployeeName is set
-    -> reject "Average lodging of {LodgingTotal / TripDays} per day exceeds the $350 policy cap"
+    -> reject "Average lodging of {LodgingTotal / TripDays} per day exceeds the $350/day policy cap"
 from Draft on Submit
-    -> reject "Employee name is required before submission"
+    -> reject "Employee name is required before submission — finance cannot route the reimbursement without an owner"
 
+# Approve — capped at the requested total (min) so over-approvals are impossible.
 from Submitted on Approve when Approve.Amount <= RequestedTotal
     -> set ApprovedTotal = min(Approve.Amount, RequestedTotal)
     -> set FinanceNote = Approve.Note
     -> transition Approved
 from Submitted on Approve
     -> reject "Cannot approve {Approve.Amount} — the submitted total is only {RequestedTotal}"
+
+# Reject
 from Submitted on Reject
     -> set FinanceNote = Reject.Note
     -> transition Rejected
 
+# Pay
 from Approved on Pay
     -> transition Paid

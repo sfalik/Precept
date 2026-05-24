@@ -1,0 +1,372 @@
+precept VehicleRegistrationRenewal
+
+# A motor-vehicle registration renewal moves through notice, payment, optional
+# emissions/safety inspection, and either renewal or suspension. The DMV issues
+# a renewal notice 60-90 days before the current registration expires. The
+# vehicle owner pays the renewal fee (and any backed-up fees), submits proof of
+# insurance, and — in jurisdictions that require it — passes an emissions and/or
+# safety inspection. Once everything clears, the new registration is issued.
+# Failure to pay by the expiration date suspends the registration; failure to
+# show valid insurance suspends it; failure of an inspection blocks renewal
+# until the issue is remediated. The host fires CloseGracePeriod when the
+# statutory late-renewal grace window expires — Precept does not expose today().
+#
+# Free-Construction: the DMV clerk enriches a Draft over time. Required-at-
+# notice fields are declared optional and gated by the IssueNotice event's
+# ensures.
+
+# Identity
+field RegistrationNumber as string optional maxlength 50
+field VehicleVin as string optional maxlength 17
+field OwnerName as string optional maxlength 200
+field OwnerAddress as string optional maxlength 500
+field OwnerLicenseNumber as string optional maxlength 50
+field DmvClerk as string optional maxlength 100
+
+# Vehicle classification
+field VehicleClass as choice of string("Passenger","Motorcycle","LightTruck","HeavyTruck","Trailer","RecreationalVehicle","Bus","Taxi","CommercialFleet") optional
+field FuelType as choice of string("Gasoline","Diesel","Hybrid","Electric","Hydrogen","NaturalGas","Other") optional
+field VehicleAgeYears as integer optional nonnegative max 100
+field VehicleWeightLbs as integer optional positive max 80000
+
+# Registration term — period for renewal length; date for boundaries.
+# BUG-003: `period default '<literal>'` crashes the compiler — host supplies.
+field RegistrationTerm as period optional
+field PreviousExpirationDate as date optional
+field NewExpirationDate as date optional
+field NoticeIssueDate as date optional
+field PaymentDueDate as date optional
+
+# Fees — exact money, no approximation
+field BaseRegistrationFee as money in 'USD' default '0.00 USD'
+field WeightSurcharge as money in 'USD' default '0.00 USD'
+field EmissionsFee as money in 'USD' default '0.00 USD'
+field PlatesFee as money in 'USD' default '0.00 USD'
+field LateFee as money in 'USD' default '0.00 USD'
+field BackedUpFees as money in 'USD' default '0.00 USD'
+field TotalFeesDue as money in 'USD' <- BaseRegistrationFee + WeightSurcharge + EmissionsFee + PlatesFee + LateFee + BackedUpFees
+field AmountPaid as money in 'USD' default '0.00 USD'
+field OutstandingBalance as money in 'USD' <- TotalFeesDue - AmountPaid
+
+# Insurance — DMV requires proof of an active liability policy.
+field InsuranceCarrier as string optional maxlength 200
+field InsurancePolicyNumber as string optional maxlength 100
+field InsuranceVerified as boolean default false
+field InsuranceEffectiveDate as date optional
+field InsuranceExpirationDate as date optional
+
+# Inspection — jurisdictions require emissions and/or safety on specific schedules.
+field EmissionsRequired as boolean default false
+field SafetyInspectionRequired as boolean default false
+field EmissionsPassed as boolean default false
+field SafetyInspectionPassed as boolean default false
+field InspectionStationId as string optional maxlength 50
+field LastInspectionDate as date optional
+field InspectionFailureReason as string optional maxlength 500
+
+# Grace and suspension status — flipped by the host when calendar windows close.
+# Once the statutory grace period after expiration elapses, GracePeriodOpen
+# becomes false and renewal moves to suspension rather than late-renew paths.
+field GracePeriodOpen as boolean default true
+
+# Outcomes
+field SuspensionReason as string optional maxlength 500
+field RevocationReason as string optional maxlength 500
+field RefundAmount as money in 'USD' default '0.00 USD'
+
+# Audit log
+field RegistrationLog as log of string
+
+# Timestamps
+field NoticeIssuedAt as instant optional
+field PaymentReceivedAt as instant optional
+field InsuranceVerifiedAt as instant optional
+field InspectionCompletedAt as instant optional
+field RenewedAt as instant optional
+field ExpiredAt as instant optional
+field SuspendedAt as instant optional
+field RevokedAt as instant optional
+
+# Rules
+rule NewExpirationDate > PreviousExpirationDate when PreviousExpirationDate is set and NewExpirationDate is set because "New expiration date {NewExpirationDate} must be after previous expiration date {PreviousExpirationDate}"
+rule PaymentDueDate >= NoticeIssueDate when NoticeIssueDate is set and PaymentDueDate is set because "Payment due date {PaymentDueDate} must be on or after notice issue date {NoticeIssueDate}"
+rule AmountPaid <= TotalFeesDue because "Amount paid {AmountPaid} cannot exceed total fees due {TotalFeesDue} — credit balances should not arise"
+rule RefundAmount <= AmountPaid because "Refund {RefundAmount} cannot exceed amount paid {AmountPaid}"
+rule InsuranceExpirationDate > InsuranceEffectiveDate when InsuranceEffectiveDate is set and InsuranceExpirationDate is set because "Insurance expiration {InsuranceExpirationDate} must be after effective date {InsuranceEffectiveDate}"
+
+# Heavy commercial vehicles attract weight surcharges — DMV jurisdictions vary,
+# but rule of thumb is non-zero surcharge once weight exceeds 10,000 lbs.
+rule WeightSurcharge > '0.00 USD' when VehicleWeightLbs is set and VehicleWeightLbs > 10000 because "Vehicles over 10,000 lbs ({VehicleWeightLbs}) require a weight surcharge — currently {WeightSurcharge}"
+
+# Electric and hydrogen vehicles in many jurisdictions skip emissions inspection.
+rule not EmissionsRequired when FuelType is set and (FuelType == "Electric" or FuelType == "Hydrogen") because "Emissions inspection is not required for {FuelType} vehicles"
+
+# States
+state Draft initial
+state NoticeIssued
+state PaymentPending
+state PaymentReceived
+state InsuranceReview
+state InspectionPending
+state InspectionFailed
+state Renewed
+state ExpiredGrace
+state Suspended
+state Revoked terminal
+state Cancelled terminal
+
+# State ensures
+in NoticeIssued ensure NoticeIssuedAt is set because "A notice-issued registration must record when the notice went out"
+in NoticeIssued ensure PreviousExpirationDate is set because "A notice-issued registration must record the current expiration date"
+in PaymentPending ensure TotalFeesDue > '0.00 USD' because "Payment-pending requires a positive fee total"
+in PaymentReceived ensure PaymentReceivedAt is set because "Payment-received requires a payment timestamp"
+in PaymentReceived ensure AmountPaid >= TotalFeesDue because "Payment-received requires the balance be paid in full"
+in InsuranceReview ensure InsuranceCarrier is set because "Insurance review requires a carrier on file"
+in InsuranceReview ensure InsurancePolicyNumber is set because "Insurance review requires a policy number on file"
+in InspectionPending ensure EmissionsRequired or SafetyInspectionRequired because "Inspection-pending requires at least one inspection to be required"
+in InspectionFailed ensure InspectionFailureReason is set because "Inspection-failed must record the failure reason"
+in Renewed ensure RenewedAt is set because "A renewed registration must record when renewal took effect"
+in Renewed ensure NewExpirationDate is set because "A renewed registration must have a new expiration date"
+in Renewed ensure InsuranceVerified because "A renewed registration must have verified insurance"
+in ExpiredGrace ensure ExpiredAt is set because "An expired-grace registration must record when it expired"
+in ExpiredGrace ensure GracePeriodOpen because "An expired-grace registration must still be inside the grace window"
+in Suspended ensure SuspendedAt is set because "A suspended registration must record the suspension timestamp"
+in Suspended ensure SuspensionReason is set because "A suspended registration must record the suspension reason"
+in Revoked ensure RevokedAt is set because "A revoked registration must record the revocation timestamp"
+in Revoked ensure RevocationReason is set because "A revoked registration must record the revocation reason"
+
+# Editable windows — broad intake in Draft; targeted updates afterward.
+in Draft modify RegistrationNumber, VehicleVin, OwnerName, OwnerAddress, OwnerLicenseNumber, DmvClerk, VehicleClass, FuelType, VehicleAgeYears, VehicleWeightLbs, RegistrationTerm, PreviousExpirationDate, EmissionsRequired, SafetyInspectionRequired editable
+in NoticeIssued modify OwnerAddress, InsuranceCarrier, InsurancePolicyNumber, InsuranceEffectiveDate, InsuranceExpirationDate editable
+in PaymentPending modify InsuranceCarrier, InsurancePolicyNumber, InsuranceEffectiveDate, InsuranceExpirationDate editable
+in InspectionPending modify InspectionStationId editable
+
+# Events
+event IssueNotice(BaseFee as money in 'USD', WeightFee as money in 'USD', EmissionsFee as money in 'USD', PlatesFee as money in 'USD', PaymentDue as date)
+event RecordPayment(Amount as money in 'USD')
+event SubmitInsurance(Carrier as string notempty, PolicyNumber as string notempty, EffectiveDate as date, ExpirationDate as date)
+event VerifyInsurance
+event RejectInsurance(Reason as string notempty)
+event ScheduleInspection(StationId as string notempty)
+event PassEmissions
+event PassSafetyInspection
+event FailInspection(Reason as string notempty)
+event Remediate
+event IssueRenewal(NewExpiration as date)
+event ExpireRegistration
+event CloseGracePeriod
+event SuspendForNonpayment
+event SuspendForInsuranceLapse(Reason as string notempty)
+event Reinstate
+event Revoke(Reason as string notempty)
+event Cancel(Reason as string notempty)
+event RefundOverpayment(Amount as money in 'USD')
+
+on IssueNotice ensure IssueNotice.BaseFee > '0.00 USD' because "Base registration fee must be positive"
+on IssueNotice ensure IssueNotice.WeightFee >= '0.00 USD' because "Weight surcharge cannot be negative"
+on IssueNotice ensure IssueNotice.EmissionsFee >= '0.00 USD' because "Emissions fee cannot be negative"
+on IssueNotice ensure IssueNotice.PlatesFee >= '0.00 USD' because "Plates fee cannot be negative"
+
+on RecordPayment ensure RecordPayment.Amount > '0.00 USD' because "Recorded payments must be positive"
+
+on SubmitInsurance ensure SubmitInsurance.ExpirationDate > SubmitInsurance.EffectiveDate because "Insurance expiration {SubmitInsurance.ExpirationDate} must be after effective date {SubmitInsurance.EffectiveDate}"
+
+on RefundOverpayment ensure RefundOverpayment.Amount > '0.00 USD' because "Refund amount must be positive"
+
+# Transitions
+
+# Notice — DMV computes fees and issues the renewal notice. The host fires
+# IssueNotice with all fee components; the precept assembles TotalFeesDue.
+from Draft on IssueNotice
+    -> set BaseRegistrationFee = IssueNotice.BaseFee
+    -> set WeightSurcharge = IssueNotice.WeightFee
+    -> set EmissionsFee = IssueNotice.EmissionsFee
+    -> set PlatesFee = IssueNotice.PlatesFee
+    -> set PaymentDueDate = IssueNotice.PaymentDue
+    -> set NoticeIssuedAt = now()
+    -> append RegistrationLog "Renewal notice issued"
+    -> transition NoticeIssued
+
+# Move to payment-pending — DMV transitions when fees are confirmed and notice
+# has been delivered.
+from NoticeIssued on RecordPayment when RecordPayment.Amount + AmountPaid > TotalFeesDue
+    -> reject "Payment {RecordPayment.Amount} would exceed total fees due (need {OutstandingBalance} more)"
+from NoticeIssued on RecordPayment
+    -> set AmountPaid = AmountPaid + RecordPayment.Amount
+    -> set PaymentReceivedAt = now()
+    -> append RegistrationLog "Partial payment received"
+    -> transition PaymentPending
+
+from PaymentPending on RecordPayment when RecordPayment.Amount + AmountPaid > TotalFeesDue
+    -> reject "Payment {RecordPayment.Amount} would exceed total fees due (need {OutstandingBalance} more)"
+from PaymentPending on RecordPayment when RecordPayment.Amount + AmountPaid < TotalFeesDue
+    -> set AmountPaid = AmountPaid + RecordPayment.Amount
+    -> append RegistrationLog "Partial payment received"
+    -> no transition
+from PaymentPending on RecordPayment
+    -> set AmountPaid = AmountPaid + RecordPayment.Amount
+    -> set PaymentReceivedAt = now()
+    -> append RegistrationLog "Payment in full"
+    -> transition PaymentReceived
+
+# Insurance submission and review.
+from PaymentReceived on SubmitInsurance
+    -> set InsuranceCarrier = SubmitInsurance.Carrier
+    -> set InsurancePolicyNumber = SubmitInsurance.PolicyNumber
+    -> set InsuranceEffectiveDate = SubmitInsurance.EffectiveDate
+    -> set InsuranceExpirationDate = SubmitInsurance.ExpirationDate
+    -> append RegistrationLog "Insurance submitted"
+    -> transition InsuranceReview
+
+from InsuranceReview on VerifyInsurance
+    -> set InsuranceVerified = true
+    -> set InsuranceVerifiedAt = now()
+    -> append RegistrationLog "Insurance verified"
+    -> transition InspectionPending
+
+from InsuranceReview on RejectInsurance
+    -> set InsuranceVerified = false
+    -> append RegistrationLog "Insurance rejected"
+    -> transition PaymentPending
+
+# Inspection — emissions and/or safety. Some vehicles skip if jurisdiction allows.
+# A vehicle that requires neither moves directly to renewal.
+from InsuranceReview on VerifyInsurance when not EmissionsRequired and not SafetyInspectionRequired
+    -> set InsuranceVerified = true
+    -> set InsuranceVerifiedAt = now()
+    -> append RegistrationLog "Insurance verified — no inspection required"
+    -> no transition
+
+from InspectionPending on ScheduleInspection
+    -> set InspectionStationId = ScheduleInspection.StationId
+    -> append RegistrationLog "Inspection scheduled"
+    -> no transition
+
+from InspectionPending on PassEmissions when not EmissionsRequired
+    -> reject "Emissions inspection not required for this vehicle"
+from InspectionPending on PassEmissions
+    -> set EmissionsPassed = true
+    -> set InspectionCompletedAt = now()
+    -> append RegistrationLog "Emissions passed"
+    -> no transition
+
+from InspectionPending on PassSafetyInspection when not SafetyInspectionRequired
+    -> reject "Safety inspection not required for this vehicle"
+from InspectionPending on PassSafetyInspection
+    -> set SafetyInspectionPassed = true
+    -> set InspectionCompletedAt = now()
+    -> append RegistrationLog "Safety inspection passed"
+    -> no transition
+
+from InspectionPending on FailInspection
+    -> set InspectionFailureReason = FailInspection.Reason
+    -> append RegistrationLog "Inspection failed"
+    -> transition InspectionFailed
+
+# Remediation — owner addresses the inspection issue, re-enters inspection pending.
+from InspectionFailed on Remediate
+    -> set InspectionFailureReason = ""
+    -> append RegistrationLog "Remediation complete"
+    -> transition InspectionPending
+
+# Issue the new registration — once payment, insurance, and inspections all
+# clear. The DMV issues the renewal with a new expiration date.
+from InspectionPending on IssueRenewal when EmissionsRequired and not EmissionsPassed
+    -> reject "Emissions inspection has not been passed"
+from InspectionPending on IssueRenewal when SafetyInspectionRequired and not SafetyInspectionPassed
+    -> reject "Safety inspection has not been passed"
+from InspectionPending on IssueRenewal
+    -> set NewExpirationDate = IssueRenewal.NewExpiration
+    -> set RenewedAt = now()
+    -> append RegistrationLog "Registration renewed"
+    -> transition Renewed
+
+# An insurance-only renewal path: no inspections required, jump straight from
+# InsuranceReview to Renewed.
+from InsuranceReview on IssueRenewal when EmissionsRequired or SafetyInspectionRequired
+    -> reject "Inspections are required — verify insurance first, then complete inspections"
+from InsuranceReview on IssueRenewal when not InsuranceVerified
+    -> reject "Insurance must be verified before issuing renewal"
+from InsuranceReview on IssueRenewal
+    -> set NewExpirationDate = IssueRenewal.NewExpiration
+    -> set RenewedAt = now()
+    -> append RegistrationLog "Registration renewed (no inspection required)"
+    -> transition Renewed
+
+# Expiration — host fires when PaymentDueDate elapses without payment. Moves
+# to the grace period, where late fees apply but renewal is still possible.
+from NoticeIssued, PaymentPending on ExpireRegistration
+    -> set ExpiredAt = now()
+    -> append RegistrationLog "Registration expired — grace period open"
+    -> transition ExpiredGrace
+
+# Late fees can be added while in grace.
+from ExpiredGrace on RecordPayment when RecordPayment.Amount + AmountPaid > TotalFeesDue
+    -> reject "Payment {RecordPayment.Amount} would exceed total fees due (need {OutstandingBalance} more)"
+from ExpiredGrace on RecordPayment when RecordPayment.Amount + AmountPaid < TotalFeesDue
+    -> set AmountPaid = AmountPaid + RecordPayment.Amount
+    -> append RegistrationLog "Late payment received (partial)"
+    -> no transition
+from ExpiredGrace on RecordPayment
+    -> set AmountPaid = AmountPaid + RecordPayment.Amount
+    -> set PaymentReceivedAt = now()
+    -> append RegistrationLog "Late payment in full"
+    -> transition PaymentReceived
+
+# Host fires when the statutory grace period elapses without resolution.
+from ExpiredGrace on CloseGracePeriod
+    -> set GracePeriodOpen = false
+    -> set SuspensionReason = "Grace period elapsed without renewal"
+    -> set SuspendedAt = now()
+    -> append RegistrationLog "Grace period closed — suspended"
+    -> transition Suspended
+
+# Direct suspension paths.
+from NoticeIssued, PaymentPending, ExpiredGrace on SuspendForNonpayment
+    -> set SuspensionReason = "Non-payment of registration fees"
+    -> set SuspendedAt = now()
+    -> append RegistrationLog "Suspended for non-payment"
+    -> transition Suspended
+
+from Renewed on SuspendForInsuranceLapse
+    -> set SuspensionReason = SuspendForInsuranceLapse.Reason
+    -> set SuspendedAt = now()
+    -> append RegistrationLog "Suspended for insurance lapse"
+    -> transition Suspended
+
+# Reinstatement — from a still-grace-open suspension, owner clears the issue.
+# Not allowed from terminal Suspended without going through the DMV's separate
+# reinstatement process (modeled here as Cancel + new registration).
+from Suspended on Reinstate when not GracePeriodOpen
+    -> reject "Cannot reinstate — grace period has closed; a new registration application is required"
+from Suspended on Reinstate when OutstandingBalance > '0.00 USD'
+    -> reject "Cannot reinstate — outstanding balance of {OutstandingBalance} must be paid first"
+from Suspended on Reinstate when not InsuranceVerified
+    -> reject "Cannot reinstate — insurance must be verified first"
+from Suspended on Reinstate
+    -> append RegistrationLog "Reinstated"
+    -> transition Renewed
+
+# Revocation — DMV takes the registration away for cause (fraud, repeated
+# violations, etc.). More serious than suspension.
+from NoticeIssued, PaymentPending, PaymentReceived, InsuranceReview, InspectionPending, InspectionFailed, Renewed, ExpiredGrace, Suspended on Revoke
+    -> set RevocationReason = Revoke.Reason
+    -> set RevokedAt = now()
+    -> append RegistrationLog "Revoked"
+    -> transition Revoked
+
+# Cancellation — owner-initiated (e.g., vehicle sold or scrapped). Allowed
+# before renewal completes; after renewal, the owner uses a separate process.
+from Draft, NoticeIssued, PaymentPending, PaymentReceived, InsuranceReview, InspectionPending, InspectionFailed, ExpiredGrace on Cancel
+    -> set SuspensionReason = Cancel.Reason
+    -> append RegistrationLog "Cancelled"
+    -> transition Cancelled
+
+# Refund — issued from Cancelled or for genuine overpayments. Refund amount
+# cannot exceed what was paid in.
+from Cancelled on RefundOverpayment when RefundOverpayment.Amount > AmountPaid
+    -> reject "Refund {RefundOverpayment.Amount} exceeds amount paid {AmountPaid}"
+from Cancelled on RefundOverpayment
+    -> set RefundAmount = RefundOverpayment.Amount
+    -> append RegistrationLog "Refund issued"
+    -> no transition

@@ -1,0 +1,43 @@
+precept ProductCatalog
+
+# A stateless data-only precept governing a single product entry in a catalog.
+# A product entry holds identity (SKU, name, description), classification
+# (category, brand), pricing (list price and optional cost basis), physical
+# attributes (weight, length/width/height), and availability flags.
+#
+# A product is reference data — it does not have a lifecycle of its own.
+# Workflow precepts that consume products (orders, shipments, returns)
+# reference a product by SKU and assume its data is valid at every read.
+# This precept's job is to ensure the data ever stored on a product is valid.
+#
+# All fields are writable — the host application's catalog management UI is
+# responsible for editing them. Identity fields (Sku, Name) are optional in
+# storage but the host should refuse to publish a product without them set.
+
+# Identity
+field Sku as string optional maxlength 50 writable
+field Name as string optional maxlength 200 writable
+field Description as string optional maxlength 2000 writable
+
+# Classification
+field Category as choice of string("Electronics","Clothing","HomeGoods","Grocery","HealthBeauty","SportsOutdoors","Toys","Books","Other") default "Other" writable
+field Brand as string optional maxlength 100 writable
+
+# Pricing — list price is in the catalog currency.
+field CatalogCurrency as currency default 'USD' writable
+field ListPrice as money in 'USD' default '0.00 USD' nonnegative writable
+field CostBasis as money in 'USD' optional writable
+
+# Physical attributes — weight in kilograms, dimensions in centimetres.
+field Weight as quantity in 'kg' default '0 kg' nonnegative writable
+field Length as quantity in 'cm' default '0 cm' nonnegative writable
+field Width as quantity in 'cm' default '0 cm' nonnegative writable
+field Height as quantity in 'cm' default '0 cm' nonnegative writable
+
+# Availability flags
+field Active as boolean default true writable
+field Discontinued as boolean default false writable
+field RequiresShipping as boolean default true writable
+
+rule CostBasis <= ListPrice when CostBasis is set because "Cost basis {CostBasis} cannot exceed the list price {ListPrice} — a product cannot be sold at a structural loss"
+rule Active == false or Discontinued == false because "An entry cannot be both Active and Discontinued — these are mutually exclusive lifecycle flags"

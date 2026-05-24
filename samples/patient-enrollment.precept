@@ -1,0 +1,222 @@
+precept PatientEnrollment
+
+# A patient's insurance-enrollment application — submitted with applicant
+# identity, plan selection, and a requested effective date, then verified in
+# two tiers (eligibility, then insurance) before a member ID is assigned and
+# coverage activates on its effective date. Verification outcomes are encoded
+# by states, not parallel boolean fields: EligibilityVerified and
+# InsuranceVerified are real lifecycle positions that gate downstream
+# transitions. Applications can be withdrawn by the applicant pre-enrollment
+# or denied by the payer when verification fails.
+
+# Applicant identity — fixed at submission.
+field PatientId as string notempty maxlength 50
+field PatientName as string notempty maxlength 200
+field DateOfBirth as date
+field Gender as choice of string("Male", "Female", "Other", "Unknown")
+field SocialSecurityNumber as string optional maxlength 11
+
+# Contact.
+field StreetAddress as string notempty maxlength 200
+field City as string notempty maxlength 100
+field StateCode as string notempty maxlength 2
+field PostalCode as string notempty maxlength 10
+field PrimaryPhone as string notempty maxlength 20
+field EmailAddress as string optional maxlength 200
+
+# Insurance — plan applied for; member ID assigned on enrollment.
+field PayerName as string notempty maxlength 200
+field PlanId as string notempty maxlength 50
+field PlanType as choice of string("HMO", "PPO", "EPO", "POS", "HDHP", "Medicare", "Medicaid", "DualEligible")
+field GroupNumber as string optional maxlength 50
+field MemberId as string optional maxlength 50
+
+# Effective dating — application is typically submitted in advance of coverage.
+field ApplicationDate as date
+field RequestedEffectiveDate as date
+field ActualEffectiveDate as date optional
+
+# Verification audit — who verified and when.
+field EligibilityVerifier as string optional maxlength 200
+field EligibilityVerifiedAt as instant optional
+field InsuranceVerifier as string optional maxlength 200
+field InsuranceVerifiedAt as instant optional
+
+# Document collection — required and submitted document names.
+field RequiredDocuments as set of string
+field SubmittedDocuments as set of string
+
+# Off-ramp reasons.
+field DenialReason as string optional maxlength 1000
+field WithdrawalReason as string optional maxlength 500
+
+# Audit trail.
+field EnrollmentLog as log of string
+
+# Effective dating invariant — requested coverage cannot start before the
+# application date.
+rule RequestedEffectiveDate >= ApplicationDate because "Requested coverage start {RequestedEffectiveDate} cannot precede the application date {ApplicationDate}"
+rule ActualEffectiveDate >= ApplicationDate when ActualEffectiveDate is set because "Actual coverage start {ActualEffectiveDate} cannot precede the application date {ApplicationDate}"
+
+# States — verification tiers are real lifecycle positions, not boolean
+# fields. Submitted → EligibilityCheck → EligibilityVerified → InsuranceCheck
+# → InsuranceVerified → Enrolled → Active.
+state Submitted initial
+state EligibilityCheck
+state EligibilityVerified
+state InsuranceCheck
+state InsuranceVerified
+state Enrolled
+state Active terminal
+state Denied terminal
+state Withdrawn terminal
+
+# Fields with no meaning until later in the lifecycle.
+in Submitted, EligibilityCheck omit EligibilityVerifiedAt
+in Submitted, EligibilityCheck, EligibilityVerified, InsuranceCheck omit InsuranceVerifiedAt
+in Submitted, EligibilityCheck, EligibilityVerified, InsuranceCheck, InsuranceVerified omit MemberId, ActualEffectiveDate
+
+# State ensures.
+in EligibilityCheck ensure EligibilityVerifier is set because "Eligibility check requires the name of the verifying agent"
+in EligibilityVerified ensure EligibilityVerifiedAt is set because "Eligibility verification must record when it succeeded"
+in InsuranceCheck ensure InsuranceVerifier is set because "Insurance check requires the name of the verifying agent"
+in InsuranceVerified ensure InsuranceVerifiedAt is set because "Insurance verification must record when it succeeded"
+in Enrolled ensure MemberId is set because "An enrolled patient must have an assigned member ID"
+in Enrolled ensure ActualEffectiveDate is set because "An enrolled patient must have a confirmed effective date"
+in Active ensure MemberId is set because "An active member must carry a member ID"
+in Denied ensure DenialReason is set because "A denied application must record the denial reason"
+in Withdrawn ensure WithdrawalReason is set because "A withdrawn application must record the withdrawal reason"
+
+# Construction — application is submitted from the enrollment portal.
+event Create(
+    PatientId as string notempty maxlength 50,
+    PatientName as string notempty maxlength 200,
+    DateOfBirth as date,
+    Gender as choice of string("Male", "Female", "Other", "Unknown"),
+    StreetAddress as string notempty maxlength 200,
+    City as string notempty maxlength 100,
+    StateCode as string notempty maxlength 2,
+    PostalCode as string notempty maxlength 10,
+    PrimaryPhone as string notempty maxlength 20,
+    EmailAddress as string optional maxlength 200,
+    PayerName as string notempty maxlength 200,
+    PlanId as string notempty maxlength 50,
+    PlanType as choice of string("HMO", "PPO", "EPO", "POS", "HDHP", "Medicare", "Medicaid", "DualEligible"),
+    GroupNumber as string optional maxlength 50,
+    ApplicationDate as date,
+    RequestedEffectiveDate as date) initial
+on Create ensure Create.RequestedEffectiveDate >= Create.ApplicationDate because "Requested coverage start {Create.RequestedEffectiveDate} cannot precede the application date {Create.ApplicationDate}"
+
+# Document collection events.
+event AddRequiredDocument(DocumentName as string notempty maxlength 200)
+event SubmitDocument(DocumentName as string notempty maxlength 200)
+
+# Verification events.
+event BeginEligibilityCheck(Verifier as string notempty maxlength 200)
+event RecordEligibilityResult(Verified as boolean, Notes as string notempty maxlength 1000)
+event BeginInsuranceCheck(Verifier as string notempty maxlength 200)
+event RecordInsuranceResult(Verified as boolean, Notes as string notempty maxlength 1000)
+
+# Enrollment + activation.
+event Enroll(MemberId as string notempty maxlength 50, ActualEffectiveDate as date)
+on Enroll ensure Enroll.ActualEffectiveDate >= ApplicationDate because "Effective date {Enroll.ActualEffectiveDate} cannot precede the application date"
+event Activate
+
+# Off-ramps.
+event DenyApplication(Reason as string notempty maxlength 1000)
+event WithdrawApplication(Reason as string notempty maxlength 500)
+
+# Construction row — opens in Submitted.
+on Create
+    -> set PatientId = Create.PatientId
+    -> set PatientName = Create.PatientName
+    -> set DateOfBirth = Create.DateOfBirth
+    -> set Gender = Create.Gender
+    -> set StreetAddress = Create.StreetAddress
+    -> set City = Create.City
+    -> set StateCode = Create.StateCode
+    -> set PostalCode = Create.PostalCode
+    -> set PrimaryPhone = Create.PrimaryPhone
+    -> set EmailAddress = Create.EmailAddress
+    -> set PayerName = Create.PayerName
+    -> set PlanId = Create.PlanId
+    -> set PlanType = Create.PlanType
+    -> set GroupNumber = Create.GroupNumber
+    -> set ApplicationDate = Create.ApplicationDate
+    -> set RequestedEffectiveDate = Create.RequestedEffectiveDate
+    -> append EnrollmentLog "Application submitted for {Create.PatientName} ({Create.PlanType} via {Create.PayerName})"
+
+# Transitions
+
+# Submitted — document collection accrues in place; eligibility check opens.
+from Submitted on AddRequiredDocument
+    -> add RequiredDocuments AddRequiredDocument.DocumentName
+    -> append EnrollmentLog "Required document added: {AddRequiredDocument.DocumentName}"
+    -> no transition
+
+from Submitted on SubmitDocument when not (RequiredDocuments contains SubmitDocument.DocumentName)
+    -> reject "Document '{SubmitDocument.DocumentName}' is not on the required-documents list"
+
+from Submitted on SubmitDocument
+    -> add SubmittedDocuments SubmitDocument.DocumentName
+    -> append EnrollmentLog "Document submitted: {SubmitDocument.DocumentName}"
+    -> no transition
+
+# Submitted → EligibilityCheck.
+from Submitted on BeginEligibilityCheck
+    -> set EligibilityVerifier = BeginEligibilityCheck.Verifier
+    -> append EnrollmentLog "Eligibility check started by {BeginEligibilityCheck.Verifier}"
+    -> transition EligibilityCheck
+
+# EligibilityCheck — verification result routes to EligibilityVerified or Denied.
+from EligibilityCheck on RecordEligibilityResult when RecordEligibilityResult.Verified
+    -> set EligibilityVerifiedAt = now()
+    -> append EnrollmentLog "Eligibility verified"
+    -> transition EligibilityVerified
+
+from EligibilityCheck on RecordEligibilityResult
+    -> set DenialReason = "Eligibility not verified: " + RecordEligibilityResult.Notes
+    -> append EnrollmentLog "Eligibility check failed"
+    -> transition Denied
+
+# EligibilityVerified → InsuranceCheck.
+from EligibilityVerified on BeginInsuranceCheck
+    -> set InsuranceVerifier = BeginInsuranceCheck.Verifier
+    -> append EnrollmentLog "Insurance verification started by {BeginInsuranceCheck.Verifier}"
+    -> transition InsuranceCheck
+
+# InsuranceCheck — verification result routes to InsuranceVerified or Denied.
+from InsuranceCheck on RecordInsuranceResult when RecordInsuranceResult.Verified
+    -> set InsuranceVerifiedAt = now()
+    -> append EnrollmentLog "Insurance verified — ready to enroll"
+    -> transition InsuranceVerified
+
+from InsuranceCheck on RecordInsuranceResult
+    -> set DenialReason = "Insurance not verified: " + RecordInsuranceResult.Notes
+    -> append EnrollmentLog "Insurance check failed"
+    -> transition Denied
+
+# InsuranceVerified → Enrolled.
+from InsuranceVerified on Enroll
+    -> set MemberId = Enroll.MemberId
+    -> set ActualEffectiveDate = Enroll.ActualEffectiveDate
+    -> append EnrollmentLog "Patient enrolled — member {Enroll.MemberId}, coverage begins {Enroll.ActualEffectiveDate}"
+    -> transition Enrolled
+
+# Enrolled → Active. The host scheduler invokes Activate on or after the
+# actual effective date; the entry ensure on Active keeps MemberId required.
+from Enrolled on Activate
+    -> append EnrollmentLog "Coverage activated"
+    -> transition Active
+
+# Withdrawals — applicant-initiated, pre-enrollment.
+from Submitted, EligibilityCheck, EligibilityVerified, InsuranceCheck, InsuranceVerified on WithdrawApplication
+    -> set WithdrawalReason = WithdrawApplication.Reason
+    -> append EnrollmentLog "Application withdrawn: {WithdrawApplication.Reason}"
+    -> transition Withdrawn
+
+# Denials — payer-initiated, pre-enrollment.
+from Submitted, EligibilityVerified, InsuranceCheck, InsuranceVerified on DenyApplication
+    -> set DenialReason = DenyApplication.Reason
+    -> append EnrollmentLog "Application denied: {DenyApplication.Reason}"
+    -> transition Denied

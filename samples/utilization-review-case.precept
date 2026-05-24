@@ -1,0 +1,178 @@
+precept UtilizationReviewCase
+
+# An inpatient utilization-review case opened at hospital admission and worked
+# through initial review, periodic concurrent reviews, level-of-care changes,
+# discharge planning, and discharge. The case is fed by the hospital admit
+# system, so identity, payer, diagnosis, admitting provider, level of care,
+# and initially-authorized days arrive complete. Concurrent reviews
+# (typically every 24-72 hours depending on level of care) authorize
+# additional days and schedule the next review; a denial at any review tier
+# routes to the terminal Denied state. Discharge planning runs in parallel
+# with concurrent reviews and culminates in the patient's discharge.
+
+# Case identity — fixed at admission.
+field CaseId as string notempty maxlength 50
+field PatientId as string notempty maxlength 50
+field PatientName as string notempty maxlength 200
+field PayerName as string notempty maxlength 200
+field PrimaryDiagnosisCode as string notempty maxlength 10
+
+# Admission.
+field AdmissionDate as date
+field AdmittingProvider as string notempty maxlength 200
+field AdmissionSource as choice of string("EmergencyDepartment", "DirectAdmit", "Transfer", "Elective")
+
+# Level of care — ordered so length-of-stay limits scale with intensity:
+# ICU > StepDown > MedSurg > Observation.
+field LevelOfCare as choice of string("Observation", "MedSurg", "StepDown", "ICU") ordered
+field AuthorizedDays as integer positive default 1
+field LengthOfStayDays as integer nonnegative default 0
+
+# Review cycle.
+field NextReviewDue as date optional
+field ReviewCount as integer nonnegative default 0
+field ReviewerName as string optional maxlength 200
+field LastReviewNotes as string optional maxlength 2000
+
+# Discharge planning.
+field DischargePlanInitiatedAt as instant optional
+field PlannedDischargeDate as date optional
+field DischargeDisposition as choice of string("Home", "HomeWithHomeHealth", "SkilledNursing", "Rehab", "LTACH", "Hospice", "AMA", "Expired") optional
+field DischargeDate as date optional
+
+# Denial — populated only when the payer denies authorization.
+field DenialReason as string optional maxlength 1000
+
+# Audit trail.
+field CaseLog as log of string
+
+# Invariants — bound discharge dates relative to admission.
+rule DischargeDate >= AdmissionDate when DischargeDate is set because "Discharge date {DischargeDate} cannot precede admission {AdmissionDate}"
+rule PlannedDischargeDate >= AdmissionDate when PlannedDischargeDate is set because "Planned discharge {PlannedDischargeDate} cannot precede admission {AdmissionDate}"
+
+# States — lifecycle is encoded by the state, no parallel status field.
+# Admitted → InitialReview → OngoingReview ↔ DischargePlanning → Discharged
+# Denied is a terminal off-ramp from any review state.
+state Admitted initial
+state InitialReview
+state OngoingReview
+state DischargePlanning
+state Discharged terminal
+state Denied terminal
+
+# Fields with no meaning until later in the lifecycle.
+in Admitted omit ReviewerName, LastReviewNotes, NextReviewDue
+in Admitted, InitialReview, OngoingReview omit DischargePlanInitiatedAt, PlannedDischargeDate
+in Admitted, InitialReview, OngoingReview, DischargePlanning omit DischargeDate
+in Admitted, InitialReview, OngoingReview, DischargePlanning, Discharged omit DenialReason
+
+# State ensures.
+in InitialReview ensure ReviewerName is set because "An assigned reviewer is required to perform the admission review"
+in DischargePlanning ensure DischargePlanInitiatedAt is set because "Discharge planning must record when planning began"
+in Discharged ensure DischargeDate is set because "A discharged case must record the actual discharge date"
+in Discharged ensure DischargeDisposition is set because "A discharged case must record where the patient went"
+in Denied ensure DenialReason is set because "A denied case must document why authorization was denied"
+
+# Construction — case is opened from the hospital admit system at admission.
+event Create(
+    CaseId as string notempty maxlength 50,
+    PatientId as string notempty maxlength 50,
+    PatientName as string notempty maxlength 200,
+    PayerName as string notempty maxlength 200,
+    PrimaryDiagnosisCode as string notempty maxlength 10,
+    AdmissionDate as date,
+    AdmittingProvider as string notempty maxlength 200,
+    AdmissionSource as choice of string("EmergencyDepartment", "DirectAdmit", "Transfer", "Elective"),
+    LevelOfCare as choice of string("Observation", "MedSurg", "StepDown", "ICU"),
+    AuthorizedDays as integer positive) initial
+
+# Review-cycle events.
+event AssignReviewer(ReviewerName as string notempty maxlength 200)
+event ConductReview(Notes as string notempty maxlength 2000, AdditionalDaysAuthorized as integer nonnegative, NextReviewDue as date)
+event ChangeLevelOfCare(NewLevel as choice of string("Observation", "MedSurg", "StepDown", "ICU"), Reason as string notempty maxlength 500)
+event DenyAuthorization(Reason as string notempty maxlength 1000)
+
+# Discharge-planning events.
+event InitiateDischargePlanning(PlannedDate as date, ProposedDisposition as choice of string("Home", "HomeWithHomeHealth", "SkilledNursing", "Rehab", "LTACH", "Hospice", "AMA", "Expired"))
+event UpdateDischargePlan(NewPlannedDate as date)
+event Discharge(ActualDischargeDate as date, FinalDisposition as choice of string("Home", "HomeWithHomeHealth", "SkilledNursing", "Rehab", "LTACH", "Hospice", "AMA", "Expired"))
+
+# Construction row — opens in Admitted.
+on Create
+    -> set CaseId = Create.CaseId
+    -> set PatientId = Create.PatientId
+    -> set PatientName = Create.PatientName
+    -> set PayerName = Create.PayerName
+    -> set PrimaryDiagnosisCode = Create.PrimaryDiagnosisCode
+    -> set AdmissionDate = Create.AdmissionDate
+    -> set AdmittingProvider = Create.AdmittingProvider
+    -> set AdmissionSource = Create.AdmissionSource
+    -> set LevelOfCare = Create.LevelOfCare
+    -> set AuthorizedDays = Create.AuthorizedDays
+    -> append CaseLog "Case opened at admission: {Create.PatientName} on {Create.AdmissionDate}"
+
+# Transitions
+
+# Admitted → InitialReview.
+from Admitted on AssignReviewer
+    -> set ReviewerName = AssignReviewer.ReviewerName
+    -> append CaseLog "Initial review assigned to {AssignReviewer.ReviewerName}"
+    -> transition InitialReview
+
+# InitialReview → OngoingReview (review certifies the stay).
+from InitialReview on ConductReview
+    -> set AuthorizedDays = AuthorizedDays + ConductReview.AdditionalDaysAuthorized
+    -> set NextReviewDue = ConductReview.NextReviewDue
+    -> set LastReviewNotes = ConductReview.Notes
+    -> set ReviewCount = ReviewCount + 1
+    -> append CaseLog "Initial review completed; {ConductReview.AdditionalDaysAuthorized} additional days authorized"
+    -> transition OngoingReview
+
+# OngoingReview — same-state concurrent reviews and level-of-care changes.
+from OngoingReview on ConductReview
+    -> set AuthorizedDays = AuthorizedDays + ConductReview.AdditionalDaysAuthorized
+    -> set NextReviewDue = ConductReview.NextReviewDue
+    -> set LastReviewNotes = ConductReview.Notes
+    -> set ReviewCount = ReviewCount + 1
+    -> append CaseLog "Concurrent review completed"
+    -> no transition
+
+from OngoingReview on ChangeLevelOfCare
+    -> set LevelOfCare = ChangeLevelOfCare.NewLevel
+    -> append CaseLog "Level of care changed to {ChangeLevelOfCare.NewLevel}: {ChangeLevelOfCare.Reason}"
+    -> no transition
+
+# OngoingReview → DischargePlanning. Discharge planning typically begins
+# 24-48 hours before anticipated discharge.
+from OngoingReview on InitiateDischargePlanning
+    -> set DischargePlanInitiatedAt = now()
+    -> set PlannedDischargeDate = InitiateDischargePlanning.PlannedDate
+    -> set DischargeDisposition = InitiateDischargePlanning.ProposedDisposition
+    -> append CaseLog "Discharge planning initiated: {InitiateDischargePlanning.ProposedDisposition} on {InitiateDischargePlanning.PlannedDate}"
+    -> transition DischargePlanning
+
+# DischargePlanning — concurrent review and plan revision continue;
+# Discharge closes the case.
+from DischargePlanning on UpdateDischargePlan
+    -> set PlannedDischargeDate = UpdateDischargePlan.NewPlannedDate
+    -> append CaseLog "Discharge plan updated to {UpdateDischargePlan.NewPlannedDate}"
+    -> no transition
+
+from DischargePlanning on ConductReview
+    -> set NextReviewDue = ConductReview.NextReviewDue
+    -> set LastReviewNotes = ConductReview.Notes
+    -> set ReviewCount = ReviewCount + 1
+    -> append CaseLog "Review conducted during discharge planning"
+    -> no transition
+
+from DischargePlanning on Discharge
+    -> set DischargeDate = Discharge.ActualDischargeDate
+    -> set DischargeDisposition = Discharge.FinalDisposition
+    -> append CaseLog "Patient discharged to {Discharge.FinalDisposition} on {Discharge.ActualDischargeDate}"
+    -> transition Discharged
+
+# Denial — payer denies authorization at any review tier.
+from InitialReview, OngoingReview on DenyAuthorization
+    -> set DenialReason = DenyAuthorization.Reason
+    -> append CaseLog "Authorization denied: {DenyAuthorization.Reason}"
+    -> transition Denied

@@ -1,18 +1,26 @@
 precept WarrantyRepairRequest
 
-# Pattern B: Draft is a genuine enrichment phase — the customer fills in product details
-# progressively before submitting. The repair step log uses a stack so the last entered
-# step can be reversed cleanly.
+# A warranty repair request — the customer enriches identifying details in
+# Draft, submits for approval, and the manufacturer either denies or accepts
+# the repair. Accepted requests log the repair steps as a stack so the last
+# step can be reversed cleanly. Free-Construction Pattern: the customer fills
+# in product identity progressively rather than supplying everything atomically.
 
-field CustomerName as string optional
-field ProductName as string optional
-field SerialNumber as string optional
-field ApprovalNote as string optional
-field LastReversedStep as string optional
+# Customer and product identity — filled progressively in Draft.
+field CustomerName as string optional maxlength 200
+field ProductName as string optional maxlength 200
+field SerialNumber as string optional maxlength 100
+
+# Decision tracking — populated on the approve/deny transitions.
+field ApprovalNote as string optional maxlength 2000
+
+# Repair workflow
+field RepairSteps as stack of string
+field LastReversedStep as string optional maxlength 200
 field RepairComplete as boolean default false
 field ShippingLabelSent as boolean default false
-field RepairSteps as stack of string
 
+# States
 state Draft initial
 state Submitted
 state Approved
@@ -21,27 +29,33 @@ state ReadyToReturn
 state Closed terminal
 state Denied terminal
 
+# Editable window — the customer enriches identity in Draft.
 in Draft modify CustomerName, ProductName, SerialNumber editable
 
-in ReadyToReturn ensure RepairComplete because "Ready-to-return cases must have finished repair work"
-in Closed ensure ShippingLabelSent because "Closed cases must have a return label on record"
+# State ensures
+in ReadyToReturn ensure RepairComplete because "A repair must be marked complete before the unit is ready to return — partial repairs are not shippable"
+in Closed ensure ShippingLabelSent because "A closed warranty case must have a return shipping label on record so the customer can ship the unit back"
 
+# Entry hook — generate the return label automatically on entry to ReadyToReturn.
 to ReadyToReturn -> set ShippingLabelSent = true
 
+# Events
 event Submit
-event Approve(Note as string optional)
-event Deny(Note as string notempty)
+event Approve(Note as string optional maxlength 2000)
+event Deny(Note as string notempty maxlength 2000)
 event StartRepair
-event LogRepairStep(StepName as string notempty)
+event LogRepairStep(StepName as string notempty maxlength 200)
 event UndoLastStep
 event FinishRepair
 event ConfirmReturn
 
+# Submit — all three identifiers must be on record before the manufacturer can review.
 from Draft on Submit when CustomerName is set and ProductName is set and SerialNumber is set
     -> transition Submitted
 from Draft on Submit
-    -> reject "Customer name, product name, and serial number are all required before submission"
+    -> reject "Customer name, product name, and serial number are all required before submission — warranty cannot be verified without them"
 
+# Approval decision
 from Submitted on Approve
     -> set ApprovalNote = Approve.Note
     -> transition Approved
@@ -49,9 +63,11 @@ from Submitted on Deny
     -> set ApprovalNote = Deny.Note
     -> transition Denied
 
+# Repair execution
 from Approved on StartRepair
     -> transition InRepair
 
+# Repair step log — push records steps; pop reverses the most recent one.
 from InRepair on LogRepairStep
     -> push RepairSteps LogRepairStep.StepName
     -> no transition
@@ -59,13 +75,14 @@ from InRepair on UndoLastStep when RepairSteps.count > 0
     -> pop RepairSteps into LastReversedStep
     -> no transition
 from InRepair on UndoLastStep
-    -> reject "There is no logged repair step to undo"
+    -> reject "There is no logged repair step to undo — the step log is empty"
 from InRepair on FinishRepair when RepairSteps.count > 0
     -> set RepairComplete = true
     -> transition ReadyToReturn
 from InRepair on FinishRepair
-    -> reject "At least one repair step must be logged before the repair can finish"
+    -> reject "At least one repair step must be logged before the repair can finish — undocumented repairs are not auditable"
 
+# Return — clear the step log and close the case.
 from ReadyToReturn on ConfirmReturn
     -> clear RepairSteps
     -> transition Closed

@@ -1,0 +1,253 @@
+precept SaasUserProvisioning
+
+# A SaaS user-provisioning record fed by the identity-management system. The
+# user arrives in Requested with subscription and contact details. An
+# administrator approves access (Approved), provisioning issues a license
+# with an externally-supplied expiration (Active), the user works normally
+# until either security suspends them (Suspended) or admin/security
+# deactivates them (Deactivated, terminal). A suspended user may be
+# reactivated. Status is encoded by the state — no parallel field needed.
+# License-pool counters live on the separate SaasLicenseManagement entity;
+# this precept governs a single user's lifecycle.
+
+# User identity — fixed at construction.
+field SubscriptionId as string notempty maxlength 50
+field UserId as string notempty maxlength 50
+field UserEmail as string notempty maxlength 200
+field UserDisplayName as string notempty maxlength 200
+field Department as string notempty maxlength 100
+
+# Access configuration — established at request, refined by provisioning.
+field UserRole as choice of string("Admin", "Editor", "Viewer") default "Viewer"
+field LicenseType as choice of string("Full", "Limited", "Trial") default "Full"
+field LicenseExpirationDate as instant optional
+
+# Permission flags — derived from role on provisioning.
+field CanCreate as boolean default false
+field CanEdit as boolean default false
+field CanDelete as boolean default false
+field CanManageUsers as boolean default false
+field CanViewReports as boolean default false
+
+# Resource access table — resource name to access level (read/write/admin).
+field ResourceAccess as lookup of string to string
+
+# Activity tracking
+field LoginCount as integer default 0 nonnegative
+field FailedLoginAttempts as integer default 0 nonnegative
+field LastActivityAt as instant optional
+
+# Approval, suspension, deactivation reasons
+field SuspensionReason as string optional maxlength 500
+field DeactivationReason as string optional maxlength 500
+field ApprovedBy as string optional maxlength 200
+
+# Timestamps
+field RequestedAt as instant
+field ApprovedAt as instant optional
+field ActivatedAt as instant optional
+field SuspendedAt as instant optional
+field DeactivatedAt as instant optional
+
+# Audit trail
+field AuditLog as log of string
+
+# Domain rules — permission flags align with role.
+rule CanManageUsers == false when UserRole != "Admin" because "Only Admin users may have the manage-users permission"
+rule CanDelete == false when UserRole == "Viewer" because "Viewer users cannot have delete permission — Viewer is read-only by definition"
+
+# States — user-provisioning lifecycle.
+state Requested initial
+state Approved
+state Active
+state Suspended
+state Deactivated terminal
+
+# State ensures — each state activates a distinct rule set.
+in Approved ensure ApprovedAt is set because "Approved state requires the approval timestamp — required for audit"
+in Approved ensure ApprovedBy is set because "Approved state requires the approver's identity — required for audit"
+in Active ensure ActivatedAt is set because "Active state requires the activation timestamp — required for usage analytics"
+in Active ensure LicenseExpirationDate is set because "Active users must hold a license with a defined expiration — provisioning issues the license"
+in Suspended ensure SuspendedAt is set because "Suspended state requires the suspension timestamp — required for audit"
+in Suspended ensure SuspensionReason is set because "Suspended state requires the suspension reason — required for review"
+in Deactivated ensure DeactivatedAt is set because "Deactivated state requires the deactivation timestamp — required for audit"
+in Deactivated ensure DeactivationReason is set because "Deactivated state requires the deactivation reason — required for compliance"
+
+# Construction — identity-management requests access.
+event Create(
+    SubscriptionId as string notempty maxlength 50,
+    UserId as string notempty maxlength 50,
+    UserEmail as string notempty maxlength 200,
+    UserDisplayName as string notempty maxlength 200,
+    Department as string notempty maxlength 100,
+    UserRole as choice of string("Admin", "Editor", "Viewer"),
+    LicenseType as choice of string("Full", "Limited", "Trial")) initial
+
+# Lifecycle events. Provisioning carries the license expiration as an
+# event-arg — the identity-management host computes it from the
+# subscription term (BUG-010 currently blocks `now() + '<duration>'`).
+event ApproveAccess(ApprovedBy as string notempty maxlength 200)
+event ProvisionUser(LicenseExpirationDate as instant)
+on ProvisionUser ensure ProvisionUser.LicenseExpirationDate > now() because "License expiration of {ProvisionUser.LicenseExpirationDate} must be in the future — provisioning a pre-expired license has no purpose"
+event SuspendUser(Reason as string notempty maxlength 500)
+event ReactivateUser
+event DeactivateUser(Reason as string notempty maxlength 500)
+
+# Role and resource management
+event UpdateRole(NewRole as choice of string("Admin", "Editor", "Viewer"))
+event GrantResourceAccess(ResourceName as string notempty maxlength 200, AccessLevel as string notempty maxlength 50)
+event RevokeResourceAccess(ResourceName as string notempty maxlength 200)
+
+# Activity events — security auto-suspends after enough failed logins.
+event RecordLogin
+event RecordFailedLogin
+
+# Construction row — opens in Requested.
+on Create
+    -> set SubscriptionId = Create.SubscriptionId
+    -> set UserId = Create.UserId
+    -> set UserEmail = Create.UserEmail
+    -> set UserDisplayName = Create.UserDisplayName
+    -> set Department = Create.Department
+    -> set UserRole = Create.UserRole
+    -> set LicenseType = Create.LicenseType
+    -> set RequestedAt = now()
+    -> append AuditLog "User access requested for {Create.UserEmail} ({Create.UserRole})"
+
+# Approval — Requested → Approved.
+from Requested on ApproveAccess
+    -> set ApprovedBy = ApproveAccess.ApprovedBy
+    -> set ApprovedAt = now()
+    -> append AuditLog "Access approved by {ApproveAccess.ApprovedBy}"
+    -> transition Approved
+
+# Provisioning — Approved → Active. Permissions derived from role; license
+# expiration supplied by the host.
+from Approved on ProvisionUser when UserRole == "Admin"
+    -> set ActivatedAt = now()
+    -> set LicenseExpirationDate = ProvisionUser.LicenseExpirationDate
+    -> set CanCreate = true
+    -> set CanEdit = true
+    -> set CanDelete = true
+    -> set CanManageUsers = true
+    -> set CanViewReports = true
+    -> append AuditLog "User provisioned with Admin permissions"
+    -> transition Active
+
+from Approved on ProvisionUser when UserRole == "Editor"
+    -> set ActivatedAt = now()
+    -> set LicenseExpirationDate = ProvisionUser.LicenseExpirationDate
+    -> set CanCreate = true
+    -> set CanEdit = true
+    -> set CanDelete = false
+    -> set CanManageUsers = false
+    -> set CanViewReports = true
+    -> append AuditLog "User provisioned with Editor permissions"
+    -> transition Active
+
+from Approved on ProvisionUser
+    -> set ActivatedAt = now()
+    -> set LicenseExpirationDate = ProvisionUser.LicenseExpirationDate
+    -> set CanCreate = false
+    -> set CanEdit = false
+    -> set CanDelete = false
+    -> set CanManageUsers = false
+    -> set CanViewReports = true
+    -> append AuditLog "User provisioned with Viewer permissions"
+    -> transition Active
+
+# Role update — Active only; permissions track the new role.
+from Active on UpdateRole when UpdateRole.NewRole == "Admin"
+    -> set UserRole = "Admin"
+    -> set CanCreate = true
+    -> set CanEdit = true
+    -> set CanDelete = true
+    -> set CanManageUsers = true
+    -> set CanViewReports = true
+    -> set LastActivityAt = now()
+    -> append AuditLog "Role updated to Admin"
+    -> no transition
+
+from Active on UpdateRole when UpdateRole.NewRole == "Editor"
+    -> set UserRole = "Editor"
+    -> set CanCreate = true
+    -> set CanEdit = true
+    -> set CanDelete = false
+    -> set CanManageUsers = false
+    -> set CanViewReports = true
+    -> set LastActivityAt = now()
+    -> append AuditLog "Role updated to Editor"
+    -> no transition
+
+from Active on UpdateRole
+    -> set UserRole = "Viewer"
+    -> set CanCreate = false
+    -> set CanEdit = false
+    -> set CanDelete = false
+    -> set CanManageUsers = false
+    -> set CanViewReports = true
+    -> set LastActivityAt = now()
+    -> append AuditLog "Role updated to Viewer"
+    -> no transition
+
+# Resource access — granted and revoked while Active.
+from Active on GrantResourceAccess
+    -> put ResourceAccess GrantResourceAccess.ResourceName = GrantResourceAccess.AccessLevel
+    -> set LastActivityAt = now()
+    -> append AuditLog "Resource access granted: {GrantResourceAccess.ResourceName} = {GrantResourceAccess.AccessLevel}"
+    -> no transition
+
+from Active on RevokeResourceAccess
+    -> put ResourceAccess RevokeResourceAccess.ResourceName = ""
+    -> set LastActivityAt = now()
+    -> append AuditLog "Resource access revoked: {RevokeResourceAccess.ResourceName}"
+    -> no transition
+
+# Login activity — Active only; failed-login threshold drives auto-suspension.
+from Active on RecordLogin
+    -> set LoginCount = LoginCount + 1
+    -> set FailedLoginAttempts = 0
+    -> set LastActivityAt = now()
+    -> append AuditLog "User logged in (total: {LoginCount + 1})"
+    -> no transition
+
+from Active on RecordFailedLogin when FailedLoginAttempts + 1 >= 5
+    -> set FailedLoginAttempts = FailedLoginAttempts + 1
+    -> set SuspendedAt = now()
+    -> set SuspensionReason = "Auto-suspended after 5 failed login attempts"
+    -> set LastActivityAt = now()
+    -> append AuditLog "User auto-suspended after 5 failed login attempts"
+    -> transition Suspended
+
+from Active on RecordFailedLogin
+    -> set FailedLoginAttempts = FailedLoginAttempts + 1
+    -> set LastActivityAt = now()
+    -> append AuditLog "Failed login attempt (total: {FailedLoginAttempts + 1})"
+    -> no transition
+
+# Manual suspension — Active → Suspended.
+from Active on SuspendUser
+    -> set SuspendedAt = now()
+    -> set SuspensionReason = SuspendUser.Reason
+    -> set LastActivityAt = now()
+    -> append AuditLog "User suspended: {SuspendUser.Reason}"
+    -> transition Suspended
+
+# Reactivation — Suspended → Active; failed-login counter is cleared.
+from Suspended on ReactivateUser
+    -> set FailedLoginAttempts = 0
+    -> set LastActivityAt = now()
+    -> append AuditLog "User reactivated from suspension"
+    -> transition Active
+
+# Deactivation — from Approved, Active, or Suspended → Deactivated.
+from Approved, Active, Suspended on DeactivateUser
+    -> set DeactivatedAt = now()
+    -> set DeactivationReason = DeactivateUser.Reason
+    -> set CanCreate = false
+    -> set CanEdit = false
+    -> set CanDelete = false
+    -> set CanManageUsers = false
+    -> set CanViewReports = false
+    -> append AuditLog "User deactivated: {DeactivateUser.Reason}"
+    -> transition Deactivated

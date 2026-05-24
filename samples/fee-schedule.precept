@@ -1,17 +1,20 @@
 precept FeeSchedule
 
-# A stateless data-only precept representing a pricing configuration object.
-# No lifecycle states or events — this precept governs what a valid fee schedule
-# looks like and which pricing fields the host application is allowed to adjust.
+# A stateless data-only precept governing a single fee schedule for a service
+# or product line. A fee schedule holds the base price, the allowed discount
+# lever, the minimum chargeable amount, and the tax rate that applies —
+# together they determine what the host application bills.
 #
-# TaxRate and CurrencyCode are intentionally locked (not editable) — these are
-# jurisdiction-level settings that must go through a separate administrative
-# approval flow, not direct editing.
+# Pricing levers (BaseFee, DiscountPercent, MinimumCharge) are writable — the
+# host's pricing UI adjusts them. TaxRate and CurrencyCode are intentionally
+# locked: they are jurisdiction-level settings that must go through a separate
+# administrative approval flow, not direct editing on a fee record.
 
-field BaseFee as decimal default 0 nonnegative maxplaces 2 writable
+field CurrencyCode as currency default 'USD'
+
+field BaseFee as money in '{CurrencyCode}' default '0 {CurrencyCode}' nonnegative writable
 field DiscountPercent as decimal default 0 nonnegative max 100 maxplaces 2 writable
-field TaxRate as decimal default 0.1 nonnegative maxplaces 4
-field MinimumCharge as decimal default 0 nonnegative maxplaces 2 writable
-field CurrencyCode as string default "USD"
+field MinimumCharge as money in '{CurrencyCode}' default '0 {CurrencyCode}' nonnegative writable
+field TaxRate as decimal default 0.1 nonnegative max 1 maxplaces 4
 
-# Only pricing levers are editable; TaxRate and CurrencyCode are locked.
+rule MinimumCharge <= BaseFee because "Minimum charge {MinimumCharge} exceeds the base fee {BaseFee} — the minimum cannot raise a quote above the headline price"

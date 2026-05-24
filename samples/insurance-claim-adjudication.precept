@@ -1,0 +1,206 @@
+precept InsuranceClaimAdjudication
+
+# Insurance claim adjudication — the carrier-side workflow that takes a filed
+# claim through review, investigation, coverage determination, settlement
+# calculation, payment, and closure. Adjudication is typically fed by an
+# upstream claim-intake system (FNOL feed, broker submission), so the entity
+# arrives complete: claim number, policy reference, loss details, and the
+# carrier's initial deductible position. Subrogation is detected during
+# investigation and tracked alongside the payment lifecycle. Reserves track
+# the carrier's loss exposure and must equal or exceed the loss amount.
+
+# Claim identity
+field ClaimNumber as string notempty maxlength 50
+field PolicyNumber as string notempty maxlength 50
+field PolicyHolderName as string notempty maxlength 200
+field IncidentDate as date
+field IncidentLocation as string optional maxlength 500
+field ClaimType as choice of string("Property", "Liability", "Auto", "WorkersComp", "Medical")
+
+# Financial amounts — money in 'USD' for exactness.
+field LossAmount as money in 'USD' positive
+field Deductible as money in 'USD' nonnegative
+field Reserves as money in 'USD' default '0.00 USD' nonnegative
+field PaymentAmount as money in 'USD' default '0.00 USD' nonnegative
+field SubrogationRecovery as money in 'USD' default '0.00 USD' nonnegative
+
+# Coverage details — per-coverage limits keyed by coverage code.
+# Note: lookup values use decimal because lookup of money in 'X' is not
+# currently supported (BUG-005); currency is tracked at the entity level.
+field CoverageDetails as lookup of string to decimal
+
+# Subrogation tracking — whether a third party may be at fault and recoverable.
+field HasSubrogationPotential as boolean default false
+field AtFaultParty as string optional maxlength 200
+field SubrogationDetails as lookup of string to string
+
+# Audit trail — append-only log of adjudication events.
+field ClaimLog as log of string
+
+# Additional contacts — adjuster, witness, medical provider keyed by role.
+field AdditionalContacts as lookup of string to string
+
+# Timestamps tracking each adjudication phase
+field FiledAt as instant
+field ReviewedAt as instant optional
+field InvestigatedAt as instant optional
+field AdjudicatedAt as instant optional
+field PaidAt as instant optional
+field DeniedAt as instant optional
+
+# Notes and reasons
+field ClaimDescription as string optional maxlength 2000
+field AdjustmentNotes as string optional maxlength 2000
+field DenialReason as string optional maxlength 500
+field PaymentMethod as choice of string("Check", "Wire", "ACH", "DirectDeposit") optional
+
+# SLA tracking — handling-time bound for review.
+field ReviewSLA as duration default '30 days'
+field TargetCompletion as instant optional
+
+# Rules — domain invariants
+rule PaymentAmount <= LossAmount because "Total payments {PaymentAmount} cannot exceed the claim's loss amount of {LossAmount}"
+rule Reserves >= LossAmount when AdjudicatedAt is set because "Reserves {Reserves} must cover the loss amount {LossAmount} once the claim is adjudicated — carriers cannot under-reserve a known liability"
+rule Deductible <= LossAmount because "Deductible {Deductible} cannot exceed the loss amount {LossAmount} — the insured cannot owe more than the loss"
+
+# States
+state UnderReview initial
+state Investigation
+state Adjudication
+state PaymentProcessing
+state Paid terminal
+state Denied terminal
+
+# Fields with no meaning until adjudication has completed.
+in UnderReview, Investigation omit PaymentAmount, PaymentMethod, AdjustmentNotes, AdjudicatedAt
+in UnderReview, Investigation, Adjudication omit PaidAt
+in UnderReview, Investigation, Adjudication, PaymentProcessing omit DeniedAt, DenialReason
+
+# State ensures — adjudication progress timestamps
+in Investigation ensure InvestigatedAt is set because "Investigation must record when fact-finding began"
+in Adjudication ensure AdjudicatedAt is set because "Adjudication must record when the coverage decision was made"
+in PaymentProcessing ensure PaymentAmount > '0.00 USD' because "Payment processing requires a positive approved amount — a zero payment is structurally a denial, not a payment"
+in Paid ensure PaidAt is set because "Paid claims must record when the payment was disbursed"
+in Denied ensure DeniedAt is set because "Denied claims must record when the denial decision was made"
+
+# Construction — claim arrives from upstream intake fully formed.
+event Create(
+    ClaimNumber as string notempty maxlength 50,
+    PolicyNumber as string notempty maxlength 50,
+    PolicyHolderName as string notempty maxlength 200,
+    IncidentDate as date,
+    IncidentLocation as string optional maxlength 500,
+    ClaimType as choice of string("Property", "Liability", "Auto", "WorkersComp", "Medical"),
+    LossAmount as money in 'USD' positive,
+    Deductible as money in 'USD' nonnegative) initial
+on Create ensure Create.Deductible <= Create.LossAmount because "Deductible {Create.Deductible} cannot exceed the loss amount {Create.LossAmount}"
+
+# Adjudication events
+event SetDescription(Description as string notempty maxlength 2000)
+event AssignAdjuster(AdjusterName as string notempty maxlength 200)
+event RequestAdditionalInfo(RequestedInfo as string notempty maxlength 500, Deadline as duration)
+event BeginInvestigation
+event SubmitInvestigationReport(
+    ReportSummary as string notempty maxlength 2000,
+    HasSubrogation as boolean,
+    AtFaultParty as string optional maxlength 200)
+event DetermineCoverage(CoverageCode as string notempty maxlength 50, CoverageLimit as money in 'USD' positive)
+event CalculateSettlement(ApprovedAmount as money in 'USD' positive)
+event ApprovePayment(PaymentMethod as choice of string("Check", "Wire", "ACH", "DirectDeposit"))
+event ProcessPayment
+event RecordSubrogationRecovery(RecoveryAmount as money in 'USD' positive)
+event DenyClaim(Reason as string notempty maxlength 500)
+
+# Construction row — populate fields and arrive in UnderReview.
+on Create
+    -> set ClaimNumber = Create.ClaimNumber
+    -> set PolicyNumber = Create.PolicyNumber
+    -> set PolicyHolderName = Create.PolicyHolderName
+    -> set IncidentDate = Create.IncidentDate
+    -> set IncidentLocation = Create.IncidentLocation
+    -> set ClaimType = Create.ClaimType
+    -> set LossAmount = Create.LossAmount
+    -> set Deductible = Create.Deductible
+    -> set FiledAt = now()
+    -> set ReviewedAt = now()
+    -> set TargetCompletion = now() + ReviewSLA
+
+# Description and adjuster — captured during review.
+from UnderReview on SetDescription
+    -> set ClaimDescription = SetDescription.Description
+    -> append ClaimLog "Claim description set"
+    -> no transition
+
+from UnderReview on AssignAdjuster
+    -> put AdditionalContacts "Adjuster" = AssignAdjuster.AdjusterName
+    -> append ClaimLog "Adjuster assigned: {AssignAdjuster.AdjusterName}"
+    -> no transition
+
+from UnderReview on RequestAdditionalInfo
+    -> set TargetCompletion = now() + RequestAdditionalInfo.Deadline
+    -> append ClaimLog "Additional info requested: {RequestAdditionalInfo.RequestedInfo}"
+    -> no transition
+
+# Begin investigation — UnderReview → Investigation.
+from UnderReview on BeginInvestigation
+    -> set InvestigatedAt = now()
+    -> append ClaimLog "Investigation begun"
+    -> transition Investigation
+
+# Submit investigation report — subrogation detection drives field setup.
+from Investigation on SubmitInvestigationReport when SubmitInvestigationReport.HasSubrogation
+    -> set AdjustmentNotes = SubmitInvestigationReport.ReportSummary
+    -> set HasSubrogationPotential = true
+    -> set AtFaultParty = SubmitInvestigationReport.AtFaultParty
+    -> put SubrogationDetails "Party" = if SubmitInvestigationReport.AtFaultParty is set then SubmitInvestigationReport.AtFaultParty else "Unknown"
+    -> set AdjudicatedAt = now()
+    -> append ClaimLog "Investigation complete — subrogation detected"
+    -> transition Adjudication
+from Investigation on SubmitInvestigationReport
+    -> set AdjustmentNotes = SubmitInvestigationReport.ReportSummary
+    -> set HasSubrogationPotential = false
+    -> clear AtFaultParty
+    -> set AdjudicatedAt = now()
+    -> append ClaimLog "Investigation complete — no subrogation"
+    -> transition Adjudication
+
+# Determine coverage — adjudicator sets per-coverage limits and reserves.
+from Adjudication on DetermineCoverage
+    -> put CoverageDetails DetermineCoverage.CoverageCode = DetermineCoverage.CoverageLimit.amount
+    -> set Reserves = LossAmount
+    -> append ClaimLog "Coverage determined: {DetermineCoverage.CoverageCode}"
+    -> no transition
+
+# Calculate settlement — approved amount must not exceed the loss.
+from Adjudication on CalculateSettlement when CalculateSettlement.ApprovedAmount > LossAmount
+    -> reject "Approved settlement of {CalculateSettlement.ApprovedAmount} exceeds the loss amount of {LossAmount}"
+from Adjudication on CalculateSettlement
+    -> set PaymentAmount = CalculateSettlement.ApprovedAmount
+    -> set PaymentMethod = "Check"
+    -> append ClaimLog "Settlement calculated: {CalculateSettlement.ApprovedAmount}"
+    -> transition PaymentProcessing
+
+# Approve payment method — confirm the disbursement channel.
+from PaymentProcessing on ApprovePayment
+    -> set PaymentMethod = ApprovePayment.PaymentMethod
+    -> append ClaimLog "Payment method confirmed: {ApprovePayment.PaymentMethod}"
+    -> no transition
+
+# Process payment — PaymentProcessing → Paid.
+from PaymentProcessing on ProcessPayment
+    -> set PaidAt = now()
+    -> append ClaimLog "Payment processed"
+    -> transition Paid
+
+# Subrogation recovery — track third-party recovery against the claim.
+from PaymentProcessing on RecordSubrogationRecovery
+    -> set SubrogationRecovery = SubrogationRecovery + RecordSubrogationRecovery.RecoveryAmount
+    -> append ClaimLog "Subrogation recovery recorded: {RecordSubrogationRecovery.RecoveryAmount}"
+    -> no transition
+
+# Deny claim — available from review through adjudication.
+from UnderReview, Investigation, Adjudication on DenyClaim
+    -> set DenialReason = DenyClaim.Reason
+    -> set DeniedAt = now()
+    -> append ClaimLog "Claim denied: {DenyClaim.Reason}"
+    -> transition Denied

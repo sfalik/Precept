@@ -1,22 +1,29 @@
 precept InvoiceLineItem
 
-# A stateless precept governing individual invoice line-item calculations.
-# The host application edits UnitPrice, Quantity, and DiscountPercent; derived
-# totals are computed automatically and cannot be directly manipulated.
-# This sample demonstrates computed fields in a data-only precept — there are
-# no lifecycle states or events, just structural constraints and derived math.
+# A stateless precept governing a single invoice line — unit price, quantity,
+# discount, tax — together with the derived totals every billing system needs
+# downstream. Source fields are writable (the host's invoice editor sets them);
+# computed fields cannot be assigned and update atomically when their inputs
+# change. There is no lifecycle: a line either is or isn't a valid line.
+#
+# Demonstrates the computed-field idiom (<-) in a data-only precept. The
+# structural modifiers on the source fields (nonnegative, positive, max 100,
+# maxplaces 2) are what make the computed totals provably non-negative — no
+# separate runtime rules required.
 
-field Description as string optional writable
-field UnitPrice as number default 0 nonnegative writable
-field Quantity as number default 1 min 1 writable
-field DiscountPercent as number default 0 nonnegative max 100 writable
-field TaxRate as number default 8
+field CurrencyCode as currency default 'USD' writable
 
-# Computed fields — derived from editable source fields.
-field Subtotal as number <- UnitPrice * Quantity
-field DiscountAmount as number <- Subtotal * DiscountPercent / 100
-field TaxableAmount as number <- Subtotal - DiscountAmount
-field TaxAmount as number <- TaxableAmount * TaxRate / 100
-field LineTotal as number nonnegative <- TaxableAmount + TaxAmount
+# Source fields — directly edited by the host's line-editor UI.
+field Description as string optional maxlength 500 writable
+field UnitPrice as money in '{CurrencyCode}' default '0 {CurrencyCode}' nonnegative writable
+field Quantity as integer default 1 positive writable
+field DiscountPercent as decimal default 0 nonnegative max 100 maxplaces 2 writable
+field TaxRate as decimal default 0.08 nonnegative max 1 maxplaces 4 writable
 
-# Only source fields are editable; derived totals are locked.
+# Computed fields — derived from source values at every read. Cannot be
+# assigned; the formula is the single source of truth.
+field Subtotal as money in '{CurrencyCode}' <- UnitPrice * Quantity
+field DiscountAmount as money in '{CurrencyCode}' <- Subtotal * DiscountPercent / 100
+field TaxableAmount as money in '{CurrencyCode}' <- Subtotal - DiscountAmount
+field TaxAmount as money in '{CurrencyCode}' <- TaxableAmount * TaxRate
+field LineTotal as money in '{CurrencyCode}' <- TaxableAmount + TaxAmount

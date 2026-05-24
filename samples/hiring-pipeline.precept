@@ -1,14 +1,22 @@
 precept HiringPipeline
 
-# Hiring is a good fit for Precept because the state flow is clear but the details still matter.
-# The interview loop uses a set of pending interviewers to track who still owes feedback.
-# Demonstrates: form-fill pattern, money type for offer amount, set operations.
+# A candidate moving through a hiring funnel: filled out by the recruiter on
+# the shelf, screened by the recruiting team, run through an interview loop
+# with a tracked panel of interviewers, decided on, offered, and either hired
+# or rejected. The pipeline shows how a real-world workflow benefits from
+# Precept's lifecycle model — each state activates a distinct rule set, and
+# the panel of pending interviewers is a first-class set field that
+# transitions cannot leave underpopulated.
+#
+# Free-Construction: a candidate enters in Draft and the recruiter fills in
+# the name, role, and recruiter via direct edits. Submit promotes the record
+# into Screening once those three fields are filled.
 
 field CandidateName as string optional maxlength 100
-field RoleName as string optional
-field RecruiterName as string optional
+field RoleName as string optional maxlength 100
+field RecruiterName as string optional maxlength 100
 field FeedbackCount as integer default 0 nonnegative
-field OfferAmount as money in 'USD' default '0.00 USD'
+field OfferAmount as money in 'USD' default '0.00 USD' nonnegative
 field FinalNote as string optional maxlength 500
 field PendingInterviewers as set of string
 
@@ -20,35 +28,49 @@ state OfferExtended
 state Hired terminal
 state Rejected terminal
 
+# Editable window — recruiter fills the candidate intake fields before Submit.
 in Draft modify CandidateName, RoleName, RecruiterName editable
 
-in InterviewLoop ensure PendingInterviewers.count > 0 because "Interview loops require at least one pending interviewer"
-in Hired ensure OfferAmount > '0.00 USD' because "Hired candidates must have an offer amount"
+# State ensures
+in InterviewLoop ensure PendingInterviewers.count > 0 because "Interview loop requires at least one pending interviewer — a loop with no panel cannot collect feedback"
+in Hired ensure OfferAmount > '0.00 USD' because "Hired candidate must carry a positive offer amount — a $0 hire is a record-keeping error, not a compensation decision"
 
+# Events
 event Submit
-event AddInterviewer(Name as string notempty)
+event AddInterviewer(Name as string notempty maxlength 100)
 event PassScreen
-event RecordInterviewFeedback(Interviewer as string notempty)
+event RecordInterviewFeedback(Interviewer as string notempty maxlength 100)
 event ExtendOffer(Amount as money in 'USD' positive)
 event AcceptOffer
-event RejectCandidate(Note as string notempty)
+event RejectCandidate(Note as string notempty maxlength 500)
 
+# ── Transitions ───────────────────────────────────────────────────────────────
+
+# Submit guards on completeness — Draft holds the intake fields editable; Submit
+# checks they are all set before promoting into the screening lane.
 from Draft on Submit when CandidateName is set and RoleName is set and RecruiterName is set
     -> transition Screening
 from Draft on Submit
-    -> reject "A complete application needs a candidate name, role, and recruiter"
+    -> reject "A complete application needs a candidate name, role, and recruiter — fill in the three Draft fields before submitting"
 
+# Screening builds the interview panel via AddInterviewer; PassScreen promotes
+# only once at least one interviewer is on the panel.
 from Screening on AddInterviewer
     -> add PendingInterviewers AddInterviewer.Name
     -> no transition
 from Screening on PassScreen when PendingInterviewers.count > 0
     -> transition InterviewLoop
 from Screening on PassScreen
-    -> reject "At least one interviewer must be assigned before the interview loop begins"
+    -> reject "At least one interviewer must be assigned before the interview loop begins — add a panelist via AddInterviewer first"
+
+# Rejection is allowed from any active review stage, with the reason captured.
 from Screening, InterviewLoop, Decision on RejectCandidate
     -> set FinalNote = RejectCandidate.Note
     -> transition Rejected
 
+# Interview loop — each panelist's feedback removes them from the pending set.
+# The two-row pattern lets the final feedback close the loop into Decision; an
+# earlier feedback leaves the candidate in InterviewLoop with the panel narrowed.
 from InterviewLoop on RecordInterviewFeedback when PendingInterviewers contains RecordInterviewFeedback.Interviewer and PendingInterviewers.count == 1
     -> remove PendingInterviewers RecordInterviewFeedback.Interviewer
     -> set FeedbackCount = FeedbackCount + 1
@@ -58,14 +80,17 @@ from InterviewLoop on RecordInterviewFeedback when PendingInterviewers contains 
     -> set FeedbackCount = FeedbackCount + 1
     -> no transition
 from InterviewLoop on RecordInterviewFeedback
-    -> reject "Only assigned interviewers can submit feedback"
+    -> reject "Only assigned interviewers can submit feedback — {RecordInterviewFeedback.Interviewer} is not on the current panel"
 
+# Decision — an offer requires at least two completed feedback entries. The
+# tier note is set inline based on the feedback count (a richer signal would
+# come from a calibration committee, but this captures the structural pattern).
 from Decision on ExtendOffer when FeedbackCount >= 2
     -> set OfferAmount = ExtendOffer.Amount
     -> set FinalNote = if FeedbackCount >= 3 then "Strong Hire" else "Standard Hire"
     -> transition OfferExtended
 from Decision on ExtendOffer
-    -> reject "At least two completed interview feedback entries are required before extending an offer"
+    -> reject "At least two completed interview feedback entries are required before extending an offer — only {FeedbackCount} so far"
 
 from OfferExtended on AcceptOffer
     -> transition Hired

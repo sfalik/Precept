@@ -1,17 +1,33 @@
 precept VehicleServiceAppointment
 
-# Pattern B: Scheduled is a genuine enrichment phase — the customer books a slot and fills
-# in vehicle details before arriving. The advisor assigns themselves at check-in.
-# Uses a set of recommended services so advisors can add and remove items safely.
+# A vehicle in the shop from scheduled drop-off through pickup. The customer books
+# a slot and fills in vehicle details before arriving; on arrival the advisor takes
+# the keys and the workflow advances through inspection, approval, service, and pickup.
+#
+# Free-Construction: the customer enriches a Scheduled appointment over time, then
+# the advisor's CheckIn promotes it into the active workflow. Recommended services
+# accumulate during inspection; approval matches the customer's authorization to the
+# advisor's list, locking the scope before any wrench is turned.
 
-field CustomerName as string optional
-field VehiclePlate as string optional
-field AdvisorName as string optional
-field ApprovedWorkCount as number default 0 nonnegative
-field InvoiceTotal as number default 0 nonnegative
+# Customer and vehicle identity — filled progressively in Scheduled.
+field CustomerName as string optional maxlength 200
+field VehiclePlate as string optional maxlength 20
+
+# Advisor identity — set at check-in by the advisor taking the keys.
+field AdvisorName as string optional maxlength 200
+
+# Approved work and invoice — meaningful only once the estimate is approved.
+field ApprovedWorkCount as integer default 0 nonnegative
+field InvoiceTotal as money in 'USD' default '0.00 USD'
+
+# Pickup notification — set on entry to ReadyForPickup so the state ensure holds.
 field PickupContacted as boolean default false
+
+# Inspection recommendations — built up by the advisor in AwaitingApproval, then
+# matched against the customer's approval count when the estimate is signed off.
 field RecommendedServices as set of string
 
+# States
 state Scheduled initial
 state CheckedIn
 state AwaitingApproval
@@ -19,31 +35,45 @@ state InService
 state ReadyForPickup
 state Closed terminal
 
+# ApprovedWorkCount and InvoiceTotal are not meaningful until ApproveEstimate fires.
+in Scheduled, CheckedIn, AwaitingApproval omit ApprovedWorkCount
+in Scheduled, CheckedIn, AwaitingApproval omit InvoiceTotal
+
+# Editable windows — customer fills vehicle details before arrival; the advisor name
+# is captured at check-in.
 in Scheduled modify CustomerName, VehiclePlate editable
 in CheckedIn modify AdvisorName editable
-in ReadyForPickup ensure PickupContacted because "Customers must be notified before pickup"
 
-# If service leaves approval, it must leave with at least one approved recommendation.
-from AwaitingApproval ensure RecommendedServices.count > 0 because "Approval cannot finish with an empty recommendation list"
+# State ensures
+in ReadyForPickup ensure PickupContacted because "A vehicle ready for pickup must have the customer notified — letting the car sit without contact erodes service trust"
 
+# Approval cannot finish with an empty recommendation list — leaving AwaitingApproval
+# only happens via ApproveEstimate, and the estimate must contain at least one item.
+from AwaitingApproval ensure RecommendedServices.count > 0 because "Approval cannot finish with an empty recommendation list — at least one service must be on the estimate"
+
+# Entry hook — every inbound edge to ReadyForPickup notifies the customer.
 to ReadyForPickup -> set PickupContacted = true
 
-event CheckIn(Advisor as string notempty)
-event RecommendService(ServiceName as string notempty)
-event RemoveServiceRecommendation(ServiceName as string notempty)
-event ApproveEstimate(ApprovedCount as number, EstimateTotal as number)
-on ApproveEstimate ensure ApproveEstimate.ApprovedCount > 0 because "At least one service must be approved"
-on ApproveEstimate ensure ApproveEstimate.EstimateTotal >= 0 because "Estimate totals cannot be negative"
+# Events
+event CheckIn(Advisor as string notempty maxlength 200)
+event RecommendService(ServiceName as string notempty maxlength 200)
+event RemoveServiceRecommendation(ServiceName as string notempty maxlength 200)
+event ApproveEstimate(ApprovedCount as integer positive, EstimateTotal as money in 'USD')
+on ApproveEstimate ensure ApproveEstimate.EstimateTotal >= '0.00 USD' because "Estimate total cannot be negative — labor and parts are never refunds"
 
 event FinishService
 event PickUpVehicle
 
+# Check-in — the advisor takes the keys. Vehicle identity must be on record so the
+# shop can find the car in the lot.
 from Scheduled on CheckIn when CustomerName is set and VehiclePlate is set
     -> set AdvisorName = CheckIn.Advisor
     -> transition CheckedIn
 from Scheduled on CheckIn
-    -> reject "Customer name and vehicle plate are required before check-in"
+    -> reject "Customer name and vehicle plate must be set before check-in — the shop needs to identify the car in the lot"
 
+# Initial inspection finding — the first recommendation moves the appointment into
+# AwaitingApproval. Subsequent recommendations stay in AwaitingApproval.
 from CheckedIn on RecommendService
     -> add RecommendedServices RecommendService.ServiceName
     -> transition AwaitingApproval
@@ -55,14 +85,17 @@ from AwaitingApproval on RemoveServiceRecommendation when RecommendedServices co
     -> remove RecommendedServices RemoveServiceRecommendation.ServiceName
     -> no transition
 from AwaitingApproval on RemoveServiceRecommendation
-    -> reject "That recommendation is not on the estimate"
+    -> reject "Service {RemoveServiceRecommendation.ServiceName} is not on the estimate — cannot remove what was never recommended"
 
+# Approval locks the scope — the customer's approved-count must match the advisor's
+# recommendation list exactly. A mismatch means the customer and advisor are looking
+# at different estimates; resolve before authorizing work.
 from AwaitingApproval on ApproveEstimate when RecommendedServices.count == ApproveEstimate.ApprovedCount
     -> set ApprovedWorkCount = ApproveEstimate.ApprovedCount
     -> set InvoiceTotal = ApproveEstimate.EstimateTotal
     -> transition InService
 from AwaitingApproval on ApproveEstimate
-    -> reject "Approved count {ApproveEstimate.ApprovedCount} does not match the {RecommendedServices.count} services currently on the estimate"
+    -> reject "Approved count {ApproveEstimate.ApprovedCount} does not match the {RecommendedServices.count} services on the estimate — customer and advisor must agree on scope before work begins"
 
 from InService on FinishService
     -> transition ReadyForPickup

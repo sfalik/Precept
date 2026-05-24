@@ -1,47 +1,74 @@
 precept RestaurantWaitlist
 
-# A front-desk waitlist with one active call at a time.
-# This sample stays compact while still showing queue.peek and from any rows.
+# A front-of-house waitlist with one active call at a time. Parties join the queue
+# in Accepting; the host calls the next party, which moves the waitlist into Seating
+# until that party is seated; then the cycle resumes. Service can close at any time
+# and reopen later without losing the existing queue.
+#
+# Free-Construction: the waitlist exists as a long-lived shift artifact; no party
+# identity is captured at creation. Parties flow through via JoinWaitlist events.
 
-field CurrentParty as string optional
-field LastCalledParty as string optional
-field EstimatedWaitMinutes as number default 0 nonnegative
+# Currently-calling party — set when SeatNextParty dequeues, cleared on MarkSeated.
+field CurrentParty as string optional maxlength 200
+field LastCalledParty as string optional maxlength 200
+
+# Estimated wait — 10 minutes per party in the queue. Updated whenever the queue changes.
+field EstimatedWaitMinutes as integer default 0 nonnegative
+
+# Service status — false while Closed, true otherwise.
 field WalkInOpen as boolean default true
+
+# The waiting queue itself — FIFO of party names.
 field PartyQueue as queue of string
 
+# States
 state Accepting initial
 state Seating
 state Closed
 
-in Seating ensure CurrentParty is set because "The seating state must know which party is being seated"
+# CurrentParty has no meaning while accepting new parties — the host is between calls.
+in Accepting, Closed omit CurrentParty
 
-event JoinWaitlist(PartyName as string notempty)
+# State ensures
+in Seating ensure CurrentParty is set because "The Seating state must name the party currently being seated — without it the host has no record of who was just called"
+
+# Events
+event JoinWaitlist(PartyName as string notempty maxlength 200)
 event SeatNextParty
 event MarkSeated
 event CloseService
 event ReopenService
 
+# A party joins — the queue grows and the wait time updates.
 from Accepting on JoinWaitlist
     -> enqueue PartyQueue JoinWaitlist.PartyName
     -> set EstimatedWaitMinutes = PartyQueue.count * 10
     -> no transition
 
-# The queue's front party is visible through .peek before the dequeue happens.
+# Call the next party — peek captures the name into LastCalledParty before dequeue
+# removes it; the dequeue then writes the same party into CurrentParty for Seating.
 from Accepting on SeatNextParty when PartyQueue.count > 0
     -> set LastCalledParty = PartyQueue.peek
     -> dequeue PartyQueue into CurrentParty
     -> transition Seating
 from Accepting on SeatNextParty
-    -> reject "No party is currently waiting"
+    -> reject "No party is currently waiting — the queue is empty"
 
+# Party seated — resume accepting. CurrentParty is omitted in Accepting, so the
+# state-exit clear below drops it as the waitlist leaves Seating.
 from Seating on MarkSeated
-    -> clear CurrentParty
     -> set EstimatedWaitMinutes = PartyQueue.count * 10
     -> transition Accepting
 
+# Exit Seating — clear the active call so CurrentParty's omission in Accepting holds.
+from Seating -> clear CurrentParty
+
+# Service close — cross-cutting, fires from any state. The queue is preserved so
+# parties already waiting are still on record when service resumes.
 from any on CloseService
     -> set WalkInOpen = false
     -> transition Closed
+
 from Closed on ReopenService
     -> set WalkInOpen = true
     -> set EstimatedWaitMinutes = PartyQueue.count * 10

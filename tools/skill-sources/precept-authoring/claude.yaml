@@ -1,0 +1,8 @@
+name: precept-authoring
+description: >-
+  Create and edit Precept DSL state-machine and data-only definitions. Use when building a
+  new precept from scratch, adding states/events/fields to an existing precept, writing
+  guards and rules, modeling a business workflow or data entity, or generating a state
+  diagram. Triggers on: create precept, new precept, add state, add event, add field,
+  model workflow, state machine, precept definition, write precept, edit precept, state
+  diagram.

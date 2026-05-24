@@ -1,58 +1,81 @@
 precept ItHelpdeskTicket
 
-# This sample uses a shared assignment queue to demonstrate queue.peek and dequeue.
-# It also shows from any rows that act like system-wide support events.
+# An IT helpdesk ticket from intake through assignment, customer interaction,
+# resolution, and closure. Tickets are progressively enriched: the requester
+# files an empty ticket, triage records the title and severity, and a shared
+# agent queue dispatches the next available agent. The queue is the demonstrative
+# focus — RegisterAgent fires from any active state to grow the on-call pool.
 
-field TicketTitle as string optional
-field Severity as number default 3 min 1 max 5
-field AssignedAgent as string optional
-field LastQueuedAgent as string optional
-field ResolutionNote as string optional
+# Identity and triage data — filled by the Triage event after intake.
+field TicketTitle as string optional maxlength 200
+field Severity as integer default 3 min 1 max 5
+field Priority as choice of string("Low", "Medium", "High", "Critical") default "Low"
+
+# Assignment — populated when an agent is dispatched from the queue.
+field AssignedAgent as string optional maxlength 200
+field LastQueuedAgent as string optional maxlength 200
+
+# Resolution
+field ResolutionNote as string optional maxlength 2000
 field ReopenCount as integer default 0 nonnegative
-field Priority as choice of string("Low","Medium","High","Critical") default "Low"
+
+# Shared on-call queue — agents register themselves; Assign dequeues the next.
 field AgentQueue as queue of string
 
+# States
 state New initial
 state Assigned
 state WaitingOnCustomer
 state Resolved
 state Closed terminal
 
-in Assigned ensure AssignedAgent is set because "Assigned tickets must name an agent"
+# State ensures
+in Assigned ensure AssignedAgent is set because "An assigned ticket must name the responsible agent"
+in Assigned ensure TicketTitle is set because "An assigned ticket must have a triaged title — assignment without intake context produces unactionable work"
+in Resolved ensure ResolutionNote is set because "A resolved ticket must carry the resolution note so future readers understand how it was fixed"
+
+# Editable windows — the requester can adjust priority while the ticket is new.
 in New modify Priority editable
 
-event RegisterAgent(AgentName as string notempty)
-event Triage(Title as string notempty, Level as number min 1 max 5 default 3)
-on Triage ensure Triage.Level >= 1 and Triage.Level <= 5 because "Severity {Triage.Level} is outside the supported range of 1–5"
-
+# Events
+event RegisterAgent(AgentName as string notempty maxlength 200)
+event Triage(Title as string notempty maxlength 200, Level as integer min 1 max 5 default 3)
 event Assign
 event CustomerReply
-event Resolve(Note as string notempty)
+event Resolve(Note as string notempty maxlength 2000)
 event CloseTicket
-event Reopen(Note as string optional)
+event Reopen(Note as string optional maxlength 2000)
 
+# Cross-cutting — any active state can grow the on-call pool.
 from New, Assigned, WaitingOnCustomer, Resolved on RegisterAgent
     -> enqueue AgentQueue RegisterAgent.AgentName
     -> no transition
 
+# Triage — title and severity are captured before assignment becomes possible.
 from New on Triage
     -> set TicketTitle = Triage.Title
     -> set Severity = Triage.Level
     -> no transition
-from New, WaitingOnCustomer on Assign when AgentQueue.count > 0
+
+# Assign — the next queued agent picks up the ticket. Title must already exist.
+from New, WaitingOnCustomer on Assign when AgentQueue.count > 0 and TicketTitle is set
     -> set LastQueuedAgent = AgentQueue.peek
     -> set AssignedAgent = AgentQueue.peek
     -> dequeue AgentQueue
     -> transition Assigned
+from New, WaitingOnCustomer on Assign when AgentQueue.count > 0
+    -> reject "Triage the ticket title before assigning an agent — agents cannot work an unidentified issue"
 from New, WaitingOnCustomer on Assign
-    -> reject "No support agent is currently available"
+    -> reject "No support agent is currently available — RegisterAgent first"
 
+# Customer interaction and resolution
 from Assigned on CustomerReply
     -> transition WaitingOnCustomer
 from Assigned on Resolve
     -> set ResolutionNote = Resolve.Note
     -> transition Resolved
 
+# Closure and reopen
 from Resolved on CloseTicket
     -> transition Closed
 from Resolved on Reopen

@@ -275,6 +275,12 @@ public static partial class ProofEngine
             TransitionRowContext t => t.Row.Guard,
             StateHookContext s => s.Hook.Guard,
             EventHandlerContext h => h.Handler.Guard,
+            ConstraintContext c => c.Constraint switch
+            {
+                RuleIdentity ri => semantics.Rules[ri.RuleIndex].Guard,
+                EnsureIdentity ei => semantics.Ensures[ei.EnsureIndex].Guard,
+                _ => null
+            },
             _ => null
         };
         if (guard is null) return false;
@@ -516,6 +522,12 @@ public static partial class ProofEngine
             TransitionRowContext t => t.Row.Guard,
             StateHookContext s => s.Hook.Guard,
             EventHandlerContext h => h.Handler.Guard,
+            ConstraintContext c => c.Constraint switch
+            {
+                RuleIdentity ri => semantics.Rules[ri.RuleIndex].Guard,
+                EnsureIdentity ei => semantics.Ensures[ei.EnsureIndex].Guard,
+                _ => null
+            },
             _ => null
         };
         if (guard is null) return false;

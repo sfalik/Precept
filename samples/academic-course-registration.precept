@@ -1,0 +1,202 @@
+precept AcademicCourseRegistration
+
+# A student's per-semester course registration. The registrar opens a registration
+# window; during the window the student selects courses one at a time, builds out
+# a personal-info section, and then submits the registration. The registrar then
+# advisor-reviews, and either approves or rejects. Approved registrations enroll
+# on the first day of classes; the student can withdraw a course during the
+# add/drop window, and the entire registration can be cancelled before enrollment.
+#
+# Free-Construction: the student enriches a Draft over time. Required-at-submit
+# fields are declared optional and gated by the Submit event's ensures. Selected
+# courses are modeled as a parallel pair — CourseNumbers (set, membership) and
+# CourseCredits (lookup, per-course credit hours) — kept consistent by the
+# AddCourse / DropCourse rows. TotalCreditHours accumulates so guards can reason
+# about overload without iterating.
+
+# Identity
+field StudentId as string optional maxlength 50
+field StudentName as string optional maxlength 100
+field AcademicProgram as choice of string("Undergraduate","Graduate","Doctoral","Certificate") optional
+field StudentLevel as choice of string("Freshman","Sophomore","Junior","Senior","Graduate") optional
+
+# Semester scope
+field Semester as choice of string("Fall","Spring","Summer","Winter") optional
+field AcademicYear as integer optional min 2020 max 2100
+field RegistrationOpens as date optional
+field RegistrationCloses as date optional
+field AddDropDeadline as date optional
+field FirstDayOfClasses as date optional
+
+# Course selections — parallel pair: set for membership, lookup for credit hours
+field CourseNumbers as set of string
+field CourseCredits as lookup of string to integer
+field TotalCreditHours as integer default 0 nonnegative
+field CourseCount as integer default 0 nonnegative
+
+# Advisor and approvals
+field AdvisorName as string optional maxlength 100
+field AdvisorNote as string optional maxlength 500
+field RejectionReason as string optional maxlength 500
+field CancellationReason as string optional maxlength 500
+
+# Add/drop window status — flipped by CloseAddDropWindow once the deadline has passed.
+# The host fires the event when the calendar reaches AddDropDeadline; the precept
+# then refuses further withdrawals. (Precept does not expose `today()`, so calendar
+# arithmetic relative to "now" lives at the host boundary.)
+field AddDropWindowClosed as boolean default false
+
+# Audit log
+field RegistrationLog as log of string
+
+# Timestamps
+field SubmittedAt as instant optional
+field ApprovedAt as instant optional
+field EnrolledAt as instant optional
+field CompletedAt as instant optional
+
+# Rules
+rule RegistrationCloses > RegistrationOpens when RegistrationOpens is set and RegistrationCloses is set because "Registration close date {RegistrationCloses} must be after open date {RegistrationOpens}"
+rule AddDropDeadline > FirstDayOfClasses when FirstDayOfClasses is set and AddDropDeadline is set because "Add/drop deadline {AddDropDeadline} must be after first day of classes {FirstDayOfClasses}"
+rule TotalCreditHours >= CourseCount because "Total credit hours ({TotalCreditHours}) cannot be less than course count ({CourseCount}) — every course carries at least one credit"
+
+# Undergraduate students: 12 to 18 credits is a normal full-time load.
+# A student above 18 credits is considered overloaded and requires advisor approval —
+# that gate is enforced on the Approve event below, not here.
+rule TotalCreditHours <= 21 when StudentLevel is set and StudentLevel != "Graduate" because "Undergraduate students cannot register for more than 21 credit hours in a single semester (current: {TotalCreditHours})"
+rule TotalCreditHours <= 15 when StudentLevel == "Graduate" because "Graduate students cannot register for more than 15 credit hours in a single semester (current: {TotalCreditHours})"
+
+# States
+state Draft initial
+state Submitted
+state Approved
+state Enrolled
+state Completed terminal
+state Rejected terminal
+state Cancelled terminal
+
+# State ensures
+in Submitted ensure SubmittedAt is set because "A submitted registration must carry a submission timestamp"
+in Approved ensure AdvisorName is set because "An approved registration must record the approving advisor"
+in Approved ensure ApprovedAt is set because "An approved registration must carry an approval timestamp"
+in Enrolled ensure EnrolledAt is set because "An enrolled registration must record when enrollment took effect"
+in Rejected ensure RejectionReason is set because "A rejected registration must record the rejection reason"
+in Cancelled ensure CancellationReason is set because "A cancelled registration must record the cancellation reason"
+
+# Editable windows — full intake in Draft; advisor note window after submission
+in Draft modify StudentId, StudentName, AcademicProgram, StudentLevel, Semester, AcademicYear, RegistrationOpens, RegistrationCloses, AddDropDeadline, FirstDayOfClasses editable
+in Submitted modify AdvisorNote editable
+
+# Events
+event AddCourse(CourseNumber as string notempty, Credits as integer positive)
+event DropCourse(CourseNumber as string notempty)
+event Submit
+event Approve(Advisor as string notempty, Note as string optional)
+event Reject(Advisor as string notempty, Reason as string notempty)
+event Enroll
+event WithdrawCourse(CourseNumber as string notempty)
+event CloseAddDropWindow
+event Complete
+event Cancel(Reason as string notempty)
+
+on Submit ensure StudentId is set because "Student ID is required before submission"
+on Submit ensure StudentName is set because "Student name is required before submission"
+on Submit ensure AcademicProgram is set because "Academic program must be declared before submission"
+on Submit ensure StudentLevel is set because "Student level must be declared before submission"
+on Submit ensure Semester is set because "Semester must be specified before submission"
+on Submit ensure AcademicYear is set because "Academic year must be specified before submission"
+on Submit ensure RegistrationOpens is set because "Registration window open date must be specified before submission"
+on Submit ensure RegistrationCloses is set because "Registration window close date must be specified before submission"
+on Submit ensure FirstDayOfClasses is set because "First day of classes must be specified before submission"
+
+# Transitions
+
+# Draft course management — add and drop. Duplicate add is rejected — the student
+# should drop and re-add if the credit hours need to change.
+from Draft on AddCourse when CourseNumbers contains AddCourse.CourseNumber
+    -> reject "Course {AddCourse.CourseNumber} already in registration — drop it first if credit hours need to change"
+from Draft on AddCourse
+    -> add CourseNumbers AddCourse.CourseNumber
+    -> put CourseCredits AddCourse.CourseNumber = AddCourse.Credits
+    -> set TotalCreditHours = TotalCreditHours + AddCourse.Credits
+    -> set CourseCount = CourseCount + 1
+    -> append RegistrationLog AddCourse.CourseNumber
+    -> no transition
+
+# Drop a course: drop membership from the set and zero the lookup entry.
+# BUG-002: `remove CourseCredits Key` does not type-check (the type checker expects
+# the lookup's value type, not the key type), so we zero-out the lookup entry via
+# `put CourseCredits Key = 0` instead. CourseNumbers is the source of truth for
+# membership; the orphan zero-valued lookup entry is harmless because every
+# CourseCredits access flows through a `CourseNumbers contains` guard.
+from Draft on DropCourse when CourseNumbers contains DropCourse.CourseNumber
+    -> set TotalCreditHours = TotalCreditHours - (CourseCredits for DropCourse.CourseNumber)
+    -> set CourseCount = CourseCount - 1
+    -> put CourseCredits DropCourse.CourseNumber = 0
+    -> remove CourseNumbers DropCourse.CourseNumber
+    -> append RegistrationLog DropCourse.CourseNumber
+    -> no transition
+from Draft on DropCourse
+    -> reject "Course {DropCourse.CourseNumber} not in registration — nothing to drop"
+
+# Submission — requires at least one course.
+from Draft on Submit when CourseCount == 0
+    -> reject "Cannot submit an empty registration — add at least one course first"
+from Draft on Submit
+    -> set SubmittedAt = now()
+    -> transition Submitted
+
+# Approval path — graduate overload requires explicit advisor approval.
+# A graduate student with > 12 credits is considered overloaded and the advisor
+# must include a note acknowledging it. Undergraduate overload (> 18 credits) is
+# the symmetric guard.
+from Submitted on Approve when StudentLevel == "Graduate" and TotalCreditHours > 12 and Approve.Note is not set
+    -> reject "Graduate overload ({TotalCreditHours} credits) requires an advisor note acknowledging the overload"
+from Submitted on Approve when StudentLevel != "Graduate" and TotalCreditHours > 18 and Approve.Note is not set
+    -> reject "Undergraduate overload ({TotalCreditHours} credits) requires an advisor note acknowledging the overload"
+from Submitted on Approve
+    -> set AdvisorName = Approve.Advisor
+    -> set AdvisorNote = if Approve.Note is set then Approve.Note else "Approved"
+    -> set ApprovedAt = now()
+    -> transition Approved
+
+from Submitted on Reject
+    -> set AdvisorName = Reject.Advisor
+    -> set RejectionReason = Reject.Reason
+    -> transition Rejected
+
+# Enrollment — the registrar enrolls the student on the first day of classes.
+from Approved on Enroll
+    -> set EnrolledAt = now()
+    -> transition Enrolled
+
+# Add/drop window — students can withdraw a course while enrolled, but only
+# before the host has closed the add/drop window. CloseAddDropWindow is fired by
+# the host on the calendar deadline; once flipped, withdrawal is refused.
+from Enrolled on WithdrawCourse when AddDropWindowClosed
+    -> reject "Add/drop deadline ({AddDropDeadline}) has passed — withdrawal is no longer permitted"
+from Enrolled on WithdrawCourse when CourseNumbers contains WithdrawCourse.CourseNumber and CourseCount == 1
+    -> reject "Cannot withdraw the last remaining course — cancel the entire registration instead"
+from Enrolled on WithdrawCourse when CourseNumbers contains WithdrawCourse.CourseNumber
+    -> set TotalCreditHours = TotalCreditHours - (CourseCredits for WithdrawCourse.CourseNumber)
+    -> set CourseCount = CourseCount - 1
+    -> put CourseCredits WithdrawCourse.CourseNumber = 0
+    -> remove CourseNumbers WithdrawCourse.CourseNumber
+    -> append RegistrationLog WithdrawCourse.CourseNumber
+    -> no transition
+from Enrolled on WithdrawCourse
+    -> reject "Course {WithdrawCourse.CourseNumber} not in registration — nothing to withdraw"
+
+from Enrolled on CloseAddDropWindow
+    -> set AddDropWindowClosed = true
+    -> no transition
+
+# Completion — the semester ends.
+from Enrolled on Complete
+    -> set CompletedAt = now()
+    -> transition Completed
+
+# Cancellation — allowed from Draft, Submitted, Approved, or Enrolled.
+from Draft, Submitted, Approved, Enrolled on Cancel
+    -> set CancellationReason = Cancel.Reason
+    -> transition Cancelled

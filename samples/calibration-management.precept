@@ -1,0 +1,208 @@
+precept CalibrationManagement
+
+# A measurement-instrument calibration record. The instrument is
+# registered when its scheduled calibration comes due. A technician
+# schedules the calibration, performs the measurement (which captures
+# a single value against upper/lower tolerance bounds), records the
+# certificate, and the calibration closes as Passed or Failed.
+# A failed calibration drives either Recalibrated (after adjustment)
+# or Quarantined (if the instrument cannot be brought back into
+# tolerance).
+
+# Instrument identity
+field CalibrationNumber as string notempty maxlength 50
+field EquipmentId as string notempty maxlength 50
+field EquipmentName as string optional maxlength 200
+field InstrumentType as choice of string("Scale", "PressureGauge", "Thermometer", "Voltmeter", "FlowMeter", "TorqueWrench", "Other")
+field Manufacturer as string optional maxlength 200
+field ModelNumber as string optional maxlength 100
+field SerialNumber as string optional maxlength 100
+
+# Calibration plan — tolerance bounds carried for the duration of the work order.
+field CalibrationStandard as string notempty maxlength 200
+field ToleranceUpper as decimal maxplaces 6
+field ToleranceLower as decimal maxplaces 6
+field NextDueDate as date
+
+# Measurement and certificate — populated during the calibration itself.
+field MeasuredValue as decimal optional maxplaces 6
+field OutOfTolerance as boolean default false
+field CertificateNumber as string optional maxlength 100
+field CertificateDate as date optional
+field LastCalibrationDate as date optional
+
+# Adjustment — only meaningful after a failed calibration.
+field AdjustmentRequired as boolean default false
+field AdjustmentPerformed as boolean default false
+field AdjustmentNotes as string optional maxlength 2000
+field QuarantineReason as string optional maxlength 500
+
+# Ownership
+field TechnicianName as string optional maxlength 200
+
+# Audit trail and historical context.
+field CalibrationLog as log of string
+field CalibrationHistory as lookup of string to string
+
+# Timestamps
+field ScheduledAt as instant optional
+field MeasurementStartedAt as instant optional
+field CompletedAt as instant optional
+field QuarantinedAt as instant optional
+
+# Rules — structural invariants the proof engine enforces.
+rule ToleranceUpper >= ToleranceLower because "Upper tolerance {ToleranceUpper} must not be below lower tolerance {ToleranceLower} — a tolerance band cannot invert"
+
+# States
+state Due initial
+state Scheduled
+state Measuring
+state Measured
+state Passed terminal
+state Failed
+state Recalibrated terminal
+state Quarantined terminal
+
+# Fields with no meaning until the relevant phase has been reached.
+in Due omit MeasuredValue, OutOfTolerance, CertificateNumber, CertificateDate, AdjustmentRequired, AdjustmentPerformed, AdjustmentNotes, QuarantineReason
+in Scheduled omit MeasuredValue, OutOfTolerance, CertificateNumber, CertificateDate, AdjustmentRequired, AdjustmentPerformed, AdjustmentNotes, QuarantineReason
+in Measuring omit MeasuredValue, OutOfTolerance, CertificateNumber, CertificateDate, AdjustmentRequired, AdjustmentPerformed, AdjustmentNotes, QuarantineReason
+in Measured omit CertificateNumber, CertificateDate, AdjustmentRequired, AdjustmentPerformed, AdjustmentNotes, QuarantineReason
+in Passed omit AdjustmentRequired, AdjustmentPerformed, AdjustmentNotes, QuarantineReason
+in Recalibrated omit QuarantineReason
+
+# State ensures
+in Scheduled ensure ScheduledAt is set because "A scheduled calibration must record when scheduling occurred"
+in Scheduled ensure TechnicianName is set because "A scheduled calibration must have an assigned technician"
+in Measuring ensure MeasurementStartedAt is set because "Measurement in progress must record when the technician began"
+in Measured ensure MeasuredValue is set because "A measured calibration must record the captured value"
+in Passed ensure CompletedAt is set because "Passed calibrations must record the completion timestamp"
+in Passed ensure CertificateNumber is set because "Passed calibrations must record the issued certificate number — required for audit"
+in Passed ensure not OutOfTolerance because "Passed calibrations cannot be out of tolerance"
+in Failed ensure CompletedAt is set because "Failed calibrations must record the completion timestamp"
+in Failed ensure OutOfTolerance because "Failed calibrations must record an out-of-tolerance measurement"
+in Recalibrated ensure CompletedAt is set because "Recalibrated instruments must record completion"
+in Recalibrated ensure AdjustmentPerformed because "Recalibrated instruments must have a documented adjustment"
+in Quarantined ensure QuarantinedAt is set because "Quarantined instruments must record when quarantine took effect"
+in Quarantined ensure QuarantineReason is set because "Quarantined instruments must document the reason — required for service-management audit"
+
+# Construction — calibration record opens when scheduling comes due.
+event Create(
+    CalibrationNumber as string notempty maxlength 50,
+    EquipmentId as string notempty maxlength 50,
+    EquipmentName as string optional maxlength 200,
+    InstrumentType as choice of string("Scale", "PressureGauge", "Thermometer", "Voltmeter", "FlowMeter", "TorqueWrench", "Other"),
+    Manufacturer as string optional maxlength 200,
+    ModelNumber as string optional maxlength 100,
+    SerialNumber as string optional maxlength 100,
+    CalibrationStandard as string notempty maxlength 200,
+    ToleranceUpper as decimal,
+    ToleranceLower as decimal,
+    NextDueDate as date) initial
+on Create ensure Create.ToleranceUpper >= Create.ToleranceLower because "Upper tolerance {Create.ToleranceUpper} must not be below lower tolerance {Create.ToleranceLower}"
+
+# Calibration lifecycle events.
+event ScheduleCalibration(TechnicianName as string notempty maxlength 200)
+event StartMeasurement
+event RecordMeasurement(MeasuredValue as decimal)
+event RecordCertificate(CertificateNumber as string notempty maxlength 100, CertificateDate as date)
+event PassCalibration
+event FailCalibration(Reason as string notempty maxlength 500)
+event PerformAdjustment(Notes as string notempty maxlength 2000)
+event CompleteRecalibration
+event Quarantine(Reason as string notempty maxlength 500)
+
+# Construction row — populate fields and arrive in Due.
+on Create
+    -> set CalibrationNumber = Create.CalibrationNumber
+    -> set EquipmentId = Create.EquipmentId
+    -> set EquipmentName = Create.EquipmentName
+    -> set InstrumentType = Create.InstrumentType
+    -> set Manufacturer = Create.Manufacturer
+    -> set ModelNumber = Create.ModelNumber
+    -> set SerialNumber = Create.SerialNumber
+    -> set CalibrationStandard = Create.CalibrationStandard
+    -> set ToleranceUpper = Create.ToleranceUpper
+    -> set ToleranceLower = Create.ToleranceLower
+    -> set NextDueDate = Create.NextDueDate
+    -> append CalibrationLog "Calibration record opened: {Create.CalibrationNumber}"
+
+# Schedule — Due → Scheduled.
+from Due on ScheduleCalibration
+    -> set TechnicianName = ScheduleCalibration.TechnicianName
+    -> set ScheduledAt = now()
+    -> append CalibrationLog "Calibration scheduled with {ScheduleCalibration.TechnicianName}"
+    -> transition Scheduled
+
+# Start measurement — Scheduled → Measuring.
+from Scheduled on StartMeasurement
+    -> set MeasurementStartedAt = now()
+    -> append CalibrationLog "Measurement started"
+    -> transition Measuring
+
+# Record measurement — Measuring → Measured. The decision funnel below routes
+# the result based on tolerance: out-of-tolerance (high or low) flags the
+# measurement, in-tolerance clears the flag.
+from Measuring on RecordMeasurement when RecordMeasurement.MeasuredValue > ToleranceUpper
+    -> set MeasuredValue = RecordMeasurement.MeasuredValue
+    -> set OutOfTolerance = true
+    -> append CalibrationLog "Measurement {RecordMeasurement.MeasuredValue} above upper tolerance {ToleranceUpper}"
+    -> transition Measured
+from Measuring on RecordMeasurement when RecordMeasurement.MeasuredValue < ToleranceLower
+    -> set MeasuredValue = RecordMeasurement.MeasuredValue
+    -> set OutOfTolerance = true
+    -> append CalibrationLog "Measurement {RecordMeasurement.MeasuredValue} below lower tolerance {ToleranceLower}"
+    -> transition Measured
+from Measuring on RecordMeasurement
+    -> set MeasuredValue = RecordMeasurement.MeasuredValue
+    -> set OutOfTolerance = false
+    -> append CalibrationLog "Measurement {RecordMeasurement.MeasuredValue} within tolerance"
+    -> transition Measured
+
+# Record certificate — captured while in Measured before pass/fail decision.
+from Measured on RecordCertificate
+    -> set CertificateNumber = RecordCertificate.CertificateNumber
+    -> set CertificateDate = RecordCertificate.CertificateDate
+    -> set LastCalibrationDate = RecordCertificate.CertificateDate
+    -> put CalibrationHistory "LastCalibration" = RecordCertificate.CertificateNumber
+    -> append CalibrationLog "Certificate {RecordCertificate.CertificateNumber} recorded"
+    -> no transition
+
+# Pass calibration — Measured → Passed. Requires certificate and in-tolerance.
+from Measured on PassCalibration when OutOfTolerance
+    -> reject "Cannot pass — measurement {MeasuredValue} is out of tolerance"
+from Measured on PassCalibration when CertificateNumber is not set
+    -> reject "Cannot pass — certificate has not been recorded"
+from Measured on PassCalibration
+    -> set CompletedAt = now()
+    -> append CalibrationLog "Calibration passed"
+    -> transition Passed
+
+# Fail calibration — Measured → Failed.
+from Measured on FailCalibration
+    -> set CompletedAt = now()
+    -> set AdjustmentRequired = true
+    -> append CalibrationLog "Calibration failed: {FailCalibration.Reason}"
+    -> transition Failed
+
+# Adjustment — within Failed state, technician applies and documents.
+from Failed on PerformAdjustment
+    -> set AdjustmentNotes = PerformAdjustment.Notes
+    -> set AdjustmentPerformed = true
+    -> append CalibrationLog "Adjustment performed: {PerformAdjustment.Notes}"
+    -> no transition
+
+# Complete recalibration — Failed → Recalibrated (instrument back in service).
+from Failed on CompleteRecalibration when AdjustmentPerformed
+    -> set CompletedAt = now()
+    -> append CalibrationLog "Recalibration complete — instrument back in service"
+    -> transition Recalibrated
+from Failed on CompleteRecalibration
+    -> reject "Cannot complete recalibration — perform and document the adjustment first"
+
+# Quarantine — Failed → Quarantined (instrument cannot be brought back).
+from Failed on Quarantine
+    -> set QuarantineReason = Quarantine.Reason
+    -> set QuarantinedAt = now()
+    -> append CalibrationLog "Instrument quarantined: {Quarantine.Reason}"
+    -> transition Quarantined

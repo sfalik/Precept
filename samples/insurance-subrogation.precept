@@ -1,0 +1,243 @@
+precept InsuranceSubrogation
+
+# Subrogation — the carrier's right to recover from a third party who is
+# legally responsible for a loss the carrier has paid. The case is opened
+# once an at-fault party is identified during claim handling, then moves
+# through liability investigation, a demand letter, negotiation, optional
+# litigation, settlement, and recovery. Cases are fed from the upstream
+# claims system, so the carrier already knows the original claim,
+# at-fault party, and recovery potential at intake. Legal costs are
+# tracked alongside recovery; the net recovery is what the carrier
+# actually retains after legal expenses.
+
+# Identity
+field ClaimNumber as string notempty maxlength 50
+field SubrogationNumber as string notempty maxlength 50
+field OriginalInsuredName as string notempty maxlength 200
+field AtFaultParty as string notempty maxlength 200
+field AtFaultInsurance as string optional maxlength 200
+field IncidentDate as date
+field IncidentType as choice of string("Auto", "Premises", "Product", "Medical", "Other")
+
+# Liability assessment
+field LiabilityDocuments as lookup of string to string
+field LiabilityPercentage as decimal default 0 nonnegative max 100 maxplaces 2
+field LiabilityDisputed as boolean default false
+
+# Financial tracking
+field RecoveryAmount as money in 'USD' positive
+field TotalRecovered as money in 'USD' default '0.00 USD' nonnegative
+field LegalCosts as money in 'USD' default '0.00 USD' nonnegative
+field NetRecovery as money in 'USD' default '0.00 USD'
+field RecoveryPercentage as decimal default 0 nonnegative max 100 maxplaces 2
+
+# Legal status
+field LegalStatus as choice of string("NoLegal", "DemandLetter", "Litigation", "Arbitration", "Mediation", "SettlementConference") default "NoLegal"
+field AttorneyName as string optional maxlength 200
+field AttorneyContact as string optional maxlength 200
+field CourtFiled as boolean default false
+field FilingDate as date optional
+
+# Settlement and recovery
+field SettlementAmount as money in 'USD' optional
+field SettlementTerms as string optional maxlength 2000
+field RecoveryMethod as choice of string("Check", "Wire", "ACH", "Offset", "DirectDeposit") optional
+field RecoveryDate as instant optional
+
+# Audit trail
+field SubrogationLog as log of string
+
+# Timestamps tracking each lifecycle phase
+field IdentifiedAt as instant
+field InvestigationStartedAt as instant optional
+field DemandSentAt as instant optional
+field NegotiationStartedAt as instant optional
+field LitigationStartedAt as instant optional
+field SettlementExecutedAt as instant optional
+field ClosedAt as instant optional
+
+# Notes and reasons
+field RecoveryNotes as string optional maxlength 2000
+field LitigationReason as string optional maxlength 1000
+field ClosureReason as string optional maxlength 500
+
+# Rules — domain invariants
+rule TotalRecovered <= RecoveryAmount because "Total recovered {TotalRecovered} cannot exceed the recovery target of {RecoveryAmount} — the carrier cannot collect more than the loss"
+
+# States
+state Identified initial
+state Investigation
+state DemandSent
+state Negotiation
+state Litigation
+state Settlement
+state Recovered
+state Closed terminal
+state Abandoned terminal
+
+# Fields with no meaning until the relevant phase has been reached.
+in Identified, Investigation omit DemandSentAt, NegotiationStartedAt, LitigationStartedAt, SettlementAmount, SettlementTerms, SettlementExecutedAt
+in Identified, Investigation, DemandSent omit NegotiationStartedAt
+in Identified, Investigation, DemandSent, Negotiation omit LitigationStartedAt, AttorneyContact, FilingDate
+in Identified, Investigation, DemandSent, Negotiation, Litigation omit SettlementExecutedAt, RecoveryMethod, RecoveryDate
+in Closed, Abandoned omit RecoveryMethod
+
+# State ensures
+in Investigation ensure InvestigationStartedAt is set because "Investigation must record when liability fact-finding began"
+in DemandSent ensure DemandSentAt is set because "DemandSent state requires that a demand letter has actually been sent"
+in DemandSent ensure AttorneyName is set because "Demand letters must record the attorney of record on the demand"
+in Negotiation ensure NegotiationStartedAt is set because "Negotiation must record when discussions opened with the at-fault party"
+in Litigation ensure LitigationStartedAt is set because "Litigation must record when court proceedings began"
+in Litigation ensure CourtFiled because "Litigation state implies a court filing has occurred — otherwise the case is still in pre-litigation negotiation"
+in Settlement ensure SettlementAmount is set because "Settlement state requires a settlement offer on the table"
+in Recovered ensure RecoveryDate is set because "Recovered state requires the date funds were collected"
+in Closed ensure ClosedAt is set because "Closed cases must record when closure occurred"
+in Closed ensure ClosureReason is set because "Closed cases must document why the case was closed"
+in Abandoned ensure ClosedAt is set because "Abandoned cases must record when the carrier walked away"
+in Abandoned ensure ClosureReason is set because "Abandoned cases must document why the carrier walked away — required for regulatory audit"
+
+# Construction — case arrives from claims with at-fault party already identified.
+event Create(
+    ClaimNumber as string notempty maxlength 50,
+    SubrogationNumber as string notempty maxlength 50,
+    OriginalInsuredName as string notempty maxlength 200,
+    AtFaultParty as string notempty maxlength 200,
+    AtFaultInsurance as string optional maxlength 200,
+    IncidentDate as date,
+    IncidentType as choice of string("Auto", "Premises", "Product", "Medical", "Other"),
+    RecoveryAmount as money in 'USD' positive) initial
+
+# Subrogation events
+event AddDocument(DocumentType as string notempty maxlength 100, DocumentContent as string notempty maxlength 2000)
+event SetLiability(LiabilityPercentage as decimal nonnegative max 100, Disputed as boolean)
+event StartInvestigation
+event SendDemand(AttorneyName as string notempty maxlength 200)
+event StartNegotiation
+event BeginLitigation(
+    AttorneyName as string notempty maxlength 200,
+    AttorneyContact as string notempty maxlength 200,
+    FilingDate as date)
+event FileCourtDocuments
+event AddLitigationCosts(CostAmount as money in 'USD' positive)
+event OfferSettlement(
+    SettlementAmount as money in 'USD' positive,
+    SettlementTerms as string optional maxlength 2000)
+event AcceptSettlement(RecoveryMethod as choice of string("Check", "Wire", "ACH", "Offset", "DirectDeposit"))
+event RejectSettlement(Reason as string notempty maxlength 500)
+event RecordRecovery(Amount as money in 'USD' positive)
+event Close(Reason as string notempty maxlength 500)
+event Abandon(Reason as string notempty maxlength 500)
+
+# Construction row — populate fields and arrive in Identified.
+on Create
+    -> set ClaimNumber = Create.ClaimNumber
+    -> set SubrogationNumber = Create.SubrogationNumber
+    -> set OriginalInsuredName = Create.OriginalInsuredName
+    -> set AtFaultParty = Create.AtFaultParty
+    -> set AtFaultInsurance = Create.AtFaultInsurance
+    -> set IncidentDate = Create.IncidentDate
+    -> set IncidentType = Create.IncidentType
+    -> set RecoveryAmount = Create.RecoveryAmount
+    -> set IdentifiedAt = now()
+
+# Add document — accumulate liability evidence in Identified or Investigation.
+from Identified, Investigation on AddDocument
+    -> put LiabilityDocuments AddDocument.DocumentType = AddDocument.DocumentContent
+    -> append SubrogationLog "Document added: {AddDocument.DocumentType}"
+    -> no transition
+
+# Set liability — record the at-fault party's percentage of fault.
+from Investigation on SetLiability
+    -> set LiabilityPercentage = SetLiability.LiabilityPercentage
+    -> set LiabilityDisputed = SetLiability.Disputed
+    -> append SubrogationLog "Liability set at {SetLiability.LiabilityPercentage}%"
+    -> no transition
+
+# Start investigation — Identified → Investigation.
+from Identified on StartInvestigation
+    -> set InvestigationStartedAt = now()
+    -> append SubrogationLog "Investigation started"
+    -> transition Investigation
+
+# Send demand — Investigation → DemandSent. The demand letter is the
+# transition itself; sending it is what moves the case forward.
+from Investigation on SendDemand
+    -> set AttorneyName = SendDemand.AttorneyName
+    -> set DemandSentAt = now()
+    -> set LegalStatus = "DemandLetter"
+    -> append SubrogationLog "Demand letter sent by {SendDemand.AttorneyName}"
+    -> transition DemandSent
+
+# Start negotiation — DemandSent → Negotiation.
+from DemandSent on StartNegotiation
+    -> set NegotiationStartedAt = now()
+    -> append SubrogationLog "Negotiation opened with at-fault party"
+    -> transition Negotiation
+
+# Begin litigation — Negotiation → Litigation when negotiation fails.
+from Negotiation on BeginLitigation
+    -> set AttorneyName = BeginLitigation.AttorneyName
+    -> set AttorneyContact = BeginLitigation.AttorneyContact
+    -> set CourtFiled = true
+    -> set FilingDate = BeginLitigation.FilingDate
+    -> set LitigationStartedAt = now()
+    -> set LegalStatus = "Litigation"
+    -> append SubrogationLog "Litigation filed on {BeginLitigation.FilingDate}"
+    -> transition Litigation
+
+# File court documents — track additional filings during litigation.
+from Litigation on FileCourtDocuments
+    -> append SubrogationLog "Court documents filed"
+    -> no transition
+
+# Add litigation costs — track expenses against future recovery.
+from Litigation on AddLitigationCosts
+    -> set LegalCosts = LegalCosts + AddLitigationCosts.CostAmount
+    -> append SubrogationLog "Legal costs added: {AddLitigationCosts.CostAmount}"
+    -> no transition
+
+# Offer settlement — Negotiation or Litigation → Settlement.
+from Negotiation, Litigation on OfferSettlement
+    -> set SettlementAmount = OfferSettlement.SettlementAmount
+    -> set SettlementTerms = OfferSettlement.SettlementTerms
+    -> set SettlementExecutedAt = now()
+    -> append SubrogationLog "Settlement offered: {OfferSettlement.SettlementAmount}"
+    -> transition Settlement
+
+# Accept settlement — Settlement → Recovered. The state ensure guarantees
+# SettlementAmount is set, so we can read it unconditionally.
+from Settlement on AcceptSettlement when SettlementAmount is set
+    -> set RecoveryMethod = AcceptSettlement.RecoveryMethod
+    -> set RecoveryDate = now()
+    -> set TotalRecovered = SettlementAmount
+    -> set NetRecovery = SettlementAmount - LegalCosts
+    -> append SubrogationLog "Settlement accepted; recovery method {AcceptSettlement.RecoveryMethod}"
+    -> transition Recovered
+
+# Reject settlement — Settlement → Negotiation.
+from Settlement on RejectSettlement
+    -> clear SettlementAmount
+    -> clear SettlementTerms
+    -> append SubrogationLog "Settlement rejected: {RejectSettlement.Reason}"
+    -> transition Negotiation
+
+# Record additional recovery — track payments received during Recovered.
+from Recovered on RecordRecovery
+    -> set TotalRecovered = TotalRecovered + RecordRecovery.Amount
+    -> set NetRecovery = TotalRecovered + RecordRecovery.Amount - LegalCosts
+    -> append SubrogationLog "Recovery received: {RecordRecovery.Amount}"
+    -> no transition
+
+# Close — Recovered → Closed.
+from Recovered on Close
+    -> set ClosedAt = now()
+    -> set ClosureReason = Close.Reason
+    -> append SubrogationLog "Case closed: {Close.Reason}"
+    -> transition Closed
+
+# Abandon — the carrier walks away from any pre-recovery state.
+from Identified, Investigation, DemandSent, Negotiation, Litigation, Settlement on Abandon
+    -> set ClosedAt = now()
+    -> set ClosureReason = Abandon.Reason
+    -> append SubrogationLog "Case abandoned: {Abandon.Reason}"
+    -> transition Abandoned

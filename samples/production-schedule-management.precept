@@ -1,0 +1,157 @@
+precept ProductionScheduleManagement
+
+# A production planner builds out a schedule for a specific production line and
+# planning window. Jobs are added one at a time with sequence, priority, and
+# estimated duration; total scheduled hours accumulate as the planner works.
+# Once the schedule is complete the planner submits it for shop-floor approval.
+# Approved schedules become Active when the planning window opens; from Active
+# they complete normally, are cancelled, or get reopened back to Draft for
+# rework (a true back-edge — Reopen is not the constructor).
+#
+# Free-Construction: the entity is governed from birth but the planner enriches
+# the Draft progressively. Create() is parameterless. Required-at-submit fields
+# are declared optional and gated by the Submit event's ensures.
+
+# Identity and scope
+field ScheduleId as string optional maxlength 50
+field ProductionLine as string optional maxlength 100
+field PlannerName as string optional maxlength 100
+field PlanningWindowStart as date optional
+field PlanningWindowEnd as date optional
+
+# Capacity — the line's available hours over the planning window
+field AvailableHours as quantity in 'h' optional
+
+# Job accumulators — updated by AddJob events
+field JobCount as integer default 0 nonnegative
+field TotalScheduledHours as quantity in 'h' default '0 h' nonnegative
+field HighPriorityJobCount as integer default 0 nonnegative
+
+# Append-only job log — captures every job added or removed with a short note
+field JobLog as log of string
+
+# Approval and reschedule audit
+field ApproverName as string optional maxlength 100
+field CancellationReason as string optional maxlength 500
+field ReopenCount as integer default 0 nonnegative
+
+# Timestamps
+field SubmittedAt as instant optional
+field ApprovedAt as instant optional
+field ActivatedAt as instant optional
+field CompletedAt as instant optional
+
+# Rules
+rule PlanningWindowEnd > PlanningWindowStart when PlanningWindowStart is set and PlanningWindowEnd is set because "Planning window end {PlanningWindowEnd} must be after start {PlanningWindowStart}"
+rule HighPriorityJobCount <= JobCount because "High-priority jobs ({HighPriorityJobCount}) cannot exceed total jobs ({JobCount})"
+
+# States
+state Draft initial
+state Submitted
+state Approved
+state Active
+state Completed terminal
+state Cancelled terminal
+
+# State ensures
+in Submitted ensure SubmittedAt is set because "A submitted schedule must carry a submission timestamp"
+in Approved ensure ApproverName is set because "An approved schedule must record the approver"
+in Approved ensure ApprovedAt is set because "An approved schedule must carry an approval timestamp"
+in Active ensure ActivatedAt is set because "An active schedule must record when it became active"
+in Cancelled ensure CancellationReason is set because "Cancelled schedules must record a reason"
+
+# Editable windows — full planning in Draft; only minor metadata after submission
+in Draft modify ScheduleId, ProductionLine, PlannerName, PlanningWindowStart, PlanningWindowEnd, AvailableHours editable
+
+# Events
+event AddJob(JobName as string notempty, Hours as quantity in 'h' positive, HighPriority as boolean default false)
+event RemoveJob(JobName as string notempty, Hours as quantity in 'h' positive, HighPriority as boolean default false)
+event Submit
+event Approve(Approver as string notempty)
+event RequestChanges(Reason as string notempty)
+event Activate
+event Complete
+event Cancel(Reason as string notempty)
+event Reopen(Reason as string notempty)
+
+on Submit ensure ScheduleId is set because "Schedule ID is required before submission"
+on Submit ensure ProductionLine is set because "Production line must be assigned before submission"
+on Submit ensure PlannerName is set because "Planner must be on record before submission"
+on Submit ensure PlanningWindowStart is set because "Planning window start is required before submission"
+on Submit ensure PlanningWindowEnd is set because "Planning window end is required before submission"
+on Submit ensure AvailableHours is set because "Available capacity must be specified before submission"
+
+# Transitions
+
+# Draft job management — add and remove. Capacity is enforced on Add so the
+# planner gets immediate feedback before the schedule is submitted.
+from Draft on AddJob when AvailableHours is set and TotalScheduledHours + AddJob.Hours > AvailableHours
+    -> reject "Adding {AddJob.Hours} would exceed available capacity ({AvailableHours}) — {TotalScheduledHours} already scheduled"
+from Draft on AddJob when AddJob.HighPriority
+    -> set TotalScheduledHours = TotalScheduledHours + AddJob.Hours
+    -> set JobCount = JobCount + 1
+    -> set HighPriorityJobCount = HighPriorityJobCount + 1
+    -> append JobLog AddJob.JobName
+    -> no transition
+from Draft on AddJob
+    -> set TotalScheduledHours = TotalScheduledHours + AddJob.Hours
+    -> set JobCount = JobCount + 1
+    -> append JobLog AddJob.JobName
+    -> no transition
+
+from Draft on RemoveJob when RemoveJob.Hours > TotalScheduledHours
+    -> reject "Cannot remove {RemoveJob.Hours} — only {TotalScheduledHours} currently scheduled"
+from Draft on RemoveJob when JobCount == 0
+    -> reject "No jobs scheduled to remove"
+from Draft on RemoveJob when RemoveJob.HighPriority and HighPriorityJobCount == 0
+    -> reject "No high-priority jobs to remove"
+from Draft on RemoveJob when RemoveJob.HighPriority
+    -> set TotalScheduledHours = TotalScheduledHours - RemoveJob.Hours
+    -> set JobCount = JobCount - 1
+    -> set HighPriorityJobCount = HighPriorityJobCount - 1
+    -> append JobLog RemoveJob.JobName
+    -> no transition
+from Draft on RemoveJob
+    -> set TotalScheduledHours = TotalScheduledHours - RemoveJob.Hours
+    -> set JobCount = JobCount - 1
+    -> append JobLog RemoveJob.JobName
+    -> no transition
+
+# Submit requires at least one job; otherwise the schedule is empty.
+from Draft on Submit when JobCount == 0
+    -> reject "Cannot submit an empty schedule — add at least one job first"
+from Draft on Submit
+    -> set SubmittedAt = now()
+    -> transition Submitted
+
+# Approval and request-for-changes
+from Submitted on Approve
+    -> set ApproverName = Approve.Approver
+    -> set ApprovedAt = now()
+    -> transition Approved
+
+from Submitted on RequestChanges
+    -> append JobLog RequestChanges.Reason
+    -> transition Draft
+
+# Activation — the planning window opens for the shop floor.
+from Approved on Activate
+    -> set ActivatedAt = now()
+    -> transition Active
+
+# Completion
+from Active on Complete
+    -> set CompletedAt = now()
+    -> transition Completed
+
+# Cancellation — allowed from Submitted, Approved, or Active.
+from Submitted, Approved, Active on Cancel
+    -> set CancellationReason = Cancel.Reason
+    -> transition Cancelled
+
+# Reopen — back-edge for rescheduling. From Approved (not yet running) or Active
+# (already running), the planner can pull the schedule back to Draft to rework.
+from Approved, Active on Reopen
+    -> set ReopenCount = ReopenCount + 1
+    -> append JobLog Reopen.Reason
+    -> transition Draft

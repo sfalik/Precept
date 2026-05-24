@@ -1,0 +1,350 @@
+precept LibraryInterLibraryLoan
+
+# A library patron requests material the local library does not hold, and the
+# request is routed through Inter-Library Loan (ILL). The requesting librarian
+# locates a holding library, the source library reviews and ships the item,
+# the requesting library receives and loans it to the patron, the patron
+# returns it before the due date, and the requesting library returns it to
+# source. The local copy of the loan is closed. Variations: source can reject;
+# patron can lose or damage; loan can be renewed if source allows. The host
+# fires CloseLoanWindow when the loan-period deadline passes — Precept does
+# not expose today().
+#
+# Free-Construction: the requesting librarian enriches a Draft over time.
+# Required-at-request fields are declared optional and gated by the
+# SubmitRequest event's ensures. Common-shape: lookup-with-membership for the
+# candidate-source-libraries list (parallel set + per-library notes).
+
+# Identity
+field RequestId as string optional maxlength 50
+field PatronId as string optional maxlength 50
+field PatronName as string optional maxlength 200
+field PatronEmail as string optional maxlength 200
+field RequestingLibrarian as string optional maxlength 100
+field RequestingLibraryCode as string optional maxlength 50
+
+# Material
+field MaterialType as choice of string("Book","Journal","Article","Thesis","Microfilm","Audiobook","DVD","DigitalScan","RareBook","ConferenceProceedings") optional
+field MaterialFormat as choice of string("Physical","Digital","Either") optional
+field ItemTitle as string optional maxlength 500
+field ItemAuthor as string optional maxlength 300
+field ItemIsbnOrIssn as string optional maxlength 50
+field ItemCallNumber as string optional maxlength 100
+field ItemPublicationYear as integer optional min 1400 max 2200
+field ItemPublisher as string optional maxlength 200
+
+# Source library — parallel pair: set of candidates, lookup of per-candidate notes
+field CandidateSourceLibraries as set of string
+field SourceLibraryNotes as lookup of string to string
+field CandidateCount as integer default 0 nonnegative
+field SelectedSourceLibrary as string optional maxlength 100
+field SourceLibrarian as string optional maxlength 100
+
+# Loan terms
+# BUG-003: `period default '<literal>'` crashes — host supplies.
+field LoanPeriod as period optional
+field LoanRenewable as boolean default false
+field MaxRenewals as integer default 0 nonnegative max 5
+field RenewalCount as integer default 0 nonnegative
+field RushRequest as boolean default false
+
+# Calendar — dates and deadlines
+field RequestDate as date optional
+field NeededByDate as date optional
+field ShippedDate as date optional
+field ReceivedDate as date optional
+field LoanedToPatronDate as date optional
+field DueDate as date optional
+field ReturnedByPatronDate as date optional
+field ReturnedToSourceDate as date optional
+field ClosedDate as date optional
+
+# Fees — exact money for any patron-borne charges
+field LoanFee as money in 'USD' default '0.00 USD'
+field PatronFeePaid as money in 'USD' default '0.00 USD'
+field ReplacementCost as money in 'USD' default '0.00 USD'
+field LateFee as money in 'USD' default '0.00 USD'
+
+# Status flags — flipped by host events when calendar boundaries pass.
+field LoanWindowOpen as boolean default true
+field SourceAllowsRenewal as boolean default false
+
+# Outcomes
+field RejectionReason as string optional maxlength 500
+field CancellationReason as string optional maxlength 500
+field LostOrDamagedReason as string optional maxlength 500
+field LostOrDamaged as boolean default false
+
+# Audit log
+field LoanLog as log of string
+
+# Timestamps
+field RequestedAt as instant optional
+field RoutedAt as instant optional
+field ShippedAt as instant optional
+field ReceivedAt as instant optional
+field LoanedAt as instant optional
+field ReturnedByPatronAt as instant optional
+field ReturnedToSourceAt as instant optional
+field ClosedAt as instant optional
+field CancelledAt as instant optional
+
+# Rules
+rule NeededByDate >= RequestDate when RequestDate is set and NeededByDate is set because "Needed-by date {NeededByDate} must be on or after request date {RequestDate}"
+rule DueDate > LoanedToPatronDate when LoanedToPatronDate is set and DueDate is set because "Due date {DueDate} must be after loan-to-patron date {LoanedToPatronDate}"
+rule ReturnedByPatronDate >= LoanedToPatronDate when LoanedToPatronDate is set and ReturnedByPatronDate is set because "Patron return date {ReturnedByPatronDate} must be on or after loan-to-patron date {LoanedToPatronDate}"
+rule ReturnedToSourceDate >= ReturnedByPatronDate when ReturnedByPatronDate is set and ReturnedToSourceDate is set because "Source return date {ReturnedToSourceDate} must be on or after patron return date {ReturnedByPatronDate}"
+rule RenewalCount <= MaxRenewals because "Renewal count {RenewalCount} cannot exceed maximum allowed renewals {MaxRenewals}"
+rule PatronFeePaid <= LoanFee + LateFee + ReplacementCost because "Patron payments {PatronFeePaid} cannot exceed total charges (loan {LoanFee} + late {LateFee} + replacement {ReplacementCost})"
+
+# Rush requests get expedited treatment — must have needed-by within a tighter
+# window relative to the request, but Precept can't compute relative dates;
+# the host validates the actual window. This rule just enforces flag consistency.
+rule NeededByDate is set when RushRequest because "Rush requests require a needed-by date on file"
+
+# Renewability — if loan is non-renewable, RenewalCount must stay zero.
+rule RenewalCount == 0 when not LoanRenewable because "Non-renewable loans cannot accumulate renewals (currently {RenewalCount})"
+
+# States
+state Draft initial
+state Requested
+state SourceLibraryReview
+state InTransitToBorrower
+state ReceivedByBorrower
+state LoanedToPatron
+state Overdue
+state ReturnedByPatron
+state InTransitToSource
+state ReturnedToSource
+state Closed terminal
+state LostOrDamagedClosed terminal
+state Cancelled terminal
+
+# State ensures
+in Requested ensure RequestedAt is set because "A requested loan must record the request timestamp"
+in Requested ensure ItemTitle is set because "A requested loan must have an item title"
+in Requested ensure PatronId is set because "A requested loan must have a patron ID"
+in SourceLibraryReview ensure SelectedSourceLibrary is set because "Source-library review requires a selected source library"
+in SourceLibraryReview ensure RoutedAt is set because "Source-library review requires a routing timestamp"
+in InTransitToBorrower ensure ShippedAt is set because "An in-transit-to-borrower loan must record when it was shipped"
+in InTransitToBorrower ensure ShippedDate is set because "An in-transit-to-borrower loan must have a shipped date"
+in ReceivedByBorrower ensure ReceivedAt is set because "A received-by-borrower loan must record the receipt timestamp"
+in ReceivedByBorrower ensure ReceivedDate is set because "A received-by-borrower loan must have a received date"
+in LoanedToPatron ensure LoanedAt is set because "A loaned-to-patron loan must record when the loan started"
+in LoanedToPatron ensure DueDate is set because "A loaned-to-patron loan must have a due date"
+in Overdue ensure not LoanWindowOpen because "An overdue loan must have its loan window closed"
+in ReturnedByPatron ensure ReturnedByPatronAt is set because "A returned-by-patron loan must record when the patron returned the item"
+in InTransitToSource ensure ReturnedByPatronAt is set because "In-transit-to-source requires the patron return already recorded"
+in ReturnedToSource ensure ReturnedToSourceAt is set because "Returned-to-source requires the source return timestamp"
+in Closed ensure ClosedAt is set because "A closed loan must record a closure timestamp"
+in LostOrDamagedClosed ensure LostOrDamaged because "A lost-or-damaged closed loan must be marked as such"
+in LostOrDamagedClosed ensure LostOrDamagedReason is set because "A lost-or-damaged closed loan must record a reason"
+in Cancelled ensure CancellationReason is set because "A cancelled loan must record the cancellation reason"
+
+# Editable windows
+in Draft modify RequestId, PatronId, PatronName, PatronEmail, RequestingLibrarian, RequestingLibraryCode, MaterialType, MaterialFormat, ItemTitle, ItemAuthor, ItemIsbnOrIssn, ItemCallNumber, ItemPublicationYear, ItemPublisher, RequestDate, NeededByDate, RushRequest, LoanPeriod, LoanRenewable, MaxRenewals editable
+in Requested modify PatronEmail, NeededByDate editable
+in SourceLibraryReview modify SourceLibrarian, LoanPeriod, LoanRenewable, MaxRenewals, LoanFee, SourceAllowsRenewal editable
+
+# Events
+event AddCandidateSource(LibraryCode as string notempty, Note as string optional)
+event RemoveCandidateSource(LibraryCode as string notempty)
+event SubmitRequest
+event RouteToSource(LibraryCode as string notempty)
+event AcceptBySource(SourceLibrarian as string notempty, AllowRenewal as boolean, MaxRenew as integer nonnegative max 5, LoanFeeAmt as money in 'USD')
+event RejectBySource(Reason as string notempty)
+event ShipToBorrower(ShippedOn as date)
+event ReceiveAtBorrower(ReceivedOn as date)
+event LoanToPatron(LoanedOn as date, DueOn as date)
+event MarkOverdue(LateAmount as money in 'USD')
+event RenewLoan(NewDueDate as date)
+event CloseLoanWindow
+event ReceiveFromPatron(ReturnedOn as date)
+event ShipToSource
+event ConfirmAtSource(ReturnedOn as date)
+event CloseLoan
+event MarkLostOrDamaged(Reason as string notempty, ReplacementCost as money in 'USD')
+event RecordPatronPayment(Amount as money in 'USD')
+event Cancel(Reason as string notempty)
+
+on SubmitRequest ensure PatronId is set because "Patron ID must be on file before submitting"
+on SubmitRequest ensure PatronName is set because "Patron name must be on file before submitting"
+on SubmitRequest ensure ItemTitle is set because "Item title is required before submitting"
+on SubmitRequest ensure MaterialType is set because "Material type must be chosen before submitting"
+on SubmitRequest ensure RequestingLibrarian is set because "Requesting librarian must be on file before submitting"
+on SubmitRequest ensure RequestDate is set because "Request date must be set before submitting"
+
+on AcceptBySource ensure AcceptBySource.LoanFeeAmt >= '0.00 USD' because "Loan fee cannot be negative"
+on AcceptBySource ensure AcceptBySource.MaxRenew >= 0 because "Max renewals cannot be negative"
+on AcceptBySource ensure AcceptBySource.MaxRenew <= 5 because "Max renewals cannot exceed 5"
+
+on LoanToPatron ensure LoanToPatron.DueOn > LoanToPatron.LoanedOn because "Due date {LoanToPatron.DueOn} must be after loan-to-patron date {LoanToPatron.LoanedOn}"
+
+on MarkOverdue ensure MarkOverdue.LateAmount >= '0.00 USD' because "Late fee cannot be negative"
+
+on MarkLostOrDamaged ensure MarkLostOrDamaged.ReplacementCost >= '0.00 USD' because "Replacement cost cannot be negative"
+
+on RecordPatronPayment ensure RecordPatronPayment.Amount > '0.00 USD' because "Patron payment must be positive"
+
+# Transitions
+
+# Candidate-source management — librarian builds a list of libraries to ask.
+# Lookup-with-membership: CandidateSourceLibraries is the source of truth for
+# presence; SourceLibraryNotes carries per-candidate notes (e.g. "holds OCLC #").
+from Draft on AddCandidateSource when CandidateSourceLibraries contains AddCandidateSource.LibraryCode
+    -> reject "Library {AddCandidateSource.LibraryCode} already in the candidate list — remove it first if the note needs to change"
+from Draft on AddCandidateSource
+    -> add CandidateSourceLibraries AddCandidateSource.LibraryCode
+    -> put SourceLibraryNotes AddCandidateSource.LibraryCode = if AddCandidateSource.Note is set then AddCandidateSource.Note else ""
+    -> set CandidateCount = CandidateCount + 1
+    -> append LoanLog AddCandidateSource.LibraryCode
+    -> no transition
+
+# BUG-002 workaround: zero the lookup entry rather than `remove`; the set is
+# the membership source of truth.
+from Draft on RemoveCandidateSource when CandidateSourceLibraries contains RemoveCandidateSource.LibraryCode
+    -> set CandidateCount = CandidateCount - 1
+    -> put SourceLibraryNotes RemoveCandidateSource.LibraryCode = ""
+    -> remove CandidateSourceLibraries RemoveCandidateSource.LibraryCode
+    -> append LoanLog RemoveCandidateSource.LibraryCode
+    -> no transition
+from Draft on RemoveCandidateSource
+    -> reject "Library {RemoveCandidateSource.LibraryCode} not in the candidate list — nothing to remove"
+
+# Submit — requires at least one candidate source. The requesting librarian
+# may then route to a specific source from the candidate list.
+from Draft on SubmitRequest when CandidateCount == 0
+    -> reject "Cannot submit a request without at least one candidate source library"
+from Draft on SubmitRequest
+    -> set RequestedAt = now()
+    -> append LoanLog "Request submitted"
+    -> transition Requested
+
+# Route — selecting a source library from the candidates. Source must already
+# be in the candidate list.
+from Requested on RouteToSource when not (CandidateSourceLibraries contains RouteToSource.LibraryCode)
+    -> reject "Library {RouteToSource.LibraryCode} not in the candidate list — add it first"
+from Requested on RouteToSource
+    -> set SelectedSourceLibrary = RouteToSource.LibraryCode
+    -> set RoutedAt = now()
+    -> append LoanLog RouteToSource.LibraryCode
+    -> transition SourceLibraryReview
+
+# Source accepts — supplies its loan terms (fee, renewability).
+from SourceLibraryReview on AcceptBySource
+    -> set SourceLibrarian = AcceptBySource.SourceLibrarian
+    -> set LoanRenewable = AcceptBySource.AllowRenewal
+    -> set SourceAllowsRenewal = AcceptBySource.AllowRenewal
+    -> set MaxRenewals = AcceptBySource.MaxRenew
+    -> set LoanFee = AcceptBySource.LoanFeeAmt
+    -> append LoanLog "Source accepted"
+    -> no transition
+
+# Source rejects — request bounces back; can re-route to another candidate.
+from SourceLibraryReview on RejectBySource
+    -> set RejectionReason = RejectBySource.Reason
+    -> append LoanLog "Source rejected"
+    -> transition Requested
+
+# Ship — source library ships the item to the borrowing library.
+from SourceLibraryReview on ShipToBorrower
+    -> set ShippedDate = ShipToBorrower.ShippedOn
+    -> set ShippedAt = now()
+    -> append LoanLog "Shipped to borrower"
+    -> transition InTransitToBorrower
+
+# Receive — borrowing library receives the item.
+from InTransitToBorrower on ReceiveAtBorrower
+    -> set ReceivedDate = ReceiveAtBorrower.ReceivedOn
+    -> set ReceivedAt = now()
+    -> append LoanLog "Received by borrowing library"
+    -> transition ReceivedByBorrower
+
+# Loan to patron — borrowing library hands the item to the patron with a due date.
+from ReceivedByBorrower on LoanToPatron
+    -> set LoanedToPatronDate = LoanToPatron.LoanedOn
+    -> set DueDate = LoanToPatron.DueOn
+    -> set LoanedAt = now()
+    -> append LoanLog "Loaned to patron"
+    -> transition LoanedToPatron
+
+# Renew — only if source library allows and we haven't hit the cap.
+from LoanedToPatron on RenewLoan when not LoanRenewable
+    -> reject "Loan is not renewable per source library terms"
+from LoanedToPatron on RenewLoan when not SourceAllowsRenewal
+    -> reject "Source library does not allow renewal"
+from LoanedToPatron on RenewLoan when RenewalCount >= MaxRenewals
+    -> reject "Renewal would exceed maximum allowed renewals ({MaxRenewals})"
+from LoanedToPatron on RenewLoan when RenewLoan.NewDueDate <= DueDate
+    -> reject "New due date {RenewLoan.NewDueDate} must be after current due date {DueDate}"
+from LoanedToPatron on RenewLoan
+    -> set DueDate = RenewLoan.NewDueDate
+    -> set RenewalCount = RenewalCount + 1
+    -> append LoanLog "Renewed"
+    -> no transition
+
+# Host fires when the calendar reaches the due date without return — marks overdue.
+from LoanedToPatron on CloseLoanWindow
+    -> set LoanWindowOpen = false
+    -> append LoanLog "Loan window closed"
+    -> transition Overdue
+
+# Late fees can accumulate while overdue.
+from Overdue on MarkOverdue
+    -> set LateFee = LateFee + MarkOverdue.LateAmount
+    -> append LoanLog "Late fee added"
+    -> no transition
+
+# Receive from patron — patron returns the item. Reachable from LoanedToPatron
+# (on time) or Overdue (late).
+from LoanedToPatron, Overdue on ReceiveFromPatron
+    -> set ReturnedByPatronDate = ReceiveFromPatron.ReturnedOn
+    -> set ReturnedByPatronAt = now()
+    -> append LoanLog "Returned by patron"
+    -> transition ReturnedByPatron
+
+# Ship to source — borrowing library returns the item to source.
+from ReturnedByPatron on ShipToSource
+    -> append LoanLog "Shipping back to source"
+    -> transition InTransitToSource
+
+# Source confirms receipt — final leg of the round trip.
+from InTransitToSource on ConfirmAtSource
+    -> set ReturnedToSourceDate = ConfirmAtSource.ReturnedOn
+    -> set ReturnedToSourceAt = now()
+    -> append LoanLog "Confirmed at source"
+    -> transition ReturnedToSource
+
+# Close — once any patron-borne fees are cleared. Reachable from ReturnedToSource
+# (clean close) or directly from ReturnedByPatron if no source-return is tracked.
+from ReturnedToSource on CloseLoan when LateFee + LoanFee > PatronFeePaid
+    -> reject "Cannot close — patron still owes {LateFee + LoanFee - PatronFeePaid} in fees"
+from ReturnedToSource on CloseLoan
+    -> set ClosedAt = now()
+    -> append LoanLog "Loan closed"
+    -> transition Closed
+
+# Lost or damaged — patron reports item lost or damaged. Replacement cost
+# applies; loan closes as terminal-bad-outcome.
+from LoanedToPatron, Overdue, ReturnedByPatron on MarkLostOrDamaged
+    -> set LostOrDamaged = true
+    -> set LostOrDamagedReason = MarkLostOrDamaged.Reason
+    -> set ReplacementCost = MarkLostOrDamaged.ReplacementCost
+    -> append LoanLog "Marked lost or damaged"
+    -> transition LostOrDamagedClosed
+
+# Patron payment — applied against accumulated fees. Reachable from any
+# active-loan state (the patron can pay anytime there's an outstanding charge).
+from LoanedToPatron, Overdue, ReturnedByPatron, InTransitToSource, ReturnedToSource on RecordPatronPayment when PatronFeePaid + RecordPatronPayment.Amount > LoanFee + LateFee + ReplacementCost
+    -> reject "Payment {RecordPatronPayment.Amount} would exceed total charges (loan {LoanFee} + late {LateFee} + replacement {ReplacementCost}, already paid {PatronFeePaid})"
+from LoanedToPatron, Overdue, ReturnedByPatron, InTransitToSource, ReturnedToSource on RecordPatronPayment
+    -> set PatronFeePaid = PatronFeePaid + RecordPatronPayment.Amount
+    -> append LoanLog "Patron payment received"
+    -> no transition
+
+# Cancellation — patron or librarian aborts the request. Allowed pre-loan only.
+from Draft, Requested, SourceLibraryReview, InTransitToBorrower, ReceivedByBorrower on Cancel
+    -> set CancellationReason = Cancel.Reason
+    -> set CancelledAt = now()
+    -> append LoanLog "Cancelled"
+    -> transition Cancelled

@@ -1,0 +1,190 @@
+precept InsuranceRenewalProcessing
+
+# A policy renewal — the carrier-side workflow that reassesses risk before
+# a policy term expires, generates a renewal quote, sends notice to the
+# insured, and concludes when the insured accepts (renewed), declines
+# (cancelled), or the grace period expires (lapsed). Renewals arrive from
+# policy administration with the in-force policy already known: holder,
+# current premium, original effective date, and expiration. Risk factors
+# are accumulated during review; the carrier may decline renewal or the
+# insured may walk away.
+
+# Policy identity
+field PolicyNumber as string notempty maxlength 50
+field PolicyHolderName as string notempty maxlength 200
+field PolicyType as choice of string("Auto", "Home", "Life", "Health", "Umbrella")
+field OriginalPolicyDate as date
+field ExpirationDate as date
+
+# Risk reassessment — factors accumulated during review, scored and categorized.
+field RiskFactors as lookup of string to decimal
+field RiskScore as decimal default 0 nonnegative max 100 maxplaces 2
+field RiskCategory as choice of string("Preferred", "Standard", "Substandard", "Decline") default "Standard"
+
+# Premium calculations
+field CurrentPremium as money in 'USD' positive
+field ProposedPremium as money in 'USD' default '0.00 USD' nonnegative
+field PremiumChange as money in 'USD' default '0.00 USD'
+
+# Renewal notice tracking
+field NoticeSentFlag as boolean default false
+field NoticeDate as instant optional
+field GracePeriodEnd as instant optional
+
+# Cancellation and lapse tracking
+field CancellationReason as string optional maxlength 500
+field CancellationDate as instant optional
+field LapseDate as instant optional
+field CancellationInitiatedBy as choice of string("Policyholder", "Carrier", "Both") optional
+
+# Renewal offer details
+field CoverageChanges as string optional maxlength 1000
+field DiscountPercent as decimal default 0 nonnegative max 100 maxplaces 2
+
+# Audit trail
+field RenewalLog as log of string
+
+# Timestamps tracking each lifecycle phase
+field RenewalStartedAt as instant
+field RiskReviewCompletedAt as instant optional
+field QuoteGeneratedAt as instant optional
+field RenewedAt as instant optional
+field LapsedAt as instant optional
+
+# Rules — domain invariants
+rule ProposedPremium <= CurrentPremium * 3 when QuoteGeneratedAt is set because "Proposed premium {ProposedPremium} exceeds 3x the current premium of {CurrentPremium} — a single-term increase of this magnitude requires re-underwriting, not renewal"
+
+# States
+state RiskReview initial
+state QuoteGenerated
+state NoticeSent
+state Renewed terminal
+state Lapsed terminal
+state Cancelled terminal
+
+# Fields with no meaning until the relevant phase has been reached.
+in RiskReview omit ProposedPremium, PremiumChange, QuoteGeneratedAt, CoverageChanges
+in RiskReview, QuoteGenerated omit NoticeDate, GracePeriodEnd, RenewedAt, LapsedAt, LapseDate
+in Renewed omit CancellationReason, CancellationDate, LapseDate
+in Cancelled omit RenewedAt, LapseDate, LapsedAt
+in Lapsed omit CancellationReason, CancellationDate, RenewedAt
+
+# State ensures
+in QuoteGenerated ensure QuoteGeneratedAt is set because "Quote generation must record when the quote was produced"
+in QuoteGenerated ensure ProposedPremium > '0.00 USD' because "Quote generation requires a positive proposed premium — a $0 quote is structurally a cancellation, not a renewal offer"
+in NoticeSent ensure NoticeDate is set because "Notice phase must record when notice was sent to the insured"
+in NoticeSent ensure GracePeriodEnd is set because "Notice phase must record when the grace period ends — required for lapse determination"
+in Renewed ensure RenewedAt is set because "Renewed policies must record when the renewal was accepted"
+in Lapsed ensure LapsedAt is set because "Lapsed policies must record when the grace period expired"
+in Cancelled ensure CancellationDate is set because "Cancelled renewals must record when cancellation occurred"
+
+# Construction — renewal arrives from policy administration with the in-force
+# policy context fully attached.
+event Create(
+    PolicyNumber as string notempty maxlength 50,
+    PolicyHolderName as string notempty maxlength 200,
+    PolicyType as choice of string("Auto", "Home", "Life", "Health", "Umbrella"),
+    OriginalPolicyDate as date,
+    ExpirationDate as date,
+    CurrentPremium as money in 'USD' positive) initial
+
+# Renewal events
+event AddRiskFactor(FactorName as string notempty maxlength 100, FactorValue as decimal)
+event CompleteRiskReview(RiskScore as decimal nonnegative max 100, RiskCategory as choice of string("Preferred", "Standard", "Substandard", "Decline"))
+event GenerateQuote(ProposedPremium as money in 'USD' positive, CoverageChanges as string optional maxlength 1000)
+event ApplyDiscount(DiscountPercent as decimal nonnegative max 100)
+event SendRenewalNotice(GracePeriodDays as duration)
+event AcceptRenewal
+event DeclineRenewal(Reason as string notempty maxlength 500)
+event LapsePolicy
+event CancelRenewal(Reason as string notempty maxlength 500)
+
+# Construction row — populate fields and arrive in RiskReview.
+on Create
+    -> set PolicyNumber = Create.PolicyNumber
+    -> set PolicyHolderName = Create.PolicyHolderName
+    -> set PolicyType = Create.PolicyType
+    -> set OriginalPolicyDate = Create.OriginalPolicyDate
+    -> set ExpirationDate = Create.ExpirationDate
+    -> set CurrentPremium = Create.CurrentPremium
+    -> set RenewalStartedAt = now()
+
+# Add risk factor — accumulate factors during review.
+from RiskReview on AddRiskFactor
+    -> put RiskFactors AddRiskFactor.FactorName = AddRiskFactor.FactorValue
+    -> append RenewalLog "Risk factor added: {AddRiskFactor.FactorName}"
+    -> no transition
+
+# Complete risk review — claims history is required before scoring.
+from RiskReview on CompleteRiskReview when not (RiskFactors contains "ClaimsHistory")
+    -> reject "Claims history must be assessed before completing risk review"
+from RiskReview on CompleteRiskReview when CompleteRiskReview.RiskCategory == "Decline"
+    -> set RiskScore = CompleteRiskReview.RiskScore
+    -> set RiskCategory = CompleteRiskReview.RiskCategory
+    -> set RiskReviewCompletedAt = now()
+    -> set CancellationReason = "Risk reassessment: not renewable"
+    -> set CancellationDate = now()
+    -> set CancellationInitiatedBy = "Carrier"
+    -> append RenewalLog "Risk review complete: declined for renewal"
+    -> transition Cancelled
+from RiskReview on CompleteRiskReview
+    -> set RiskScore = CompleteRiskReview.RiskScore
+    -> set RiskCategory = CompleteRiskReview.RiskCategory
+    -> set RiskReviewCompletedAt = now()
+    -> set QuoteGeneratedAt = now()
+    -> append RenewalLog "Risk review complete: {CompleteRiskReview.RiskCategory}"
+    -> transition QuoteGenerated
+
+# Generate quote — set the proposed premium against the current.
+from QuoteGenerated on GenerateQuote
+    -> set ProposedPremium = GenerateQuote.ProposedPremium
+    -> set PremiumChange = GenerateQuote.ProposedPremium - CurrentPremium
+    -> set CoverageChanges = GenerateQuote.CoverageChanges
+    -> append RenewalLog "Quote generated: {GenerateQuote.ProposedPremium}"
+    -> no transition
+
+# Apply discount — reduce the proposed premium by a percentage.
+from QuoteGenerated on ApplyDiscount when ProposedPremium <= '0.00 USD'
+    -> reject "Cannot apply discount before a quote has been generated"
+from QuoteGenerated on ApplyDiscount
+    -> set DiscountPercent = ApplyDiscount.DiscountPercent
+    -> append RenewalLog "Discount applied: {ApplyDiscount.DiscountPercent}%"
+    -> no transition
+
+# Send renewal notice — QuoteGenerated → NoticeSent. Grace period drives lapse.
+from QuoteGenerated on SendRenewalNotice
+    -> set NoticeSentFlag = true
+    -> set NoticeDate = now()
+    -> set GracePeriodEnd = now() + SendRenewalNotice.GracePeriodDays
+    -> append RenewalLog "Renewal notice sent"
+    -> transition NoticeSent
+
+# Accept renewal — NoticeSent → Renewed. The new premium becomes the policy's.
+from NoticeSent on AcceptRenewal
+    -> set RenewedAt = now()
+    -> set CurrentPremium = ProposedPremium
+    -> append RenewalLog "Renewal accepted by policyholder"
+    -> transition Renewed
+
+# Decline renewal — NoticeSent → Cancelled. Policyholder-initiated.
+from NoticeSent on DeclineRenewal
+    -> set CancellationReason = DeclineRenewal.Reason
+    -> set CancellationDate = now()
+    -> set CancellationInitiatedBy = "Policyholder"
+    -> append RenewalLog "Renewal declined: {DeclineRenewal.Reason}"
+    -> transition Cancelled
+
+# Lapse policy — grace period expired without acceptance or decline.
+from NoticeSent on LapsePolicy
+    -> set LapseDate = now()
+    -> set LapsedAt = now()
+    -> append RenewalLog "Renewal lapsed — grace period expired"
+    -> transition Lapsed
+
+# Carrier-initiated cancellation — available before notice has been sent.
+from RiskReview, QuoteGenerated on CancelRenewal
+    -> set CancellationReason = CancelRenewal.Reason
+    -> set CancellationDate = now()
+    -> set CancellationInitiatedBy = "Carrier"
+    -> append RenewalLog "Renewal cancelled by carrier: {CancelRenewal.Reason}"
+    -> transition Cancelled

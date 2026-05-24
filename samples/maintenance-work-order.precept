@@ -1,64 +1,74 @@
 precept MaintenanceWorkOrder
 
-# A facilities work order from intake through scheduling and completion.
-# Temporal types carry scheduling and SLA semantics that plain numbers cannot:
-# - date captures when the work is due without conflating it with a count
-# - duration tracks estimated and actual labour time with exact arithmetic
-# - duration <= duration enforces SLA overrun limits structurally
+# A facilities work order — submitted by a requester, assigned to a technician,
+# scheduled, executed, and completed. Demonstrates temporal types carrying
+# scheduling and SLA semantics that plain numbers cannot: date for the due
+# date, duration for estimated and actual labour with exact arithmetic, and
+# duration <= duration enforcing an SLA overrun limit structurally.
 
-field RequesterName as string optional
-field Location as string optional
-field IssueSummary as string optional
-field AssignedTechnician as string optional
+# Identity and request data — established at submission.
+field RequesterName as string notempty maxlength 200
+field Location as string notempty maxlength 200
+field IssueSummary as string notempty maxlength 1000
+field Urgent as boolean default false
+
+# Scheduling — populated when an assignment is recorded.
+field AssignedTechnician as string optional maxlength 200
 field ScheduledDate as date optional
 field EstimatedDuration as duration optional
-field ActualDuration as duration default '0 hours'
-field Urgent as boolean default false
-field PartsApproved as boolean default false
-field CompletionNote as string optional
-field CancellationReason as string optional
 
-state Draft initial
-state Open
+# Progress and parts
+field ActualDuration as duration default '0 hours'
+field PartsApproved as boolean default false
+
+# Completion and cancellation
+field CompletionNote as string optional maxlength 2000
+field CancellationReason as string optional maxlength 1000
+
+# States — the work order begins in Open the moment intake completes.
+state Open initial
 state Scheduled
 state InProgress
 state Completed terminal
 state Cancelled terminal
 
-in Draft modify Location, IssueSummary, Urgent editable
-in Scheduled ensure AssignedTechnician is set because "Scheduled work must have an assigned technician"
-in Scheduled ensure ScheduledDate is set because "Scheduled work must have a date"
-in Completed ensure CompletionNote is set because "Completed work orders need a completion note"
+# State ensures
+in Scheduled ensure AssignedTechnician is set because "Scheduled work must name the technician responsible for executing it"
+in Scheduled ensure ScheduledDate is set because "Scheduled work must have a committed date — facilities scheduling fails without one"
+in Completed ensure CompletionNote is set because "Completed work orders must carry the technician's completion note for audit and follow-up"
 
-from InProgress ensure AssignedTechnician is set because "Active work cannot finish without a technician"
+# Active work cannot finish without a technician — guards mid-flight reassignment loss.
+from InProgress ensure AssignedTechnician is set because "Active work cannot finish without a technician on record"
 
+# Events
 event Submit(
-    Requester as string notempty,
-    WorkLocation as string notempty,
-    Summary as string notempty,
-    IsUrgent as boolean default false)
+    Requester as string notempty maxlength 200,
+    WorkLocation as string notempty maxlength 200,
+    Summary as string notempty maxlength 1000,
+    IsUrgent as boolean default false) initial
 
 event Assign(
-    Technician as string notempty,
+    Technician as string notempty maxlength 200,
     DueDate as date,
     Estimate as duration)
-on Assign ensure Assign.Estimate > '0 hours' because "Estimated duration must be positive"
+on Assign ensure Assign.Estimate > '0 hours' because "Estimated duration must be positive — a zero-hour estimate cannot be scheduled meaningfully"
 
 event ApproveParts
 event StartWork
 event RecordProgress(Elapsed as duration)
-on RecordProgress ensure RecordProgress.Elapsed > '0 hours' because "Progress entries must be positive"
+on RecordProgress ensure RecordProgress.Elapsed > '0 hours' because "Progress entries must record a positive elapsed time — zero-hour entries add no information"
 
-event Complete(Note as string notempty)
-event Cancel(Reason as string optional)
+event Complete(Note as string notempty maxlength 2000)
+event Cancel(Reason as string optional maxlength 1000)
 
-from Draft on Submit
+# Construction — the requester submits an intake form; the work order is born Open.
+on Submit
     -> set RequesterName = Submit.Requester
     -> set Location = Submit.WorkLocation
     -> set IssueSummary = Submit.Summary
     -> set Urgent = Submit.IsUrgent
-    -> transition Open
 
+# Assignment — facilities dispatches a technician with a date and estimate.
 from Open on Assign
     -> set AssignedTechnician = Assign.Technician
     -> set ScheduledDate = Assign.DueDate
@@ -68,13 +78,16 @@ from Open, Scheduled on Cancel
     -> set CancellationReason = Cancel.Reason
     -> transition Cancelled
 
+# Parts approval and work start — urgent jobs cannot begin without parts in hand.
 from Scheduled on ApproveParts
     -> set PartsApproved = true
     -> no transition
 from Scheduled on StartWork when not Urgent or PartsApproved
     -> transition InProgress
 from Scheduled on StartWork
-    -> reject "Urgent work must have parts approved before it starts"
+    -> reject "Urgent work cannot start without approved parts — call ApproveParts first"
+
+# Progress and completion — actual duration must stay within four hours of estimate.
 from InProgress on RecordProgress
     -> set ActualDuration = ActualDuration + RecordProgress.Elapsed
     -> no transition
@@ -82,4 +95,4 @@ from InProgress on Complete when not EstimatedDuration is set or ActualDuration 
     -> set CompletionNote = Complete.Note
     -> transition Completed
 from InProgress on Complete
-    -> reject "Actual duration {ActualDuration} exceeds the estimate of {EstimatedDuration} by more than 4 hours — supervisor review required"
+    -> reject "Actual duration {ActualDuration} exceeds the estimate of {EstimatedDuration} by more than 4 hours — supervisor review required before completing"

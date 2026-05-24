@@ -1,57 +1,160 @@
 precept ApartmentRentalApplication
 
-# A rental application moves from submission through screening, approval, and lease execution.
-# The rules stay realistic: income, credit, and household size all influence approval.
-# Money types enforce currency semantics; CreditScore and HouseholdSize use integer.
-# Applicant fills in the form in Draft state before submitting.
+# An apartment rental application moves from progressive form-fill through
+# submission, landlord review, approval, deposit payment, and lease signing —
+# or denial. The income, credit, and household-size thresholds are realistic;
+# fraud-free, but a landlord can request additional information mid-review,
+# which bounces the application back to the applicant for enrichment. Once
+# the lease is signed the tenant reaches MoveInReady; landlords can also
+# cancel an approved lease before signing, after which the applicant may
+# return to sign once the deposit is settled.
+#
+# Demonstrates: money types with currency, choice types for fixed categorical
+# data, set type for emergency contacts, optional fields for joint applications,
+# Free-Construction Draft with progressive enrichment, and conditional rules
+# for joint-application requirements.
 
-field ApplicantName as string optional
+# Applicant identity
+field ApplicantName as string optional maxlength 200
+field EmailAddress as string optional maxlength 200
+field PhoneNumber as string optional maxlength 50
+field CurrentAddress as string optional maxlength 500
+
+# Application categorical data
+field ApplicationType as choice of string("Individual", "Joint", "Corporate") default "Individual"
+field PetPreference as choice of string("None", "Dog", "Cat", "Bird", "Other") default "None"
+field LeaseTerm as choice of string("6 months", "12 months", "18 months", "24 months") default "12 months"
+field MoveInDate as date optional
+
+# Financial — money in 'USD' for exactness; CreditScore + HouseholdSize as
+# bounded integers.
 field MonthlyIncome as money in 'USD' default '0.00 USD'
 field RequestedRent as money in 'USD' default '0.00 USD'
-field CreditScore as integer default 0 nonnegative
-field HouseholdSize as integer default 1 positive
-field ReviewerNote as string optional
+field CreditScore as integer default 0 nonnegative max 850
+field HouseholdSize as integer default 1 positive max 12
+field SecurityDeposit as money in 'USD' default '0.00 USD'
+field ApplicationFeePaid as boolean default false
+
+# Emergency contacts — set type, at least two required to submit.
+field EmergencyContacts as set of string
+
+# Co-applicant — required when ApplicationType = "Joint".
+field CoApplicantName as string optional maxlength 200
+field CoApplicantIncome as money in 'USD' default '0.00 USD'
+
+# Pet detail — required when PetPreference is anything other than "None".
+field PetDescription as string optional maxlength 500
+
+# Review state
+field ReviewerName as string optional maxlength 200
+field ReviewNotes as string optional maxlength 1000
+field RejectionReason as string optional maxlength 500
+field PropertyUnit as string optional maxlength 100
 field DepositPaid as boolean default false
 field LeaseSigned as boolean default false
 
+# Timestamps
+field SubmittedAt as instant optional
+field DecidedAt as instant optional
+
+# Rules
+rule EmergencyContacts.count >= 2 when SubmittedAt is set because "Submitted applications need at least two emergency contacts on file"
+rule CoApplicantName is set when ApplicationType == "Joint" and SubmittedAt is set because "Joint applications require a co-applicant name once submitted"
+
+# States
 state Draft initial
-state Submitted
+state UnderReview
 state Approved
+state LeaseCancelled
 state MoveInReady terminal
 state Declined terminal
 
-in Draft modify ApplicantName, MonthlyIncome, RequestedRent, CreditScore, HouseholdSize editable
+# Editable windows
+in Draft modify ApplicantName, EmailAddress, PhoneNumber, CurrentAddress,
+                ApplicationType, PetPreference, PetDescription, LeaseTerm, MoveInDate,
+                MonthlyIncome, RequestedRent, CreditScore, HouseholdSize,
+                EmergencyContacts, CoApplicantName, CoApplicantIncome,
+                PropertyUnit editable
+in UnderReview modify ReviewNotes editable
+in Approved modify ReviewNotes editable
+in LeaseCancelled modify ReviewNotes editable
 
-in Approved ensure MonthlyIncome >= RequestedRent * 3 because "Monthly income {MonthlyIncome} does not meet the 3x rent requirement — {RequestedRent * 3} needed"
-in MoveInReady ensure DepositPaid and LeaseSigned because "Move-in ready applications need both a deposit and a signed lease"
+# State ensures
+in Approved ensure ReviewerName is set because "Approved applications must record the reviewing landlord"
+in Approved ensure MonthlyIncome >= RequestedRent * 3 because "Monthly income {MonthlyIncome} does not meet the 3x rent requirement of {RequestedRent * 3}"
+in MoveInReady ensure DepositPaid and LeaseSigned because "Move-in-ready applications need both a paid deposit and a signed lease"
+in Declined ensure RejectionReason is set because "Declined applications must document the rejection reason"
 
+# Events
 event Submit
 on Submit ensure ApplicantName is set because "Applicant name is required before submitting"
 on Submit ensure MonthlyIncome > '0.00 USD' because "Monthly income must be provided before submitting"
 on Submit ensure RequestedRent > '0.00 USD' because "Requested rent must be provided before submitting"
+on Submit ensure PropertyUnit is set because "Property unit is required before submitting"
 
-event Approve(Note as string optional)
-event PayDeposit
+event RequestAdditionalInfo(Notes as string notempty)
+event Approve(Reviewer as string notempty, Note as string optional)
+event Decline(Reviewer as string notempty, Reason as string notempty)
+event PayDeposit(Amount as money in 'USD' positive)
 event SignLease
-event Decline(Note as string notempty)
+event CancelLease(Reason as string notempty)
 
+# Submit — applicant pushes the form. The 3x income / credit / household-size
+# gate fires at review time, not at submission.
 from Draft on Submit
-    -> transition Submitted
+    -> set SubmittedAt = now()
+    -> set ApplicationFeePaid = true
+    -> transition UnderReview
 
-from Submitted on Approve when MonthlyIncome >= RequestedRent * 3 and CreditScore >= 650 and HouseholdSize < 8
-    -> set ReviewerNote = Approve.Note
+# Request additional info — landlord bounces the application back to Draft
+# for enrichment.
+from UnderReview on RequestAdditionalInfo
+    -> set ReviewNotes = RequestAdditionalInfo.Notes
+    -> transition Draft
+
+# Approve — gate is income, credit, and household size. Failure produces a
+# diagnostic that names every value that did not meet the bar.
+from UnderReview on Approve when MonthlyIncome >= RequestedRent * 3 and CreditScore >= 650 and HouseholdSize < 8
+    -> set ReviewerName = Approve.Reviewer
+    -> set ReviewNotes = if Approve.Note is set then Approve.Note else "Approved on review"
+    -> set SecurityDeposit = RequestedRent
+    -> set DecidedAt = now()
     -> transition Approved
-from Submitted on Approve
+from UnderReview on Approve
     -> reject "Approval requires income of at least {RequestedRent * 3} (yours: {MonthlyIncome}), credit score 650 or higher (yours: {CreditScore}), and household size under 8 (yours: {HouseholdSize})"
-from Submitted on Decline
-    -> set ReviewerNote = Decline.Note
+
+# Decline — landlord rejects with a reason.
+from UnderReview on Decline
+    -> set ReviewerName = Decline.Reviewer
+    -> set RejectionReason = Decline.Reason
+    -> set DecidedAt = now()
     -> transition Declined
 
-from Approved on PayDeposit
+# Pay deposit — must cover at least one month's rent.
+from Approved, LeaseCancelled on PayDeposit when PayDeposit.Amount < RequestedRent
+    -> reject "Deposit of {PayDeposit.Amount} is below the required one month's rent ({RequestedRent})"
+from Approved, LeaseCancelled on PayDeposit
+    -> set SecurityDeposit = PayDeposit.Amount
     -> set DepositPaid = true
     -> no transition
-from Approved on SignLease when DepositPaid
+
+# Sign lease — deposit must be paid first.
+from Approved, LeaseCancelled on SignLease when not DepositPaid
+    -> reject "Security deposit ({RequestedRent} required) must be paid before signing the lease"
+from Approved, LeaseCancelled on SignLease
     -> set LeaseSigned = true
     -> transition MoveInReady
-from Approved on SignLease
-    -> reject "The security deposit must be paid before the lease is signed"
+
+# Cancel an approved lease before signing — applicant can later return and
+# sign again once the deposit is reconfirmed.
+from Approved on CancelLease
+    -> set ReviewNotes = CancelLease.Reason
+    -> set LeaseSigned = false
+    -> transition LeaseCancelled
+
+# Landlord changes mind on approval — declines outright.
+from Approved on Decline
+    -> set ReviewerName = Decline.Reviewer
+    -> set RejectionReason = Decline.Reason
+    -> set DecidedAt = now()
+    -> transition Declined

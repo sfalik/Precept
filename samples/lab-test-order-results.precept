@@ -1,0 +1,128 @@
+precept LabTestOrder
+
+# A diagnostic lab order — from creation through specimen collection,
+# processing, results entry, verification, and final clinician review.
+# The order requires at least one test on creation; critical-value flags
+# can be appended only for tests actually ordered. Verification must
+# carry the verifying provider on record.
+
+# Fields
+field OrderId as string notempty maxlength 50
+field PatientId as string notempty maxlength 50
+field OrderingProvider as string notempty maxlength 200
+field Tests as set of string
+field SpecimenType as choice of string("Blood", "Urine", "Saliva", "Tissue", "Swab") default "Blood"
+
+field OrderedAt as instant
+field CollectionDueBy as instant optional
+field CollectedAt as instant optional
+field ResultsEnteredAt as instant optional
+field VerifiedAt as instant optional
+
+field Results as string optional maxlength 5000
+field ReferenceRanges as string optional maxlength 2000
+field CriticalFlags as set of string
+field VerifiedBy as string optional maxlength 200
+
+field RejectionReason as string optional maxlength 1000
+field StatusReason as string optional maxlength 500
+
+# Rules
+rule Tests.count > 0 because "A lab order must request at least one test"
+rule CriticalFlags.count <= Tests.count because "Cannot flag {CriticalFlags.count} critical values for an order containing only {Tests.count} tests"
+
+# States
+state Ordered initial
+state Collected
+state Processing
+state ResultsEntered
+state Verified
+state Reviewed terminal
+
+# State ensures
+in Verified ensure VerifiedBy is set because "A verified result must carry the verifying provider on record"
+
+# Editable windows
+in Ordered modify OrderingProvider, Tests, SpecimenType, CollectionDueBy editable
+in Collected modify StatusReason editable
+in ResultsEntered modify StatusReason, CriticalFlags editable
+in Verified modify StatusReason editable
+
+# Events
+event CreateOrder(
+    OrderId as string notempty,
+    PatientId as string notempty,
+    OrderingProvider as string notempty,
+    Tests as set of string,
+    SpecimenType as choice of string("Blood", "Urine", "Saliva", "Tissue", "Swab"),
+    CollectionDueBy as instant) initial
+
+on CreateOrder ensure CreateOrder.Tests.count > 0 because "A lab order must request at least one test at creation"
+
+on CreateOrder
+    -> set OrderId = CreateOrder.OrderId
+    -> set PatientId = CreateOrder.PatientId
+    -> set OrderingProvider = CreateOrder.OrderingProvider
+    -> set Tests = CreateOrder.Tests
+    -> set SpecimenType = CreateOrder.SpecimenType
+    -> set OrderedAt = now()
+    -> set CollectionDueBy = CreateOrder.CollectionDueBy
+    -> set StatusReason = "Order created"
+
+event CollectSpecimen
+event StartProcessing
+event EnterResults(ResultText as string notempty, Ranges as string notempty)
+event FlagCritical(TestCode as string notempty, ValueDescription as string notempty)
+event VerifyResults(VerifiedByProvider as string notempty)
+event ReviewResults(Outcome as choice of string("Accept", "Request Clarification", "Send For Retest"))
+
+# Transitions
+
+# Collection respects the deadline if one is on file.
+from Ordered on CollectSpecimen when CollectionDueBy is set and now() > CollectionDueBy
+    -> reject "Cannot collect specimen — collection deadline {CollectionDueBy} has already passed"
+from Ordered on CollectSpecimen
+    -> set CollectedAt = now()
+    -> set StatusReason = "Specimen collected"
+    -> transition Collected
+
+from Collected on StartProcessing
+    -> set StatusReason = "Processing started"
+    -> transition Processing
+
+from Processing on EnterResults
+    -> set Results = EnterResults.ResultText
+    -> set ReferenceRanges = EnterResults.Ranges
+    -> set ResultsEnteredAt = now()
+    -> transition ResultsEntered
+
+# Critical-value flags must reference a test actually ordered.
+from ResultsEntered on FlagCritical when not (Tests contains FlagCritical.TestCode)
+    -> reject "Cannot flag critical value for test {FlagCritical.TestCode} — not part of this order"
+from ResultsEntered on FlagCritical
+    -> add CriticalFlags FlagCritical.TestCode
+    -> set StatusReason = "Critical value flagged: " + FlagCritical.TestCode
+    -> no transition
+
+from ResultsEntered on VerifyResults
+    -> set VerifiedBy = VerifyResults.VerifiedByProvider
+    -> set VerifiedAt = now()
+    -> set StatusReason = "Results verified by " + VerifyResults.VerifiedByProvider
+    -> transition Verified
+
+# Reviewer decides the disposition — accept, request clarification, or retest.
+from Verified on ReviewResults when ReviewResults.Outcome == "Accept"
+    -> set StatusReason = "Results accepted"
+    -> transition Reviewed
+from Verified on ReviewResults when ReviewResults.Outcome == "Request Clarification"
+    -> clear VerifiedAt
+    -> clear VerifiedBy
+    -> set ResultsEnteredAt = now()
+    -> set StatusReason = "Clarification requested — re-entering results"
+    -> transition ResultsEntered
+from Verified on ReviewResults when ReviewResults.Outcome == "Send For Retest"
+    -> clear VerifiedAt
+    -> clear VerifiedBy
+    -> set CollectedAt = now()
+    -> set StatusReason = "Retest ordered"
+    -> transition Collected

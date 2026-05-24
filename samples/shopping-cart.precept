@@ -1,0 +1,260 @@
+precept ShoppingCart
+
+# An e-commerce shopping cart moves from open editing through checkout, payment,
+# shipment, and delivery — or is cancelled before fulfillment. The catalog is
+# fixed at construction (the customer cannot add arbitrary items); each line
+# item tracks a quantity in a separate lookup so quantity updates do not require
+# reordering the list. Promotions are keyed by code so the same discount cannot
+# be applied twice. Gift messages queue in FIFO order — the cashier prints them
+# in the sequence the shopper attached them.
+#
+# Demonstrates four collection types in one entity (set, list, lookup, queue)
+# with the canonical operations on each.
+
+# Identity
+field CustomerId as string notempty maxlength 100
+field SessionId as string notempty maxlength 100
+field CartName as string optional maxlength 200
+field BaseCurrency as currency default 'USD'
+
+# Catalog — set of allowable product IDs, fixed at construction. The cart
+# enforces that only catalog items can be added; deprecated products can be
+# removed from the set, which then blocks further additions.
+field Catalog as set of string
+
+# Line items — ordered list of item IDs in the cart. The actual quantity for
+# each item lives in ItemQuantities (a separate lookup) so quantity updates do
+# not require touching the list.
+field LineItems as list of string
+
+# Quantities — lookup of item ID to ordered quantity.
+field ItemQuantities as lookup of string to integer
+
+# Promotions — lookup of promotion code to discount percent. Keyed by code so
+# the same promotion cannot be applied twice.
+field CartPromotions as lookup of string to decimal
+
+# Gift messages — FIFO queue, printed in the order the shopper attached them.
+field GiftMessages as queue of string
+
+# Order metrics. ItemCount and DiscountPercent are computed from lookup
+# values whose intervals the proof engine cannot narrow, so the bound is
+# expressed as a rule rather than a structural max.
+field ItemCount as integer default 0 nonnegative
+field TotalValue as decimal default 0.0 nonnegative maxplaces 2
+field DiscountPercent as decimal default 0.0 nonnegative maxplaces 2
+field DiscountApplied as decimal default 0.0 nonnegative maxplaces 2
+
+rule ItemCount <= 1000 because "Cart cannot exceed 1,000 total items — orders above this size require a wholesale workflow"
+rule DiscountPercent <= 100 because "Combined promotion discount cannot exceed 100 percent"
+
+# Fulfillment data
+field CurrentGiftMessage as string optional maxlength 500
+field ShippingAddress as string optional maxlength 500
+field TrackingNumber as string optional maxlength 100
+field OrderReason as string optional maxlength 500
+
+# Timestamps
+field CreatedAt as instant
+field CheckedOutAt as instant optional
+field PaidAt as instant optional
+field ShippedAt as instant optional
+field DeliveredAt as instant optional
+field CancelledAt as instant optional
+
+# States
+state Cart initial
+state Checkout
+state Paid
+state Shipped
+state Delivered terminal
+state Cancelled terminal
+
+# Editable windows
+in Cart modify LineItems, ItemQuantities, CartPromotions, GiftMessages,
+                ItemCount, TotalValue, DiscountPercent,
+                DiscountApplied, CurrentGiftMessage, OrderReason editable
+in Checkout, Paid modify ShippingAddress editable
+in Shipped modify TrackingNumber, ShippingAddress editable
+
+# State ensures
+in Delivered ensure DeliveredAt is set because "A delivered order must record when it arrived"
+in Shipped ensure TrackingNumber is set because "A shipped order must carry a tracking number"
+
+# Events
+event Create(
+    CustomerId as string notempty,
+    SessionId as string notempty,
+    BaseCurrency as currency,
+    CatalogItems as set of string notempty,
+    CatalogName as string optional) initial
+
+event AddItem(ItemId as string notempty, Quantity as integer positive max 100)
+event RemoveItem(ItemId as string notempty)
+event UpdateQuantity(ItemId as string notempty, NewQuantity as integer positive max 100)
+event ClearCart
+event ReorderItem(FromIndex as integer nonnegative, ToIndex as integer nonnegative)
+
+event ApplyPromotion(PromotionCode as string notempty, DiscountPercent as decimal positive max 100 maxplaces 2)
+event RemovePromotion(PromotionCode as string notempty, AppliedDiscount as decimal nonnegative max 100 maxplaces 2)
+
+event AddGiftMessage(Message as string notempty)
+
+event CheckOut(Reason as string notempty)
+event Pay
+event Ship(Address as string notempty, TrackingNumber as string notempty)
+event Deliver
+event Cancel(Reason as string notempty)
+
+# Construction
+on Create
+    -> set CustomerId = Create.CustomerId
+    -> set SessionId = Create.SessionId
+    -> set BaseCurrency = Create.BaseCurrency
+    -> set Catalog = Create.CatalogItems
+    -> set CartName = Create.CatalogName
+    -> set CreatedAt = now()
+
+# Add item — already in cart, update quantity in place
+from Cart on AddItem when Catalog contains AddItem.ItemId and LineItems contains AddItem.ItemId
+    -> set ItemCount = ItemCount - (ItemQuantities for AddItem.ItemId) + AddItem.Quantity
+    -> put ItemQuantities AddItem.ItemId = AddItem.Quantity
+    -> set TotalValue = ItemCount * 10.0
+    -> no transition
+
+# Add item — new item, append to list and quantities
+from Cart on AddItem when Catalog contains AddItem.ItemId
+    -> set ItemCount = ItemCount + AddItem.Quantity
+    -> put ItemQuantities AddItem.ItemId = AddItem.Quantity
+    -> append LineItems AddItem.ItemId
+    -> set TotalValue = ItemCount * 10.0
+    -> no transition
+
+# Add item — not in catalog
+from Cart on AddItem
+    -> reject "Item {AddItem.ItemId} is not in the catalog"
+
+# Remove item — last item in cart, clear quantities and zero out totals
+from Cart on RemoveItem when LineItems contains RemoveItem.ItemId and ItemQuantities.count == 1
+    -> clear ItemQuantities
+    -> remove LineItems RemoveItem.ItemId
+    -> set ItemCount = 0
+    -> set TotalValue = 0.0
+    -> set DiscountPercent = 0.0
+    -> set DiscountApplied = 0.0
+    -> no transition
+
+# Remove item — multiple items remain. The lookup uses put to zero-out the
+# entry because BUG-002 prevents direct value removal from a lookup.
+from Cart on RemoveItem when LineItems contains RemoveItem.ItemId
+    -> set ItemCount = ItemCount - (ItemQuantities for RemoveItem.ItemId)
+    -> put ItemQuantities RemoveItem.ItemId = 0
+    -> remove LineItems RemoveItem.ItemId
+    -> set TotalValue = ItemCount * 10.0
+    -> no transition
+
+# Remove item — not in cart
+from Cart on RemoveItem
+    -> reject "Item {RemoveItem.ItemId} is not in the cart"
+
+# Update quantity — item must be in cart
+from Cart on UpdateQuantity when not (LineItems contains UpdateQuantity.ItemId)
+    -> reject "Item {UpdateQuantity.ItemId} is not in the cart"
+from Cart on UpdateQuantity
+    -> set ItemCount = ItemCount - (ItemQuantities for UpdateQuantity.ItemId) + UpdateQuantity.NewQuantity
+    -> put ItemQuantities UpdateQuantity.ItemId = UpdateQuantity.NewQuantity
+    -> set TotalValue = ItemCount * 10.0
+    -> no transition
+
+# Clear cart — remove all items, promotions, and gift messages
+from Cart on ClearCart
+    -> clear LineItems
+    -> clear ItemQuantities
+    -> clear CartPromotions
+    -> clear GiftMessages
+    -> set ItemCount = 0
+    -> set TotalValue = 0.0
+    -> set DiscountPercent = 0.0
+    -> set DiscountApplied = 0.0
+    -> no transition
+
+# Reorder item — each bound check is its own rejection row so the proof engine
+# can see the exact guard that enables the success row.
+from Cart on ReorderItem when LineItems.count == 0
+    -> reject "Cannot reorder an empty cart"
+from Cart on ReorderItem when ReorderItem.FromIndex >= LineItems.count
+    -> reject "Source index {ReorderItem.FromIndex} out of bounds (cart has {LineItems.count} items)"
+from Cart on ReorderItem when ReorderItem.ToIndex >= LineItems.count
+    -> reject "Target index {ReorderItem.ToIndex} out of bounds (cart has {LineItems.count} items)"
+from Cart on ReorderItem when ReorderItem.FromIndex < LineItems.count and ReorderItem.ToIndex < LineItems.count and LineItems.count > 0
+    -> insert LineItems LineItems.at(ReorderItem.FromIndex) at ReorderItem.ToIndex
+    -> remove LineItems at ReorderItem.FromIndex
+    -> no transition
+
+# Apply promotion — cart must have items, promotion must not already be active
+from Cart on ApplyPromotion when ItemCount == 0
+    -> reject "Cannot apply promotion to empty cart"
+from Cart on ApplyPromotion when CartPromotions for ApplyPromotion.PromotionCode > 0
+    -> reject "Promotion {ApplyPromotion.PromotionCode} is already applied"
+from Cart on ApplyPromotion
+    -> put CartPromotions ApplyPromotion.PromotionCode = ApplyPromotion.DiscountPercent
+    -> set DiscountPercent = DiscountPercent + ApplyPromotion.DiscountPercent
+    -> set DiscountApplied = TotalValue * DiscountPercent / 100.0
+    -> no transition
+
+# Remove promotion — deactivate by zeroing the entry. The lookup uses put
+# instead of remove because BUG-002 prevents direct value removal.
+from Cart on RemovePromotion when CartPromotions for RemovePromotion.PromotionCode <= 0
+    -> reject "Promotion {RemovePromotion.PromotionCode} is not active"
+from Cart on RemovePromotion
+    -> set DiscountPercent = max(0.0, DiscountPercent - RemovePromotion.AppliedDiscount)
+    -> set DiscountApplied = TotalValue * DiscountPercent / 100.0
+    -> put CartPromotions RemovePromotion.PromotionCode = 0.0
+    -> no transition
+
+# Add gift message — FIFO queue, latest message tracked separately
+from Cart on AddGiftMessage
+    -> enqueue GiftMessages AddGiftMessage.Message
+    -> set CurrentGiftMessage = AddGiftMessage.Message
+    -> no transition
+
+# Checkout — cart must have items
+from Cart on CheckOut when ItemCount == 0
+    -> reject "Cannot checkout — cart is empty"
+from Cart on CheckOut
+    -> set CheckedOutAt = now()
+    -> set OrderReason = CheckOut.Reason
+    -> transition Checkout
+
+# Pay
+from Checkout on Pay
+    -> set PaidAt = now()
+    -> transition Paid
+
+# Ship — shipping address must be set
+from Paid on Ship when ShippingAddress is not set
+    -> reject "Cannot ship — shipping address required"
+from Paid on Ship
+    -> set ShippingAddress = Ship.Address
+    -> set TrackingNumber = Ship.TrackingNumber
+    -> set ShippedAt = now()
+    -> transition Shipped
+
+# Deliver
+from Shipped on Deliver
+    -> set DeliveredAt = now()
+    -> transition Delivered
+
+# Cancel — reachable before fulfillment. Shared cleanup across Cart, Checkout, Paid.
+from Cart, Checkout, Paid on Cancel
+    -> set CancelledAt = now()
+    -> set OrderReason = Cancel.Reason
+    -> clear LineItems
+    -> clear ItemQuantities
+    -> clear CartPromotions
+    -> clear GiftMessages
+    -> set ItemCount = 0
+    -> set TotalValue = 0.0
+    -> set DiscountPercent = 0.0
+    -> set DiscountApplied = 0.0
+    -> transition Cancelled

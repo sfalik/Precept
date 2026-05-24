@@ -315,6 +315,14 @@ dotnet test                         # Run all tests (xUnit + FluentAssertions)
 1. Run task `build`.
 2. Run task `extension: install`, then reload the window.
 
+The `extension: install` task is driven by Node and works on Windows, macOS, and Linux. It needs **Node.js + npm** and the **`code` (or `code-insiders`) CLI** on your `PATH` — the script invokes `code --install-extension <vsix>` to install the freshly packaged extension into your local profile.
+
+- **Windows:** `code` is added to `PATH` by the VS Code installer.
+- **macOS:** run `Shell Command: Install 'code' command in PATH` from the command palette.
+- **Linux:** `code` is on `PATH` already if you installed VS Code via apt, dnf, snap, or AUR; otherwise add the VS Code `bin/` directory yourself.
+
+VS Code Insiders is auto-detected from the launching terminal's environment and routed to `code-insiders` instead of `code`.
+
 ## MCP Configuration Surfaces
 
 Three MCP config files exist and must stay distinct:

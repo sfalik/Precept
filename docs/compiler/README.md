@@ -25,9 +25,9 @@ Source string → Lexer.Lex → TokenStream → Parser.Parse → ConstructManife
 | 1. Lexer | [lexer.md](lexer.md) | Full | Implemented |
 | 2. Parser | [parser.md](parser.md) | Full | Implemented |
 | 3. Name Binder | [name-binder.md](name-binder.md) | Full | Implemented |
-| 4. Type Checker | [type-checker.md](type-checker.md) | Full | Stub |
-| 5. Graph Analyzer | [graph-analyzer.md](graph-analyzer.md) | Full | Stub |
-| 6. Proof Engine | [proof-engine.md](proof-engine.md) | Full | Stub |
+| 4. Type Checker | [type-checker.md](type-checker.md) | Full | Implemented |
+| 5. Graph Analyzer | [graph-analyzer.md](graph-analyzer.md) | Full | Implemented |
+| 6. Proof Engine | [proof-engine.md](proof-engine.md) | Full | Implemented |
 
 ## Cross-Cutting Infrastructure
 

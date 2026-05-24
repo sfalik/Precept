@@ -1,52 +1,60 @@
 precept LoanApplication
 
-# Pattern A showcase: Submit is the constructor, so the application arrives in UnderReview fully formed.
-# This sample keeps underwriting rules in the workflow itself instead of spreading them across services.
-# The approval guard combines document verification, credit policy, and affordability checks.
-# Money types enforce same-currency arithmetic and carry currency semantics throughout.
-# CreditScore uses integer — scores are whole numbers with no fractional meaning.
+# A loan application from intake through funding. The applicant submits a
+# complete file in a single event, the underwriter verifies documents, and
+# the application is either approved (with an approved amount that may be
+# less than the requested amount) and later funded, or declined with a note.
+#
+# Constructor pattern: Submit is marked `initial`, so the application arrives
+# in UnderReview fully formed. There is no hollow Draft state — every loan
+# record carries the applicant's intake fields from the moment it exists.
+#
+# Demonstrates: constructor pattern (Submit with `initial`), money type with
+# enforced same-currency arithmetic, conditional rule (rule X when Y), a
+# state-scoped editable window (DecisionNote becomes editable only after
+# documents are verified), and a multi-factor approval guard combining
+# document verification, credit policy, and affordability checks.
 
-field ApplicantName as string optional
-field RequestedAmount as money in 'USD' default '0.00 USD'
-field ApprovedAmount as money in 'USD' default '0.00 USD'
-field CreditScore as integer default 0
-field AnnualIncome as money in 'USD' default '0.00 USD'
-field ExistingDebt as money in 'USD' default '0.00 USD'
-field DecisionNote as string optional
+field ApplicantName as string notempty maxlength 200
+field RequestedAmount as money in 'USD' default '0.00 USD' positive
+field ApprovedAmount as money in 'USD' default '0.00 USD' nonnegative
+field CreditScore as integer default 300 min 300 max 850
+field AnnualIncome as money in 'USD' default '0.00 USD' nonnegative
+field ExistingDebt as money in 'USD' default '0.00 USD' nonnegative
+field DecisionNote as string optional maxlength 500
 field DocumentsVerified as boolean default false
 
-rule ApprovedAmount <= RequestedAmount because "Approved amount {ApprovedAmount} exceeds the submitted request of {RequestedAmount}"
-rule ExistingDebt <= AnnualIncome * 3.0 when DocumentsVerified because "Debt {ExistingDebt} exceeds the 3x income ceiling — maximum is {AnnualIncome * 3.0}"
+# Invariants
+rule ApprovedAmount <= RequestedAmount because "Approved amount {ApprovedAmount} exceeds the submitted request of {RequestedAmount} — the bank cannot approve more than the applicant asked for"
+rule ExistingDebt <= AnnualIncome * 3.0 when DocumentsVerified because "Existing debt {ExistingDebt} exceeds the 3x income ceiling — maximum allowed at {AnnualIncome} income is {AnnualIncome * 3.0}"
 
 state UnderReview initial
 state Approved
 state Funded terminal
 state Declined terminal
 
-in Approved ensure DocumentsVerified because "Approved loans must have verified documents"
-in UnderReview when DocumentsVerified ensure CreditScore >= 300 because "Verified applicants must have a minimum credit score of 300"
-in Funded ensure ApprovedAmount > '0.00 USD' because "Funded loans must have a positive approved amount"
+# State ensures
+in Approved ensure DocumentsVerified because "Approved loan must have verified documents — approval cannot precede the verification step"
+in Funded ensure ApprovedAmount > '0.00 USD' because "Funded loan must carry a positive approved amount — a $0 funded loan is a bookkeeping error, not a disbursement"
 
+# DecisionNote becomes editable only after documents are verified — the
+# underwriter cannot draft a decision rationale before the file is complete.
 in UnderReview when DocumentsVerified modify DecisionNote editable
 
+# Events
 event Submit(
-    Applicant as string notempty,
-    Amount as money in 'USD',
-    Score as integer,
-    Income as money in 'USD',
-    Debt as money in 'USD') initial
-on Submit ensure Submit.Amount > '0.00 USD' because "Loan requests must be positive"
-on Submit ensure Submit.Score >= 0 because "Credit score cannot be negative"
-on Submit ensure Submit.Income >= '0.00 USD' because "Income cannot be negative"
-on Submit ensure Submit.Debt >= '0.00 USD' because "Debt cannot be negative"
+    Applicant as string notempty maxlength 200,
+    Amount as money in 'USD' positive,
+    Score as integer min 300 max 850,
+    Income as money in 'USD' nonnegative,
+    Debt as money in 'USD' nonnegative) initial
 
 event VerifyDocuments
-event Approve(Amount as money in 'USD', Note as string optional)
-on Approve ensure Approve.Amount > '0.00 USD' because "Approved amounts must be positive"
-
-event Decline(Note as string notempty)
+event Approve(Amount as money in 'USD' positive, Note as string optional maxlength 500)
+event Decline(Note as string notempty maxlength 500)
 event FundLoan
 
+# ── Construction ──────────────────────────────────────────────────────────────
 on Submit
     -> set ApplicantName = Submit.Applicant
     -> set RequestedAmount = Submit.Amount
@@ -54,10 +62,16 @@ on Submit
     -> set AnnualIncome = Submit.Income
     -> set ExistingDebt = Submit.Debt
 
+# ── Transitions ───────────────────────────────────────────────────────────────
+
 from UnderReview on VerifyDocuments
     -> set DocumentsVerified = true
     -> no transition
 
+# Approval guard combines four underwriting checks: documents verified, credit
+# floor (680), DTI floor (income at least 2x debt), and affordability ceiling
+# (requested amount at most half of annual income). The Approve event also
+# carries the underwriter's approved amount, which must not exceed the request.
 from UnderReview on Approve when DocumentsVerified and CreditScore >= 680 and AnnualIncome >= ExistingDebt * 2.0 and RequestedAmount < AnnualIncome / 2.0 and Approve.Amount <= RequestedAmount
     -> set ApprovedAmount = Approve.Amount
     -> set DecisionNote = if Approve.Note is set then Approve.Note else if CreditScore >= 750 then "Prime tier — auto-approved" else "Standard tier — approved"
@@ -68,5 +82,6 @@ from UnderReview on Approve
 from UnderReview on Decline
     -> set DecisionNote = Decline.Note
     -> transition Declined
+
 from Approved on FundLoan
     -> transition Funded

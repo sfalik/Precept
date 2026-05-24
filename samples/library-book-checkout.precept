@@ -1,109 +1,139 @@
 precept LibraryBookCheckout
 
-# A library checkout workflow from loan creation through return, shelving, and loss resolution.
-# This sample emphasizes due-date guards, renewal limits, and overdue fine accumulation.
+# A library book moving through circulation: from the shelf, out to a borrower,
+# overdue if it goes past its due day, returned for inspection, shelved back to
+# the shelf, or written off as lost. Fines accrue while the book is overdue and
+# are settled on return or loss resolution.
+#
+# Free-Construction: a book exists on the shelf as a long-lived artifact —
+# title is filled in via direct edit on Available before the first checkout.
+# Renewal is capped at two extensions per loan; the day counter is monotone
+# and drives the Overdue transition automatically.
 
-field BookTitle as string optional
-field BorrowerId as string optional
-field CurrentDay as number default 0 nonnegative
-field CheckoutDay as number default 0 nonnegative
-field DueDay as number default 0 nonnegative
-field RenewalCount as number default 0 nonnegative
-field FineAmount as number default 0 nonnegative
-field ConditionNote as string optional
-field LostReported as boolean default false
+# Identity — set once on the shelf, edited in Available.
+field BookTitle as string optional maxlength 200
 
+# Loan party — populated by Checkout, cleared on exit from CheckedOut/Overdue/Lost.
+field BorrowerId as string optional maxlength 100
+
+# Monotone day counter — advanced by AdvanceDay events; never decreases.
+field CurrentDay as integer default 0 nonnegative
+field CheckoutDay as integer default 0 nonnegative
+field DueDay as integer default 0 nonnegative
+
+# Renewal cap is enforced by the guard `RenewalCount < 2` on the renewal row
+# plus the runtime rule below. A field-level `max 2` modifier would express the
+# bound structurally, but the proof engine cannot combine guard narrowing with
+# field-level max for the `Counter + 1` interval check (BUG-006).
+field RenewalCount as integer default 0 nonnegative
+rule RenewalCount <= 2 because "RenewalCount {RenewalCount} exceeds the per-loan renewal cap of 2 — additional extensions require staff override, not patron self-service"
+
+# Outstanding fines — accumulate while overdue, settled on Shelve / ResolveLoss.
+field FineAmount as money in 'USD' default '0.00 USD' nonnegative
+
+# Condition note set at return or loss report, cleared on shelving.
+field ConditionNote as string optional maxlength 500
+
+# States
 state Available initial
 state CheckedOut
 state Overdue
 state Returned
 state Lost
 
-# Staff can correct due-date handling while a loan is active.
+# Editable windows — staff may rename a book on the shelf, adjust loan dates
+# while a loan is active, and revise the fine total when settling an overdue.
+in Available modify BookTitle editable
 in CheckedOut modify DueDay editable
 in Overdue modify DueDay, FineAmount editable
 
-in Available ensure BorrowerId is not set because "Available books cannot still be assigned to a borrower"
-in CheckedOut ensure BorrowerId is set because "Checked-out books must record a borrower"
-in Overdue ensure BorrowerId is set because "Overdue books must still record a borrower"
-in Overdue ensure CurrentDay > DueDay because "Overdue books must be past their due day"
-in Returned ensure BorrowerId is not set because "Returned books must clear the borrower"
-in Lost ensure LostReported because "Lost books must be marked as reported lost"
-in Lost ensure BorrowerId is set because "Lost books must still record the last borrower"
+# BorrowerId is meaningful only while a book is out, overdue, or lost — every
+# circulation cycle starts and ends without a patron attached.
+in Available, Returned omit BorrowerId
 
+# State ensures
+in CheckedOut ensure BorrowerId is set because "A checked-out book must record the borrower — the library cannot release a copy without a known patron"
+in Overdue ensure BorrowerId is set because "An overdue book must still record the borrower — fine collection cannot happen anonymously"
+in Overdue ensure CurrentDay > DueDay because "An overdue book must be past its due day — CurrentDay {CurrentDay} is not yet past DueDay {DueDay}"
+in Lost ensure BorrowerId is set because "A lost book must still record the borrower of record — accountability for the loss attaches to the last patron who held it"
+
+# Exit-clear hook — leaving CheckedOut/Overdue/Lost back toward Returned or
+# Available drops the borrower so the next state's `omit` invariant holds.
+from CheckedOut, Overdue, Lost -> clear BorrowerId
+
+# Events
 event Checkout(
-    Title as string notempty,
-    PatronId as string notempty,
-    LoanDays as number default 14)
-on Checkout ensure Checkout.LoanDays > 0 because "Loan days must be positive"
+    PatronId as string notempty maxlength 100,
+    LoanDays as integer positive)
 
-event Renew(ExtraDays as number default 7)
-on Renew ensure Renew.ExtraDays > 0 because "Renewal days must be positive"
+event Renew(ExtraDays as integer positive)
 
-event AdvanceDay(DayNumber as number)
-on AdvanceDay ensure AdvanceDay.DayNumber >= 0 because "The day counter cannot be negative"
+event AdvanceDay(DayNumber as integer nonnegative)
 
-event ReturnBook(Condition as string optional)
-event ReportLost(Note as string optional)
+event ReturnBook(Condition as string optional maxlength 500)
+event ReportLost(Note as string optional maxlength 500)
 event Shelve
-event ResolveLoss
+event ResolveLoss(SettlementAmount as money in 'USD')
+on ResolveLoss ensure ResolveLoss.SettlementAmount >= '0.00 USD' because "Settlement amount cannot be negative — a loss resolution credits or zeroes the fine, never reverses it"
+
+# ── Transitions ───────────────────────────────────────────────────────────────
 
 from Available on Checkout
-    -> set BookTitle = Checkout.Title
     -> set BorrowerId = Checkout.PatronId
     -> set CheckoutDay = CurrentDay
     -> set DueDay = CurrentDay + Checkout.LoanDays
     -> set RenewalCount = 0
-    -> set FineAmount = 0
+    -> set FineAmount = '0.00 USD'
     -> clear ConditionNote
-    -> set LostReported = false
     -> transition CheckedOut
 
-from CheckedOut on Renew when RenewalCount < 2 and not LostReported and CurrentDay <= DueDay
+# Renewal — guarded by the renewal cap and "not yet overdue" condition.
+from CheckedOut on Renew when RenewalCount < 2 and CurrentDay <= DueDay
     -> set DueDay = DueDay + Renew.ExtraDays
     -> set RenewalCount = RenewalCount + 1
     -> no transition
 from CheckedOut on Renew
-    -> reject "Only active loans with remaining renewals can be renewed"
+    -> reject "Cannot renew loan — renewal cap reached ({RenewalCount}/2) or loan already past DueDay {DueDay}"
 
+# AdvanceDay is monotone — refuse to move backwards.
 from CheckedOut on AdvanceDay when AdvanceDay.DayNumber > CurrentDay and AdvanceDay.DayNumber <= DueDay
     -> set CurrentDay = AdvanceDay.DayNumber
     -> no transition
-from CheckedOut on AdvanceDay when AdvanceDay.DayNumber > CurrentDay
+from CheckedOut on AdvanceDay when AdvanceDay.DayNumber > DueDay
     -> set CurrentDay = AdvanceDay.DayNumber
-    -> set FineAmount = AdvanceDay.DayNumber - DueDay
     -> transition Overdue
+from CheckedOut on AdvanceDay
+    -> reject "Day counter must move forward — AdvanceDay.DayNumber {AdvanceDay.DayNumber} is not after CurrentDay {CurrentDay}"
+
 from Overdue on AdvanceDay when AdvanceDay.DayNumber > CurrentDay
     -> set CurrentDay = AdvanceDay.DayNumber
-    -> set FineAmount = AdvanceDay.DayNumber - DueDay
     -> no transition
-from CheckedOut, Overdue on AdvanceDay
-    -> reject "Day {AdvanceDay.DayNumber} is not after the current day {CurrentDay} — the counter must move forward"
+from Overdue on AdvanceDay
+    -> reject "Day counter must move forward — AdvanceDay.DayNumber {AdvanceDay.DayNumber} is not after CurrentDay {CurrentDay}"
 
+# Return — staff inspects condition; the book sits in Returned for shelving.
 from CheckedOut, Overdue on ReturnBook
-    -> clear BorrowerId
-    -> set ConditionNote = ReturnBook.Condition
+    -> set ConditionNote = if ReturnBook.Condition is set then ReturnBook.Condition else "Good"
     -> transition Returned
 
 from CheckedOut, Overdue on ReportLost
-    -> set LostReported = true
-    -> set ConditionNote = ReportLost.Note
+    -> set ConditionNote = if ReportLost.Note is set then ReportLost.Note else "Reported lost"
     -> transition Lost
 
+# Shelving zeroes the loan state — the copy returns to the shelf for the next patron.
 from Returned on Shelve
     -> set CheckoutDay = 0
     -> set DueDay = 0
     -> set RenewalCount = 0
-    -> set FineAmount = 0
+    -> set FineAmount = '0.00 USD'
     -> clear ConditionNote
     -> transition Available
 
+# Loss resolution — the patron settles, the title is retired from active circulation.
 from Lost on ResolveLoss
-    -> clear BorrowerId
+    -> set FineAmount = ResolveLoss.SettlementAmount
     -> set CheckoutDay = 0
     -> set DueDay = 0
     -> set RenewalCount = 0
-    -> set FineAmount = 0
     -> clear ConditionNote
-    -> set LostReported = false
     -> transition Available

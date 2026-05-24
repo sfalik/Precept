@@ -1,0 +1,8 @@
+name: precept-debugging
+description: >-
+  Diagnose and fix problems in Precept DSL definitions. Use when a precept has
+  compile errors, unexpected transition behavior, guard logic issues, constraint
+  violations, unreachable states, dead-end states, or qualifier mismatches.
+  Triggers on: debug precept, fix precept, precept error, transition not working,
+  guard not matching, constraint violation, unreachable state, dead-end state,
+  trace event, why does this reject, qualifier mismatch.

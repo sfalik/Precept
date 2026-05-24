@@ -1,0 +1,303 @@
+precept UtilityServiceConnection
+
+# A new utility service connection moves from customer application through
+# field inspection, activation, ongoing active service, and eventual
+# disconnection. The customer applies (specifying service address, requested
+# service type, account name, and identification); the utility runs a credit
+# check and either accepts the application (collecting any required deposit)
+# or rejects it. A field technician then inspects the service location and
+# either passes or fails the inspection; failed inspections must be remediated
+# (a Remediate event resets the inspection) before re-inspection. Once passed,
+# the connection is activated and enters service. The customer is billed
+# periodically (RecordCharge) and pays (RecordPayment); the account may be
+# suspended for non-payment (and reinstated after catch-up payment). Service
+# ends with a Disconnect event — either customer-initiated or utility-initiated
+# for cause.
+#
+# Free-Construction: the customer service rep enriches a Draft over time.
+# Required-at-submit fields are declared optional and gated by the Submit
+# event's ensures.
+
+# Identity
+field AccountNumber as string optional maxlength 50
+field CustomerName as string optional maxlength 200
+field CustomerPhone as string optional maxlength 50
+field CustomerEmail as string optional maxlength 200
+field GovernmentIdLast4 as string optional maxlength 4
+
+# Service address
+field ServiceStreetAddress as string optional maxlength 200
+field ServiceCity as string optional maxlength 100
+field ServiceStateOrProvince as string optional maxlength 100
+field ServicePostalCode as string optional maxlength 20
+
+# Service classification
+field ServiceType as choice of string("Electric","Gas","Water","Sewer","Internet","Bundle") optional
+field PremisesType as choice of string("Residential","Commercial","Industrial","MultiUnit","Agricultural") optional
+field BillingCycle as choice of string("Monthly","Bimonthly","Quarterly") optional
+field RatePlan as choice of string("Standard","TimeOfUse","Demand","FlatRate","LifelineDiscount") optional
+
+# Calendar
+field ApplicationDate as date optional
+field RequestedConnectionDate as date optional
+field ScheduledInspectionDate as date optional
+field ActualConnectionDate as date optional
+field DisconnectionDate as date optional
+
+# Financials — exact money, no approximation. Decimal for usage measurements
+# that genuinely admit fractional readings.
+field RequiredDeposit as money in 'USD' default '0.00 USD'
+field DepositPaid as boolean default false
+field ConnectionFee as money in 'USD' default '0.00 USD'
+field MonthlyBaseCharge as money in 'USD' optional
+field UsageMetered as decimal default 0 nonnegative maxplaces 3
+field TotalCharged as money in 'USD' default '0.00 USD'
+field TotalPaid as money in 'USD' default '0.00 USD'
+field OutstandingBalance as money in 'USD' <- TotalCharged - TotalPaid
+
+# Credit check — utility runs a credit pull before quoting deposit. A score
+# below the threshold means a larger deposit is required.
+field CreditScore as integer optional min 300 max 850
+field CreditCheckCompleted as boolean default false
+
+# Inspection
+field FieldTechnicianName as string optional maxlength 100
+field InspectionPassed as boolean default false
+field InspectionFailureReason as string optional maxlength 500
+# BUG-006: the proof engine cannot narrow `InspectionAttemptCount + 1`
+# against a structural `max 5` after the guard, so the cap is expressed as a
+# rule rather than a modifier.
+field InspectionAttemptCount as integer default 0 nonnegative
+
+rule InspectionAttemptCount <= 5 because "Inspection attempts capped at 5 — the customer must withdraw or escalate after the fifth failure"
+
+# Outcomes
+field RejectionReason as string optional maxlength 500
+field DisconnectionReason as string optional maxlength 500
+field SuspensionReason as string optional maxlength 500
+
+# Audit log
+field ServiceLog as log of string
+
+# Timestamps
+field SubmittedAt as instant optional
+field AcceptedAt as instant optional
+field ActivatedAt as instant optional
+field SuspendedAt as instant optional
+field DisconnectedAt as instant optional
+
+# Rules
+rule RequestedConnectionDate > ApplicationDate when ApplicationDate is set and RequestedConnectionDate is set because "Requested connection date {RequestedConnectionDate} must be after application date {ApplicationDate}"
+rule ScheduledInspectionDate >= ApplicationDate when ApplicationDate is set and ScheduledInspectionDate is set because "Scheduled inspection date {ScheduledInspectionDate} must be on or after application date {ApplicationDate}"
+rule ActualConnectionDate >= ScheduledInspectionDate when ScheduledInspectionDate is set and ActualConnectionDate is set because "Actual connection date {ActualConnectionDate} must be on or after the inspection date {ScheduledInspectionDate}"
+rule TotalPaid <= TotalCharged because "Total paid {TotalPaid} cannot exceed total charged {TotalCharged} — credit balances roll forward as charges, not as negative balances"
+
+# Credit-score-driven deposit floor — utilities typically require larger
+# deposits for low-credit customers. This is a structural floor; the actual
+# quoted deposit may be higher.
+rule RequiredDeposit >= '200.00 USD' when CreditScore is set and CreditScore < 600 because "Credit score {CreditScore} below 600 requires a minimum deposit of $200.00 (currently {RequiredDeposit})"
+
+# States
+state Draft initial
+state Submitted
+state CreditReview
+state Accepted
+state InspectionScheduled
+state InspectionFailed
+state Activated
+state Active
+state Suspended
+state Disconnected terminal
+state Rejected terminal
+state Withdrawn terminal
+
+# State ensures
+in Submitted ensure SubmittedAt is set because "A submitted application must carry a submission timestamp"
+in CreditReview ensure GovernmentIdLast4 is set because "Credit review requires identification on file"
+in Accepted ensure AcceptedAt is set because "An accepted application must carry an acceptance timestamp"
+in Accepted ensure CreditCheckCompleted because "An accepted application must have completed its credit check"
+in InspectionScheduled ensure ScheduledInspectionDate is set because "A scheduled inspection must have a date on file"
+in InspectionFailed ensure InspectionFailureReason is set because "A failed inspection must record the failure reason"
+in Activated ensure InspectionPassed because "An activated connection must have passed inspection"
+in Activated ensure ActualConnectionDate is set because "An activated connection must have an actual connection date"
+in Active ensure ActivatedAt is set because "An active service must record its activation timestamp"
+in Suspended ensure SuspensionReason is set because "A suspended service must record the suspension reason"
+in Disconnected ensure DisconnectionReason is set because "A disconnected service must record the reason"
+in Disconnected ensure DisconnectedAt is set because "A disconnected service must record the disconnection timestamp"
+in Rejected ensure RejectionReason is set because "A rejected application must record the rejection reason"
+
+# Editable windows
+in Draft modify AccountNumber, CustomerName, CustomerPhone, CustomerEmail, GovernmentIdLast4, ServiceStreetAddress, ServiceCity, ServiceStateOrProvince, ServicePostalCode, ServiceType, PremisesType, BillingCycle, RatePlan, ApplicationDate, RequestedConnectionDate editable
+in Submitted modify CustomerPhone, CustomerEmail editable
+in CreditReview modify RequiredDeposit, MonthlyBaseCharge editable
+in Accepted modify ScheduledInspectionDate, FieldTechnicianName, ConnectionFee editable
+in InspectionFailed modify ScheduledInspectionDate, FieldTechnicianName editable
+
+# Events
+event Submit
+event StartCreditReview
+event RecordCreditScore(Score as integer min 300 max 850)
+event AcceptApplication(Deposit as money in 'USD', BaseCharge as money in 'USD', Fee as money in 'USD')
+event RejectApplication(Reason as string notempty)
+event PayDeposit
+event ScheduleInspection(Technician as string notempty, ScheduledOn as date)
+event PassInspection(ConnectedOn as date)
+event FailInspection(Reason as string notempty)
+event Remediate
+event Activate
+event RecordUsage(Units as decimal)
+event RecordCharge(Amount as money in 'USD', Description as string notempty)
+event RecordPayment(Amount as money in 'USD')
+event SuspendForNonpayment(Reason as string notempty)
+event ReinstateService
+event Disconnect(Reason as string notempty, EffectiveOn as date)
+event Withdraw(Reason as string notempty)
+
+on Submit ensure AccountNumber is set because "Account number is required before submission"
+on Submit ensure CustomerName is set because "Customer name is required before submission"
+on Submit ensure CustomerPhone is set because "Customer phone is required before submission"
+on Submit ensure ServiceStreetAddress is set because "Service street address is required before submission"
+on Submit ensure ServiceCity is set because "Service city is required before submission"
+on Submit ensure ServicePostalCode is set because "Service postal code is required before submission"
+on Submit ensure ServiceType is set because "Service type must be specified before submission"
+on Submit ensure PremisesType is set because "Premises type must be specified before submission"
+on Submit ensure RequestedConnectionDate is set because "Requested connection date is required before submission"
+
+on AcceptApplication ensure AcceptApplication.Deposit >= '0.00 USD' because "Deposit cannot be negative"
+on AcceptApplication ensure AcceptApplication.BaseCharge > '0.00 USD' because "Monthly base charge must be positive"
+on AcceptApplication ensure AcceptApplication.Fee >= '0.00 USD' because "Connection fee cannot be negative"
+
+on RecordUsage ensure RecordUsage.Units >= 0 because "Usage units cannot be negative"
+on RecordCharge ensure RecordCharge.Amount > '0.00 USD' because "Recorded charges must be positive"
+on RecordPayment ensure RecordPayment.Amount > '0.00 USD' because "Recorded payments must be positive"
+
+# Transitions
+
+# Application intake — the customer service rep collects everything in Draft,
+# then submits.
+from Draft on Submit
+    -> set SubmittedAt = now()
+    -> append ServiceLog "Application submitted"
+    -> transition Submitted
+
+# Credit review — utility pulls credit before quoting deposit.
+from Submitted on StartCreditReview when GovernmentIdLast4 is not set
+    -> reject "Credit review requires the last 4 digits of government ID — collect from customer first"
+from Submitted on StartCreditReview
+    -> append ServiceLog "Credit review started"
+    -> transition CreditReview
+
+from CreditReview on RecordCreditScore
+    -> set CreditScore = RecordCreditScore.Score
+    -> set CreditCheckCompleted = true
+    -> append ServiceLog "Credit score recorded"
+    -> no transition
+
+# Accept — utility commits to the application, quotes deposit, base charge, and
+# connection fee. The credit-score deposit floor is enforced by the rule above.
+from CreditReview on AcceptApplication when not CreditCheckCompleted
+    -> reject "Cannot accept application before credit check completes"
+from CreditReview on AcceptApplication
+    -> set RequiredDeposit = AcceptApplication.Deposit
+    -> set MonthlyBaseCharge = AcceptApplication.BaseCharge
+    -> set ConnectionFee = AcceptApplication.Fee
+    -> set AcceptedAt = now()
+    -> append ServiceLog "Application accepted"
+    -> transition Accepted
+
+# Reject — application denied before inspection. Reachable from Submitted or CreditReview.
+from Submitted, CreditReview on RejectApplication
+    -> set RejectionReason = RejectApplication.Reason
+    -> append ServiceLog "Application rejected"
+    -> transition Rejected
+
+# Deposit payment — required if RequiredDeposit > 0 before inspection scheduling.
+from Accepted on PayDeposit
+    -> set DepositPaid = true
+    -> set TotalPaid = TotalPaid + RequiredDeposit
+    -> append ServiceLog "Deposit paid"
+    -> no transition
+
+# Inspection scheduling — only after deposit cleared (when required).
+from Accepted on ScheduleInspection when RequiredDeposit > '0.00 USD' and not DepositPaid
+    -> reject "Deposit of {RequiredDeposit} must be paid before scheduling inspection"
+from Accepted on ScheduleInspection
+    -> set FieldTechnicianName = ScheduleInspection.Technician
+    -> set ScheduledInspectionDate = ScheduleInspection.ScheduledOn
+    -> append ServiceLog "Inspection scheduled"
+    -> transition InspectionScheduled
+
+# Field inspection — pass or fail.
+from InspectionScheduled on PassInspection
+    -> set InspectionPassed = true
+    -> set ActualConnectionDate = PassInspection.ConnectedOn
+    -> set InspectionAttemptCount = InspectionAttemptCount + 1
+    -> append ServiceLog "Inspection passed"
+    -> transition Activated
+
+from InspectionScheduled on FailInspection when InspectionAttemptCount + 1 >= 5
+    -> reject "Inspection attempt limit (5) reached — withdraw the application or escalate"
+from InspectionScheduled on FailInspection
+    -> set InspectionFailureReason = FailInspection.Reason
+    -> set InspectionAttemptCount = InspectionAttemptCount + 1
+    -> append ServiceLog "Inspection failed"
+    -> transition InspectionFailed
+
+# Remediation — customer fixes the issue and re-schedules. Reschedule via the
+# same ScheduleInspection event, back to InspectionScheduled.
+from InspectionFailed on Remediate
+    -> set InspectionFailureReason = ""
+    -> append ServiceLog "Remediation complete"
+    -> transition Accepted
+
+# Activation — energize/turn-on. Moves to Active service.
+from Activated on Activate
+    -> set ActivatedAt = now()
+    -> append ServiceLog "Service activated"
+    -> transition Active
+
+# Usage and billing — recorded against the account while in service.
+from Active on RecordUsage
+    -> set UsageMetered = UsageMetered + RecordUsage.Units
+    -> no transition
+
+from Active on RecordCharge
+    -> set TotalCharged = TotalCharged + RecordCharge.Amount
+    -> append ServiceLog RecordCharge.Description
+    -> no transition
+
+from Active, Suspended on RecordPayment when TotalPaid + RecordPayment.Amount > TotalCharged
+    -> reject "Payment of {RecordPayment.Amount} would create a credit balance — pay only the outstanding {OutstandingBalance}"
+from Active, Suspended on RecordPayment
+    -> set TotalPaid = TotalPaid + RecordPayment.Amount
+    -> append ServiceLog "Payment received"
+    -> no transition
+
+# Suspension for non-payment — service stops but the account remains.
+from Active on SuspendForNonpayment
+    -> set SuspensionReason = SuspendForNonpayment.Reason
+    -> set SuspendedAt = now()
+    -> append ServiceLog "Suspended for non-payment"
+    -> transition Suspended
+
+# Reinstate — outstanding balance must be zero.
+from Suspended on ReinstateService when OutstandingBalance > '0.00 USD'
+    -> reject "Cannot reinstate — outstanding balance of {OutstandingBalance} must be paid first"
+from Suspended on ReinstateService
+    -> append ServiceLog "Service reinstated"
+    -> transition Active
+
+# Disconnection — end of service. Reachable from Active or Suspended. The host
+# supplies the effective disconnection date as an event argument.
+from Active, Suspended on Disconnect
+    -> set DisconnectionReason = Disconnect.Reason
+    -> set DisconnectionDate = Disconnect.EffectiveOn
+    -> set DisconnectedAt = now()
+    -> append ServiceLog "Disconnected"
+    -> transition Disconnected
+
+# Withdraw — customer pulls the application pre-activation.
+from Draft, Submitted, CreditReview, Accepted, InspectionScheduled, InspectionFailed on Withdraw
+    -> set RejectionReason = Withdraw.Reason
+    -> append ServiceLog "Withdrawn"
+    -> transition Withdrawn

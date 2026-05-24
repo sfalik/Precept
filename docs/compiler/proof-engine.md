@@ -1021,37 +1021,56 @@ on Process when Value >= 0
 
 bool TryGuardInPathProof(ProofObligation obligation, SemanticIndex semantics)
 {
-    // Read context from obligation — set at instantiation time (O(1), not post-hoc search)
-    if (obligation.Context is not TransitionRowContext trc and not StateHookContext shc)
-        return false;  // only transition rows and state hooks have guards
+    // Read context from obligation — set at instantiation time (O(1), not post-hoc search).
+    // Guards come from four context kinds:
+    //   - TransitionRowContext: the row's `when` clause
+    //   - StateHookContext:     the hook's `when` clause
+    //   - EventHandlerContext:  the handler's `when` clause (incl. construction rows)
+    //   - ConstraintContext:    the rule or ensure's `when` clause
     var guard = obligation.Context switch
     {
         TransitionRowContext t => t.Row.Guard,
         StateHookContext s => s.Hook.Guard,
+        EventHandlerContext h => h.Handler.Guard,
+        ConstraintContext c => c.Constraint switch
+        {
+            RuleIdentity ri   => semantics.Rules[ri.RuleIndex].Guard,
+            EnsureIdentity ei => semantics.Ensures[ei.EnsureIndex].Guard,
+            _ => null
+        },
         _ => null
     };
     if (guard is null) return false;
 
-    // 2. Decompose the guard into simple constraint forms
-    var guardConstraints = ExtractGuardConstraints(guard);
+    // 2. Decompose the guard into AND/OR branches.
+    //    AND nodes cross-product their children's branch sets;
+    //    OR nodes union them. Each branch holds the constraints
+    //    that are simultaneously true on that branch.
+    var branches = ExtractGuardBranches(guard);
 
-    // 3. For each guard constraint, check if it covers the requirement
-    foreach (var guardConstraint in guardConstraints)
+    // 3. Every OR branch must independently prove the obligation
+    //    (a disjunctive guard only discharges when every disjunct works).
+    foreach (var branchConstraints in branches)
     {
-        if (obligation.Requirement is NumericProofRequirement numeric)
+        var thisBranchProved = false;
+        foreach (var gc in branchConstraints)
         {
-            if (GuardSubsumes(guardConstraint, numeric, obligation.Site))
-                return true;
+            if (obligation.Requirement is NumericProofRequirement numeric)
+            {
+                if (GuardSubsumes(gc, numeric, obligation.Site))
+                { thisBranchProved = true; break; }
+            }
+            else if (obligation.Requirement is PresenceProofRequirement presence)
+            {
+                if (gc.Field == GetFieldName(presence.Subject, obligation.Site)
+                    && gc.IsPresenceCheck)
+                { thisBranchProved = true; break; }
+            }
         }
-        else if (obligation.Requirement is PresenceProofRequirement presence)
-        {
-            if (guardConstraint.Field == GetFieldName(presence.Subject, obligation.Site)
-                && guardConstraint.IsPresenceCheck)
-                return true;
-        }
+        if (!thisBranchProved) return false;
     }
 
-    return false;  // no guard constraint covers the requirement
+    return branches.Length > 0;
 }
 
 bool GuardSubsumes(GuardConstraint guard, NumericProofRequirement requirement, TypedExpression site)
@@ -1176,22 +1195,25 @@ This strategy handles the case where a guard establishes a *relative* constraint
 
 bool TryFlowNarrowingProof(ProofObligation obligation, SemanticIndex semantics)
 {
-    // Read context from obligation — set at instantiation time (O(1), not post-hoc search)
-    if (obligation.Context is not TransitionRowContext trc and not StateHookContext shc)
-        return false;  // only transition rows and state hooks have guards
+    // Read context from obligation — set at instantiation time (O(1), not post-hoc search).
+    // Same context kinds as Strategy 3: TransitionRow, StateHook, EventHandler, Constraint.
     var guard = obligation.Context switch
     {
         TransitionRowContext t => t.Row.Guard,
         StateHookContext s => s.Hook.Guard,
+        EventHandlerContext h => h.Handler.Guard,
+        ConstraintContext c => c.Constraint switch
+        {
+            RuleIdentity ri   => semantics.Rules[ri.RuleIndex].Guard,
+            EnsureIdentity ei => semantics.Ensures[ei.EnsureIndex].Guard,
+            _ => null
+        },
         _ => null
     };
     if (guard is null) return false;
 
-    // 2. Decompose the guard — look for field-vs-field comparisons only
-    var relationalGuards = ExtractFieldToFieldConstraints(guard);
-    if (relationalGuards.IsEmpty) return false;
-
-    // 3. Check if the obligation's expression site uses both fields from a guard
+    // 2. Pre-check obligation shape — Strategy 4 fires only on binary-op
+    //    obligations with a NumericProofRequirement over two named fields.
     if (obligation.Site is not TypedBinaryOp binaryOp) return false;
     if (obligation.Requirement is not NumericProofRequirement numeric) return false;
 
@@ -1199,18 +1221,28 @@ bool TryFlowNarrowingProof(ProofObligation obligation, SemanticIndex semantics)
     var rightField = GetFieldName(binaryOp.Right);
     if (leftField is null || rightField is null) return false;
 
-    // 4. For each relational guard, check if it establishes a constraint
-    //    that makes the binary operation safe
-    foreach (var relationalGuard in relationalGuards)
-    {
-        if (!InvolvesFields(relationalGuard, leftField, rightField)) continue;
+    // 3. Decompose the guard into AND/OR branches of field-to-field
+    //    relational constraints (cross-product on AND, union on OR).
+    var branches = ExtractFieldToFieldBranches(guard);
+    if (branches.IsEmpty) return false;
 
-        // 5. Check if the guard's established relation implies the obligation
-        if (GuardRelationImpliesObligation(relationalGuard, binaryOp, numeric))
-            return true;
+    // 4. Every OR branch must independently prove the flow-narrowing
+    //    obligation (a disjunctive guard only discharges when every
+    //    disjunct establishes the relation that implies the obligation).
+    foreach (var branchConstraints in branches)
+    {
+        var thisBranchProved = false;
+        foreach (var rg in branchConstraints)
+        {
+            if (!InvolvesFields(rg, leftField, rightField)) continue;
+
+            if (GuardRelationImpliesObligation(rg, binaryOp, leftField, rightField, numeric))
+            { thisBranchProved = true; break; }
+        }
+        if (!thisBranchProved) return false;
     }
 
-    return false;
+    return true;
 }
 ```
 

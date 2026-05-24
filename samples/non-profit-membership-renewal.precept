@@ -1,0 +1,241 @@
+precept NonProfitMembershipRenewal
+
+# A non-profit membership moves through enrollment, active service for a fixed
+# term, a renewal-window period before expiration, and then either renewal or
+# lapse. The membership officer enrolls a new member at a chosen level
+# (Individual / Family / Patron / Lifetime / Corporate), collects dues, and the
+# membership stays Active for the term. As the term-end date approaches, the
+# host fires OpenRenewalWindow, moving the membership into ExpiringSoon —
+# during that window the member can renew without losing continuity. When the
+# term-end date passes without renewal, the host fires CloseRenewalWindow,
+# placing the membership in a Grace period of forgiveness. If the grace period
+# elapses without payment, the host fires EndGracePeriod and the membership
+# lapses terminally.
+#
+# Free-Construction: the membership officer enriches a Draft over time.
+# Required-at-enroll fields are declared optional and gated by the Enroll
+# event's ensures. Lifetime memberships skip the renewal cycle entirely — a
+# guarded OpenRenewalWindow row refuses the event for them.
+
+# Identity
+field MembershipId as string optional maxlength 50
+field MemberName as string optional maxlength 200
+field MemberEmail as string optional maxlength 200
+field OrganizationName as string optional maxlength 200
+field MembershipOfficer as string optional maxlength 100
+
+# Membership level and billing — choice types for level, frequency, and chapter
+field MembershipLevel as choice of string("Individual","Family","Patron","Lifetime","Corporate") optional
+field BillingFrequency as choice of string("Annual","Biennial","Lifetime") optional
+field PrimaryChapter as choice of string("Local","Regional","National","International") optional
+
+# Calendar — host populates these from the chosen level/frequency
+field EnrolledOn as date optional
+field TermStartDate as date optional
+field TermEndDate as date optional
+# BUG-003: `period default '<literal>'` crashes the MCP compiler — host supplies.
+field GracePeriod as period optional
+
+# Dues and payment tracking — exact money, no approximation
+field DuesAmount as money in 'USD' optional
+field AmountPaid as money in 'USD' default '0.00 USD'
+field DonationOnTop as money in 'USD' default '0.00 USD'
+field TotalContribution as money in 'USD' <- AmountPaid + DonationOnTop
+
+# Renewal tracking — counters across multiple term cycles
+field RenewalCount as integer default 0 nonnegative
+field MissedRenewalCount as integer default 0 nonnegative
+
+# Window flags — flipped by host events when calendar boundaries are reached.
+# Precept does not expose today() so all "is the window open?" reasoning lives
+# in field state, advanced by host-fired events.
+field RenewalWindowOpen as boolean default false
+field GraceWindowOpen as boolean default false
+
+# Reasons
+field LapseReason as string optional maxlength 500
+field CancellationReason as string optional maxlength 500
+field DeclineReason as string optional maxlength 500
+
+# Audit log
+field MembershipLog as log of string
+
+# Timestamps
+field EnrolledAt as instant optional
+field ActivatedAt as instant optional
+field LapsedAt as instant optional
+field CancelledAt as instant optional
+
+# Rules
+rule TermEndDate > TermStartDate when TermStartDate is set and TermEndDate is set because "Term-end date {TermEndDate} must be after term-start date {TermStartDate}"
+rule AmountPaid <= DuesAmount * (RenewalCount + 1) when DuesAmount is set because "Amount paid {AmountPaid} cannot exceed dues x cycle count ({DuesAmount} x {RenewalCount + 1})"
+
+# Lifetime level and Lifetime billing are mutually entailing. Both fields are
+# optional in early Draft, so each rule narrows the guard with `is set` before
+# reading them on either side of the implication.
+rule BillingFrequency == "Lifetime" when MembershipLevel is set and BillingFrequency is set and MembershipLevel == "Lifetime" because "Lifetime members must use Lifetime billing frequency"
+rule MembershipLevel == "Lifetime" when MembershipLevel is set and BillingFrequency is set and BillingFrequency == "Lifetime" because "Lifetime billing frequency is only available for Lifetime members"
+
+# States
+state Draft initial
+state PendingPayment
+state Active
+state ExpiringSoon
+state Grace
+state Renewed
+state Lapsed terminal
+state Cancelled terminal
+state Declined terminal
+
+# State ensures
+in PendingPayment ensure DuesAmount is set because "A pending-payment membership must have a dues amount on file"
+in Active ensure ActivatedAt is set because "An active membership must record its activation timestamp"
+in Active ensure MembershipLevel is set because "An active membership must have a level on file"
+in Active when MembershipLevel != "Lifetime" ensure TermEndDate is set because "Non-lifetime active memberships must have a term-end date"
+in ExpiringSoon ensure RenewalWindowOpen because "An expiring-soon membership must be in the renewal window"
+in Grace ensure GraceWindowOpen because "A grace-period membership must be in the grace window"
+in Lapsed ensure LapsedAt is set because "A lapsed membership must record when it lapsed"
+in Lapsed ensure LapseReason is set because "A lapsed membership must record the lapse reason"
+in Cancelled ensure CancellationReason is set because "A cancelled membership must record the cancellation reason"
+in Declined ensure DeclineReason is set because "A declined application must record the decline reason"
+
+# Editable windows — broad intake in Draft; member-facing corrections in
+# PendingPayment; donations stay editable across the active lifecycle.
+in Draft modify MembershipId, MemberName, MemberEmail, OrganizationName, MembershipOfficer, MembershipLevel, BillingFrequency, PrimaryChapter, EnrolledOn, TermStartDate, TermEndDate, DuesAmount editable
+in PendingPayment modify MemberEmail editable
+in Active modify DonationOnTop editable
+in ExpiringSoon modify DonationOnTop editable
+
+# Events
+event Enroll
+event RecordPayment(Amount as money in 'USD')
+event Activate
+event Decline(Reason as string notempty)
+event OpenRenewalWindow
+event Renew(Amount as money in 'USD', NewTermStart as date, NewTermEnd as date)
+event CloseRenewalWindow
+event RenewInGrace(Amount as money in 'USD', NewTermStart as date, NewTermEnd as date)
+event EndGracePeriod
+event RecordDonation(Amount as money in 'USD', Note as string optional)
+event Cancel(Reason as string notempty)
+
+on Enroll ensure MembershipId is set because "Membership ID is required before enrollment"
+on Enroll ensure MemberName is set because "Member name is required before enrollment"
+on Enroll ensure MemberEmail is set because "Member email is required before enrollment"
+on Enroll ensure MembershipLevel is set because "Membership level must be chosen before enrollment"
+on Enroll ensure BillingFrequency is set because "Billing frequency must be chosen before enrollment"
+on Enroll ensure DuesAmount is set because "Dues amount must be set before enrollment"
+on Enroll ensure TermStartDate is set because "Term-start date must be set before enrollment"
+on Enroll ensure TermEndDate is set because "Term-end date must be set before enrollment"
+
+on RecordPayment ensure RecordPayment.Amount > '0.00 USD' because "Recorded payments must be positive"
+on Renew ensure Renew.Amount > '0.00 USD' because "Renewal payment must be positive"
+on Renew ensure Renew.NewTermEnd > Renew.NewTermStart because "Renewed term-end {Renew.NewTermEnd} must be after term-start {Renew.NewTermStart}"
+on RenewInGrace ensure RenewInGrace.Amount > '0.00 USD' because "Grace-period renewal payment must be positive"
+on RenewInGrace ensure RenewInGrace.NewTermEnd > RenewInGrace.NewTermStart because "Renewed term-end {RenewInGrace.NewTermEnd} must be after term-start {RenewInGrace.NewTermStart}"
+on RecordDonation ensure RecordDonation.Amount > '0.00 USD' because "Donations must be positive"
+
+# Transitions
+
+# Enrollment — full intake validated by Enroll's ensures, then the membership
+# enters PendingPayment until dues are paid.
+from Draft on Enroll
+    -> set EnrolledAt = now()
+    -> append MembershipLog "Enrolled"
+    -> transition PendingPayment
+
+# Decline — the membership officer rejects the application before payment.
+from Draft, PendingPayment on Decline
+    -> set DeclineReason = Decline.Reason
+    -> append MembershipLog "Declined"
+    -> transition Declined
+
+# Payment — recorded against the membership. The membership officer fires
+# Activate once dues are fully paid.
+# BUG-004: redundant `when DuesAmount is set` guard because event ensures don't
+# narrow transition-row bodies. PendingPayment's state ensure already proves it.
+from PendingPayment on RecordPayment when DuesAmount is set and AmountPaid + RecordPayment.Amount > DuesAmount
+    -> reject "Payment of {RecordPayment.Amount} would exceed dues ({DuesAmount} due, {AmountPaid} already paid)"
+from PendingPayment on RecordPayment
+    -> set AmountPaid = AmountPaid + RecordPayment.Amount
+    -> append MembershipLog "Payment"
+    -> no transition
+
+# Activate — requires dues paid in full.
+# BUG-004 workaround: redundant guard establishes DuesAmount presence for the row body.
+from PendingPayment on Activate when DuesAmount is set and AmountPaid < DuesAmount
+    -> reject "Cannot activate — dues of {DuesAmount} are not fully paid (only {AmountPaid} received)"
+from PendingPayment on Activate
+    -> set ActivatedAt = now()
+    -> append MembershipLog "Activated"
+    -> transition Active
+
+# Renewal window — host fires OpenRenewalWindow as the term-end date approaches.
+# Lifetime members are skipped: there's nothing to renew.
+from Active on OpenRenewalWindow when MembershipLevel == "Lifetime"
+    -> reject "Lifetime memberships do not enter a renewal window"
+from Active on OpenRenewalWindow
+    -> set RenewalWindowOpen = true
+    -> append MembershipLog "Renewal window opened"
+    -> transition ExpiringSoon
+
+# Renew during the renewal window — clean continuity. The host computes the new
+# term dates and passes them through; the precept validates internal consistency.
+from ExpiringSoon on Renew when AmountPaid + Renew.Amount > DuesAmount * (RenewalCount + 2)
+    -> reject "Renewal payment {Renew.Amount} would exceed cumulative dues ceiling"
+from ExpiringSoon on Renew
+    -> set AmountPaid = AmountPaid + Renew.Amount
+    -> set TermStartDate = Renew.NewTermStart
+    -> set TermEndDate = Renew.NewTermEnd
+    -> set RenewalCount = RenewalCount + 1
+    -> set RenewalWindowOpen = false
+    -> append MembershipLog "Renewed"
+    -> transition Renewed
+
+# Host fires CloseRenewalWindow when the term-end date passes without renewal.
+from ExpiringSoon on CloseRenewalWindow
+    -> set RenewalWindowOpen = false
+    -> set GraceWindowOpen = true
+    -> set MissedRenewalCount = MissedRenewalCount + 1
+    -> append MembershipLog "Renewal window closed, entered grace period"
+    -> transition Grace
+
+# Grace period — late renewal still possible, with a "renewed late" note.
+from Grace on RenewInGrace when AmountPaid + RenewInGrace.Amount > DuesAmount * (RenewalCount + 2)
+    -> reject "Grace-period renewal payment would exceed cumulative dues ceiling"
+from Grace on RenewInGrace
+    -> set AmountPaid = AmountPaid + RenewInGrace.Amount
+    -> set TermStartDate = RenewInGrace.NewTermStart
+    -> set TermEndDate = RenewInGrace.NewTermEnd
+    -> set RenewalCount = RenewalCount + 1
+    -> set GraceWindowOpen = false
+    -> append MembershipLog "Renewed during grace period"
+    -> transition Renewed
+
+# Host fires EndGracePeriod when the grace window expires without payment.
+from Grace on EndGracePeriod
+    -> set GraceWindowOpen = false
+    -> set LapsedAt = now()
+    -> set LapseReason = "Grace period elapsed without renewal payment"
+    -> append MembershipLog "Lapsed"
+    -> transition Lapsed
+
+# Renewed -> Active cycle: a renewed membership re-enters Active for the new term.
+from Renewed on Activate
+    -> set ActivatedAt = now()
+    -> append MembershipLog "Reactivated for new term"
+    -> transition Active
+
+# Donations — accepted at any active stage. Donations are not dues; they sit in
+# DonationOnTop and flow through TotalContribution for reporting.
+from Active, ExpiringSoon, Grace on RecordDonation
+    -> set DonationOnTop = DonationOnTop + RecordDonation.Amount
+    -> append MembershipLog if RecordDonation.Note is set then RecordDonation.Note else "Donation"
+    -> no transition
+
+# Cancellation — member-initiated; allowed from any non-terminal state.
+from Draft, PendingPayment, Active, ExpiringSoon, Grace, Renewed on Cancel
+    -> set CancellationReason = Cancel.Reason
+    -> set CancelledAt = now()
+    -> append MembershipLog "Cancelled"
+    -> transition Cancelled

@@ -193,20 +193,23 @@ State diagrams align to the same hue families, but they do not use lifecycle-tie
 
 ## ✅ Typography / Wordmark
 
-**Brand font**: Cascadia Cove (with Cascadia Code fallback)
+**Brand mono**: Geist Mono (fallbacks: Cascadia Code, Consolas, monospace)
+**Brand sans**: Geist (fallbacks: Segoe UI Variable, Segoe UI, system-ui, sans-serif)
 
-Monospace with a slightly more engineered, editor-native feel than Inconsolata. The Cove variant keeps the family recognizable while giving the wordmark and code samples a sharper technical posture.
+Geist Mono is purpose-built for developer tooling: clean ligatures, optimized for code, and an editor-native posture that pairs naturally with the `.precept` syntax surface. Geist sans is reserved for prose-style copy; mono carries the wordmark, code, labels, and UI chrome. The canonical stack lives in [`design/system/semantic-visual-system.html`](../system/semantic-visual-system.html) (`--mono` / `--sans` custom properties).
 
-**Wordmark treatment**: Cascadia Cove 700, small caps + 0.1em letter-spacing.
+**Wordmark treatment**: Geist Mono 700, small caps + 0.1em letter-spacing.
 
 Small caps is the typographic convention for defined terms, legal codes, and axioms — exactly what a precept is. The typography says "this is a defined concept" before you read the word.
 
-**Code font**: Cascadia Cove 400–700, normal case. Same typeface family — the code literally grows out of the wordmark.
+**Code font**: Geist Mono 400–700, normal case. Same typeface family — the code literally grows out of the wordmark.
 
 ```
-Wordmark:  PRECEPT  (Cascadia Cove 700, font-variant: small-caps, letter-spacing: 0.1em)
-Code:      precept LoanApplication  (Cascadia Cove 400-700, normal case)
+Wordmark:  PRECEPT  (Geist Mono 700, font-variant: small-caps, letter-spacing: 0.1em)
+Code:      precept LoanApplication  (Geist Mono 400-700, normal case)
 ```
+
+> Historical note: an earlier draft of this doc named Cascadia Cove as the brand font. That choice was superseded on 2026-04-09 in favor of Geist Mono + Geist (see commit `c3b463a0`); Cascadia Code remains as a fallback in the mono stack.
 
 ## ✅ Visual language
 

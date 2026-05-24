@@ -1,0 +1,207 @@
+precept PatientCarePlan
+
+# A coordinated FHIR-style care plan — created by a primary care provider,
+# enriched with goals and care-team members in Active, executed in
+# InProgress, and revisited at milestone reviews. A plan can be
+# discontinued from any active stage with a stated reason; completion
+# requires a clinical confirmation that goals were achieved.
+
+# Fields
+field PatientId as string notempty maxlength 50
+field PatientName as string notempty maxlength 200
+field DateOfBirth as date
+field Gender as string maxlength 20
+
+field CarePlanId as string notempty maxlength 50
+field CarePlanTitle as string notempty maxlength 200
+field CarePlanDescription as string optional maxlength 1000
+field CreatedDate as date
+field CreatedBy as string optional maxlength 200
+field LastModifiedAt as instant optional
+
+# Care team
+field PrimaryCareProvider as string notempty maxlength 200
+field AssignedNurses as set of string
+field SpecialistConsultants as set of string
+field CareCoordinators as set of string
+
+# Goals and progress
+field CarePlanGoals as set of string
+field GoalStartDate as date
+field GoalEndDate as date optional
+field GoalStatus as choice of string("Active", "Completed", "OnHold", "Modified") ordered default "Active"
+field GoalProgressPercent as integer nonnegative default 0 max 100
+
+field ProgressNotes as log of string
+field LastProgressUpdate as instant optional
+field NextScheduledReview as date optional
+# BUG-008: duration default crashes the compiler. Review-frequency scheduling
+# lives in the host until the bug is fixed; the precept governs progress
+# tracking only.
+
+field CarePlanReason as string optional maxlength 500
+
+# Rules
+rule GoalStartDate >= CreatedDate because "Goal start date {GoalStartDate} cannot precede care plan creation date {CreatedDate}"
+
+# States
+state Draft initial
+state Active
+state InProgress
+state MilestoneReview
+state Completed terminal
+state Discontinued terminal
+
+# State ensures
+in Completed ensure GoalStatus == "Completed" because "A completed care plan must record its goals as completed"
+in Discontinued ensure CarePlanReason is set because "A discontinued care plan must carry a stated discontinuation reason"
+
+# Events
+event CreateCarePlan(
+    PatientId as string notempty,
+    PatientName as string notempty,
+    DateOfBirth as date,
+    Gender as string,
+    CarePlanId as string notempty,
+    CarePlanTitle as string notempty,
+    CarePlanDescription as string optional,
+    PrimaryCareProvider as string notempty,
+    GoalStartDate as date,
+    CreatedDate as date,
+    CreatedBy as string optional) initial
+
+on CreateCarePlan ensure CreateCarePlan.GoalStartDate >= CreateCarePlan.CreatedDate because "Goal start date {CreateCarePlan.GoalStartDate} cannot precede care plan creation date {CreateCarePlan.CreatedDate}"
+
+on CreateCarePlan
+    -> set PatientId = CreateCarePlan.PatientId
+    -> set PatientName = CreateCarePlan.PatientName
+    -> set DateOfBirth = CreateCarePlan.DateOfBirth
+    -> set Gender = CreateCarePlan.Gender
+    -> set CarePlanId = CreateCarePlan.CarePlanId
+    -> set CarePlanTitle = CreateCarePlan.CarePlanTitle
+    -> set CarePlanDescription = CreateCarePlan.CarePlanDescription
+    -> set PrimaryCareProvider = CreateCarePlan.PrimaryCareProvider
+    -> set GoalStartDate = CreateCarePlan.GoalStartDate
+    -> set CreatedDate = CreateCarePlan.CreatedDate
+    -> set CreatedBy = CreateCarePlan.CreatedBy
+
+event AddGoal(Goal as string notempty)
+event AddCareTeamMember(MemberType as choice of string("Nurse", "Specialist", "Coordinator"), MemberName as string notempty)
+event ActivateCarePlan
+event UpdateProgress(Notes as string notempty, ProgressPercent as integer nonnegative max 100)
+event RequestMilestoneReview
+event CompleteMilestone(MilestoneOutcome as string notempty, GoalAchieved as boolean)
+event ReviewCarePlan(ClinicalNotes as string notempty)
+event MarkAsCompleted(CompletionNotes as string notempty)
+event DiscontinueCarePlan(Reason as string notempty)
+event BeginExecution
+
+# Transitions
+
+# Draft is the planning window — goals and care team are assembled here.
+from Draft on AddGoal
+    -> add CarePlanGoals AddGoal.Goal
+    -> no transition
+
+from Draft on AddCareTeamMember when AddCareTeamMember.MemberType == "Nurse"
+    -> add AssignedNurses AddCareTeamMember.MemberName
+    -> no transition
+from Draft on AddCareTeamMember when AddCareTeamMember.MemberType == "Specialist"
+    -> add SpecialistConsultants AddCareTeamMember.MemberName
+    -> no transition
+from Draft on AddCareTeamMember when AddCareTeamMember.MemberType == "Coordinator"
+    -> add CareCoordinators AddCareTeamMember.MemberName
+    -> no transition
+
+from Draft on ActivateCarePlan when CarePlanGoals.count > 0
+    -> set LastModifiedAt = now()
+    -> transition Active
+from Draft on ActivateCarePlan
+    -> reject "Cannot activate a care plan with no goals — add at least one goal before activation"
+
+from Draft on DiscontinueCarePlan
+    -> set CarePlanReason = DiscontinueCarePlan.Reason
+    -> set LastModifiedAt = now()
+    -> transition Discontinued
+
+# Active — care team and goals can still be enriched; execution is opened explicitly.
+from Active on AddGoal
+    -> add CarePlanGoals AddGoal.Goal
+    -> no transition
+
+from Active on AddCareTeamMember when AddCareTeamMember.MemberType == "Nurse"
+    -> add AssignedNurses AddCareTeamMember.MemberName
+    -> no transition
+from Active on AddCareTeamMember when AddCareTeamMember.MemberType == "Specialist"
+    -> add SpecialistConsultants AddCareTeamMember.MemberName
+    -> no transition
+from Active on AddCareTeamMember when AddCareTeamMember.MemberType == "Coordinator"
+    -> add CareCoordinators AddCareTeamMember.MemberName
+    -> no transition
+
+from Active on UpdateProgress
+    -> set GoalProgressPercent = UpdateProgress.ProgressPercent
+    -> add ProgressNotes UpdateProgress.Notes
+    -> set LastProgressUpdate = now()
+    -> no transition
+
+from Active on RequestMilestoneReview
+    -> set LastModifiedAt = now()
+    -> transition MilestoneReview
+
+from Active on BeginExecution
+    -> set LastModifiedAt = now()
+    -> transition InProgress
+
+from Active on DiscontinueCarePlan
+    -> set CarePlanReason = DiscontinueCarePlan.Reason
+    -> set LastModifiedAt = now()
+    -> transition Discontinued
+
+# InProgress — the plan is being executed; reviews capture clinical observations.
+from InProgress on UpdateProgress
+    -> set GoalProgressPercent = UpdateProgress.ProgressPercent
+    -> add ProgressNotes UpdateProgress.Notes
+    -> set LastProgressUpdate = now()
+    -> no transition
+
+from InProgress on ReviewCarePlan
+    -> add ProgressNotes ReviewCarePlan.ClinicalNotes
+    -> set LastProgressUpdate = now()
+    -> set LastModifiedAt = now()
+    -> transition Active
+
+from InProgress on MarkAsCompleted
+    -> add ProgressNotes MarkAsCompleted.CompletionNotes
+    -> set LastModifiedAt = now()
+    -> set GoalStatus = "Completed"
+    -> transition Completed
+
+from InProgress on DiscontinueCarePlan
+    -> set CarePlanReason = DiscontinueCarePlan.Reason
+    -> set LastModifiedAt = now()
+    -> transition Discontinued
+
+# MilestoneReview — clinical confirmation that progress meets the milestone.
+from MilestoneReview on CompleteMilestone when CompleteMilestone.GoalAchieved
+    -> set GoalProgressPercent = min(GoalProgressPercent + 25, 100)
+    -> set GoalStatus = "Completed"
+    -> add ProgressNotes "Milestone achieved: " + CompleteMilestone.MilestoneOutcome
+    -> set LastModifiedAt = now()
+    -> transition Active
+from MilestoneReview on CompleteMilestone
+    -> set GoalStatus = "Modified"
+    -> add ProgressNotes "Milestone not achieved: " + CompleteMilestone.MilestoneOutcome
+    -> set LastModifiedAt = now()
+    -> no transition
+
+from MilestoneReview on ReviewCarePlan
+    -> add ProgressNotes ReviewCarePlan.ClinicalNotes
+    -> set LastProgressUpdate = now()
+    -> set LastModifiedAt = now()
+    -> transition Active
+
+from MilestoneReview on DiscontinueCarePlan
+    -> set CarePlanReason = DiscontinueCarePlan.Reason
+    -> set LastModifiedAt = now()
+    -> transition Discontinued

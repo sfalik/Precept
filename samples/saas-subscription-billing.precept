@@ -1,0 +1,155 @@
+precept SaasSubscriptionBilling
+
+# A SaaS subscription record fed from the billing system. The subscription
+# arrives Active with the customer, plan, and price set at construction.
+# Payment lifecycle drives the state machine: a failed payment moves to
+# PastDue; the customer can recover by paying or be expired by the dunning
+# system; the customer can also cancel at any time. Renewal from Expired
+# returns the entity to Active for a fresh billing period.
+
+# Subscription identity — fixed at construction.
+field SubscriptionId as string notempty maxlength 50
+field CustomerId as string notempty maxlength 50
+field CustomerName as string notempty maxlength 200
+field PlanId as string notempty maxlength 50
+field PlanName as choice of string("Free", "Basic", "Professional", "Enterprise") default "Free"
+field BillingCycle as choice of string("Monthly", "Annual") default "Monthly"
+
+# Pricing — money in 'USD' for exactness.
+field Amount as money in 'USD' positive
+field DiscountPercent as decimal default 0 nonnegative max 100 maxplaces 2
+field DiscountEndDate as instant optional
+
+# Billing period
+field CurrentPeriodStart as instant
+field CurrentPeriodEnd as instant
+field NextBillingDate as instant
+field AutoRenew as boolean default true
+
+# Payment tracking
+field PaymentMethod as choice of string("CreditCard", "BankTransfer", "Invoice") optional
+field LastPaymentDate as instant optional
+field LastPaymentAmount as money in 'USD' optional
+field LastPaymentStatus as choice of string("Success", "Failed", "Pending") optional
+field OutstandingBalance as money in 'USD' default '0.00 USD' nonnegative
+
+# BUG-006: would prefer `integer default 0 nonnegative max 365` but the proof
+# engine can't compose the guard `DaysPastDue < 365` with the field's `max 365`
+# to prove `DaysPastDue + 1 <= 365`. Dropping `max 365`; runtime rule below.
+field DaysPastDue as integer default 0 nonnegative
+
+# Cancellation
+field CancellationDate as instant optional
+field CancellationReason as string optional maxlength 500
+
+# Dunning window invariant — beyond 365 days, dunning must move to Expired.
+rule DaysPastDue <= 365 because "A subscription cannot remain past-due longer than 365 days — the dunning system must transition to Expired before that"
+
+# States — payment lifecycle.
+state Active initial
+state PastDue
+state Expired
+state Cancelled terminal
+
+# State ensures — invariants the proof engine enforces per state.
+in PastDue ensure OutstandingBalance > '0.00 USD' because "A past-due subscription must have an outstanding balance — without one, dunning has nothing to collect"
+in Expired ensure DaysPastDue > 0 because "An expired subscription must have accumulated overdue days — expiry is the terminal outcome of unrecovered past-due"
+in Cancelled ensure CancellationDate is set because "A cancelled subscription must record when cancellation took effect"
+
+# Construction — subscription created by the billing system.
+event Create(
+    SubscriptionId as string notempty maxlength 50,
+    CustomerId as string notempty maxlength 50,
+    CustomerName as string notempty maxlength 200,
+    PlanId as string notempty maxlength 50,
+    PlanName as choice of string("Free", "Basic", "Professional", "Enterprise"),
+    BillingCycle as choice of string("Monthly", "Annual"),
+    Amount as money in 'USD' positive) initial
+
+# Billing events
+event ProcessPayment(PaymentAmount as money in 'USD' positive, PaymentMethod as choice of string("CreditCard", "BankTransfer", "Invoice"))
+event PaymentSuccess(PaymentDate as instant, PaymentAmount as money in 'USD' positive)
+event PaymentFailed(Reason as string notempty maxlength 500)
+event CancelSubscription(Reason as string notempty maxlength 500)
+event ExpireSubscription
+event RenewSubscription(NewPeriodStart as instant, NewPeriodEnd as instant, NewAmount as money in 'USD' positive)
+event UpdatePlan(NewPlanId as string notempty maxlength 50, NewPlanName as choice of string("Free", "Basic", "Professional", "Enterprise"), NewAmount as money in 'USD' positive)
+
+# Construction row — populate fields and arrive Active.
+on Create
+    -> set SubscriptionId = Create.SubscriptionId
+    -> set CustomerId = Create.CustomerId
+    -> set CustomerName = Create.CustomerName
+    -> set PlanId = Create.PlanId
+    -> set PlanName = Create.PlanName
+    -> set BillingCycle = Create.BillingCycle
+    -> set Amount = Create.Amount
+    -> set CurrentPeriodStart = now()
+    -> set CurrentPeriodEnd = now()
+    -> set NextBillingDate = now()
+
+# Payment processing — Active → PastDue when the period payment fails.
+from Active on ProcessPayment
+    -> set PaymentMethod = ProcessPayment.PaymentMethod
+    -> set LastPaymentAmount = ProcessPayment.PaymentAmount
+    -> set OutstandingBalance = Amount
+    -> set DaysPastDue = 1
+    -> transition PastDue
+
+# Cancellation from Active.
+from Active on CancelSubscription
+    -> set CancellationDate = now()
+    -> set CancellationReason = CancelSubscription.Reason
+    -> set AutoRenew = false
+    -> transition Cancelled
+
+# Plan update — stays Active.
+from Active on UpdatePlan
+    -> set PlanId = UpdatePlan.NewPlanId
+    -> set PlanName = UpdatePlan.NewPlanName
+    -> set Amount = UpdatePlan.NewAmount
+    -> set NextBillingDate = now()
+    -> no transition
+
+# Payment recovery — PastDue → Active.
+from PastDue on PaymentSuccess
+    -> set LastPaymentDate = PaymentSuccess.PaymentDate
+    -> set LastPaymentAmount = PaymentSuccess.PaymentAmount
+    -> set LastPaymentStatus = "Success"
+    -> set OutstandingBalance = '0.00 USD'
+    -> set DaysPastDue = 0
+    -> transition Active
+
+# Payment failure during dunning — stays PastDue, accumulates balance and days.
+from PastDue on PaymentFailed
+    -> set LastPaymentStatus = "Failed"
+    -> set DaysPastDue = DaysPastDue + 1
+    -> set OutstandingBalance = OutstandingBalance + Amount
+    -> no transition
+
+# Dunning exhausted — PastDue → Expired (dunning system decides when).
+from PastDue on ExpireSubscription
+    -> transition Expired
+
+# Cancellation from PastDue.
+from PastDue on CancelSubscription
+    -> set CancellationDate = now()
+    -> set CancellationReason = CancelSubscription.Reason
+    -> set AutoRenew = false
+    -> transition Cancelled
+
+# Renewal — Expired → Active for a fresh billing period.
+from Expired on RenewSubscription
+    -> set CurrentPeriodStart = RenewSubscription.NewPeriodStart
+    -> set CurrentPeriodEnd = RenewSubscription.NewPeriodEnd
+    -> set Amount = RenewSubscription.NewAmount
+    -> set NextBillingDate = RenewSubscription.NewPeriodEnd
+    -> set OutstandingBalance = '0.00 USD'
+    -> set DaysPastDue = 0
+    -> transition Active
+
+# Cancellation from Expired.
+from Expired on CancelSubscription
+    -> set CancellationDate = now()
+    -> set CancellationReason = CancelSubscription.Reason
+    -> transition Cancelled

@@ -1,17 +1,22 @@
 precept CustomerProfile
 
-# A stateless data-only precept representing a customer identity object.
-# No lifecycle states or events — this precept governs what a CustomerProfile
-# must look like at all times, and which fields the host application can edit.
+# A stateless data-only precept governing a single customer identity record.
+# A customer profile holds contact details and communication preferences — it
+# does not have a lifecycle of its own. Workflow precepts that interact with
+# customers (orders, support tickets, billing) reference a profile by identifier
+# and assume its data is valid at every read.
 #
-# This is a stateless precept: it has fields, rules, and editability rules,
-# but no states, no events, and no transitions. Use it to represent domain objects
-# that evolve through direct field edits rather than state-machine transitions.
+# All fields are writable — the host application's account-management UI is
+# responsible for editing them. The rules below enforce the cross-field
+# invariants that must hold at every read: marketing consent and preferred
+# channel both require a stored, reachable address of the corresponding kind.
 
-field Name as string optional writable
-field Email as string optional writable
-field Phone as string optional writable
+field Name as string optional maxlength 200 writable
+field Email as string optional maxlength 320 writable
+field Phone as string optional maxlength 32 writable
 field PreferredContactMethod as choice of string("email","phone","sms") default "email" writable
 field MarketingOptIn as boolean default false writable
 
-rule MarketingOptIn == false or Email is set because "Marketing opt-in requires an email address"
+rule MarketingOptIn == false or Email is set because "A profile cannot opt in to marketing without a stored email address — the host has no reachable channel for the promised communications"
+rule PreferredContactMethod != "email" or Email is set because "Preferred contact method is email but no email address is stored — the preference is unreachable as written"
+rule PreferredContactMethod == "email" or Phone is set because "Preferred contact method is {PreferredContactMethod} but no phone number is stored — the preference is unreachable as written"

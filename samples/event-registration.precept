@@ -1,65 +1,91 @@
 precept EventRegistration
 
-# A simple attendee registration workflow with payment and check-in.
-# Demonstrates: money type for ticket pricing, integer for seat counts,
-# positive/nonnegative modifiers, bulk discount in a conditional action,
-# and the form-fill pattern (editable fields + no-arg Register event).
+# A conference or event attendee registration: the registrant fills in identity,
+# seat count, and ticket price; submission moves them to PendingPayment; payment
+# confirms the registration; check-in finalizes their arrival on event day.
+#
+# Free-Construction: the registrant enriches a Draft over time before submitting.
+# Required-at-submit fields are declared optional and gated by the Register row's
+# guard. A bulk discount (10+ seats) is applied inline via a conditional value.
 
-field RegistrantName as string optional
-field ContactEmail as string optional
-field SeatsReserved as integer default 0 nonnegative
-field TicketsIssued as integer default 0 nonnegative
+# Registrant identity — filled progressively in Draft.
+field RegistrantName as string optional maxlength 200
+field ContactEmail as string optional maxlength 200
+
+# Seat accounting — SeatsReserved is set by the registrant; TicketsIssued is
+# minted at payment time and must match the reserved count.
+field SeatsReserved as integer default 0 nonnegative max 100
+field TicketsIssued as integer default 0 nonnegative max 100
+
+# Pricing — money in 'USD' for exactness. AmountDue applies the 10+ seat bulk discount.
 field PricePerSeat as money in 'USD' default '0.00 USD'
 field AmountDue as money in 'USD' default '0.00 USD'
-field PaymentReceived as boolean default false
-field CancellationReason as string optional
-field CheckInDesk as string optional
-rule TicketsIssued <= SeatsReserved because "Issued tickets cannot exceed reserved seats"
 
+# Operational fields
+field CancellationReason as string optional maxlength 500
+field CheckInDesk as string optional maxlength 100
+
+# Issued tickets cannot exceed reserved seats — the bulk discount is on price, not
+# on entitlement; selling more tickets than seats would oversubscribe the event.
+rule TicketsIssued <= SeatsReserved because "Issued tickets ({TicketsIssued}) cannot exceed reserved seats ({SeatsReserved}) — the event is capacity-constrained"
+
+# States
 state Draft initial
 state PendingPayment
 state Confirmed
 state Cancelled terminal
 state CheckedIn terminal
 
-# Registrants fill in details before submitting.
+# CheckInDesk is meaningful only on the day of the event, when the registrant arrives.
+in Draft, PendingPayment, Confirmed, Cancelled omit CheckInDesk
+
+# Editable windows — the registrant fills the form in Draft; contact corrections
+# are allowed after submission. Seat changes go through UpdateSeats so AmountDue
+# stays consistent with seat count and the bulk-discount tier is reapplied.
 in Draft modify RegistrantName, ContactEmail, SeatsReserved, PricePerSeat editable
-# Contact corrections are allowed after submission; seat changes go through UpdateSeats.
 in PendingPayment modify ContactEmail editable
 
-in Confirmed ensure PaymentReceived because "Confirmed registrations must be paid"
-in Confirmed ensure TicketsIssued == SeatsReserved because "Confirmed registrations must issue one ticket per reserved seat"
-in CheckedIn ensure CheckInDesk is set because "Checked-in registrations must record the desk"
+# State ensures
+in Confirmed ensure TicketsIssued == SeatsReserved because "A confirmed registration must issue one ticket per reserved seat — payment commits the entitlement"
+in CheckedIn ensure CheckInDesk is set because "A checked-in registration must record the desk that processed arrival — for badge reissue and capacity reconciliation"
 
-to Confirmed -> set PaymentReceived = true
-
+# Events
 event Register
-event UpdateSeats(Seats as integer positive)
+event UpdateSeats(Seats as integer positive max 100)
 event RecordPayment
-event Cancel(Reason as string optional)
-event CheckIn(Desk as string notempty)
+event Cancel(Reason as string optional maxlength 500)
+event CheckIn(Desk as string notempty maxlength 100)
 
+# Register — full intake must be on record. The 10+ seat bulk discount applies a
+# 10% reduction to the line total.
 from Draft on Register when RegistrantName is set and ContactEmail is set and SeatsReserved > 0 and PricePerSeat > '0.00 USD'
     -> set AmountDue = if SeatsReserved >= 10 then SeatsReserved * PricePerSeat * 0.9 else SeatsReserved * PricePerSeat
     -> transition PendingPayment
 from Draft on Register
-    -> reject "Registration needs a name, email, at least one seat, and a price per seat"
+    -> reject "Registration requires a name, contact email, at least one seat, and a positive price per seat — incomplete forms cannot be submitted"
 
+# Seat updates while pending payment recompute AmountDue and reset TicketsIssued
+# (tickets aren't minted until payment lands).
 from PendingPayment on UpdateSeats
     -> set SeatsReserved = UpdateSeats.Seats
     -> set TicketsIssued = 0
     -> set AmountDue = if UpdateSeats.Seats >= 10 then UpdateSeats.Seats * PricePerSeat * 0.9 else UpdateSeats.Seats * PricePerSeat
     -> no transition
+
+# Payment confirms — tickets are minted to match reserved seats.
 from PendingPayment on RecordPayment when SeatsReserved > 0
     -> set TicketsIssued = SeatsReserved
     -> transition Confirmed
 from PendingPayment on RecordPayment
-    -> reject "A payment cannot be recorded before seats are reserved"
+    -> reject "Payment cannot be recorded before any seats are reserved — the line total would be zero"
 
+# Cancellation before payment — Draft or PendingPayment only. A Confirmed registration
+# requires a refund process, which is out of scope here.
 from Draft, PendingPayment on Cancel
-    -> set CancellationReason = if Cancel.Reason is set then Cancel.Reason else "Cancelled"
+    -> set CancellationReason = if Cancel.Reason is set then Cancel.Reason else "Cancelled by registrant — no reason given"
     -> transition Cancelled
 
+# Check-in on event day.
 from Confirmed on CheckIn
     -> set CheckInDesk = CheckIn.Desk
     -> transition CheckedIn

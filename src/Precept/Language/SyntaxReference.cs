@@ -118,6 +118,25 @@ public static class SyntaxReference
     public static IReadOnlyList<CommonPattern> CommonPatterns { get; } =
     [
         new(
+            "Required string field with bounds",
+            "Declare a required identifier or name field using the 'notempty maxlength N' modifier idiom. The modifiers are structural — non-emptiness and length bound become proof obligations satisfied at compile time, not runtime rules. Prefer this over declaring an empty default plus a separate non-empty rule, which compiles but weakens the contract.",
+            """
+            field PatientId as string notempty maxlength 50
+            field ProcedureCode as string notempty maxlength 20
+            field ReferringProviderNpi as string notempty maxlength 10
+            """),
+
+        new(
+            "Numeric field with structural constraints",
+            "Constrain numeric, money, quantity, and decimal fields with structural modifiers ('nonnegative', 'positive', 'min N', 'max N', 'maxplaces N') rather than separate 'rule' declarations. Modifiers participate in proof obligations and constrain the type itself; rules can only check after the fact. Use 'default' only when the business value at creation time is the default — not as a workaround for required fields.",
+            """
+            field CreditScore as integer default 0 nonnegative max 850
+            field Premium as money in 'USD' default '0 USD' positive
+            field DiscountPercent as decimal default 0 nonnegative max 100 maxplaces 2
+            field RemainingDays as integer nonnegative
+            """),
+
+        new(
             "Guarded transition",
             "A transition that only fires when a runtime condition is true. The 'when' clause is evaluated against current field values and event arguments.",
             """
@@ -208,46 +227,57 @@ public static class SyntaxReference
             """),
 
         new(
-            "Constructor Pattern (Existential Fields)",
-            "Use an initial event as the entity's constructor when specific fields must exist at birth. Declare 'event Create(...) initial', validate its inputs with event ensures, and populate required fields in 'on Create' construction rows. Choose this when the entity cannot meaningfully exist without intake data; for entities that can exist in a governed draft state, see Free-Construction Pattern (Governed Draft).",
+            "Constructor Pattern (Atomic Creation)",
+            "Use the Constructor Pattern only when the entity's data is available *atomically* at creation — from a system event, automated process, batch import, single-API-call record, snapshot, or scheduled job. Declare 'event Create(...) initial', validate inputs with event ensures, and populate required fields in 'on Create' rows. **This pattern is NOT appropriate for user-filled forms.** For applications, claims, tickets, work orders, registrations, requests — anywhere data accumulates over time as a user fills in a form — use Free-Construction Pattern (Governed Draft). Free-Construction is the default for user-facing workflow entities; the Constructor Pattern is the exception, reserved for genuinely atomic-creation scenarios.",
             """
-            precept LoanApplication
+            precept ScheduledMaintenanceTask
 
-            field ApplicantName as string
-            field RequestedAmount as money in 'USD'
-            field CreditScore as integer
-            field DecisionNote as string optional
+            field EquipmentId as string notempty maxlength 50
+            field MaintenanceType as choice of string("Inspection", "Lubrication", "PartReplacement", "Calibration")
+            field ScheduledFor as date
+            field AssignedTechnician as string notempty maxlength 100
+            field Priority as choice of string("Routine", "High", "Critical")
+            field CompletionNote as string optional maxlength 500
 
-            state Pending initial
-            state UnderReview
-            state Approved terminal
-            state Declined terminal
+            state Scheduled initial
+            state InProgress
+            state Completed terminal
+            state Cancelled terminal
 
-            event Create(Applicant as string notempty, Amount as money in 'USD', Score as integer) initial
-            on Create ensure Create.Amount > '0.00 USD' because "Loan amount must be positive"
-            on Create ensure Create.Score >= 300 because "Minimum credit score is 300"
+            # Created atomically by the maintenance scheduler when it generates the next task
+            # from the equipment's preventive-maintenance plan. All fields are derivable at
+            # creation time from the plan + equipment record — no user form-filling involved.
+            event Schedule(
+                EquipmentId as string notempty,
+                Type as choice of string("Inspection", "Lubrication", "PartReplacement", "Calibration"),
+                ScheduledFor as date,
+                Technician as string notempty,
+                Priority as choice of string("Routine", "High", "Critical")
+            ) initial
 
-            on Create
-                -> set ApplicantName = Create.Applicant
-                -> set RequestedAmount = Create.Amount
-                -> set CreditScore = Create.Score
+            on Schedule
+                -> set EquipmentId = Schedule.EquipmentId
+                -> set MaintenanceType = Schedule.Type
+                -> set ScheduledFor = Schedule.ScheduledFor
+                -> set AssignedTechnician = Schedule.Technician
+                -> set Priority = Schedule.Priority
 
-            event Review
-            event Approve
-            event Decline(Note as string notempty)
+            event Start
+            event Complete(Note as string optional)
+            event Cancel(Reason as string notempty)
 
-            from Pending on Review
-                -> transition UnderReview
-            from UnderReview on Approve
-                -> transition Approved
-            from UnderReview on Decline
-                -> set DecisionNote = Decline.Note
-                -> transition Declined
+            from Scheduled on Start
+                -> transition InProgress
+            from InProgress on Complete
+                -> set CompletionNote = Complete.Note
+                -> transition Completed
+            from Scheduled, InProgress on Cancel
+                -> transition Cancelled
             """),
 
         new(
             "Free-Construction Pattern (Governed Draft)",
-            "Use free construction when the entity should be governed from birth but can begin life as an incomplete draft. Leave the initial event undeclared so Create() is parameterless, start in an initial draft state, open selected fields with 'editable', and enforce readiness on a later activation transition. Choose this when data is enriched progressively; for entities that require fields at birth, see Constructor Pattern (Existential Fields).",
+            "**This is the default pattern for user-filled workflow entities** — loan applications, insurance claims, IT tickets, work orders, hiring requests, prior authorizations, referrals, registrations. The entity is governed from birth but its data accumulates over time as the user fills in a form. Leave the initial event undeclared so Create() is parameterless and always succeeds, start in an initial draft state, open the form fields with 'in Draft modify Fields editable', and gate progression to a real state with state ensures or event ensures on the submit event. The draft IS the form; the editing window IS the workflow. Use the Constructor Pattern only when data arrives atomically (system events, batch imports, automated creation) — not for user forms.",
             """
             precept InventoryItem
 
@@ -405,16 +435,97 @@ public static class SyntaxReference
             """),
 
         new(
-            "Cross-cutting event (from any)",
-            "An event that must fire regardless of current state — a system-level signal that cuts across all lifecycle stages. Declare it once with 'from any on Event' instead of repeating the row for every individual state. The usual outcome is 'no transition' to stay in place, or 'transition Target' to jump unconditionally.",
+            "Cross-cutting event (from any or multi-state source list)",
+            "An event that must fire across multiple states. Two forms: 'from any on Event' for events that apply everywhere (system-level signals like CancelOrder, ClosedForHoliday). 'from State1, State2, State3 on Event' for events that apply to a known finite subset — useful when the event is valid in some non-terminal states but NOT in terminals (since 'from any' would include them). Prefer the explicit multi-state list when the source set is finite and the exclusion matters; use 'from any' only when the event truly applies regardless of state.",
             """
+            # Form 1 — from any: applies in every state including terminals.
             from any on PedestrianRequest
                 -> set RequestPending = true
                 -> no transition
 
-            from any on CloseService
-                -> set WalkInOpen = false
+            # Form 2 — multi-state source list: applies to a known finite subset only.
+            # Excludes Closed (terminal) and Cancelled (terminal); 'from any' would
+            # incorrectly allow Close from those states too.
+            from Monitoring, InControl, Warning, OutOfControl, CorrectiveAction on RetireChart
+                -> set RetiredAt = now()
+                -> transition Retired
+
+            # Multi-state source list with terminal source: closing from two non-terminal states.
+            from Passed, Failed on Close
+                -> set DispositionNote = Close.Note
                 -> transition Closed
+            """),
+
+        new(
+            "Host-driven event dispatch by calendar window",
+            "When a state transition depends on which side of a calendar deadline 'today' falls on (cancellation free window, lease grace period, course add/drop window, renewal grace), Precept does NOT expose 'today()' — calendar-vs-now arithmetic is a host concern. The idiomatic shape: declare distinct events for the different windows ('CancelWithFullRefund' / 'CancelWithPartialRefund' / 'CancelNoRefund', or 'RenewOnTime' / 'RenewInGracePeriod') AND a host-fired window-closing event ('CloseFreeWindow', 'CloseGracePeriod') that flips a boolean flag. Subsequent transitions guard on the flag, not on the calendar. The host picks which event to fire by consulting the clock; the precept governs the structural consequence.",
+            """
+            field FreeCancellationWindowOpen as boolean default true
+            field PartialRefundWindowOpen as boolean default true
+
+            state Booked initial
+            state Cancelled terminal
+
+            # Host fires these as the calendar crosses each boundary.
+            event CloseFreeWindow
+            event ClosePartialRefundWindow
+
+            from Booked on CloseFreeWindow
+                -> set FreeCancellationWindowOpen = false
+                -> no transition
+
+            from Booked on ClosePartialRefundWindow
+                -> set PartialRefundWindowOpen = false
+                -> no transition
+
+            # The host picks the right cancel event based on the current date.
+            # Each row guards on flags, not on calendar arithmetic.
+            event CancelWithFullRefund
+            event CancelWithPartialRefund(Reason as string notempty)
+            event CancelNoRefund(Reason as string notempty)
+
+            from Booked on CancelWithFullRefund when FreeCancellationWindowOpen
+                -> transition Cancelled
+            from Booked on CancelWithFullRefund
+                -> reject "Free cancellation window has closed"
+
+            from Booked on CancelWithPartialRefund when PartialRefundWindowOpen and not FreeCancellationWindowOpen
+                -> transition Cancelled
+            from Booked on CancelWithPartialRefund
+                -> reject "Partial-refund window does not apply at this time"
+
+            from Booked on CancelNoRefund when not PartialRefundWindowOpen
+                -> transition Cancelled
+            from Booked on CancelNoRefund
+                -> reject "Cancel with full or partial refund is still available"
+            """),
+
+        new(
+            "Lookup with membership (parallel set + lookup)",
+            "When you need a key→value mapping AND a way to test/iterate membership, pair a 'lookup of K to V' with a 'set of K' that carries the membership truth. The set supports 'contains', '.count', and 'remove'; the lookup supports 'put Key = Value' and '(lookup for Key)' for retrieval. Both fields stay in sync via the same transition rows. Why this idiom: 'contains' is not currently defined on lookup directly, and 'remove' on a lookup has a sharp edge (see docs/Working/bugs.md BUG-002), so the parallel set is the canonical workaround AND a clearer model of intent — membership and quantity are separately readable. Use this for any 'collection of named items each with a quantity / weight / price' situation.",
+            """
+            # Two fields that move together: ComponentPartNumbers is the membership set,
+            # Components is the per-component quantity.
+            field ComponentPartNumbers as set of string
+            field Components as lookup of string to integer
+
+            event AddComponent(PartNumber as string notempty, Quantity as integer positive)
+            event RemoveComponent(PartNumber as string notempty)
+
+            from Draft on AddComponent when ComponentPartNumbers contains AddComponent.PartNumber
+                -> reject "Component {AddComponent.PartNumber} already present — use UpdateComponentQuantity to change the quantity"
+            from Draft on AddComponent
+                -> add ComponentPartNumbers AddComponent.PartNumber
+                -> put Components AddComponent.PartNumber = AddComponent.Quantity
+                -> no transition
+
+            from Draft on RemoveComponent when ComponentPartNumbers contains RemoveComponent.PartNumber
+                # BUG-002: 'remove Components Key' fails type check on lookups; workaround is zero + drop membership.
+                -> put Components RemoveComponent.PartNumber = 0
+                -> remove ComponentPartNumbers RemoveComponent.PartNumber
+                -> no transition
+            from Draft on RemoveComponent
+                -> reject "Component {RemoveComponent.PartNumber} is not in the BOM"
             """),
 
         new(
@@ -685,6 +796,71 @@ public static class SyntaxReference
                 -> set CreditScore = Submit.Score
             """,
             "The hollow draft state contributes no governance. A draft implies the entity exists with progressive enrichment — fields being set over time, rules applying, editability windows governing what is allowed. When the initial state has zero `editable` declarations and the first event fills everything atomically, the \"draft\" is structurally identical to not existing at all. Use the constructor pattern (Pattern A): mark the initial event with `initial`, write a construction row with `on EventName { }`, and let the entity arrive in its first real state fully formed. The tell: if your initial state has zero `editable` declarations and the first event provides all field values as parameters, it is a hollow draft. Either add `editable` fields with real governance to the initial state (Pattern B), or drop the hollow state and mark the event `initial` (Pattern A)."),
+
+        new(
+            "Sub-state encoded as a field-presence guard",
+            "Using a self-looping 'commit' event in a draft state that records a timestamp (or sets some flag), then guarding every subsequent state-changing transition with 'when XxxAt is set' to gate 'has the draft been committed yet.' The guard is doing the work that a state should be doing. If 'uncommitted draft' and 'committed draft' are distinct lifecycle positions (different editability, different available transitions), they are distinct states — make the sub-state real with an explicit transition.",
+            """
+            precept InspectionPlan
+
+            field ProductId as string optional maxlength 50
+            field InspectorName as string optional maxlength 100
+            field ScheduledAt as instant optional
+
+            state Scheduled initial
+            state InProgress
+            state Passed terminal
+
+            in Scheduled modify ProductId, InspectorName, ScheduledAt editable
+
+            event ScheduleInspection
+            on ScheduleInspection ensure ProductId is set because "Product ID required before scheduling"
+            on ScheduleInspection ensure InspectorName is set because "Inspector required before scheduling"
+
+            event BeginInspection
+
+            # Self-loop commits the draft by setting a timestamp.
+            from Scheduled on ScheduleInspection
+                -> set ScheduledAt = now()
+                -> no transition
+
+            # Guard now has to gate "commit happened yet?" — but the state machine is the wrong place for this.
+            from Scheduled on BeginInspection when ScheduledAt is set
+                -> transition InProgress
+            from Scheduled on BeginInspection
+                -> reject "Inspection not yet scheduled — call ScheduleInspection first"
+            """,
+            """
+            precept InspectionPlan
+
+            field ProductId as string optional maxlength 50
+            field InspectorName as string optional maxlength 100
+            field ScheduledAt as instant optional
+
+            state Draft initial
+            state Scheduled
+            state InProgress
+            state Passed terminal
+
+            in Draft modify ProductId, InspectorName editable
+
+            event ScheduleInspection
+            on ScheduleInspection ensure ProductId is set because "Product ID required before scheduling"
+            on ScheduleInspection ensure InspectorName is set because "Inspector required before scheduling"
+
+            event BeginInspection
+
+            # Commit IS a transition. The state machine carries the sub-flow.
+            from Draft on ScheduleInspection
+                -> set ScheduledAt = now()
+                -> transition Scheduled
+
+            # No guard needed — the state machine guarantees we only fire BeginInspection
+            # from Scheduled, which by construction means ScheduleInspection already ran.
+            from Scheduled on BeginInspection
+                -> transition InProgress
+            """,
+            "When you find yourself writing `when XxxField is set` as the guard on a state-changing transition, and the only purpose of that guard is to gate 'has the user completed this sub-flow,' you are using field presence to encode a sub-state. That is the wrong mechanism. States are Precept's structural device for capturing distinct lifecycle positions with distinct rules and editability windows. If 'uncommitted' and 'committed' are distinct in any meaningful way (different events available, different fields editable, different ensures applicable), they are distinct states — make the sub-state real. Bonus payoff: the `in Draft modify` editing window automatically closes on the transition out of Draft, which the self-loop pattern cannot achieve without an additional conditional editability clause that further compounds the workaround."),
 
         new(
             "Reading uninitialized field in construction row",

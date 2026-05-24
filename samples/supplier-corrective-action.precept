@@ -1,0 +1,220 @@
+precept SupplierCorrectiveAction
+
+# A Supplier Corrective Action Request (SCAR) record — the formal 8D
+# problem-solving instrument issued against a supplier when a quality
+# or process failure is detected. The SCAR is filed against an
+# identified supplier and problem, moves through a team-led
+# investigation that produces a documented root cause, a proposed
+# permanent corrective action, implementation, effectiveness
+# verification, and finally closure. A verification that fails
+# returns the SCAR to investigation with a documented reason.
+
+# SCAR identity — populated at intake.
+field SCARNumber as string notempty maxlength 50
+field SupplierNumber as string notempty maxlength 50
+field SupplierName as string notempty maxlength 200
+field IssueDate as date
+field DueDate as date
+field IssueCategory as choice of string("Defect", "Delivery", "Documentation", "Process", "QualitySystem", "Other")
+field Severity as choice of string("Minor", "Major", "Critical")
+field ProblemDescription as string notempty maxlength 2000
+field QuantityAffected as integer default 0 nonnegative
+field DateOfOccurrence as date optional
+field DetectionDate as date optional
+
+# 8D — team and containment.
+field TeamMembers as lookup of string to string
+field ContainmentActions as string optional maxlength 2000
+field ContainmentDate as date optional
+
+# 8D — root cause and corrective action.
+field RootCauseCategory as choice of string("HumanError", "Equipment", "Material", "Method", "Environment", "Design", "Other") optional
+field RootCauseDescription as string optional maxlength 2000
+field CorrectiveActionCategory as choice of string("Training", "ProcessChange", "EquipmentRepair", "DesignChange", "InspectionIncrease", "Other") optional
+field CorrectiveActionDescription as string optional maxlength 2000
+field PreventiveActions as string optional maxlength 2000
+
+# 8D — verification.
+field VerificationMethod as choice of string("OnSiteAudit", "DocumentReview", "SampleInspection", "PerformanceData", "Other") optional
+field VerificationResults as string optional maxlength 2000
+field EffectivenessConfirmed as boolean default false
+field RejectionReason as string optional maxlength 500
+
+# Evidence and audit trail.
+field EvidenceDocuments as lookup of string to string
+field SCARLog as log of string
+
+# Ownership.
+field AssignedTo as string optional maxlength 200
+
+# Timestamps tracking each phase.
+field FiledAt as instant
+field AssignedAt as instant optional
+field InvestigationStartedAt as instant optional
+field ActionProposedAt as instant optional
+field ImplementedAt as instant optional
+field VerificationStartedAt as instant optional
+field ClosedAt as instant optional
+
+# Rules — domain invariants.
+rule DueDate > IssueDate because "Due date {DueDate} must be after the issue date {IssueDate} — a SCAR cannot be due before it is issued"
+
+# States
+state Open initial
+state Investigating
+state ActionProposed
+state Implemented
+state Verifying
+state Closed terminal
+
+# Fields with no meaning until the relevant phase has been reached.
+in Open omit RootCauseCategory, RootCauseDescription, CorrectiveActionCategory, CorrectiveActionDescription, VerificationMethod, VerificationResults
+in Investigating omit CorrectiveActionCategory, CorrectiveActionDescription, VerificationMethod, VerificationResults
+in ActionProposed omit VerificationMethod, VerificationResults
+
+# State ensures
+in Investigating ensure InvestigationStartedAt is set because "Investigating SCARs must record when fact-finding began"
+in ActionProposed ensure RootCauseDescription is set because "A corrective action can only be proposed once a root cause has been documented"
+in ActionProposed ensure ActionProposedAt is set because "ActionProposed state must record when the corrective action was proposed"
+in Implemented ensure CorrectiveActionDescription is set because "Implemented state requires the corrective action description on record"
+in Implemented ensure ImplementedAt is set because "Implemented state must record when the corrective action was implemented"
+in Verifying ensure VerificationStartedAt is set because "Verifying state must record when verification began"
+in Closed ensure ClosedAt is set because "Closed SCARs must record when closure occurred"
+
+# Construction — SCAR opens with identified supplier, problem, and severity.
+event Create(
+    SCARNumber as string notempty maxlength 50,
+    SupplierNumber as string notempty maxlength 50,
+    SupplierName as string notempty maxlength 200,
+    IssueDate as date,
+    DueDate as date,
+    IssueCategory as choice of string("Defect", "Delivery", "Documentation", "Process", "QualitySystem", "Other"),
+    Severity as choice of string("Minor", "Major", "Critical"),
+    ProblemDescription as string notempty maxlength 2000) initial
+on Create ensure Create.DueDate > Create.IssueDate because "Due date {Create.DueDate} must be after the issue date {Create.IssueDate}"
+
+# SCAR lifecycle events.
+event AssignOwner(AssignedTo as string notempty maxlength 200)
+event AddTeamMember(MemberRole as string notempty maxlength 100, MemberName as string notempty maxlength 200)
+event AddEvidence(DocumentType as string notempty maxlength 100, DocumentContent as string notempty maxlength 2000)
+event BeginInvestigation
+event SubmitContainment(Actions as string notempty maxlength 2000, OnDate as date)
+event CompleteInvestigation(
+    RootCauseCategory as choice of string("HumanError", "Equipment", "Material", "Method", "Environment", "Design", "Other"),
+    RootCauseDescription as string notempty maxlength 2000)
+event ProposeAction(
+    Category as choice of string("Training", "ProcessChange", "EquipmentRepair", "DesignChange", "InspectionIncrease", "Other"),
+    Description as string notempty maxlength 2000)
+event ImplementAction(PreventiveActions as string optional maxlength 2000)
+event RequestVerification
+event RecordVerification(
+    Method as choice of string("OnSiteAudit", "DocumentReview", "SampleInspection", "PerformanceData", "Other"),
+    Results as string notempty maxlength 2000)
+event ConfirmEffectiveness
+event RejectVerification(Reason as string notempty maxlength 500)
+event CloseSCAR
+
+# Construction row — populate fields and arrive in Open.
+on Create
+    -> set SCARNumber = Create.SCARNumber
+    -> set SupplierNumber = Create.SupplierNumber
+    -> set SupplierName = Create.SupplierName
+    -> set IssueDate = Create.IssueDate
+    -> set DueDate = Create.DueDate
+    -> set IssueCategory = Create.IssueCategory
+    -> set Severity = Create.Severity
+    -> set ProblemDescription = Create.ProblemDescription
+    -> set FiledAt = now()
+    -> append SCARLog "SCAR opened: {Create.SCARNumber}"
+
+# Assign owner — typically once during Open, before investigation.
+from Open on AssignOwner
+    -> set AssignedTo = AssignOwner.AssignedTo
+    -> set AssignedAt = now()
+    -> append SCARLog "SCAR assigned to {AssignOwner.AssignedTo}"
+    -> no transition
+
+# Team members — built during Open and Investigating.
+from Open, Investigating on AddTeamMember
+    -> put TeamMembers AddTeamMember.MemberRole = AddTeamMember.MemberName
+    -> append SCARLog "Team member added: {AddTeamMember.MemberRole} = {AddTeamMember.MemberName}"
+    -> no transition
+
+# Evidence — collected during Open and Investigating.
+from Open, Investigating on AddEvidence
+    -> put EvidenceDocuments AddEvidence.DocumentType = AddEvidence.DocumentContent
+    -> append SCARLog "Evidence added: {AddEvidence.DocumentType}"
+    -> no transition
+
+# Begin investigation — Open → Investigating.
+from Open on BeginInvestigation
+    -> set InvestigationStartedAt = now()
+    -> append SCARLog "Investigation started"
+    -> transition Investigating
+
+# Containment — interim action during investigation.
+from Investigating on SubmitContainment
+    -> set ContainmentActions = SubmitContainment.Actions
+    -> set ContainmentDate = SubmitContainment.OnDate
+    -> append SCARLog "Containment actions documented"
+    -> no transition
+
+# Complete investigation — Investigating → ActionProposed (root cause locked).
+from Investigating on CompleteInvestigation
+    -> set RootCauseCategory = CompleteInvestigation.RootCauseCategory
+    -> set RootCauseDescription = CompleteInvestigation.RootCauseDescription
+    -> set ActionProposedAt = now()
+    -> append SCARLog "Investigation complete — root cause identified"
+    -> transition ActionProposed
+
+# Propose action — populate corrective-action narrative within ActionProposed.
+from ActionProposed on ProposeAction
+    -> set CorrectiveActionCategory = ProposeAction.Category
+    -> set CorrectiveActionDescription = ProposeAction.Description
+    -> append SCARLog "Corrective action proposed: {ProposeAction.Category}"
+    -> no transition
+
+# Implement action — ActionProposed → Implemented. Corrective action narrative required.
+from ActionProposed on ImplementAction when CorrectiveActionDescription is set
+    -> set PreventiveActions = ImplementAction.PreventiveActions
+    -> set ImplementedAt = now()
+    -> append SCARLog "Corrective action implemented"
+    -> transition Implemented
+from ActionProposed on ImplementAction
+    -> reject "Cannot implement — propose a corrective action first"
+
+# Request verification — Implemented → Verifying.
+from Implemented on RequestVerification
+    -> set VerificationStartedAt = now()
+    -> append SCARLog "Verification requested"
+    -> transition Verifying
+
+# Record verification results — narrative captured while still Verifying.
+from Verifying on RecordVerification
+    -> set VerificationMethod = RecordVerification.Method
+    -> set VerificationResults = RecordVerification.Results
+    -> append SCARLog "Verification recorded: {RecordVerification.Method}"
+    -> no transition
+
+# Confirm effectiveness — Verifying → Closed.
+from Verifying on ConfirmEffectiveness when VerificationResults is set
+    -> set EffectivenessConfirmed = true
+    -> set ClosedAt = now()
+    -> append SCARLog "Effectiveness confirmed — SCAR closed"
+    -> transition Closed
+from Verifying on ConfirmEffectiveness
+    -> reject "Cannot confirm effectiveness — record verification results first"
+
+# Reject verification — Verifying → Investigating. SCAR re-opens for another pass.
+from Verifying on RejectVerification
+    -> set EffectivenessConfirmed = false
+    -> set RejectionReason = RejectVerification.Reason
+    -> set InvestigationStartedAt = now()
+    -> append SCARLog "Verification rejected — returned to investigation: {RejectVerification.Reason}"
+    -> transition Investigating
+
+# Close without verification — Implemented → Closed when effectiveness is self-evident.
+from Implemented on CloseSCAR
+    -> set ClosedAt = now()
+    -> append SCARLog "SCAR closed without verification"
+    -> transition Closed

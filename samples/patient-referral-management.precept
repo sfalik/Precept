@@ -1,0 +1,187 @@
+precept PatientReferralManagement
+
+# A specialist referral that moves a patient from a referring provider through
+# (optional) payer authorization, appointment scheduling, the consultation
+# visit, and report receipt to closure. Whether prior authorization is required
+# is plan-driven and captured at intake; if required, the workflow passes
+# through Authorized before scheduling. Validity windows on the referral and
+# date ordering on authorization are enforced by global rules narrowed with
+# `when ... is set` guards so the same invariant covers every scenario without
+# scattering checks across transitions.
+# FHIR resources: ServiceRequest, Appointment, DocumentReference, Coverage.
+
+# Patient and referring provider — fixed at construction.
+field ReferralId as string notempty maxlength 50
+field PatientId as string notempty maxlength 50
+field PatientName as string notempty maxlength 200
+field ReferringProviderNpi as string notempty maxlength 10
+field ReferringProviderName as string notempty maxlength 200
+
+# Specialist — assigned at scheduling.
+field SpecialistNpi as string optional maxlength 10
+field SpecialistName as string optional maxlength 200
+field Specialty as choice of string("Cardiology", "Oncology", "Orthopedics", "Neurology", "Dermatology", "GI", "ENT", "Endocrinology", "Pulmonology", "Psychiatry")
+
+# Clinical context.
+field PrimaryDiagnosisCode as string notempty maxlength 10
+field ReasonForReferral as string notempty maxlength 2000
+field UrgencyLevel as choice of string("Routine", "Urgent", "Stat") ordered default "Routine"
+
+# Authorization — whether required is plan-driven and captured at intake.
+field ReferralPriorAuthRequired as boolean default false
+field AuthorizationNumber as string optional maxlength 50
+field AuthorizationDate as date optional
+field AuthorizationExpiresOn as date optional
+
+# Temporal validity — RequestedAt is intake; ValidUntil bounds when the
+# appointment may be scheduled.
+field RequestedAt as instant
+field ValidUntil as date
+field AppointmentDate as date optional
+field CompletedAt as instant optional
+field ReportReceivedAt as instant optional
+field ClosedAt as instant optional
+
+# Consultation outcome — populated when the specialist's report arrives.
+field ConsultationNotes as string optional maxlength 4000
+field FollowUpRequired as boolean default false
+field FollowUpInterval as duration optional
+field DispositionReason as string optional maxlength 500
+
+# Audit trail.
+field ReferralHistory as log of string
+
+# Cross-field date invariants — narrowed with `is set` guards so the same
+# global invariant covers every scenario without scattered ensures.
+rule AuthorizationDate <= AuthorizationExpiresOn when AuthorizationDate is set and AuthorizationExpiresOn is set because "Authorization issue date {AuthorizationDate} cannot fall after its expiry {AuthorizationExpiresOn}"
+rule AppointmentDate <= ValidUntil when AppointmentDate is set because "Appointment {AppointmentDate} falls outside the referral's validity window — expires {ValidUntil}"
+
+# States — Requested → (Authorized) → Scheduled → Completed → ReportReceived
+# → Closed. Cancelled is the terminal off-ramp from pre-completion states.
+state Requested initial
+state Authorized
+state Scheduled
+state Completed
+state ReportReceived
+state Closed terminal
+state Cancelled terminal
+
+# Fields with no meaning until scheduling or completion.
+in Requested, Authorized omit SpecialistNpi, SpecialistName, AppointmentDate
+in Requested, Authorized, Scheduled omit CompletedAt
+in Requested, Authorized, Scheduled, Completed omit ConsultationNotes, FollowUpRequired, FollowUpInterval, ReportReceivedAt
+in Requested, Authorized, Scheduled, Completed, ReportReceived omit ClosedAt, DispositionReason
+
+# State ensures.
+in Authorized ensure AuthorizationNumber is set because "Cannot enter Authorized without an authorization number from the payer"
+in Scheduled ensure AppointmentDate is set because "Scheduled referrals must carry a concrete appointment date"
+in Scheduled ensure SpecialistNpi is set because "Scheduled referrals must record the specialist the appointment is with"
+in Completed ensure AppointmentDate is set because "A completed referral must reference the appointment date on which the consultation occurred"
+in ReportReceived ensure ConsultationNotes is set because "The specialist's consultation report is required before the referral can be closed"
+
+# Construction — referral arrives from the referring provider's EHR fully
+# formed. The referring system supplies patient, provider, specialty,
+# clinical reason, urgency, and the validity window.
+event Create(
+    ReferralId as string notempty maxlength 50,
+    PatientId as string notempty maxlength 50,
+    PatientName as string notempty maxlength 200,
+    ReferringProviderNpi as string notempty maxlength 10,
+    ReferringProviderName as string notempty maxlength 200,
+    Specialty as choice of string("Cardiology", "Oncology", "Orthopedics", "Neurology", "Dermatology", "GI", "ENT", "Endocrinology", "Pulmonology", "Psychiatry"),
+    PrimaryDiagnosisCode as string notempty maxlength 10,
+    ReasonForReferral as string notempty maxlength 2000,
+    UrgencyLevel as choice of string("Routine", "Urgent", "Stat"),
+    ReferralPriorAuthRequired as boolean,
+    ValidUntil as date) initial
+
+# Authorization, scheduling, visit, report, closure.
+event RecordAuthorization(AuthorizationNumber as string notempty maxlength 50, AuthorizationDate as date, AuthorizationExpiresOn as date)
+event ScheduleAppointment(SpecialistNpi as string notempty maxlength 10, SpecialistName as string notempty maxlength 200, AppointmentDate as date)
+event RescheduleAppointment(NewAppointmentDate as date)
+event CompleteVisit
+event ReceiveReport(ConsultationNotes as string notempty maxlength 4000, FollowUpRequired as boolean, FollowUpInterval as duration optional)
+event CloseReferral(DispositionReason as string notempty maxlength 500)
+event CancelReferral(Reason as string notempty maxlength 500)
+
+# Construction row — opens in Requested.
+on Create
+    -> set ReferralId = Create.ReferralId
+    -> set PatientId = Create.PatientId
+    -> set PatientName = Create.PatientName
+    -> set ReferringProviderNpi = Create.ReferringProviderNpi
+    -> set ReferringProviderName = Create.ReferringProviderName
+    -> set Specialty = Create.Specialty
+    -> set PrimaryDiagnosisCode = Create.PrimaryDiagnosisCode
+    -> set ReasonForReferral = Create.ReasonForReferral
+    -> set UrgencyLevel = Create.UrgencyLevel
+    -> set ReferralPriorAuthRequired = Create.ReferralPriorAuthRequired
+    -> set ValidUntil = Create.ValidUntil
+    -> set RequestedAt = now()
+    -> append ReferralHistory "Referral created for {Create.Specialty}"
+
+# Transitions
+
+# Requested — authorization (if required) or direct scheduling (if not).
+from Requested on RecordAuthorization when ReferralPriorAuthRequired
+    -> set AuthorizationNumber = RecordAuthorization.AuthorizationNumber
+    -> set AuthorizationDate = RecordAuthorization.AuthorizationDate
+    -> set AuthorizationExpiresOn = RecordAuthorization.AuthorizationExpiresOn
+    -> append ReferralHistory "Authorization granted: {RecordAuthorization.AuthorizationNumber}"
+    -> transition Authorized
+
+from Requested on RecordAuthorization
+    -> reject "Authorization was recorded but the plan does not require prior authorization for this specialty"
+
+from Requested on ScheduleAppointment when ReferralPriorAuthRequired
+    -> reject "Cannot schedule — prior authorization is required and has not been recorded"
+
+from Requested on ScheduleAppointment
+    -> set SpecialistNpi = ScheduleAppointment.SpecialistNpi
+    -> set SpecialistName = ScheduleAppointment.SpecialistName
+    -> set AppointmentDate = ScheduleAppointment.AppointmentDate
+    -> append ReferralHistory "Appointment scheduled with {ScheduleAppointment.SpecialistName} on {ScheduleAppointment.AppointmentDate}"
+    -> transition Scheduled
+
+# Authorized → Scheduled — appointment-within-validity enforced by the
+# global rule `AppointmentDate <= ValidUntil`.
+from Authorized on ScheduleAppointment
+    -> set SpecialistNpi = ScheduleAppointment.SpecialistNpi
+    -> set SpecialistName = ScheduleAppointment.SpecialistName
+    -> set AppointmentDate = ScheduleAppointment.AppointmentDate
+    -> append ReferralHistory "Appointment scheduled with {ScheduleAppointment.SpecialistName} on {ScheduleAppointment.AppointmentDate}"
+    -> transition Scheduled
+
+# Scheduled — same-state reschedule, then completion.
+from Scheduled on RescheduleAppointment
+    -> set AppointmentDate = RescheduleAppointment.NewAppointmentDate
+    -> append ReferralHistory "Appointment rescheduled to {RescheduleAppointment.NewAppointmentDate}"
+    -> no transition
+
+from Scheduled on CompleteVisit
+    -> set CompletedAt = now()
+    -> append ReferralHistory "Specialist visit completed"
+    -> transition Completed
+
+# Completed → ReportReceived.
+from Completed on ReceiveReport
+    -> set ConsultationNotes = ReceiveReport.ConsultationNotes
+    -> set FollowUpRequired = ReceiveReport.FollowUpRequired
+    -> set FollowUpInterval = ReceiveReport.FollowUpInterval
+    -> set ReportReceivedAt = now()
+    -> append ReferralHistory "Consultation report received"
+    -> transition ReportReceived
+
+# ReportReceived → Closed.
+from ReportReceived on CloseReferral
+    -> set DispositionReason = CloseReferral.DispositionReason
+    -> set ClosedAt = now()
+    -> append ReferralHistory "Referral closed: {CloseReferral.DispositionReason}"
+    -> transition Closed
+
+# Cancellation — pre-completion off-ramp.
+from Requested, Authorized, Scheduled on CancelReferral
+    -> set DispositionReason = CancelReferral.Reason
+    -> set ClosedAt = now()
+    -> append ReferralHistory "Referral cancelled: {CancelReferral.Reason}"
+    -> transition Cancelled

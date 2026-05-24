@@ -1,73 +1,164 @@
 precept InsuranceClaim
 
-# Claims often bounce between missing-document collection and adjuster review.
-# This example keeps that back-and-forth in one readable file.
-# Demonstrates: money type, form-fill pattern, conditional state constraints,
-# conditional rules (FraudFlag cap), and trim() on adjuster name.
+# An insurance claim moves from intake through document collection, adjuster
+# review, approval (full or partial), payment, or denial. Claims may bounce
+# between document collection and adjuster review before a decision is made.
+# Fraud-flagged claims are capped at half the claim amount and require a
+# decision note before approval. Approved claims pay out and reach Paid;
+# denied claims terminate without payment, with an appeal path available.
+#
+# Demonstrates: money types with currency, set type for missing documents,
+# lookup type for received documents and their status, conditional rules and
+# state ensures keyed off a fraud flag, the omit pattern for fields that have
+# no meaning before adjudication, and a Free-Construction Draft where the
+# applicant fills the form before submitting.
 
-field ClaimantName as string optional
+# Claim identity
+field ClaimantName as string optional maxlength 200
+field PolicyNumber as string optional maxlength 50
+field ClaimType as choice of string("Auto", "Property", "Liability", "Health") optional
+
+# Monetary fields — money in 'USD' for exactness.
 field ClaimAmount as money in 'USD' default '0.00 USD'
 field ApprovedAmount as money in 'USD' default '0.00 USD'
-field AdjusterName as string optional
+field PaidAmount as money in 'USD' default '0.00 USD'
+
+# Adjuster + decision
+field AdjusterName as string optional maxlength 200
 field DecisionNote as string optional maxlength 500
+field DenialReason as string optional maxlength 500
+
+# Investigation flags
 field PoliceReportRequired as boolean default false
 field FraudFlag as boolean default false
-field MissingDocuments as set of string
-rule ApprovedAmount <= ClaimAmount because "Approved amount {ApprovedAmount} cannot exceed the claim of {ClaimAmount}"
-rule ApprovedAmount * 2 <= ClaimAmount when FraudFlag because "Fraud-flagged claims are capped at {ClaimAmount / 2}"
 
+# Document tracking — the missing-documents set tracks what the adjuster has
+# requested but not yet received; the lookup tracks the status of every
+# document the claim has touched.
+field MissingDocuments as set of string
+field SupportingDocuments as lookup of string to string
+
+# Timestamps
+field FiledAt as instant optional
+field DecidedAt as instant optional
+field PaidAt as instant optional
+
+# Rules — domain invariants
+rule ApprovedAmount <= ClaimAmount because "Approved amount {ApprovedAmount} cannot exceed the claim of {ClaimAmount}"
+rule PaidAmount <= ApprovedAmount because "Paid amount {PaidAmount} cannot exceed approved amount {ApprovedAmount}"
+rule ApprovedAmount * 2 <= ClaimAmount when FraudFlag because "Fraud-flagged claims are capped at half the claim amount ({ClaimAmount / 2})"
+
+# States
 state Draft initial
 state Submitted
 state UnderReview
 state Approved
-state Denied terminal
 state Paid terminal
+state Denied
+state Appealed
+state Closed terminal
 
-in Draft omit ApprovedAmount, AdjusterName,  DecisionNote, MissingDocuments
-in Draft modify ClaimantName, ClaimAmount, PoliceReportRequired editable
+# Fields with no meaning before adjudication.
+in Draft, Submitted omit ApprovedAmount, PaidAmount, AdjusterName, DecisionNote, DenialReason
+
+# Editable windows
+in Draft modify ClaimantName, PolicyNumber, ClaimType, ClaimAmount, PoliceReportRequired editable
 in UnderReview modify FraudFlag editable
 in UnderReview when not FraudFlag modify AdjusterName editable
-in Approved ensure ApprovedAmount > '0.00 USD' because "Approved claims must specify a payout amount"
-in Approved when FraudFlag ensure DecisionNote is set because "Fraud-flagged approvals require a decision note"
 
+# State ensures
+in Approved ensure ApprovedAmount > '0.00 USD' because "Approved claims must specify a positive payout amount"
+in Approved when FraudFlag ensure DecisionNote is set because "Fraud-flagged approvals require a written decision note from the adjuster"
+in Paid ensure PaidAmount > '0.00 USD' because "Paid claims must have a positive payment amount"
+in Paid ensure PaidAt is set because "Paid claims must record the payment timestamp"
+in Denied, Closed ensure DenialReason is set because "Denied claims must document the denial reason"
+
+# Events
 event Submit
+on Submit ensure ClaimantName is set because "Claimant name is required before submission"
+on Submit ensure ClaimAmount > '0.00 USD' because "Claim amount must be positive before submission"
+on Submit ensure PolicyNumber is set because "Policy number is required before submission"
+
+event AssignAdjuster(Name as string notempty)
 event RequestDocument(Name as string notempty)
 event ReceiveDocument(Name as string notempty)
-event AssignAdjuster(Name as string notempty)
 event Approve(Amount as money in 'USD' positive, Note as string optional)
 on Approve ensure Approve.Amount <= ClaimAmount because "Approved amount cannot exceed the claim amount"
-event Deny(Note as string notempty)
+
+event Deny(Reason as string notempty)
+event Appeal(Reason as string notempty)
 event PayClaim
+event CloseClaim
 
-from Draft on Submit when ClaimantName is set and ClaimAmount > '0.00 USD' and (not PoliceReportRequired or ClaimAmount <= '100000.00 USD')
-    -> transition Submitted
-from Draft on Submit when ClaimantName is set and ClaimAmount > '0.00 USD'
-    -> reject "Police-report claims are capped at $100,000"
+# Submit — applicant pushes the claim from Draft. Police-report claims have a
+# strict ceiling — submitting one above the cap is rejected outright.
+from Draft on Submit when PoliceReportRequired and ClaimAmount > '100000.00 USD'
+    -> reject "Police-report claims are capped at $100,000 (you submitted {ClaimAmount})"
 from Draft on Submit
-    -> reject "A claim needs a claimant name and a positive claim amount"
+    -> set FiledAt = now()
+    -> transition Submitted
 
-from Submitted, UnderReview on RequestDocument
-    -> add MissingDocuments RequestDocument.Name
-    -> no transition
+# Assign adjuster — moves the claim into review.
 from Submitted on AssignAdjuster
     -> set AdjusterName = trim(AssignAdjuster.Name)
     -> transition UnderReview
 
-from UnderReview on ReceiveDocument when MissingDocuments contains ReceiveDocument.Name
-    -> remove MissingDocuments ReceiveDocument.Name
+# Request document — adjuster flags a missing document.
+from Submitted, UnderReview on RequestDocument when MissingDocuments contains RequestDocument.Name
+    -> reject "Document {RequestDocument.Name} is already outstanding"
+from Submitted, UnderReview on RequestDocument
+    -> add MissingDocuments RequestDocument.Name
+    -> put SupportingDocuments RequestDocument.Name = "Requested"
     -> no transition
-from UnderReview on ReceiveDocument
-    -> reject "That document is not currently outstanding"
 
-from UnderReview on Approve when not PoliceReportRequired or MissingDocuments.count == 0
+# Receive document — close out the missing entry, mark the supporting status.
+from UnderReview on ReceiveDocument when not (MissingDocuments contains ReceiveDocument.Name)
+    -> reject "Document {ReceiveDocument.Name} is not currently outstanding"
+from UnderReview on ReceiveDocument
+    -> remove MissingDocuments ReceiveDocument.Name
+    -> put SupportingDocuments ReceiveDocument.Name = "Received"
+    -> no transition
+
+# Approve — police-report claims need all documents in. Fraud-flagged approvals
+# cap the payout at half the claim amount, expressed inline.
+from UnderReview on Approve when PoliceReportRequired and MissingDocuments.count > 0
+    -> reject "Required documents must be complete before a police-report claim can be approved (missing: {MissingDocuments.count})"
+from UnderReview on Approve
     -> set ApprovedAmount = if FraudFlag then min(Approve.Amount, ClaimAmount / 2) else Approve.Amount
     -> set DecisionNote = if Approve.Note is set then Approve.Note else "Approved"
+    -> set DecidedAt = now()
     -> transition Approved
-from UnderReview on Approve
-    -> reject "Required documents must be complete before a claim can be approved"
 
+# Deny — adjuster rejects the claim.
 from UnderReview on Deny
-    -> set DecisionNote = Deny.Note
+    -> set DenialReason = Deny.Reason
+    -> set DecisionNote = Deny.Reason
+    -> set DecidedAt = now()
     -> transition Denied
+
+# Pay claim — approved claims pay out.
 from Approved on PayClaim
+    -> set PaidAmount = ApprovedAmount
+    -> set PaidAt = now()
     -> transition Paid
+
+# Appeal — denied claims can be appealed once. Without an appeal, the
+# claimant must close the claim explicitly to reach a terminal state.
+from Denied on Appeal
+    -> set DecisionNote = Appeal.Reason
+    -> transition Appealed
+from Denied on CloseClaim
+    -> transition Closed
+
+# After appeal — adjuster can re-approve (with the same checks) or close
+# the claim with a final denial reason.
+from Appealed on Approve
+    -> set ApprovedAmount = if FraudFlag then min(Approve.Amount, ClaimAmount / 2) else Approve.Amount
+    -> set DecisionNote = if Approve.Note is set then Approve.Note else "Approved on appeal"
+    -> set DecidedAt = now()
+    -> transition Approved
+from Appealed on Deny
+    -> set DenialReason = Deny.Reason
+    -> set DecisionNote = Deny.Reason
+    -> set DecidedAt = now()
+    -> transition Closed

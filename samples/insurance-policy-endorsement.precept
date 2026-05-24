@@ -1,0 +1,181 @@
+precept InsurancePolicyEndorsement
+
+# A policy endorsement modifies an in-force insurance policy mid-term —
+# adding a driver, changing an address, increasing coverage, or adjusting
+# the deductible. Endorsements arrive from policy administration with the
+# current policy terms already known (current premium, effective window),
+# so the entity arrives fully formed. The underwriter reviews, approves
+# or rejects, sets an effective date, and the carrier issues the
+# endorsed policy. Premium changes are computed at approval as
+# NewPremium − CurrentPremium and prorated across the remaining term.
+
+# Policy and endorsement identity
+field PolicyNumber as string notempty maxlength 50
+field EndorsementNumber as string notempty maxlength 50
+field EndorsementType as choice of string(
+    "CoverageIncrease", "CoverageDecrease", "AddressChange",
+    "NamedDriverAdded", "NamedDriverRemoved", "DeductibleChange",
+    "PaymentMethodChange", "AdditionalCoverage", "LiabilityAdjustment", "Other")
+field EndorsementDate as date
+
+# Effective dating — the existing policy term and the proposed change window.
+field CurrentEffectiveDate as date
+field CurrentExpirationDate as date
+field EffectiveDate as date
+field ExpirationDate as date
+
+# Financial amounts — premium before and after the endorsement.
+field CurrentPremium as money in 'USD' positive
+field NewPremium as money in 'USD' default '0.00 USD' nonnegative
+field PremiumAdjustment as money in 'USD' default '0.00 USD'
+field ProrationDays as integer default 0 nonnegative max 365
+
+# Prior terms snapshot — captured at approval, before fields are overwritten.
+field PriorTerms as lookup of string to string
+
+# Coverage details — per-coverage limits keyed by coverage code.
+field CoverageLimits as lookup of string to integer
+
+# Approval tracking
+field ApprovedBy as string optional maxlength 200
+field ApprovalDate as instant optional
+
+# Reasons and notes
+field Reason as string optional maxlength 1000
+field AdditionalNotes as string optional maxlength 2000
+field RejectionReason as string optional maxlength 1000
+
+# Audit trail
+field EndorsementLog as log of string
+
+# Timestamps tracking each lifecycle phase
+field RequestedAt as instant
+field ReviewedAt as instant optional
+field ApprovedAt as instant optional
+field EffectiveFrom as instant optional
+field IssuedAt as instant optional
+field RejectedAt as instant optional
+
+# Rules — domain invariants
+rule EffectiveDate >= EndorsementDate because "Effective date {EffectiveDate} cannot precede the endorsement request date {EndorsementDate} — a change cannot take effect before it was requested"
+rule ExpirationDate > EffectiveDate because "Expiration date {ExpirationDate} must follow the effective date {EffectiveDate}"
+
+# States
+state UnderReview initial
+state Approved
+state PendingEffectiveDate
+state Issued terminal
+state Rejected terminal
+
+# Fields with no meaning until approval and issuance respectively.
+in UnderReview omit ApprovedBy, ApprovalDate, NewPremium, PremiumAdjustment, EffectiveFrom
+in UnderReview, Approved, PendingEffectiveDate omit IssuedAt
+
+# State ensures
+in Approved ensure ApprovedBy is set because "Approved endorsements must record who approved them"
+in Approved ensure ApprovalDate is set because "Approved endorsements must record when approval occurred"
+in PendingEffectiveDate ensure EffectiveFrom is set because "Endorsements awaiting effective date must record when they were activated"
+in Issued ensure IssuedAt is set because "Issued endorsements must record when the policy change took effect"
+in Rejected ensure RejectionReason is set because "Rejected endorsements must document why approval was denied"
+
+# Construction — endorsement arrives from policy administration with full
+# policy term context already attached.
+event Create(
+    PolicyNumber as string notempty maxlength 50,
+    EndorsementNumber as string notempty maxlength 50,
+    EndorsementType as choice of string(
+        "CoverageIncrease", "CoverageDecrease", "AddressChange",
+        "NamedDriverAdded", "NamedDriverRemoved", "DeductibleChange",
+        "PaymentMethodChange", "AdditionalCoverage", "LiabilityAdjustment", "Other"),
+    EndorsementDate as date,
+    CurrentPremium as money in 'USD' positive,
+    EffectiveDate as date,
+    ExpirationDate as date,
+    CurrentEffectiveDate as date,
+    CurrentExpirationDate as date) initial
+on Create ensure Create.EffectiveDate >= Create.EndorsementDate because "Effective date cannot precede request date"
+on Create ensure Create.ExpirationDate > Create.EffectiveDate because "Expiration must follow effective date"
+
+# Endorsement events
+event SetReason(Reason as string notempty maxlength 1000)
+event RequestAdditionalInfo(InfoRequest as string notempty maxlength 500)
+event Approve(ApprovedBy as string notempty maxlength 200, NewPremium as money in 'USD' positive)
+event Reject(Reason as string notempty maxlength 1000)
+event SetEffectiveDate(NewEffectiveDate as date)
+event MakeEffective
+event Issue
+event CancelRequest
+
+# Construction row — populate fields and arrive in UnderReview.
+on Create
+    -> set PolicyNumber = Create.PolicyNumber
+    -> set EndorsementNumber = Create.EndorsementNumber
+    -> set EndorsementType = Create.EndorsementType
+    -> set EndorsementDate = Create.EndorsementDate
+    -> set CurrentPremium = Create.CurrentPremium
+    -> set EffectiveDate = Create.EffectiveDate
+    -> set ExpirationDate = Create.ExpirationDate
+    -> set CurrentEffectiveDate = Create.CurrentEffectiveDate
+    -> set CurrentExpirationDate = Create.CurrentExpirationDate
+    -> set RequestedAt = now()
+    -> set ReviewedAt = now()
+
+# Reason and information requests — captured during review.
+from UnderReview on SetReason
+    -> set Reason = SetReason.Reason
+    -> append EndorsementLog "Reason set: {SetReason.Reason}"
+    -> no transition
+
+from UnderReview on RequestAdditionalInfo
+    -> append EndorsementLog "Additional info requested: {RequestAdditionalInfo.InfoRequest}"
+    -> no transition
+
+# Approve — UnderReview → Approved. Compute the premium adjustment.
+from UnderReview on Approve
+    -> set ApprovedBy = Approve.ApprovedBy
+    -> set ApprovalDate = now()
+    -> set ApprovedAt = now()
+    -> set NewPremium = Approve.NewPremium
+    -> set PremiumAdjustment = Approve.NewPremium - CurrentPremium
+    -> append EndorsementLog "Endorsement approved by {Approve.ApprovedBy}"
+    -> transition Approved
+
+# Reject — UnderReview → Rejected.
+from UnderReview on Reject
+    -> set RejectionReason = Reject.Reason
+    -> set RejectedAt = now()
+    -> append EndorsementLog "Endorsement rejected: {Reject.Reason}"
+    -> transition Rejected
+
+# Adjust effective date — only allowed while in Approved, before activation.
+from Approved on SetEffectiveDate when SetEffectiveDate.NewEffectiveDate < EndorsementDate
+    -> reject "Effective date {SetEffectiveDate.NewEffectiveDate} cannot precede the endorsement request date {EndorsementDate}"
+from Approved on SetEffectiveDate
+    -> set EffectiveDate = SetEffectiveDate.NewEffectiveDate
+    -> append EndorsementLog "Effective date adjusted to {SetEffectiveDate.NewEffectiveDate}"
+    -> no transition
+
+# Make effective — snapshot prior terms before they get overwritten on issue.
+from Approved on MakeEffective
+    -> set EffectiveFrom = now()
+    -> put PriorTerms "PreviousPremium" = CurrentPremium.amount
+    -> put PriorTerms "PreviousEffectiveDate" = CurrentEffectiveDate.day
+    -> put PriorTerms "PreviousExpirationDate" = CurrentExpirationDate.day
+    -> append EndorsementLog "Endorsement activated; prior terms snapshotted"
+    -> transition PendingEffectiveDate
+
+# Issue — PendingEffectiveDate → Issued. Apply the new terms to the policy.
+from PendingEffectiveDate on Issue
+    -> set IssuedAt = now()
+    -> set CurrentPremium = NewPremium
+    -> set CurrentEffectiveDate = EffectiveDate
+    -> set CurrentExpirationDate = ExpirationDate
+    -> append EndorsementLog "Endorsement issued"
+    -> transition Issued
+
+# Cancel — the requester withdraws before approval.
+from UnderReview on CancelRequest
+    -> set RejectionReason = "Withdrawn by requester"
+    -> set RejectedAt = now()
+    -> append EndorsementLog "Endorsement request withdrawn"
+    -> transition Rejected

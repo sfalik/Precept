@@ -1,0 +1,213 @@
+precept StatisticalProcessControl
+
+# A control chart tracking one measured characteristic of a manufacturing process.
+# Engineering sets the target value and the warning (2-sigma) and control (3-sigma)
+# limits when the chart is initialized — these are atomic facts established by
+# capability studies, so this uses the Constructor pattern. The chart then runs
+# continuously: each sample reading drives a state change. Readings inside the
+# warning band keep the chart InControl; readings between warning and control
+# limits trigger Warning; readings outside control limits trigger OutOfControl
+# and require corrective action before monitoring can resume.
+
+# Fields
+field ProcessId as string notempty maxlength 50
+field ChartName as string notempty maxlength 100
+field MeasurementUnit as unitofmeasure
+field TargetValue as decimal
+field UpperControlLimit as decimal
+field LowerControlLimit as decimal
+field UpperWarningLimit as decimal
+field LowerWarningLimit as decimal
+field SampleSize as integer positive
+
+field SamplesRecorded as integer default 0 nonnegative
+field LastSampleValue as decimal optional
+field LastSampleAt as instant optional
+field ConsecutiveOutOfControl as integer default 0 nonnegative
+field ConsecutiveWarnings as integer default 0 nonnegative
+
+field CurrentAlertReason as string optional maxlength 200
+field CorrectiveActionNote as string optional maxlength 500
+field CorrectiveActionOwner as string optional maxlength 100
+field CorrectiveActionStartedAt as instant optional
+field CorrectiveActionResolvedAt as instant optional
+
+field ChartRetiredAt as instant optional
+field RetirementReason as string optional maxlength 200
+
+# Rules — control-chart geometry must hold for every reading the chart classifies.
+rule LowerControlLimit < LowerWarningLimit because "Lower control limit {LowerControlLimit} must sit below lower warning limit {LowerWarningLimit}"
+rule LowerWarningLimit < TargetValue because "Lower warning limit {LowerWarningLimit} must sit below target {TargetValue}"
+rule TargetValue < UpperWarningLimit because "Target {TargetValue} must sit below upper warning limit {UpperWarningLimit}"
+rule UpperWarningLimit < UpperControlLimit because "Upper warning limit {UpperWarningLimit} must sit below upper control limit {UpperControlLimit}"
+
+# States
+state Monitoring initial
+state InControl
+state Warning
+state OutOfControl
+state CorrectiveAction
+state Retired terminal
+
+# State ensures
+in Warning ensure CurrentAlertReason is set because "Warning state must record why the chart alerted"
+in OutOfControl ensure CurrentAlertReason is set because "Out-of-control state must record the alert reason"
+in CorrectiveAction ensure CorrectiveActionOwner is set because "Corrective action requires a named owner"
+in CorrectiveAction ensure CorrectiveActionStartedAt is set because "Corrective action must record a start time"
+in CorrectiveAction ensure CorrectiveActionNote is set because "Corrective action requires a narrative of the action being taken"
+in Retired ensure ChartRetiredAt is set because "A retired chart must record the retirement timestamp"
+in Retired ensure RetirementReason is set because "A retired chart must record the retirement reason"
+
+# Events
+
+# Constructor — engineering establishes the chart's geometry up front.
+event InitializeChart(
+    Process as string notempty,
+    Name as string notempty,
+    Unit as unitofmeasure,
+    Target as decimal,
+    Ucl as decimal,
+    Uwl as decimal,
+    Lwl as decimal,
+    Lcl as decimal,
+    Sample as integer positive) initial
+
+on InitializeChart ensure InitializeChart.Lcl < InitializeChart.Lwl because "Lower control limit must sit below lower warning limit"
+on InitializeChart ensure InitializeChart.Lwl < InitializeChart.Target because "Lower warning limit must sit below target"
+on InitializeChart ensure InitializeChart.Target < InitializeChart.Uwl because "Target must sit below upper warning limit"
+on InitializeChart ensure InitializeChart.Uwl < InitializeChart.Ucl because "Upper warning limit must sit below upper control limit"
+on InitializeChart ensure InitializeChart.Sample > 0 because "Sample size must be positive"
+
+on InitializeChart
+    -> set ProcessId = InitializeChart.Process
+    -> set ChartName = InitializeChart.Name
+    -> set MeasurementUnit = InitializeChart.Unit
+    -> set TargetValue = InitializeChart.Target
+    -> set UpperControlLimit = InitializeChart.Ucl
+    -> set UpperWarningLimit = InitializeChart.Uwl
+    -> set LowerWarningLimit = InitializeChart.Lwl
+    -> set LowerControlLimit = InitializeChart.Lcl
+    -> set SampleSize = InitializeChart.Sample
+
+event RecordSample(Value as decimal)
+
+event AcknowledgeAlert(Reason as string notempty)
+event OpenCorrectiveAction(Owner as string notempty, Action as string notempty)
+event ResolveCorrectiveAction(ResolutionNote as string notempty)
+event RetireChart(Reason as string notempty)
+
+# Transitions
+
+# First reading classifies the chart out of the Monitoring bootstrap state.
+from Monitoring on RecordSample when RecordSample.Value >= LowerWarningLimit and RecordSample.Value <= UpperWarningLimit
+    -> set LastSampleValue = RecordSample.Value
+    -> set LastSampleAt = now()
+    -> set SamplesRecorded = SamplesRecorded + 1
+    -> set ConsecutiveOutOfControl = 0
+    -> set ConsecutiveWarnings = 0
+    -> transition InControl
+from Monitoring on RecordSample when RecordSample.Value >= LowerControlLimit and RecordSample.Value <= UpperControlLimit
+    -> set LastSampleValue = RecordSample.Value
+    -> set LastSampleAt = now()
+    -> set SamplesRecorded = SamplesRecorded + 1
+    -> set ConsecutiveWarnings = ConsecutiveWarnings + 1
+    -> set CurrentAlertReason = "Sample {RecordSample.Value} is outside the warning band [{LowerWarningLimit}, {UpperWarningLimit}]"
+    -> transition Warning
+from Monitoring on RecordSample
+    -> set LastSampleValue = RecordSample.Value
+    -> set LastSampleAt = now()
+    -> set SamplesRecorded = SamplesRecorded + 1
+    -> set ConsecutiveOutOfControl = ConsecutiveOutOfControl + 1
+    -> set CurrentAlertReason = "Sample {RecordSample.Value} is outside control limits [{LowerControlLimit}, {UpperControlLimit}]"
+    -> transition OutOfControl
+
+# In-control: stays in-control as long as readings remain inside the warning band; degrades otherwise.
+from InControl on RecordSample when RecordSample.Value >= LowerWarningLimit and RecordSample.Value <= UpperWarningLimit
+    -> set LastSampleValue = RecordSample.Value
+    -> set LastSampleAt = now()
+    -> set SamplesRecorded = SamplesRecorded + 1
+    -> set ConsecutiveWarnings = 0
+    -> no transition
+from InControl on RecordSample when RecordSample.Value >= LowerControlLimit and RecordSample.Value <= UpperControlLimit
+    -> set LastSampleValue = RecordSample.Value
+    -> set LastSampleAt = now()
+    -> set SamplesRecorded = SamplesRecorded + 1
+    -> set ConsecutiveWarnings = 1
+    -> set CurrentAlertReason = "Sample {RecordSample.Value} crossed into the warning band [{LowerWarningLimit}, {UpperWarningLimit}]"
+    -> transition Warning
+from InControl on RecordSample
+    -> set LastSampleValue = RecordSample.Value
+    -> set LastSampleAt = now()
+    -> set SamplesRecorded = SamplesRecorded + 1
+    -> set ConsecutiveOutOfControl = 1
+    -> set CurrentAlertReason = "Sample {RecordSample.Value} fell outside control limits [{LowerControlLimit}, {UpperControlLimit}]"
+    -> transition OutOfControl
+
+# Warning: a return to the warning band recovers; a third consecutive warning escalates;
+# a value outside control limits trips immediately.
+from Warning on RecordSample when RecordSample.Value >= LowerWarningLimit and RecordSample.Value <= UpperWarningLimit
+    -> set LastSampleValue = RecordSample.Value
+    -> set LastSampleAt = now()
+    -> set SamplesRecorded = SamplesRecorded + 1
+    -> set ConsecutiveWarnings = 0
+    -> transition InControl
+from Warning on RecordSample when RecordSample.Value >= LowerControlLimit and RecordSample.Value <= UpperControlLimit and ConsecutiveWarnings + 1 >= 3
+    -> set LastSampleValue = RecordSample.Value
+    -> set LastSampleAt = now()
+    -> set SamplesRecorded = SamplesRecorded + 1
+    -> set ConsecutiveWarnings = ConsecutiveWarnings + 1
+    -> set ConsecutiveOutOfControl = 1
+    -> set CurrentAlertReason = "Three consecutive warning-band samples — last value {RecordSample.Value}"
+    -> transition OutOfControl
+from Warning on RecordSample when RecordSample.Value >= LowerControlLimit and RecordSample.Value <= UpperControlLimit
+    -> set LastSampleValue = RecordSample.Value
+    -> set LastSampleAt = now()
+    -> set SamplesRecorded = SamplesRecorded + 1
+    -> set ConsecutiveWarnings = ConsecutiveWarnings + 1
+    -> no transition
+from Warning on RecordSample
+    -> set LastSampleValue = RecordSample.Value
+    -> set LastSampleAt = now()
+    -> set SamplesRecorded = SamplesRecorded + 1
+    -> set ConsecutiveOutOfControl = 1
+    -> set CurrentAlertReason = "Sample {RecordSample.Value} fell outside control limits [{LowerControlLimit}, {UpperControlLimit}]"
+    -> transition OutOfControl
+
+# Out-of-control: further samples accumulate but the alert is sticky until acknowledged.
+from OutOfControl on RecordSample
+    -> set LastSampleValue = RecordSample.Value
+    -> set LastSampleAt = now()
+    -> set SamplesRecorded = SamplesRecorded + 1
+    -> set ConsecutiveOutOfControl = ConsecutiveOutOfControl + 1
+    -> no transition
+
+from OutOfControl on AcknowledgeAlert
+    -> set CurrentAlertReason = AcknowledgeAlert.Reason
+    -> no transition
+
+from OutOfControl on OpenCorrectiveAction
+    -> set CorrectiveActionOwner = OpenCorrectiveAction.Owner
+    -> set CorrectiveActionNote = OpenCorrectiveAction.Action
+    -> set CorrectiveActionStartedAt = now()
+    -> transition CorrectiveAction
+
+# Corrective action — readings can still arrive but the chart stays in CorrectiveAction
+# until the owner resolves it. Resolution returns to Monitoring for re-classification.
+from CorrectiveAction on RecordSample
+    -> set LastSampleValue = RecordSample.Value
+    -> set LastSampleAt = now()
+    -> set SamplesRecorded = SamplesRecorded + 1
+    -> no transition
+
+from CorrectiveAction on ResolveCorrectiveAction
+    -> set CorrectiveActionResolvedAt = now()
+    -> set CorrectiveActionNote = ResolveCorrectiveAction.ResolutionNote
+    -> set ConsecutiveOutOfControl = 0
+    -> set ConsecutiveWarnings = 0
+    -> transition Monitoring
+
+# Retirement — any non-terminal state can retire the chart (e.g., process change, end-of-life).
+from Monitoring, InControl, Warning, OutOfControl, CorrectiveAction on RetireChart
+    -> set ChartRetiredAt = now()
+    -> set RetirementReason = RetireChart.Reason
+    -> transition Retired

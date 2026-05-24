@@ -1,0 +1,215 @@
+precept InsuranceUnderwriting
+
+# An underwriting case — the carrier-side workflow that assesses a new
+# life, health, disability, annuity, or long-term-care application,
+# scores its risk, generates a quote, and decides to approve, decline,
+# or approve with modifications. Applications arrive from the
+# distribution side (broker, agent, direct channel) with applicant and
+# policy-request data complete. Information gathering — medical exams,
+# attending-physician statements, supporting documents — happens after
+# intake. Risk factors are accumulated and scored; the underwriter
+# generates a quote, then issues a final decision.
+
+# Applicant identity
+field ApplicationNumber as string notempty maxlength 50
+field ApplicantName as string notempty maxlength 200
+field ApplicantDateOfBirth as date
+field ApplicantGender as string optional maxlength 20
+field Occupation as string optional maxlength 200
+field AnnualIncome as money in 'USD' default '0.00 USD' nonnegative
+
+# Policy request
+field PolicyType as choice of string("Life", "Health", "Disability", "Annuity", "LongTermCare")
+field CoverageAmount as money in 'USD' positive
+field PolicyTerm as integer nonnegative max 100
+field PremiumRating as choice of string("Standard", "Preferred", "PreferredPlus", "SuperPreferred", "TableRating") default "Standard"
+
+# Risk assessment — factors accumulated and scored.
+field RiskFactors as lookup of string to decimal
+field RiskScore as decimal default 0 nonnegative max 100 maxplaces 2
+field RiskCategory as choice of string("Preferred", "Standard", "Substandard", "HighRisk", "Decline") default "Standard"
+
+# Underwriting decision
+field UnderwritingDecision as choice of string("Approved", "Declined", "Modified", "Postponed", "Deferred") default "Postponed"
+field ApprovedCoverage as money in 'USD' default '0.00 USD' nonnegative
+field ApprovedPremium as money in 'USD' default '0.00 USD' nonnegative
+field ApprovedTerm as integer default 0 nonnegative max 100
+field RatingMultiplier as decimal default 1 nonnegative max 5 maxplaces 4
+
+# Medical information
+field HasMedicalExam as boolean default false
+field MedicalExamDate as date optional
+field ExamResult as string optional maxlength 2000
+field PrescribedMedications as string optional maxlength 1000
+field FamilyHistory as string optional maxlength 1000
+field TobaccoUse as choice of string("Never", "Former", "Current") optional
+field TobaccoYearsQuit as integer optional nonnegative max 100
+
+# Risk modifiers
+field HazardousHobbies as boolean default false
+field HazardousOccupation as boolean default false
+field TravelToHighRiskCountries as boolean default false
+field AviationActivity as boolean default false
+
+# Notes
+field UnderwriterNotes as string optional maxlength 2000
+field DecisionReason as string optional maxlength 500
+field RequiredConditions as string optional maxlength 1000
+
+# Audit trail
+field UnderwritingLog as log of string
+
+# Timestamps tracking each lifecycle phase
+field ReceivedAt as instant
+field InformationCompleteAt as instant optional
+field RiskAssessedAt as instant optional
+field QuoteGeneratedAt as instant optional
+field DecidedAt as instant optional
+
+# Rules — domain invariants
+rule ApprovedCoverage <= CoverageAmount because "Approved coverage {ApprovedCoverage} cannot exceed the requested coverage of {CoverageAmount} — underwriting can reduce but not enlarge what the applicant asked for"
+
+# States
+state InformationGathering initial
+state RiskAssessment
+state QuoteGenerated
+state Approved terminal
+state Declined terminal
+state Modified terminal
+
+# Fields with no meaning until the relevant phase has been reached.
+in InformationGathering omit RiskScore, RiskAssessedAt
+in InformationGathering, RiskAssessment omit QuoteGeneratedAt, ApprovedCoverage, ApprovedPremium, ApprovedTerm, RatingMultiplier
+in InformationGathering, RiskAssessment, QuoteGenerated omit DecidedAt, RequiredConditions, DecisionReason
+
+# State ensures
+in RiskAssessment ensure InformationCompleteAt is set because "Risk assessment requires that information gathering has completed"
+in QuoteGenerated ensure RiskAssessedAt is set because "Quote generation requires that risk has been assessed"
+in QuoteGenerated ensure QuoteGeneratedAt is set because "Quote generation must record when the quote was produced"
+in QuoteGenerated ensure ApprovedPremium > '0.00 USD' because "Quote generation requires a positive premium — a $0 quote is structurally a decline, not an offer"
+in Approved ensure DecidedAt is set because "Approved applications must record when the decision was made"
+in Declined ensure DecidedAt is set because "Declined applications must record when the decision was made"
+in Declined ensure DecisionReason is set because "Declined applications must document why the application was rejected"
+in Modified ensure DecidedAt is set because "Modified applications must record when the decision was made"
+in Modified ensure RequiredConditions is set because "Modified applications must document the conditions of the modified offer"
+
+# Construction — application arrives from distribution with applicant and
+# coverage-request data complete.
+event Create(
+    ApplicationNumber as string notempty maxlength 50,
+    ApplicantName as string notempty maxlength 200,
+    ApplicantDateOfBirth as date,
+    PolicyType as choice of string("Life", "Health", "Disability", "Annuity", "LongTermCare"),
+    CoverageAmount as money in 'USD' positive,
+    PolicyTerm as integer nonnegative max 100) initial
+
+# Underwriting events
+event RequestInformation(InformationType as string notempty maxlength 200)
+event SubmitMedicalExam(ExamDate as date, Result as string notempty maxlength 2000)
+event SubmitInformation(DocumentType as string notempty maxlength 100, Content as string notempty maxlength 2000)
+event CompleteInformationGathering
+event AddRiskFactor(FactorName as string notempty maxlength 100, FactorScore as decimal)
+event CompleteRiskAssessment(RiskScore as decimal nonnegative max 100, RiskCategory as choice of string("Preferred", "Standard", "Substandard", "HighRisk", "Decline"))
+event GenerateQuote(
+    RatingMultiplier as decimal nonnegative max 5,
+    AdjustedPremium as money in 'USD' positive,
+    UnderwriterNotes as string optional maxlength 2000)
+event Approve
+event Decline(Reason as string notempty maxlength 500, Conditions as string optional maxlength 1000)
+event Modify(
+    NewCoverage as money in 'USD' positive,
+    NewPremium as money in 'USD' positive,
+    NewTerm as integer nonnegative max 100,
+    Conditions as string notempty maxlength 1000)
+on Modify ensure Modify.NewCoverage <= CoverageAmount because "Modified coverage cannot exceed the requested coverage"
+
+# Construction row — populate fields and arrive in InformationGathering.
+on Create
+    -> set ApplicationNumber = Create.ApplicationNumber
+    -> set ApplicantName = Create.ApplicantName
+    -> set ApplicantDateOfBirth = Create.ApplicantDateOfBirth
+    -> set PolicyType = Create.PolicyType
+    -> set CoverageAmount = Create.CoverageAmount
+    -> set PolicyTerm = Create.PolicyTerm
+    -> set ReceivedAt = now()
+
+# Information gathering — accumulate exam results and documents.
+from InformationGathering on RequestInformation
+    -> append UnderwritingLog "Information requested: {RequestInformation.InformationType}"
+    -> no transition
+from InformationGathering on SubmitMedicalExam
+    -> set HasMedicalExam = true
+    -> set MedicalExamDate = SubmitMedicalExam.ExamDate
+    -> set ExamResult = SubmitMedicalExam.Result
+    -> append UnderwritingLog "Medical exam received"
+    -> no transition
+from InformationGathering on SubmitInformation
+    -> append UnderwritingLog "Document submitted: {SubmitInformation.DocumentType}"
+    -> no transition
+
+# Complete information gathering — InformationGathering → RiskAssessment.
+from InformationGathering on CompleteInformationGathering
+    -> set InformationCompleteAt = now()
+    -> append UnderwritingLog "Information gathering complete"
+    -> transition RiskAssessment
+
+# Add risk factor — accumulate scored factors during risk assessment.
+from RiskAssessment on AddRiskFactor
+    -> put RiskFactors AddRiskFactor.FactorName = AddRiskFactor.FactorScore
+    -> append UnderwritingLog "Risk factor scored: {AddRiskFactor.FactorName}"
+    -> no transition
+
+# Complete risk assessment — score and category drive routing.
+from RiskAssessment on CompleteRiskAssessment when CompleteRiskAssessment.RiskCategory == "Decline"
+    -> set RiskScore = CompleteRiskAssessment.RiskScore
+    -> set RiskCategory = CompleteRiskAssessment.RiskCategory
+    -> set RiskAssessedAt = now()
+    -> set UnderwritingDecision = "Declined"
+    -> set DecisionReason = "Risk reassessment: not insurable"
+    -> set DecidedAt = now()
+    -> append UnderwritingLog "Risk assessment: declined"
+    -> transition Declined
+from RiskAssessment on CompleteRiskAssessment
+    -> set RiskScore = CompleteRiskAssessment.RiskScore
+    -> set RiskCategory = CompleteRiskAssessment.RiskCategory
+    -> set RiskAssessedAt = now()
+    -> append UnderwritingLog "Risk assessment: {CompleteRiskAssessment.RiskCategory}"
+    -> transition QuoteGenerated
+
+# Generate quote — sets the rating multiplier and the adjusted premium.
+from QuoteGenerated on GenerateQuote
+    -> set RatingMultiplier = GenerateQuote.RatingMultiplier
+    -> set ApprovedPremium = GenerateQuote.AdjustedPremium
+    -> set ApprovedCoverage = CoverageAmount
+    -> set ApprovedTerm = PolicyTerm
+    -> set UnderwriterNotes = GenerateQuote.UnderwriterNotes
+    -> set QuoteGeneratedAt = now()
+    -> append UnderwritingLog "Quote generated at multiplier {GenerateQuote.RatingMultiplier}"
+    -> no transition
+
+# Approve — QuoteGenerated → Approved. Standard issue terms.
+from QuoteGenerated on Approve
+    -> set UnderwritingDecision = "Approved"
+    -> set DecidedAt = now()
+    -> append UnderwritingLog "Application approved"
+    -> transition Approved
+
+# Decline — QuoteGenerated → Declined. Reason is mandatory.
+from QuoteGenerated on Decline
+    -> set UnderwritingDecision = "Declined"
+    -> set DecisionReason = Decline.Reason
+    -> set DecidedAt = now()
+    -> append UnderwritingLog "Application declined: {Decline.Reason}"
+    -> transition Declined
+
+# Modify — QuoteGenerated → Modified. Alternative terms with conditions.
+from QuoteGenerated on Modify
+    -> set UnderwritingDecision = "Modified"
+    -> set ApprovedCoverage = Modify.NewCoverage
+    -> set ApprovedPremium = Modify.NewPremium
+    -> set ApprovedTerm = Modify.NewTerm
+    -> set RequiredConditions = Modify.Conditions
+    -> set DecisionReason = "Coverage and premium adjusted to fit risk profile"
+    -> set DecidedAt = now()
+    -> append UnderwritingLog "Application modified — alternative terms issued"
+    -> transition Modified
