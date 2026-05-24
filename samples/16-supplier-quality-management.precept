@@ -355,6 +355,15 @@ from Approved on UpdateScores
     -> append QualityLog "Scores updated"
     -> no transition
 
+from Monitored on UpdateScores when FirstPassYield >= 95.0 and OpenNonconformances == 0
+    -> set OnTimeDeliveryRate = UpdateScores.OnTimeDeliveryRate
+    -> set FirstPassYield = UpdateScores.FirstPassYield
+    -> set OpenNonconformances = UpdateScores.OpenNonconformances
+    -> set ClosedNonconformances = UpdateScores.ClosedNonconformances
+    -> set LastReviewScore = FirstPassYield
+    -> set SupplierStatus = "Approved"
+    -> append QualityLog "Scores updated — supplier approved"
+    -> transition Approved
 from Monitored on UpdateScores
     -> set OnTimeDeliveryRate = UpdateScores.OnTimeDeliveryRate
     -> set FirstPassYield = UpdateScores.FirstPassYield
@@ -362,12 +371,7 @@ from Monitored on UpdateScores
     -> set ClosedNonconformances = UpdateScores.ClosedNonconformances
     -> set LastReviewScore = FirstPassYield
     -> append QualityLog "Scores updated"
-    -> if FirstPassYield >= 95.0 and OpenNonconformances == 0 then
-        -> set SupplierStatus = "Approved"
-        -> transition Approved
-    else
-        -> no transition
-    end
+    -> no transition
 
 # --------------------------------------------------------------------------
 # PASS AUDIT — compliance verified
