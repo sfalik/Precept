@@ -1,9 +1,11 @@
 ---
-name: research
-description: Conduct technical, cross-domain, or feasibility research that informs Precept's language design, architecture, tooling, or product positioning. Triggers on — research, investigate, survey, compare alternatives, evaluate feasibility, prior art, precedent, landscape, "how do other tools handle X". Use this for any task whose output is a markdown document in `research/` (or a domain-owned research folder), not code. Excludes: brand identity research (use `design/brand/research/`) and UX research (use `design/system/research/`).
+name: lifecycle-1-research
+description: Stage 1 of the engineering lifecycle — research and exploration that feeds /lifecycle-2-design. Conduct technical, cross-domain, or feasibility research that informs Precept's language design, architecture, tooling, or product positioning. Triggers on — research, investigate, survey, compare alternatives, evaluate feasibility, prior art, precedent, landscape, "how do other tools handle X". Use this for any task whose output is a markdown document in `research/` (or a domain-owned research folder), not code. Excludes: brand identity research (use `design/brand/research/`) and UX research (use `design/system/research/`).
 ---
 
-# Precept Research
+# Precept Research (Lifecycle Stage 1)
+
+Stage 1 of the engineering lifecycle. Conclusions that lock decisions feed forward to `/lifecycle-2-design`.
 
 Research in this repo informs language design, architecture, tooling, and policy. The discipline matters as much as the findings — evidence-oriented, citation-rich, and never shadow policy.
 

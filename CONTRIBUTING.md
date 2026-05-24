@@ -2,7 +2,86 @@
 
 ## Development Workflow
 
-### Proposal Lifecycle
+## Doc Lifecycle
+
+Every meaningful design or implementation decision moves through seven stages. The lifecycle ensures that **why-content** (rationale, alternatives, tradeoffs, precedent) is captured at decision time and preserved as the work moves from idea to maintenance. Lifecycle skills automate the transitions between stages.
+
+| Stage | Activity | Skill | Where work lives |
+|---|---|---|---|
+| 1 | Research / explore | `/lifecycle-1-research` | `research/` |
+| 2 | Lock a design | `/lifecycle-2-design` | `docs/Working/` |
+| 3 | Plan execution | `/lifecycle-3-plan` | `docs/Working/` (plan doc) |
+| 4 | Execute the plan | — (engineering work) | code + tests |
+| 5 | Promote to canonical | `/lifecycle-5-promote` | canonical `docs/` updated; design moved to `docs/Working/Archive/` with cross-link |
+| 6 | End-of-lifecycle review | `/lifecycle-6-review` | one-shot completion check per work item |
+| 7 | Maintain | `/lifecycle-7-audit` (deferred to Phase 9) | canonical `docs/` |
+
+### Stage 5 is mandatory
+
+The most common failure mode is **Stage 4 → 5 transition skipped**: implementation ships, design doc gets archived, but canonical doc never receives the "why." The 2026-05-24 compiler-readiness review found 16 instances of this pattern across hover-design, constructor-semantics, diagnostic-enforcement, SemanticTokenTypes Slice 10, and 12 more from the archive scan — substantial design rationale stranded in `docs/Working/Archive/` while canonical docs lagged.
+
+**Rule**: every design doc moved to `docs/Working/Archive/` MUST carry a top-of-file header declaring one of:
+- `**Promoted to:** <canonical link>` — the why lives in the linked canonical doc
+- `**Status:** Historical — superseded by <link>` — concept evolved into a different design
+- `**Status:** Historical — design dropped, no canonical replacement` — design abandoned
+
+The `/lifecycle-5-promote` skill enforces this — it refuses to archive a design doc without the header. Manual archive moves (via `mv`) bypass the skill, which is allowed but reviewer-checked.
+
+### Pointer-philosophy applies to canonical content
+
+After Stage 5 promotion, canonical docs should preserve "why" content and point to code for "what" content. Concretely:
+
+- **Enumerable content** (member lists, type/field shapes, counts, file paths) → **pointer to code**: e.g., `See \`src/Precept/Language/Tokens.cs\` for member list.`
+- **Conceptual content** (architecture, design rationale, why-decisions, tradeoffs) → **hand-written, preserved across promotion**
+
+The 2026-05-24 review found `catalog-system.md` had drifted on counts (14 of 14 catalogs had at least one count discrepancy) precisely because enumerable content was duplicated in the doc. Pointer-philosophy makes that class of drift mechanically impossible.
+
+### Four-leg rationale policy
+
+Per the "Per-Decision Rationale (Non-Negotiable)" section in `CLAUDE.md`, locked design decisions must include four legs:
+1. **Rationale** — why this choice
+2. **Alternatives considered** — and rejection reasons
+3. **Precedent** — research / prior art / existing pattern grounding the choice
+4. **Tradeoff accepted** — known downside being taken on
+
+**Scope of the rule**:
+
+- **New decisions** going through `/lifecycle-2-design`: **required**. The skill refuses to mark a design "Locked" without all four legs on every decision. Author can answer "no precedent — novel choice" or "no tradeoff identified — flag for review" honestly, but cannot skip.
+- **Decisions backed by Archive design docs** (Stage 4 → 5 promotion): the `/lifecycle-5-promote` skill lifts whatever depth the source provides. Pre-policy designs with Decision + Rationale only get lifted as-is with a "no further rationale recorded in source" note. **No fabrication.**
+- **Existing canonical doc § Design Rationale entries** without four legs: **grandfather**. No required backfill. `/lifecycle-7-audit` may flag these as gaps, but they don't block promotion of new work.
+
+The rule's purpose is to prevent future ambiguity at decision time, not to retroactively annotate shipped code. Honest grandfathering beats fabricated four-leg structure.
+
+### Doc routing table
+
+When implementation work touches code, the canonical docs that may need updates depend on what's touched. The CLAUDE.md "Documentation Sync" section is the source of truth for routing:
+
+| Kind of change | Update |
+|---|---|
+| Pipeline stage behavior | `docs/compiler/<stage>.md` |
+| Runtime API | `docs/runtime/runtime-api.md` + relevant per-type doc |
+| Language surface (keyword, type, operator, modifier, construct) | Catalog entry first; then `docs/language/precept-language-spec.md` + relevant type doc |
+| Diagnostic added/changed | `docs/compiler/diagnostic-system.md` |
+| Catalog architecture | `docs/language/catalog-system.md` |
+| MCP tool surface | `docs/tooling/mcp.md` + DTO/formatter in `tools/Precept.Mcp/` |
+| Language server feature | `docs/tooling/language-server.md` |
+| Doc status changing (Stub → Design → Implemented) | The doc's own Status field AND any cross-referencing tables |
+| README claim invalidated | `README.md` |
+
+`/lifecycle-2-design` consults this table when populating a design doc's "Doc-update enumeration" section. `/lifecycle-3-plan` uses that enumeration to populate per-phase doc-touch obligations. `/lifecycle-5-promote` verifies those obligations at promotion time.
+
+The skills make routing automatic — authors don't need to memorize the table, but should understand it exists so they can override when the heuristic gets a case wrong.
+
+### Proposal Lifecycle (Stages 1-3 of the Doc Lifecycle)
+
+When PR-and-issue workflow is in use (main branch development), the proposal lifecycle below maps onto Stages 1-3 of the Doc Lifecycle:
+- Stage 1 (Research) corresponds to "Research" below
+- Stage 2 (Lock a design) corresponds to "Design Review" below + the design doc in Track B
+- Stage 3 (Plan execution) corresponds to "Implementation plan" in the PR body
+
+On spike branches without PRs (current `spike/Precept-V2-Radical` workflow), the lifecycle skills (`/lifecycle-1-research`, `/lifecycle-2-design`, `/lifecycle-3-plan`) handle the same transitions without the GitHub gates. The discipline is the same; the enforcement mechanism differs.
+
+Stages 4-7 (execute, promote, review, maintain) are the same on both workflows.
 
 Every language or runtime change follows this flow:
 
@@ -238,6 +317,19 @@ A spike is exploratory work that validates a hypothesis or explores a design spa
 **Spike vs. feature branch:**
 A spike is NOT a slow-moving feature branch. If the work is ready for review, it is not a spike — open a proper PR and go through the implementation gate.
 
+**Doc lifecycle on spike branches**:
+
+The doc lifecycle (Stages 1-7) applies in full on spike branches. Without GitHub PRs as enforcement gates, the lifecycle skills become the primary discipline:
+
+- `/lifecycle-1-research` — exploration in `research/`
+- `/lifecycle-2-design` — lock the design with four-leg rationale; refuses to lock without
+- `/lifecycle-3-plan` — phased execution plan with decisions surfaced as gates
+- (execute the plan)
+- `/lifecycle-5-promote` — lift "why" to canonical, archive with header. **Mandatory** — design docs cannot reach Archive without it (or the explicit historical-status header).
+- `/lifecycle-6-review` — one-shot end-of-lifecycle completion check before declaring a work item closed
+
+Reviewer prompts (the GitHub PR template equivalent) are folded into `/lifecycle-3-plan` (doc-touch obligations enumerated upfront) and `/lifecycle-5-promote` (obligations verified at promotion). The discipline lives in the skills the agent invokes, not in a manual checklist.
+
 #### 7. Merge and Close
 
 After review approval:
@@ -272,6 +364,20 @@ Language proposals are assigned to wave milestones that reflect priority and dep
 | What changed, why this PR exists, and HOW to implement (summary + reviewer context + checklist) | PR body | Ephemeral — dies with the PR |
 | Design doc in "to be" form (Track B) | PR branch — reaches `main` only with implementing code | Ephemeral on branch — permanent once merged |
 | AI agent directives | `.github/copilot-instructions.md` | Permanent — updated as process evolves |
+
+### Doc Lifecycle Path
+
+| Stage | Path |
+|---|---|
+| Research (Stage 1) | `research/<subfolder>/<topic>.md` |
+| Locked design (Stage 2) | `docs/Working/<topic>.md` with frontmatter `status: Locked YYYY-MM-DD` |
+| Execution plan (Stage 3) | `docs/Working/<topic>-plan-YYYY-MM-DD.md` |
+| Canonical (Stage 5+) | `docs/compiler/` / `docs/language/` / `docs/tooling/` / `docs/runtime/` per the routing table |
+| Archived design (Stage 5 complete) | `docs/Working/Archive/<original-filename>` with `**Promoted to:**` header |
+| Lifecycle review report (Stage 6) | `docs/Working/lifecycle-review-<work-item>-YYYY-MM-DD.md` |
+| Audit reports (recurring Stage 7) | `docs/Working/<workstream>-review-YYYY-MM-DD.md` |
+
+The `/lifecycle-*` skills handle moves between these locations.
 
 ### Why not separate implementation plan docs?
 
