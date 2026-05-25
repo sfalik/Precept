@@ -160,7 +160,7 @@ The tooling surface is intentionally **thin** — a projection layer, not a reas
 When a new token is added to `Tokens.All`:
 - It **automatically** appears in syntax highlighting (grammar generation derives from catalog)
 - It **automatically** appears in completions (completion provider queries catalog)
-- It **automatically** appears in MCP vocabulary (`precept_language` tool queries catalog)
+- It **automatically** appears in MCP vocabulary (the catalog-reference tools — `precept_syntax`, `precept_types`, `precept_operations`, etc. — query catalogs at request time)
 - It **automatically** gets semantic token classification (LS reads `TokenMeta.SemanticTokenType`)
 
 If any of these require manual tooling changes, the design is violated. The single atomic act of adding a catalog entry propagates to every surface.
@@ -813,7 +813,7 @@ string FormatEventHover(TypedEvent evt)
               ▼                             ▼                             ▼
     ┌─────────────────────┐     ┌─────────────────────┐     ┌─────────────────────┐
     │  Grammar Generator  │     │   Language Server   │     │    MCP Server       │
-    │  (build time)       │     │   (request time)    │     │ precept_language    │
+    │  (build time)       │     │   (request time)    │     │ precept_syntax/etc  │
     └──────────┬──────────┘     └──────────┬──────────┘     └──────────┬──────────┘
                │                           │                           │
                ▼                           ▼                           ▼
@@ -1036,7 +1036,7 @@ Grammar, completions, hover, semantic tokens, and MCP vocabulary all derive from
 | Completion items | `Types.All`, `Actions.All`, `Modifiers.All`, etc. |
 | Hover text | `TokenMeta.Description`, `SemanticIndex` symbols |
 | Semantic token types | `TokenMeta.SemanticTokenType` |
-| MCP `precept_language` | All 13 catalogs |
+| MCP catalog-reference tools (`precept_syntax`, `precept_types`, `precept_operations`, `precept_domains`, `precept_proofs`, `precept_patterns`, `precept_diagnostic`) | The catalogs |
 
 **Innovation:** A single source of truth eliminates parallel maintenance and synchronization bugs.
 

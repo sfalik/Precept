@@ -93,7 +93,7 @@ The fault system mirrors the compiler's diagnostic system but is trimmed for the
 | Output | Consumer |
 |--------|----------|
 | `Fault` (readonly record struct) | Evaluator → `FaultException` → caller (shape pending Q1) |
-| `FaultMeta` | MCP `precept_language` enumerates `Faults.All` to list all evaluator fault codes |
+| `FaultMeta` | MCP `precept_proofs` enumerates `Faults.All` to list all evaluator fault codes; `precept_diagnostic <CODE>` returns per-code detail |
 | `Faults.All` | Language server and drift tests enumerate all registered fault codes |
 
 ## FaultCode — The Registry
@@ -273,7 +273,7 @@ See [diagnostic-system.md § Why an exhaustive switch, not attributes + reflecti
 
 ### Recovery hints are on FaultMeta, not Fault
 
-Recovery hints are per-code guidance, not per-instance guidance. Moving `RecoveryHint` onto `Fault` would add it to every `Fault` value and all downstream consumers. Because the hint is the same for every instance of a given `FaultCode`, it belongs on `FaultMeta`, where consumers that need it (MCP `precept_language`, preview inspector) can look it up by code without carrying it through the evaluator's output path.
+Recovery hints are per-code guidance, not per-instance guidance. Moving `RecoveryHint` onto `Fault` would add it to every `Fault` value and all downstream consumers. Because the hint is the same for every instance of a given `FaultCode`, it belongs on `FaultMeta`, where consumers that need it (MCP `precept_proofs` / `precept_diagnostic`, preview inspector) can look it up by code without carrying it through the evaluator's output path.
 
 ### Defense-in-depth, not a primary error path
 

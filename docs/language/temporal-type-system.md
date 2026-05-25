@@ -1816,7 +1816,7 @@ Temporal types are valid as collection inner types where the collection's struct
 
 ### MCP Tools
 
-- `precept_language`: All 8 types. Typed constant quantity syntax description. Typed constant delimiter syntax. Interpolation syntax. Reference [Literal System](../compiler/literal-system.md) for canonical literal model.
+- `precept_types` (scope=temporal): All 8 types. Typed constant quantity syntax description. Typed constant delimiter syntax. Interpolation syntax. Reference [Literal System](../compiler/literal-system.md) for canonical literal model.
 - `precept_compile`/`fire`/`inspect`/`update`: All temporal values serialized as strings via NodaTime STJ converters.
 - **Serialization:** Configure `NodaTime.Serialization.SystemTextJson` on the serializer. All 8 types serialize and deserialize via the registered NodaTime converters — no custom serialization code. Input requires type-directed deserialization: MCP input arrives as generic dictionaries (values are raw strings), so the engine dispatches to the correct NodaTime converter based on the compiled field type declaration. The MCP layer stays thin — no conversion code.
 

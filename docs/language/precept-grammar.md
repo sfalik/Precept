@@ -881,7 +881,7 @@ Precept model:
     ├──▶ Type checker reads Types, Operations, Modifiers → type rules
     ├──▶ IDE completions read all catalogs → context-sensitive suggestions
     ├──▶ TextMate grammar reads Tokens, Constructs → syntax highlighting
-    └──▶ MCP precept_language reads all catalogs → AI grounding
+    └──▶ MCP catalog-reference tools (precept_syntax, precept_types, etc.) read catalogs → AI grounding
 ```
 
 ### Implication for language evolution

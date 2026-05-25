@@ -102,7 +102,7 @@ Every consumer reads from these catalogs:
 
 | Consumer | What it reads |
 |----------|---------------|
-| MCP `precept_language` | All keywords, types, operators, operations, functions, constraints, grammar forms, outcome forms |
+| MCP catalog-reference tools (`precept_syntax`, `precept_types`, `precept_operations`, `precept_domains`, `precept_proofs`, `precept_patterns`, `precept_diagnostic`) | All keywords, types, operators, operations, functions, constraints, grammar forms, outcome forms — projected per tool from the relevant catalogs |
 | TextMate grammar | Token keyword alternations, type name alternations, construct slot patterns, `SemanticTokenTypeMeta.TextMateScope` |
 | LS completions | Types, functions, modifiers, actions, outcome forms — context-dependent |
 | LS hover | Type documentation, function signatures, operator descriptions, outcome descriptions |
@@ -346,7 +346,7 @@ flowchart LR
     subgraph Tooling["Tooling consumers"]
         LS["Language Server"]
         Grammar["TextMate Grammar"]
-        MCP["MCP precept_language"]
+        MCP["MCP catalog tools (precept_syntax, precept_types, ...)"]
     end
 
     Lexer         --> CL1
@@ -1220,7 +1220,7 @@ public static class SyntaxReference
 
 | Consumer | How it reads |
 |----------|-------------|
-| MCP `precept_language` | Serializes to a `syntaxReference` JSON object in the response |
+| MCP `precept_syntax` | Serializes to a `syntaxReference` JSON object in the response |
 | Human reference docs | Generates a "Grammar Basics" section from the same properties |
 | LS hover | Tooltip text for identifier tokens, comment tokens, etc. |
 | AI grounding | Reads alongside catalog data for complete language understanding |
@@ -1236,7 +1236,7 @@ The test of completeness: every cell should trace back to a catalog, never to ha
 | Consumer surface | Catalogs read | How |
 |------------------|---------------|-----|
 | **TextMate grammar** | Constructs → Tokens → Types | **Generated** from catalog metadata. Construct slot arrays generate patterns; token keywords generate keyword alternations; type keywords via `Types.All` filtered by `Token.Text`. No hand-maintained alternation lists. Tests verify the generator produces correct output. |
-| **MCP `precept_language`** | All catalogs' `.All` + `SyntaxReference` | Union of all catalog enumerations IS the language spec. MCP tool iterates each and serializes. `SyntaxReference` adds grammar meta-rules. |
+| **MCP catalog-reference tools** | Each tool reads the relevant catalogs' `.All` + `SyntaxReference` | Union of all catalog enumerations IS the language spec. Each MCP catalog tool projects one slice (syntax, types, operations, domains, proofs, patterns, per-code diagnostic). `SyntaxReference` adds grammar meta-rules consumed by `precept_syntax`. |
 | **LS completions** | Tokens + Types + Functions + Modifiers + Actions | **Generated** from catalog metadata. Context-filtered: type position → `Types.All`; expression → `Functions.All`; after type → `Modifiers.All` filtered by `ApplicableTo`; event body → `Actions.All`. No hand-maintained completion lists. |
 | **LS hover** | Types + Functions + Operators + Operations + Constraints | Per-member descriptions from catalog metadata. `ConstraintMeta.Description` populates hover for `rule`/`ensure` declarations. |
 | **LS semantic tokens** | Tokens (via `TokenMeta.Categories`) | Token categories map directly to semantic token types |

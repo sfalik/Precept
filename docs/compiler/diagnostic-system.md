@@ -8,7 +8,7 @@
 | Implementation state | Implemented |
 | Source | `src/Precept/Language/Diagnostic.cs`, `src/Precept/Language/DiagnosticCode.cs`, `src/Precept/Language/Diagnostics.cs` |
 | Upstream | Lexer, Parser, NameBinder, TypeChecker, GraphAnalyzer, ProofEngine |
-| Downstream | Language Server, MCP (`precept_compile`, `precept_language`), drift tests |
+| Downstream | Language Server, MCP (`precept_compile`, `precept_diagnostic`), drift tests |
 
 ---
 
@@ -100,7 +100,7 @@ Roslyn's diagnostic system was surveyed as the primary reference. It introduces 
 
 **Outputs:**
 - `Diagnostic` value structs collected in `Compilation.Diagnostics` — consumed by the Language Server, MCP `precept_compile`, and downstream callers
-- `DiagnosticMeta` records enumerated by `Diagnostics.All` — consumed by MCP `precept_language` to list all rules without compiling
+- `DiagnosticMeta` records enumerated by `Diagnostics.All` — consumed by MCP `precept_diagnostic` (per-code detail) and `precept_proofs` (proof/fault catalog) to surface rules without compiling
 - `string Code` derived from `nameof(DiagnosticCode.XYZ)` — used as the LSP `code` field and MCP rule identifier
 - `Fault` output records (from the evaluator) — consumed by MCP `precept_fire` and the preview inspector when a runtime fault occurs
 
@@ -684,7 +684,7 @@ This prevents cascading errors from confusing users — if the file doesn't lex,
 
 ### MCP Consumption
 
-MCP `precept_compile` serializes diagnostics to JSON. The flat `Diagnostic` fields map directly. MCP `precept_language` enumerates `Diagnostics.All` to list all rules without compiling.
+MCP `precept_compile` serializes diagnostics to JSON. The flat `Diagnostic` fields map directly. MCP `precept_diagnostic` returns per-code detail and `precept_proofs` enumerates the proof/fault catalog — both read `Diagnostics.All` to surface rules without compiling.
 
 ---
 
@@ -696,7 +696,7 @@ The prototype already has a diagnostic catalog (`DiagnosticCatalog` + `LanguageC
 
 That analysis was wrong. The enumeration surface exists because **consumer surfaces need to enumerate all diagnostic rules without compiling anything**:
 
-- **MCP `precept_language`** iterates all rules to tell agents every rule the language enforces (edge E22 in the alignment inventory — zero-drift by construction).
+- **MCP `precept_diagnostic` and `precept_proofs`** iterate the diagnostic catalog to tell agents every rule the language enforces (edge E22 in the alignment inventory — zero-drift by construction).
 - **LS diagnostic codes** derive from catalog entries (edge E23).
 - **Drift tests** verify every registered rule has a triggering test (edge E49) and every `SYNC:CONSTRAINT` comment references a valid catalog entry (edges E19–E21).
 

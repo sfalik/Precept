@@ -502,9 +502,9 @@ The TextMate grammar (`tools/Precept.VsCode/syntaxes/precept.tmLanguage.json`) i
 
 Keyword completions are derived from `Tokens.All`. `TokenMeta.ValidAfter` controls which completions appear after which tokens — the language server reads this metadata, not a hardcoded completion table.
 
-### MCP Language Tool
+### MCP Catalog Tools
 
-The `precept_language` MCP tool serializes the Tokens catalog (among others) as part of its vocabulary output. The tool reads catalog entries directly — it has no parallel keyword list.
+The MCP catalog-reference tool `precept_syntax` serializes the Tokens catalog as part of its vocabulary output. The tool reads catalog entries directly — it has no parallel keyword list. See [`docs/tooling/mcp.md`](../tooling/mcp.md) for the live tool surface.
 
 ---
 

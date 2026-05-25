@@ -2014,7 +2014,7 @@ Parse failure returns a `QualifierMismatch`/`DimensionCategoryMismatch` diagnost
 
 ### MCP tool changes
 
-- `precept_language`: add all seven types, `in` and `of` syntax, operator tables, D15 cancellation rules.
+- `precept_types` (scope=business-domain) + `precept_operations`: add all seven types, `in` and `of` syntax, operator tables, D15 cancellation rules.
 - `precept_compile`: return unit information in field metadata (currency, unit, dimension, compound status).
 
 ---

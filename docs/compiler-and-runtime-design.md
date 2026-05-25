@@ -1289,7 +1289,7 @@ The TextMate grammar (`tools/Precept.VsCode/syntaxes/precept.tmLanguage.json`) i
 | `Constructs` | Declaration-level patterns (anchor keywords for each `ConstructKind`), block delimiters, slot-level structure hints |
 | `Operators` | Operator precedence groups (used for scope nesting in the grammar to support bracket matching and indentation) |
 
-The same catalog metadata drives LS completions, LS hover content, LS semantic tokens, and MCP `precept_language` vocabulary. Adding a keyword, type, or operator to the appropriate catalog automatically updates every surface — grammar, completions, hover, semantic tokens, and MCP output.
+The same catalog metadata drives LS completions, LS hover content, LS semantic tokens, and the MCP catalog-reference tools (`precept_syntax`, `precept_types`, `precept_operations`, `precept_domains`, `precept_proofs`, `precept_patterns`, `precept_diagnostic`). Adding a keyword, type, or operator to the appropriate catalog automatically updates every surface — grammar, completions, hover, semantic tokens, and MCP output.
 
 ### Anti-pattern
 
@@ -1304,41 +1304,42 @@ See [`docs/compiler/tooling-surface.md`](./compiler/tooling-surface.md) for the 
 
 ## 14. MCP integration
 
-Precept ships five MCP tools as **primary distribution surfaces** — not integrations bolted on afterward. The MCP server is an AI-first design concern: every architectural decision accounts for AI agent consumers alongside human developers.
+Precept ships MCP tools as **primary distribution surfaces** — not integrations bolted on afterward. The MCP server is an AI-first design concern: every architectural decision accounts for AI agent consumers alongside human developers.
 
 ### Tool inventory
 
-| Tool | Purpose | Core API surface |
-|---|---|---|
-| `precept_language` | Complete DSL vocabulary — keywords, operators, scopes, constraints, pipeline stages | Catalogs directly |
-| `precept_compile(text)` | Parse, type-check, analyze; returns typed structure + diagnostics | `Compilation` |
-| `precept_inspect(text, currentState, data, eventArgs?)` | Read-only preview of what each event would do | `Precept` + inspection runtime |
-| `precept_fire(text, currentState, event, data?, args?)` | Single-event execution for step-by-step tracing | `Precept` / `Version.Fire` |
-| `precept_update(text, currentState, data, fields)` | Direct field editing to test `edit` declarations and constraints | `Precept` / `Version.Update` |
+The canonical tool inventory lives in [`docs/tooling/mcp.md`](../tooling/mcp.md) (§ 3 Live tool surface and § 4 Planned or absent tools). At a glance:
+
+- **Compile surface:** `precept_compile` — parse, type-check, analyze; returns structured JSON diagnostics + proof obligations + summary.
+- **Catalog/reference surface:** `precept_syntax`, `precept_types`, `precept_operations`, `precept_domains`, `precept_proofs`, `precept_patterns`, `precept_diagnostic`, `precept_quickstart` — focused tools that project the catalogs and reference content for AI consumption. Each derives directly from catalog metadata; adding a keyword/type/operator/diagnostic automatically updates the relevant tool's output.
+- **Health/discovery:** `precept_ping`.
+- **Planned (ship with v1 runtime):** `precept_inspect`, `precept_fire`, `precept_update`, `precept_create` — runtime orchestration tools that consume `Precept` and `Version` runtime artifacts. Not present in `tools/Precept.Mcp/Tools/` today.
+
+The legacy broad `precept_language` tool has been removed — the focused catalog tools above replace it with no compatibility shim.
 
 ### Architectural principles
 
 **Thin wrappers.** MCP tools are thin wrappers around core APIs — domain logic lives in `src/Precept/`, not in the MCP layer. If a tool method exceeds ~30 lines of non-serialization code, the logic belongs in the core.
 
-**Catalog-derived vocabulary.** The `precept_language` tool derives its vocabulary directly from catalog metadata. When a new keyword, type, or construct is added to the catalogs, it appears in `precept_language` output automatically — no MCP code change required.
+**Catalog-derived vocabulary.** The catalog-reference tools derive their output directly from catalog metadata. When a new keyword, type, operator, diagnostic, or domain entry is added to the appropriate catalog, it appears in the relevant tool's output automatically — no MCP code change required.
 
-**Structured outcomes for AI consumption.** Fire, inspect, and update return structured outcomes designed for AI agent consumption — causal reasoning, not just status codes. Constraint violations carry expression text, evaluated values, and guard context. Inspection results carry per-row prospects, effects, and constraint results.
+**Structured outcomes for AI consumption.** Compile diagnostics and (planned) fire / inspect / update return structured outcomes designed for AI agent consumption — causal reasoning, not just status codes. Constraint violations will carry expression text, evaluated values, and guard context; inspection results will carry per-row prospects, effects, and constraint results.
 
-**MCP as the primary research instrument.** The intended workflow for both AI agents and human developers: use `precept_compile` and `precept_language` BEFORE reading source code. The MCP tools provide the authoritative view of what the language is and what a definition means.
+**MCP as the primary research instrument.** The intended workflow for both AI agents and human developers: use `precept_compile` and the catalog-reference tools BEFORE reading source code. The MCP tools provide the authoritative view of what the language is and what a definition means.
 
 ### AI-first design principle
 
-Public API contracts, diagnostic structures, and DSL constructs must be understandable by AI agents without contextual human knowledge. This means: structured types over string messages, deterministic output shapes, causal explanations in violation results, and complete vocabulary exposure through `precept_language`.
+Public API contracts, diagnostic structures, and DSL constructs must be understandable by AI agents without contextual human knowledge. This means: structured types over string messages, deterministic output shapes, causal explanations in violation results, and complete vocabulary exposure through the catalog-reference tools.
 
 The `ConstraintInfluenceMap` (§8 innovation) would make MCP tools causal reasoning engines: given a constraint failure, an AI agent could determine "which field change would satisfy this constraint?" without reverse-engineering expression semantics — the influence map provides the dependency graph directly.
 
 > **Precept Innovations**
-> - **MCP vocabulary from catalogs.** The `precept_language` vocabulary is generated from the same catalogs that drive grammar and completions. A developer (human or AI) who knows the MCP vocabulary already knows the language surface — no redundancy, no drift.
-> - **Inspection as a first-class MCP operation.** `precept_inspect` provides read-only preview of every possible transition from any state — with full constraint evaluation, per-row prospects, and structured outcomes. Without inspection, AI agents would need to speculatively fire events and observe outcomes to determine what the lifecycle allows, rather than querying the full action landscape before committing.
-> - **Causal reasoning in tool output.** Structured "why not" explanations in fire/update results transform MCP from status reporting to causal reasoning — an AI agent can explain failures without access to source code.
+> - **MCP vocabulary from catalogs.** The catalog-reference tools' vocabulary is generated from the same catalogs that drive grammar and completions. A developer (human or AI) who knows the MCP vocabulary already knows the language surface — no redundancy, no drift.
+> - **Inspection as a first-class MCP operation (planned).** `precept_inspect` will provide read-only preview of every possible transition from any state — with full constraint evaluation, per-row prospects, and structured outcomes. Without inspection, AI agents would need to speculatively fire events and observe outcomes to determine what the lifecycle allows, rather than querying the full action landscape before committing.
+> - **Causal reasoning in tool output.** Structured "why not" explanations in fire/update results (planned) transform MCP from status reporting to causal reasoning — an AI agent can explain failures without access to source code.
 > - **AI-first, not AI-adapted.** The MCP surface was designed alongside the core API, not retrofitted. Structured outcomes, deterministic shapes, and complete vocabulary exposure are architectural requirements, not afterthoughts.
 
-See [`docs/tooling/mcp.md`](../tooling/mcp.md) for the full MCP design including tool signatures and thin-wrapper discipline.
+See [`docs/tooling/mcp.md`](../tooling/mcp.md) for the canonical live tool surface, tool signatures, and thin-wrapper discipline.
 
 ## 15. Language-server integration
 
@@ -1369,11 +1370,11 @@ Two hard rules: (1) Do not make semantic LS features walk `ConstructManifest` to
 | Consumer | Correct artifact |
 |---|---|
 | LS diagnostics / semantic tokens / completions / hover / definition | `Compilation` |
-| MCP `precept_language` | catalogs directly |
+| MCP catalog-reference tools (`precept_syntax`, `precept_types`, `precept_operations`, `precept_domains`, `precept_proofs`, `precept_patterns`, `precept_diagnostic`) | catalogs directly |
 | MCP `precept_compile` | `Compilation` |
-| MCP `precept_inspect` | `Precept` + inspection runtime |
-| MCP `precept_fire` | `Precept` / `Version.Fire` |
-| MCP `precept_update` | `Precept` / `Version.Update` |
+| MCP `precept_inspect` (planned, ships with v1 runtime) | `Precept` + inspection runtime |
+| MCP `precept_fire` (planned, ships with v1 runtime) | `Precept` / `Version.Fire` |
+| MCP `precept_update` (planned, ships with v1 runtime) | `Precept` / `Version.Update` |
 | Host application authoring-time validation | `Compilation` |
 | Host application execution | `Precept` + `Version` |
 
