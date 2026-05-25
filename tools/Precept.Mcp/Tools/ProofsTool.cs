@@ -9,5 +9,5 @@ public static class ProofsTool
     [McpServerTool(Name = "precept_proofs")]
     [Description("Return the proof-requirement and runtime-fault catalogs as markdown. Call when guards, ensures, or runtime safety behavior are unclear.")]
     public static string Proofs()
-        => CatalogFormatters.FormatProofs();
+        => McpToolSafeInvoke.Invoke(nameof(Proofs), () => CatalogFormatters.FormatProofs());
 }

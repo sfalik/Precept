@@ -165,6 +165,41 @@ public static partial class Parser
                 keyType = elementType; // In lookup, the first type is the key
                 elementType = ParseInnerTypeReference(); // second is value
                 lastSpan = elementType.Span;
+
+                // Symptom fix (BUG-005): full qualified-inner-type support is
+                // deferred to F-LANG-COLL-06 (Phase 4). Until then, accepting a
+                // trailing `in '...'` or `of '...'` qualifier on the value type
+                // would either cascade as parser noise (currency case: `money in 'USD'`)
+                // or hand a stray preposition back to the declaration parser
+                // (dimension case: `quantity of 'mass'`). Detect that shape here,
+                // emit a single PRE0105 CollectionInnerTypeError, and consume the
+                // qualifier tokens so the surrounding parse stays clean.
+                if (Peek().Kind is TokenKind.In or TokenKind.Of)
+                {
+                    var qualifierStart = Peek().Span;
+                    var qualifierEnd = qualifierStart;
+                    var elementMeta = elementType is SimpleTypeReference simple ? simple.Type : null;
+                    var elementName = elementMeta?.DisplayName ?? "value";
+
+                    while (Peek().Kind is TokenKind.In or TokenKind.Of)
+                    {
+                        qualifierEnd = Advance().Span; // consume preposition
+                        if (Peek().Kind is TokenKind.TypedConstant or TokenKind.StringLiteral
+                            or TokenKind.Identifier)
+                        {
+                            qualifierEnd = Advance().Span; // consume qualifier value
+                        }
+                    }
+
+                    var qualifierSpan = SourceSpan.Covering(qualifierStart, qualifierEnd);
+                    _diagnostics.Add(DiagnosticsCatalog.Create(
+                        DiagnosticCode.CollectionInnerTypeError,
+                        qualifierSpan,
+                        $"unqualified {elementName}",
+                        "lookup value",
+                        $"qualified {elementName}"));
+                    lastSpan = qualifierSpan;
+                }
             }
             else if ((collectionMeta.Kind is TypeKind.LogBy or TypeKind.QueueBy) && Peek().Kind == TokenKind.By)
             {

@@ -63,19 +63,29 @@ internal static class DiagnosticCoverageAllowLists
         // ── Deferred — OutOfRange ────────────────────────────────────────────────
         "OutOfRange",                         // Deferred: constant-literal bounds check not wired
 
+        // ── Catalog-mediated fallthrough emission ────────────────────────────────
+        // InvalidTypedConstantContent is emitted from the SelectDiagnosticCode
+        // coalesce fallback in TypeChecker.Expressions.cs when a typed-constant
+        // family declares neither FormatErrorCode nor SemanticErrorCode. The
+        // emission flows through a DiagnosticCode-typed local variable into
+        // Diagnostics.Create, so the syntactic scanner can't trace it. Tests
+        // exercise the path via NodaTime-validated families.
+        "InvalidTypedConstantContent",
+
         // ── Pre-existing gaps (not in Slice 8 scope) ─────────────────────────────
         "CollectionOperationOnScalar",        // no emission site wired
-        "InvalidTypedConstantContent",        // no emission site wired
-        "InvalidDateValue",                   // no emission site wired
-        "InvalidDateFormat",                  // no emission site wired
-        "InvalidTimeValue",                   // no emission site wired
-        "InvalidInstantFormat",               // no emission site wired
         "NonOrderableCollectionExtreme",      // no emission site wired
         "UnsatisfiableGuard",                 // no emission site wired
         "DivisionByZero",                     // no emission site wired
         "SqrtOfNegative",                     // no emission site wired
         "ChoiceElementTypeMismatch",          // no emission site wired
         "ChoiceMissingElementType",           // no emission site wired
+
+        // ── MCP tooling backstop ─────────────────────────────────────────────────
+        // McpToolInternalError fires only from the McpToolSafeInvoke wrapper in
+        // tools/Precept.Mcp — it never reaches the normal compile pipeline that
+        // the Precept0027 analyzer scans, so it must be allow-listed here.
+        "McpToolInternalError",
     };
 
     /// <summary>
@@ -155,6 +165,10 @@ internal static class DiagnosticCoverageAllowLists
         "InvalidQuantifierTarget",
         "InvalidTemporalDimensionString",
         "InvalidTemporalUnitString",
+        "InvalidDateFormat",
+        "InvalidDateValue",
+        "InvalidTimeValue",
+        "InvalidInstantFormat",
         "InvalidUnitString",
         "IrreversibleStateHasBackEdge",
         "IsSetOnNonOptional",
@@ -211,5 +225,11 @@ internal static class DiagnosticCoverageAllowLists
         "MaterializedFieldSelfReference",
         "WritableOnEventArg",
         "ZeroConstructionRows",
+
+        // ── MCP tooling backstop ─────────────────────────────────────────────────
+        // McpToolInternalError is exercised by tests in test/Precept.Mcp.Tests/ that
+        // call the MCP tool wrappers directly. Those tests are not visible to the
+        // Precept.Tests cross-project test scanner.
+        "McpToolInternalError",
     };
 }

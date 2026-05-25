@@ -118,7 +118,7 @@ public class NewToolTests
         result.Should().Contain("## Common Patterns");
         result.Should().Contain("### Guarded transition");
         result.Should().Contain("### Entry action hook");
-        result.Should().Contain("### Cross-cutting event (from any)");
+        result.Should().Contain("### Cross-cutting event (from any or multi-state source list)");
         result.Should().Contain("### Stack and queue operations");
         result.Should().Contain("### Optional-with-fallback assignment");
         result.Should().Contain("### Conditional rule (rule when)");

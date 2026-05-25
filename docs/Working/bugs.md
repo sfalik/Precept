@@ -27,96 +27,45 @@ surfaced for proper fixing.
 
 ## Active
 
-### BUG-011: `timezone` and `time` fields with typed-constant default crash the compiler
+### BUG-013: `ParserIntegrationTests.TestSample_EventDeclaration_BindsInitialToCreateOnly` references missing `samples/Test.precept`
 
-- **Discovered**: 2026-05-24 during feature-gap-fill batch authoring `samples/global-meeting-scheduler.precept`
-- **Affected**: any precept that declares `field X as timezone default '<literal>'` (e.g. `field DefaultTz as timezone default 'America/New_York'`) or `field X as time default '<literal>'` (e.g. `field DefaultStart as time default '09:00'`). Same fault family as BUG-003 (`period`), BUG-008 (`duration`), BUG-010 (`now() + duration`) — typed-constant temporal-literal handling.
-- **Symptom**: `precept_compile` returns "An error occurred invoking 'precept_compile'." with no diagnostic, no PRE-code, no message — identical to BUG-003/008/010. Stripping `default '<literal>'` (leaving the field as `optional`) lets the same definition compile clean. The crash reproduces on minimal inputs:
+- **Discovered**: 2026-05-25 during Phase 2 Step 2.7 verification of the test suite
+- **Affected**: `test/Precept.Tests/Parser/ParserIntegrationTests.cs:179` reads `Path.Combine(SamplesRoot, "Test.precept")` and parses it; `samples/Test.precept` does not exist in the repo, so `ParseFile` throws `FileNotFoundException`. Single sample-side test failure surfaced by `dotnet test`.
+- **Symptom**: `System.IO.FileNotFoundException : Could not find file '/home/sfalik/source/repos/Precept/samples/Test.precept'.` at the test's `ParseFile(path)` call. The 1 failing test out of 6108 in `Precept.Tests` after Phase 2.
+- **Root cause** (suspected): the test was authored when `Test.precept` existed (parallel sample-authoring sessions historically added/removed a scratch `Test.precept` fixture); the file was removed without updating the test. Either the test should embed its expected source inline (no filesystem dependency), or the sample file should be re-added under a stable name.
+- **Workaround used**: none — the test simply fails. Out of Phase 2 scope per the plan ("Sample-side failures, if any remain, are routed to bugs.md").
+- **Fix complexity**: trivial — either rewrite the test with inline `precept ...` source, or re-add `samples/Test.precept` with the minimal multi-event-with-`initial` shape the test asserts (`event create, start, stop, reset` with `create initial`).
+- **Priority**: quality bar — exactly 1 test failure noise in an otherwise green baseline. Quick to clear.
+
+### BUG-012: Ordinal comparison between an ordered-choice field and a choice-literal cannot be proved
+
+- **Discovered**: 2026-05-25 during refactor of `samples/it-helpdesk-ticket.precept` to give Severity, Urgency, and Priority an idiomatic ordered-choice shape.
+- **Affected**: any precept that uses `<`, `<=`, `>`, or `>=` between an `ordered` `choice of …` field and a bare literal from the same choice set. Both flavors reproduce: `choice of integer(...)` (e.g. `Severity <= 2`) and `choice of string(...)` (e.g. `Tier <= "Medium"`). Field-vs-field comparisons of two same-set ordered choice fields prove cleanly via `DeclarationAttribute`.
+- **Symptom**: `precept_compile` emits `PRE0112` UnprovedModifierRequirement: `Cannot prove that '<literal>' satisfies the required modifier 'Ordered' (used in the computed expression for field '<F>')`. The proof obligation `Both choice operands must be declared ordered` lists as `Unresolved`. The proof engine appears to require both operands to carry the `Ordered` modifier directly on their declaration; a literal that lexically belongs to a same-set ordered choice declaration is not lifted to "ordered" by virtue of the field on the other side of the operator.
+- **Minimal repro**:
   ```precept
   precept Repro
-  field A as integer default 0
-  field DefaultTz as timezone default 'America/New_York'
-  state Draft initial
-  state Done terminal
-  event Create(X as integer) initial
-  on Create -> set A = Create.X
-  event Finish
-  from Draft on Finish -> transition Done
+  field Severity as choice of integer(1, 2, 3, 4, 5) ordered default 3
+  field IsCritical as boolean <- Severity <= 2
   ```
-  Replacing the `timezone` field with `field DefaultStart as time default '09:00'` reproduces with the same symptom.
-- **Root cause** (suspected): typed-constant resolution for `timezone` and `time` defaults — same code path as BUG-003 and BUG-008. The literal parser, normalizer, or default-evaluation path throws unhandled instead of producing a typed diagnostic. Almost certainly the same fix covers all four temporal-literal-default bugs (period, duration, timezone, time) in a single pass.
-- **Workaround used**: in `samples/global-meeting-scheduler.precept`, `DefaultTimezone` is declared `timezone optional` and the host supplies it at construction via `Create(DefaultTimezone as timezone, ...)`; `DefaultStartTime` is similarly `time optional`. Cited inline with a `# BUG-011:` comment in the file header.
-- **Post-fix cleanup**: in `samples/global-meeting-scheduler.precept`, restore `field DefaultTimezone as timezone default 'America/New_York'` and `field DefaultStartTime as time default '09:00'`; drop the `DefaultTimezone` and `DefaultStartTime` arguments from `Create(...)`; remove the `# BUG-011:` header comment.
-- **Fix complexity**: small — likely the same code path as BUG-003, BUG-008. Fix all temporal-literal-default paths in one pass.
-- **Priority**: quality bar — workaround is acceptable (host-supplied tz/time at construction) but the silent crash blocks idiomatic per-tenant defaults for global / multi-region scheduling samples.
-
-### BUG-010: `now() + '<duration>'` expression crashes the compiler
-
-- **Discovered**: 2026-05-24 during sweep batch 6 refactor of `samples/saas-user-provisioning.precept` and `samples/saas-license-management.precept`
-- **Affected**: any precept that computes a future `instant` by adding a duration literal to `now()` — e.g. `set ExpirationDate = now() + '365 days'`, `now() + '30 days'`, `now() + '1 hour'`. The shape appears in `now() + '<duration literal>'` whether in a transition row body or an event ensure (line 164 of the pre-refactor `saas-license-management.precept`: `on PurchaseLicenses ensure PurchaseLicenses.PurchaseDateAsInstant <= now() + '1 days'`).
-- **Symptom**: `precept_compile` returns "An error occurred invoking 'precept_compile'." with no diagnostic, no PRE-code, no message — same shape as BUG-003/005/008/009. The minimal repro is just:
+  Equivalent string-set repro:
   ```precept
   precept Repro
-  field X as instant optional
-  state Requested initial
-  state Active terminal
-  event Create(K as integer) initial
-  event Activate
-  on Create -> set X = now()
-  from Requested on Activate -> set X = now() + '365 days' -> transition Active
+  field Tier as choice of string("Low", "Medium", "High") ordered default "Low"
+  field IsLow as boolean <- Tier <= "Low"
   ```
-  Replacing `now() + '365 days'` with `Activate.NewDate` (event arg of type `instant`) lets the same definition compile clean.
-- **Root cause** (suspected): typed-constant `'<duration>'` literal resolution when used as a `+` operand against an `instant`. Same code-path family as BUG-003 (`period` default) and BUG-008 (`duration` default): the literal parser, normalizer, or operator-overload resolution throws unhandled instead of producing a typed diagnostic. The `'<instant literal>'` form (e.g. `set X = '2026-01-01T00:00:00Z'`) also crashes with the same symptom — likely the same root.
-- **Workaround used**: in batch 6, both `samples/saas-user-provisioning.precept` (`ProvisionUser(LicenseExpirationDate as instant)`) and `samples/saas-license-management.precept` (`MarkAsExpiring(ExpirationDate as instant)`, `RenewLicense(NewExpirationDate as instant, ...)`) carry the expiration date as an event argument supplied by the procurement/identity host. Cited inline with `# BUG-010:` comment in the file header. Acceptable for Constructor-pattern entities but blocks any precept that wants to derive a temporal field server-side from `now()`.
-- **Post-fix cleanup**: restore server-side temporal derivation in `samples/saas-user-provisioning.precept` and `samples/saas-license-management.precept`: replace the `LicenseExpirationDate`/`ExpirationDate`/`NewExpirationDate` event-arg path with `set ExpirationDate = now() + '<term>'` row bodies (e.g. `'365 days'` for annual license, `'30 days'` for grace, etc.); restore the `on PurchaseLicenses ensure PurchaseLicenses.PurchaseDateAsInstant <= now() + '1 days'` form. **Scope-check**: sweep `grep -rn "# BUG-010" samples/` to find every cite site. Remove `# BUG-010` comments. Coordinate with BUG-003, BUG-008, BUG-011 — same fault family; verify a single fix covers all typed-constant temporal-literal evaluation paths.
-- **Fix complexity**: small — likely the same code path as BUG-003 and BUG-008. Fix all temporal-literal evaluation paths in one pass.
-- **Priority**: quality bar — workaround is acceptable (push the date computation to the host) but the silent crash blocks idiomatic `set ExpiresAt = now() + '<term>'` shapes, which are natural for license expirations, grace periods, token TTLs, follow-up dates.
-- **Repro**: see snippet above.
-
-### BUG-009: `precept_compile` MCP tool has an undocumented payload-size limit
-
-- **Discovered**: 2026-05-24 during sweep batch 1 refactor of `samples/medical-prior-auth.precept` and `samples/prior-auth-appeal.precept`
-- **Affected**: any precept file larger than ~12-15 KB sent to `precept_compile` via the MCP tool. Affects authoring of large samples and especially refactoring of legacy ones (the whole-file operation that's central to a refactor).
-- **Symptom**: `precept_compile` returns "An error occurred invoking 'precept_compile'." with no diagnostic, no PRE-code, no message — identical symptom to BUG-003, BUG-005, BUG-008. Files in the 8-10 KB range compile fine; files at ~14 KB crash. The threshold isn't documented anywhere. Agents have to fall back to chunked compile validation (splitting the file into pieces, compiling each piece, reassembling) — which catches structural errors but cannot validate cross-chunk references.
-- **Root cause** (suspected): likely a payload-size limit on the MCP tool wrapper or an unhandled exception when the compiler operates on inputs above a certain size. Worth checking `tools/Precept.Mcp/Tools/CompileTool.cs` for buffer / serialization limits and the core compiler for any size-dependent code paths.
-- **Workaround used**: in sweep batch 1, the agent validated `samples/medical-prior-auth.precept` (~14 KB) and `samples/prior-auth-appeal.precept` (~14 KB) via chunked compiles — split the file along state-machine boundaries, compile each chunk, infer structural soundness. Less robust than a full-file compile but unblocks the refactor.
-- **Post-fix cleanup**: no sample changes required — this is a tooling bug, not a DSL workaround. Once the size limit is raised or removed, agents and `/precept-author` workflows revert to full-file `precept_compile` instead of chunked validation; the agent body's "compile after every edit" guidance becomes operational again at any file size. No in-corpus `# BUG-009` citations exist to remove. Re-run F5TempVerify on all large samples after the fix to confirm clean full-file compile.
-- **Fix complexity**: small-to-medium — investigation needed to identify the limit and remove or raise it. May involve buffer sizes in the MCP stdio transport, JSON serialization limits, or compiler memory limits.
-- **Priority**: quality bar approaching blocker — directly hampers the corpus-sweep workflow (every large legacy sample takes longer to refactor) and the agent body explicitly says "compile after every edit." That guidance breaks on large files.
-- **Note**: this is the *fourth* "MCP-level crash with no PRE-code" symptom (BUGs 3, 5, 8, 9 all share the symptom shape). Worth a coordinated fix pass — the compiler / MCP wrapper has multiple failure modes that all surface identically and indistinguishably from a normal compile error to anything reading the response.
-
-### BUG-008: `duration` field with typed-constant default crashes the compiler
-
-- **Discovered**: 2026-05-24 during refactor of `samples/patient-care-plan-coordination.precept`
-- **Affected**: any precept that declares `field X as duration default '<literal>'` (e.g. `field ReviewFrequencyDays as duration default '14 days'`, `field GracePeriod as duration default '4 hours'`). Same family as BUG-003 (`period` default) — the duration-default variant was not previously surfaced.
-- **Symptom**: `precept_compile` returns an MCP-level error: `"An error occurred invoking 'precept_compile'."` with no diagnostic, no PRE-code, no message. Stripping `default '<literal>'` and leaving the field as `duration optional` lets the same definition compile clean. The crash reproduces on minimal inputs:
+  Field-vs-field (proves clean — shows the gap is literal-side, not the operator):
   ```precept
   precept Repro
-  field A as integer default 0
-  field ReviewFrequencyDays as duration default '14 days'
-  state Draft initial
-  state Done terminal
-  event Create(X as integer) initial
-  on Create -> set A = Create.X
-  event Finish
-  from Draft on Finish -> transition Done
+  field Severity as choice of integer(1, 2, 3, 4, 5) ordered default 3
+  field Threshold as choice of integer(1, 2, 3, 4, 5) ordered default 1
+  field R as boolean <- Severity <= Threshold
   ```
-- **Root cause** (suspected): typed-constant resolution for `duration` defaults — same fault class as BUG-003 (`period`). Probably the same code path: the literal parser, normalizer, or default-evaluation throws unhandled instead of producing a diagnostic. Worth fixing both temporal-type defaults in one pass.
-- **Workaround used**: in `samples/patient-care-plan-coordination.precept`, dropped the `ReviewFrequencyDays` field entirely. The host can carry review-frequency scheduling outside the precept. Cited inline with `# BUG-008:` comment.
-- **Post-fix cleanup**: restore `field ReviewFrequencyDays as duration default '14 days'` (or whatever frequency the domain calls for) in `samples/patient-care-plan-coordination.precept`; if the field had rules / ensures that referenced it, restore those too. **Scope-check**: sweep `grep -rn "# BUG-008" samples/` to find every cite site. Remove `# BUG-008` comments. Coordinate with BUG-003 and BUG-011 — same fault family; a single fix should cover all temporal-literal defaults.
-- **Fix complexity**: small — likely the same code path as BUG-003. Convert unhandled exception in duration-default normalization to a typed diagnostic, or fix the underlying literal handling if structurally valid.
-- **Priority**: quality bar — silent crash blocks any precept that wants a duration default, which is a natural shape for review frequencies, retry intervals, billing cycles, etc.
-
-### BUG-007: `precept_domains` MCP tool crashes on any scope
-
-- **Discovered**: 2026-05-24 during Phase 4 stateless authoring
-- **Affected**: AI agents that follow the agent body's guidance to use `precept_domains` for currency / unit / dimension lookups; user-facing because the MCP tool is documented and surfaced
-- **Symptom**: Calling `precept_domains` (with or without a scope argument: `currencies`, `units`, full catalog) returns "An error occurred invoking 'precept_domains'." with no detail or error code. Other MCP tools (`precept_compile`, `precept_patterns`, `precept_types`, etc.) work fine — issue is isolated to `precept_domains`.
-- **Root cause** (unknown): server-side fault inside the `precept_domains` tool implementation. Could be a serialization issue, a missing catalog dependency, or a regression from recent catalog work.
-- **Workaround used**: agents fall back to inline known values (ISO 4217 codes, UCUM unit categories) or to `precept_types` for type-system metadata. Works but loses the authoritative-source guarantee `precept_domains` was supposed to provide.
-- **Post-fix cleanup**: no sample changes required — this is a tooling bug, not a DSL workaround. Once `precept_domains` returns, the `precept-author` agent body's existing guidance to call it for currency/unit/dimension lookups becomes operational again; no in-corpus `# BUG-007` citations exist to remove.
-- **Fix complexity**: small-to-medium — needs investigation. Likely a bug in `tools/Precept.Mcp/Tools/DomainsTool.cs` or its DTO assembly.
-- **Priority**: quality bar — agent body explicitly instructs authors to use `precept_domains`; the tool not working undermines that guidance.
+- **Root cause** (suspected): the proof obligation `Both choice operands must be declared ordered` (defined on `ChoiceLessThanChoice` etc. in the operations catalog) is resolved by `DeclarationAttribute` strategy only — it walks operand declarations looking for the `ordered` modifier. A choice literal has no field declaration to inspect, so the obligation falls through to `Unresolved` and reports against the literal text. The fix is either to (a) lift the `Ordered` modifier from the contextual choice-set type when one operand is a literal and the other a typed ordered-choice field, or (b) add a typed-literal strategy that infers the modifier from the operand's expected type.
+- **Workaround used**: in `samples/it-helpdesk-ticket.precept`, the Priority computed field was rewritten as an equality-based cascade (`Severity == 1 or Severity == 2 or …`) instead of the more natural ordinal form (`Severity <= 2 or …`). The original mapping shape (`if Severity <= 1 and Urgency <= 1 then …`) is recorded in the file header docstring; equivalence to the cascade form is verified by case analysis. No BUG-012 inline citation was added because the cascade is correct as written — but it is more verbose than the ordinal form would be.
+- **Post-fix cleanup**: in `samples/it-helpdesk-ticket.precept`, replace the equality-based cascade with the ordinal form documented in the original refactor brief — `if Severity <= 1 and Urgency <= 1 then "Critical" / else if Severity <= 2 or Urgency <= 2 then "High" / else if Severity <= 4 and Urgency <= 4 then "Medium" / else "Low"`. Update the field-level comment to drop the reference to this bug entry.
+- **Fix complexity**: small to medium — extends one proof strategy or adds a new typed-literal strategy. Self-contained to the proof engine; no language surface change.
+- **Priority**: quality bar — the workaround is correct but verbose, and the limitation forecloses the natural idiom for tier/rank fields where ordinal comparisons against thresholds are the obvious shape. Documented in `docs/language/primitive-types.md` § Type Operator Surface Summary that the `choice` row supports ordinal comparison; consumers will reach for it.
 
 ### BUG-006: Proof engine doesn't combine guard narrowing with field-level `max` for arithmetic interval inference
 
@@ -130,27 +79,20 @@ surfaced for proper fixing.
 - **Priority**: quality bar — workaround is a small downgrade (runtime check vs compile-time guarantee) but doesn't block samples.
 - **Repro**: a precept with `field Counter as integer default 0 nonnegative` and `field MaxCount as integer max 5`, plus rows `from S on Inc when Counter >= MaxCount -> reject "..."` then `from S on Inc -> set Counter = Counter + 1 -> no transition`. The unguarded second row fails proof on `Counter + 1` containment.
 
-### BUG-005: `lookup of K to money in '<Currency>'` crashes the compiler with no PRE-code
+### BUG-005: `lookup of K to money in '<Currency>'` — full qualified-inner-type support pending Phase 4
 
+- **Status**: ⚠️ **Symptom fixed by Phase 2 (2026-05-25); full support deferred to Phase 4 (F-LANG-COLL-06).** The crash is gone — `lookup of K to money in 'USD'` now emits a clean `CollectionInnerTypeError` (PRE0105) diagnostic instead of crashing the MCP server. The fix in `src/Precept/Pipeline/Parser.Types.cs` extends the dimension-qualifier rejection (which already handled `lookup of K to quantity of 'mass'`) to also catch currency-qualified money. **Full support for qualified inner types in lookups** — making `lookup of string to money in 'USD'` actually work as documented — lands in Phase 4 alongside the other collection completeness work. Scenario test in `test/Precept.Mcp.Tests/CompileTool_BugReproTests.cs`. **This entry stays Active** until Phase 4 ships the full feature.
 - **Discovered**: 2026-05-24 during authoring of `samples/event-venue-booking.precept`
 - **Affected**: any precept declaring a lookup with a qualified-money value type; bisected to specifically the `in '<Currency>'` qualifier on the value side
-- **Symptom**: `precept_compile` returns "An error occurred invoking 'precept_compile'." with no PRE-code and no diagnostic. Bisected:
+- **Original symptom** (before Phase 2): `precept_compile` returned "An error occurred invoking 'precept_compile'." with no PRE-code and no diagnostic. Bisected:
   - `lookup of string to money` — compiles clean (unqualified money is fine)
-  - `lookup of string to money in 'USD'` — crashes
-  - `lookup of string to quantity of 'mass'` — emits a clean PRE0009 (different code path)
-  The qualified-money value type slips through parsing and crashes a later compiler stage.
-- **Root cause** (suspected): qualified-money value-type handling in the collection-typecheck pipeline. The clean PRE0009 on the parallel quantity case suggests there's a check site that catches dimension-qualified collection inner types but not currency-qualified ones.
-- **Workaround used**: in `samples/event-venue-booking.precept`, dropped the `lookup of K to money in 'USD'` for per-service fees; per-add-on services live only in `AddOnServices` (a `set of string`); `AddOnTotal` accumulates the running total. The `RemoveService` event carries `Fee as money in 'USD'` as an arg so the row can decrement `AddOnTotal` directly without reading per-service fees back out of a lookup. The sample retains the lookup-with-membership *pattern shape* on `AddOnServices` (set membership guards every action) but skips the per-key value table because of this crash. Cited inline with `# BUG-005:` comment.
+  - `lookup of string to money in 'USD'` — crashed (now emits clean PRE0105)
+  - `lookup of string to quantity of 'mass'` — emits a clean PRE0105 (was already covered)
+- **Root cause** (now understood): qualified inner types are unsupported in lookup value position. Phase 2 added the symmetric currency-qualifier rejection; Phase 4 will add full support (F-LANG-COLL-06).
+- **Workaround used**: in `samples/event-venue-booking.precept`, dropped the `lookup of K to money in 'USD'` for per-service fees; per-add-on services live only in `AddOnServices` (a `set of string`); `AddOnTotal` accumulates the running total. The `RemoveService` event carries `Fee as money in 'USD'` as an arg so the row can decrement `AddOnTotal` directly without reading per-service fees back out of a lookup. The sample retains the lookup-with-membership *pattern shape* on `AddOnServices` (set membership guards every action) but skips the per-key value table because of this restriction. Cited inline with `# BUG-005:` comment.
 - **Post-fix cleanup**: restore `field AddOnFees as lookup of string to money in 'USD'` in `samples/event-venue-booking.precept`; drop the `Fee as money in 'USD'` arg from `RemoveService`; have the row read the fee back from `AddOnFees` instead. Remove `# BUG-005` comment.
-- **Fix complexity**: small-to-medium — investigate where dimension-qualified collection inner types get rejected and extend the check to currency-qualified ones.
-- **Priority**: quality bar — workaround is awkward (event-arg fee instead of authoritative lookup) but unblocks samples. A clean PRE-code matching PRE0009 would at least surface the limitation.
-- **Repro**:
-  ```precept
-  precept Repro
-  field Fees as lookup of string to money in 'USD'
-  state Draft initial terminal
-  ```
-  Yields the MCP-level crash, not a PRE-code.
+- **Fix complexity**: small-to-medium — Phase 4 work; extend the qualified-inner-type plumbing through the type checker, proof engine, and runtime evaluator.
+- **Priority**: quality bar — workaround is awkward (event-arg fee instead of authoritative lookup) but unblocks samples.
 
 ### BUG-002: `remove` on a lookup expects the value type instead of the key
 
@@ -175,26 +117,6 @@ surfaced for proper fixing.
   ```
   Yields `PRE0105 Expected a integer value, but 'Items' holds elements of type string`.
 
-### BUG-003: `period` field with typed-constant default crashes the compiler
-
-- **Discovered**: 2026-05-24 during authoring of `samples/equipment-lease-agreement.precept`
-- **Affected**: any precept that declares `field X as period default '<literal>'` (e.g. `field GracePeriod as period default '10 days'`, `field RenewalPeriod as period default '1 year'`). The existing `samples/insurance-renewal-processing.precept` contains the same shape and presumably tripped this bug in earlier runs.
-- **Symptom**: `precept_compile` returns an MCP-level error: `"An error occurred invoking 'precept_compile'."` with no diagnostic, no message, no structured payload. Stripping the `default '<literal>'` clause (leaving the field as `period optional`) lets the same definition compile clean. The crash reproduces on minimal inputs:
-  ```precept
-  precept Repro
-  field G as period default '1 year'
-  state Draft initial
-  state Done terminal
-  event E
-  from Draft on E -> transition Done
-  ```
-- **Root cause** (suspected): typed-constant resolution for `period` defaults — the literal parser, normalizer (`NormalizingIso`), or default-evaluation path throws unhandled instead of producing a diagnostic. Other temporal types with defaults (`duration default '4 hours'`, `date default '2024-01-15'`, `instant default '...'`) should be sanity-checked for the same gap.
-- **Workaround used**: equipment-lease-agreement sample declares `GracePeriod` as `period optional` (the host supplies it) and cites BUG-003 in a comment.
-- **Post-fix cleanup**: restore `field GracePeriod as period default '<literal>'` in `samples/equipment-lease-agreement.precept`; drop the constructor / event-arg path that supplies it from the host; restore equivalent `period default '<literal>'` form in `samples/insurance-renewal-processing.precept` if it was workarounded too. **Scope-check**: sweep `grep -rn "# BUG-003" samples/` to find every cite site. Remove `# BUG-003` comments. Coordinate with BUG-008 and BUG-011 — same fault family; verify a single fix covers all temporal-literal defaults.
-- **Fix complexity**: small — locate the unhandled exception in period-default normalization and convert it to a typed diagnostic (or fix the underlying parse if the literal is structurally fine).
-- **Priority**: quality bar — the workaround is acceptable for the sample but the silent crash blocks any precept that wants a calendar-period default, which is a natural shape for renewal terms, grace periods, billing cycles, etc. Worth fixing before more samples need calendar-period defaults.
-- **Repro**: see snippet above.
-
 ### BUG-004: Proof engine ignores event ensures for transition-row body narrowing
 
 - **Discovered**: 2026-05-24 during authoring of `samples/equipment-lease-agreement.precept`
@@ -218,6 +140,59 @@ surfaced for proper fixing.
   Yields PRE0116 on the right-hand `Amount` read even though `on Submit ensure Amount is set` provably establishes presence before the row body runs.
 
 ## Fixed
+
+### BUG-011: `timezone` and `time` fields with typed-constant default crash the compiler
+
+- **Status**: ✅ **Fixed by Phase 2 (2026-05-25, commit `5b156fb2`)** — already passing per the Phase 2 Step 2.2 verification (no crash; valid temporal defaults compile clean). Defence-in-depth wrapper added to `tools/Precept.Mcp/Tools/McpToolSafeInvoke.cs` ensures any future regression surfaces as a structured `McpToolInternalError` diagnostic instead of the raw `"An error occurred invoking ..."` MCP response. Scenario test in `test/Precept.Mcp.Tests/CompileTool_BugReproTests.cs`. **Post-fix sample cleanup pending**: restore the `timezone default` / `time default` declarations in `samples/global-meeting-scheduler.precept`.
+- **Discovered**: 2026-05-24 during feature-gap-fill batch authoring `samples/global-meeting-scheduler.precept`
+- **Affected**: any precept that declares `field X as timezone default '<literal>'` (e.g. `field DefaultTz as timezone default 'America/New_York'`) or `field X as time default '<literal>'` (e.g. `field DefaultStart as time default '09:00'`). Same fault family as BUG-003 (`period`), BUG-008 (`duration`), BUG-010 (`now() + duration`) — typed-constant temporal-literal handling.
+- **Original symptom**: `precept_compile` returned "An error occurred invoking 'precept_compile'." with no diagnostic, no PRE-code, no message — identical to BUG-003/008/010. Stripping `default '<literal>'` (leaving the field as `optional`) let the same definition compile clean.
+- **Workaround used**: in `samples/global-meeting-scheduler.precept`, `DefaultTimezone` is declared `timezone optional` and the host supplies it at construction via `Create(DefaultTimezone as timezone, ...)`; `DefaultStartTime` is similarly `time optional`. Cited inline with a `# BUG-011:` comment in the file header.
+- **Post-fix cleanup**: in `samples/global-meeting-scheduler.precept`, restore `field DefaultTimezone as timezone default 'America/New_York'` and `field DefaultStartTime as time default '09:00'`; drop the `DefaultTimezone` and `DefaultStartTime` arguments from `Create(...)`; remove the `# BUG-011:` header comment.
+
+### BUG-010: `now() + '<duration>'` expression crashes the compiler
+
+- **Status**: ⚠️ **Crash fixed by Phase 2 (2026-05-25, commit `5b156fb2`); type-inference quirk deferred to Phase 4.** No crash anymore — `now() + '365 days'` returns a structured PRE0058 diagnostic (literal interpreted as instant rather than duration). Defense-in-depth wrapper in `McpToolSafeInvoke` covers any residual unexpected throw. Full type-inference fix (treating `'<duration literal>'` as a duration when arithmetic context demands one) is deferred to Phase 4 with the other typed-constant work. Scenario test in `test/Precept.Mcp.Tests/CompileTool_BugReproTests.cs` asserts the structured-diagnostic guarantee.
+- **Discovered**: 2026-05-24 during sweep batch 6 refactor of `samples/saas-user-provisioning.precept` and `samples/saas-license-management.precept`
+- **Affected**: any precept that computes a future `instant` by adding a duration literal to `now()` — e.g. `set ExpirationDate = now() + '365 days'`, `now() + '30 days'`, `now() + '1 hour'`. The shape appears in `now() + '<duration literal>'` whether in a transition row body or an event ensure.
+- **Original symptom** (before Phase 2): `precept_compile` returned "An error occurred invoking 'precept_compile'." with no diagnostic, no PRE-code, no message. Now returns structured PRE0058 (type-inference quirk; no crash).
+- **Workaround used**: in batch 6, both `samples/saas-user-provisioning.precept` and `samples/saas-license-management.precept` carry the expiration date as an event argument supplied by the procurement/identity host. Cited inline with `# BUG-010:` comment in the file header.
+- **Post-fix cleanup** (after Phase 4 type-inference fix): restore server-side temporal derivation in `samples/saas-user-provisioning.precept` and `samples/saas-license-management.precept`: replace the `LicenseExpirationDate`/`ExpirationDate`/`NewExpirationDate` event-arg path with `set ExpirationDate = now() + '<term>'` row bodies (e.g. `'365 days'` for annual license, `'30 days'` for grace). **Scope-check**: sweep `grep -rn "# BUG-010" samples/` to find every cite site. Remove `# BUG-010` comments.
+
+### BUG-009: `precept_compile` MCP tool has an undocumented payload-size limit
+
+- **Status**: ✅ **Fixed by Phase 2 (2026-05-25, commit `5b156fb2`)** — not reproducible in-process. Synthetic ~20 KB precept compiles cleanly via direct `CompileTool.Compile()` call; if a stdio-framing limit exists in the MCP SDK, the new `McpToolSafeInvoke` wrapper catches it cleanly and returns a structured `McpToolInternalError` diagnostic rather than the raw `"An error occurred invoking ..."` MCP response. Scenario test in `test/Precept.Mcp.Tests/CompileTool_LargePayloadTests.cs`. **Wire-level re-verification needed** once the MCP server is rebuilt and the new wrapper is loaded — current session's MCP server is the pre-Phase-2 build.
+- **Discovered**: 2026-05-24 during sweep batch 1 refactor of `samples/medical-prior-auth.precept` and `samples/prior-auth-appeal.precept`
+- **Affected**: any precept file larger than ~12-15 KB sent to `precept_compile` via the MCP tool (originally reported).
+- **Original symptom**: `precept_compile` returned "An error occurred invoking 'precept_compile'." with no diagnostic, no PRE-code, no message — identical symptom to BUG-003, BUG-005, BUG-008. Files in the 8-10 KB range compiled fine; files at ~14 KB crashed.
+- **Workaround used**: in sweep batch 1, the agent validated `samples/medical-prior-auth.precept` (~14 KB) and `samples/prior-auth-appeal.precept` (~14 KB) via chunked compiles.
+- **Post-fix cleanup**: no sample changes required — this is a tooling bug, not a DSL workaround. Once the MCP server is rebuilt with the Phase 2 wrapper, agents and `/precept-author` workflows revert to full-file `precept_compile` instead of chunked validation. No in-corpus `# BUG-009` citations exist to remove.
+
+### BUG-008: `duration` field with typed-constant default crashes the compiler
+
+- **Status**: ✅ **Fixed by Phase 2 (2026-05-25, commit `5b156fb2`)** — already passing per the Phase 2 Step 2.2 verification (valid duration defaults like `'14 days'` compile clean). Defense-in-depth wrapper in `McpToolSafeInvoke` covers regression. Scenario test in `test/Precept.Mcp.Tests/CompileTool_BugReproTests.cs`. **Post-fix sample cleanup pending**: restore `duration default` in `samples/patient-care-plan-coordination.precept`.
+- **Discovered**: 2026-05-24 during refactor of `samples/patient-care-plan-coordination.precept`
+- **Affected**: any precept that declares `field X as duration default '<literal>'` (e.g. `field ReviewFrequencyDays as duration default '14 days'`, `field GracePeriod as duration default '4 hours'`). Same family as BUG-003 (`period` default).
+- **Original symptom**: `precept_compile` returned an MCP-level error: `"An error occurred invoking 'precept_compile'."` with no diagnostic, no PRE-code, no message. Stripping `default '<literal>'` and leaving the field as `duration optional` let the same definition compile clean.
+- **Workaround used**: in `samples/patient-care-plan-coordination.precept`, dropped the `ReviewFrequencyDays` field entirely. The host can carry review-frequency scheduling outside the precept. Cited inline with `# BUG-008:` comment.
+- **Post-fix cleanup**: restore `field ReviewFrequencyDays as duration default '14 days'` (or whatever frequency the domain calls for) in `samples/patient-care-plan-coordination.precept`; if the field had rules / ensures that referenced it, restore those too. **Scope-check**: sweep `grep -rn "# BUG-008" samples/` to find every cite site. Remove `# BUG-008` comments.
+
+### BUG-007: `precept_domains` MCP tool crashes on any scope
+
+- **Status**: ✅ **Fixed by Phase 2 (2026-05-25, commit `5b156fb2`)** — verified working for all 5 scopes (`currencies`, `units`, `dimensions`, `prefixes`, `temporal`, and no-arg) via direct call to `DomainsTool.Domains(scope)`. The earlier-reported crash appears to have been resolved by intervening work before Phase 2; Phase 2's `McpToolSafeInvoke` wrapper provides defense-in-depth against regression. Scenario test in `test/Precept.Mcp.Tests/DomainsTool_AllScopesTests.cs`. **Wire-level re-verification needed** once the MCP server is rebuilt.
+- **Discovered**: 2026-05-24 during Phase 4 stateless authoring
+- **Affected**: AI agents that follow the agent body's guidance to use `precept_domains` for currency / unit / dimension lookups; user-facing because the MCP tool is documented and surfaced.
+- **Original symptom**: Calling `precept_domains` (with or without a scope argument) returned "An error occurred invoking 'precept_domains'." with no detail or error code. Other MCP tools worked fine.
+- **Workaround used**: agents fell back to inline known values or to `precept_types` for type-system metadata. No in-corpus `# BUG-007` citations exist to remove.
+
+### BUG-003: `period` field with typed-constant default crashes the compiler
+
+- **Status**: ✅ **Fixed by Phase 2 (2026-05-25, commit `5b156fb2`)** — already passing per the Phase 2 Step 2.2 verification (valid period defaults like `'1 year'` compile clean; invalid defaults like `'1 bogus'` emit a structured `InvalidTypedConstantContent` diagnostic). Defense-in-depth wrapper in `McpToolSafeInvoke` covers regression. Scenario test in `test/Precept.Mcp.Tests/CompileTool_BugReproTests.cs`. **Post-fix sample cleanup pending**: restore `period default` in `samples/equipment-lease-agreement.precept` and `samples/insurance-renewal-processing.precept`.
+- **Discovered**: 2026-05-24 during authoring of `samples/equipment-lease-agreement.precept`
+- **Affected**: any precept that declares `field X as period default '<literal>'` (e.g. `field GracePeriod as period default '10 days'`, `field RenewalPeriod as period default '1 year'`).
+- **Original symptom**: `precept_compile` returned an MCP-level error: `"An error occurred invoking 'precept_compile'."` with no diagnostic, no message, no structured payload. Stripping the `default '<literal>'` clause (leaving the field as `period optional`) let the same definition compile clean.
+- **Workaround used**: equipment-lease-agreement sample declares `GracePeriod` as `period optional` (the host supplies it) and cites BUG-003 in a comment.
+- **Post-fix cleanup**: restore `field GracePeriod as period default '<literal>'` in `samples/equipment-lease-agreement.precept`; drop the constructor / event-arg path that supplies it from the host; restore equivalent `period default '<literal>'` form in `samples/insurance-renewal-processing.precept` if it was workarounded too. **Scope-check**: sweep `grep -rn "# BUG-003" samples/` to find every cite site. Remove `# BUG-003` comments.
 
 ### BUG-001: Proof engine ignored rule/ensure `when` guards for body narrowing
 

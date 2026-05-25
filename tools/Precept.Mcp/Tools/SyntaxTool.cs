@@ -9,5 +9,5 @@ public static class SyntaxTool
     [McpServerTool(Name = "precept_syntax")]
     [Description("Return the Precept syntax reference as markdown: grammar rules, precedence, conventional order, constructs, actions, outcomes, and operators.")]
     public static string Syntax()
-        => CatalogFormatters.FormatSyntax();
+        => McpToolSafeInvoke.Invoke(nameof(Syntax), () => CatalogFormatters.FormatSyntax());
 }

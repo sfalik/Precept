@@ -282,6 +282,72 @@ public class OperationsTests
         meta.BidirectionalLookup.Should().BeTrue();
     }
 
+    // ── Resolve (FindCandidates + DisambiguateCandidates wrapper) ───────────────
+
+    [Fact]
+    public void Resolve_ExactMatch_ReturnsSingleCandidate()
+    {
+        var meta = Operations.Resolve(OperatorKind.Plus, TypeKind.Integer, TypeKind.Integer);
+
+        meta.Should().NotBeNull("Integer + Integer has exactly one binary operation entry");
+        meta!.Kind.Should().Be(OperationKind.IntegerPlusInteger);
+        meta.Op.Should().Be(OperatorKind.Plus);
+        meta.Result.Should().Be(TypeKind.Integer);
+    }
+
+    [Fact]
+    public void Resolve_NoCandidate_ReturnsNull()
+    {
+        // Boolean + Integer has no operation entry.
+        var meta = Operations.Resolve(OperatorKind.Plus, TypeKind.Boolean, TypeKind.Integer);
+
+        meta.Should().BeNull("no operation is defined for Boolean + Integer");
+    }
+
+    [Fact]
+    public void Resolve_QualifierDisambiguation_PrefersSameMatch()
+    {
+        // Money / Money has two entries: Same (→ Decimal) and Different (→ ExchangeRate).
+        // Resolve must select the Same entry — the structurally safe default per the proof contract.
+        var meta = Operations.Resolve(OperatorKind.Divide, TypeKind.Money, TypeKind.Money);
+
+        meta.Should().NotBeNull();
+        meta!.Match.Should().Be(QualifierMatch.Same);
+        meta.Kind.Should().Be(OperationKind.MoneyDivideMoneySameCurrency);
+        meta.Result.Should().Be(TypeKind.Decimal);
+    }
+
+    [Fact]
+    public void Resolve_QualifierDisambiguation_QuantityDivideQuantity_PrefersSameDimension()
+    {
+        var meta = Operations.Resolve(OperatorKind.Divide, TypeKind.Quantity, TypeKind.Quantity);
+
+        meta.Should().NotBeNull();
+        meta!.Match.Should().Be(QualifierMatch.Same);
+        meta.Kind.Should().Be(OperationKind.QuantityDivideQuantitySameDimension);
+    }
+
+    [Fact]
+    public void DisambiguateCandidates_EmptySpan_ReturnsNull()
+    {
+        var result = Operations.DisambiguateCandidates(ReadOnlySpan<BinaryOperationMeta>.Empty);
+
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public void DisambiguateCandidates_SingleCandidate_ReturnsIt()
+    {
+        // Integer + Integer is single-entry; FindCandidates returns one.
+        var candidates = Operations.FindCandidates(OperatorKind.Plus, TypeKind.Integer, TypeKind.Integer);
+        candidates.Length.Should().Be(1, "sanity: Integer + Integer should be single-entry");
+
+        var result = Operations.DisambiguateCandidates(candidates);
+
+        result.Should().NotBeNull();
+        result!.Kind.Should().Be(OperationKind.IntegerPlusInteger);
+    }
+
     // ── QualifierMatch entries ───────────────────────────────────────────────────
 
     [Fact]

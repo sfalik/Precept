@@ -16,7 +16,7 @@
 | Phase | Goal | F-count | Decisions required | Effort | Status |
 |---|---|---|---|---|---|
 | 1 | Doc foundation truthful + lifecycle skills + 16 Archive promotions | ~55 | 8 (✅ all settled 2026-05-24) | XL (~5-7 days) | ✅ **Complete 2026-05-24** (all 6 workstreams shipped; verification report at [`lifecycle-review-phase-1-2026-05-24.md`](lifecycle-review-phase-1-2026-05-24.md)) |
-| 2 | Green baseline + no crashes + Operations.Resolve + MCP-crash family | **12+** | 2 | **L (~4-5 days)** | Planned |
+| 2 | Green baseline + no crashes + Operations.Resolve + MCP-crash family | **12+** | 2 | **L (~4-5 days)** | ✅ **Complete 2026-05-25** (all 7 steps shipped: 2.1–2.7; MCP wrapper backstop + temporal-literal verified clean + LS URI-case fix + Operations.Resolve + generic SyntaxReference test; 6107/6108 Precept.Tests pass with the 1 failure as new BUG-013; 411/411 LS tests pass; 67/67 Mcp tests pass; 291/291 analyzer tests pass) |
 | 3 | Type system completeness | ~15 | 3 | L | Stub — TBD |
 | 4 | Collection completeness + BUG-002 | **~16** | 2 | L | Stub — TBD |
 | 5 | Proof engine satisfiability + BUG-004 + BUG-006 | **~12** | 2 | XL | Stub — TBD |
@@ -454,7 +454,7 @@ Plus, since Phase 1's F-LANG-CAT-15 decision was "implement," `Operations.Resolv
 **Goal**: Every documented capability of the primitive, temporal, and business-domain type systems is exercised by tests and works as the spec claims. Remove the per-`TypeKind` dispatch in `TypeChecker.Expressions.TypedConstants.cs` in favor of catalog-driven dispatch (catalog discipline).
 
 **Findings in scope** (~15):
-- ~~F-LANG-PRIM-01 (string ordering — resolved: false claims removed from docs; no implementation work required)~~
+- ~~F-LANG-PRIM-01 (string ordering — **resolved by removal, not implementation**. `<`/`>`/`<=`/`>=` on `string`/`~string` is intentionally out of scope. False doc claims removed from `primitive-types.md`, `precept-language-spec.md`, and `collection-types.md`. Per-decision rationale added at `docs/language/primitive-types.md` § String Ordering — Out of Scope, grounded in the [string-ordering-broad-use-cases survey](../../research/language/expressiveness/string-ordering-broad-use-cases.md) and [string-ordering-external-survey](../../research/language/expressiveness/string-ordering-external-survey.md). Catalog already excluded the trait; no runtime work required.)~~
 - F-LANG-PRIM-04 (RedundantModifier warning vs error)
 - F-LANG-TEMP-01/02 (context-aware `'3 days'`/`'2 weeks'` parser)
 - F-LANG-TEMP-03 (nonzero/nonnegative on duration)

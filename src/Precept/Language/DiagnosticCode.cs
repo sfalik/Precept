@@ -294,4 +294,12 @@ public enum DiagnosticCode
     // ── NameBinder ───────────────────────────────────────────────
     /// <summary>Event argument reference not found in scope.</summary>
     UndeclaredArg                   = 107,
+
+    // ── MCP tooling backstop ─────────────────────────────────────
+    /// <summary>
+    /// An MCP tool entry point caught an unhandled exception and reported it
+    /// as a structured diagnostic. Never emitted by the normal compile pipeline —
+    /// only by the <c>McpToolSafeInvoke</c> wrapper in <c>tools/Precept.Mcp/</c>.
+    /// </summary>
+    McpToolInternalError            = 149,
 }

@@ -1164,6 +1164,15 @@ public static class Diagnostics
             ExampleBefore: "precept Example\nfield Cost as price in 'foo'",
             ExampleAfter: "precept Example\nfield Cost as price in 'USD'"),
 
+        // ── MCP tooling backstop ─────────────────────────────────────────────────
+        DiagnosticCode.McpToolInternalError => new(
+            nameof(DiagnosticCode.McpToolInternalError),
+            DiagnosticStage.Lex, Severity.Error,
+            "MCP tool '{0}' threw {1}: {2}",
+            DiagnosticCategory.Structure,
+            TriggerCondition: "An MCP tool entry point caught an unhandled exception from the underlying compiler or formatter. Reported through the McpToolSafeInvoke wrapper so consumers see a structured diagnostic instead of a transport-level error.",
+            RecoverySteps: ["File a bug citing the exception type and message", "Capture the input that triggered the failure so the root cause can be reproduced"]),
+
         _ => throw new ArgumentOutOfRangeException(nameof(code), code, null),
     };
 

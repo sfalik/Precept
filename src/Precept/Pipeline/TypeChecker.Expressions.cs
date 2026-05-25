@@ -882,20 +882,20 @@ internal static partial class TypeChecker
         OperatorKind op, TypeKind lhsType, TypeKind rhsType)
     {
         // Level 1: Exact match (no widening)
-        var exact = DisambiguateCandidates(Operations.FindCandidates(op, lhsType, rhsType));
+        var exact = Operations.Resolve(op, lhsType, rhsType);
         if (exact is not null) return exact;
 
         // Level 2: Left widening only
         foreach (var lwt in Types.GetMeta(lhsType).WidensTo)
         {
-            var match = DisambiguateCandidates(Operations.FindCandidates(op, lwt, rhsType));
+            var match = Operations.Resolve(op, lwt, rhsType);
             if (match is not null) return match;
         }
 
         // Level 3: Right widening only
         foreach (var rwt in Types.GetMeta(rhsType).WidensTo)
         {
-            var match = DisambiguateCandidates(Operations.FindCandidates(op, lhsType, rwt));
+            var match = Operations.Resolve(op, lhsType, rwt);
             if (match is not null) return match;
         }
 
@@ -904,36 +904,12 @@ internal static partial class TypeChecker
         {
             foreach (var rwt in Types.GetMeta(rhsType).WidensTo)
             {
-                var match = DisambiguateCandidates(Operations.FindCandidates(op, lwt, rwt));
+                var match = Operations.Resolve(op, lwt, rwt);
                 if (match is not null) return match;
             }
         }
 
         return null;
-    }
-
-    /// <summary>
-    /// Disambiguate binary operation candidates using qualifier matching (D9/§7.3).
-    /// Returns a single <see cref="BinaryOperationMeta"/> if unambiguous, or null if no candidates.
-    /// For multi-candidate results (qualifier-disambiguated operations), selects the
-    /// <see cref="QualifierMatch.Same"/> entry by default — the checker assumes same-qualifier
-    /// until runtime qualifier values prove otherwise. The ProofEngine adds obligations to verify.
-    /// </summary>
-    private static BinaryOperationMeta? DisambiguateCandidates(ReadOnlySpan<BinaryOperationMeta> candidates)
-    {
-        if (candidates.Length == 0) return null;
-        if (candidates.Length == 1) return candidates[0];
-
-        // Multi-candidate: qualifier disambiguation.
-        // Default to QualifierMatch.Same — the structurally safe assumption.
-        // ProofEngine will verify qualifier compatibility at deeper analysis.
-        foreach (var c in candidates)
-        {
-            if (c.Match == QualifierMatch.Same) return c;
-        }
-
-        // Fallback: return first candidate if no Same entry exists
-        return candidates[0];
     }
 
     /// <summary>

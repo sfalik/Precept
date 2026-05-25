@@ -12,20 +12,21 @@ public static class CompileTool
     [McpServerTool(Name = "precept_compile")]
     [Description("Parse, type-check, and analyze a precept definition. Returns compact JSON with `success`, `diagnosticCount`, compact `diagnostics`, `proofObligations`, `eventHandlers`, and a one-line `summary`.")]
     public static CompileResultDto Compile(string text)
-    {
-        var compilation = Compiler.Compile(text);
-        var diagnostics = compilation.Diagnostics.Select(MapDiagnostic).ToArray();
-        var proofObligations = compilation.Proof.Obligations.Select(MapProofObligation).ToArray();
-        var eventHandlers = compilation.Semantics.EventHandlers.Select(MapEventRow).ToArray();
+        => McpToolSafeInvoke.Invoke(nameof(Compile), () =>
+        {
+            var compilation = Compiler.Compile(text);
+            var diagnostics = compilation.Diagnostics.Select(MapDiagnostic).ToArray();
+            var proofObligations = compilation.Proof.Obligations.Select(MapProofObligation).ToArray();
+            var eventHandlers = compilation.Semantics.EventHandlers.Select(MapEventRow).ToArray();
 
-        return new CompileResultDto(
-            !compilation.HasErrors,
-            diagnostics.Length,
-            diagnostics,
-            BuildSummary(compilation),
-            proofObligations,
-            eventHandlers);
-    }
+            return new CompileResultDto(
+                !compilation.HasErrors,
+                diagnostics.Length,
+                diagnostics,
+                BuildSummary(compilation),
+                proofObligations,
+                eventHandlers);
+        });
 
     private static CompileDiagnosticDto MapDiagnostic(Diagnostic diagnostic)
         => new(

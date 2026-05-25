@@ -1272,6 +1272,34 @@ public static class Operations
             ? entries.AsSpan()
             : ReadOnlySpan<BinaryOperationMeta>.Empty;
 
+    /// <summary>
+    /// Resolves a binary operator + operand types pair to a single <see cref="BinaryOperationMeta"/>,
+    /// applying qualifier disambiguation when the catalog has multiple candidates for the triple.
+    /// Returns null when no candidate exists.
+    /// </summary>
+    public static BinaryOperationMeta? Resolve(OperatorKind op, TypeKind lhs, TypeKind rhs)
+        => DisambiguateCandidates(FindCandidates(op, lhs, rhs));
+
+    /// <summary>
+    /// Disambiguates binary operation candidates using qualifier matching (D9 / spec §7.3).
+    /// Returns the single match if unambiguous, null if no candidates. For multi-candidate results
+    /// (qualifier-disambiguated ops like <c>money / money</c>), selects the
+    /// <see cref="QualifierMatch.Same"/> entry by default — the checker assumes same-qualifier until
+    /// runtime values prove otherwise. The proof engine adds obligations to verify.
+    /// </summary>
+    public static BinaryOperationMeta? DisambiguateCandidates(ReadOnlySpan<BinaryOperationMeta> candidates)
+    {
+        if (candidates.Length == 0) return null;
+        if (candidates.Length == 1) return candidates[0];
+
+        foreach (var c in candidates)
+        {
+            if (c.Match == QualifierMatch.Same) return c;
+        }
+
+        return candidates[0];
+    }
+
     // ════════════════════════════════════════════════════════════════════════════
     //  Interval transfer functions — referenced by catalog entries above
     // ════════════════════════════════════════════════════════════════════════════

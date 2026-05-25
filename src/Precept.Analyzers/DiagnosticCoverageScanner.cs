@@ -158,10 +158,15 @@ internal static class DiagnosticCoverageScanner
             }
 
             // Pattern 2b: Named argument CIDiagnosticCode: in constructor.
-            if (current is IArgumentOperation argument &&
-                argument.Parameter?.Name == "CIDiagnosticCode")
+            if (current is IArgumentOperation argument)
             {
-                return true;
+                var paramName = argument.Parameter?.Name;
+                if (paramName == "CIDiagnosticCode"
+                    || paramName == "FormatErrorCode"
+                    || paramName == "SemanticErrorCode")
+                {
+                    return true;
+                }
             }
 
             current = current.Parent;

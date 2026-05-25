@@ -10,10 +10,15 @@ using Xunit.Abstractions;
 namespace Precept.Tests;
 
 /// <summary>
-/// TEMPORARY: F5 verification pass — compile all 30 sample files and report residual diagnostics.
-/// Remove this file after F5 verification is complete.
+/// Compile every <c>samples/*.precept</c> file and assert zero diagnostics.
+/// Strict full-clean guarantee: any diagnostic (warning or error) on any sample
+/// fails the test.
+///
+/// Complementary to <see cref="SampleFieldStateRegressionTests"/>, which checks
+/// only the four field-state-guarantee codes (D130/D131/D132/D143). This test
+/// covers the entire diagnostic surface.
 /// </summary>
-public class F5TempVerify(ITestOutputHelper output)
+public class SampleCompilesCleanTests(ITestOutputHelper output)
 {
     private static string SamplesRoot =>
         Path.GetFullPath(

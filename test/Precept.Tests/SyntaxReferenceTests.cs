@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using FluentAssertions;
 using Precept;
@@ -153,13 +154,60 @@ public class SyntaxReferenceTests
         computedField.DslSnippet.Should().NotContain("->");
     }
 
-    [Fact]
-    public void ConstructorPattern_ExistentialFields_DslSnippet_CompilesClean()
-    {
-        var constructorPattern = SyntaxReference.CommonPatterns.Single(pattern => pattern.Name == "Constructor Pattern (Existential Fields)");
-        var compilation = Compiler.Compile(constructorPattern.DslSnippet);
+    // ── Generic: catalog snippets compile per their declared expectations ───────
+    //
+    // The contract is declared on each catalog entry via metadata:
+    //
+    //   CommonPattern.IsFragment  — true: snippet is a documentation fragment
+    //     (no enclosing `precept Name` header); not testable standalone.
+    //   AntiPattern.IsFragment    — same for BadSnippet + GoodSnippet pair.
+    //   AntiPattern.BadCompilesClean — true (default): design anti-pattern; bad
+    //     snippet compiles clean but represents bad design. false: compiler-
+    //     enforced anti-pattern; bad snippet is expected to produce errors.
+    //
+    // GoodSnippet always compiles clean for non-fragment AntiPatterns —
+    // it is the recommended alternative.
 
-        compilation.HasErrors.Should().BeFalse();
+    public static IEnumerable<object[]> SnippetsThatMustCompileClean()
+    {
+        foreach (var p in SyntaxReference.CommonPatterns.Where(p => !p.IsFragment))
+            yield return new object[] { $"CommonPattern: {p.Name}", p.DslSnippet };
+
+        foreach (var p in SyntaxReference.AntiPatterns.Where(p => !p.IsFragment))
+        {
+            if (p.BadCompilesClean)
+                yield return new object[] { $"AntiPattern (Bad, design-only): {p.Name}", p.BadSnippet };
+            yield return new object[] { $"AntiPattern (Good): {p.Name}", p.GoodSnippet };
+        }
+    }
+
+    public static IEnumerable<object[]> SnippetsThatMustHaveErrors()
+    {
+        foreach (var p in SyntaxReference.AntiPatterns.Where(p => !p.IsFragment && !p.BadCompilesClean))
+            yield return new object[] { $"AntiPattern (Bad, compiler-caught): {p.Name}", p.BadSnippet };
+    }
+
+    [Theory]
+    [MemberData(nameof(SnippetsThatMustCompileClean))]
+    public void CatalogSnippet_CompilesClean(string label, string snippet)
+    {
+        var compilation = Compiler.Compile(snippet);
+
+        var diagnostics = compilation.Diagnostics.Select(d => $"{d.Code}: {d.Message}").ToList();
+        compilation.HasErrors.Should().BeFalse(
+            $"snippet '{label}' should compile without errors. " +
+            $"Diagnostics: [{string.Join(" | ", diagnostics)}]");
+    }
+
+    [Theory]
+    [MemberData(nameof(SnippetsThatMustHaveErrors))]
+    public void CatalogSnippet_HasErrors(string label, string snippet)
+    {
+        var compilation = Compiler.Compile(snippet);
+
+        compilation.HasErrors.Should().BeTrue(
+            $"snippet '{label}' is a compiler-caught anti-pattern and should produce " +
+            $"diagnostics — the compiler IS the enforcement.");
     }
 
     [Fact]

@@ -4,21 +4,42 @@ namespace Precept.Language;
 /// A named multi-construct pattern example showing how Precept language features combine
 /// in typical real-world definitions.
 /// </summary>
+/// <param name="IsFragment">
+/// True when <see cref="DslSnippet"/> is a documentation fragment (single construct or
+/// row, no enclosing <c>precept Name</c> header). Fragments cannot be compiled
+/// standalone — they reference identifiers not declared in the snippet. Default false.
+/// </param>
 public sealed record CommonPattern(
     string Name,
     string Description,
-    string DslSnippet);
+    string DslSnippet,
+    bool   IsFragment = false);
 
 /// <summary>
 /// A named anti-pattern showing a common mistake in Precept definitions,
 /// paired with a correct alternative and explanation.
 /// </summary>
+/// <param name="IsFragment">
+/// True when both <see cref="BadSnippet"/> and <see cref="GoodSnippet"/> are
+/// documentation fragments (rows / declarations without an enclosing
+/// <c>precept Name</c> header). Default false.
+/// </param>
+/// <param name="BadCompilesClean">
+/// True when <see cref="BadSnippet"/> is a *design* anti-pattern that compiles
+/// without errors but represents bad design (the compiler cannot catch it).
+/// False when <see cref="BadSnippet"/> illustrates a violation the compiler IS
+/// expected to catch — the anti-pattern's badness is expressed as a diagnostic.
+/// Default true (most anti-patterns are design quality issues). Ignored when
+/// <see cref="IsFragment"/> is true.
+/// </param>
 public sealed record AntiPattern(
     string Name,
     string Description,
     string BadSnippet,
     string GoodSnippet,
-    string WhyItFails);
+    string WhyItFails,
+    bool   IsFragment        = false,
+    bool   BadCompilesClean  = true);
 
 /// <summary>
 /// Grammar meta-rules — singular facts about how Precept source text is structured.
@@ -124,7 +145,8 @@ public static class SyntaxReference
             field PatientId as string notempty maxlength 50
             field ProcedureCode as string notempty maxlength 20
             field ReferringProviderNpi as string notempty maxlength 10
-            """),
+            """,
+            IsFragment: true),
 
         new(
             "Numeric field with structural constraints",
@@ -134,7 +156,8 @@ public static class SyntaxReference
             field Premium as money in 'USD' default '0 USD' positive
             field DiscountPercent as decimal default 0 nonnegative max 100 maxplaces 2
             field RemainingDays as integer nonnegative
-            """),
+            """,
+            IsFragment: true),
 
         new(
             "Guarded transition",
@@ -145,7 +168,8 @@ public static class SyntaxReference
                 -> transition Approved
             from UnderReview on Approve
                 -> reject "Approval requires sufficient credit score"
-            """),
+            """,
+            IsFragment: true),
 
         new(
             "Computed field",
@@ -154,7 +178,8 @@ public static class SyntaxReference
             field Subtotal as number <- UnitPrice * Quantity
             field DiscountAmount as number <- Subtotal * DiscountPercent / 100
             field LineTotal as number nonnegative <- Subtotal - DiscountAmount
-            """),
+            """,
+            IsFragment: true),
 
         new(
             "Conditional action",
@@ -163,7 +188,8 @@ public static class SyntaxReference
             from UnderReview on Approve when CreditScore >= 680
                 -> set DecisionNote = if CreditScore >= 750 then "Prime tier — auto-approved" else "Standard tier — approved"
                 -> transition Approved
-            """),
+            """,
+            IsFragment: true),
 
         new(
             "Collection state gate",
@@ -179,7 +205,8 @@ public static class SyntaxReference
                 -> no transition
             from InterviewLoop on RecordFeedback
                 -> reject "At least one interviewer must be pending"
-            """),
+            """,
+            IsFragment: true),
 
         new(
             "Stateless write-only precept",
@@ -432,7 +459,8 @@ public static class SyntaxReference
 
             # Reset-on-re-entry: fires even when a re-approval transitions back into Approved.
             to Approved -> set BadgePrinted = false
-            """),
+            """,
+            IsFragment: true),
 
         new(
             "Cross-cutting event (from any or multi-state source list)",
@@ -454,7 +482,8 @@ public static class SyntaxReference
             from Passed, Failed on Close
                 -> set DispositionNote = Close.Note
                 -> transition Closed
-            """),
+            """,
+            IsFragment: true),
 
         new(
             "Host-driven event dispatch by calendar window",
@@ -526,7 +555,8 @@ public static class SyntaxReference
                 -> no transition
             from Draft on RemoveComponent
                 -> reject "Component {RemoveComponent.PartNumber} is not in the BOM"
-            """),
+            """,
+            IsFragment: true),
 
         new(
             "Stack and queue operations",
@@ -552,7 +582,8 @@ public static class SyntaxReference
                 -> set LastCalledParty = PartyQueue.peek
                 -> dequeue PartyQueue into CurrentParty
                 -> transition Seating
-            """),
+            """,
+            IsFragment: true),
 
         new(
             "Optional-with-fallback assignment",
@@ -564,7 +595,8 @@ public static class SyntaxReference
                 -> set ApprovedAmount = Approve.Amount
                 -> set DecisionNote = if Approve.Note is set then Approve.Note else if CreditScore >= 750 then "Prime tier — auto-approved" else "Standard tier — approved"
                 -> transition Approved
-            """),
+            """,
+            IsFragment: true),
 
         new(
             "Conditional rule (rule when)",
@@ -572,7 +604,8 @@ public static class SyntaxReference
             """
             # Skipped until DocumentsVerified = true; enforced on every operation thereafter.
             rule ExistingDebt <= AnnualIncome * 3.0 when DocumentsVerified because "Debt {ExistingDebt} exceeds the 3x income ceiling — maximum is {AnnualIncome * 3.0}"
-            """),
+            """,
+            IsFragment: true),
 
         new(
             "State-scoped editing window",
@@ -583,7 +616,8 @@ public static class SyntaxReference
 
             # Conditional editing window — only open once DocumentsVerified is true.
             in UnderReview when DocumentsVerified modify DecisionNote editable
-            """),
+            """,
+            IsFragment: true),
 
         new(
             "Interpolation in diagnostic strings",
@@ -602,7 +636,8 @@ public static class SyntaxReference
             # Division in a reject message — the same computed value the guard checked.
             from Draft on Submit
                 -> reject "Average lodging of {Submit.Lodging / Submit.Days} per day exceeds the $350 policy cap"
-            """),
+            """,
+            IsFragment: true),
     ];
 
     public static IReadOnlyList<string> ConventionalOrder { get; } =
@@ -639,7 +674,8 @@ public static class SyntaxReference
             field A as number default 1
             field B as number <- A + 1
             """,
-            "'->' is the transition outcome arrow and is not valid in a field declaration. Use '<-' to declare a computed field's derivation formula."),
+            "'->' is the transition outcome arrow and is not valid in a field declaration. Use '<-' to declare a computed field's derivation formula.",
+            BadCompilesClean: false),
 
         new(
             "Chaining comparisons",
@@ -655,7 +691,8 @@ public static class SyntaxReference
             rule Amount >= 0 because "must be nonnegative"
             rule Amount <= 1000 because "must be in range"
             """,
-            "Today the parser accepts the first comparison and produces a boolean (`0 <= Amount`), then the second comparison type-errors as `boolean <= 1000`, so precept_compile currently emits PRE0018 rather than a parser diagnostic. PRE0010 (NonAssociativeComparison) is the intended diagnostic and should fire once the parser detects chained comparisons directly. Use 'and' to combine two separate comparison conditions."),
+            "Today the parser accepts the first comparison and produces a boolean (`0 <= Amount`), then the second comparison type-errors as `boolean <= 1000`, so precept_compile currently emits PRE0018 rather than a parser diagnostic. PRE0010 (NonAssociativeComparison) is the intended diagnostic and should fire once the parser detects chained comparisons directly. Use 'and' to combine two separate comparison conditions.",
+            BadCompilesClean: false),
 
         new(
             "Assigning a computed field",
@@ -678,7 +715,8 @@ public static class SyntaxReference
             event Complete
             from Draft on Complete -> transition Done
             """,
-            "Computed fields (declared with '<-') are read-only by definition. Their value is recalculated from the formula whenever A changes. Attempting to 'set' a computed field produces a ComputedFieldNotWritable error."),
+            "Computed fields (declared with '<-') are read-only by definition. Their value is recalculated from the formula whenever A changes. Attempting to 'set' a computed field produces a ComputedFieldNotWritable error.",
+            BadCompilesClean: false),
 
         new(
             "Sentinel defaults for not-yet-meaningful fields",
@@ -752,7 +790,8 @@ public static class SyntaxReference
             from Submitted on Approve
                 -> reject "Approval requires strong income coverage and acceptable credit"
             """,
-            "Approve from Draft and from Approved adds rows for events with no meaning in those states — no UI should offer an Approve button there, and no row is the correct way to say so. The only reject that belongs here is the fallback from Submitted when the applicant fails the income and credit check — that is a condition the applicant could potentially remedy. Structurally inapplicable events need no row."),
+            "Approve from Draft and from Approved adds rows for events with no meaning in those states — no UI should offer an Approve button there, and no row is the correct way to say so. The only reject that belongs here is the fallback from Submitted when the applicant fails the income and credit check — that is a condition the applicant could potentially remedy. Structurally inapplicable events need no row.",
+            IsFragment: true),
 
         new(
             "Hollow draft state",
@@ -885,6 +924,7 @@ public static class SyntaxReference
             on Create
                 -> set Counter = Create.InitialCount
             """,
-            "`Counter` on the right-hand side is not reading a meaningful prior business value — construction is the first write. In today's precept_compile behavior, this exact integer example is accepted with no PRE-code and reads the field's pre-write default instead of reporting a dedicated undefined-read diagnostic, so the bug is semantic rather than compiler-blocked. Use the event payload (or a value established earlier in the same action chain) for the field's first assignment."),
+            "`Counter` on the right-hand side is not reading a meaningful prior business value — construction is the first write. In today's precept_compile behavior, this exact integer example is accepted with no PRE-code and reads the field's pre-write default instead of reporting a dedicated undefined-read diagnostic, so the bug is semantic rather than compiler-blocked. Use the event payload (or a value established earlier in the same action chain) for the field's first assignment.",
+            BadCompilesClean: false),
     ];
 }

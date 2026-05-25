@@ -35,17 +35,19 @@ internal sealed class TextDocumentSyncHandler : TextDocumentSyncHandlerBase
     public override TextDocumentAttributes GetTextDocumentAttributes(DocumentUri uri) =>
         new(uri, "precept");
 
-    public override Task<Unit> Handle(DidOpenTextDocumentParams request, CancellationToken cancellationToken)
+    public override async Task<Unit> Handle(DidOpenTextDocumentParams request, CancellationToken cancellationToken)
     {
-        RecompileAndPublish(request.TextDocument.Uri, request.TextDocument.Version, request.TextDocument.Text);
-        return Unit.Task;
+        await RecompileAndPublishAsync(request.TextDocument.Uri, request.TextDocument.Version, request.TextDocument.Text, cancellationToken)
+            .ConfigureAwait(false);
+        return Unit.Value;
     }
 
-    public override Task<Unit> Handle(DidChangeTextDocumentParams request, CancellationToken cancellationToken)
+    public override async Task<Unit> Handle(DidChangeTextDocumentParams request, CancellationToken cancellationToken)
     {
         var text = request.ContentChanges.FirstOrDefault()?.Text ?? string.Empty;
-        RecompileAndPublish(request.TextDocument.Uri, request.TextDocument.Version, text);
-        return Unit.Task;
+        await RecompileAndPublishAsync(request.TextDocument.Uri, request.TextDocument.Version, text, cancellationToken)
+            .ConfigureAwait(false);
+        return Unit.Value;
     }
 
     public override Task<Unit> Handle(DidCloseTextDocumentParams request, CancellationToken cancellationToken)
@@ -57,10 +59,18 @@ internal sealed class TextDocumentSyncHandler : TextDocumentSyncHandlerBase
 
     public override Task<Unit> Handle(DidSaveTextDocumentParams request, CancellationToken cancellationToken) => Unit.Task;
 
-    private void RecompileAndPublish(DocumentUri uri, int? version, string text)
+    // RecompileAndPublishAsync hops the CPU-bound compile to a thread-pool task so it
+    // does not block the LSP dispatch thread. Holding the dispatch thread synchronously
+    // prevents OmniSharp from pumping the wire writer, which deadlocks subsequent
+    // `PublishDiagnostics` notifications (F-LS-02 / DiagnosticPublishIntegrationTests).
+    private async Task RecompileAndPublishAsync(DocumentUri uri, int? version, string text, CancellationToken cancellationToken)
     {
-        var compilation = Precept.Compiler.Compile(text);
-        var (enrichedDiagnostics, suggestions) = DiagnosticEnricher.Enrich(compilation);
+        var (compilation, enrichedDiagnostics, suggestions) = await Task.Run(() =>
+        {
+            var c = Precept.Compiler.Compile(text);
+            var (d, s) = DiagnosticEnricher.Enrich(c);
+            return (c, d, s);
+        }, cancellationToken).ConfigureAwait(false);
 
         var state = _store.GetOrAdd(uri);
         if (version is null)

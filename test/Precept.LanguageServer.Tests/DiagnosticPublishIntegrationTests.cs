@@ -37,7 +37,8 @@ public class DiagnosticPublishIntegrationTests
 
         var publishedDiagnostics = await publishedDiagnosticsTask;
 
-        publishedDiagnostics.Uri.Should().Be(uri);
+        // DocumentUri.Equals is case-sensitive on Linux; compare canonical string form to keep the contract OS-portable.
+        publishedDiagnostics.Uri.ToString().Should().BeEquivalentTo(uri.ToString());
         publishedDiagnostics.Diagnostics.Should().NotBeEmpty();
     }
 
@@ -74,7 +75,7 @@ public class DiagnosticPublishIntegrationTests
 
         var closedDiagnostics = await closeDiagnosticsTask;
 
-        closedDiagnostics.Uri.Should().Be(uri);
+        closedDiagnostics.Uri.ToString().Should().BeEquivalentTo(uri.ToString());
         closedDiagnostics.Diagnostics.Should().BeEmpty();
     }
 
@@ -144,7 +145,7 @@ public class DiagnosticPublishIntegrationTests
             """));
 
         var newestDiagnostics = await newestDiagnosticsTask;
-        newestDiagnostics.Uri.Should().Be(uri);
+        newestDiagnostics.Uri.ToString().Should().BeEquivalentTo(uri.ToString());
         newestDiagnostics.Diagnostics.Should().NotBeEmpty();
         newestDiagnostics.Diagnostics.Should().Contain(diagnostic => diagnostic.Message.Contains("UnknownType", StringComparison.Ordinal));
 
