@@ -90,12 +90,13 @@ Read `CLAUDE.md` at the repo root before doing anything else. It contains the ca
 
 ### 10. Philosophy Alignment
 
-For design-doc reviews: is the `## Philosophy Alignment` section present and substantive? Does it address each core commitment specifically? A single sentence ("this design is consistent with Precept's philosophy") is not substantive — flag as BLOCKER.
+For design-doc reviews: is the `## Philosophy Alignment` section present and substantive? It must include the **principle-coverage matrix** — every one of the eleven principles in `precept-language-spec.md § 0.1` is a row, every row has Affected? / How served / Tension / Tradeoff filled (or explicit N/A with one-line justification). A missing matrix or any blank cell is a BLOCKER. A single sentence ("this design is consistent with Precept's philosophy") with no matrix is a BLOCKER. The companion-commitments paragraph (Stateless-first-class, Domain-expert-primary-author) must be present unless trivially N/A.
 
 For all reviews: does the proposed implementation or design introduce behavior that tensions a core commitment without acknowledging it? Check specifically:
 - **Prevention vs. detection**: does this push enforcement to runtime or later when compile-time enforcement was achievable?
-- **Honesty about approximation**: does this introduce behavior where approximation could be mistaken for exactness?
+- **Honesty about approximation**: does this introduce behavior where approximation could be mistaken for exactness? For new types, verify the Approximation Stance is stated in the relevant type doc; missing Approximation Stance on a new type is a BLOCKER.
 - **Determinism and inspectability**: is every behavior of this construct deterministic and inspectable at compile time?
+- **Authoring Audience**: does the design respect the domain-expert reader, or does it assume a developer-tier reader without acknowledging the tradeoff? Designs that fail this check without acknowledgment are BLOCKERs.
 
 A philosophy gap that isn't acknowledged is a BLOCKER. A philosophy gap that is acknowledged with a justified tradeoff is a CONCERN.
 
@@ -103,9 +104,19 @@ A philosophy gap that isn't acknowledged is a BLOCKER. A philosophy gap that is 
 
 For design-doc reviews involving language surface changes: is the `## Language Design Grounding` section present? Does the "general language design" sub-section engage with the broader field — comparable languages, PLT theory — or does it only cite Precept-internal docs? Citing only Precept-internal docs is a BLOCKER; language surface decisions must be grounded in the broader field. Check `research/language/README.md` — its domain index maps each language domain to expressiveness studies and theory companions that the design should have consulted.
 
-For all reviews involving language surface: do the decisions demonstrate formally defensible semantics? Can the evaluation semantics of the proposed construct be stated precisely — binding, evaluation order, type inference implications? A construct whose semantics cannot be stated precisely is not ready. Flag as BLOCKER.
+For all reviews involving language surface: do the decisions demonstrate formally defensible semantics? Is the `## Semantic Rules` section present with reduction/typing-rule sketches and a soundness-preservation claim naming the principles preserved? A construct touching evaluation, typing, or proof obligations without Semantic Rules is a BLOCKER. Prose descriptions of behavior without reduction/typing-rule notation are CONCERNs for non-trivial cases.
 
 Does the design check proposed syntax against existing principles and deliberate exclusions in `docs/language/precept-language-spec.md`? A language surface decision that conflicts with a stated spec principle without acknowledging the conflict is a BLOCKER.
+
+### 11a. Audience and Teachability (language-surface reviews)
+
+For design-doc reviews involving language surface changes: is the `## Audience and Teachability` section present and substantive?
+
+- **Worked example**: must be a plausible 5-10 line `.precept` snippet from a real domain (financial, lifecycle, regulatory, scheduling). A compiler-test fragment or synthetic minimal example is a CONCERN. A missing worked example is a BLOCKER.
+- **Error message**: must use domain-targeted vocabulary, not compiler internals ("type mismatch in arm 3 of LedExpressionForm" is wrong; "the rule expression must produce a true/false value" is right). A compiler-internal error message is a CONCERN.
+- **10-minute teaching path**: must be an enumerated reading sequence ≤10 minutes for a competent domain expert. If the path can't reasonably fit in 10 minutes, the feature is too complex for the surface and the design must reconsider — flag as CONCERN.
+
+Missing Audience and Teachability on a language-surface change is a BLOCKER.
 
 ### 12. Architecture Grounding
 

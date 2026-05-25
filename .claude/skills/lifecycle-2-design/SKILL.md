@@ -74,13 +74,25 @@ sources-consulted:
 
 [Required for every design — "Not applicable" is not acceptable.]
 
-How this design serves or tensions against Precept's core commitments. Address each specifically:
-- **Prevention vs. detection**: does this design enforce at compile time, or does it push enforcement to runtime or later?
-- **Honesty about approximation**: does this design introduce any behavior where approximation could be mistaken for exactness?
-- **Determinism and inspectability**: is the behavior of this construct fully deterministic and inspectable?
-- **Compile-time structural checking**: does this design rely on anything that can't be verified at compile time when it should be?
+Fill the principle-coverage matrix. Every principle from `docs/language/precept-language-spec.md § 0.1` (eleven principles) is a row. No row may be left blank — if a principle is unaffected, say "N/A" explicitly with a one-line justification. The matrix forces engagement with the full principle set, not a curated subset.
 
-If the design tensions a core commitment, state the tradeoff being accepted and why it's justified. See `docs/philosophy.md` for the canonical commitments.
+| Principle | Affected? (Y/N) | How served (1 sentence + cite) | Tension (1 sentence or N/A) | Tradeoff (1 sentence or N/A) |
+|---|---|---|---|---|
+| 1. Prevention not detection | | | | |
+| 2. One file, complete rules | | | | |
+| 3. Determinism | | | | |
+| 4. Full inspectability | | | | |
+| 5. Keyword-anchored readability | | | | |
+| 6. Governance not validation | | | | |
+| 7. Compile-time totality | | | | |
+| 8. Honesty about approximation | | | | |
+| 9. Mandatory rationale (`because`) | | | | |
+| 10. Static semantic checking | | | | |
+| 11. Static completeness (no runtime faults from well-typed programs) | | | | |
+
+Then, for any row marked Affected? = Y with a Tension or Tradeoff that isn't N/A: state the tradeoff being accepted and why it's justified, in 2-3 sentences. See `docs/philosophy.md` for the canonical commitments.
+
+**Companion commitments** (from philosophy.md, not in § 0.1 but still load-bearing): Stateless-first-class, Domain-expert-primary-author. Address these in a brief paragraph after the matrix — does this design respect them? — unless they are trivially N/A for this design.
 
 ## Language Design Grounding
 
@@ -95,6 +107,48 @@ Citing only Precept-internal docs for this sub-section is not acceptable — lan
 
 **Precept-specific application:**
 Which principles or deliberate exclusions in `docs/language/precept-language-spec.md` does this proposal touch, extend, or risk conflicting with? Cite by section or principle number.
+
+## Audience and Teachability
+
+[Required when the design touches language surface — new token, keyword, construct, modifier, type, operator, accessor, or expression form. Omit with an explicit one-line note for designs that don't touch language surface.]
+
+Precept's primary author is the **domain expert**, not the developer (see `docs/philosophy.md § Who authors a precept` and `docs/language/precept-language-spec.md § 0.7 Authoring Audience`). Language surface decisions must serve that reader. Provide:
+
+**Worked example.** A 5-10 line `.precept` snippet a domain expert would actually write using this feature. Plausible domain (financial, lifecycle, regulatory, scheduling, etc.), not a synthetic compiler-test fragment. Show the feature in its intended context, not in isolation.
+
+**Error message.** Pick one specific misuse a domain expert is plausibly going to commit. Write the diagnostic message exactly as it would appear (PRE-code, audience-targeted wording, recovery hint if applicable). Explain in one sentence why the wording serves the domain-expert reader rather than the developer.
+
+**10-minute teaching path.** What does the domain expert need to read to use this feature? Ordered list of 2-5 docs / sections / sample files. The path must be ≤10 minutes for a competent domain expert; if it isn't, the feature is too complex for the surface and should be reconsidered.
+
+**Reviewer obligation.** A missing Audience and Teachability section on a language-surface change is a BLOCKER. A worked example that's a compiler-test fragment rather than a plausible domain scenario is a CONCERN. An error message that uses compiler-internal vocabulary is a CONCERN.
+
+## Semantic Rules
+
+[Required when the design touches expression evaluation, typing rules, proof obligations, or constraint semantics. Omit with an explicit one-line note for designs that touch only diagnostics, formatting, or documentation.]
+
+State the semantic rules precisely enough that a competent reader can derive the construct's behavior without ambiguity. Required content:
+
+**Evaluation / reduction rules.** For new expression forms, state the reduction rule. Prose notation is acceptable; rule notation is preferred for non-trivial cases. Example forms:
+
+```
+E[set X to e]  →  E'[X = v]   where  e ⇓ v
+```
+
+For constructs that don't introduce expressions, state the binding rule, evaluation order, or transition rule analogously.
+
+**Typing rules.** For new typing behavior, sketch the inference rule with premises and conclusion. Hindley-Milner style is acceptable:
+
+```
+  Γ ⊢ e : τ      τ ∈ AcceptedTypes(modifier)
+  ──────────────────────────────────────────
+       Γ ⊢ field X modifier e : τ
+```
+
+**Proof obligations.** For constructs that introduce new proof obligations, state what the proof engine must establish before the construct is accepted. Cite the ProofRequirement catalog entry the obligation maps to (or note the new entry being added).
+
+**Soundness preservation claim.** Name the specific principles from `docs/language/precept-language-spec.md § 0.1` that this construct could threaten (most often Principles 7, 10, 11 — totality, static semantic checking, static completeness). For each, state in one sentence why the principle continues to hold after this construct ships. Example: "Principle 11 holds because the new construct produces no expression form whose evaluation is undefined; the proof engine discharges divisor safety and bounds before any runtime path is reachable."
+
+**Reviewer obligation.** A design touching evaluation, proof obligations, or typing without a Semantic Rules section is a BLOCKER. Prose descriptions of behavior without reduction/typing rule notation are CONCERNs for non-trivial cases.
 
 ## Architecture Grounding
 
@@ -172,21 +226,25 @@ remains. Either resolve or move to a separate Wave 0 triage doc.
 
 The skill enforces:
 
-1. **No "Locked" status without Philosophy Alignment.** The section must be present and address each core commitment specifically. "This design is consistent with Precept's philosophy" with no specifics is refused. The author must state how each commitment is served, or what tradeoff is being accepted and why.
+1. **No "Locked" status without Philosophy Alignment.** The section must be present and the principle-coverage matrix must be filled — every one of the eleven principles in `precept-language-spec.md § 0.1` must have a row with no blank cells. Rows marked "N/A" require a one-line justification. "This design is consistent with Precept's philosophy" with no matrix is refused. The companion-commitments paragraph (Stateless-first-class, Domain-expert-primary-author) must be present unless trivially N/A.
 
 2. **Language surface changes require Language Design Grounding.** If the design introduces or modifies any token, keyword, construct, modifier, type, operator, accessor, or expression form: the section must be present and both sub-sections must be substantive. The "general language design" sub-section must engage with the broader field — comparable languages, PLT theory, or explicit acknowledgment of a gap in `research/language/`. Citing only Precept-internal docs is refused.
 
-3. **Pipeline/API/catalog changes require Architecture Grounding.** If the design touches catalog structure, pipeline stage boundaries, public API contracts, or cross-component interfaces: all three sub-sections (layer placement, cross-component propagation, breaking changes) must be present and addressed. Any propagation category left blank rather than explicitly "None" is refused.
+3. **Language surface changes require Audience and Teachability.** Same trigger as guard 2. The worked example must be plausible-domain (not a compiler-test fragment), the error message must use domain-targeted vocabulary, and the 10-minute teaching path must be enumerated. Missing this section on a language-surface change is refused.
 
-4. **No "Locked" status without four-leg decisions.** Every decision must carry Rationale + Alternatives + Precedent + Tradeoff. The skill checks for the four headers and asks the author to fill missing ones one at a time. Author can answer "no precedent — novel choice" or "no tradeoff identified — flag for review", but cannot skip the question.
+4. **Designs touching evaluation, proof, or typing require Semantic Rules.** If the design introduces a new expression form, modifies typing behavior, adds a proof obligation, or changes constraint semantics: the Semantic Rules section must be present with reduction/typing-rule sketches and a soundness-preservation claim naming the specific principles preserved. Prose descriptions without notation are refused for non-trivial cases.
 
-5. **No "Locked" status with open questions.** Forces resolution before locking. If questions are too big to resolve in the session, the skill suggests creating a separate Wave 0 decision-triage doc.
+5. **Pipeline/API/catalog changes require Architecture Grounding.** If the design touches catalog structure, pipeline stage boundaries, public API contracts, or cross-component interfaces: all three sub-sections (layer placement, cross-component propagation, breaking changes) must be present and addressed. Any propagation category left blank rather than explicitly "None" is refused.
 
-6. **Acceptance criteria must be test-shaped.** The skill refuses vague criteria like "works correctly." Prompts for specific testable conditions.
+6. **No "Locked" status without four-leg decisions.** Every decision must carry Rationale + Alternatives + Precedent + Tradeoff. The skill checks for the four headers and asks the author to fill missing ones one at a time. Author can answer "no precedent — novel choice" or "no tradeoff identified — flag for review", but cannot skip the question.
 
-7. **Doc-update enumeration must be present.** The skill consults the CLAUDE.md routing table for the file paths the design touches and pre-populates the doc-update section. Author can edit or expand.
+7. **No "Locked" status with open questions.** Forces resolution before locking. If questions are too big to resolve in the session, the skill suggests creating a separate Wave 0 decision-triage doc.
 
-8. **Every decision must cite the sources that informed it — with proof-of-reading.** A citation is `<source identifier> — <short verbatim excerpt>`. The excerpt is the forcing function: it can't be fabricated without opening the source. Citations are listed per-decision (under the "Sources consulted for this decision" leg) AND aggregated in the frontmatter `sources-consulted` field. The skill checks two things at lock time:
+8. **Acceptance criteria must be test-shaped.** The skill refuses vague criteria like "works correctly." Prompts for specific testable conditions.
+
+9. **Doc-update enumeration must be present.** The skill consults the CLAUDE.md routing table for the file paths the design touches and pre-populates the doc-update section. Author can edit or expand.
+
+10. **Every decision must cite the sources that informed it — with proof-of-reading.** A citation is `<source identifier> — <short verbatim excerpt>`. The excerpt is the forcing function: it can't be fabricated without opening the source. Citations are listed per-decision (under the "Sources consulted for this decision" leg) AND aggregated in the frontmatter `sources-consulted` field. The skill checks two things at lock time:
    - **Decision text vs. citations.** If a decision's prose names external state (a file path, a code identifier, a doc section, a tool, a sample, a bug ID, an enum, an interface, a precept feature, a research conclusion, another design doc) but the decision's `Sources consulted` leg is empty, refuse to lock. The author either cites what they consulted or explicitly declares "no sources consulted — pure-policy choice."
    - **Frontmatter aggregation.** `sources-consulted` in frontmatter must list every source identifier that appears in any decision's `Sources consulted` leg. The check is mechanical set membership — every per-decision citation also appears at the top of the doc.
    "Source" is an open category — anything with a permanent address that informed the design qualifies. The skill does NOT hardcode which source types are acceptable; the discipline is "cite what you read, regardless of what kind of thing it is."

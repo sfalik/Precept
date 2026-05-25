@@ -246,6 +246,27 @@ The v1 proposal violated all five. It collapsed `Period` into `Duration`, hid th
 
 ---
 
+## Approximation Stance
+
+Per [`philosophy.md`](../philosophy.md) — "honesty about approximation": Precept does not present approximation as exactness, and where temporal arithmetic admits calendar-relative ambiguity, the type system surfaces the case.
+
+| Type | Stance | Reasoning |
+|------|--------|-----------|
+| `date` | Exact | A calendar date is a discrete identifier. No precision loss. |
+| `time` | Exact | A wall-clock time-of-day; tick-precision per NodaTime. |
+| `instant` | Exact | A point on the universal timeline; tick-precision UTC. |
+| `datetime` | Exact | A calendar-aware local datetime; deterministic given an explicit zone via `.inZone(tz)`. |
+| `zoneddatetime` | Exact | An instant + a known IANA zone; round-trip preserves both. |
+| `timezone` | Exact (enumerated) | IANA timezone identifier set; bounded by the TZDB version. |
+| `duration` | Exact | Tick-precision elapsed time. Arithmetic on durations is closed and exact. |
+| `period` | **Admits calendar-relative ambiguity** | A `period` of `1 month` has variable physical duration (28–31 days). Period + datetime is well-defined (NodaTime's algorithm); period-as-duration coercion is **rejected** when the period contains calendar-variable units (years, months). The type system enforces this — see [`PRECEPT0007 — calendar-variable period rejected as duration`]. |
+
+**Mixing periods and durations is a category error.** A `period` carries calendar semantics; a `duration` is physical elapsed time. Operations that conflate them are rejected at compile time. The two types exist precisely because the distinction is real and the language refuses to hide it. See [Semantic Rules](#semantic-rules) § calendar vs timeline for the formal rules.
+
+**Timezone mediation is explicit.** Converting a `datetime` to an `instant` requires `.inZone(tz)` — the author must name the zone. Implicit zone defaults are not allowed; that would present approximation (zone-guessing) as exactness.
+
+---
+
 ## Motivation
 
 ### The temporal gap

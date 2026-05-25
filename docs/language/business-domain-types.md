@@ -158,6 +158,27 @@ The governing question for every decision: **"If a domain author has this kind o
 
 ---
 
+## Approximation Stance
+
+Per [`philosophy.md`](../philosophy.md) — "honesty about approximation": Precept does not present approximation as exactness. Business-domain types are the highest-stakes case because financial and measurement values flow into regulated and audited systems.
+
+| Type | Stance | Reasoning |
+|------|--------|-----------|
+| `money` | **Exact** | Backed by `decimal`; no float drift. Precision is the author's responsibility, opt-in via `maxplaces N`. ISO 4217 minor-unit data is available as metadata (`Currency.minorUnit`) but is **not** automatically enforced — author writes `maxplaces 2` explicitly when strict mode is required. See [§ Position 3 — decoupled at the default surface](#d10-iso-4217-default-precision-as-implicit-maxplaces-for-money) (after retirement: the rationale lives in `research/architecture/compiler/currency-precision-coupling-survey.md`). |
+| `quantity` | **Exact within the unit-of-measure system** | UCUM-derived; arithmetic preserves dimensional integrity. Cross-dimension multiplication that doesn't cancel is **rejected** (compile error), not silently approximated. Unit conversion is explicit. |
+| `unit-of-measure` | Exact (enumerated) | UCUM identifier set; bounded by the UCUM revision in use. |
+| `price` | **Exact** | `money` + `quantity` composition; same exactness as components. |
+| `exchangerate` | **Exact representation; approximation is the domain** | The value itself is a `decimal` (exact); but exchange rates are a *snapshot* of an inherently fluid quantity. The type's `from`/`to` qualifiers force the author to name the directional pair, which makes the approximation surface (the rate is exact for this pair at this moment; converting through it remains an approximation of the underlying market). |
+| `currency` | Exact (enumerated) | ISO 4217 identifier set; bounded by the ISO 4217 revision in use. |
+
+**Decimal arithmetic is the default for money operations.** Multiplication, division, and percentage operations preserve exact base-10 representation up to the author's declared precision. There is no implicit rounding. When rounding is required (e.g., final billing amounts), the author calls `round(...)` explicitly with an explicit rounding mode (default `half-even`).
+
+**Cross-currency arithmetic is rejected at compile time.** `USD + EUR` does not produce an approximate USD-equivalent — it produces a type error. Conversion requires an explicit `exchangerate` and the author writing the conversion. The type system surfaces what would otherwise be implicit and dangerous.
+
+**The qualifier system is load-bearing for approximation honesty.** `money in 'USD'`, `quantity in 'kg'`, `exchangerate in 'USD' to 'EUR'` — qualifiers travel with values through arithmetic, and operations that would silently coerce or lose them are rejected. See [`catalog-system.md § Qualifier Propagation`](catalog-system.md).
+
+---
+
 ## Motivation
 
 ### The business-domain gap

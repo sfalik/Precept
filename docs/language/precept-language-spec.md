@@ -30,6 +30,7 @@
   - [0.4 Execution Model Properties](#04-execution-model-properties)
   - [0.5 Graph Analyzer Design Contract](#05-graph-analyzer-design-contract)
   - [0.6 Proof Engine Design Contract](#06-proof-engine-design-contract)
+  - [0.7 Authoring Audience](#07-authoring-audience)
 - [1. Lexer](#1-lexer)
   - [1.1 Token Vocabulary](#11-token-vocabulary)
   - [1.2 Reserved Keywords](#12-reserved-keywords)
@@ -243,6 +244,36 @@ The proof-engine obligations enumerated above describe the full language-level c
 | 12 | Sharpened reachability/routing diagnostics from proven-dead guards | Specification-only — depends on #9 + #10 | F-LANG-SPEC-12 (Phase 5) |
 
 All other obligations (numeric intervals, relational reasoning, divisor safety, non-negative obligations, unit-aware comparison, assignment-range impossibility, default-violation enforcement, proof attribution, sequential proof flow) are implemented and exercised by the proof-engine test suite. Authors who depend on the specification-only obligations today must supply the equivalent hand-written constraints (an explicit `rule` or `ensure`) until Phase 5 ships them.
+
+---
+
+### 0.7 Authoring Audience
+
+The primary author of a `.precept` definition is the **domain expert** — a business analyst, product owner, regulatory specialist, or subject-matter expert who reasons in terms of "what is this data allowed to become." Not the software developer.
+
+This is the most distinguishing positioning claim Precept makes (see [`philosophy.md § Who authors a precept`](../philosophy.md)). It constrains every language-surface decision in this spec. The constraints below are not aspirational — they are *forcing functions* on what the language is allowed to look like.
+
+**Operational implications:**
+
+1. **Keyword-anchored grammar.** Every construct begins with a known keyword (`field`, `state`, `event`, `rule`, `ensure`, `from`, `on`, `transition`, `set`, `assign`). The parser dispatches on leading tokens; the author reads top-to-bottom in domain vocabulary. See Principle 5 in [§ 0.1](#01-design-principles) and the `Constructs.ByLeadingToken` catalog. Symbol-heavy or expression-first grammars are deliberate exclusions — they optimize for developer terseness over domain-expert readability.
+
+2. **Mandatory `because` clauses.** Every `rule` and `ensure` carries a domain-readable rationale (Principle 9). The clause is not documentation; it is part of the construct. A rule without a `because` is rejected by the parser. The domain expert reads the rationale; the developer would have skipped writing it.
+
+3. **Readable diagnostics.** Compile-time error messages target domain vocabulary, not compiler internals. A message that says "monthly price cannot be negative" speaks to the author; a message that says "type mismatch: expected `decimal{nonnegative}`, got `decimal`" does not. The diagnostic catalog ([`diagnostic-system.md`](../compiler/diagnostic-system.md)) enforces audience-targeted wording. Hover text in the language server follows the same constraint.
+
+4. **No opaque proof.** The proof engine's obligations and discharges are inspectable — `precept_proofs` MCP tool surfaces them; LS hover surfaces them. The domain expert can ask "what did the compiler prove about this rule and how?" and get a domain-readable answer. SMT-style or theorem-prover-style proof artifacts (which would be opaque to the audience) are excluded.
+
+5. **No iteration constructs.** Loops, comprehensions, recursive function definitions are absent. The domain expert reasons declaratively — what *is* true, what *must* be true. Iteration is procedural reasoning; it belongs in the hosting layer, not the precept.
+
+**The audience constraint is reviewable.** When a new language-surface change is proposed, the design must demonstrate it serves the domain expert — not merely "is technically expressive." Designs that fail this check are CONCERNs at minimum; designs that assume a developer-tier reader without acknowledging the tradeoff are BLOCKERs (per [`precept-reviewer.md`](../../.claude/agents/precept-reviewer.md)).
+
+**Reading by audience tier:**
+
+- **Domain expert / business analyst**: this spec, the type docs ([`primitive-types.md`](primitive-types.md), [`temporal-type-system.md`](temporal-type-system.md), [`business-domain-types.md`](business-domain-types.md), [`collection-types.md`](collection-types.md)), the samples in [`samples/`](../../samples/).
+- **Developer integrating Precept**: this spec plus [`runtime/runtime-api.md`](../runtime/runtime-api.md) and [`tooling/`](../tooling/README.md).
+- **Compiler / runtime author**: this spec plus [`compiler-and-runtime-design.md`](../compiler-and-runtime-design.md), the per-stage docs in [`compiler/`](../compiler/README.md), and [`catalog-system.md`](catalog-system.md).
+
+The spec is read by all three. The audience commitment ensures that "domain expert" remains a real reader of this document, not a category referenced only in philosophy.md.
 
 ---
 

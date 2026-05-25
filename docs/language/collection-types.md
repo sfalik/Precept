@@ -86,6 +86,23 @@ The inner type `T` must be a scalar type — any primitive type (`string`, `inte
 
 ---
 
+## Approximation Stance
+
+Per [`philosophy.md`](../philosophy.md) — "honesty about approximation": collections in Precept are **exact**. No sampling, no probabilistic membership, no approximate cardinality.
+
+| Property | Stance |
+|----------|--------|
+| Cardinality (`.count`) | Exact. Always reflects the precise number of elements. |
+| Membership (`contains`) | Exact. Deterministic; no false positives or negatives. |
+| Equality | Exact. Element-wise per the inner type's equality. |
+| Ordering | Exact and well-defined per collection kind (FIFO for queue, LIFO for stack, insertion-ordered for log/list, unordered for set/bag, key-ordered for `queue of T by P`). |
+
+Bloom filters, count-min sketches, and other approximate-membership data structures are deliberately excluded from the language surface. The author who needs them can use them in the hosting layer; Precept's collections are governance primitives, not performance primitives. If approximation appears in a collection operation, it is a domain modeling error — name the approximation explicitly via `number` element types or by qualifying the field with `because` rationale that surfaces the imprecision.
+
+**Inner type approximation propagates honestly.** A `set of number` carries the approximation stance of `number` — element equality follows IEEE 754 semantics, which the proof engine refuses to prove on exact equality. A `set of decimal` is exact in both cardinality and element identity.
+
+---
+
 ## `set`
 
 **Declaration:**

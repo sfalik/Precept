@@ -71,6 +71,23 @@ Precept has six primitive types. Each has a fixed backing type, a defined operat
 
 ---
 
+## Approximation Stance
+
+Per [`philosophy.md`](../philosophy.md) — "honesty about approximation": Precept does not present approximation as exactness, and the distinction must be visible at the type surface.
+
+| Type | Stance | Implication |
+|------|--------|-------------|
+| `string` | Exact | UTF-16 round-trips losslessly. |
+| `integer` | Exact | Arbitrary-precision whole numbers; no overflow, no rounding. |
+| `decimal` | Exact | Base-10 fractional arithmetic; no float drift. Use for financial, rates, tax, currency-precision-sensitive values. |
+| `number` | **Approximate by design** | IEEE 754 double. Tolerates approximation error; appropriate for scientific computation, scoring, statistical aggregates. The proof engine cannot prove exact equality on `number`. |
+| `boolean` | Exact | Two values, no third. |
+| `choice` | Exact | Finite enumeration. |
+
+**The lane separation matters.** `decimal` and `number` are distinct types — there is no implicit coercion. An author who writes `field Price as number` has opted into approximation; one who writes `field Price as decimal` has opted out. Mixing them in arithmetic requires an explicit conversion; the type system surfaces the choice rather than hiding it. See [Numeric Lane Rules](#numeric-lane-rules) for the full rule set.
+
+---
+
 ## `string`
 
 **Declaration:**
