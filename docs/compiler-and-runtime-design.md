@@ -364,17 +364,9 @@ TokenStream
 | **Catalog role** | `TokenKind` comes from `Tokens.GetMeta(...)` / `Tokens.Keywords`. Token categories, TextMate scope, semantic token type, and completion hints derive from `TokenMeta`. |
 | **Consumers** | Parser, `Compilation`, LS lexical tokenization and grammar tooling |
 
-### Completion filtering via `ValidAfter`
+**How it serves the guarantee:** The lexer accounts for every character of source text and classifies it according to catalog-defined vocabulary. No ambiguity in token identity propagates downstream.
 
-The language server's completion logic uses `TokenMeta.ValidAfter` to filter candidates: for each `TokenKind` that is a completion candidate, its `ValidAfter` array declares which preceding token kinds make it legal in context. A completion candidate is only offered if the token immediately preceding the cursor appears in the candidate's `ValidAfter` set. This is catalog-declared positional grammar — the LS does not hardcode which completions follow which keywords; it reads the constraint from the metadata.
-
-**How it serves the guarantee:**The lexer ensures that every character of source text is accounted for and classified according to catalog-defined vocabulary. No ambiguity in token identity propagates downstream.
-
-> **Precept Innovations**
-> - **Catalog-driven token recognition.** `TokenKind` derives from catalog metadata, not a parallel enum. The lexer is a vocabulary consumer — adding a keyword to the `Tokens` catalog automatically makes it lexable, highlightable, and completable.
-> - **No vocabulary ownership at the lexer level.** Traditional lexers own a hardcoded keyword table. Precept's lexer reads its vocabulary from the same metadata that drives every other consumer.
-
-See [`docs/compiler/lexer.md`](./compiler/lexer.md) for the full stage design.
+See [`docs/compiler/lexer.md`](./compiler/lexer.md) for the full stage design including completion-filtering via `TokenMeta.ValidAfter`, interpolation-mode handling, and the keyword-vs-identifier discipline. The "Precept Innovations" detail — catalog-driven token recognition with no parallel keyword table — is covered there.
 
 ## 5. Parser
 
@@ -411,69 +403,11 @@ flowchart LR
 
 **How it serves the guarantee:** Structural fidelity means the type checker and downstream stages work from a faithful representation of the author's intent, including malformed programs — authoring tools can diagnose problems precisely because the structure is preserved, not discarded on error.
 
-### Parser/NameBinder/TypeChecker contract boundary
+**Cross-stage contract.** The parser stamps `ConstructKind`, `ActionKind`, `ModifierKind`, and `TypeKind` at parse time. Name resolution, type compatibility, overload selection, and semantic legality are NOT parser responsibilities — they live in the NameBinder and TypeChecker. Every parsed region produces a `ParsedConstruct` node; missing or invalid slots produce synthesized placeholder `SlotValue` instances so downstream stages never see silent absence. Error recovery synchronizes at newline-anchored declaration keywords.
 
-The parser guarantees to the name binder and type checker:
+The cross-stage Earliest-knowable kind assignment table — which stage stamps which `*Kind` — lives in [§ 6 Type Checker](#6-type-checker) below.
 
-- Every parsed region produces a `ParsedConstruct` node. Missing or invalid slots produce synthesized placeholder `SlotValue` instances — required content is never silently absent. The type checker does not re-validate structural completeness.
-- The `ConstructKind` for each construct is stamped via `Meta.Kind` at parse time. `ActionKind` and `ModifierKind` are resolved and stored in `ActionChainSlot` and `ModifierListSlot` subtypes at parse time.
-- `TypeKind` IS stamped at parse time — `TypeExpressionSlot` carries `TypeMeta`; the parser resolves type references via the `Types` catalog at parse time (Decision 2026-05-06 in parser.md). The type checker receives an already-resolved `TypeMeta` object.
-
-What the parser does NOT guarantee: name resolution, type compatibility, overload selection, or semantic legality. The name binder owns name resolution and reference binding; the type checker owns all semantic resolution.
-
-### Error recovery
-
-Error recovery is construct-level, not token-level. When the parser encounters a malformed construct, it emits a diagnostic and skips to the next newline-anchored declaration keyword (`field`, `state`, `event`, `rule`, `from`, `in`, `to`, `on`). This is panic-mode recovery with synchronization at declaration boundaries.
-
-For slots where expected tokens are absent, the parser synthesizes a placeholder `SlotValue` for the slot kind and continues. The parser always terminates; every syntax error produces a `Diagnostic`; partial constructs are emitted with available slots populated.
-
-### Output: `ParsedConstruct` and `SlotValue`
-
-The parser produces one output type for all constructs:
-
-```csharp
-public sealed record ParsedConstruct(
-    ConstructMeta Meta,
-    ImmutableArray<SlotValue> Slots,
-    SourceSpan Span);
-```
-
-- **Meta** — The `Constructs` catalog entry describing this construct's kind, slots, and routing
-- **Slots** — Parsed values in declaration order matching `Meta.Slots`
-- **Span** — Source location from first to last consumed token
-
-There are no per-construct AST node types. The old typed-class hierarchy (`FieldDeclarationSyntax`, `StateBlockSyntax`, `EventDeclarationSyntax`, `TransitionRowSyntax`, etc.) has been deleted. Consumers work with `ParsedConstruct` uniformly, dispatching on `ConstructKind` via `Meta.Kind` when construct-specific handling is needed.
-
-`SlotValue` is a 17-subtype discriminated union, one per `ConstructSlotKind`. Expression-carrying slots (`ComputeExpressionSlot`, `GuardClauseSlot`, `OutcomeSlot`, `EnsureClauseSlot`, `RuleExpressionSlot`) carry `ParsedExpression` — a Pratt-parser AST stamped at parse time and stored directly in the slot. See [`docs/compiler/parser.md`](./compiler/parser.md) for the full slot subtype inventory.
-
-The parser stamps `ParsedExpression` into expression-carrying slots in a single pass. The type checker consumes `ParsedExpression` and produces `TypedExpression` into the `SemanticIndex` — no re-parsing. `ParsedExpression` is the syntactic form (operator + operands, unresolved names); `TypedExpression` is the semantic form (resolved identities, inferred types). This is the clean syntactic/semantic boundary. The Pratt parser for expressions uses `Operators.GetMeta()` for precedence/associativity metadata. SlotValue DU shape is stable at 17 subtypes.
-
-> **Resolved slot-shape alignment (2026-05-07T00:02:01.887-04:00):** The parser/type-checker slot contract is now aligned in source. `TypeExpressionSlot` carries `TypeMeta`, `ModifierListSlot` carries `ImmutableArray<ModifierKind>`, `BecauseClauseSlot` carries `string Message`, and `AccessModeSlot` carries `TokenKind AccessMode`. Expression-carrying slots carry the parser-owned `ParsedExpression` DU.
-
-### Catalog-to-grammar mapping
-
-Catalog metadata factors into parsing decisions at specific points. The parser uses `Constructs.GetMeta()` to determine legal declaration forms — each `ConstructKind` defines the expected slot sequence via `ConstructSlot` entries, each carrying whether the slot is required or optional and its expected position. The parser validates that slots appear in the declared order with declared optionality. Slot validation is catalog-driven: there is no per-construct parser logic that hardcodes what a `field` declaration requires vs. what a `from` row requires. Add a new required slot to a `ConstructKind` in the catalog, and the parser diagnoses all existing declarations that are missing it. The parser uses `Operators.GetMeta()` for expression parsing — operator precedence and associativity come from catalog metadata, not a hardcoded table. Keyword recognition is inherited from the lexer's catalog-driven `TokenKind` assignments; the parser dispatches on `TokenKind`, not on string comparison.
-
-### Right-sized parser patterns
-
-Precept's grammar calls for parser patterns scaled to a flat, keyword-anchored, line-oriented DSL — not patterns designed for deeply nested general-purpose languages. The surveyed DSL-scale systems confirm what works at this scale:
-
-- **Flat parse trees.** Precept's grammar has no deep nesting, no brace-delimited scopes, no expression statements. Red/green tree architectures (Roslyn, rust-analyzer) solve incremental reparsing of deeply nested, brace-delimited structures — a problem that does not exist in flat, line-oriented grammars. CEL produces a flat protobuf AST; OPA/Rego produces module-level `Rule` lists; Dhall and Jsonnet both produce single-expression trees with no incremental infrastructure.
-- **Declaration-boundary error recovery.** When the parser encounters a malformed construct, it skips to the next newline-anchored declaration keyword (`field`, `state`, `event`, `rule`, `from`, `in`, `to`, `on`). This is panic-mode recovery with synchronization at declaration boundaries. Token-level insertion/deletion with cost models (as in Roslyn or GCC) is designed for statement-level grammars where recovery points are ambiguous. Precept's keyword-anchored lines provide unambiguous synchronization. OPA's parser similarly synchronizes at rule boundaries; Pkl's tree-sitter grammar provides node-level error recovery.
-- **Expressions only in specific slots** — guards, action RHS, ensure clauses, computed fields, if/then/else, and because clauses. CEL is a single-expression language; OPA confines expressions to rule bodies and comprehensions. Precept follows the same containment pattern — the parser does not need a general-purpose expression parser for the full language.
-- **Operator precedence from metadata.** Operator precedence comes from `Operators.GetMeta()`, not a hardcoded table. The correct pattern is precedence-climbing — a standard technique for expression parsing at this scale (CEL uses a similar approach in its ANTLR-generated parser with explicit precedence levels; OPA's parser embeds precedence in its recursive descent structure).
-- **LL(1) with single-token lookahead** in most positions, given the keyword-anchored, line-oriented design. This is simpler than the LL(k) or GLR techniques general-purpose languages require.
-
-### `ActionKind` dual-use note
-
-`set` appears as both an action keyword (`TokenCategory.Action` — e.g., `set Amount to 100`) and a type keyword (`TokenCategory.Type` — e.g., `field Tags as set of string`). The parser disambiguates by position context: after `->` or in action position = action; after `as`/`of` or in type position = type. This disambiguation is a parser responsibility, not a catalog lookup — the catalog correctly classifies `set` under both categories.
-
-> **Precept Innovations**
-> - **Flat, declaration-oriented grammar.** No nesting beyond expression-within-declaration. This makes the grammar trivially parseable, the error recovery model simple and predictable, and the `ConstructManifest` shape directly useful for tooling without the complexity budget of a general-purpose language parser.
-> - **Precedence from catalog metadata.** Operator precedence and associativity are not hardcoded — they derive from `Operators.GetMeta()`. Changing precedence is a catalog edit, not a parser rewrite.
-> - **Catalog-driven generic interpreter.** The parser contains no per-construct parsing logic — it is a generic slot-walking engine driven by `Constructs` catalog metadata. There are no per-construct AST node types: a single `ParsedConstruct(ConstructMeta, ImmutableArray<SlotValue>, SourceSpan)` is the parser's universal output type. Adding a new construct requires only a catalog entry, not parser code changes.
-
-See [`docs/compiler/parser.md`](./compiler/parser.md) for the full stage design including slot subtype inventory, disambiguation protocol, and routing family details.
+See [`docs/compiler/parser.md`](./compiler/parser.md) for the full stage design including the 17-subtype `SlotValue` discriminated union, catalog-to-grammar mapping, disambiguation protocol, `ActionKind` dual-use handling, the slot-shape alignment contract, and the right-sized parser patterns (CEL/OPA/Dhall/Roslyn comparative rationale).
 
 ## 6. Type Checker
 
@@ -520,6 +454,8 @@ flowchart LR
 
 **How it serves the guarantee:** The type checker catches semantic defects — type mismatches, illegal operations, invalid modifier combinations, unresolved references — before the program reaches graph analysis or runtime. Every expression and declaration that passes type checking has a resolved, catalog-backed semantic identity. This is where the structural guarantee begins to take shape: if it type-checks, its operations are legal.
 
+The full SemanticIndex shape — symbols, bindings, normalized declarations, typed expressions, typed action family (three shapes), back-pointer discipline, and anti-mirroring rules — lives in [`docs/compiler/type-checker.md`](./compiler/type-checker.md). This document carries only the cross-stage kind-assignment contract below; everything else is canonical there.
+
 ### SemanticIndex: flat semantic inventory, not a mirrored tree
 
 The `SemanticIndex` is not a second tree that mirrors parser structure with types bolted on. It is a flat semantic inventory — declarations organized by semantic role, not by source position. Rules, `in`/`to`/`from`/`on` ensures, transition rows, access declarations, state hooks, and stateless hooks live in normalized inventories shaped for what downstream consumers need, not for what the parser produces. Typed expressions still carry structure — a resolved event-arg symbol, a resolved field symbol, a resolved `OperationKind`, a result type — but the top-level organization is inventory-shaped.
@@ -532,112 +468,11 @@ This is the right trade for Precept. The LS runs in the same process as the comp
 
 The back-pointer is a navigation convenience for LS features and diagnostic rendering — not a license for semantic consumers to depend on syntax structure. Graph analysis, proof, and the Precept Builder consume the semantic inventories. They must not traverse syntax nodes via back-pointers, even though the pointers make them reachable. If graph analysis walked syntax to extract transition topology, a change to parser recovery shape could break it. These stages consume normalized semantic declarations and should continue to work correctly regardless of how the parser evolves.
 
-### SemanticIndex inventory
-
-The semantic inventory is organized by role, not by source position. Each entry carries a back-pointer (→ syntax) to its originating syntax node for diagnostics and LS navigation — but downstream stages consume the semantic columns, not the pointer.
-
-```
-SemanticIndex                              ◄ flat inventory, not a tree
-│
-├── Symbols ─────────────────────────────────────────────────────
-│   TypedField    "Amount"    number   [required]       → ParsedConstruct (FieldDeclaration)
-│   TypedField    "Status"    string   [computed]        → ParsedConstruct (FieldDeclaration)
-│   TypedState    "Draft"     [initial]                  → ParsedConstruct (StateDeclaration)
-│   TypedState    "Approved"  [terminal]                 → ParsedConstruct (StateDeclaration)
-│   TypedEvent    "Submit"    args: [Approver]           → ParsedConstruct (EventDeclaration)
-│   TypedArg      "Approver"  string   [required]        → slot within ParsedConstruct
-│
-├── Bindings ────────────────────────────────────────────────────
-│   expr site  "Amount > 0"   →  OperationKind.GreaterThan(number, number)
-│   field ref  "Amount"       →  TypedField "Amount"
-│   action     "set"          →  ActionMeta (input shape)
-│   type ref   "number"       →  TypeKind.Number + TypeAccessor
-│
-├── Normalized Declarations ─────────────────────────────────────
-│   TransitionRow   (Draft, Submit, Review)    guard + action chain
-│   Rule            constraint-1               ensure Amount > 0
-│   Ensure          (in Draft, constraint-2)   ensure Status == "new"
-│   Access          (Draft, Amount)            edit
-│
-├── Typed Expressions ───────────────────────────────────────────
-│   Amount > 0       →  result: bool   op: GreaterThan   → expr syntax
-│   arg.Approver     →  result: string                    → expr syntax
-│
-└── Dependency Facts ────────────────────────────────────────────
-    computed "Status"  depends-on: [Amount, State]
-    constraint-1       references: [Amount]
-```
-
-**Symbols** — stable semantic identities
-
-| Symbol | Key | Semantic content | → syntax |
-|---|---|---|---|
-| `TypedField` | field name | `TypeKind`, modifiers, default/computed expression | `ParsedConstruct` |
-| `TypedState` | state name | modifier set (initial, terminal, required, …) | `ParsedConstruct` |
-| `TypedEvent` | event name | modifier set, arg symbols | `ParsedConstruct` |
-| `TypedArg` | event + arg name | `TypeKind`, optionality, default expression | slot within `ParsedConstruct` |
-
-**Bindings** — every reference site resolved to its target
-
-| Binding site | Resolves to |
-|---|---|
-| identifier in expression | field symbol, arg symbol, or function overload |
-| operator in expression | `OperationKind` (from `Operations` catalog) |
-| type reference | `TypeKind` + `TypeAccessor` |
-| action verb | `ActionMeta` shape (base / input / binding) |
-
-`TypeAccessor` is a discriminated union — its subtypes carry different proof obligation metadata. Accessing `.peek` on a queue-typed field resolves to a `TypeAccessor` subtype that carries a `ProofRequirement` for non-emptiness: the proof engine must establish that the collection is non-empty before the access is safe. The accessor shape — not the type checker — owns this obligation declaration. This means new container operations get proof obligations by updating catalog metadata, not by modifying checker logic.
-
-**Normalized declarations** — inventories shaped for analysis, not parser nesting
-
-| Inventory | Keyed by | Content |
-|---|---|---|
-| Transition rows | (source state, event, target state) | guard, action chain, typed expressions |
-| Rules | constraint identity | guard, ensure expression, because clause |
-| Ensures | (scope anchor, constraint identity) | `in`/`to`/`from`/`on`-scoped constraints |
-| Access declarations | (state, field) | edit / readonly mode |
-| State hooks | state identity | hook entries |
-| Stateless hooks | — | hook entries |
-
-**Typed expressions** — resolved result type, resolved operation/function/accessor identity, semantic subjects, with → syntax back-pointer.
-
-**Typed actions** — resolve to one of three shapes: `TypedAction` (no operand), `TypedInputAction` (carries `InputExpression`), `TypedBindingAction` (carries `Binding`).
-
-**Dependency facts** — computed-field dependencies, arg dependencies, referenced-field sets, and semantic edge data required by graph/proof/the Precept Builder.
-
-### Anti-mirroring rules
-
-These rules constrain the `SemanticIndex` shape. They are architectural constraints on the artifact boundary — not algorithmic guidance for the type checker implementation:
-
-1. **No parser layout inheritance.** `SemanticIndex` must not preserve parser child layout, missing-node shape, or recovery nullability as its primary contract. The semantic inventory is organized by semantic role, not by source structure.
-2. **Semantic LS features must not walk syntax.** Hover, go-to-definition, semantic tokens, and semantic completions must be satisfiable from `SemanticIndex` bindings plus back-pointers to originating syntax nodes. If an LS feature must walk parser structure to answer a semantic question, the `SemanticIndex` is underspecified — fix the inventory, not the LS feature.
-3. **Downstream stages consume semantic inventories.** Graph analysis, proof, and the Precept Builder consume normalized semantic inventories. They must not traverse syntax nodes via back-pointers. If a downstream stage needs source-structural information, the `SemanticIndex` is missing a semantic fact.
-4. **`ConstructManifest` retains sole ownership of source shape.** Recovery, construct ordering, span information, and parse-phase slot layout belong to `ConstructManifest`/`ParsedConstruct` exclusively. `SemanticIndex` entries hold back-pointers for navigation, not syntax fragments for reconstruction.
+The inventory's per-role shape (symbols, bindings, normalized declarations, typed expressions, typed action family — three shapes only) and the four anti-mirroring rules that govern the SemanticIndex contract live in [`docs/compiler/type-checker.md § 7.1`](./compiler/type-checker.md). The cross-stage kind-assignment contract (which stage stamps which `*Kind`) is the one piece this document retains — see below.
 
 ### Right-sized type checking: generic resolution passes
 
 The type checker should NOT have a `CheckFieldDeclaration()`, `CheckTransitionRow()`, `CheckRuleDeclaration()` method per construct kind. The surveyed DSL-scale type checkers confirm the right pattern for this scale: CEL's checker walks the AST once, resolving types against its `Env` environment with overload dispatch from a centralized function registry; OPA's type checker (`ast/check.go`) makes a single pass over rules against a `TypeEnv`. The correct model for Precept is the same — generic resolution passes that read construct metadata from catalogs. Catalog-resolvable checks are generic passes; only construct-specific structural validation that genuinely differs by kind (field declarations vs. transition rows have different type-checking needs) warrants per-kind methods. The type checker builds semantic symbol tables and binding indexes — a symbol-table-driven approach — not a parallel tree that mirrors `ConstructManifest` with type annotations added. Type widening rules and implied modifiers are catalog-declared: `TypeMeta.WidensTo` lists the types a given type automatically widens to (e.g., `integer` widens to `number`; `money` widens to a notempty context), and `TypeMeta.ImpliedModifiers` lists modifiers a type carries by virtue of its kind (e.g., `money` implies `notempty`). The type checker reads these from catalog metadata — there are no hardcoded widening chains or modifier-implication switches in the checker logic.
-
-### Typed action family — three shapes only
-
-Actions in the typed model resolve to exactly one of three semantic shapes:
-
-- **`TypedAction`** (base) — verbs like `clear`. No operand; value ownership is internal.
-- **`TypedInputAction`** (operand-bearing) — verbs like `set`, `add`, `remove`, `enqueue`, `push`. Carries `InputExpression: TypedExpression`.
-- **`TypedBindingAction`** (binding) — verbs like `dequeue`, `pop`. Carries `Binding: TypedBinding`.
-
-The partition reflects verb-surface ownership. A flat shape with optional fields would require nullable fields on the majority of members.
-
-Field naming discipline:
-
-| Correct | Do not use |
-|---|---|
-| `InputExpression` | `Value`, `Input` |
-| `Binding` | `IntoTarget` |
-| `ConstraintKind` | `EnsureBucketType` |
-| `FaultSite` | `RuntimeCheckLocation` |
-
-The Precept Builder produces the matching executable family: `ExecutableAction`, `ExecutableInputAction`, `ExecutableBindingAction`. Same naming discipline.
 
 ### Earliest-knowable kind assignment
 
@@ -646,17 +481,9 @@ The Precept Builder produces the matching executable family: `ExecutableAction`,
 | Parser | `ConstructKind`, `ActionKind`, `OperatorKind`, `ModifierKind` — stamped into `SlotValue` subtypes at parse time |
 | Type checker | `TypeKind`, `OperationKind`, `FunctionKind`, resolved `TypeAccessor`, resolved result types on typed expressions |
 
-The parser stamps everything that syntax alone can determine. The type checker stamps everything that requires name, type, or overload resolution. A kind that requires name resolution does not appear in `ConstructManifest`; a kind that syntax alone determines does not wait for the type checker. (See §5 open question on `SlotValue` subtype shapes — the `ModifierKind` entry above follows `parser.md`; `type-checker.md` lists `ImmutableArray<TokenKind>` for `ModifierListSlot`.)
+The parser stamps everything that syntax alone can determine. The type checker stamps everything that requires name, type, or overload resolution. A kind that requires name resolution does not appear in `ConstructManifest`; a kind that syntax alone determines does not wait for the type checker.
 
-> **Precept Innovations**
-> - **Catalog-driven resolution passes.** Type checking resolves against catalog metadata (`Operations`, `Functions`, `Types`, `Modifiers`, `Actions`, `Constraints`, `ProofRequirements`) rather than encoding per-construct behavior in checker logic. Adding a new operation or function to the catalog automatically makes it resolvable — no checker code changes required.
-> - **Flat semantic inventory, not annotated syntax.** The `SemanticIndex` is a flat inventory of symbols, bindings, and normalized declarations — not an AST with types bolted on. The shape is driven by what graph analysis, proof, the Precept Builder, and the LS need, not by what the parser produces. The anti-mirroring rules enforce this structurally.
-> - **Syntax-node back-pointers with consumer discipline.** Semantic entries hold direct references to originating `ParsedConstruct` nodes — cheap LS navigation without span correlation. But downstream stages (graph, proof, the Precept Builder) consume only the semantic inventories, never the syntax structure behind the pointers. The back-pointer is a navigation convenience, not a structural dependency.
-> - **Three-shape typed action family.** Actions resolve to exactly one of three semantic shapes (`TypedAction`, `TypedInputAction`, `TypedBindingAction`), enforced by the DU pattern. A flat shape with optional nullable fields is prohibited — the type system prevents invalid action representations.
-
-> **Resolved expression payloads (2026-05-07T00:02:01.887-04:00):** Expression-carrying slots now store the parser-owned `ParsedExpression` DU directly. The type checker consumes those nodes to produce `TypedExpression`; no re-parse from `SourceSpan` is part of the design.
-
-See [`docs/compiler/type-checker.md`](./compiler/type-checker.md) for the full stage design including `SemanticIndex` record types, 2-pass architecture, and expression resolution strategy.
+See [`docs/compiler/type-checker.md`](./compiler/type-checker.md) for the full stage design including SemanticIndex record types, the anti-mirroring rules, the three-shape typed action family with naming discipline, 2-pass architecture, and expression resolution strategy.
 
 ## 7. Graph Analyzer
 
@@ -691,69 +518,7 @@ flowchart LR
 
 **How it serves the guarantee:** The graph analyzer detects lifecycle defects — unreachable states, terminal states with outgoing edges, required-state dominance violations, irreversible back-edges — that would make the state machine unsound. These are structural problems in the contract itself, caught before any instance exists. The surveyed state-graph analysis systems confirm the value of compile-time structural verification: SPIN/Promela performs reachability and deadlock detection on state models; Alloy Analyzer checks structural properties of relational models; NuSMV/nuXmv performs CTL/LTL model checking for reachability and liveness; XState's `@xstate/graph` computes reachable states and transition paths. Precept's graph analyzer applies these same structural analysis patterns — reachability, dead-state detection, topological validation — at compile time rather than as a separate verification step.
 
-### StateGraph inventory
-
-The artifact is **topology** (the directed edge set) plus **derived facts** (structural properties computed from that topology).
-
-```
-StateGraph                             ◄ graph + derived facts
-│
-│  ┌─────────── Topology ───────────┐
-│  │                                │
-│  │   Draft ──Submit──> Review     │
-│  │   Review ──Approve──> Approved │
-│  │   Review ──Reject───> Draft    │
-│  │                                │
-│  └────────────────────────────────┘
-│
-├── Adjacency            Draft   → { Submit→Review }
-│                        Review  → { Approve→Approved, Reject→Draft }
-├── Predecessor Index    Review  → { Draft }
-│                        Draft   → { Review }
-│                        Approved→ { Review }
-├── Successor Index      Draft   → { Review }
-│                        Review  → { Approved, Draft }
-├── Reachability         reachable: {Draft, Review, Approved}
-│                        unreachable: ∅    terminal: {Approved}
-│
-└── Derived Facts ───────────────────────────────────────
-    DominanceFact          Review dominates path to Approved
-    EventCoverage          Draft: [Submit ✓]  Review: [Approve ✓, Reject ✓]
-    ProofForwardingFact    (none — no structural defects)
-```
-
-**Topology — adjacency and navigation indexes**
-
-| Structure | Shape | Purpose |
-|---|---|---|
-| `TransitionAdjacency` | state → { event → target states } | directed edge set of the lifecycle graph |
-| `PredecessorIndex` | state → { predecessor states } | reverse-edge lookup |
-| `SuccessorIndex` | state → { successor states } | forward-edge lookup |
-| `ReachabilitySet` | reachable / unreachable / terminal partitions | state partitioning relative to initial state |
-
-Example adjacency (from a three-state lifecycle):
-```
-Draft   ──Submit──>  Review
-Review  ──Approve──> Approved  (terminal)
-Review  ──Reject───> Draft
-```
-
-**Derived facts — structural verdicts and proof inputs**
-
-| Fact | What it captures |
-|---|---|
-| `DominanceFact` | required-state modifier mandates all paths to terminal pass through it |
-| `TerminalOutgoingViolation` | terminal state has outgoing transitions — structural defect |
-| `IrreversibleBackEdgeViolation` | transition re-enters an irreversible state from downstream |
-| `EventCoverageEntry` | per-state inventory: which events have declared rows, which do not |
-| `ProofForwardingFact` | reachability gaps, dominance violations, structural defects forwarded to proof engine |
-
-> **Precept Innovations**
-> - **Reachability as a first-class design artifact.** Graph analysis produces reachable/unreachable state sets, structural validity facts, and runtime indexes — not just a pass/fail check. These facts flow into proof obligations and runtime precomputation.
-> - **Lifecycle soundness as a compile-time guarantee.** Unreachable states, terminal outgoing-edge violations, required-state dominance violations, and irreversible back-edges are all caught before any instance exists. Without this analysis stage, these defects would surface as runtime surprises — an entity that can never reach a terminal state, a transition that violates an irreversibility promise — with no static signal to the author.
-> - **Structural cycle and dominance detection.** The graph analyzer reasons about structural properties (dominance, predecessor/successor relationships, event coverage per state) that would otherwise require runtime observation to discover.
-
-See [`docs/compiler/graph-analyzer.md`](./compiler/graph-analyzer.md) for the full stage design.
+The full `StateGraph` inventory (topology shape — adjacency, predecessor/successor indexes, reachability partition — plus derived facts — `DominanceFact`, `TerminalOutgoingViolation`, `IrreversibleBackEdgeViolation`, `EventCoverageEntry`, `ProofForwardingFact`) lives in [`docs/compiler/graph-analyzer.md`](./compiler/graph-analyzer.md). The doc also covers the four-phase analysis pipeline, catalog-driven modifier dispatch, and the reachability-first design rationale.
 
 ## 8. Proof Engine
 
@@ -790,63 +555,7 @@ flowchart LR
 | **Catalog role** | Proof obligations originate in metadata: `BinaryOperationMeta.ProofRequirements`, `FunctionOverload.ProofRequirements`, `TypeAccessor.ProofRequirements`, and action metadata. `FaultCode` ↔ `DiagnosticCode` linkage is catalog-owned. |
 | **Consumers** | `Compilation`, LS/MCP proof reporting, Precept Builder fault backstops |
 
-### ProofLedger inventory
-
-The artifact is an **obligation ledger** — every provable claim the compiler must discharge, with its verdict, strategy, and downstream linkage.
-
-```
-ProofLedger                              ◄ obligation ledger
-│
-│  OBLIGATION                          DISP.        STRATEGY            CHAIN
-│  ─────────────────────────────────── ──────────── ─────────────────── ──────────────────────
-│  Amount > 0  at set Amount           proved       literal proof       ─
-│  Approver is-set  at Submit guard    proved       guard-in-path       ─
-│  ApprovedAmt ≤ RequestedAmt         unresolvable ─                   → DiagnosticCode.E042
-│  initial-state satisfiability        proved       literal proof       ─
-│
-├── Fault-Site Links ────────────────────────────────────────────
-│   E042  →  FaultSiteDescriptor { FaultCode.DivisionOverflow, DiagnosticCode.E042 }
-│
-├── Constraint Influence ────────────────────────────────────────
-│   constraint-1  →  fields: [Amount]        expr: "Amount > 0"
-│   constraint-2  →  fields: [Status]        expr: "Status == \"new\""
-│
-└── Coverage Map ────────────────────────────────────────────────
-    3 proved / 1 unresolvable  — 4 total obligations
-```
-
-| Obligation entry | Columns |
-|---|---|
-| `ProofObligation` | semantic site · originating `ProofRequirement` · **disposition** (`proved` · `unresolvable`) · strategy used · `DiagnosticCode` if unresolvable |
-| `FaultSiteLink` | obligation → `FaultSiteDescriptor` (threads the proof/fault chain so the Precept Builder can plant runtime backstops) |
-| `ConstraintInfluenceEntry` | constraint → contributing fields + expression-text excerpts (the Precept Builder reads these to build `ConstraintInfluenceMap`) |
-| `InitialStateSatisfiabilityResult` | (field, constraint) → satisfiable / unsatisfiable + diagnostic reference |
-| `ObligationCoverageRecord` | obligation → discharging strategy (auditable coverage map across the strategy set) |
-
-Each row in the ledger resolves to an explicit **disposition**, not a binary pass/fail. The disposition is the proof engine's primary output — `proved` means no runtime check needed; `unresolvable` means the compiler emits a diagnostic and the author must fix the source.
-
-### Proof strategy set
-
-The proof engine operates over a bounded, non-extensible strategy set:
-
-- **Literal proof** — the value is a known compile-time literal; outcome is directly knowable.
-- **Modifier proof** — the value flows through a catalog-defined modifier chain whose output bounds are statically determined.
-- **Guard-in-path proof** — a guard expression in the control flow statically establishes a sufficient range or type constraint.
-- **Straightforward flow narrowing** — if a guard clause in the same transition row establishes a constraint on a field, that constraint is available as evidence for proof obligations on expressions within that row's action chain. This is type-state narrowing through the immediately enclosing control path, not general dataflow analysis.
-
-Any obligation outside this set is unresolvable by the compiler and emits a `Diagnostic`. New strategies are language changes, not tooling extensions. Each strategy is a simple predicate function, not a solver — literal proof checks a compile-time constant, modifier proof checks a modifier chain, guard-in-path proof checks enclosing guard subsumption, flow narrowing checks immediate control-path type state. This bounded approach is a deliberate design decision: the surveyed verification systems (SPARK Ada/GNATprove, Dafny, Liquid Haskell, CBMC) all depend on external SMT solvers (Z3, CVC4/5) or SAT solvers for general proof discharge, introducing significant implementation complexity and non-deterministic verification times. Precept's four-strategy set avoids external solver dependencies entirely — at the cost of proof coverage breadth — which is appropriate for a DSL where the expression language is intentionally constrained and the obligation space is bounded.
-
-### Per-obligation disposition model
-
-Each proof obligation resolves to an explicit disposition — not a binary pass/fail. The surveyed verification systems confirm the value of per-obligation disposition granularity: CBMC reports `SUCCESS`, `FAILURE`, or `UNKNOWN` per property; Frama-C/WP reports `Valid`, `Unknown`, `Invalid`, or `Timeout` per ACSL annotation; Dafny tracks per-method `PipelineStatistics` with `ErrorCount`, `InconclusiveCount`, `TimeoutCount`, and `OutOfResourceCount`. Precept's proof model follows this pattern — each `ProofObligation` carries a disposition (proved, unresolvable) and the strategy that discharged it (or the diagnostic emitted). The disposition is the proof engine's primary output; the proof/fault chain (below) threads it into the rest of the system.
-
-SPARK GNATprove additionally provides a `Justified` disposition for checks that cannot be proved but have been manually annotated as acceptable (`pragma Annotate(GNATprove, False_Positive|Intentional, Pattern, Reason)`). Precept does not need this mechanism today — the bounded strategy set and constrained expression language should cover the obligation space — but if the proof coverage boundary (below) reveals uncoverable obligations, a justification mechanism would be the precedented response.
-
-**Proof coverage boundary:** The four strategies must be validated against the sample corpus (20 files in `samples/`). If cross-field comparison obligations (e.g., `ApprovedAmount <= RequestedAmount`) cannot be discharged by any of the four strategies, a fifth strategy (e.g., relational pair narrowing) is needed before v1. This is the highest-risk unknown in the proof engine — the value proposition depends on coverage being sufficient for real-world programs.
-
-### Initial-state satisfiability
-
-If default field values and initial-state constraints are both statically known, the proof engine verifies satisfiability at compile time and emits a diagnostic if no valid initial configuration exists. An author who writes `field X as number default 0` and `in Draft ensure X > 5` gets a compile-time error, not a runtime `EventConstraintsFailed` on create. This is threaded through the proof/fault chain: `ProofRequirement` (initial-state satisfiability) → `ProofObligation` (specific field/constraint pair) → `DiagnosticCode` (unsatisfiable initial configuration). This check applies to `Create` without initial event; `Create` with initial event evaluates satisfiability through the normal fire-path proof chain.
+The full `ProofLedger` inventory (per-obligation disposition shape, strategy set with bounded four-strategy rationale, initial-state satisfiability, constraint influence, coverage map) lives in [`docs/compiler/proof-engine.md`](./compiler/proof-engine.md). The doc also covers the catalog-driven obligation generation contract, the two-pass design, and the proof-coverage boundary that gates v1.
 
 ### Proof/fault chain
 
@@ -963,68 +672,7 @@ flowchart LR
 | **Catalog role** | Catalog metadata reaches runtime only in built semantic form: descriptor identity, resolved operation/function/action identity, constraint descriptors, and proof-owned fault-site residue. The Precept Builder reads catalog metadata transitively through already-resolved model identities — it does not perform fresh catalog lookups for classification. |
 | **Consumers** | `Precept.Create`, `Precept.Restore`, `Version` operations, MCP runtime tools, host applications |
 
-### Precept inventory
-
-The executable model is organized as **descriptor tables** (identity), **dispatch indexes** (routing), and **execution plans** (action). Every runtime lookup is an index hit — no scanning, no filtering.
-
-```
-Precept                                 ◄ sealed dispatch map
-│
-├── Descriptor Tables ───────────────────────────────────────────
-│   Fields      [0] Amount: number  [1] Status: string  [2] Tags: set
-│   States      Draft [initial]   Review []   Approved [terminal]
-│   Events      Submit { Approver: string }   Reject { Reason: string }
-│   Constraints C1: "Amount > 0" always   C2: "Status=new" in Draft
-│   FaultSites  F1: DivisionOverflow → E042  (defense-in-depth)
-│
-├── Dispatch Indexes ────────────────────────────────────────────
-│   Transition   (Draft, Submit)   → Review  + plan_0
-│                (Review, Approve) → Approved + plan_1
-│                (Review, Reject)  → Draft   + plan_2
-│   Constraints  always → [C1]    in Draft → [C2]    to Approved → [C3]
-│   Slots        Amount → slot[0]   Status → slot[1]   Tags → slot[2]
-│   Reachability Draft → {Review, Approved}   Review → {Approved, Draft}
-│
-└── Execution Plans ─────────────────────────────────────────────
-    plan_0:  LOAD_ARG arg.NewAmount → r0 │ STORE_SLOT r0 → slot[0]
-    plan_1:  LOAD_SLOT slot[0] → r0 │ LOAD_LIT 0 → r1 │ CMP_GT r0 r1 → r2
-    plan_2:  LOAD_ARG arg.Reason → r0 │ STORE_SLOT r0 → slot[1]
-```
-
-**Descriptor tables** — the runtime face of declarations
-
-| Descriptor | Key | Content |
-|---|---|---|
-| `FieldDescriptor` | field name | `TypeKind`, slot index, modifiers, default-value expression |
-| `StateDescriptor` | state name | terminal flag, modifier set, available events |
-| `EventDescriptor` | event name | modifier set, arg descriptors |
-| `ArgDescriptor` | event + arg name | `TypeKind`, optionality, default expression |
-| `ConstraintDescriptor` | constraint identity | expression text, `ConstraintKind` anchor, because text, scope targets |
-| `FaultSiteDescriptor` | site identity | `FaultCode`, prevention `DiagnosticCode` (defense-in-depth only) |
-
-**Dispatch indexes** — precomputed routing for the evaluator
-
-| Index | Key → Value |
-|---|---|
-| `TransitionDispatchIndex` | (state, event) → target state + prebuilt action plan |
-| `ConstraintPlanIndex` | activation anchor → precomputed constraint-plan bucket |
-| `SlotLayout` | field → slot index (addresses the flat plan's register file) |
-| `ReachabilityIndex` | state → set of reachable states |
-| `ConstraintInfluenceMap` | constraint → contributing fields + expression-text excerpts |
-
-**Execution plans** — prebuilt flat action sequences
-
-| Element | Description |
-|---|---|
-| `ExecutionPlan` | slot-addressed opcodes with field-slot refs, literal constants, operation codes, result slots |
-
-Flat-plan sketch (a `set Amount to arg.NewAmount` action in a transition):
-```
-LOAD_ARG   arg.NewAmount  → r0       # read event arg into scratch slot
-STORE_SLOT r0             → slot[2]  # write to Amount's field slot
-```
-
-The evaluator walks the plan array — no recursive dispatch, no semantic reasoning at runtime.
+The full `Precept` executable model — descriptor tables, dispatch indexes, execution plans, flat opcode model, constraint activation indexes, six-pass transformation pipeline, and the "Restructuring, not renaming" design principle — lives in [`docs/runtime/precept-builder.md`](../runtime/precept-builder.md). The cross-stage Executable-model contract table below is retained here as the single-page view of runtime-concern → executable-structure → consumer.
 
 ### Executable-model contract
 
@@ -1041,44 +689,9 @@ The evaluator walks the plan array — no recursive dispatch, no semantic reason
 | inspection | row/source/result-shaping metadata for `EventInspection`, `RowInspection`, `UpdateInspection`, `ConstraintResult`, `FieldSnapshot` | inspection surfaces |
 | fault backstops | `FaultSite`/fault-site descriptors linked to `FaultCode` and prevention `DiagnosticCode` | impossible-path defense only |
 
-### Descriptor type shapes
-
-The descriptor types referenced throughout this document are first-class sealed types, not string aliases:
-
-- **`FieldDescriptor`** — field name, `TypeKind`, slot index, modifiers (optional, required, computed, readonly, etc.), default-value expression, source origin.
-- **`StateDescriptor`** — state name, modifier set (initial, terminal, required, irreversible, success, warning, error), source origin.
-- **`EventDescriptor`** — event name, modifier set (initial, forbidden, etc.), arg descriptors, source origin.
-- **`ArgDescriptor`** — arg name, `TypeKind`, optionality, default expression, source origin.
-- **`ConstraintDescriptor`** — constraint kind (rule/ensure), anchor family, expression text, because text, guard context, source lines, scope targets, `ConstraintKind` anchor.
-
-These are the runtime face of declarations. Every runtime API surface routes through descriptor identity.
-
-### Expression evaluation model
-
-The executable model is a **flat evaluation plan** — precomputed slot references, operation opcodes, literal constants, and result slots — not a recursive tree interpreter. Think of it as register-based bytecode where "registers" are field slots. This makes evaluation predictable-time, cache-friendly, and trivially serializable for inspection. Tree-walk interpretation is the dominant pattern in the surveyed DSL-scale systems — CEL uses tree-walking via `Interpretable.Eval()`, OPA/Rego uses top-down tree evaluation, Dhall normalizes via recursive substitution, Pkl evaluates lazily through its AST — and it would be correct for Precept. However, Precept's evaluation is tighter than expression evaluation: it executes a fixed action/constraint plan against a known slot layout. The flat plan trades the simplicity of tree-walking for predictable-time execution, inspectability (MCP tools can display plan structure without tracing recursive calls), and determinism properties that make Precept's runtime distinctive. This is a design decision, not a researched consensus — the surveyed systems succeed with tree-walking at their scale.
-
-### Precept Builder: restructuring, not renaming
-
-The runtime model is organized for execution, not for semantic analysis. Constraint plans are grouped by activation anchor, not by source declaration order. Action plans are grouped by transition row, not by field. The runtime model is a dispatch-optimized index, not a renamed analysis model. The surveyed systems confirm this pattern: CEL's `Program` is a lowered `Interpretable` tree optimized for evaluation, not a copy of the checked AST; OPA's `Compiler` builds internal rule indexes that restructure policy for efficient top-down evaluation; XState v5 transforms machine configuration into a normalized internal model with precomputed transition maps. An implementer must NOT map `SemanticIndex` types 1:1 to runtime types — the Precept Builder is a selective, restructuring transformation.
-
-### Constraint activation indexes
-
-The five constraint-plan families (`always`, `in`, `to`, `from`, `on`) are accessed through four precomputed activation indexes, built once during the Precept Builder stage and keyed to descriptor identity:
-
-- **Always index** (global) — rules and ensures with no state or event anchor; active on every operation.
-- **State activation index** (`StateDescriptor`, `ConstraintKind`) — `StateResident`, `StateEntry`, and `StateExit` anchors.
-- **Event activation index** (`EventDescriptor`) — `on Event ensure` anchors.
-- **Event availability index** (`StateDescriptor?`, `EventDescriptor`) — available-event scope; null state key for stateless precepts.
-
-The `ConstraintKind` discriminant distinguishes whether a constraint binds to the current state, the source state, or the target state of a transition. Callers look up a prebuilt bucket, not compute activation at dispatch time. `ConstraintKind` is cataloged in `Constraints` — its five members (`Invariant`, `StateResident`, `StateEntry`, `StateExit`, `EventPrecondition`) are described by the `ConstraintMeta` DU, with the `StateAnchored` intermediate layer grouping the three state-scoped kinds.
-
 ### `Version` serialization contract
 
 Host applications must persist and hand back to `Restore` the following: the current state name (or stateless marker), and field values keyed by field name. The serialization shape is `(string StateName, IDictionary<string, object?> FieldValues)` — or equivalently, `(StateDescriptor?, SlotArray)` at the descriptor level. Hosts own the serialization format (JSON, binary, database columns); Precept owns the contract for what data is required. `Restore` validates the supplied data against the current definition's constraints — it does not trust the persisted shape.
-
-### Current surface
-
-The stable runtime contract is descriptor-backed. Current public stubs still expose string placeholders and string-selected entry points. Those strings are provisional implementation placeholders, not the architectural end state.
 
 > **Precept Innovations**
 > - **Flat evaluation plans with slot-addressed opcodes.** Expressions are not tree-walked — they are precomputed into flat, cache-friendly execution plans with field-slot references and operation codes. Without this, the evaluator would need to walk expression trees at runtime and re-resolve operation kinds and field names on every operation. Flat plans make evaluation predictable-time and the execution trace trivially inspectable.
@@ -1160,39 +773,10 @@ Two rules: (1) `Restore` bypasses access-mode checks and row dispatch but does *
 
 Inspection and commit paths execute the same prebuilt plans. Disposition alone differs — report vs. enforce.
 
-### Create
+The four operations (Create, Restore, Fire, Update) and their per-operation input/output contracts, including the "Update exists because Precept owns the data layer" positioning and the "Restore recomputes before validating" discipline, live in [`docs/runtime/runtime-api.md`](../runtime/runtime-api.md). Two cross-operation discriminators that this monolith uniquely captures:
 
-Create constructs the first valid `Version`, optionally by atomically firing the declared initial event. Creation with an initial event reuses the full fire-path execution — not a separate code path — so initial-event constraints, actions, and transitions apply identically.
-
-| **Input** | `Precept`; prebuilt defaults, `InitialState`, `InitialEvent`, arg descriptors, fire-path runtime plans |
-|---|---|
-| **Output** | `EventOutcome` (commit) or `EventInspection` (inspect). Success yields `Applied(Version)` or `Transitioned(Version)`. |
-
-### Restore
-
-Restore reconstitutes persisted data under the current definition. It validates rather than trusts — it runs constraint evaluation but intentionally bypasses access-mode restrictions, because persisted data represents a prior valid state, not an active field edit. **Restore recomputes computed fields BEFORE constraint evaluation, not after** — persisted data may include stale computed-field values, and constraints must evaluate against recomputed results. The compiler-result-to-runtime survey shows that XState v5 provides the closest precedent for state reconstitution: `createActor(machine, { snapshot: JSON.parse(persistedSnapshot) })` restores a previously serialized snapshot. However, XState performs no constraint re-evaluation on restore — it trusts the persisted snapshot shape. Precept's `Restore` deliberately does not trust: it re-validates against the current definition's constraints, catching both stale computed values and definition-evolution mismatches.
-
-| **Input** | `Precept`; caller-supplied persisted state and fields; descriptor tables, slot validation, recomputation, restore constraint plans |
-|---|---|
-| **Output** | `RestoreOutcome` — `Restored(Version)`, `RestoreConstraintsFailed(IReadOnlyList<ConstraintViolation>)`, or `RestoreInvalidInput(string Reason)` |
-
-### Fire
-
-Fire is the core state-machine operation. Routing, action execution, transition, recomputation, and constraint evaluation are a single atomic pipeline — not composable steps callers assemble — because partial execution would violate the determinism guarantee.
-
-| **Input** | `Version`; event/arg descriptors, row dispatch tables; prebuilt action plans, recomputation index; anchor-plan indexes, fault sites |
-|---|---|
-| **Output** | `EventOutcome` — `Transitioned`, `Applied`, `Rejected`, `InvalidArgs`, `EventConstraintsFailed`, `Unmatched`, provisional `UndefinedEvent`. `EventInspection` / `RowInspection` for inspect. |
-
-Constraint identity survives into `ConstraintResult` and `ConstraintViolation` through `ConstraintDescriptor`. Routing uses descriptor-backed row identity. Precept structurally distinguishes `Unmatched` (no row matched the state × event combination) from `Rejected` or `EventConstraintsFailed` (rows matched but guard or constraint evaluation prevented the transition) — a distinction most state machine runtimes cannot make at the type level, leaving callers to infer why an event did not produce a transition.
-
-### Update
-
-Update governs direct field edits under access-mode declarations and constraint evaluation. `InspectUpdate` additionally evaluates the event landscape over the hypothetical post-patch state. `Update` exists because Precept is not a state machine runtime — it is a domain integrity engine that owns the data layer alongside the lifecycle layer. Fields have access-mode declarations per state, always-constraints, recomputed dependencies, and structured outcomes for denied or constrained writes. A pure event/transition mechanism would leave direct field edits ungoverned; `Update` closes that gap without routing every data change through an event.
-
-| **Input** | `Version`; field descriptors, per-state access facts; recomputation dependencies; `always`/`in` constraint plans, event-prospect evaluation |
-|---|---|
-| **Output** | `UpdateOutcome` — `FieldWriteCommitted`, `UpdateConstraintsFailed`, `AccessDenied`, `InvalidInput`. `UpdateInspection` for inspect. |
+- **Precept structurally distinguishes `Unmatched` (no row matched the state × event combination) from `Rejected` / `EventConstraintsFailed` (rows matched but guard or constraint prevented the transition).** Most state machine runtimes cannot make this distinction at the type level — leaving callers to infer why an event produced no transition.
+- **`Update` exists because Precept is not a state machine runtime** — it is a domain integrity engine that owns the data layer alongside the lifecycle layer. A pure event/transition mechanism would leave direct field edits ungoverned; `Update` closes that gap without routing every data change through an event.
 
 ### Structured outcomes
 
@@ -1225,11 +809,7 @@ The structural guarantee means that a valid executable model communicates entire
 | `Update` | `FieldWriteCommitted` | `UpdateConstraintsFailed`, `AccessDenied` | `InvalidInput` | `Fault` |
 | `Restore` | `Restored` | `RestoreConstraintsFailed` | `RestoreInvalidInput` | `Fault` |
 
-### Inspection
-
-`EventInspection` provides the reduced event-level landscape. `RowInspection` provides per-row prospect, effect, snapshots, and constraints. `UpdateInspection` provides hypothetical field state plus the resulting event landscape. `ConstraintResult` carries evaluation status referencing `ConstraintDescriptor`. `FieldSnapshot` captures resolved or unresolved field value in hypothetical state.
-
-Inspection shares the same prebuilt plans as commit — it is not a second evaluator. The inspection surface previews every possible transition from any state with full constraint evaluation and per-row structured outcomes. The same prebuilt execution plans execute in report mode rather than enforce mode.
+**Inspection** shares the same prebuilt plans as commit — it is not a second evaluator. `InspectFire` / `InspectUpdate` preview every possible transition (or field-edit outcome) with full constraint evaluation, using the same plans in report mode rather than enforce mode. The full shape of `EventInspection`, `RowInspection`, `UpdateInspection`, `ConstraintResult`, and `FieldSnapshot` lives in [`docs/runtime/runtime-api.md`](../runtime/runtime-api.md).
 
 ### Constraint query contract
 
@@ -1246,15 +826,6 @@ Three tiers, additive in specificity:
 When `Fire` returns `Rejected` or `EventConstraintsFailed`, or `Update` returns `UpdateConstraintsFailed`, the outcome carries `ConstraintViolation` objects with **structured explanation depth**: the failing constraint descriptor, the expression text, the evaluated field values at the point of failure (`{ field: value }` pairs), the guard context that scoped the constraint (if guarded), and the specific sub-expression that failed. This is not a formatting concern — it is cheap to compute during evaluation and transforms MCP and inspection from "it failed" to "it failed because X was 3 and the constraint requires X > 5."
 
 The multi-span attribution pattern from the Rust borrow checker provides relevant precedent for this design: a single borrow-checker diagnostic carries multiple labeled source spans (primary span for the conflict, secondary spans for the causal chain — "first mutable borrow occurs here," "second mutable borrow occurs here," "first borrow later used here"). Precept's `ConstraintViolation` follows the same structural principle — the failing expression, the contributing field values, and the guard context form a labeled causal chain, not a single error site. Infer (Meta) takes a similar approach with `bug_trace` — an ordered array of inter-procedural trace steps, each attributed to a source location with a description of what the analysis observed.
-
-### Operation-facing plan selection
-
-| Operation | Required executable contract |
-|---|---|
-| `Create` | default-value plan, initial-state seed, optional initial-event descriptor/arg contract, then shared fire-path execution |
-| `Restore` | slot population, descriptor validation, recomputation, `always` + `in <current>` constraint plans; no access checks, no row dispatch |
-| `Fire` | row dispatch, action plans, recomputation, `always` + `from <current>` + `on <event>` + `to <target>` constraint plans |
-| `Update` | access-mode index, patch validation, recomputation, `always` + `in <current>` constraint plans; inspect additionally runs event-prospect evaluation |
 
 > **Precept Innovations**
 > - **Structured outcomes taxonomy.** Every runtime operation communicates through a structured outcome — success, domain rejection, boundary validation, or impossible-path fault. There are no exceptions, no error codes, no untyped failures. An AI agent or host application can pattern-match on outcome type and always know what happened and why.
@@ -1291,14 +862,9 @@ The TextMate grammar (`tools/Precept.VsCode/syntaxes/precept.tmLanguage.json`) i
 
 The same catalog metadata drives LS completions, LS hover content, LS semantic tokens, and the MCP catalog-reference tools (`precept_syntax`, `precept_types`, `precept_operations`, `precept_domains`, `precept_proofs`, `precept_patterns`, `precept_diagnostic`). Adding a keyword, type, or operator to the appropriate catalog automatically updates every surface — grammar, completions, hover, semantic tokens, and MCP output.
 
-### Anti-pattern
+**Anti-pattern.** Do NOT add patterns directly to `tmLanguage.json`. Add the language element to the appropriate catalog, and let the grammar generator pick it up. Hand-editing the grammar file creates drift between the grammar and the language specification — the exact problem the catalog-driven architecture is designed to prevent.
 
-Do NOT add patterns directly to `tmLanguage.json`. Add the language element to the appropriate catalog, and let the grammar generator pick it up. Hand-editing the grammar file creates drift between the grammar and the language specification — the exact problem the catalog-driven architecture is designed to prevent.
-
-> **Precept Innovations**
-> - **Single source of truth for language surface.** Grammar, completions, hover, semantic tokens, and MCP vocabulary are all derived from the same catalog definitions. Without this, each surface would maintain its own keyword list and drift independently — a grammar that highlights syntax the parser rejects, completions that suggest constructs the type checker doesn't recognize.
-> - **Grammar generation, not grammar authoring.** The TextMate grammar is a build output. Syntax highlighting correctness is a property of catalog completeness, not of grammar maintenance. A new keyword highlights correctly the moment its catalog entry is added.
-> - **Zero-drift guarantee (design property).** Because the grammar is generated from the same metadata the parser and type checker consume, it will be structurally impossible for syntax highlighting to disagree with actual parse behavior. This property holds once the grammar generator replaces the current hand-crafted grammar.
+**Zero-drift guarantee.** Because the grammar is generated from the same metadata the parser and type checker consume, it is structurally impossible for syntax highlighting to disagree with actual parse behavior — once the grammar generator replaces the current hand-crafted grammar.
 
 See [`docs/compiler/tooling-surface.md`](./compiler/tooling-surface.md) for the full tooling surface design. Note: the grammar generator is currently designed but not yet implemented — the current `precept.tmLanguage.json` is hand-crafted.
 

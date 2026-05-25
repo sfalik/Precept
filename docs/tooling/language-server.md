@@ -159,25 +159,11 @@ When `!HasErrors`, the LS also holds a `Precept` (built from `Compilation`) for 
 
 ### LSP Feature Routing and Artifact Consumption
 
-#### Consumer Artifact Map
+The per-feature artifact map (which LS feature reads which pipeline artifact) and the four hard rules (no walking `ConstructManifest` for semantic questions; no consuming `Compilation` after `Precept` is available; no duplicating catalog knowledge; diagnostics are push-only) are the contract between LS features and the compile pipeline. Because this contract is cross-component (LS *and* MCP *and* host applications consume the same artifacts under the same rules), it lives in the cross-stage doc as the single source of truth:
 
-| LS Feature | Correct Artifact | Pipeline Stage |
-|---|---|---|
-| Diagnostics | `Compilation.Diagnostics` | All stages (accumulated) |
-| Lexical semantic tokens (Pass 1) | `TokenStream` + `TokenMeta.VisualCategory` → `SemanticTokenTypes` | Lexer |
-| Identifier semantic tokens (Pass 2) | `SemanticIndex` reference bindings | TypeChecker |
-| Completions | Catalogs + `ConstructManifest` context + `SymbolTable` + `SemanticIndex` | Parser + NameBinder + TypeChecker |
-| Hover | `SemanticIndex` + catalog documentation | TypeChecker + Catalogs |
-| Go-to-definition | `SemanticIndex` reference → `ParsedConstruct Syntax` back-pointer | TypeChecker |
-| Preview/inspect | `Precept` + inspection runtime | Builder + Evaluator |
-| Outline | `ConstructManifest.Constructs` | Parser |
-| Folding | `ConstructManifest.Constructs` (multi-line spans) | Parser |
+→ See [`docs/compiler-and-runtime-design.md § 15 Language-server integration`](../compiler-and-runtime-design.md#15-language-server-integration) for the **Per-feature artifact responsibility** list, the **Consumer artifact map** table (LS + MCP + host app), and the two hard rules. The LS-specific extensions to that map (Pipeline-Stage column, Outline / Folding rows) extend the canonical contract — they do not replace it.
 
-#### Hard Rules
-
-1. **Semantic LS features must not walk `ConstructManifest` to answer semantic questions** — use `SemanticIndex` + back-pointers only. The type checker owns semantic identity; the LS reads it.
-
-2. **Preview/runtime features must not consume `Compilation` after `Precept` is available** — the runtime snapshot is the source of truth for inspection.
+Beyond the cross-component contract, two LS-internal disciplines:
 
 3. **Completions and hover must not duplicate catalog knowledge** — query the catalog, format the response.
 
