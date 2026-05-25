@@ -75,6 +75,11 @@ The skill enforces:
 
 6. **"What's already decided" log.** Forces a Decisions captured section so decisions don't get re-litigated when the plan is revisited.
 
+7. **Plan-touches ⊆ design's sources-consulted ∪ explicitly-deferred.** When the plan derives from a locked design (via `--from <design-doc>`), enumerate every source identifier the plan will touch — files to edit, docs to update, tools to invoke, samples to modify, test fixtures to add. Compare against the design's `sources-consulted` frontmatter:
+   - For each plan-touch source not in `sources-consulted`, either flag it as a design gap (the design didn't acknowledge this surface but the plan must touch it — design needs re-lock) OR list it in the plan under a `## Discovered during planning` section with a one-line rationale ("uncovered during execution sequencing; not a design oversight").
+   - The check is mechanical set membership. The lint refuses to mark the plan "Draft" with unflagged out-of-design sources.
+   - This is the second gate on the cite-and-verify discipline: if the author and reviewer both skipped reading a source at design time, the planner catches it here when the plan touches that source for real.
+
 ## Composability
 
 - **Input**: `--from <design-or-audit-doc>` — extracts findings, locked decisions, and acceptance criteria; pre-populates phase scope and exit criteria.
@@ -97,3 +102,4 @@ The skill enforces:
 | Exit criteria = "phase complete" | Refuse; prompt for testable condition |
 | Effort = "L" with no day estimate | Refuse; ask for day band |
 | No "Decisions captured" log | Add the section; populate from history |
+| Plan touches a source the design didn't cite | Refuse "Draft"; ask the author to either re-lock the design with the missing source cited, or move the source to a `## Discovered during planning` section with a one-line rationale |

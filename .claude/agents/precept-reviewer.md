@@ -69,6 +69,14 @@ Read `CLAUDE.md` at the repo root before doing anything else. It contains the ca
 ### 9. Per-Decision Rationale
 - Locked design decisions in proposals must include: **rationale**, **alternatives considered and rejected**, **precedent from the research base**, **tradeoff accepted**. A WHAT without WHY is incomplete.
 
+### 10. Source Verification (design-doc reviews)
+When the review target is a locked design doc (from `/lifecycle-2-design`):
+- The design's frontmatter MUST carry `sources-consulted`. If absent or empty when decision prose references external state, that's a BLOCKER.
+- For every source listed in `sources-consulted` (or cited inline in a decision's `Sources consulted` leg), **open the source and read it**. Verify the cited excerpt exists and the design's claim about the source is accurate.
+- The review report MUST emit its own `sources-verified` frontmatter listing every source actually opened, with a one-line note on what was checked. The lint: `sources-verified ⊇ sources-consulted`. If the design cited a source the reviewer didn't open, that's a process violation (reviewer skipped a citation) — report it as a CONCERN against the review process, not against the design.
+- Beyond verifying cited sources, look for **uncited sources the design should have consulted**. If a decision takes a position on, say, the modifier surface but didn't cite the modifier catalog, open the catalog yourself and check whether the design's enumeration is complete against what's actually there. Missing source citations the design clearly needed are findings.
+- "Source" is an open category — code files, doc sections, MCP tool outputs, sample files, test fixtures, bug entries, other design docs, research notes, RFCs, anything with a permanent address. Do not filter by source type.
+
 ## How to report findings
 
 For each finding:
@@ -111,7 +119,24 @@ If something looks suspicious but you can't tell from the diff alone, ask in you
 
 ## Output discipline
 
-Lead with a one-line summary: `N findings: X BLOCKER, Y CONCERN, Z NIT.` (Or `No findings against the non-negotiable rules.`)
+When the target is a design doc, the review begins with a YAML frontmatter block:
+
+```yaml
+---
+review-target: docs/Working/<topic>.md
+sources-verified:
+  - <source identifier>: <one-line note on what was checked>
+  - <source identifier>: <one-line note>
+  # ...
+sources-uncited-but-checked:
+  - <source identifier>: <one-line note — why you opened this even though the design didn't cite it>
+  # ...
+---
+```
+
+`sources-verified` must be a superset of the design's `sources-consulted`. If you couldn't open a cited source (e.g., it's an external URL you can't fetch), say so explicitly — `sources-verified` then lists it with note "skipped — unfetchable" and you flag a CONCERN against the design's reliance on an unverifiable citation.
+
+Then lead with a one-line summary: `N findings: X BLOCKER, Y CONCERN, Z NIT.` (Or `No findings against the non-negotiable rules.`)
 
 Then list findings: **BLOCKERS first**, then CONCERNS, then NITs. Group by file when there are multiple findings per file.
 

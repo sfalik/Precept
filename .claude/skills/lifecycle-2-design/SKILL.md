@@ -28,6 +28,10 @@ A markdown file at `docs/Working/<topic-slug>.md` with these sections:
 ---
 status: Locked YYYY-MM-DD
 phase-target: <Phase N from current readiness plan, or 'TBD'>
+sources-consulted:
+  - <opaque source identifier>: <one-line note on what was checked>
+  - <opaque source identifier>: <one-line note>
+  # ...
 ---
 
 # <Title>
@@ -56,10 +60,19 @@ For each locked design decision, all four legs are REQUIRED:
 - **Precedent**: research / prior art / existing pattern that grounds the choice
   (or explicit "no precedent — novel choice, accepting risk")
 - **Tradeoff accepted**: the known downside being taken on
+- **Sources consulted for this decision**: one or more source identifiers
+  with a short verbatim or near-verbatim excerpt that proves the source was
+  read (e.g., `path/to/file.cs:L1-L20 — "<excerpt>"`, or `docs/foo.md § N —
+  "<excerpt>"`). Source identifier is opaque — anything with a permanent
+  address (code file with line range, doc section, MCP tool query, URL,
+  another design doc, test fixture, sample file, bug entry, RFC, etc.).
+  Honest "no sources consulted — pure-policy choice, no external state
+  informed this" is acceptable when true.
 
 The skill refuses to mark a design "Locked" if any decision is missing
-any of the four legs. Author must either fill the leg honestly or
-explicitly state "no precedent" / "no tradeoff identified — flag for review."
+any of the five legs. Author must either fill the leg honestly or
+explicitly state "no precedent" / "no tradeoff identified — flag for review"
+/ "no sources consulted — pure-policy choice."
 
 ## Acceptance criteria
 Test-shaped. "This passes" / "this fails as expected" / "this is documented in Y."
@@ -96,6 +109,11 @@ The skill enforces:
 
 4. **Doc-update enumeration must be present.** The skill consults the CLAUDE.md routing table for the file paths the design touches and pre-populates the doc-update section. Author can edit or expand.
 
+5. **Every decision must cite the sources that informed it — with proof-of-reading.** A citation is `<source identifier> — <short verbatim excerpt>`. The excerpt is the forcing function: it can't be fabricated without opening the source. Citations are listed per-decision (under the "Sources consulted for this decision" leg) AND aggregated in the frontmatter `sources-consulted` field. The skill checks two things at lock time:
+   - **Decision text vs. citations.** If a decision's prose names external state (a file path, a code identifier, a doc section, a tool, a sample, a bug ID, an enum, an interface, a precept feature, a research conclusion, another design doc) but the decision's `Sources consulted` leg is empty, refuse to lock. The author either cites what they consulted or explicitly declares "no sources consulted — pure-policy choice."
+   - **Frontmatter aggregation.** `sources-consulted` in frontmatter must list every source identifier that appears in any decision's `Sources consulted` leg. The check is mechanical set membership — every per-decision citation also appears at the top of the doc.
+   "Source" is an open category — anything with a permanent address that informed the design qualifies. The skill does NOT hardcode which source types are acceptable; the discipline is "cite what you read, regardless of what kind of thing it is."
+
 ## Composability
 
 - **Input**: optional `--from <research-doc>` flag — extracts research conclusions and pre-populates the Decisions section's Rationale and Precedent legs from the research findings.
@@ -107,6 +125,8 @@ The skill enforces:
 - Leave acceptance criteria as prose ("the feature works")
 - Skip doc-update enumeration ("I'll figure it out later")
 - Mark "Locked" with `(?)` markers or `TBD` placeholders in decision rationale
+- Cite a source without an excerpt ("Consulted: `Modifiers.cs`" — bare; no proof of reading). The excerpt is the forcing function. Bare-path citations are refused.
+- Make claims about external state with no `Sources consulted` ("The catalog already has 8 of these" — no citation). The skill refuses to lock when prose references external state but the citation leg is empty.
 
 ## Quick reference
 
@@ -117,3 +137,6 @@ The skill enforces:
 | No doc-update enumeration | Auto-populate from CLAUDE.md routing table; let author edit |
 | Decision lacks Precedent | Accept "no precedent — novel" as honest answer; do not invent precedent |
 | Open question remains | Refuse "Locked"; offer to move to Wave 0 triage doc |
+| Decision references external state but `Sources consulted` empty | Refuse; ask the author to cite what they read or honestly declare "pure-policy choice — no external state informed this" |
+| Citation has no excerpt (bare path or section name) | Refuse; ask the author to open the source and paste a short verbatim excerpt |
+| Per-decision citations not aggregated in frontmatter `sources-consulted` | Auto-aggregate; author confirms |
