@@ -346,12 +346,18 @@ public enum DiagnosticCode
     MultipleInitialEvents           = 147,
     ConstructionGuardReadsUninitializedField = 148,
 
+    // ── Tooling (emitted outside the compile pipeline) ──
+    McpToolInternalError            = 149,
+
+    // ── Type (business-domain interpolation) ─────────────
+    CurrencyMismatchInCurrencySlot  = 150,
+
     // ── NameBinder ───────────────────────────────────────
     UndeclaredArg                   = 107,
 }
 ```
 
-**148 total diagnostic codes** across the five diagnostic stages.
+**150 total diagnostic codes** across the five diagnostic stages. (`McpToolInternalError = 149` is a tooling-side code emitted by the MCP-tool wrapper, not the compile pipeline — see the note in § DiagnosticStage above. `CurrencyMismatchInCurrencySlot = 150` fires when a currency-slot hole expression (`{field.currency}`) carries a currency that conflicts with the target field's declared qualifier.)
 
 The enum **is** the complete set of diagnostic rules. It is a closed set — you cannot produce a diagnostic that is not a member. Adding a member without completing the catalog chain causes a build failure (see the FaultCode → DiagnosticCode Chain section below).
 

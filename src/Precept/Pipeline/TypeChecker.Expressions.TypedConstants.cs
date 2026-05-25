@@ -274,7 +274,6 @@ internal static partial class TypeChecker
         new([MatchEmpty, (string s) => s == " ", MatchEmpty], [InterpolationSlotKind.Magnitude, InterpolationSlotKind.Unit]),
     ];
 
-    /// <summary>
     private static SegmentForm[]? GetFormsByCategory(InterpolationFormsCategory? category) => category switch
     {
         InterpolationFormsCategory.Money          => MoneyForms,
@@ -285,7 +284,9 @@ internal static partial class TypeChecker
         InterpolationFormsCategory.UnitOfMeasure   => UnitOfMeasureForms,
         InterpolationFormsCategory.Temporal        => TemporalSingleForms,
         null                                       => null,
-        _                                          => null,
+        // Every named InterpolationFormsCategory must have a form array above.
+        // An unexpected value means a category was added without wiring its forms.
+        var unknown => throw new InvalidOperationException($"No form array registered for InterpolationFormsCategory {unknown}"),
     };
 
     /// <summary>
