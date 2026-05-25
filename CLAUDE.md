@@ -23,6 +23,8 @@ Precept is documentation-dense. Many design decisions live in `docs/` and `resea
 - **`docs/README.md`** — the doc landscape and navigation gateway. Know what exists before deciding what to read.
 - **`docs/language/README.md`** — the language surface: spec, canonical types, grammar, catalog as source of truth. Precept's design decisions are language decisions; this is the primary substance.
 
+**First time in this codebase?** Read `docs/agent-onboarding.md` once — the five organizing concepts (catalogs as language spec, the pipeline → Compilation → Precept chain, lifecycle-driven design, pointer-philosophy + doc-sync, required reads vs context-on-demand). When a term feels ambiguous, grep `docs/glossary.md`.
+
 ### Entry points
 
 Each area has a README that catalogs its documents, status fields, and reading order. Treat these as the canonical maps before diving into individual files:

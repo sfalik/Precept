@@ -42,3 +42,18 @@ Source string → Lexer.Lex → TokenStream → Parser.Parse → ConstructManife
 ## Source Code
 
 All pipeline stages live under `src/Precept/Pipeline/`. Tests are in `test/Precept.Tests/`.
+
+## Relationship to Other Docs
+
+- [`../compiler-and-runtime-design.md`](../compiler-and-runtime-design.md) — the architectural spine; covers stage boundaries, artifact types, and the non-negotiable rules every stage doc respects. Always read before the per-stage docs.
+- [`../language/README.md`](../language/README.md) — the language surface this pipeline implements. Catalog definitions in `docs/language/catalog-system.md` ground every parser and type-checker decision.
+- [`../runtime/README.md`](../runtime/README.md) — what consumes the pipeline's `Compilation` output. The `Precept` runtime type wraps a `Compilation`.
+- [`../tooling/README.md`](../tooling/README.md) — what consumes the pipeline's diagnostics and structural data. LS diagnostics, MCP `precept_compile`, and the TextMate grammar all derive from the pipeline.
+- `research/architecture/compiler/` — the comparator surveys that ground architectural decisions in `compiler-and-runtime-design.md`.
+
+## Cross-cutting concerns
+
+- **Catalog discipline.** Per the [!IMPORTANT] callout above. Every stage derives from catalog metadata; no parallel keyword lists, no per-member kind switches.
+- **Diagnostic system.** Every stage emits diagnostics through [`diagnostic-system.md`](diagnostic-system.md)'s codes and templates. Adding a new diagnostic touches the `Diagnostics` catalog first, then the emitting stage, then the doc.
+- **Literal system.** Literals flow through every stage — lexer segmentation, parser assembly, type-checker resolution. [`literal-system.md`](literal-system.md) is the cross-stage reference.
+- **Anti-mirroring.** `SemanticIndex` (TypeChecker output) is a flat semantic inventory, **not** a structural mirror of the parse tree. Downstream stages consume semantic data, not parser shape. See [`type-checker.md § SemanticIndex`](type-checker.md).

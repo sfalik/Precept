@@ -34,5 +34,12 @@ Documents defining the Precept DSL surface — what the language looks like to a
 ## Relationship to Other Docs
 
 - `docs/archive/language-design/precept-language-vision.md` — archived v1 language vision. Superseded by the v2 spec in this folder.
-- `research/language/` — precedent surveys, rationale, and proposal research that ground the decisions here.
+- `research/language/` — precedent surveys, rationale, and proposal research that ground the decisions here. See `research/language/README.md` for the domain index.
 - `docs/compiler/` — the pipeline stage docs that implement this language surface.
+- `docs/runtime/runtime-api.md` — the public surface that exposes the language at runtime.
+
+## Cross-cutting concerns
+
+- **Catalog discipline.** Every language element (token, type, operator, modifier, action, construct, expression form, accessor, constraint, proof requirement, outcome) gets a catalog entry first. The [!IMPORTANT] callout at the top of this README enumerates the questions to answer. Pipeline code derives from catalogs; it never re-encodes language knowledge.
+- **Authoring audience.** The primary author of `.precept` is the **domain expert**, not the developer. See [`philosophy.md § Who authors a precept`](../philosophy.md). This constrains keyword choices, error message wording, modifier surface complexity, and which expressions are allowed at the surface.
+- **Approximation honesty.** Every type doc states the type family's stance on approximation — exact, admits approximation in cases X/Y, or approximate-by-design. See the Approximation Stance sections in the type docs (Phase 3 of the corpus improvement plan adds these uniformly).

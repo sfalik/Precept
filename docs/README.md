@@ -8,6 +8,8 @@ Design documents for the Precept compiler pipeline, language surface, runtime AP
 
 **[`language/README.md`](language/README.md)** — the language surface. Precept's design decisions are language decisions. Grammar, spec, canonical types, and catalog as source of truth all live here.
 
+**First time in this codebase?** Read [`agent-onboarding.md`](agent-onboarding.md) once — the five organizing concepts (catalogs as language spec, the pipeline → Compilation → Precept chain, lifecycle-driven design, pointer-philosophy + doc-sync, required reads vs context-on-demand). Short orientation; everything else assumes you have it.
+
 ## Structure
 
 | Area | Entry point | What it covers |
@@ -52,6 +54,11 @@ Each area has a README that maps its documents, status, and reading order. Navig
 | Runtime API or public contracts | [`runtime/README.md`](runtime/README.md) |
 | Tooling (LS, MCP, VS Code extension) | [`tooling/README.md`](tooling/README.md) |
 | Comparable systems, PLT theory, language precedent | [`research/language/README.md`](../research/language/README.md) |
+
+## Discovery aids
+
+- [`glossary.md`](glossary.md) — one-paragraph definitions for load-bearing terms (catalog, qualifier, descriptor, etc.). Grep here when a term is ambiguous.
+- [`agent-onboarding.md`](agent-onboarding.md) — first-session orientation for fresh AI agents.
 
 ## In-flight and working docs
 
