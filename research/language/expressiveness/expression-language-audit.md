@@ -4,7 +4,7 @@
 **Date:** 2026-05-01  
 **Status:** Complete (v1)  
 **Audience:** GitHub proposal authors, Shane (approval gate)  
-**Input artifacts:** `docs/PreceptLanguageDesign.md`, `docs/RulesDesign.md`, `src/Precept/Dsl/`, `samples/` (all 21 files), `research/language/expressiveness/README.md`
+**Input artifacts:** `docs/language/precept-language-spec.md`, `docs/RulesDesign.md`, `src/Precept/Dsl/`, `samples/` (all 21 files), `research/language/expressiveness/README.md`
 
 ---
 

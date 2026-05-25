@@ -358,5 +358,5 @@ The following were considered and deliberately deferred. They are not part of th
 - GitHub issue: #NNN (coordinator fills in)
 - `research/language/expressiveness/data-only-precepts-research.md` — philosophy foundation for stateless precepts
 - `research/language/expressiveness/event-hooks.md` — XState/SCXML/Akka precedent survey for event-level action hooks
-- `docs/PreceptLanguageDesign.md` § Stateless Precepts
+- `docs/language/precept-language-spec.md` § Stateless Precepts
 - `docs/philosophy.md` § Entity Surfaces

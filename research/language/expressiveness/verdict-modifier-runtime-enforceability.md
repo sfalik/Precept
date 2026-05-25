@@ -385,7 +385,7 @@ The runtime change itself is tractable. The philosophy reframing is the hard par
 - [verdict-modifiers.md](verdict-modifiers.md) — Frank's externally grounded research (Pattern 1: severity is always metadata)
 - [PreceptRuntime.cs](../../../src/Precept/Dsl/PreceptRuntime.cs) — Fire pipeline, constraint evaluation
 - [PreceptTypeChecker.cs](../../../src/Precept/Dsl/PreceptTypeChecker.cs) — Static analysis, expression validation
-- [RuntimeApiDesign.md](../../../docs/RuntimeApiDesign.md) — TransitionOutcome enum, API contract
-- [PreceptLanguageDesign.md](../../../docs/PreceptLanguageDesign.md) — 12 design principles
+- [RuntimeApiDesign.md](../../../docs/runtime/runtime-api.md) — TransitionOutcome enum, API contract
+- [PreceptLanguageDesign.md](../../../docs/language/precept-language-spec.md) — 12 design principles
 - [philosophy.md](../../../docs/philosophy.md) — Core guarantees ("prevention, not detection")
 - [DiagnosticCatalog.cs](../../../src/Precept/Dsl/DiagnosticCatalog.cs) — Existing diagnostics C1–C59

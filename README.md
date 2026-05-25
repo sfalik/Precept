@@ -7,7 +7,7 @@
 
 **Precept is a domain integrity engine for .NET.** Most systems scatter business rules across validators, handlers, and state checks — independent, forgettable, gaps waiting to happen. Precept compiles them into unbreakable precepts, a single contract where invalid configurations are structurally impossible and every operation enforces the complete logic.
 
-Precept treats AI as a first-class author. A dedicated MCP server exposes five typed tools — compile, inspect, fire, update, and language reference — so AI agents operate on definitions with the same precision as the runtime itself. A Copilot agent and purpose-built skills complete the AI authoring loop. Humans get a VS Code extension with diagnostics, semantic highlighting, completions, hover, navigation, rename, signature help, symbols, selection ranges, and quick fixes. Compile the definition, enforce the contract, produce the same outcome every time. AI is unpredictable. Precept is not.
+Precept treats AI as a first-class author. A dedicated MCP server exposes typed tools — compile, plus a focused catalog/reference surface (syntax, types, operations, modifiers, domains, proofs, patterns, diagnostics, quickstart) — so AI agents operate on definitions with the same precision as the runtime itself. Runtime orchestration tools (inspect, fire, update, create) ship alongside the v1 runtime. A Copilot agent and purpose-built skills complete the AI authoring loop. Humans get a VS Code extension with diagnostics, semantic highlighting, completions, hover, navigation, rename, signature help, symbols, selection ranges, and quick fixes. Compile the definition, enforce the contract, produce the same outcome every time. AI is unpredictable. Precept is not.
 
 ---
 
@@ -55,7 +55,7 @@ from Screening, InterviewLoop, Decision on RejectCandidate
   -> transition Rejected
 ```
 
-**The Execution**
+**The Execution** — *Runtime API design is locked; implementation ships with v1. The shape below is the designed surface.*
 
 ```csharp
 var def = PreceptParser.Parse(dslText);
@@ -81,7 +81,7 @@ Diagnostics, semantic highlighting, completions, hover, navigation, rename, sign
 
 ### 2. Add the Copilot Plugin
 
-Install the Precept plugin from the GitHub Copilot or Claude marketplace. It adds five MCP tools, a dedicated Precept Author agent, and two skills (authoring and debugging) — so AI agents can compile, inspect, fire events, and iterate on `.precept` definitions with full type safety.
+Install the Precept plugin from the GitHub Copilot or Claude marketplace. It adds the Precept MCP tools (compile + catalog/reference surface today; runtime orchestration tools ship with v1), a dedicated Precept Author agent, and two skills (authoring and debugging) — so AI agents iterate on `.precept` definitions with full type safety.
 
 ### 3. Create Your First Precept File
 
@@ -93,13 +93,13 @@ Create `Subscription.precept` and type along with the example above. The languag
 dotnet add package Precept
 ```
 
-See the [Quickstart Guide](docs/RuntimeApiDesign.md) for a complete runtime integration walkthrough.
+See the [Runtime API design](docs/runtime/runtime-api.md) for the integration surface (design locked; ships with v1).
 
 ---
 
 ## What Makes Precept Different
 
-**AI-First Authoring** — The Copilot plugin gives AI agents five MCP tools to compile, inspect, fire events, and validate `.precept` definitions — no guessing at syntax or semantics. The VS Code extension provides completions, semantic highlighting, inline diagnostics, hover, definition/references/rename, signature help, outline, workspace symbols across open files, selection ranges, and quick fixes. AI brings the fluency; the engine brings the guarantee.
+**AI-First Authoring** — The Copilot plugin gives AI agents typed MCP tools to compile and reason about `.precept` definitions — no guessing at syntax or semantics. The VS Code extension provides completions, semantic highlighting, inline diagnostics, hover, definition/references/rename, signature help, outline, workspace symbols across open files, selection ranges, and quick fixes. AI brings the fluency; the engine brings the guarantee.
 
 **Unified Domain Integrity** — In most codebases, entity governance is scattered: validators in one layer, state checks in another, editability rules in a third, conditional logic in service handlers that bypass everything else. Each layer exists because the one before it wasn't enough. Precept consolidates all of it into a single `.precept` declaration that the runtime compiles and enforces structurally — no code path outside the contract, no window where an invalid configuration can exist.
 
@@ -123,10 +123,11 @@ Precept is not a workflow orchestrator, event sourcing framework, or ORM — it 
 | Resource | Description |
 |----------|-------------|
 | [Product Philosophy](docs/philosophy.md) | What Precept governs, how it's positioned, and why |
-| [Language Reference](docs/PreceptLanguageDesign.md) | Full DSL syntax and construct reference |
-| [Quickstart Guide](docs/RuntimeApiDesign.md) | Step-by-step runtime integration walkthrough |
-| [MCP Server Docs](docs/McpServerDesign.md) | Tool reference for AI agent integration |
-| [Sample Catalog](samples/) | 28 domain models in `.precept` |
+| [Documentation Map](docs/README.md) | The doc landscape and navigation gateway |
+| [Language Specification](docs/language/precept-language-spec.md) | Full DSL syntax, type system, and construct reference |
+| [Runtime API](docs/runtime/runtime-api.md) | Public runtime API surface (design locked; ships with v1) |
+| [MCP Server Docs](docs/tooling/mcp.md) | Live tool surface and design contracts |
+| [Sample Catalog](samples/) | 75 domain models in `.precept` |
 
 **Highlighted samples:**
 

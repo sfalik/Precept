@@ -1,7 +1,7 @@
 # Precept vs CEL (Common Expression Language) — Language-Level Comparison
 
 **Date:** 2026-04-10
-**Source:** Frank (Lead/Architect & Language Designer) analysis, grounded in [CEL language spec](https://github.com/google/cel-spec/blob/master/doc/langdef.md), [CEL overview](https://cel.dev/overview/cel-overview), `docs/PreceptLanguageDesign.md`, and the expression-expansion research library.
+**Source:** Frank (Lead/Architect & Language Designer) analysis, grounded in [CEL language spec](https://github.com/google/cel-spec/blob/master/doc/langdef.md), [CEL overview](https://cel.dev/overview/cel-overview), `docs/language/precept-language-spec.md`, and the expression-expansion research library.
 **Proposals informed:** #9, #10, #15, #16, #31
 
 ---

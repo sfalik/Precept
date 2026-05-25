@@ -8,7 +8,7 @@
 |---|---|
 | Doc maturity | Incremental — grows as each compiler stage is designed and implemented |
 | Implementation state | §1 Lexer complete; §2 Parser complete; §3 Name Binding and Type Checker complete; §3A Language Semantics complete; §0 Preamble complete; §4 Graph Analyzer complete; §5 Proof Engine complete |
-| Grounding | `docs/PreceptLanguageDesign.md` (v1 spec); vision archived at `docs/archive/language-design/precept-language-vision.md` |
+| Grounding | `docs/archive/language-design/precept-language-vision.md` (archived v1 vision) |
 | Clean room rule | References v1 grammar and keyword inventory; does not import v1 implementation details |
 
 > [!IMPORTANT]

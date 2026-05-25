@@ -288,5 +288,5 @@ Precept's current grammar in `PreceptParser.cs` has these structural properties:
 | Warth, A. et al. (2008). Packrat Parsers Can Support Left Recursion | http://www.vpri.org/pdf/tr2007002_packrat.pdf |
 | Roslyn Overview | https://github.com/dotnet/roslyn/blob/main/docs/wiki/Roslyn-Overview.md |
 | ANTLR.org | https://www.antlr.org/ (HTTP 429 at fetch time; from knowledge) |
-| Precept Language Design doc | docs/PreceptLanguageDesign.md |
+| Precept Language Design doc | docs/language/precept-language-spec.md |
 | PreceptParser.cs | src/Precept/Dsl/PreceptParser.cs |

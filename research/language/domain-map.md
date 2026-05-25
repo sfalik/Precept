@@ -421,6 +421,6 @@ Domains ranked by research urgency — how badly we need the research to exist b
 - PLT references: `research/language/references/README.md`
 - Quality bar: `research/language/expressiveness/computed-fields.md`
 - Philosophy: `docs/philosophy.md`
-- Language spec: `docs/PreceptLanguageDesign.md`
+- Language spec: `docs/language/precept-language-spec.md`
 - Design docs: `docs/RulesDesign.md`, `docs/EditableFieldsDesign.md`, `docs/ConstraintViolationDesign.md`
 - Open proposals: GitHub issues #8, #9, #10, #11, #13, #14, #15, #16, #17, #22, #25, #26, #27, #29, #31

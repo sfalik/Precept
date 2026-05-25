@@ -530,7 +530,7 @@ Strongly considered, briefly. The shared syntax (`on <Event> ->`) creates a temp
 - XState v5 Transitions (targetless self-transitions): https://stately.ai/docs/transitions  
 - Akka Classic FSM (`whenUnhandled`, `onTransition`): https://doc.akka.io/libraries/akka-core/current/fsm.html  
 - Spring State Machine listener API: https://docs.spring.io/spring-statemachine/docs/current/reference/  
-- `docs/PreceptLanguageDesign.md` — Principle 7, stateless precept spec, C49 definition  
+- `docs/language/precept-language-spec.md` — Principle 7, stateless precept spec, C49 definition  
 - `docs/philosophy.md` — governed integrity, stateless precept positioning  
 - `.squad/decisions/inbox/frank-event-hook-gap.md` — gap investigation and addendum  
 - `research/language/expressiveness/xstate.md` — existing XState comparison  

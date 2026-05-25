@@ -25,7 +25,7 @@ The current compiler proves contradictions from a narrow but sound set of facts:
 
 ### What the design spec requires but has not yet shipped
 
-`docs/PreceptLanguageDesign.md` § Compile-time checks lists two further checks as locked design decisions, currently deferred in `docs/@ToDo.md` under "Later":
+`docs/language/precept-language-spec.md` § Compile-time checks lists two further checks as locked design decisions, currently deferred in `docs/@ToDo.md` under "Later":
 
 | Check | Description | Implementation Status |
 |---|---|---|
@@ -294,7 +294,7 @@ Static reasoning expansion fits Precept's philosophy only if it remains a **proo
 
 **Prevention, not detection.** C4/C5 implement Precept's prevention promise at the definition level: a contradictory assertion set or a deadlocked state cannot be compiled into a working engine. This is prevention of a definition mistake — the author wrote something that makes part of their own contract unreachable. The engine refuses to instantiate an unsound definition.
 
-**Compile-time-first static analysis.** `docs/PreceptLanguageDesign.md` principle #8: *"The DSL should reject real semantic mistakes early, but never guess. If the checker can't prove a contradiction, it assumes satisfiable."* C4/C5 follow this principle exactly: they prove emptiness of the per-field interval intersection, produce no false positives for cross-field or non-interval expressions, and the boundary between provable and unprovable is structural and authoring-visible.
+**Compile-time-first static analysis.** `docs/language/precept-language-spec.md` principle #8: *"The DSL should reject real semantic mistakes early, but never guess. If the checker can't prove a contradiction, it assumes satisfiable."* C4/C5 follow this principle exactly: they prove emptiness of the per-field interval intersection, produce no false positives for cross-field or non-interval expressions, and the boundary between provable and unprovable is structural and authoring-visible.
 
 **Deterministic inspectability.** Diagnostics must explain *why* a contradiction was proven in domain terms (`Amount > 5` and `Amount < 3` cannot both hold simultaneously), not surface opaque solver jargon or symbolic internals.
 

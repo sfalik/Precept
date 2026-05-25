@@ -1,6 +1,6 @@
 # MCP Server
 
-> **Canonical MCP contract document.** `docs/tooling/mcp.md` is the single source of truth for the live Precept MCP surface. `docs/McpServerDesign.md` is archived as a redirect.
+> **Canonical MCP contract document.** This file is the single source of truth for the live Precept MCP surface.
 
 ## 1. Status
 

@@ -149,7 +149,7 @@ The design doc (around line 226) contains a `when` vs `if` comparison table show
 
 The `not` keyword decision expanded into a broader design question: where should Precept draw the line between keywords and symbols across the entire language?
 
-Research across the keyword-symbol spectrum (APL through COBOL), cognitive readability studies, DSL design literature (Fowler), and a full inventory of Precept's 47 keywords / 26 symbols led to a settled framework now captured in `docs/PreceptLanguageDesign.md` § Keyword vs Symbol Design Framework (Locked):
+Research across the keyword-symbol spectrum (APL through COBOL), cognitive readability studies, DSL design literature (Fowler), and a full inventory of Precept's 47 keywords / 26 symbols led to a settled framework now captured in `docs/language/precept-language-spec.md` § Keyword vs Symbol Design Framework (Locked):
 
 - **Keywords** for structure, domain concepts, and logical operators (`and`, `or`, `not`)
 - **Symbols** for math/comparison (`+`, `-`, `==`, `!=`) and the one structural exception `->` (universal state machine notation, defended by Principle #11)

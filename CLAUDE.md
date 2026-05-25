@@ -48,9 +48,15 @@ Every doc declares a status. Trust it for routing; verify against code when stat
 
 - **Implemented / Active** — describes shipped code
 - **Canonical design** — architectural reference; grounded in the implementation
+- **Full** — complete reference doc; typically a stage doc following the 16-section template
+- **Incremental** — grows over time as content lands (e.g., the spec adds sections per stage)
 - **Design / Draft** — specification awaiting implementation
+- **Partial / Partial stub** — code exists but operations are stubs or incomplete; design is locked
 - **Stub** — placeholder; design not yet fully written
+- **Roadmap** — forward-looking; primarily about planning rather than current state
 - **Archived** — superseded; reference only, do not update
+
+Working-doc statuses (in `docs/Working/`): `Draft`, `Draft <kind> — YYYY-MM-DD`, `Locked YYYY-MM-DD`, `Promoted to: <link>`. Status fields may carry an inline annotation; the leading category must match the taxonomy.
 
 If a doc says "Implemented" but the code disagrees, that's drift — fix the doc in the same pass and note the drift to the user.
 
@@ -69,6 +75,8 @@ Brand research lives in `design/brand/lifecycle-1-research/`; UX/design-system r
 ## Catalog System (Non-Negotiable)
 
 Precept uses a metadata-driven architecture. **Catalogs are the language specification in machine-readable form** — domain knowledge is declared as structured metadata, and pipeline stages, tooling, and consumers derive from it. They never maintain parallel copies or encode domain knowledge in their own logic.
+
+The canonical catalog inventory lives in [`docs/language/catalog-system.md`](docs/language/catalog-system.md). Other docs reference catalogs by name, not by count — the enumeration is the source of truth.
 
 This is the inverse of traditional compilers (Roslyn, GCC, TypeScript), where domain knowledge is scattered across pipeline stages and enums are internal classification axes. In Precept the catalog drives everything downstream: grammar, completions, hover, semantic tokens, MCP vocabulary, diagnostics.
 
@@ -137,7 +145,7 @@ When making any code, interface, test, or behavior change, keep documentation in
 - `design/brand/` — brand identity and brand-level semantic meaning.
 - `design/system/` — reusable product-facing visual-system guidance and surface specs.
 - `design/prototypes/` — durable design prototypes. Hot, code-near prototypes may live near their owning tool surface but should be promoted here when durable.
-- Legacy files (`README-legacy.md`, `docs/DesignNotes-legacy.md`) — archived, do not update.
+- `docs/archive/` holds superseded specs; reference only, never update.
 
 ### When research is involved
 

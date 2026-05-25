@@ -192,9 +192,9 @@ Every implementation PR must update documentation in the same pass:
 
 | What changed | Update |
 |-------------|--------|
-| New keyword, operator, or syntax | `docs/PreceptLanguageDesign.md` + `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json` |
-| New or changed API behavior | `docs/RuntimeApiDesign.md` |
-| New editability semantics | `docs/EditableFieldsDesign.md` |
+| New keyword, operator, or syntax | `docs/language/precept-language-spec.md` (+ relevant type doc) + the catalog entry first; `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json` regenerates |
+| New or changed API behavior | `docs/runtime/runtime-api.md` |
+| New editability semantics | `docs/language/precept-language-spec.md` § Field Modifiers (or the relevant spec section) |
 | New MCP tool behavior | `docs/tooling/mcp.md` |
 | Feature claims in README | `README.md` |
 | New or changed proof engine diagnostic (C76, C92–C98, future) | `test/integrationtests/diagnostics/` — add or update a `.precept` sample that demonstrates the diagnostic scenario. See § Diagnostic Samples below. |
@@ -246,10 +246,10 @@ The table above covers which files to touch during implementation. This table is
 
 | Proposal section | Destination at merge time |
 |-----------------|--------------------------|
-| Proposed syntax, behavior, examples | `docs/PreceptLanguageDesign.md` — syntax forms, grammar rules, operator tables, precedence, examples; also `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json` for any new keywords or syntax forms |
-| Locked design decisions (the **what**) | `docs/PreceptLanguageDesign.md` — named decisions in the relevant section |
+| Proposed syntax, behavior, examples | `docs/language/precept-language-spec.md` — syntax forms, grammar rules, operator tables, precedence, examples; the catalog entry is added first; `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json` is regenerated from catalog metadata |
+| Locked design decisions (the **what**) | `docs/language/precept-language-spec.md` — named decisions in the relevant section |
 | Locked design decisions (the **why** / rationale / alternatives rejected) | `research/` — update or create the research doc; if rationale was only in the issue, move it here now |
-| Explicit exclusions / out of scope | `docs/PreceptLanguageDesign.md` — named as deliberate exclusions so they aren't re-proposed later |
+| Explicit exclusions / out of scope | `docs/language/precept-language-spec.md` — named as deliberate exclusions so they aren't re-proposed later |
 | Open questions resolved during implementation | Resolved decisions go to `research/`; if they changed the design, update the design doc too |
 | Acceptance criteria | Verified by the test suite — tests passing *is* the living acceptance criteria; no separate doc needed |
 | Implementation scope checklist | PR body — ephemeral, discarded after merge |
@@ -357,8 +357,8 @@ Language proposals are assigned to wave milestones that reflect priority and dep
 
 | Content | Location | Durability |
 |---------|----------|------------|
-| What the DSL syntax IS | `docs/PreceptLanguageDesign.md` | Permanent — tracks reality |
-| What the C# API IS | `docs/RuntimeApiDesign.md` | Permanent — tracks reality |
+| What the DSL syntax IS | `docs/language/precept-language-spec.md` + catalogs in `src/Precept/Language/` | Permanent — tracks reality |
+| What the C# API IS | `docs/runtime/runtime-api.md` | Permanent — tracks reality |
 | What a feature SHOULD BE | GitHub issue body | Until implemented |
 | WHY a decision was made | Issue body (per-decision rationale) + `research/` (full evidence base) | Permanent — rationale lives in both places |
 | What changed, why this PR exists, and HOW to implement (summary + reviewer context + checklist) | PR body | Ephemeral — dies with the PR |

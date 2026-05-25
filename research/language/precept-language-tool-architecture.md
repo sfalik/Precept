@@ -14,7 +14,7 @@ Reviewed:
 - `tools/Precept.Mcp/Tools/CompileTool.cs`
 - `tools/Precept.Mcp/Tools/PingTool.cs`
 - `tools/Precept.Mcp/Dtos/LanguageToolDtos.cs`
-- `docs/tooling/mcp.md` as the current living MCP design/spec doc (the requested `docs/McpServerDesign.md` path does not exist in the repo anymore)
+- `docs/tooling/mcp.md` as the current living MCP design/spec doc (the requested `docs/tooling/mcp.md` path does not exist in the repo anymore)
 - `.github/skills/precept-authoring/SKILL.md`
 - `.github/skills/precept-debugging/SKILL.md`
 - `.github/agents/precept-author.agent.md`

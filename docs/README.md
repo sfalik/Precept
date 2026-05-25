@@ -21,13 +21,25 @@ Design documents for the Precept compiler pipeline, language surface, runtime AP
 
 ## Doc status conventions
 
-Every doc declares a status:
+Every doc declares a status. The taxonomy:
 
+**Reference docs** (in `docs/` outside Working/):
 - **Implemented / Active** — describes shipped code; if it conflicts with code, that's drift — fix the doc in the same pass
 - **Canonical design** — architectural reference; grounded in the implementation
+- **Full** — complete reference doc; typically a stage doc following the 16-section template
+- **Incremental** — grows over time as content lands (e.g., the spec adds sections per stage)
 - **Design / Draft** — specification awaiting implementation
+- **Partial / Partial stub** — code exists but operations are stubs or incomplete; design is locked
 - **Stub** — placeholder; design not yet written
+- **Roadmap** — forward-looking; primarily about planning rather than current state
 - **Archived** — superseded; reference only, do not update
+
+**Working docs** (in `docs/Working/`):
+- **Draft** / **Draft <kind> — YYYY-MM-DD** — work in progress; not yet locked
+- **Locked YYYY-MM-DD** — design frozen, awaiting implementation or promotion to canonical
+- **Promoted to: `<link>`** — design canonicalized; doc retained as historical artifact in `docs/Working/Archive/`
+
+Status fields may carry an inline annotation (e.g., `Design — public surface locked; entity internals pending`). The leading category must match the taxonomy above.
 
 ## Navigate by topic
 

@@ -229,4 +229,4 @@ A keyword modifier that can attach to any comparison operator. Similar to CSS's 
 - Cedar Operators and Functions — https://docs.cedarpolicy.com/policies/syntax-operators.html
 - OData 4.01 URL Conventions §5.1.1 — https://docs.oasis-open.org/odata/odata/v4.01/odata-v4.01-part2-url-conventions.html
 - DMN FEEL Handbook — https://kiegroup.github.io/dmn-feel-handbook/
-- Precept Language Design §Keyword vs Symbol Design Framework — `docs/PreceptLanguageDesign.md`
+- Precept Language Design §Keyword vs Symbol Design Framework — `docs/language/precept-language-spec.md`

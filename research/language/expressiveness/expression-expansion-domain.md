@@ -248,7 +248,7 @@ The gap pattern is clear: Precept's current expression surface lacks capabilitie
 
 ## Philosophy Fit
 
-Each expansion is evaluated against the design principles in `docs/PreceptLanguageDesign.md` and the positioning in `docs/philosophy.md`.
+Each expansion is evaluated against the design principles in `docs/language/precept-language-spec.md` and the positioning in `docs/philosophy.md`.
 
 ### #9 — Conditional expressions (`if...then...else`)
 

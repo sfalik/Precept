@@ -685,8 +685,8 @@ Against the 12 design principles:
 
 - [Structural Lifecycle Modifiers](structural-lifecycle-modifiers.md) — modifier taxonomy, role framework, and scope rule
 - [semantic-visual-system-notes.md](../../../design/system/foundations/semantic-visual-system-notes.md) — verdict color definitions and visual system context
-- [PreceptLanguageDesign.md](../../../docs/PreceptLanguageDesign.md) — 12 design principles
-- [RuntimeApiDesign.md](../../../docs/RuntimeApiDesign.md) — TransitionOutcome enum
+- [PreceptLanguageDesign.md](../../../docs/language/precept-language-spec.md) — 12 design principles
+- [RuntimeApiDesign.md](../../../docs/runtime/runtime-api.md) — TransitionOutcome enum
 - [philosophy.md](../../../docs/philosophy.md) — product philosophy grounding
 
 ### External Documentation Sources

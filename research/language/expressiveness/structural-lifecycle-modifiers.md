@@ -506,7 +506,7 @@ If `terminal` advances to a proposal, these questions need answers:
 - Temporal workflows: https://docs.temporal.io/workflows
 - Lengauer & Tarjan, "A Fast Algorithm for Finding Dominators in a Flowgraph" (1979) — dominator analysis for `required`
 - Lamport, *Specifying Systems* (2002) — temporal properties (liveness, safety) for formal modifier semantics
-- `docs/PreceptLanguageDesign.md` — design principles numbered #1–#13
+- `docs/language/precept-language-spec.md` — design principles numbered #1–#13
 - `src/Precept/Dsl/PreceptAnalysis.cs` — existing terminal/dead-end/unreachable analysis
 - `src/Precept/Dsl/DiagnosticCatalog.cs` — C48, C49, C50, C51, C52 diagnostics
 - `research/language/references/state-machine-expressiveness.md` — existing theory companion

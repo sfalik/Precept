@@ -33,6 +33,6 @@ Documents defining the Precept DSL surface — what the language looks like to a
 
 ## Relationship to Other Docs
 
-- `docs/PreceptLanguageDesign.md` — v1 implemented language spec. This folder designs the v2 replacement.
+- `docs/archive/language-design/precept-language-vision.md` — archived v1 language vision. Superseded by the v2 spec in this folder.
 - `research/language/` — precedent surveys, rationale, and proposal research that ground the decisions here.
 - `docs/compiler/` — the pipeline stage docs that implement this language surface.

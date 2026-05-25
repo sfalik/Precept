@@ -45,4 +45,4 @@ Do not use `research/` as a catch-all for brand or UX research.
 - `design/brand/research/` — Brand research owned by J. Peterman.
 - `design/brand/references/` — Brand precedent, captures, and source material.
 - `design/system/research/` — Design-system and UX research owned by Elaine.
-- `docs/PreceptLanguageDesign.md` — The DSL spec that this research informs.
+- `docs/language/precept-language-spec.md` — The DSL spec that this research informs.

@@ -3113,7 +3113,7 @@ Dependencies between modifiers are stated as facts. Some modifiers require other
 - [verdict-modifier-roadmap-positioning.md](./verdict-modifier-roadmap-positioning.md) — Steinbrenner's milestone analysis
 - [verdict-modifiers.md](./verdict-modifiers.md) — 7-system external survey
 - [verdict-modifier-design-options.md](./verdict-modifier-design-options.md) — Original 3-tier design options
-- [PreceptLanguageDesign.md](../../docs/PreceptLanguageDesign.md) — Language design principles
+- [PreceptLanguageDesign.md](../../docs/language/precept-language-spec.md) — Language design principles
 - [philosophy.md](../../docs/philosophy.md) — Core guarantees
 - [DiagnosticCatalog.cs](../../src/Precept/Dsl/DiagnosticCatalog.cs) — Existing diagnostics C1–C59
-- [RuntimeApiDesign.md](../../docs/RuntimeApiDesign.md) — TransitionOutcome enum, API contract
+- [RuntimeApiDesign.md](../../docs/runtime/runtime-api.md) — TransitionOutcome enum, API contract

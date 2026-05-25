@@ -14,7 +14,7 @@ This document is the operational companion. It does not replace `catalog-system.
    → It belongs in a catalog. Do not add it as a bare constant, inline set, or ad-hoc condition.
 
 2. **Does an existing catalog cover it?**
-   Fourteen catalogs cover the complete language surface: twelve language-definition catalogs plus two failure-mode catalogs. Check each one before creating new structure. The fourteen: Tokens, Types, Functions, Operators, Operations, Modifiers, Actions, Constructs, ExpressionForms, Constraints, ProofRequirements, Outcomes, Diagnostics, Faults.
+   The catalogs cover the complete language surface: language-definition catalogs plus failure-mode catalogs. Check each one before creating new structure. The catalogs: Tokens, Types, Functions, Operators, Operations, Modifiers, Actions, Constructs, ExpressionForms, Constraints, ProofRequirements, Outcomes, Diagnostics, Faults. (The canonical enumeration lives in [`docs/language/catalog-system.md`](../language/catalog-system.md).)
 
 3. **Do all members of this kind share the same metadata shape?**
    → Flat `sealed record`. If shapes vary by kind → discriminated union (`abstract record` base + `sealed` subtypes). Do not use flat records with nullable inapplicable fields. If the type itself is the semantic signal, use a DU as identity rather than adding a classification field.
@@ -131,6 +131,6 @@ If you can answer (4) and have evidence of a genuine structural limitation, brin
 
 ## Reference
 
-- [`docs/language/catalog-system.md`](../language/catalog-system.md) — Catalog system design, the fourteen-catalog inventory, enforcement model, and full architectural identity statement
+- [`docs/language/catalog-system.md`](../language/catalog-system.md) — Catalog system design, the canonical catalog inventory, enforcement model, and full architectural identity statement
 - [`docs/philosophy.md`](../philosophy.md) — Product philosophy (read before making language design decisions)
 - [`CONTRIBUTING.md`](../../CONTRIBUTING.md) — Issue and PR workflow

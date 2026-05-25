@@ -7,10 +7,10 @@
 | Property | Value |
 |---|---|
 | Doc maturity | Full |
-| Implementation state | Implemented — all 15 catalogs in `src/Precept/`; team review complete (2026-04-25) |
+| Implementation state | Implemented — all catalogs in `src/Precept/`; team review complete (2026-04-25) |
 | Related | `docs/compiler/diagnostic-system.md` · `docs/runtime/fault-system.md` · `docs/compiler-and-runtime-design.md` |
 
-> **Catalog count convention (15 total).** Twelve catalogs describe what the language IS (Tokens, Types, Functions, Operators, Operations, Modifiers, Actions, Constructs, ExpressionForms, Constraints, ProofRequirements, Outcomes). Two describe how it reports failures (Diagnostics, Faults). One is tooling-adjacent: **SemanticTokenTypes**, which carries visual classification metadata consumed by the TextMate grammar generator and the LSP semantic-tokens handler. Some readers count only the language-surface 12+2 = 14; others include the tooling-adjacent SemanticTokenTypes for 15. This document uses 15 throughout. The Slice-10 architectural decision (`docs/Working/Archive/language-server-implementation-plan.md:641, 645`) treats SemanticTokenTypes as a first-class catalog rather than a hardcoded TokenMeta → scope mapping.
+> **Catalog inventory.** The catalogs describe what the language IS (Tokens, Types, Functions, Operators, Operations, Modifiers, Actions, Constructs, ExpressionForms, Constraints, ProofRequirements, Outcomes) and how it reports failures (Diagnostics, Faults). One is tooling-adjacent: **SemanticTokenTypes**, which carries visual classification metadata consumed by the TextMate grammar generator and the LSP semantic-tokens handler. The Slice-10 architectural decision (`docs/Working/Archive/language-server-implementation-plan.md:641, 645`) treats SemanticTokenTypes as a first-class catalog rather than a hardcoded TokenMeta → scope mapping. **This document is the canonical inventory; other docs reference catalogs by name, not by count.**
 
 > [!IMPORTANT]
 > **Non-Negotiable Rules — Read Before Implementing**
@@ -94,7 +94,7 @@
 
 ## Overview
 
-The catalog system is the **authoritative machine-readable definition of the Precept language.** Fifteen catalogs — twelve describing what the language IS, two describing how it reports failures, and one tooling-adjacent (SemanticTokenTypes for visual classification) — form a closed, compiler-enforced registry. This document defines the catalog pattern, the fifteen-catalog inventory, their shapes, cross-catalog derivation relationships, and future opportunities. (See the Status note above on the 14-vs-15 convention.)
+The catalog system is the **authoritative machine-readable definition of the Precept language.** The catalogs — describing what the language IS, how it reports failures, and (in the tooling-adjacent case) visual classification — form a closed, compiler-enforced registry. This document defines the catalog pattern, the canonical catalog inventory, their shapes, cross-catalog derivation relationships, and future opportunities.
 
 ## Vision: Metadata for the Entire Language
 
@@ -111,7 +111,7 @@ Every consumer reads from these catalogs:
 | LS semantic tokens | `TokenMeta.VisualCategory` → `SemanticTokenTypeMeta.CustomType` |
 | Type checker | Modifier applicability, function signatures, operation legality |
 | Parser (outcome dispatch) | `Outcomes.ByLeadingToken`, `OutcomeMeta.ArgumentKind` |
-| AI grounding | All 15 catalogs — complete language knowledge |
+| AI grounding | All catalogs — complete language knowledge |
 | Reference docs | All 12 language definition catalogs |
 
 No consumer maintains its own parallel copy. Adding a language feature to an enum is the single atomic act that propagates it to every surface. The compiler refuses to build if any member is missing metadata.
@@ -154,7 +154,7 @@ Fifteen catalogs in three groups (12 language-definition + 2 failure-mode + 1 to
 |---|---------|----------------|
 | 15 | **SemanticTokenTypes** | LSP semantic-token custom types and TextMate scopes for visual classification — the single-axis bridge `TokenMeta.VisualCategory → SemanticTokenTypeMeta` that powers both the TextMate grammar generator and the LSP semantic-tokens handler |
 
-If a sixteenth aspect of the language emerges that isn't covered by these fifteen, it needs a catalog. The system is complete when the catalogs are.
+If a further aspect of the language emerges that isn't covered, it needs a catalog. The system is complete when the catalogs are.
 
 ### Enums that remain bare
 
@@ -185,7 +185,7 @@ This inverts the traditional compiler model:
 | What tests verify | Implementation behavior | Metadata completeness and correctness |
 | What consumers read | Their own parallel copies | The single source of truth |
 
-The fifteen catalogs are expressions of this principle — not the principle itself. The principle is: **if something is domain knowledge, it is metadata; if it is metadata, it has a declared shape; if shapes vary by kind, the shape is a discriminated union.** Pipeline stages, tooling, and consumers derive from the metadata — they never maintain parallel copies or encode domain knowledge in their own logic.
+The catalogs are expressions of this principle — not the principle itself. The principle is: **if something is domain knowledge, it is metadata; if it is metadata, it has a declared shape; if shapes vary by kind, the shape is a discriminated union.** Pipeline stages, tooling, and consumers derive from the metadata — they never maintain parallel copies or encode domain knowledge in their own logic.
 
 **External reference data is distinct from catalogs.** ISO 4217 and UCUM are authoritative third-party data sources that Precept validates against, but they are not themselves part of the Precept language specification. They ship as embedded XML resources with lazy loaders because the data belongs to the outside world. The test is: *is this part of a complete description of Precept?* `TypeMeta` for `currency` is Precept. The 159 currently admitted currency codes are not.
 
@@ -228,7 +228,7 @@ The exhaustive switch is the enforcement — the C# compiler refuses to build if
 
 ### Derive, never duplicate
 
-The fifteen catalogs cover vocabulary, types, functions, operators, operations, modifiers, actions, grammar constructs, expression forms, constraints, proof requirements, outcome forms, compile-time rules, runtime failure modes, and visual classification. Their union is the language. Every downstream artifact — grammar, completions, hover, MCP output, documentation — derives from catalog metadata. No consumer maintains a parallel copy. Adding a language feature to an enum is the single atomic act that propagates it to every surface.
+The catalogs cover vocabulary, types, functions, operators, operations, modifiers, actions, grammar constructs, expression forms, constraints, proof requirements, outcome forms, compile-time rules, runtime failure modes, and visual classification. Their union is the language. Every downstream artifact — grammar, completions, hover, MCP output, documentation — derives from catalog metadata. No consumer maintains a parallel copy. Adding a language feature to an enum is the single atomic act that propagates it to every surface.
 
 ### Architectural Violation Patterns
 
@@ -921,7 +921,7 @@ The ten categories below cover every analyzer rule currently shipping in `src/Pr
 
 | Layer | Mechanism | What it enforces | Scope |
 |-------|-----------|-----------------|-------|
-| **Compiler** | CS8509 (exhaustive switch) | Every enum member has a metadata entry in its catalog's `GetMeta()` switch | All 15 catalogs |
+| **Compiler** | CS8509 (exhaustive switch) | Every enum member has a metadata entry in its catalog's `GetMeta()` switch | All catalogs |
 | **Roslyn** | `PRECEPT0001`–`PRECEPT0030` | The 10 categories above | Diagnostics + Faults + cross-catalog references + DU discipline + emission/test gates |
 
 For per-rule mechanics — error message, severity, code shape, suppression mechanism, allow-list format — read the source files cited above. They are short and self-contained; duplicating their text here is the failure mode the pointer-philosophy rewrite is meant to prevent.
@@ -2230,7 +2230,7 @@ Currency codes and measurement units are validated at type-check time, but they 
 
 ## Syntax Reference
 
-The 15 catalogs cover the language's *vocabulary* exhaustively. The language also has *grammar meta-rules* — singular facts about how source text is structured — that consumers need but that have no per-member enum. These are language-level constants, not catalogs.
+The catalogs cover the language's *vocabulary* exhaustively. The language also has *grammar meta-rules* — singular facts about how source text is structured — that consumers need but that have no per-member enum. These are language-level constants, not catalogs.
 
 `SyntaxReference` is a static class with typed properties, part of the same metadata-driven source of truth:
 
@@ -2268,7 +2268,7 @@ The test of completeness: every cell should trace back to a catalog, never to ha
 | Consumer surface | Catalogs read | How |
 |------------------|---------------|-----|
 | **TextMate grammar** | Constructs → Tokens → Types | **Generated** from catalog metadata. Construct slot arrays generate patterns; token keywords generate keyword alternations; type keywords via `Types.All` filtered by `Token.Text`. No hand-maintained alternation lists. Tests verify the generator produces correct output. |
-| **MCP `precept_language`** | All 15 catalogs' `.All` + `SyntaxReference` | Union of all catalog enumerations IS the language spec. MCP tool iterates each and serializes. `SyntaxReference` adds grammar meta-rules. |
+| **MCP `precept_language`** | All catalogs' `.All` + `SyntaxReference` | Union of all catalog enumerations IS the language spec. MCP tool iterates each and serializes. `SyntaxReference` adds grammar meta-rules. |
 | **LS completions** | Tokens + Types + Functions + Modifiers + Actions | **Generated** from catalog metadata. Context-filtered: type position → `Types.All`; expression → `Functions.All`; after type → `Modifiers.All` filtered by `ApplicableTo`; event body → `Actions.All`. No hand-maintained completion lists. |
 | **LS hover** | Types + Functions + Operators + Operations + Constraints | Per-member descriptions from catalog metadata. `ConstraintMeta.Description` populates hover for `rule`/`ensure` declarations. |
 | **LS semantic tokens** | Tokens (via `TokenMeta.Categories`) | Token categories map directly to semantic token types |
@@ -2280,7 +2280,7 @@ The test of completeness: every cell should trace back to a catalog, never to ha
 | **Typed constant dispatcher** | Types | `TypedConstantValidation.Validate(...)` reads `TypeMeta.ContentValidation` and dispatches on the DU subtype. No parallel validator registry. |
 | **Runtime boundary validation** | Modifiers | `ValueModifierMeta.ApplicableTo` and `HasValue` drive boundary checks. No `switch` on `ModifierKind`. |
 | **Reference documentation** | All 12 language-definition catalogs + `SyntaxReference` | **Generated** from catalog metadata. Tables, syntax sections, grammar reference all derived from `All` properties. |
-| **AI grounding** | All 15 catalogs + `SyntaxReference` | Complete, always-accurate language reference — AI grounded on catalog output cannot hallucinate features |
+| **AI grounding** | All catalogs + `SyntaxReference` | Complete, always-accurate language reference — AI grounded on catalog output cannot hallucinate features |
 
 No consumer surface maintains its own parallel list. Every fact comes from a catalog `All` property, `GetMeta()` call, or `SyntaxReference` property. TextMate grammar, LS completions, and reference documentation are **generated** from catalogs — not hand-maintained. Tests verify the generators produce correct output.
 

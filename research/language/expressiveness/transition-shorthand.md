@@ -112,7 +112,7 @@ This means multi-event `on` in Precept requires a **type-compatibility contract*
 
 ## Philosophy Fit
 
-The product's unifying principle is governed integrity — ensuring the entity's data satisfies its declared rules at every moment. Each shorthand candidate is evaluated against the 13 design principles in `docs/PreceptLanguageDesign.md`.
+The product's unifying principle is governed integrity — ensuring the entity's data satisfies its declared rules at every moment. Each shorthand candidate is evaluated against the 13 design principles in `docs/language/precept-language-spec.md`.
 
 ### Multi-event `on` clauses
 
