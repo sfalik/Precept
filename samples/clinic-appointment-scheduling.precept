@@ -13,8 +13,8 @@ field ScheduledMinute as integer nonnegative min 0 max 1439
 
 # Operational flags
 field ReminderSent as boolean default false
-field CheckInNote as string optional maxlength 500
-field CancellationReason as string optional maxlength 500
+field CheckInNote as string optional
+field CancellationReason as string optional
 
 # Appointments must start on a 15-minute boundary throughout the lifecycle —
 # both at construction and on every reschedule.
@@ -37,9 +37,9 @@ event Reschedule(DayNumber as integer nonnegative, MinuteOfDay as integer nonneg
 on Reschedule ensure Reschedule.MinuteOfDay % 15 == 0 because "Appointment slot {Reschedule.MinuteOfDay} must start on a 15-minute boundary — clinic scheduling grid is 15-minute slots"
 
 event SendReminder
-event CheckIn(Note as string optional maxlength 500)
+event CheckIn(Note as string optional)
 event CompleteVisit
-event Cancel(Reason as string optional maxlength 500)
+event Cancel(Reason as string optional)
 
 # Construction
 on Schedule

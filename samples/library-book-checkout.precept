@@ -32,7 +32,7 @@ rule RenewalCount <= 2 because "RenewalCount {RenewalCount} exceeds the per-loan
 field FineAmount as money in 'USD' default '0.00 USD' nonnegative
 
 # Condition note set at return or loss report, cleared on shelving.
-field ConditionNote as string optional maxlength 500
+field ConditionNote as string optional
 
 # States
 state Available initial
@@ -70,8 +70,8 @@ event Renew(ExtraDays as integer positive)
 
 event AdvanceDay(DayNumber as integer nonnegative)
 
-event ReturnBook(Condition as string optional maxlength 500)
-event ReportLost(Note as string optional maxlength 500)
+event ReturnBook(Condition as string optional)
+event ReportLost(Note as string optional)
 event Shelve
 event ResolveLoss(SettlementAmount as money in 'USD')
 on ResolveLoss ensure ResolveLoss.SettlementAmount >= '0.00 USD' because "Settlement amount cannot be negative — a loss resolution credits or zeroes the fine, never reverses it"

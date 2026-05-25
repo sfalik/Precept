@@ -33,12 +33,21 @@ field AvailabilityPercent as decimal default 100 nonnegative max 100 maxplaces 2
 field PerformancePercent as decimal default 100 nonnegative max 100 maxplaces 2
 field QualityPercent as decimal default 100 nonnegative max 100 maxplaces 2
 
+# Computed OEE metrics — derived directly from the three OEE components and
+# the production accumulators. The proof engine keeps these in lockstep with
+# their inputs; the MES dashboard reads them but cannot write them. OEE is
+# the headline KPI (Availability × Performance × Quality, expressed as 0–100);
+# GoodQuantity lets the host split the loss between scrap (quality) and
+# downtime (availability) without repeating the arithmetic at every read site.
+field OverallEquipmentEffectiveness as decimal <- AvailabilityPercent * PerformancePercent * QualityPercent / 10000
+field GoodQuantity as integer <- ProducedQuantity - ScrapQuantity
+
 # Audit trail and event-type counts.
 field DowntimeLog as log of string
 field DowntimeEvents as lookup of string to integer
 
 # Notes
-field MaintenanceNotes as string optional maxlength 2000
+field MaintenanceNotes as string optional
 
 # Timestamps
 field ShiftStartedAt as instant optional
@@ -75,7 +84,7 @@ event ReportDowntime(
     Reason as choice of string("MachineFailure", "Maintenance", "PowerOutage", "MaterialShortage", "QualityHold", "Other"))
 event CompleteDowntime(IncidentDuration as duration)
 event ProduceBatch(Quantity as integer positive, Scrap as integer nonnegative)
-event RecordMaintenanceNote(Note as string notempty maxlength 2000)
+event RecordMaintenanceNote(Note as string notempty)
 event CloseShift(
     Availability as decimal nonnegative max 100,
     Performance as decimal nonnegative max 100,

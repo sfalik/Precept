@@ -40,7 +40,7 @@ field SubAssemblies as set of string
 # Approval and supersession audit
 field ApproverName as string optional maxlength 100
 field SupersededByBomId as string optional maxlength 50
-field ObsoleteReason as string optional maxlength 500
+field ObsoleteReason as string optional
 field ChangeLog as log of string
 
 # Timestamps

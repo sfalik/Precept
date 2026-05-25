@@ -17,7 +17,7 @@ precept ProductCatalog
 # Identity
 field Sku as string optional maxlength 50 writable
 field Name as string optional maxlength 200 writable
-field Description as string optional maxlength 2000 writable
+field Description as string optional writable
 
 # Classification
 field Category as choice of string("Electronics","Clothing","HomeGoods","Grocery","HealthBeauty","SportsOutdoors","Toys","Books","Other") default "Other" writable

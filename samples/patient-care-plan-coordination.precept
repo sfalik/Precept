@@ -14,7 +14,7 @@ field Gender as string maxlength 20
 
 field CarePlanId as string notempty maxlength 50
 field CarePlanTitle as string notempty maxlength 200
-field CarePlanDescription as string optional maxlength 1000
+field CarePlanDescription as string optional
 field CreatedDate as date
 field CreatedBy as string optional maxlength 200
 field LastModifiedAt as instant optional
@@ -39,7 +39,7 @@ field NextScheduledReview as date optional
 # lives in the host until the bug is fixed; the precept governs progress
 # tracking only.
 
-field CarePlanReason as string optional maxlength 500
+field CarePlanReason as string optional
 
 # Rules
 rule GoalStartDate >= CreatedDate because "Goal start date {GoalStartDate} cannot precede care plan creation date {CreatedDate}"

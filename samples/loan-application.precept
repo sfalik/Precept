@@ -21,8 +21,17 @@ field ApprovedAmount as money in 'USD' default '0.00 USD' nonnegative
 field CreditScore as integer default 300 min 300 max 850
 field AnnualIncome as money in 'USD' default '0.00 USD' nonnegative
 field ExistingDebt as money in 'USD' default '0.00 USD' nonnegative
-field DecisionNote as string optional maxlength 500
+field DecisionNote as string optional
 field DocumentsVerified as boolean default false
+
+# Phase timestamps — recorded by state-entry hooks (`to State -> set ...At = now()`)
+# below, so the timestamp is captured on every inbound edge regardless of how
+# the application reached the state. The construction event sets SubmittedAt
+# directly because UnderReview is the initial state.
+field SubmittedAt as instant
+field ApprovedAt as instant optional
+field FundedAt as instant optional
+field DeclinedAt as instant optional
 
 # Invariants
 rule ApprovedAmount <= RequestedAmount because "Approved amount {ApprovedAmount} exceeds the submitted request of {RequestedAmount} — the bank cannot approve more than the applicant asked for"
@@ -35,7 +44,10 @@ state Declined terminal
 
 # State ensures
 in Approved ensure DocumentsVerified because "Approved loan must have verified documents — approval cannot precede the verification step"
+in Approved ensure ApprovedAt is set because "An approved loan must carry the approval timestamp"
 in Funded ensure ApprovedAmount > '0.00 USD' because "Funded loan must carry a positive approved amount — a $0 funded loan is a bookkeeping error, not a disbursement"
+in Funded ensure FundedAt is set because "A funded loan must record when the disbursement occurred"
+in Declined ensure DeclinedAt is set because "A declined loan must record when the decision was made"
 
 # DecisionNote becomes editable only after documents are verified — the
 # underwriter cannot draft a decision rationale before the file is complete.
@@ -50,8 +62,8 @@ event Submit(
     Debt as money in 'USD' nonnegative) initial
 
 event VerifyDocuments
-event Approve(Amount as money in 'USD' positive, Note as string optional maxlength 500)
-event Decline(Note as string notempty maxlength 500)
+event Approve(Amount as money in 'USD' positive, Note as string optional)
+event Decline(Note as string notempty)
 event FundLoan
 
 # ── Construction ──────────────────────────────────────────────────────────────
@@ -61,6 +73,16 @@ on Submit
     -> set CreditScore = Submit.Score
     -> set AnnualIncome = Submit.Income
     -> set ExistingDebt = Submit.Debt
+    -> set SubmittedAt = now()
+
+# ── Entry hooks ───────────────────────────────────────────────────────────────
+# State-entry timestamps fire automatically on every inbound transition into
+# the named state, regardless of which row triggered the transition. This
+# keeps the timestamp wiring in one place per state instead of scattered
+# across every transition row that lands there.
+to Approved -> set ApprovedAt = now()
+to Funded -> set FundedAt = now()
+to Declined -> set DeclinedAt = now()
 
 # ── Transitions ───────────────────────────────────────────────────────────────
 

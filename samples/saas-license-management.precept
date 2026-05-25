@@ -96,7 +96,7 @@ on AllocateLicense ensure AllocateLicense.UserEmail != "" because "Cannot alloca
 
 event ActivateLicense(UserEmail as string notempty maxlength 200)
 event ReassignLicense(OldUserEmail as string notempty maxlength 200, NewUserEmail as string notempty maxlength 200, NewAccessCategory as choice of string("FullAccess", "LimitedAccess", "Readonly", "Developer"))
-event ReturnLicense(UserEmail as string notempty maxlength 200, Reason as string notempty maxlength 500)
+event ReturnLicense(UserEmail as string notempty maxlength 200, Reason as string notempty)
 event MonitorUtilization(CurrentInUse as integer nonnegative)
 on MonitorUtilization ensure MonitorUtilization.CurrentInUse <= LicensesAllocated because "Reported in-use count {MonitorUtilization.CurrentInUse} cannot exceed allocated count {LicensesAllocated}"
 
@@ -108,7 +108,7 @@ event RenewLicense(NewExpirationDate as instant, RenewalAmount as money in 'USD'
 on RenewLicense ensure RenewLicense.NewExpirationDate > now() because "Renewed expiration {RenewLicense.NewExpirationDate} must be in the future"
 on RenewLicense ensure RenewLicense.DiscountAmount <= RenewLicense.RenewalAmount because "Discount of {RenewLicense.DiscountAmount} cannot exceed the renewal amount of {RenewLicense.RenewalAmount}"
 
-event ProcessExpiration(Reason as string notempty maxlength 500)
+event ProcessExpiration(Reason as string notempty)
 
 # Construction row — opens in Purchased.
 on Create

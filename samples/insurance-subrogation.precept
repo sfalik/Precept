@@ -40,7 +40,7 @@ field FilingDate as date optional
 
 # Settlement and recovery
 field SettlementAmount as money in 'USD' optional
-field SettlementTerms as string optional maxlength 2000
+field SettlementTerms as string optional
 field RecoveryMethod as choice of string("Check", "Wire", "ACH", "Offset", "DirectDeposit") optional
 field RecoveryDate as instant optional
 
@@ -57,9 +57,9 @@ field SettlementExecutedAt as instant optional
 field ClosedAt as instant optional
 
 # Notes and reasons
-field RecoveryNotes as string optional maxlength 2000
-field LitigationReason as string optional maxlength 1000
-field ClosureReason as string optional maxlength 500
+field RecoveryNotes as string optional
+field LitigationReason as string optional
+field ClosureReason as string optional
 
 # Rules — domain invariants
 rule TotalRecovered <= RecoveryAmount because "Total recovered {TotalRecovered} cannot exceed the recovery target of {RecoveryAmount} — the carrier cannot collect more than the loss"
@@ -108,7 +108,7 @@ event Create(
     RecoveryAmount as money in 'USD' positive) initial
 
 # Subrogation events
-event AddDocument(DocumentType as string notempty maxlength 100, DocumentContent as string notempty maxlength 2000)
+event AddDocument(DocumentType as string notempty maxlength 100, DocumentContent as string notempty)
 event SetLiability(LiabilityPercentage as decimal nonnegative max 100, Disputed as boolean)
 event StartInvestigation
 event SendDemand(AttorneyName as string notempty maxlength 200)
@@ -121,12 +121,12 @@ event FileCourtDocuments
 event AddLitigationCosts(CostAmount as money in 'USD' positive)
 event OfferSettlement(
     SettlementAmount as money in 'USD' positive,
-    SettlementTerms as string optional maxlength 2000)
+    SettlementTerms as string optional)
 event AcceptSettlement(RecoveryMethod as choice of string("Check", "Wire", "ACH", "Offset", "DirectDeposit"))
-event RejectSettlement(Reason as string notempty maxlength 500)
+event RejectSettlement(Reason as string notempty)
 event RecordRecovery(Amount as money in 'USD' positive)
-event Close(Reason as string notempty maxlength 500)
-event Abandon(Reason as string notempty maxlength 500)
+event Close(Reason as string notempty)
+event Abandon(Reason as string notempty)
 
 # Construction row — populate fields and arrive in Identified.
 on Create

@@ -22,7 +22,7 @@ field PricePerSeat as money in 'USD' default '0.00 USD'
 field AmountDue as money in 'USD' default '0.00 USD'
 
 # Operational fields
-field CancellationReason as string optional maxlength 500
+field CancellationReason as string optional
 field CheckInDesk as string optional maxlength 100
 
 # Issued tickets cannot exceed reserved seats — the bulk discount is on price, not
@@ -53,7 +53,7 @@ in CheckedIn ensure CheckInDesk is set because "A checked-in registration must r
 event Register
 event UpdateSeats(Seats as integer positive max 100)
 event RecordPayment
-event Cancel(Reason as string optional maxlength 500)
+event Cancel(Reason as string optional)
 event CheckIn(Desk as string notempty maxlength 100)
 
 # Register — full intake must be on record. The 10+ seat bulk discount applies a

@@ -39,7 +39,7 @@ field Source as choice of string("ECB","FederalReserve","BankOfEngland","BankOfJ
 #   Ask     — what the market maker will sell the base currency for
 field RateType as choice of string("Spot","Forward","Mid","Bid","Ask") default "Spot" writable
 
-field Notes as string optional maxlength 500 writable
+field Notes as string optional writable
 
 rule ExpiresAt > EffectiveAt when EffectiveAt is set and ExpiresAt is set because "Expiry {ExpiresAt} must come after the effective time {EffectiveAt} — an exchange-rate quote with a zero or negative validity window is malformed"
 rule BaseCurrency != QuoteCurrency because "Base and quote currencies must differ — converting a currency to itself is not a meaningful exchange rate"

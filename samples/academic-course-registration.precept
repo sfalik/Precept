@@ -36,9 +36,9 @@ field CourseCount as integer default 0 nonnegative
 
 # Advisor and approvals
 field AdvisorName as string optional maxlength 100
-field AdvisorNote as string optional maxlength 500
-field RejectionReason as string optional maxlength 500
-field CancellationReason as string optional maxlength 500
+field AdvisorNote as string optional
+field RejectionReason as string optional
+field CancellationReason as string optional
 
 # Add/drop window status — flipped by CloseAddDropWindow once the deadline has passed.
 # The host fires the event when the calendar reaches AddDropDeadline; the precept

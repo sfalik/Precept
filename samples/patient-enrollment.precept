@@ -14,13 +14,13 @@ field PatientId as string notempty maxlength 50
 field PatientName as string notempty maxlength 200
 field DateOfBirth as date
 field Gender as choice of string("Male", "Female", "Other", "Unknown")
-field SocialSecurityNumber as string optional maxlength 11
+field SocialSecurityNumber as string optional maxlength 11  # SSN with hyphens (NNN-NN-NNNN)
 
 # Contact.
 field StreetAddress as string notempty maxlength 200
 field City as string notempty maxlength 100
-field StateCode as string notempty maxlength 2
-field PostalCode as string notempty maxlength 10
+field StateCode as string notempty maxlength 2  # USPS state abbreviation
+field PostalCode as string notempty maxlength 10  # US ZIP+4 (NNNNN-NNNN)
 field PrimaryPhone as string notempty maxlength 20
 field EmailAddress as string optional maxlength 200
 
@@ -47,8 +47,8 @@ field RequiredDocuments as set of string
 field SubmittedDocuments as set of string
 
 # Off-ramp reasons.
-field DenialReason as string optional maxlength 1000
-field WithdrawalReason as string optional maxlength 500
+field DenialReason as string optional
+field WithdrawalReason as string optional
 
 # Audit trail.
 field EnrollmentLog as log of string
@@ -113,9 +113,9 @@ event SubmitDocument(DocumentName as string notempty maxlength 200)
 
 # Verification events.
 event BeginEligibilityCheck(Verifier as string notempty maxlength 200)
-event RecordEligibilityResult(Verified as boolean, Notes as string notempty maxlength 1000)
+event RecordEligibilityResult(Verified as boolean, Notes as string notempty)
 event BeginInsuranceCheck(Verifier as string notempty maxlength 200)
-event RecordInsuranceResult(Verified as boolean, Notes as string notempty maxlength 1000)
+event RecordInsuranceResult(Verified as boolean, Notes as string notempty)
 
 # Enrollment + activation.
 event Enroll(MemberId as string notempty maxlength 50, ActualEffectiveDate as date)
@@ -123,8 +123,8 @@ on Enroll ensure Enroll.ActualEffectiveDate >= ApplicationDate because "Effectiv
 event Activate
 
 # Off-ramps.
-event DenyApplication(Reason as string notempty maxlength 1000)
-event WithdrawApplication(Reason as string notempty maxlength 500)
+event DenyApplication(Reason as string notempty)
+event WithdrawApplication(Reason as string notempty)
 
 # Construction row — opens in Submitted.
 on Create

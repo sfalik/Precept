@@ -40,7 +40,7 @@ field DaysPastDue as integer default 0 nonnegative
 
 # Cancellation
 field CancellationDate as instant optional
-field CancellationReason as string optional maxlength 500
+field CancellationReason as string optional
 
 # Dunning window invariant — beyond 365 days, dunning must move to Expired.
 rule DaysPastDue <= 365 because "A subscription cannot remain past-due longer than 365 days — the dunning system must transition to Expired before that"
@@ -69,8 +69,8 @@ event Create(
 # Billing events
 event ProcessPayment(PaymentAmount as money in 'USD' positive, PaymentMethod as choice of string("CreditCard", "BankTransfer", "Invoice"))
 event PaymentSuccess(PaymentDate as instant, PaymentAmount as money in 'USD' positive)
-event PaymentFailed(Reason as string notempty maxlength 500)
-event CancelSubscription(Reason as string notempty maxlength 500)
+event PaymentFailed(Reason as string notempty)
+event CancelSubscription(Reason as string notempty)
 event ExpireSubscription
 event RenewSubscription(NewPeriodStart as instant, NewPeriodEnd as instant, NewAmount as money in 'USD' positive)
 event UpdatePlan(NewPlanId as string notempty maxlength 50, NewPlanName as choice of string("Free", "Basic", "Professional", "Enterprise"), NewAmount as money in 'USD' positive)

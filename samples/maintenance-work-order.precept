@@ -9,7 +9,7 @@ precept MaintenanceWorkOrder
 # Identity and request data — established at submission.
 field RequesterName as string notempty maxlength 200
 field Location as string notempty maxlength 200
-field IssueSummary as string notempty maxlength 1000
+field IssueSummary as string notempty
 field Urgent as boolean default false
 
 # Scheduling — populated when an assignment is recorded.
@@ -22,8 +22,8 @@ field ActualDuration as duration default '0 hours'
 field PartsApproved as boolean default false
 
 # Completion and cancellation
-field CompletionNote as string optional maxlength 2000
-field CancellationReason as string optional maxlength 1000
+field CompletionNote as string optional
+field CancellationReason as string optional
 
 # States — the work order begins in Open the moment intake completes.
 state Open initial
@@ -44,7 +44,7 @@ from InProgress ensure AssignedTechnician is set because "Active work cannot fin
 event Submit(
     Requester as string notempty maxlength 200,
     WorkLocation as string notempty maxlength 200,
-    Summary as string notempty maxlength 1000,
+    Summary as string notempty,
     IsUrgent as boolean default false) initial
 
 event Assign(
@@ -58,8 +58,8 @@ event StartWork
 event RecordProgress(Elapsed as duration)
 on RecordProgress ensure RecordProgress.Elapsed > '0 hours' because "Progress entries must record a positive elapsed time — zero-hour entries add no information"
 
-event Complete(Note as string notempty maxlength 2000)
-event Cancel(Reason as string optional maxlength 1000)
+event Complete(Note as string notempty)
+event Cancel(Reason as string optional)
 
 # Construction — the requester submits an intake form; the work order is born Open.
 on Submit

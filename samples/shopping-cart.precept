@@ -49,10 +49,10 @@ rule ItemCount <= 1000 because "Cart cannot exceed 1,000 total items — orders 
 rule DiscountPercent <= 100 because "Combined promotion discount cannot exceed 100 percent"
 
 # Fulfillment data
-field CurrentGiftMessage as string optional maxlength 500
+field CurrentGiftMessage as string optional
 field ShippingAddress as string optional maxlength 500
 field TrackingNumber as string optional maxlength 100
-field OrderReason as string optional maxlength 500
+field OrderReason as string optional
 
 # Timestamps
 field CreatedAt as instant

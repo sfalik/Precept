@@ -34,8 +34,8 @@ field LastCalibrationDate as date optional
 # Adjustment — only meaningful after a failed calibration.
 field AdjustmentRequired as boolean default false
 field AdjustmentPerformed as boolean default false
-field AdjustmentNotes as string optional maxlength 2000
-field QuarantineReason as string optional maxlength 500
+field AdjustmentNotes as string optional
+field QuarantineReason as string optional
 
 # Ownership
 field TechnicianName as string optional maxlength 200
@@ -107,10 +107,10 @@ event StartMeasurement
 event RecordMeasurement(MeasuredValue as decimal)
 event RecordCertificate(CertificateNumber as string notempty maxlength 100, CertificateDate as date)
 event PassCalibration
-event FailCalibration(Reason as string notempty maxlength 500)
-event PerformAdjustment(Notes as string notempty maxlength 2000)
+event FailCalibration(Reason as string notempty)
+event PerformAdjustment(Notes as string notempty)
 event CompleteRecalibration
-event Quarantine(Reason as string notempty maxlength 500)
+event Quarantine(Reason as string notempty)
 
 # Construction row — populate fields and arrive in Due.
 on Create

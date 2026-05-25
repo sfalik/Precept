@@ -23,13 +23,13 @@ field PackagingInspectionPassed as boolean default false
 field LabelVerificationPassed as boolean default false
 field FunctionalTestsPassed as boolean default false
 field DefectsFound as integer default 0 nonnegative
-field DefectNotes as string optional maxlength 500
+field DefectNotes as string optional
 
 field CertificateNumber as string optional maxlength 50
 field CertifyingAuthority as string optional maxlength 100
 field CertifiedAt as instant optional
 
-field QuarantineReason as string optional maxlength 500
+field QuarantineReason as string optional
 field DispositionAfterQuarantine as choice of string("PendingDecision","ReleasedForRework","Scrapped","UseAsIsConcession") default "PendingDecision"
 field ShipmentDestination as string optional maxlength 200
 field ShippedAt as instant optional

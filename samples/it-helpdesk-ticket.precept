@@ -16,7 +16,7 @@ field AssignedAgent as string optional maxlength 200
 field LastQueuedAgent as string optional maxlength 200
 
 # Resolution
-field ResolutionNote as string optional maxlength 2000
+field ResolutionNote as string optional
 field ReopenCount as integer default 0 nonnegative
 
 # Shared on-call queue — agents register themselves; Assign dequeues the next.
@@ -42,9 +42,9 @@ event RegisterAgent(AgentName as string notempty maxlength 200)
 event Triage(Title as string notempty maxlength 200, Level as integer min 1 max 5 default 3)
 event Assign
 event CustomerReply
-event Resolve(Note as string notempty maxlength 2000)
+event Resolve(Note as string notempty)
 event CloseTicket
-event Reopen(Note as string optional maxlength 2000)
+event Reopen(Note as string optional)
 
 # Cross-cutting — any active state can grow the on-call pool.
 from New, Assigned, WaitingOnCustomer, Resolved on RegisterAgent

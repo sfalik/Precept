@@ -49,8 +49,8 @@ field RoutingStages as list of string
 field CurrentRoutingIndex as integer default 0 nonnegative
 
 # Notes
-field ProductionNotes as string optional maxlength 1000
-field ScrapReason as string optional maxlength 500
+field ProductionNotes as string optional
+field ScrapReason as string optional
 
 # Timestamps
 field CreatedAt as instant

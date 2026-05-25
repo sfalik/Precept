@@ -12,7 +12,7 @@ field ProductName as string optional maxlength 200
 field SerialNumber as string optional maxlength 100
 
 # Decision tracking — populated on the approve/deny transitions.
-field ApprovalNote as string optional maxlength 2000
+field ApprovalNote as string optional
 
 # Repair workflow
 field RepairSteps as stack of string
@@ -41,8 +41,8 @@ to ReadyToReturn -> set ShippingLabelSent = true
 
 # Events
 event Submit
-event Approve(Note as string optional maxlength 2000)
-event Deny(Note as string notempty maxlength 2000)
+event Approve(Note as string optional)
+event Deny(Note as string notempty)
 event StartRepair
 event LogRepairStep(StepName as string notempty maxlength 200)
 event UndoLastStep

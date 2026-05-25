@@ -49,9 +49,9 @@ field PaidAt as instant optional
 field DeniedAt as instant optional
 
 # Notes and reasons
-field ClaimDescription as string optional maxlength 2000
-field AdjustmentNotes as string optional maxlength 2000
-field DenialReason as string optional maxlength 500
+field ClaimDescription as string optional
+field AdjustmentNotes as string optional
+field DenialReason as string optional
 field PaymentMethod as choice of string("Check", "Wire", "ACH", "DirectDeposit") optional
 
 # SLA tracking — handling-time bound for review.
@@ -96,12 +96,12 @@ event Create(
 on Create ensure Create.Deductible <= Create.LossAmount because "Deductible {Create.Deductible} cannot exceed the loss amount {Create.LossAmount}"
 
 # Adjudication events
-event SetDescription(Description as string notempty maxlength 2000)
+event SetDescription(Description as string notempty)
 event AssignAdjuster(AdjusterName as string notempty maxlength 200)
-event RequestAdditionalInfo(RequestedInfo as string notempty maxlength 500, Deadline as duration)
+event RequestAdditionalInfo(RequestedInfo as string notempty, Deadline as duration)
 event BeginInvestigation
 event SubmitInvestigationReport(
-    ReportSummary as string notempty maxlength 2000,
+    ReportSummary as string notempty,
     HasSubrogation as boolean,
     AtFaultParty as string optional maxlength 200)
 event DetermineCoverage(CoverageCode as string notempty maxlength 50, CoverageLimit as money in 'USD' positive)
@@ -109,7 +109,7 @@ event CalculateSettlement(ApprovedAmount as money in 'USD' positive)
 event ApprovePayment(PaymentMethod as choice of string("Check", "Wire", "ACH", "DirectDeposit"))
 event ProcessPayment
 event RecordSubrogationRecovery(RecoveryAmount as money in 'USD' positive)
-event DenyClaim(Reason as string notempty maxlength 500)
+event DenyClaim(Reason as string notempty)
 
 # Construction row — populate fields and arrive in UnderReview.
 on Create
@@ -124,6 +124,16 @@ on Create
     -> set FiledAt = now()
     -> set ReviewedAt = now()
     -> set TargetCompletion = now() + ReviewSLA
+
+# Entry hooks — each phase records its timestamp on state entry instead of
+# repeating the `set XxxAt = now()` action on every inbound transition row.
+# The proof engine fires the hook on every inbound edge, so the state ensure
+# (`in Investigation ensure InvestigatedAt is set`, etc.) is satisfied
+# automatically — there's only one place to update if the schema evolves.
+to Investigation -> set InvestigatedAt = now()
+to Adjudication -> set AdjudicatedAt = now()
+to Paid -> set PaidAt = now()
+to Denied -> set DeniedAt = now()
 
 # Description and adjuster — captured during review.
 from UnderReview on SetDescription
@@ -141,26 +151,25 @@ from UnderReview on RequestAdditionalInfo
     -> append ClaimLog "Additional info requested: {RequestAdditionalInfo.RequestedInfo}"
     -> no transition
 
-# Begin investigation — UnderReview → Investigation.
+# Begin investigation — UnderReview → Investigation. The InvestigatedAt
+# timestamp is set by the `to Investigation` entry hook.
 from UnderReview on BeginInvestigation
-    -> set InvestigatedAt = now()
     -> append ClaimLog "Investigation begun"
     -> transition Investigation
 
 # Submit investigation report — subrogation detection drives field setup.
+# AdjudicatedAt is set by the `to Adjudication` entry hook.
 from Investigation on SubmitInvestigationReport when SubmitInvestigationReport.HasSubrogation
     -> set AdjustmentNotes = SubmitInvestigationReport.ReportSummary
     -> set HasSubrogationPotential = true
     -> set AtFaultParty = SubmitInvestigationReport.AtFaultParty
     -> put SubrogationDetails "Party" = if SubmitInvestigationReport.AtFaultParty is set then SubmitInvestigationReport.AtFaultParty else "Unknown"
-    -> set AdjudicatedAt = now()
     -> append ClaimLog "Investigation complete — subrogation detected"
     -> transition Adjudication
 from Investigation on SubmitInvestigationReport
     -> set AdjustmentNotes = SubmitInvestigationReport.ReportSummary
     -> set HasSubrogationPotential = false
     -> clear AtFaultParty
-    -> set AdjudicatedAt = now()
     -> append ClaimLog "Investigation complete — no subrogation"
     -> transition Adjudication
 
@@ -186,9 +195,9 @@ from PaymentProcessing on ApprovePayment
     -> append ClaimLog "Payment method confirmed: {ApprovePayment.PaymentMethod}"
     -> no transition
 
-# Process payment — PaymentProcessing → Paid.
+# Process payment — PaymentProcessing → Paid. PaidAt is set by the `to Paid`
+# entry hook.
 from PaymentProcessing on ProcessPayment
-    -> set PaidAt = now()
     -> append ClaimLog "Payment processed"
     -> transition Paid
 
@@ -198,9 +207,9 @@ from PaymentProcessing on RecordSubrogationRecovery
     -> append ClaimLog "Subrogation recovery recorded: {RecordSubrogationRecovery.RecoveryAmount}"
     -> no transition
 
-# Deny claim — available from review through adjudication.
+# Deny claim — available from review through adjudication. DeniedAt is set
+# by the `to Denied` entry hook regardless of source state.
 from UnderReview, Investigation, Adjudication on DenyClaim
     -> set DenialReason = DenyClaim.Reason
-    -> set DeniedAt = now()
     -> append ClaimLog "Claim denied: {DenyClaim.Reason}"
     -> transition Denied

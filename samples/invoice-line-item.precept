@@ -14,7 +14,7 @@ precept InvoiceLineItem
 field CurrencyCode as currency default 'USD' writable
 
 # Source fields — directly edited by the host's line-editor UI.
-field Description as string optional maxlength 500 writable
+field Description as string optional writable
 field UnitPrice as money in '{CurrencyCode}' default '0 {CurrencyCode}' nonnegative writable
 field Quantity as integer default 1 positive writable
 field DiscountPercent as decimal default 0 nonnegative max 100 maxplaces 2 writable

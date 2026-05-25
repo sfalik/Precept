@@ -18,7 +18,7 @@ field EstimatedCustomers as integer nonnegative
 # Dispatch and restoration data — meaningful only after the report enters the
 # operational workflow.
 field AssignedCrew as string optional maxlength 200
-field RestorationNote as string optional maxlength 2000
+field RestorationNote as string optional
 field DispatchRound as integer default 0 nonnegative
 
 # Affected service area — assembled block by block during triage.
@@ -56,7 +56,7 @@ event RemoveBlock(BlockName as string notempty maxlength 100)
 event RegisterCrew(CrewName as string notempty maxlength 200)
 event VerifyReport
 event DispatchCrew
-event MarkRestored(Note as string notempty maxlength 2000)
+event MarkRestored(Note as string notempty)
 event CloseIncident
 
 # Construction

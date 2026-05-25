@@ -20,7 +20,7 @@ field LowestRequestedFloor as integer default 0 nonnegative
 field HighestRequestedFloor as integer default 0 nonnegative
 
 # Decision and issuance
-field ReviewerNote as string optional maxlength 2000
+field ReviewerNote as string optional
 field BadgePrinted as boolean default false
 
 # States
@@ -48,8 +48,8 @@ to Approved -> set BadgePrinted = false
 event AddFloor(Floor as integer positive)
 event RemoveFloor(Floor as integer positive)
 event Submit
-event Approve(Note as string optional maxlength 2000)
-event Reject(Reason as string notempty maxlength 2000)
+event Approve(Note as string optional)
+event Reject(Reason as string notempty)
 event PrintBadge
 
 # Floor-set editing — guards prevent removing a floor that isn't currently in the set.

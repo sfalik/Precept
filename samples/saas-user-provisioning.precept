@@ -38,8 +38,8 @@ field FailedLoginAttempts as integer default 0 nonnegative
 field LastActivityAt as instant optional
 
 # Approval, suspension, deactivation reasons
-field SuspensionReason as string optional maxlength 500
-field DeactivationReason as string optional maxlength 500
+field SuspensionReason as string optional
+field DeactivationReason as string optional
 field ApprovedBy as string optional maxlength 200
 
 # Timestamps
@@ -89,9 +89,9 @@ event Create(
 event ApproveAccess(ApprovedBy as string notempty maxlength 200)
 event ProvisionUser(LicenseExpirationDate as instant)
 on ProvisionUser ensure ProvisionUser.LicenseExpirationDate > now() because "License expiration of {ProvisionUser.LicenseExpirationDate} must be in the future — provisioning a pre-expired license has no purpose"
-event SuspendUser(Reason as string notempty maxlength 500)
+event SuspendUser(Reason as string notempty)
 event ReactivateUser
-event DeactivateUser(Reason as string notempty maxlength 500)
+event DeactivateUser(Reason as string notempty)
 
 # Role and resource management
 event UpdateRole(NewRole as choice of string("Admin", "Editor", "Viewer"))

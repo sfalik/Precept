@@ -21,7 +21,7 @@ field ConversionDiscount as money in 'USD' default '0.00 USD' nonnegative
 # Conversion tracking
 field ConversionStatus as choice of string("NotAttempted", "OfferSent", "Converted", "Declined", "Negotiating") default "NotAttempted"
 field SelectedPlanName as choice of string("Free", "Pro Starter", "Pro", "Enterprise") optional
-field ConversionRejectionReason as string optional maxlength 500
+field ConversionRejectionReason as string optional
 field SalesRepName as string optional maxlength 200
 
 # BUG-006: would prefer `integer default 0 nonnegative max 10` but the proof
@@ -85,7 +85,7 @@ event SendConversionOffer(
 on SendConversionOffer ensure SendConversionOffer.DiscountAmount <= MaximumDiscount because "Discount of {SendConversionOffer.DiscountAmount} cannot exceed the maximum allowed {MaximumDiscount}"
 
 event AcceptOffer(MonthlyFee as money in 'USD' positive)
-event DeclineOffer(Reason as string notempty maxlength 500)
+event DeclineOffer(Reason as string notempty)
 event NegotiatePlan(
     PlanTier as choice of string("Free", "Pro Starter", "Pro", "Enterprise"),
     DiscountAmount as money in 'USD' nonnegative)

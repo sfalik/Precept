@@ -69,8 +69,8 @@ field FullRefundWindowOpen as boolean default true
 field RefundWindowOpen as boolean default true
 
 # Outcomes
-field RejectionReason as string optional maxlength 500
-field CancellationReason as string optional maxlength 500
+field RejectionReason as string optional
+field CancellationReason as string optional
 field RefundAmount as money in 'USD' default '0.00 USD'
 field ForfeitAmount as money in 'USD' default '0.00 USD'
 

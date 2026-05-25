@@ -16,7 +16,7 @@ field InstalledDate as date optional
 # Downtime reason and category — set when a Down event begins.
 field CurrentReason as choice of string("PlannedMaintenance", "UnplannedFailure", "Changeover", "MaterialShortage", "QualityIssue", "ToolFailure", "PowerOutage", "Other") optional
 field CurrentCategory as choice of string("Availability", "Performance", "Quality", "Other") optional
-field FailureRootCause as string optional maxlength 500
+field FailureRootCause as string optional
 
 # Downtime timing — captured per incident.
 field DowntimeStartedAt as instant optional
@@ -25,7 +25,7 @@ field RepairStartedAt as instant optional
 field RestoredAt as instant optional
 
 # Impact tracking
-field EstimatedImpact as string optional maxlength 500
+field EstimatedImpact as string optional
 field ScrapQuantity as integer default 0 nonnegative
 field RepairCost as money in 'USD' default '0.00 USD' nonnegative
 
@@ -72,12 +72,12 @@ event Create(
 event ReportDowntime(
     Reason as choice of string("PlannedMaintenance", "UnplannedFailure", "Changeover", "MaterialShortage", "QualityIssue", "ToolFailure", "PowerOutage", "Other"),
     Category as choice of string("Availability", "Performance", "Quality", "Other"),
-    Impact as string optional maxlength 500)
+    Impact as string optional)
 event AssignTechnician(TechnicianName as string notempty maxlength 200)
 event StartDiagnosis
-event CompleteDiagnosis(RootCause as string notempty maxlength 500)
+event CompleteDiagnosis(RootCause as string notempty)
 event CompleteRepair(
-    Description as string notempty maxlength 500,
+    Description as string notempty,
     Cost as money in 'USD' nonnegative)
 event RestoreEquipment
 event LogScrap(Quantity as integer positive)

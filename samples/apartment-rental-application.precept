@@ -43,12 +43,12 @@ field CoApplicantName as string optional maxlength 200
 field CoApplicantIncome as money in 'USD' default '0.00 USD'
 
 # Pet detail — required when PetPreference is anything other than "None".
-field PetDescription as string optional maxlength 500
+field PetDescription as string optional
 
 # Review state
 field ReviewerName as string optional maxlength 200
-field ReviewNotes as string optional maxlength 1000
-field RejectionReason as string optional maxlength 500
+field ReviewNotes as string optional
+field RejectionReason as string optional
 field PropertyUnit as string optional maxlength 100
 field DepositPaid as boolean default false
 field LeaseSigned as boolean default false

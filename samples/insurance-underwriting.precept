@@ -39,9 +39,9 @@ field RatingMultiplier as decimal default 1 nonnegative max 5 maxplaces 4
 # Medical information
 field HasMedicalExam as boolean default false
 field MedicalExamDate as date optional
-field ExamResult as string optional maxlength 2000
-field PrescribedMedications as string optional maxlength 1000
-field FamilyHistory as string optional maxlength 1000
+field ExamResult as string optional
+field PrescribedMedications as string optional
+field FamilyHistory as string optional
 field TobaccoUse as choice of string("Never", "Former", "Current") optional
 field TobaccoYearsQuit as integer optional nonnegative max 100
 
@@ -52,9 +52,9 @@ field TravelToHighRiskCountries as boolean default false
 field AviationActivity as boolean default false
 
 # Notes
-field UnderwriterNotes as string optional maxlength 2000
-field DecisionReason as string optional maxlength 500
-field RequiredConditions as string optional maxlength 1000
+field UnderwriterNotes as string optional
+field DecisionReason as string optional
+field RequiredConditions as string optional
 
 # Audit trail
 field UnderwritingLog as log of string
@@ -105,22 +105,22 @@ event Create(
 
 # Underwriting events
 event RequestInformation(InformationType as string notempty maxlength 200)
-event SubmitMedicalExam(ExamDate as date, Result as string notempty maxlength 2000)
-event SubmitInformation(DocumentType as string notempty maxlength 100, Content as string notempty maxlength 2000)
+event SubmitMedicalExam(ExamDate as date, Result as string notempty)
+event SubmitInformation(DocumentType as string notempty maxlength 100, Content as string notempty)
 event CompleteInformationGathering
 event AddRiskFactor(FactorName as string notempty maxlength 100, FactorScore as decimal)
 event CompleteRiskAssessment(RiskScore as decimal nonnegative max 100, RiskCategory as choice of string("Preferred", "Standard", "Substandard", "HighRisk", "Decline"))
 event GenerateQuote(
     RatingMultiplier as decimal nonnegative max 5,
     AdjustedPremium as money in 'USD' positive,
-    UnderwriterNotes as string optional maxlength 2000)
+    UnderwriterNotes as string optional)
 event Approve
-event Decline(Reason as string notempty maxlength 500, Conditions as string optional maxlength 1000)
+event Decline(Reason as string notempty, Conditions as string optional)
 event Modify(
     NewCoverage as money in 'USD' positive,
     NewPremium as money in 'USD' positive,
     NewTerm as integer nonnegative max 100,
-    Conditions as string notempty maxlength 1000)
+    Conditions as string notempty)
 on Modify ensure Modify.NewCoverage <= CoverageAmount because "Modified coverage cannot exceed the requested coverage"
 
 # Construction row — populate fields and arrive in InformationGathering.

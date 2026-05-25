@@ -8,34 +8,49 @@ precept StatisticalProcessControl
 # warning band keep the chart InControl; readings between warning and control
 # limits trigger Warning; readings outside control limits trigger OutOfControl
 # and require corrective action before monitoring can resume.
+#
+# The measurement field is typed as `quantity in '{MeasurementUnit}'` rather
+# than a bare decimal. The chart's measurement unit (e.g., `'mm'`, `'g'`,
+# `'V'`, `'degC'`) is supplied at initialization and propagated to every
+# measurement-typed field; the engine enforces that all samples and limits
+# share the same unit. Comparing a 25.4 mm sample against a 0.5 in upper
+# control limit becomes a structural impossibility instead of a runtime bug.
 
 # Fields
 field ProcessId as string notempty maxlength 50
 field ChartName as string notempty maxlength 100
+
+# The measurement unit drives the dimension of every measured field. It is set
+# at initialization and locked thereafter (no editable declaration).
 field MeasurementUnit as unitofmeasure
-field TargetValue as decimal
-field UpperControlLimit as decimal
-field LowerControlLimit as decimal
-field UpperWarningLimit as decimal
-field LowerWarningLimit as decimal
+
+# All measurement-typed fields share `quantity in '{MeasurementUnit}'`. A chart
+# initialized in 'mm' carries 'mm' targets, limits, and samples; a chart in 'V'
+# carries volts. Cross-unit comparisons are rejected at compile time.
+field TargetValue as quantity in '{MeasurementUnit}'
+field UpperControlLimit as quantity in '{MeasurementUnit}'
+field LowerControlLimit as quantity in '{MeasurementUnit}'
+field UpperWarningLimit as quantity in '{MeasurementUnit}'
+field LowerWarningLimit as quantity in '{MeasurementUnit}'
 field SampleSize as integer positive
 
 field SamplesRecorded as integer default 0 nonnegative
-field LastSampleValue as decimal optional
+field LastSampleValue as quantity in '{MeasurementUnit}' optional
 field LastSampleAt as instant optional
 field ConsecutiveOutOfControl as integer default 0 nonnegative
 field ConsecutiveWarnings as integer default 0 nonnegative
 
 field CurrentAlertReason as string optional maxlength 200
-field CorrectiveActionNote as string optional maxlength 500
+field CorrectiveActionNote as string optional
 field CorrectiveActionOwner as string optional maxlength 100
 field CorrectiveActionStartedAt as instant optional
 field CorrectiveActionResolvedAt as instant optional
 
 field ChartRetiredAt as instant optional
-field RetirementReason as string optional maxlength 200
+field RetirementReason as string optional
 
 # Rules — control-chart geometry must hold for every reading the chart classifies.
+# Same-unit comparisons inherit from the qualifier on each field's type.
 rule LowerControlLimit < LowerWarningLimit because "Lower control limit {LowerControlLimit} must sit below lower warning limit {LowerWarningLimit}"
 rule LowerWarningLimit < TargetValue because "Lower warning limit {LowerWarningLimit} must sit below target {TargetValue}"
 rule TargetValue < UpperWarningLimit because "Target {TargetValue} must sit below upper warning limit {UpperWarningLimit}"
@@ -65,11 +80,11 @@ event InitializeChart(
     Process as string notempty,
     Name as string notempty,
     Unit as unitofmeasure,
-    Target as decimal,
-    Ucl as decimal,
-    Uwl as decimal,
-    Lwl as decimal,
-    Lcl as decimal,
+    Target as quantity in '{MeasurementUnit}',
+    Ucl as quantity in '{MeasurementUnit}',
+    Uwl as quantity in '{MeasurementUnit}',
+    Lwl as quantity in '{MeasurementUnit}',
+    Lcl as quantity in '{MeasurementUnit}',
     Sample as integer positive) initial
 
 on InitializeChart ensure InitializeChart.Lcl < InitializeChart.Lwl because "Lower control limit must sit below lower warning limit"
@@ -89,7 +104,9 @@ on InitializeChart
     -> set LowerControlLimit = InitializeChart.Lcl
     -> set SampleSize = InitializeChart.Sample
 
-event RecordSample(Value as decimal)
+# Samples are measurements in the chart's configured unit; the engine rejects
+# any caller trying to feed a different unit at compile time.
+event RecordSample(Value as quantity in '{MeasurementUnit}')
 
 event AcknowledgeAlert(Reason as string notempty)
 event OpenCorrectiveAction(Owner as string notempty, Action as string notempty)

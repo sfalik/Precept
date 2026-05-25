@@ -27,11 +27,11 @@ field DrugInteractionSource as string optional maxlength 200
 field DrugInteractionTarget as string optional maxlength 200
 field DrugInteractionSeverity as choice of string("None", "Mild", "Moderate", "Severe") optional
 field HighestInteractionSeverity as choice of string("None", "Mild", "Moderate", "Severe") ordered default "None"
-field FlagInteractionDetails as string optional maxlength 2000
+field FlagInteractionDetails as string optional
 
 # Priority and review
 field Priority as choice of string("Routine", "Standard", "Urgent", "Stat") ordered default "Standard"
-field ReviewNotes as string optional maxlength 2000
+field ReviewNotes as string optional
 field ReviewedBy as string optional maxlength 200
 
 # Approval tracking — terminal Filled state carries one of
@@ -40,12 +40,12 @@ field ApprovedByPharmacistId as string optional maxlength 50
 field ApprovedByPharmacistAt as instant optional
 field ApprovedByPhysicianId as string optional maxlength 50
 field ApprovedByPhysicianAt as instant optional
-field OverrideReason as string optional maxlength 1000
+field OverrideReason as string optional
 
 # Insurance
 field InsuranceProvider as string notempty maxlength 200
-field InsuranceBin as string optional maxlength 10
-field InsurancePcn as string optional maxlength 10
+field InsuranceBin as string optional maxlength 10  # BIN (Bank Identification Number) for Rx claim routing — 6 digits per NCPDP, 10 covers historical variants
+field InsurancePcn as string optional maxlength 10  # PCN (Processor Control Number) per NCPDP — alphanumeric, up to 10 chars
 field InsuranceGroup as string optional maxlength 50
 field InsurancePolicyNumber as string optional maxlength 50
 
@@ -54,7 +54,7 @@ field FillLocation as string notempty maxlength 200
 field FillPharmacyId as string notempty maxlength 50
 
 # Rejection
-field RejectionReason as string optional maxlength 1000
+field RejectionReason as string optional
 field RejectedAt as instant optional
 
 # Timestamps

@@ -32,7 +32,7 @@ field JobLog as log of string
 
 # Approval and reschedule audit
 field ApproverName as string optional maxlength 100
-field CancellationReason as string optional maxlength 500
+field CancellationReason as string optional
 field ReopenCount as integer default 0 nonnegative
 
 # Timestamps

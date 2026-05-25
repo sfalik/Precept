@@ -18,8 +18,8 @@ field CreatedAt as instant
 field SaveOfferAccepted as boolean default false
 field RetentionDiscount as decimal default 0 nonnegative max 100 maxplaces 2
 field RetentionDaysToExpiry as integer default 0 nonnegative max 30
-field CancellationReason as string optional maxlength 500
-field LastAgentNote as string optional maxlength 500
+field CancellationReason as string optional
+field LastAgentNote as string optional
 
 # States
 state Active initial

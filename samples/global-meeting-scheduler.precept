@@ -1,0 +1,240 @@
+precept GlobalMeetingScheduler
+
+# A global meeting record for a distributed team. One host schedules the
+# meeting from their own timezone; participants in many regions need to see
+# the meeting time rendered in their local zone. The canonical time is stored
+# as an `instant` (UTC); the host's timezone determines how the local
+# rendering is computed via `instant.inZone(timezone)`. The host region's
+# business hours are kept as plain `time` values (wall-clock facts in the
+# host's region) so the scheduler can flag invitations that fall outside
+# acceptable working hours and require the host to acknowledge before the
+# meeting can advance.
+#
+# Constructor pattern: every meeting must arrive with a title, a host, a host
+# timezone, a UTC start instant, a duration, and the host region's business
+# hours. None of those can be progressively enriched — they are existential
+# facts about the meeting.
+#
+# Demonstrates: `timezone` (IANA identifiers), `zoneddatetime` (host's local
+# view of a UTC instant via `instant.inZone(timezone)`), `time` (business
+# hours as time-of-day with comparison), `duration` (meeting length and
+# instant arithmetic to derive `MeetingEndUtc`), computed fields (`<-`) for
+# every derived view of the canonical instant, entry hooks (`to State -> set`)
+# for phase timestamps, and a `set of timezone` + `lookup of string to timezone`
+# pairing for per-participant region awareness.
+
+# ── Meeting identity (existential — set at construction) ──────────────────────
+field MeetingId as string notempty maxlength 50
+field Title as string notempty maxlength 200
+field HostName as string notempty maxlength 200
+field HostEmail as string notempty maxlength 200
+
+# ── Canonical time ─────────────────────────────────────────────────────────────
+# The single source of truth: the meeting starts at this UTC instant. Every
+# participant's local rendering is derived from it via inZone(theirZone).
+field MeetingStartUtc as instant
+field MeetingDuration as duration
+
+# Host's region — drives the host-facing rendering and the business-hours check.
+field HostTimezone as timezone
+
+# Host region's working hours. Captured as time-of-day, not as a UTC instant,
+# because business hours are wall-clock facts in the host's region. The
+# scheduler flags after-hours meetings via the `IsAfterHoursForHost` signal.
+field HostBusinessHoursStart as time
+field HostBusinessHoursEnd as time
+
+# ── Derived views of the canonical instant ────────────────────────────────────
+# The host sees the meeting time in their own timezone. The proof engine
+# keeps these renderings atomically consistent with MeetingStartUtc — change
+# the canonical instant and every downstream view updates in lockstep.
+field MeetingEndUtc as instant <- MeetingStartUtc + MeetingDuration
+field HostLocalStart as zoneddatetime <- MeetingStartUtc.inZone(HostTimezone)
+field HostLocalEnd as zoneddatetime <- MeetingEndUtc.inZone(HostTimezone)
+field HostLocalDate as date <- HostLocalStart.date
+field HostLocalStartTime as time <- HostLocalStart.time
+field HostLocalEndTime as time <- HostLocalEnd.time
+field HostLocalDayOfWeek as integer <- HostLocalStart.dayOfWeek
+
+# Working-hours signal — true when the meeting's host-local start time falls
+# outside the configured working window. Hosts use this to require a confirm.
+field IsAfterHoursForHost as boolean <- HostLocalStartTime < HostBusinessHoursStart or HostLocalStartTime >= HostBusinessHoursEnd
+
+# Weekend signal — Saturday (6) or Sunday (7) by ISO weekday. Not gated, but
+# surfaced to the UI so the host can think twice about a Sunday meeting.
+field IsWeekendForHost as boolean <- HostLocalDayOfWeek >= 6
+
+# ── Participants ──────────────────────────────────────────────────────────────
+# Unique participant timezones — the scheduler renders the meeting time in
+# each of these for the invitation email. A `set` collapses duplicates so a
+# meeting with five attendees in New York counts as one zone, not five, for
+# the rendering loop.
+field ParticipantZones as set of timezone
+
+# Membership set — drives the existence check on RemoveParticipant. Pairs
+# with ParticipantZoneByEmail as the canonical record per email.
+field ParticipantEmails as set of string
+
+# Per-participant timezone map keyed by email — the source of truth that
+# feeds the rendering loop. The scheduler iterates this for the per-recipient
+# invite copy.
+field ParticipantZoneByEmail as lookup of string to timezone
+
+field ParticipantCount as integer default 0 nonnegative
+
+# ── After-hours acknowledgement ───────────────────────────────────────────────
+# When IsAfterHoursForHost is true at scheduling time, the host must
+# acknowledge before Schedule is allowed to complete. This is the closest
+# Precept can come to "are you sure?" UI — make it a structural pre-condition.
+field AfterHoursAcknowledged as boolean default false
+
+# ── Cancellation ──────────────────────────────────────────────────────────────
+field CancellationReason as string optional
+
+# ── Audit log ─────────────────────────────────────────────────────────────────
+field MeetingLog as log of string
+
+# ── Phase timestamps ──────────────────────────────────────────────────────────
+field ScheduledAt as instant optional
+field StartedAt as instant optional
+field EndedAt as instant optional
+field CancelledAt as instant optional
+
+# ── Rules ─────────────────────────────────────────────────────────────────────
+rule HostBusinessHoursEnd > HostBusinessHoursStart because "Business hours end {HostBusinessHoursEnd} must be after business hours start {HostBusinessHoursStart}"
+# BUG-008 family: `duration <= '<literal>'` crashes the compiler. Compare via
+# the totalHours accessor instead until typed-duration comparisons land.
+rule MeetingDuration.totalHours <= 8 because "A scheduled meeting may not exceed 8 hours — longer events should be split or marked as offsites"
+# BUG-006: the proof engine doesn't combine the AddParticipant guard
+# (`ParticipantCount < 500`) with a field-level `max 500` to satisfy the
+# arithmetic interval. Use a rule invariant instead.
+rule ParticipantCount <= 500 because "A single meeting record cannot host more than 500 participants"
+
+# ── States ────────────────────────────────────────────────────────────────────
+state Draft initial
+state Scheduled
+state InProgress
+state Completed terminal
+state Cancelled terminal
+
+# ── State ensures ─────────────────────────────────────────────────────────────
+in Scheduled ensure ScheduledAt is set because "A scheduled meeting must carry the timestamp it was scheduled"
+in Scheduled when IsAfterHoursForHost ensure AfterHoursAcknowledged because "The host must acknowledge an after-hours meeting before it can be scheduled — host-local start {HostLocalStartTime} is outside business hours {HostBusinessHoursStart}–{HostBusinessHoursEnd}"
+in InProgress ensure StartedAt is set because "An in-progress meeting must record its actual start time"
+in Completed ensure EndedAt is set because "A completed meeting must record its actual end time"
+in Cancelled ensure CancelledAt is set because "A cancelled meeting must record the cancellation timestamp"
+in Cancelled ensure CancellationReason is set because "A cancelled meeting must record why it was cancelled"
+
+# ── Construction event ────────────────────────────────────────────────────────
+event Create(
+    MeetingId as string notempty maxlength 50,
+    Title as string notempty maxlength 200,
+    HostName as string notempty maxlength 200,
+    HostEmail as string notempty maxlength 200,
+    HostTimezone as timezone,
+    StartUtc as instant,
+    Duration as duration,
+    BizStart as time,
+    BizEnd as time) initial
+
+on Create ensure Create.Duration.totalSeconds > 0 because "Meeting duration must be positive"
+on Create ensure Create.BizEnd > Create.BizStart because "Host business hours end must be after start"
+
+# ── Other events ──────────────────────────────────────────────────────────────
+event AddParticipant(Email as string notempty maxlength 200, Tz as timezone)
+event RemoveParticipant(Email as string notempty maxlength 200)
+event AcknowledgeAfterHours
+event Reschedule(NewStartUtc as instant, NewDuration as duration)
+event Schedule
+event StartMeeting
+event EndMeeting
+event Cancel(Reason as string notempty)
+
+on Reschedule ensure Reschedule.NewDuration.totalSeconds > 0 because "Rescheduled duration must be positive"
+
+# ── Construction row ──────────────────────────────────────────────────────────
+on Create
+    -> set MeetingId = Create.MeetingId
+    -> set Title = Create.Title
+    -> set HostName = Create.HostName
+    -> set HostEmail = Create.HostEmail
+    -> set HostTimezone = Create.HostTimezone
+    -> set MeetingStartUtc = Create.StartUtc
+    -> set MeetingDuration = Create.Duration
+    -> set HostBusinessHoursStart = Create.BizStart
+    -> set HostBusinessHoursEnd = Create.BizEnd
+    -> append MeetingLog "Meeting {Create.MeetingId} drafted — host {Create.HostName} ({Create.HostTimezone})"
+
+# ── Entry hooks ───────────────────────────────────────────────────────────────
+# Every phase records its timestamp on state entry — no need to repeat the
+# `set XxxAt = now()` line on every inbound transition row. The entry hook
+# fires on every inbound edge, including back-edges if any were declared.
+to Scheduled -> set ScheduledAt = now()
+to InProgress -> set StartedAt = now()
+to Completed -> set EndedAt = now()
+to Cancelled -> set CancelledAt = now()
+
+# ── Participant management ────────────────────────────────────────────────────
+from Draft, Scheduled on AddParticipant when ParticipantCount >= 500
+    -> reject "Maximum 500 participants per meeting — current count is {ParticipantCount}"
+from Draft, Scheduled on AddParticipant
+    -> add ParticipantZones AddParticipant.Tz
+    -> add ParticipantEmails AddParticipant.Email
+    -> put ParticipantZoneByEmail AddParticipant.Email = AddParticipant.Tz
+    -> set ParticipantCount = ParticipantCount + 1
+    -> append MeetingLog "Added {AddParticipant.Email} ({AddParticipant.Tz})"
+    -> no transition
+
+# Note: lookup deletion is unsupported (BUG-002). The ParticipantEmails set
+# is the canonical membership record; the lookup entry stays as a tombstone
+# until the meeting record is itself archived. Reads should always filter
+# through ParticipantEmails.
+from Draft, Scheduled on RemoveParticipant when ParticipantCount == 0
+    -> reject "No participants to remove"
+from Draft, Scheduled on RemoveParticipant
+    -> remove ParticipantEmails RemoveParticipant.Email
+    -> set ParticipantCount = ParticipantCount - 1
+    -> append MeetingLog "Removed {RemoveParticipant.Email}"
+    -> no transition
+
+# ── After-hours acknowledgement ───────────────────────────────────────────────
+from Draft on AcknowledgeAfterHours
+    -> set AfterHoursAcknowledged = true
+    -> append MeetingLog "After-hours scheduling acknowledged by host"
+    -> no transition
+
+# ── Reschedule (while still in Draft or Scheduled) ────────────────────────────
+# Rescheduling resets the after-hours acknowledgement — if the new time is
+# still after-hours, the host must acknowledge again before the meeting can
+# advance to Scheduled. (The state ensure on Scheduled catches the lapse.)
+from Draft, Scheduled on Reschedule
+    -> set MeetingStartUtc = Reschedule.NewStartUtc
+    -> set MeetingDuration = Reschedule.NewDuration
+    -> set AfterHoursAcknowledged = false
+    -> append MeetingLog "Rescheduled — host-local start now {HostLocalStartTime} on {HostLocalDate}"
+    -> no transition
+
+# ── Schedule ──────────────────────────────────────────────────────────────────
+# The Scheduled state ensure enforces the after-hours acknowledgement
+# requirement, so no row-level guard is needed — if IsAfterHoursForHost is
+# true and AfterHoursAcknowledged is false, the state ensure rejects.
+from Draft on Schedule
+    -> append MeetingLog "Scheduled for {HostLocalStart} ({HostTimezone})"
+    -> transition Scheduled
+
+# ── Meeting lifecycle ─────────────────────────────────────────────────────────
+from Scheduled on StartMeeting
+    -> append MeetingLog "Meeting started"
+    -> transition InProgress
+
+from InProgress on EndMeeting
+    -> append MeetingLog "Meeting ended"
+    -> transition Completed
+
+# ── Cancellation ──────────────────────────────────────────────────────────────
+# Cancellation is allowed from any non-terminal state — until the meeting
+# has run to completion, it can be called off.
+from Draft, Scheduled, InProgress on Cancel
+    -> set CancellationReason = Cancel.Reason
+    -> append MeetingLog "Cancelled: {Cancel.Reason}"
+    -> transition Cancelled

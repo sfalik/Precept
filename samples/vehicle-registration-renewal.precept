@@ -17,7 +17,7 @@ precept VehicleRegistrationRenewal
 
 # Identity
 field RegistrationNumber as string optional maxlength 50
-field VehicleVin as string optional maxlength 17
+field VehicleVin as string optional maxlength 17  # VIN is exactly 17 chars per ISO 3779 / FMVSS 565
 field OwnerName as string optional maxlength 200
 field OwnerAddress as string optional maxlength 500
 field OwnerLicenseNumber as string optional maxlength 50
@@ -62,7 +62,7 @@ field EmissionsPassed as boolean default false
 field SafetyInspectionPassed as boolean default false
 field InspectionStationId as string optional maxlength 50
 field LastInspectionDate as date optional
-field InspectionFailureReason as string optional maxlength 500
+field InspectionFailureReason as string optional
 
 # Grace and suspension status — flipped by the host when calendar windows close.
 # Once the statutory grace period after expiration elapses, GracePeriodOpen
@@ -70,8 +70,8 @@ field InspectionFailureReason as string optional maxlength 500
 field GracePeriodOpen as boolean default true
 
 # Outcomes
-field SuspensionReason as string optional maxlength 500
-field RevocationReason as string optional maxlength 500
+field SuspensionReason as string optional
+field RevocationReason as string optional
 field RefundAmount as money in 'USD' default '0.00 USD'
 
 # Audit log

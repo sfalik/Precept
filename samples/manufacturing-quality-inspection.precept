@@ -18,8 +18,8 @@ field LowerTolerance as quantity in 'mm' optional
 field MeasuredDimension as quantity in 'mm' optional
 field DefectsFound as integer default 0 nonnegative
 field DefectLog as lookup of string to integer
-field CorrectiveAction as string optional maxlength 500
-field DispositionNote as string optional maxlength 500
+field CorrectiveAction as string optional
+field DispositionNote as string optional
 field ScheduledAt as instant optional
 field InspectionStartedAt as instant optional
 field InspectionCompletedAt as instant optional

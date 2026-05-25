@@ -23,14 +23,22 @@ field BaseSubscriptionFee as money in 'USD' nonnegative
 field RatePerUnit as money in 'USD' default '0.00 USD' nonnegative
 field UsageCharge as money in 'USD' default '0.00 USD' nonnegative
 field OverageCharge as money in 'USD' default '0.00 USD' nonnegative
-field TotalInvoiceAmount as money in 'USD' default '0.00 USD' nonnegative
 field CreditsApplied as money in 'USD' default '0.00 USD' nonnegative
 field AmountPaid as money in 'USD' default '0.00 USD' nonnegative
 
+# Computed totals — derived from the accumulators above. The proof engine
+# keeps these in lockstep with their constituents; the billing host reads
+# them but cannot write them. The invoice total is base + usage + overage;
+# the net amount due subtracts credits and payments to surface the live
+# outstanding balance without a separate `set` row.
+field TotalInvoiceAmount as money in 'USD' <- BaseSubscriptionFee + UsageCharge + OverageCharge
+field NetAmountDue as money in 'USD' <- TotalInvoiceAmount - CreditsApplied - AmountPaid
+field IsFullyPaid as boolean <- AmountPaid + CreditsApplied >= TotalInvoiceAmount
+
 # Dispute tracking
-field DisputeReason as string optional maxlength 1000
+field DisputeReason as string optional
 field DisputeAmount as money in 'USD' default '0.00 USD' nonnegative
-field ResolutionNotes as string optional maxlength 1000
+field ResolutionNotes as string optional
 
 # Alert thresholds
 field AlertThresholdPercent as integer default 80 nonnegative max 100
@@ -94,8 +102,8 @@ event GenerateInvoice(RatePerUnit as money in 'USD' positive, UsageCharge as mon
 # Payment events
 event RecordPayment(PaymentAmount as money in 'USD' positive)
 event MarkOverdue
-event DisputeInvoice(Reason as string notempty maxlength 1000, ClaimAmount as money in 'USD' positive)
-event ResolveDispute(Outcome as string notempty maxlength 1000, CreditsAmount as money in 'USD' nonnegative)
+event DisputeInvoice(Reason as string notempty, ClaimAmount as money in 'USD' positive)
+event ResolveDispute(Outcome as string notempty, CreditsAmount as money in 'USD' nonnegative)
 
 # Construction row — populate identification and arrive MeteringActive.
 on Create
@@ -137,11 +145,12 @@ from MeteringActive on FinalizeUsage
     -> append BillingLog "Usage finalized — cycle aggregated"
     -> transition Aggregated
 
-# Generate invoice — Aggregated → Billed.
+# Generate invoice — Aggregated → Billed. TotalInvoiceAmount is computed
+# from BaseSubscriptionFee + UsageCharge + OverageCharge, so we only need to
+# set UsageCharge here; the derived total updates automatically.
 from Aggregated on GenerateInvoice
     -> set RatePerUnit = GenerateInvoice.RatePerUnit
     -> set UsageCharge = GenerateInvoice.UsageCharge
-    -> set TotalInvoiceAmount = BaseSubscriptionFee + GenerateInvoice.UsageCharge
     -> set InvoicedAt = now()
     -> append BillingLog "Invoice generated"
     -> transition Billed

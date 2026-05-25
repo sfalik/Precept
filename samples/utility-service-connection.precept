@@ -23,7 +23,7 @@ field AccountNumber as string optional maxlength 50
 field CustomerName as string optional maxlength 200
 field CustomerPhone as string optional maxlength 50
 field CustomerEmail as string optional maxlength 200
-field GovernmentIdLast4 as string optional maxlength 4
+field GovernmentIdLast4 as string optional maxlength 4  # last 4 digits of SSN/ID for verification
 
 # Service address
 field ServiceStreetAddress as string optional maxlength 200
@@ -63,7 +63,7 @@ field CreditCheckCompleted as boolean default false
 # Inspection
 field FieldTechnicianName as string optional maxlength 100
 field InspectionPassed as boolean default false
-field InspectionFailureReason as string optional maxlength 500
+field InspectionFailureReason as string optional
 # BUG-006: the proof engine cannot narrow `InspectionAttemptCount + 1`
 # against a structural `max 5` after the guard, so the cap is expressed as a
 # rule rather than a modifier.
@@ -72,9 +72,9 @@ field InspectionAttemptCount as integer default 0 nonnegative
 rule InspectionAttemptCount <= 5 because "Inspection attempts capped at 5 — the customer must withdraw or escalate after the fifth failure"
 
 # Outcomes
-field RejectionReason as string optional maxlength 500
-field DisconnectionReason as string optional maxlength 500
-field SuspensionReason as string optional maxlength 500
+field RejectionReason as string optional
+field DisconnectionReason as string optional
+field SuspensionReason as string optional
 
 # Audit log
 field ServiceLog as log of string

@@ -19,13 +19,13 @@ field CollectedAt as instant optional
 field ResultsEnteredAt as instant optional
 field VerifiedAt as instant optional
 
-field Results as string optional maxlength 5000
-field ReferenceRanges as string optional maxlength 2000
+field Results as string optional
+field ReferenceRanges as string optional
 field CriticalFlags as set of string
 field VerifiedBy as string optional maxlength 200
 
-field RejectionReason as string optional maxlength 1000
-field StatusReason as string optional maxlength 500
+field RejectionReason as string optional
+field StatusReason as string optional
 
 # Rules
 rule Tests.count > 0 because "A lab order must request at least one test"

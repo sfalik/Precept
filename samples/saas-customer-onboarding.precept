@@ -100,12 +100,12 @@ event ImportData(DataSourceName as string notempty maxlength 200)
 event ConfigureIntegration(IntegrationName as string notempty maxlength 200)
 
 # Support
-event CreateSupportTicket(TicketDescription as string notempty maxlength 500)
+event CreateSupportTicket(TicketDescription as string notempty)
 event ResolveSupportTicket(ResolutionMinutes as integer nonnegative)
 
 # Outcomes
 event MarkAsSuccessful
-event EscalateToAtRisk(Reason as string notempty maxlength 500)
+event EscalateToAtRisk(Reason as string notempty)
 
 # Construction row — opens in Kickoff.
 on Create

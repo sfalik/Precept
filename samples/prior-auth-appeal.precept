@@ -12,7 +12,7 @@ precept PriorAuthorizationAppeal
 field OriginalAuthId as string notempty maxlength 50
 field OriginalAuthDate as date
 field OriginalProcedureCode as string notempty maxlength 20
-field OriginalProcedureDescription as string notempty maxlength 500
+field OriginalProcedureDescription as string notempty
 field OriginalAuthorizedUnits as integer nonnegative
 field OriginalAuthorizedAmount as money in 'USD'
 
@@ -31,16 +31,16 @@ field AppealReason as choice of string(
     "OutOfNetwork", "StepTherapyNotMet", "PriorAuthorizationRequired",
     "FrequencyLimitExceeded", "ExperimentalInvestigational"
 ) ordered
-field AppealDescription as string optional maxlength 2000
+field AppealDescription as string optional
 
 # Pending decision — captured at MakeDecision, finalized at acceptance.
 field PendingDecision as choice of string("Approved", "PartiallyApproved", "Denied") optional
 
 # Clinical evidence
-field MedicalNecessityJustification as string optional maxlength 3000
-field NewClinicalData as string optional maxlength 5000
-field PeerToPeerNotes as string optional maxlength 2000
-field ClinicalNotes as string optional maxlength 2000
+field MedicalNecessityJustification as string optional
+field NewClinicalData as string optional
+field PeerToPeerNotes as string optional
+field ClinicalNotes as string optional
 
 # Temporal tracking — CMS deadlines depend on urgency tier
 field AppealFiledDate as instant
@@ -81,7 +81,7 @@ field RetroactiveAuthorizedUnits as integer nonnegative optional
 
 # Outcome
 field AppealDecisionCode as choice of string("AU01", "AU02", "AD01", "AD02", "AD03", "AD04", "AD05", "WR01") optional
-field DecisionRationale as string optional maxlength 3000
+field DecisionRationale as string optional
 field ApprovedUnits as integer nonnegative default 0
 field ApprovedAmount as money in 'USD' default '0.00 USD'
 

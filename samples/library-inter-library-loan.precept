@@ -70,9 +70,9 @@ field LoanWindowOpen as boolean default true
 field SourceAllowsRenewal as boolean default false
 
 # Outcomes
-field RejectionReason as string optional maxlength 500
-field CancellationReason as string optional maxlength 500
-field LostOrDamagedReason as string optional maxlength 500
+field RejectionReason as string optional
+field CancellationReason as string optional
+field LostOrDamagedReason as string optional
 field LostOrDamaged as boolean default false
 
 # Audit log

@@ -25,7 +25,7 @@ field RequestedTotal as money in 'USD' <- LodgingTotal + MealsTotal + MileageTot
 field ApprovedTotal as money in 'USD' default '0.00 USD'
 
 # Finance decision note
-field FinanceNote as string optional maxlength 2000
+field FinanceNote as string optional
 
 # Rules — approved cannot exceed requested.
 rule ApprovedTotal <= RequestedTotal because "Approved total {ApprovedTotal} exceeds the submitted request of {RequestedTotal}"
@@ -48,10 +48,10 @@ in Paid ensure ApprovedTotal > '0.00 USD' because "Paid reimbursements must have
 
 # Events
 event Submit
-event Approve(Amount as money in 'USD', Note as string optional maxlength 2000)
+event Approve(Amount as money in 'USD', Note as string optional)
 on Approve ensure Approve.Amount > '0.00 USD' because "Approved amounts must be positive — rejections have their own event"
 
-event Reject(Note as string notempty maxlength 2000)
+event Reject(Note as string notempty)
 event Pay
 
 # Submit — employee identity and the $350/day lodging cap are checked at submission.

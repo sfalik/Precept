@@ -14,7 +14,7 @@ precept MedicalDeviceTracking
 
 # Device identification — fixed at registration; required by FDA UDI rules.
 field DeviceId as string notempty maxlength 50
-field UdiDeviceIdentifier as string notempty maxlength 100
+field UdiDeviceIdentifier as string notempty maxlength 100  # FDA UDI per 21 CFR Part 830 — up to ~74 chars, 100 covers GS1/HIBCC/ICCBBA carrier variants
 field SerialNumber as string notempty maxlength 100
 field Manufacturer as string notempty maxlength 200
 field ModelNumber as string optional maxlength 100
@@ -46,10 +46,10 @@ field ServicedBy as string optional maxlength 200
 # Class2 = temporary or reversible; Class3 = unlikely to cause harm.
 field RecallClass as choice of string("Class1", "Class2", "Class3") optional
 field RecallNoticeDate as date optional
-field RecallReason as string optional maxlength 1000
+field RecallReason as string optional
 
 # Retirement — populated only on the terminal Retired state.
-field RetirementReason as string optional maxlength 500
+field RetirementReason as string optional
 field RetiredAt as instant optional
 
 # Audit trail.
@@ -94,7 +94,7 @@ event Create(
 
 # Assignment.
 event AssignToPatient(PatientId as string notempty maxlength 50, PatientName as string notempty maxlength 200, PrescribingProvider as string notempty maxlength 200, PrescriptionDate as date)
-event ReturnFromPatient(Reason as string notempty maxlength 500)
+event ReturnFromPatient(Reason as string notempty)
 
 # Usage lifecycle.
 event StartUse
@@ -102,12 +102,12 @@ event LogUsage(AdditionalHours as integer positive)
 event EndUse
 
 # Maintenance.
-event FlagForMaintenance(Reason as string notempty maxlength 500)
+event FlagForMaintenance(Reason as string notempty)
 event CompleteMaintenance(Technician as string notempty maxlength 200, NextServiceDueOn as date, ServiceDate as date)
 
 # Recall and retirement.
-event IssueRecall(RecallClass as choice of string("Class1", "Class2", "Class3"), NoticeDate as date, Reason as string notempty maxlength 1000)
-event RetireDevice(Reason as string notempty maxlength 500)
+event IssueRecall(RecallClass as choice of string("Class1", "Class2", "Class3"), NoticeDate as date, Reason as string notempty)
+event RetireDevice(Reason as string notempty)
 
 # Construction row — opens in Available.
 on Create

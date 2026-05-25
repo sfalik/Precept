@@ -40,10 +40,10 @@ field DepositPaid as boolean default false
 field CancellationWindow as period optional
 field FreeCancellationDeadline as date optional
 field CancellationFee as money in 'USD' default '0.00 USD'
-field CancellationReason as string optional maxlength 500
+field CancellationReason as string optional
 
 # Stay logistics
-field SpecialRequest as string optional maxlength 500
+field SpecialRequest as string optional
 field AssignedRoomNumber as string optional maxlength 20
 field NoShowMarked as boolean default false
 

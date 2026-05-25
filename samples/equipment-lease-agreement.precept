@@ -20,7 +20,7 @@ field LessorName as string optional maxlength 200
 field LeaseOfficer as string optional maxlength 100
 
 # Equipment
-field EquipmentDescription as string optional maxlength 500
+field EquipmentDescription as string optional
 field EquipmentSerialNumber as string optional maxlength 100
 field EquipmentCategory as choice of string("Vehicle","HeavyMachinery","ITHardware","MedicalDevice","OfficeEquipment","Other") optional
 field EquipmentValueAtCommencement as money in 'USD' optional
@@ -43,6 +43,17 @@ field MonthlyPayment as money in 'USD' optional
 field SecurityDeposit as money in 'USD' default '0.00 USD'
 field SecurityDepositPaid as boolean default false
 
+# Hourly overage rate — when usage exceeds the contracted hours bundled into the
+# monthly payment, the lessee is billed per hour at this rate. Modeled as a
+# `price in 'USD/h'` (money per hour) so the engine enforces dimensional
+# consistency on the multiplication: `HourlyOverageRate * UsageHours` yields
+# money because the per-hour denominator cancels with the hours quantity.
+# Cross-currency or wrong-dimension misuse is rejected at compile time.
+field HourlyOverageRate as price in 'USD/h' optional
+field ContractedMonthlyHours as quantity of 'time' optional
+field TotalOverageHours as quantity of 'time' optional
+field TotalOverageCharge as money in 'USD' default '0.00 USD' nonnegative
+
 # Payment tracking
 field PaymentsScheduled as integer default 0 nonnegative
 field PaymentsMade as integer default 0 nonnegative
@@ -52,8 +63,8 @@ field TotalScheduledValue as money in 'USD' default '0.00 USD'
 
 # Return / default
 field ReturnedAt as instant optional
-field ReturnConditionNote as string optional maxlength 500
-field DefaultReason as string optional maxlength 500
+field ReturnConditionNote as string optional
+field DefaultReason as string optional
 
 # Audit log
 field PaymentLog as log of string
@@ -97,8 +108,8 @@ in Defaulted ensure DefaultReason is set because "A defaulted lease must record 
 in Defaulted ensure DefaultedAt is set because "A defaulted lease must carry a default timestamp"
 
 # Editable windows — broad in Draft; narrower in Quoted to address lessee questions.
-in Draft modify LeaseId, LesseeName, LessorName, LeaseOfficer, EquipmentDescription, EquipmentSerialNumber, EquipmentCategory, EquipmentValueAtCommencement, LeaseClassification, LeaseTerm, CommencementDate, ExpirationDate, MonthlyPayment, SecurityDeposit, PaymentsScheduled, TotalScheduledValue editable
-in Quoted modify EquipmentDescription, MonthlyPayment, SecurityDeposit editable
+in Draft modify LeaseId, LesseeName, LessorName, LeaseOfficer, EquipmentDescription, EquipmentSerialNumber, EquipmentCategory, EquipmentValueAtCommencement, LeaseClassification, LeaseTerm, CommencementDate, ExpirationDate, MonthlyPayment, SecurityDeposit, PaymentsScheduled, TotalScheduledValue, HourlyOverageRate, ContractedMonthlyHours editable
+in Quoted modify EquipmentDescription, MonthlyPayment, SecurityDeposit, HourlyOverageRate editable
 
 # Events
 event Quote
@@ -108,6 +119,7 @@ event Activate
 event RecordPayment(Amount as money in 'USD', Note as string optional)
 event RecordMissedPayment(Note as string notempty)
 event CureDefault(Amount as money in 'USD', Note as string notempty)
+event RecordOverageUsage(UsageHours as quantity of 'time', Note as string optional)
 event ReturnEquipment(ConditionNote as string notempty)
 event Default(Reason as string notempty)
 event Withdraw(Reason as string notempty)
@@ -125,6 +137,7 @@ on Quote ensure PaymentsScheduled > 0 because "At least one scheduled payment is
 
 on RecordPayment ensure RecordPayment.Amount > '0.00 USD' because "Recorded payments must be positive"
 on CureDefault ensure CureDefault.Amount > '0.00 USD' because "Cure-default payment must be positive"
+on RecordOverageUsage ensure RecordOverageUsage.UsageHours > '0 h' because "Recorded overage usage must be positive"
 
 # Transitions
 
@@ -192,6 +205,29 @@ from Active on CureDefault
     -> set PaymentsMade = PaymentsMade + 1
     -> set TotalPaid = TotalPaid + CureDefault.Amount
     -> append PaymentLog CureDefault.Note
+    -> no transition
+
+# Overage usage — the lessee used the equipment past the contracted hourly
+# bundle (e.g. operated a leased excavator over a long weekend). The host
+# computes the overage hours outside the precept and passes them in. The
+# dimensional cancellation (`price 'USD/h' * quantity of 'time'` -> `money`)
+# is enforced at compile time — billing in the wrong currency or feeding the
+# rate against a non-time quantity is structurally rejected.
+# BUG-006 family: the proof engine doesn't propagate forward the negation of
+# the first row's guard ("is not set -> reject" implies subsequent rows see
+# "is set"). Each downstream row carries an explicit `when HourlyOverageRate
+# is set` guard to satisfy presence narrowing.
+from Active on RecordOverageUsage when HourlyOverageRate is not set
+    -> reject "No hourly overage rate is on file — set HourlyOverageRate during quotation before billing overage"
+from Active on RecordOverageUsage when HourlyOverageRate is set and TotalOverageHours is set
+    -> set TotalOverageHours = TotalOverageHours + RecordOverageUsage.UsageHours
+    -> set TotalOverageCharge = TotalOverageCharge + HourlyOverageRate * RecordOverageUsage.UsageHours
+    -> append PaymentLog if RecordOverageUsage.Note is set then RecordOverageUsage.Note else "Overage usage recorded"
+    -> no transition
+from Active on RecordOverageUsage when HourlyOverageRate is set
+    -> set TotalOverageHours = RecordOverageUsage.UsageHours
+    -> set TotalOverageCharge = HourlyOverageRate * RecordOverageUsage.UsageHours
+    -> append PaymentLog if RecordOverageUsage.Note is set then RecordOverageUsage.Note else "Overage usage recorded"
     -> no transition
 
 # End-of-term return — the standard exit. The lessee returns the equipment

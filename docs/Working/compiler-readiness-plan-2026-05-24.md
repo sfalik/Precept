@@ -16,7 +16,7 @@
 | Phase | Goal | F-count | Decisions required | Effort | Status |
 |---|---|---|---|---|---|
 | 1 | Doc foundation truthful + lifecycle skills + 16 Archive promotions | ~55 | 8 (✅ all settled 2026-05-24) | XL (~5-7 days) | ✅ **Complete 2026-05-24** (all 6 workstreams shipped; verification report at [`lifecycle-review-phase-1-2026-05-24.md`](lifecycle-review-phase-1-2026-05-24.md)) |
-| 2 | Green baseline + no crashes + Operations.Resolve + MCP-crash family | **11+** | 2 | **L (~4-5 days)** | Planned |
+| 2 | Green baseline + no crashes + Operations.Resolve + MCP-crash family | **12+** | 2 | **L (~4-5 days)** | Planned |
 | 3 | Type system completeness | ~15 | 3 | L | Stub — TBD |
 | 4 | Collection completeness + BUG-002 | **~16** | 2 | L | Stub — TBD |
 | 5 | Proof engine satisfiability + BUG-004 + BUG-006 | **~12** | 2 | XL | Stub — TBD |
@@ -26,7 +26,7 @@
 | 9 | Polish + cleanup + `/lifecycle-7-audit` skill | ~20 | 4 | M | Stub — TBD |
 | 10 | Runtime gate verification | — | 0 | S | Stub — TBD |
 
-**Overall estimate**: 7-11 weeks of focused work (was 6-10; Phase 2 grew). Phase 1 includes (a) 5 lifecycle skill builds + rename, (b) 16 Archive promotion obligations, (c) CONTRIBUTING.md lifecycle updates. Phase 2 grew from ~2-3 days to ~4-5 days after integrating 9 active bugs from `bugs.md` (parallel sample-remediation session, 2026-05-24): 5 MCP-crash family bugs (BUG-003, -005 symptom, -007, -008, -010), 1 MCP transport bug (BUG-009 payload limit), plus the original F-LANG-SPEC-10. Coordinated MCP-layer instrumentation pass catches the whole family in one fix. Phase 5 (proof engine satisfiability) remains the highest variance.
+**Overall estimate**: 7-11 weeks of focused work (was 6-10; Phase 2 grew). Phase 1 includes (a) 5 lifecycle skill builds + rename, (b) 16 Archive promotion obligations, (c) CONTRIBUTING.md lifecycle updates. Phase 2 grew from ~2-3 days to ~4-5 days after integrating 10 active bugs from `bugs.md` (parallel sample-remediation session, 2026-05-24): 6 MCP-crash family bugs (BUG-003 period, -005 symptom, -007 domains, -008 duration, -010 now()+duration, -011 timezone+time), 1 MCP transport bug (BUG-009 payload limit), plus the original F-LANG-SPEC-10. Coordinated MCP-layer instrumentation pass catches the whole family in one fix. Phase 5 (proof engine satisfiability) remains the highest variance.
 
 **`bugs.md` as ongoing source**: parallel sample-authoring sessions continue to discover bugs that surface in real authoring workflows (not in code-vs-doc audits). Plan integrates bugs.md as a standing input. Phase-kickoff protocol includes "re-read bugs.md for new entries since last integration."
 
@@ -323,7 +323,7 @@ Workstream A.2 (`/lifecycle-5-promote`) is the critical-path dependency for Work
 
 This phase is small in finding count but high in confidence yield: it removes the noise that masks real regressions and clears 5+ MCP-crash production bugs that have accumulated.
 
-## Findings in scope (11+ items, expanded from 6 after bugs.md integration 2026-05-24)
+## Findings in scope (12+ items, expanded from 6 after bugs.md integration 2026-05-24)
 
 ### Original compiler-readiness findings (6)
 - **F-LANG-SPEC-10 (P0)** — Temporal-content validation diagnostics unwired; invalid date inputs crash the MCP server via unhandled exception path. Production bug.
@@ -333,14 +333,15 @@ This phase is small in finding count but high in confidence yield: it removes th
 - **F-LANG-CAT-15 (P1)** — `Operations.Resolve` decision was **implement** — 4-line wrapper + move `DisambiguateCandidates` from `TypeChecker.Expressions.cs:922` to `Operations.cs`; update 5 TC call sites at lines 885, 891, 898, 907, 986.
 - **F-LANG-SPEC-13 partial** — `NonOrderableCollectionExtreme` (PRE0065) emission audit; the related `CollectionOperationOnScalar` (PRE0047) lands in Phase 4 (F-LANG-COLL-08).
 
-### bugs.md MCP-crash family (5) — coordinated fix pass
-All five share the same symptom: `precept_compile` (or `precept_domains` for BUG-007) returns `"An error occurred invoking ..."` with no PRE-code, no diagnostic. Different code paths, same MCP-layer leakage. **Fix as a coordinated sweep**: instrument the MCP tool wrappers to never return raw "An error occurred invoking" — every exception path must be caught and converted to a structured diagnostic.
+### bugs.md MCP-crash family (6) — coordinated fix pass
+All six share the same symptom: `precept_compile` (or `precept_domains` for BUG-007) returns `"An error occurred invoking ..."` with no PRE-code, no diagnostic. Different code paths, same MCP-layer leakage. **Fix as a coordinated sweep**: instrument the MCP tool wrappers to never return raw "An error occurred invoking" — every exception path must be caught and converted to a structured diagnostic.
 
 - **BUG-003** — `period` field with typed-constant default crashes (`field G as period default '1 year'`). Root: typed-constant resolution path in period-default normalization.
 - **BUG-005** — `lookup of K to money in '<Currency>'` crashes at compile time. Root: parser accepts the type then mis-handles the trailing qualifier, crashing downstream. (Symptom fix here in Phase 2 — surface a clean diagnostic; root-cause fix in Phase 4 — actually support qualified-money lookup values.)
 - **BUG-007** — `precept_domains` MCP tool crashes on any scope. Root: server-side fault inside `tools/Precept.Mcp/Tools/DomainsTool.cs` or its DTO assembly. This means the MCP tool review (Stage 11 of the audit) was wrong to call MCP "0 findings, healthy" — there's a P1 bug in the tool.
 - **BUG-008** — `duration` field with typed-constant default crashes. Same code-path family as BUG-003.
 - **BUG-010** — `now() + '<duration>'` expression crashes. Same code-path family — temporal-literal evaluation in arithmetic context.
+- **BUG-011** — `timezone` and `time` fields with typed-constant default crash (`field DefaultTz as timezone default 'America/New_York'`, `field DefaultStart as time default '09:00'`). Same code-path family as BUG-003 / BUG-008 / BUG-010 — typed-constant temporal-literal handling. Almost certainly the single fix that covers BUG-003/008/010 also covers BUG-011.
 
 ### bugs.md MCP transport (1)
 - **BUG-009** — `precept_compile` has an undocumented payload-size limit at ~12-15 KB. Files >14 KB crash with the same MCP-layer symptom. Likely buffer size in MCP stdio transport, JSON serialization limit, or compiler memory limit. Needs investigation in `tools/Precept.Mcp/Tools/CompileTool.cs` and the MCP wrapper config.
@@ -361,23 +362,23 @@ All five share the same symptom: `precept_compile` (or `precept_domains` for BUG
 - `tools/Precept.Mcp/Tools/CompileTool.cs` — wrap entry point with try/catch that converts unhandled to structured `MCP error response with diagnostic context`
 - `tools/Precept.Mcp/Tools/DomainsTool.cs` — investigate BUG-007 root cause (likely DTO assembly issue or missing catalog dependency); same try/catch wrapper
 - `tools/Precept.Mcp/` other tools — apply same try/catch wrapper pattern preventively
-- `src/Precept/Language/Time/TemporalParser.cs` — fix the underlying throw (F-LANG-SPEC-10, BUG-003, BUG-008, BUG-010 all likely share this code path); wrap with try/catch that emits structured diagnostic
+- `src/Precept/Language/Time/TemporalParser.cs` — fix the underlying throw (F-LANG-SPEC-10, BUG-003, BUG-008, BUG-010, BUG-011 all likely share this code path); wrap with try/catch that emits structured diagnostic
 - `src/Precept/Pipeline/TypeChecker.Expressions.TypedConstants.cs` — validator dispatch
 - `src/Precept/Language/TypedConstantValidation.cs` — validator infrastructure
 - `src/Precept/Language/Diagnostics.cs` — wire diagnostic emission paths
 - `src/Precept.Analyzers/DiagnosticCoverageAllowLists.cs` — remove the 5 temporal diagnostic codes from "no emission site wired" list (lines 68-72)
 **Approach**:
 1. **MCP wrapper instrumentation first** — every tool entry point gets a try/catch that translates raw exceptions into structured MCP error responses with the exception type, message, and where-it-happened context. Even if root-cause fixes lag, no consumer sees "An error occurred invoking" again.
-2. **Root-cause fix for the temporal literal family** (F-LANG-SPEC-10, BUG-003, BUG-008, BUG-010): trace where the exception originates (likely NodaTime parser throws on invalid input, OR a normalizer path); wrap with try/catch and translate to structured diagnostic. Cover invalid-date (`'2026-13-01'`), invalid-time (`'25:00:00'`), invalid-instant, period default (`'1 year'`), duration default (`'14 days'`), `now() + '<duration>'` arithmetic.
+2. **Root-cause fix for the temporal literal family** (F-LANG-SPEC-10, BUG-003, BUG-008, BUG-010, BUG-011): trace where the exception originates (likely NodaTime parser throws on invalid input, OR a normalizer path); wrap with try/catch and translate to structured diagnostic. Cover invalid-date (`'2026-13-01'`), invalid-time (`'25:00:00'`), invalid-instant, period default (`'1 year'`), duration default (`'14 days'`), `now() + '<duration>'` arithmetic, timezone default (`'America/New_York'`), time default (`'09:00'`).
 3. **Root-cause fix for qualified-money-in-lookup symptom** (BUG-005 symptom): emit a clean `PRE0009`-style diagnostic when the parser hits `lookup of K to money in '<Currency>'` instead of crashing. (Full support for the construct lands in Phase 4.)
 4. **Root-cause fix for `precept_domains`** (BUG-007): investigate and fix the underlying tool failure.
 5. **Payload-size investigation** (BUG-009): identify the ~12-15 KB threshold; either remove the limit, raise it substantially, or document it explicitly with a clean error message when exceeded.
 6. **Add scenario tests** for every fixed bug in the appropriate test project.
 **Validation**:
-- No input to any MCP tool returns `An error occurred invoking ...`. Verified via `mcp__precept__precept_compile` probe battery (the 10+ inputs from F-LANG-SPEC-10, BUG-003, BUG-005, BUG-008, BUG-009 (large file), BUG-010).
+- No input to any MCP tool returns `An error occurred invoking ...`. Verified via `mcp__precept__precept_compile` probe battery (the 12+ inputs from F-LANG-SPEC-10, BUG-003, BUG-005, BUG-008, BUG-009 (large file), BUG-010, BUG-011).
 - `precept_domains` returns valid JSON for all scope arguments.
 - Allow list updated; analyzer (`Precept0027DiagnosticEmissionCoverage`) doesn't regress.
-- bugs.md entries for BUG-003, BUG-005 (symptom only), BUG-007, BUG-008, BUG-009, BUG-010 move from Active to Fixed with "Fixed by" notes.
+- bugs.md entries for BUG-003, BUG-005 (symptom only), BUG-007, BUG-008, BUG-009, BUG-010, BUG-011 move from Active to Fixed with "Fixed by" notes.
 **Effort**: L (2-3 days — was M when scoped to F-LANG-SPEC-10 only; expanded for the bug family)
 
 ### Step 2.3 — Investigate and fix LS publish-integration test failures (F-LS-02)
@@ -425,19 +426,19 @@ Plus, since Phase 1's F-LANG-CAT-15 decision was "implement," `Operations.Resolv
 ## Exit criteria
 - [ ] `dotnet test` returns 0 failures across all 4 projects: `Precept.Tests`, `Precept.LanguageServer.Tests`, `Precept.Mcp.Tests`, `Precept.Analyzers.Tests`. Run 10× without flake.
 - [ ] `dotnet build` returns 0 warnings.
-- [ ] **No MCP tool returns `An error occurred invoking ...` for any input.** Verified via probe battery covering F-LANG-SPEC-10 (5 invalid temporal inputs) + BUG-003 + BUG-005 + BUG-007 + BUG-008 + BUG-009 (large file) + BUG-010.
+- [ ] **No MCP tool returns `An error occurred invoking ...` for any input.** Verified via probe battery covering F-LANG-SPEC-10 (5 invalid temporal inputs) + BUG-003 + BUG-005 + BUG-007 + BUG-008 + BUG-009 (large file) + BUG-010 + BUG-011 (timezone + time defaults).
 - [ ] `precept_domains` returns valid JSON for all scope arguments (BUG-007 fixed).
 - [ ] Files >14 KB compile via `precept_compile` without crashing (BUG-009 fixed or threshold raised + documented).
 - [ ] `F5TempVerify.cs` either deleted or renamed with permanent docstring.
 - [ ] `SyntaxReferenceTests.cs:157` passes (no more `InvalidOperationException` from `.Single(...)`).
 - [ ] `src/Precept.Analyzers/DiagnosticCoverageAllowLists.cs` updated: 5 temporal diagnostic codes removed from the "no emission site wired" list.
 - [ ] `Operations.Resolve` shipped; 5 TC call sites updated; spec § 5 code sample compiles.
-- [ ] `bugs.md` entries for BUG-003, BUG-005 (symptom only — full fix in Phase 4), BUG-007, BUG-008, BUG-009, BUG-010 moved from Active to Fixed with "Fixed by" notes citing commits.
+- [ ] `bugs.md` entries for BUG-003, BUG-005 (symptom only — full fix in Phase 4), BUG-007, BUG-008, BUG-009, BUG-010, BUG-011 moved from Active to Fixed with "Fixed by" notes citing commits.
 - [ ] Sample-side failures, if any remain, are routed to `bugs.md` (not modified from this workstream).
 
 ## Estimated effort
 - Step 2.1 (decisions): 15 min
-- Step 2.2 (compile-path robustness sweep — F-LANG-SPEC-10 + BUG-003 + BUG-005 symptom + BUG-007 + BUG-008 + BUG-009 + BUG-010): 2-3 days
+- Step 2.2 (compile-path robustness sweep — F-LANG-SPEC-10 + BUG-003 + BUG-005 symptom + BUG-007 + BUG-008 + BUG-009 + BUG-010 + BUG-011): 2-3 days
 - Step 2.3 (LS test investigation + fix): 1 day
 - Step 2.4 (F5TempVerify): 1-2 hours
 - Step 2.5 (SyntaxReferenceTests): 30 min

@@ -57,7 +57,7 @@ field UcumExpression as string optional maxlength 64 writable
 field System as choice of string("SI","USCustomary","Imperial","CGS","UCUM","Custom") default "UCUM" writable
 
 field Active as boolean default true writable
-field Notes as string optional maxlength 500 writable
+field Notes as string optional writable
 
 rule ConversionFactor == 1 when IsBaseUnit because "A base unit must have a conversion factor of exactly 1 — the base unit is the reference point of its dimension and converts to itself"
 rule ConversionFactor != 1 when IsBaseUnit == false because "A non-base unit must have a conversion factor different from 1 — a factor of 1 would make it indistinguishable from the base unit of the same dimension"

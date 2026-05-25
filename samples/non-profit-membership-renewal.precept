@@ -53,9 +53,9 @@ field RenewalWindowOpen as boolean default false
 field GraceWindowOpen as boolean default false
 
 # Reasons
-field LapseReason as string optional maxlength 500
-field CancellationReason as string optional maxlength 500
-field DeclineReason as string optional maxlength 500
+field LapseReason as string optional
+field CancellationReason as string optional
+field DeclineReason as string optional
 
 # Audit log
 field MembershipLog as log of string

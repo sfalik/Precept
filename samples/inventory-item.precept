@@ -117,19 +117,19 @@ on ReturnOrder ensure ReturnOrder.OriginalSalePrice > '0 {CatalogCurrency}/{Sale
 
 event AdjustInventory(
     Qty as quantity of '{StockingUnit.dimension}' default '0 {StockingUnit}',
-    Note as string notempty maxlength 500)
+    Note as string notempty)
 on AdjustInventory ensure AdjustInventory.Qty >= '0 {StockingUnit}' because "Adjusted quantity cannot be negative — a cycle count is a physical observation, not a debit"
 
 event RecordShrinkage(
     Qty as quantity of '{StockingUnit.dimension}',
-    Reason as string notempty maxlength 500)
+    Reason as string notempty)
 on RecordShrinkage ensure RecordShrinkage.Qty > '0 {StockingUnit}' because "Shrinkage quantity must be positive — a zero-quantity write-off is not a write-off"
 on RecordShrinkage ensure RecordShrinkage.Qty <= QuantityOnHand because "Cannot write off {RecordShrinkage.Qty} when only {QuantityOnHand} is on hand — shrinkage cannot exceed physical stock"
 
 event UpdateListPrice(NewPrice as price in '{CatalogCurrency}' of '{SaleUnit.dimension}')
 on UpdateListPrice ensure UpdateListPrice.NewPrice > '0 {CatalogCurrency}/{SaleUnit}' because "List price must be positive — a zero-priced listing is not a sellable record"
 
-event Delist(Reason as string optional maxlength 500)
+event Delist(Reason as string optional)
 event Relist
 
 # ── Transitions ───────────────────────────────────────────────────────────────

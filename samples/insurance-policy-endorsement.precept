@@ -41,9 +41,9 @@ field ApprovedBy as string optional maxlength 200
 field ApprovalDate as instant optional
 
 # Reasons and notes
-field Reason as string optional maxlength 1000
-field AdditionalNotes as string optional maxlength 2000
-field RejectionReason as string optional maxlength 1000
+field Reason as string optional
+field AdditionalNotes as string optional
+field RejectionReason as string optional
 
 # Audit trail
 field EndorsementLog as log of string
@@ -97,10 +97,10 @@ on Create ensure Create.EffectiveDate >= Create.EndorsementDate because "Effecti
 on Create ensure Create.ExpirationDate > Create.EffectiveDate because "Expiration must follow effective date"
 
 # Endorsement events
-event SetReason(Reason as string notempty maxlength 1000)
-event RequestAdditionalInfo(InfoRequest as string notempty maxlength 500)
+event SetReason(Reason as string notempty)
+event RequestAdditionalInfo(InfoRequest as string notempty)
 event Approve(ApprovedBy as string notempty maxlength 200, NewPremium as money in 'USD' positive)
-event Reject(Reason as string notempty maxlength 1000)
+event Reject(Reason as string notempty)
 event SetEffectiveDate(NewEffectiveDate as date)
 event MakeEffective
 event Issue

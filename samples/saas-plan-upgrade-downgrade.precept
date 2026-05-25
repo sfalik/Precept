@@ -16,7 +16,7 @@ field CustomerEmail as string notempty maxlength 200
 field CurrentPlan as choice of string("Free", "Pro Starter", "Pro", "Enterprise")
 field TargetPlan as choice of string("Free", "Pro Starter", "Pro", "Enterprise")
 field ChangeType as choice of string("Upgrade", "Downgrade")
-field ChangeDescription as string optional maxlength 1000
+field ChangeDescription as string optional
 
 # Lifecycle timestamps
 field RequestedAt as instant
@@ -43,7 +43,7 @@ field FeatureAccess as lookup of string to boolean
 field PendingFeatureAccess as lookup of string to boolean
 
 # Rejection
-field RejectionReason as string optional maxlength 500
+field RejectionReason as string optional
 
 # Audit trail
 field ChangeLog as log of string
@@ -74,12 +74,12 @@ event Create(
     CurrentMonthlyFee as money in 'USD' positive,
     TargetPlan as choice of string("Free", "Pro Starter", "Pro", "Enterprise"),
     ChangeType as choice of string("Upgrade", "Downgrade"),
-    ChangeDescription as string optional maxlength 1000) initial
+    ChangeDescription as string optional) initial
 on Create ensure Create.TargetPlan != Create.CurrentPlan because "A plan change request requires a target plan different from the current plan — same-plan changes are no-ops"
 
 # Lifecycle events
 event ValidateChange
-event RejectChange(Reason as string notempty maxlength 500)
+event RejectChange(Reason as string notempty)
 event ApproveChange(NewMonthlyFee as money in 'USD' positive)
 event ApplyProration(DaysRemaining as integer nonnegative max 31)
 event DeferToNextCycle(EffectiveDate as instant)

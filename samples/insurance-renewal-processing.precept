@@ -32,13 +32,13 @@ field NoticeDate as instant optional
 field GracePeriodEnd as instant optional
 
 # Cancellation and lapse tracking
-field CancellationReason as string optional maxlength 500
+field CancellationReason as string optional
 field CancellationDate as instant optional
 field LapseDate as instant optional
 field CancellationInitiatedBy as choice of string("Policyholder", "Carrier", "Both") optional
 
 # Renewal offer details
-field CoverageChanges as string optional maxlength 1000
+field CoverageChanges as string optional
 field DiscountPercent as decimal default 0 nonnegative max 100 maxplaces 2
 
 # Audit trail
@@ -91,13 +91,13 @@ event Create(
 # Renewal events
 event AddRiskFactor(FactorName as string notempty maxlength 100, FactorValue as decimal)
 event CompleteRiskReview(RiskScore as decimal nonnegative max 100, RiskCategory as choice of string("Preferred", "Standard", "Substandard", "Decline"))
-event GenerateQuote(ProposedPremium as money in 'USD' positive, CoverageChanges as string optional maxlength 1000)
+event GenerateQuote(ProposedPremium as money in 'USD' positive, CoverageChanges as string optional)
 event ApplyDiscount(DiscountPercent as decimal nonnegative max 100)
 event SendRenewalNotice(GracePeriodDays as duration)
 event AcceptRenewal
-event DeclineRenewal(Reason as string notempty maxlength 500)
+event DeclineRenewal(Reason as string notempty)
 event LapsePolicy
-event CancelRenewal(Reason as string notempty maxlength 500)
+event CancelRenewal(Reason as string notempty)
 
 # Construction row — populate fields and arrive in RiskReview.
 on Create

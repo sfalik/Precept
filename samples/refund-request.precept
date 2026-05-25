@@ -9,7 +9,7 @@ precept RefundRequest
 # Identity and reason — filled progressively in Draft.
 field OrderId as string optional maxlength 50
 field CustomerEmail as string optional maxlength 200
-field ReasonText as string optional maxlength 2000
+field ReasonText as string optional
 
 # Monetary fields — money in 'USD' for exactness. Requested is set in Draft;
 # Approved is meaningful only from AwaitingReturn onward.
@@ -20,7 +20,7 @@ field ApprovedAmount as money in 'USD' default '0.00 USD'
 field ReturnReceived as boolean default false
 
 # Decision note — populated on every terminal transition.
-field DecisionNote as string optional maxlength 2000
+field DecisionNote as string optional
 
 # Rules — approved cannot exceed requested. The omit in early states keeps the
 # invariant scoped to states where both sides have business meaning.
@@ -48,12 +48,12 @@ in Refunded ensure ReturnReceived because "A refunded request must have the retu
 event Submit
 on Submit ensure RequestedAmount > '0.00 USD' because "A refund must specify a positive requested amount before submission — zero-amount requests have no commercial meaning"
 
-event Approve(Amount as money in 'USD', Note as string optional maxlength 2000)
+event Approve(Amount as money in 'USD', Note as string optional)
 on Approve ensure Approve.Amount > '0.00 USD' because "The approved refund amount must be positive — declines have their own event"
 
-event Decline(Note as string notempty maxlength 2000)
+event Decline(Note as string notempty)
 event MarkReturnReceived
-event Cancel(Reason as string optional maxlength 2000)
+event Cancel(Reason as string optional)
 
 # Submit — full intake must be on record before review.
 from Draft on Submit when OrderId is set and CustomerEmail is set and ReasonText is set

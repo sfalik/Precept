@@ -17,7 +17,7 @@ field RoleName as string optional maxlength 100
 field RecruiterName as string optional maxlength 100
 field FeedbackCount as integer default 0 nonnegative
 field OfferAmount as money in 'USD' default '0.00 USD' nonnegative
-field FinalNote as string optional maxlength 500
+field FinalNote as string optional
 field PendingInterviewers as set of string
 
 state Draft initial
@@ -42,7 +42,7 @@ event PassScreen
 event RecordInterviewFeedback(Interviewer as string notempty maxlength 100)
 event ExtendOffer(Amount as money in 'USD' positive)
 event AcceptOffer
-event RejectCandidate(Note as string notempty maxlength 500)
+event RejectCandidate(Note as string notempty)
 
 # ── Transitions ───────────────────────────────────────────────────────────────
 

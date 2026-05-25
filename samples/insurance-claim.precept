@@ -25,8 +25,8 @@ field PaidAmount as money in 'USD' default '0.00 USD'
 
 # Adjuster + decision
 field AdjusterName as string optional maxlength 200
-field DecisionNote as string optional maxlength 500
-field DenialReason as string optional maxlength 500
+field DecisionNote as string optional
+field DenialReason as string optional
 
 # Investigation flags
 field PoliceReportRequired as boolean default false

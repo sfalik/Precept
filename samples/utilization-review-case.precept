@@ -15,7 +15,7 @@ field CaseId as string notempty maxlength 50
 field PatientId as string notempty maxlength 50
 field PatientName as string notempty maxlength 200
 field PayerName as string notempty maxlength 200
-field PrimaryDiagnosisCode as string notempty maxlength 10
+field PrimaryDiagnosisCode as string notempty maxlength 10  # ICD-10-CM (7 chars) with room for HCC/extension codes
 
 # Admission.
 field AdmissionDate as date
@@ -32,7 +32,7 @@ field LengthOfStayDays as integer nonnegative default 0
 field NextReviewDue as date optional
 field ReviewCount as integer nonnegative default 0
 field ReviewerName as string optional maxlength 200
-field LastReviewNotes as string optional maxlength 2000
+field LastReviewNotes as string optional
 
 # Discharge planning.
 field DischargePlanInitiatedAt as instant optional
@@ -41,7 +41,7 @@ field DischargeDisposition as choice of string("Home", "HomeWithHomeHealth", "Sk
 field DischargeDate as date optional
 
 # Denial — populated only when the payer denies authorization.
-field DenialReason as string optional maxlength 1000
+field DenialReason as string optional
 
 # Audit trail.
 field CaseLog as log of string
@@ -88,9 +88,9 @@ event Create(
 
 # Review-cycle events.
 event AssignReviewer(ReviewerName as string notempty maxlength 200)
-event ConductReview(Notes as string notempty maxlength 2000, AdditionalDaysAuthorized as integer nonnegative, NextReviewDue as date)
-event ChangeLevelOfCare(NewLevel as choice of string("Observation", "MedSurg", "StepDown", "ICU"), Reason as string notempty maxlength 500)
-event DenyAuthorization(Reason as string notempty maxlength 1000)
+event ConductReview(Notes as string notempty, AdditionalDaysAuthorized as integer nonnegative, NextReviewDue as date)
+event ChangeLevelOfCare(NewLevel as choice of string("Observation", "MedSurg", "StepDown", "ICU"), Reason as string notempty)
+event DenyAuthorization(Reason as string notempty)
 
 # Discharge-planning events.
 event InitiateDischargePlanning(PlannedDate as date, ProposedDisposition as choice of string("Home", "HomeWithHomeHealth", "SkilledNursing", "Rehab", "LTACH", "Hospice", "AMA", "Expired"))

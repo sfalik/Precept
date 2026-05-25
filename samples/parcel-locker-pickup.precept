@@ -16,7 +16,7 @@ field PickupCode as string notempty maxlength 20
 field ReminderCount as integer default 0 nonnegative
 field CurrentDay as integer default 0 nonnegative
 field LastReminderDay as integer default 0 nonnegative
-field LastReminderNote as string optional maxlength 500
+field LastReminderNote as string optional
 field ReminderLog as stack of string
 
 # States
@@ -34,7 +34,7 @@ event LoadParcel(
     Recipient as string notempty maxlength 200,
     Code as string notempty maxlength 20) initial
 
-event SendReminder(Note as string notempty maxlength 500)
+event SendReminder(Note as string notempty)
 event PickUp(Code as string notempty maxlength 20)
 event AdvanceDay(DayNumber as integer nonnegative)
 event ReturnParcel

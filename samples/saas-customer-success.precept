@@ -38,7 +38,7 @@ field LoginCountThisMonth as integer default 0 nonnegative
 field SupportTicketsOpen as integer default 0 nonnegative
 
 # Success plan
-field SuccessPlan as string optional maxlength 1000
+field SuccessPlan as string optional
 field KeyMetricsTracked as set of string
 field MilestonesCompleted as integer default 0 nonnegative
 field TotalMilestones as integer default 0 nonnegative
@@ -53,7 +53,7 @@ field NextOutreachScheduled as instant optional
 field ContractValue as money in 'USD' positive
 field RenewalDate as instant optional
 field RenewalRisk as choice of string("Low", "Medium", "High") default "Low"
-field ChurnReason as string optional maxlength 500
+field ChurnReason as string optional
 field CompletedAt as instant optional
 
 # Feature usage — last-used timestamp keyed by feature name.
@@ -111,8 +111,8 @@ event LogFeatureUsage(FeatureName as string notempty maxlength 100, LastUsedDate
 
 # Escalation and resolution
 event EscalateToIntervention
-event RecoverCustomer(SuccessPlan as string notempty maxlength 1000)
-event ChurnCustomer(Reason as string notempty maxlength 500)
+event RecoverCustomer(SuccessPlan as string notempty)
+event ChurnCustomer(Reason as string notempty)
 
 # Construction row — opens in Onboarded.
 on Create

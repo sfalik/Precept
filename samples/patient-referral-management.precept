@@ -14,7 +14,7 @@ precept PatientReferralManagement
 field ReferralId as string notempty maxlength 50
 field PatientId as string notempty maxlength 50
 field PatientName as string notempty maxlength 200
-field ReferringProviderNpi as string notempty maxlength 10
+field ReferringProviderNpi as string notempty maxlength 10  # NPI is exactly 10 digits per CMS NPPES
 field ReferringProviderName as string notempty maxlength 200
 
 # Specialist — assigned at scheduling.
@@ -23,8 +23,8 @@ field SpecialistName as string optional maxlength 200
 field Specialty as choice of string("Cardiology", "Oncology", "Orthopedics", "Neurology", "Dermatology", "GI", "ENT", "Endocrinology", "Pulmonology", "Psychiatry")
 
 # Clinical context.
-field PrimaryDiagnosisCode as string notempty maxlength 10
-field ReasonForReferral as string notempty maxlength 2000
+field PrimaryDiagnosisCode as string notempty maxlength 10  # ICD-10-CM (7 chars) with room for HCC/extension codes
+field ReasonForReferral as string notempty
 field UrgencyLevel as choice of string("Routine", "Urgent", "Stat") ordered default "Routine"
 
 # Authorization — whether required is plan-driven and captured at intake.
@@ -43,10 +43,10 @@ field ReportReceivedAt as instant optional
 field ClosedAt as instant optional
 
 # Consultation outcome — populated when the specialist's report arrives.
-field ConsultationNotes as string optional maxlength 4000
+field ConsultationNotes as string optional
 field FollowUpRequired as boolean default false
 field FollowUpInterval as duration optional
-field DispositionReason as string optional maxlength 500
+field DispositionReason as string optional
 
 # Audit trail.
 field ReferralHistory as log of string
@@ -90,7 +90,7 @@ event Create(
     ReferringProviderName as string notempty maxlength 200,
     Specialty as choice of string("Cardiology", "Oncology", "Orthopedics", "Neurology", "Dermatology", "GI", "ENT", "Endocrinology", "Pulmonology", "Psychiatry"),
     PrimaryDiagnosisCode as string notempty maxlength 10,
-    ReasonForReferral as string notempty maxlength 2000,
+    ReasonForReferral as string notempty,
     UrgencyLevel as choice of string("Routine", "Urgent", "Stat"),
     ReferralPriorAuthRequired as boolean,
     ValidUntil as date) initial
@@ -100,9 +100,9 @@ event RecordAuthorization(AuthorizationNumber as string notempty maxlength 50, A
 event ScheduleAppointment(SpecialistNpi as string notempty maxlength 10, SpecialistName as string notempty maxlength 200, AppointmentDate as date)
 event RescheduleAppointment(NewAppointmentDate as date)
 event CompleteVisit
-event ReceiveReport(ConsultationNotes as string notempty maxlength 4000, FollowUpRequired as boolean, FollowUpInterval as duration optional)
-event CloseReferral(DispositionReason as string notempty maxlength 500)
-event CancelReferral(Reason as string notempty maxlength 500)
+event ReceiveReport(ConsultationNotes as string notempty, FollowUpRequired as boolean, FollowUpInterval as duration optional)
+event CloseReferral(DispositionReason as string notempty)
+event CancelReferral(Reason as string notempty)
 
 # Construction row — opens in Requested.
 on Create

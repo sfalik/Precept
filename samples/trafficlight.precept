@@ -16,7 +16,7 @@ precept TrafficLight
 field VehiclesWaiting as integer default 0 nonnegative
 field CycleCount as integer default 0 nonnegative
 field LeftTurnQueued as boolean default false
-field EmergencyReason as string optional maxlength 500
+field EmergencyReason as string optional
 
 state Red initial
 state FlashingGreen
@@ -34,7 +34,7 @@ in Red modify VehiclesWaiting, LeftTurnQueued editable
 
 # Events
 event Advance
-event Emergency(AuthorizedBy as string notempty maxlength 100, Reason as string notempty maxlength 500)
+event Emergency(AuthorizedBy as string notempty maxlength 100, Reason as string notempty)
 event VehiclesArrive(Count as integer default 1 positive)
 event LeftTurnRequest
 event ClearEmergency

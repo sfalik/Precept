@@ -41,7 +41,7 @@ field OpenNonconformances as integer default 0 nonnegative
 field ClosedNonconformances as integer default 0 nonnegative
 
 # Suspension and reinstatement
-field SuspensionReason as string optional maxlength 500
+field SuspensionReason as string optional
 field ReinstatementDate as date optional
 
 # Audit trail
@@ -56,9 +56,9 @@ field QualifiedAt as instant optional
 field ClosedAt as instant optional
 
 # Review notes, improvement plan, closure reason
-field ReviewNotes as string optional maxlength 2000
-field ImprovementPlan as string optional maxlength 2000
-field ClosureReason as string optional maxlength 500
+field ReviewNotes as string optional
+field ImprovementPlan as string optional
+field ClosureReason as string optional
 
 # Rules — structural invariants the proof engine enforces.
 rule DefectRate <= 100 because "Defect rate {DefectRate}% cannot exceed 100% — a rate above 100% would mean more defects than units inspected"
@@ -102,8 +102,8 @@ event BeginReview
 event CompleteReview(
     QualityScore as decimal nonnegative max 100,
     DeliveryScore as decimal nonnegative max 100,
-    ReviewNotes as string optional maxlength 2000)
-event RejectSupplier(Reason as string notempty maxlength 500)
+    ReviewNotes as string optional)
+event RejectSupplier(Reason as string notempty)
 event RecordDefect(
     DefectType as string notempty maxlength 100,
     Quantity as integer positive,
@@ -114,12 +114,12 @@ event UpdatePerformance(
     OpenNonconformances as integer nonnegative,
     ClosedNonconformances as integer nonnegative)
 event PassAudit
-event FailAudit(Reason as string notempty maxlength 500)
-event Suspend(Reason as string notempty maxlength 500)
+event FailAudit(Reason as string notempty)
+event Suspend(Reason as string notempty)
 event Reinstate
 event PromoteToApproved
 event DeclareQualified
-event Discontinue(Reason as string notempty maxlength 500)
+event Discontinue(Reason as string notempty)
 
 on CompleteReview ensure CompleteReview.QualityScore + CompleteReview.DeliveryScore <= 200 because "Composite review scores cannot exceed the maximum of 200 (quality + delivery, each 0..100)"
 
