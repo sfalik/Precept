@@ -13,7 +13,7 @@ public static class TemporalParser
     private static readonly Regex TimeFormatRegex = new(@"^\d{2}:\d{2}(:\d{2})?$", RegexOptions.Compiled);
     private static readonly Regex InstantFormatRegex = new(@"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$", RegexOptions.Compiled);
 
-    public static TemporalParseResult Parse(TemporalLiteralKind kind, string rawText) => kind switch
+    public static TemporalParseResult Parse(TemporalLiteralKind kind, string rawText, TypeKind? expectedType = null) => kind switch
     {
         TemporalLiteralKind.Date => ParseDate(rawText),
         TemporalLiteralKind.Time => ParseTime(rawText),
@@ -21,7 +21,7 @@ public static class TemporalParser
         TemporalLiteralKind.Instant => ParseInstant(rawText),
         TemporalLiteralKind.ZonedDateTime => ParseZonedDateTime(rawText),
         TemporalLiteralKind.Timezone => ParseTimezone(rawText),
-        TemporalLiteralKind.TemporalQuantity => TemporalQuantityParser.Parse(rawText),
+        TemporalLiteralKind.TemporalQuantity => TemporalQuantityParser.Parse(rawText, expectedType),
         _ => TemporalParseResult.Failure(new TemporalDiagnostic("TEMP999", $"Unsupported temporal literal kind '{kind}'.", null)),
     };
 
@@ -115,6 +115,8 @@ public static class TemporalParser
         var zone = DateTimeZoneProviders.Tzdb.GetZoneOrNull(rawText);
         return zone is not null
             ? TemporalParseResult.Success(zone, zone.Id)
-            : TemporalParseResult.Failure(new TemporalDiagnostic("TEMP017", $"'{rawText}' is not a recognized IANA timezone.", null));
+            : TemporalParseResult.Failure(new TemporalDiagnostic("TEMP017",
+                $"'{rawText}' is not a recognized IANA timezone.",
+                "Use a canonical IANA timezone identifier in 'Region/City' form, e.g. 'America/New_York'."));
     }
 }

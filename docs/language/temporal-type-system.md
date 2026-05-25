@@ -134,6 +134,18 @@ The set of valid interpolated shapes for `duration` and `period` is a closed typ
 
 The shared temporal parsing subsystem lives in `src/Precept/Language/Time/`. `TemporalParser` and `TemporalQuantityParser` are the canonical entry points for all seven temporal literal forms plus temporal quantities, and `TemporalValidator` is the compile-time typed-constant adapter used by `TypedConstantValidation.Validate(...)`.
 
+**Context-aware temporal-quantity classification (F-LANG-TEMP-01/02):** `TemporalQuantityParser.Parse(rawText, expectedType?)` uses the expected type to guide classification:
+
+| Expected type | Calendar units (day, week) | Time units (hour, min, sec) | Mixed units | Months/years with Duration target |
+|---|---|---|---|---|
+| `duration` | Converted to exact Duration (1 day = 24 h, 1 week = 168 h) | Normal Duration path | Accepted — all units become Duration | Compile error (TEMP007 — variable length) |
+| `period` | Normal Period path | Added to PeriodBuilder (hours/minutes/seconds components) | Accepted — all units become Period components | Normal Period path |
+| (none) | Period path | Duration path | TEMP005 compile error | N/A |
+
+**Mixed-unit temporal quantities (F-LANG-TEMP-05):** `'1 day + 2 hours'` is valid when the target type is `period` (NodaTime Period supports mixed calendar+time components) or `duration` (both units convert to exact Duration). Without a target type, mixed units emit TEMP005.
+
+**Timezone error recovery (F-LANG-TEMP-06/07):** Invalid IANA timezone identifiers emit TEMP017 with the suggestion to use `'Region/City'` form and a pointer to `precept_domains scope='temporal'` for the recognized list.
+
 | Surface form | Backing type | Canonical parse shape | Canonical serialization |
 |---|---|---|---|
 | `date` | `LocalDate` | `YYYY-MM-DD` | `2026-04-15` |
@@ -804,7 +816,7 @@ field ExtendedWarranty as period default '2 years + 6 months'
 
 10 period fields across 7 samples (`GracePeriodDays`, `TermLengthMonths`, `WarrantyMonths`, etc.) are currently `integer` surrogates. See Locked Decision #12.
 
-**Constraints:** `optional`, `default '30 days'` / `default '12 months'` / `default '2 years'` / `default '2 weeks'`, or combined: `default '2 years + 6 months'`. `of 'time'` (hours/minutes/seconds only), `of 'date'` (years/months/weeks/days only) — see Decision #26. `in 'days'` / `in 'months'` / `in 'hours'` etc. pins to a specific NodaTime `PeriodUnits` basis — see the currency/quantity design doc for the full `in`/`of` qualification system.
+**Constraints:** `optional`, `default '30 days'` / `default '12 months'` / `default '2 years'` / `default '2 weeks'`, or combined: `default '2 years + 6 months'`. `nonnegative` (value ≥ zero period), `nonzero` (value ≠ zero period) — same semantics as on numeric types, compared against `Period.Zero`. `of 'time'` (hours/minutes/seconds only), `of 'date'` (years/months/weeks/days only) — see Decision #26. `in 'days'` / `in 'months'` / `in 'hours'` etc. pins to a specific NodaTime `PeriodUnits` basis — see the currency/quantity design doc for the full `in`/`of` qualification system.
 
 **The `in` and `of` qualification system for `period`:**
 

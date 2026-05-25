@@ -866,11 +866,13 @@ The structural logic clusters in: name resolution (symbol tables), scope managem
 
 ## Catalog Gaps (part of §13)
 
-### Gap 1: ContentValidation DU on TypeMeta — RESOLVED
+### Gap 1: ContentValidation DU on TypeMeta — RESOLVED (including F-TC-04)
 
-**Status:** ✅ Implemented. `TypeMeta.ContentValidation` is a sealed DU on `src/Precept/Language/Type.cs:139`; per-form subtypes (`RegexValidation`, `NodaTimeValidation`, `ClosedSetValidation`, plus typed-constant content shapes) drive typed-constant validation without per-`TypeKind` dispatch in the checker.
+**Status:** ✅ Fully implemented (Phase 3, F-TC-04). `TypeMeta.ContentValidation` is a sealed DU on `src/Precept/Language/Type.cs:139`; per-form subtypes (`RegexValidation`, `NodaTimeValidation`, `ClosedSetValidation`, plus typed-constant content shapes) drive typed-constant validation without per-`TypeKind` dispatch in the checker.
 
-The remaining per-`TypeKind` dispatch surface in `TypeChecker.Expressions.TypedConstants.cs` is tracked separately (see F-TC-04 in the Compiler Readiness Plan, Phase 3) — that work converts the residual `GetFormsForType` switch to catalog-driven lookup. ContentValidation itself is no longer the gap.
+The residual `GetFormsForType` TypeKind-switch in `TypeChecker.Expressions.TypedConstants.cs` has been eliminated (Phase 3, F-TC-04). The interpolated-typed-constant form dispatch is now catalog-driven via `InterpolationFormsCategory` — a public enum declared on the `ContentValidation` base record that identifies which form-grammar set applies to each type. The checker reads `Types.GetMeta(type).ContentValidation?.InterpolationFormsCategory` and dispatches through `GetFormsByCategory(...)`. No TypeKind-switch on type identity remains in the typed-constant checker.
+
+**F-LANG-BIZ-03 extension (Phase 3):** Currency-member interpolation slots (`{field.currency}`, `{field.from}`, `{field.to}`) are now resolved by `ValidateCurrencySlotQualifierConsistency` in `TypeChecker.Expressions.TypedConstants.cs`, mirroring the existing `ValidateUnitSlotDimensionConsistency` pattern. A currency-slot hole whose source carries a known qualifier that conflicts with the target field's declared currency emits `PRE0068` (`CurrencyMismatchInCurrencySlot`). This closes Frank's case-9 silent-acceptance gap.
 
 ### Gap 3: TypedActionShape on ActionMeta — LOW (deprioritized)
 

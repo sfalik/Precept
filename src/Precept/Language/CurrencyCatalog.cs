@@ -1,4 +1,5 @@
 using System.Collections.Frozen;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Reflection;
 using System.Xml.Linq;
@@ -80,8 +81,33 @@ public static class CurrencyCatalog
         }.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
 
     private static readonly Lazy<FrozenDictionary<string, CurrencyEntry>> _lazy = new(Load);
+    private static readonly Lazy<FrozenDictionary<int, CurrencyEntry>> _byNumericCode =
+        new(() => All.Values.ToFrozenDictionary(e => e.NumericCode));
+    private static readonly Lazy<string> _dataVersion = new(LoadDataVersion);
 
     public static FrozenDictionary<string, CurrencyEntry> All => _lazy.Value;
+
+    /// <summary>Precept does not choose a default currency; authors must declare explicitly.</summary>
+    public static CurrencyEntry? Default => null;
+
+    public static CurrencyEntry Get(string code)
+    {
+        var normalized = code.Trim().ToUpperInvariant();
+        return All.TryGetValue(normalized, out var entry)
+            ? entry
+            : throw new KeyNotFoundException($"'{code}' is not a recognized ISO 4217 currency code.");
+    }
+
+    public static bool TryGet(string code, [NotNullWhen(true)] out CurrencyEntry? entry) =>
+        All.TryGetValue(code.Trim().ToUpperInvariant(), out entry);
+
+    public static CurrencyEntry? GetByNumericCode(int numericCode) =>
+        _byNumericCode.Value.TryGetValue(numericCode, out var entry) ? entry : null;
+
+    public static bool IsValid(string code) =>
+        All.ContainsKey(code.Trim().ToUpperInvariant());
+
+    public static string DataVersion => _dataVersion.Value;
 
     private static FrozenDictionary<string, CurrencyEntry> Load()
     {
@@ -110,6 +136,14 @@ public static class CurrencyCatalog
         }
 
         return entries.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static string LoadDataVersion()
+    {
+        using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(ResourceName)
+            ?? throw new InvalidOperationException($"Embedded resource '{ResourceName}' was not found.");
+        var document = XDocument.Load(stream);
+        return document.Root?.Attribute("Pblshd")?.Value ?? "unknown";
     }
 
     private static string? GetChildValue(XElement parent, string localName) =>

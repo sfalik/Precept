@@ -84,4 +84,44 @@ public class ModifierValidationTests
             rule each Tag in Tags (Tag == "required") because "required tag missing"
             """, DiagnosticCode.CaseInsensitiveFieldRequiresTildeEquals);
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  F-LANG-TEMP-03: nonnegative / nonzero / positive on duration + period
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void DurationField_NonnegativeModifier_CompilesClean()
+    {
+        TypeCheckerTestHelpers.CheckExpectingClean("""
+            precept Sla
+            field ReviewWindow as duration default '14 days' nonnegative
+            """);
+    }
+
+    [Fact]
+    public void DurationField_NonzeroModifier_CompilesClean()
+    {
+        TypeCheckerTestHelpers.CheckExpectingClean("""
+            precept Contract
+            field LockPeriod as duration default '1 hour' nonzero
+            """);
+    }
+
+    [Fact]
+    public void PeriodField_NonnegativeModifier_CompilesClean()
+    {
+        TypeCheckerTestHelpers.CheckExpectingClean("""
+            precept Policy
+            field GracePeriod as period default '30 days' nonnegative
+            """);
+    }
+
+    [Fact]
+    public void PeriodField_NonzeroModifier_CompilesClean()
+    {
+        TypeCheckerTestHelpers.CheckExpectingClean("""
+            precept Policy
+            field ProbationPeriod as period default '1 year' nonzero
+            """);
+    }
 }

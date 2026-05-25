@@ -21,6 +21,7 @@ This corpus was commissioned to fill research gaps identified before any new com
 |--------|------------------|-----------------|
 | [context-sensitive-literal-typing-survey.md](context-sensitive-literal-typing-survey.md) | How do compilers resolve the type of numeric literals from expression context? What happens when context is insufficient? | Haskell (GHC), Kotlin, Swift, Rust, Ada, Pierce & Turner 2000 (bidirectional), TypeScript |
 | [exact-decimal-arithmetic-survey.md](exact-decimal-arithmetic-survey.md) | How do runtimes implement exact base-10 decimal arithmetic, handle precision propagation, and make overflow a deterministic error? | .NET System.Decimal, Java BigDecimal, IEEE 754-2008 decimal, SQL DECIMAL/NUMERIC, Python `decimal`, Rust `rust_decimal`, checked arithmetic patterns |
+| [currency-precision-coupling-survey.md](currency-precision-coupling-survey.md) | Does construction or arithmetic of a money value bind precision to currency identity at the type-system level? Surveyed because F-LANG-BIZ-02 needed precedent before locking D10 doctrine (Position 1/2/3). Grounded the Position 3 (decoupled) decision in `docs/Working/compiler-readiness-plan-2026-05-24.md`. Open question #1 (boundary enforcement) promoted to **F-LANG-BIZ-09** for Phase 4+. | Joda-Money, JSR-354, Fowler PoEAA, NodaMoney, Stripe/PayPal/Square/Adyen, COBOL `PIC`, IFRS IAS 21 / US GAAP ASC 830, SQL `DECIMAL`, Hibernate/JPA |
 | [proof-attribution-witness-design-survey.md](proof-attribution-witness-design-survey.md) | How do verification tools structure proof results, attribute obligations to source, and present witnesses as structured data for tooling consumption? | SPARK Ada / GNATprove, Dafny, Liquid Haskell, Infer, CBMC, Rust borrow checker, Frama-C WP |
 | [state-graph-analysis-survey.md](state-graph-analysis-survey.md) | How do formal tools and compiler frameworks perform structural analysis on state graphs at compile time? What algorithms are used for reachability, dominator computation, and dead-state detection? | SPIN / Promela, Alloy Analyzer, NuSMV / nuXmv, UPPAAL, Lengauer-Tarjan / LLVM DominatorTree, XState `@xstate/graph`, SCXML validators |
 | [temporal-type-hierarchy-survey.md](temporal-type-hierarchy-survey.md) | How do temporal libraries distinguish between instants, zoned datetimes, local times, dates, durations, and periods? What operations are type-safe vs. type errors? | NodaTime, java.time (JSR-310), Chrono (Rust), Python `datetime` + `pytz`/`zoneinfo`, PostgreSQL temporal types, ISO 8601 / RFC 3339 |
@@ -42,12 +43,13 @@ These surveys cover pipeline architecture, diagnostic design, LS integration, co
 
 ## Coverage summary
 
-15 surveys total. 50+ external systems documented across:
+16 surveys total. 60+ external systems documented across:
 
 - Compiler pipeline and IR design (Roslyn, TypeScript, Rust, Kotlin K2, Swift, Go, CEL, Rego)
 - Proof and verification systems (SPARK, Frama-C, Astrée, Liquid Haskell, Dafny, CBMC, Infer, GNATprove)
 - Type systems (F#, Haskell, Kotlin, Swift, Rust, Ada, TypeScript)
 - Numeric and decimal arithmetic (.NET, Java, Python, SQL, IEEE 754-2008)
+- Money / currency / precision coupling (Joda-Money, JSR-354, Fowler PoEAA, NodaMoney, Stripe/PayPal/Square/Adyen, COBOL, IFRS/GAAP)
 - Unit/dimension type systems (F# UoM, Boost.Units, Frink, Rust uom, JSR 354)
 - Temporal type libraries (NodaTime, java.time, Chrono, Python datetime, PostgreSQL)
 - State graph analysis (SPIN, Alloy, NuSMV, UPPAAL, LLVM, XState, SCXML)

@@ -153,4 +153,55 @@ public class OperatorTypingTests
         comparison.ResolvedOp.Should().Be(OperationKind.IntegerGreaterThanInteger);
         ((TypedBinaryOp)comparison.Left).ResolvedOp.Should().Be(OperationKind.IntegerPlusInteger);
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  F-LANG-TEMP-01/02: context-aware temporal-quantity inference (BUG-010)
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void NowPlusDaysLiteral_CompilesCleanly_BUG010()
+    {
+        // now() returns Instant; '365 days' must resolve as Duration via operation-based context inference
+        var index = TypeCheckerTestHelpers.CheckExpectingClean("""
+            precept License
+            field Expiry as instant <- now() + '365 days'
+            """);
+
+        var expr = index.FieldsByName["Expiry"].ComputedExpression;
+        expr.Should().BeOfType<TypedBinaryOp>();
+        ((TypedBinaryOp)expr!).ResolvedOp.Should().Be(OperationKind.InstantPlusDuration);
+    }
+
+    [Fact]
+    public void NowPlusHoursLiteral_CompilesCleanly()
+    {
+        var index = TypeCheckerTestHelpers.CheckExpectingClean("""
+            precept Reminder
+            field DeadlineAt as instant <- now() + '72 hours'
+            """);
+
+        var expr = index.FieldsByName["DeadlineAt"].ComputedExpression;
+        expr.Should().BeOfType<TypedBinaryOp>();
+        ((TypedBinaryOp)expr!).ResolvedOp.Should().Be(OperationKind.InstantPlusDuration);
+    }
+
+    [Fact]
+    public void DurationFieldDefault_WithDaysLiteral_CompilesClean()
+    {
+        // field D as duration default '30 days' — context says Duration from declaration
+        TypeCheckerTestHelpers.CheckExpectingClean("""
+            precept Sla
+            field ReviewWindow as duration default '30 days'
+            """);
+    }
+
+    [Fact]
+    public void PeriodFieldDefault_WithMixedUnitsLiteral_CompilesClean()
+    {
+        // F-LANG-TEMP-05: mixed calendar+time units accepted under Period context
+        TypeCheckerTestHelpers.CheckExpectingClean("""
+            precept Shift
+            field StandardShift as period default '1 day + 8 hours'
+            """);
+    }
 }

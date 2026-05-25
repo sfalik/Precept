@@ -88,8 +88,6 @@ public enum OperationKind
     // ── Temporal: zoneddatetime ─────────────────────────────────────
     ZonedDateTimePlusDuration                =  57,
     ZonedDateTimeMinusDuration               =  58,
-    ZonedDateTimePlusPeriod                  =  59,
-    ZonedDateTimeMinusPeriod                 =  60,
     ZonedDateTimeMinusZonedDateTime          =  61,
 
     // ── Temporal: datetime ──────────────────────────────────────────

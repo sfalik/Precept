@@ -393,14 +393,6 @@ public static class Operations
             kind, OperatorKind.Minus, PZonedDateTime, PDuration, TypeKind.ZonedDateTime,
             "ZonedDateTime − duration → zoneddatetime (timeline arithmetic)"),
 
-        OperationKind.ZonedDateTimePlusPeriod => new BinaryOperationMeta(
-            kind, OperatorKind.Plus, PZonedDateTime, PPeriod, TypeKind.ZonedDateTime,
-            "ZonedDateTime + period → zoneddatetime (calendar arithmetic — accepts all components)"),
-
-        OperationKind.ZonedDateTimeMinusPeriod => new BinaryOperationMeta(
-            kind, OperatorKind.Minus, PZonedDateTime, PPeriod, TypeKind.ZonedDateTime,
-            "ZonedDateTime − period → zoneddatetime (calendar arithmetic — accepts all components)"),
-
         OperationKind.ZonedDateTimeMinusZonedDateTime => new BinaryOperationMeta(
             kind, OperatorKind.Minus, PZonedDateTime, PZonedDateTime, TypeKind.Duration,
             "ZonedDateTime − zoneddatetime → duration (instant subtraction)"),

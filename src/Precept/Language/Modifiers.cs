@@ -18,6 +18,7 @@ public static class Modifiers
         new(TypeKind.Integer), new(TypeKind.Decimal), new(TypeKind.Number),
         new(TypeKind.Money),   new(TypeKind.Quantity),
         new(TypeKind.Price),   new(TypeKind.ExchangeRate),
+        new(TypeKind.Duration), new(TypeKind.Period),
     ];
 
     private static readonly TypeTarget[] RangedNumericTypes =

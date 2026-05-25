@@ -1,11 +1,11 @@
 # Precept Sample Corpus Expansion Plan
 ## Workflow Governance Edition
 
-## Status (Updated 2026-05-23)
+## Status (Updated 2026-05-25)
 
-**Samples completed so far:** 12 new samples (01-12) + Sample 10 (Production Order Tracking) = 13 new files  
+**Samples completed so far:** 32 new numbered samples (01-32) authored to date; see status table below for individual file states.  
 **Samples in progress:** 0  
-**Remaining samples:** 17 (13-29 per plan)  
+**Remaining samples:** the original §1.x detailed specs largely did not ship under their planned filenames — see **Phase 1 Implementation Drift** subsection inside Phase 1 for what shipped, what didn't, and what is now deferred. Phase 5 (catalog coverage showcase) added 2026-05-25 with 4 sample specs targeting unshowcased catalog members.  
 
 ### Completed Samples (18 files)
 
@@ -976,6 +976,49 @@ These 15 samples demonstrate Precept's unique value: binding state machines + da
 
 ---
 
+### Phase 1 Implementation Drift (Recorded 2026-05-25)
+
+Honest accounting of what actually shipped against the §1.1–§1.15 detailed specs above. Verified by direct grep of `samples/` on 2026-05-25.
+
+**§1.x specs that shipped (4 of 15):**
+
+| Spec | Shipped as | Notes |
+|---|---|---|
+| §1.1 Medical Prior Authorization | `samples/medical-prior-auth.precept` | Filename truncated from spec; FHIR alignment preserved |
+| §1.2 Insurance Underwriting | `samples/insurance-underwriting.precept` | Shipped under exact spec filename |
+| §1.3 Manufacturing Quality Control | `samples/manufacturing-quality-inspection.precept` | Renamed from spec; SCOR alignment preserved |
+| §1.12 Insurance Claim Adjudication | `samples/insurance-claim-adjudication.precept` | Shipped under exact spec filename |
+
+**§1.x specs that never shipped (11 of 15):**
+
+- §1.4 Grant Application Review
+- §1.5 Construction Permit Application
+- §1.6 SaaS Billing Cycle (Usage Metering)
+- §1.7 Clinical Trial Participant Enrollment
+- §1.8 Employee Onboarding (Multi-Department)
+- §1.9 Product Recall Management
+- §1.10 Mortgage Loan Servicing
+- §1.11 Healthcare Patient Surgery Scheduling
+- §1.13 Financial Portfolio Rebalancing
+- §1.14 SaaS Subscription Upgrade/Downgrade
+- §1.15 Regulatory Compliance Audit Trail
+
+Phase 1 in practice shipped a different set of 18 healthcare/insurance/manufacturing samples (see the Status table at the top of this document) — most of which aligned to the **Implementation Priority & Workflow** week-list further below, not to the §1.x detailed specs in this section. The §1.x specs above are now aspirational rather than authoritative.
+
+**`appendBy` / `enqueueBy` pattern drift:**
+
+§1.3, §1.5, §1.6, §1.7, §1.8, §1.9, §1.12, and §1.15 each promised `appendBy` or `enqueueBy` patterns in their **Features** lists. Of the 8, only §1.3 and §1.12 shipped at all, and **neither shipped sample uses `appendBy` or `enqueueBy`** (corpus-wide: 0 uses of either action). The canonical idiom for these patterns is queued in **Phase 5** below; existing samples can adopt them in a future quality sweep.
+
+**Disposition for the 11 unshipped §1.x specs:**
+
+- **Defer (default):** keep the spec text intact above; treat it as a backlog of candidate samples for future expansion waves. No action required now.
+- **Drop:** explicitly retire any spec the team no longer wants. Mark with `Status: Dropped YYYY-MM-DD — reason` inline.
+- **Re-prioritize into Phase 5:** if a spec's primary value is catalog showcase (e.g., §1.7 Clinical Trial / §1.9 Product Recall heavily exercise `appendBy`/`Irreversible`), it can be folded into a Phase 5 entry instead of shipping standalone.
+
+This subsection is a snapshot, not a commitment. Update on each subsequent corpus audit.
+
+---
+
 ### Phase 2: Enterprise Workflows (Tier 2 — Strong)
 
 These 12 samples demonstrate enterprise-grade workflows with moderate complexity.
@@ -1102,6 +1145,78 @@ These 3-4 samples provide supporting examples of data governance without lifecyc
 
 ---
 
+### Phase 5: Catalog Coverage Showcase (Added 2026-05-25)
+
+These 4 samples exist specifically to exercise catalog members that have zero idiomatic uses anywhere in the current corpus. Verified by direct grep of `samples/` on 2026-05-25. Bug-blocked patterns (BUG-006 interval narrowing, BUG-012 ordered-choice literal proof, etc.) are tracked separately in `docs/Working/bugs.md` and are out of scope here — Phase 5 covers only non-bug-blocked catalog gaps.
+
+#### 5.1 Priority Incident Queue
+**Filename:** `priority-incident-queue.precept`  
+**Pair:** §5.2 (read as a unit — both demonstrate write-by-ordering collection idioms)  
+**Catalog Members Targeted:** `QueueBy` type, `enqueueBy` action, `dequeueBy` action — all currently at zero corpus uses.  
+**Domain:** SRE / service-desk incident response queue, prioritized by severity, dequeued FIFO within priority band.  
+**Features:**
+- `QueueBy Severity` collection of pending incidents
+- `enqueueBy Severity` on the IncidentRaised event
+- `dequeueBy` on the IncidentClaimed event
+- State machine: Queued → Claimed → Investigating → Resolved
+- `choice` types: Severity (SEV1..SEV4 ordered), IncidentStatus
+- `duration` field for time-to-claim SLA
+**Why This Demonstrates Precept's Value:**
+- Priority queue ordering is structural, not enforced by application code
+- Severity ranking is sealed at compile time (catalog-driven choice ordering)
+- The canonical idiom for any priority-workflow domain (oncall, support tiers, dispatch)
+
+#### 5.2 Regulatory Audit Log
+**Filename:** `regulatory-audit-log.precept`  
+**Pair:** §5.1  
+**Catalog Members Targeted:** `LogBy` type, `appendBy` action — both currently at zero corpus uses.  
+**Domain:** Immutable, append-only audit trail for a compliance-bound entity (HIPAA access log / SOX change log shape).  
+**Features:**
+- `LogBy Timestamp` collection of audit entries
+- `appendBy Timestamp` on every state-changing event
+- Each entry records actor, action, target, and timestamp — never modified after append
+- Lifecycle state where the log is unbounded but per-entry fields are `Irreversible` (cross-references §5.4)
+**Why This Demonstrates Precept's Value:**
+- Append-only is structural, not policy — entries cannot be edited or removed even by privileged code
+- Required by all compliance frameworks (GDPR, HIPAA, SOX, PCI-DSS) — Precept enforces it at the entity boundary
+- The canonical idiom for any audit-trail or event-sourcing-lite domain
+
+#### 5.3 Sensor Measurement Aggregation
+**Filename:** `sensor-measurement-aggregation.precept`  
+**Catalog Members Targeted:** Math functions on `Number` — `approximate`, `floor`, `ceil`, `clamp`, `sqrt`, possibly `pow` — all currently at zero corpus uses. (`Number` type itself is well-covered in 18 existing samples; this sample is specifically about the unused math surface.)  
+**Domain:** Aggregated sensor reading (e.g., IoT temperature/pressure feed) with tolerance bands, rolling averages, and statistical thresholds.  
+**Features:**
+- `Number` fields for raw readings, computed averages, and tolerance bounds
+- `approximate` modifier on the average — honest about the fact that aggregated readings are not exact
+- `clamp` to bound a derived value within calibration limits
+- `sqrt` and `pow` for variance/standard-deviation calculations
+- `floor` / `ceil` for sample-window bucketing
+- Lifecycle: Active → Out-of-Tolerance → Calibrating → Active
+**Why This Demonstrates Precept's Value:**
+- "Honesty about approximation" is a core principle (`docs/philosophy.md`) — `approximate` makes it visible in the type system
+- Bounded numeric computation prevents silent overflow or out-of-range derived values
+- Demonstrates the math surface in a domain where approximation is intrinsic, not accidental
+
+#### 5.4 Regulatory Submission Package
+**Filename:** `regulatory-submission-package.precept`  
+**Catalog Members Targeted:** `Irreversible` modifier, `Mincount` modifier on collections, `Maxcount` modifier on collections — all currently at zero corpus uses. Also exercises `Warning` and `Error` constraint severities in modifier position (currently used only as identifier strings in choice values, never as constraint severities).  
+**Domain:** Regulatory filing (FDA submission, SEC 10-K, IND application shape) where the package locks structurally once filed.  
+**Features:**
+- `set of Attachment` with `Mincount 1` (mandatory minimum) and `Maxcount 50` (per-filing cap)
+- Per-attachment fields marked `Irreversible` after the SubmitFiling event — structurally locked, not policy-locked
+- Two constraint severities demonstrated: `Warning` for soft-fail rules (e.g., attachment naming convention) and `Error` for hard-fail rules (e.g., signature missing)
+- Lifecycle: Draft → Validating → Submitted → AcceptanceReceived/Rejected
+**Why This Demonstrates Precept's Value:**
+- "Prevention, not detection" — once filed, the package is structurally locked; no application-layer guard can be bypassed
+- Demonstrates the difference between Warning and Error severities, which today exist only in the catalog without idiomatic showcase
+- Mincount/Maxcount enforce regulatory bounds at compile time, not at runtime validation
+
+#### Function coverage note
+
+Of the ~14 unused functions identified in the 2026-05-25 corpus audit, §5.3 covers the math subset (`approximate`, `floor`, `ceil`, `clamp`, `sqrt`, possibly `pow`). The remaining temporal and string functions are not given a dedicated sample — they will be folded into existing samples opportunistically during future quality sweeps, since each function in isolation does not warrant its own showcase domain.
+
+---
+
 ## Implementation Priority & Workflow
 
 ### Phase 1: Healthcare & Insurance Workflows (Weeks 1-3)
@@ -1171,6 +1286,14 @@ These 3-4 samples provide supporting examples of data governance without lifecyc
 37. product-catalog.precept
 38. currency-exchange-rates.precept
 39. unit-of-measure-reference.precept
+
+### Phase 5: Catalog Coverage Showcase (Added 2026-05-25)
+**Goal:** Author 4 samples that exercise catalog members with zero idiomatic corpus uses; pair §5.1/§5.2 as a log/queue idiom unit.
+
+40. priority-incident-queue.precept (paired with §5.2)
+41. regulatory-audit-log.precept (paired with §5.1)
+42. sensor-measurement-aggregation.precept
+43. regulatory-submission-package.precept
 
 ---
 

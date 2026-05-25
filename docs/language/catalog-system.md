@@ -1083,6 +1083,8 @@ Both fields shipped in the same window as the qualifier-axis additions documente
 
 `TypeMeta.ContentValidation` is the compile-time typed-literal registration hook. The DU subtype declares how `'...'` content is validated for the type, and `TypedConstantValidation.Validate(...)` is the single dispatcher. The DU is the registry — there is no parallel validator interface.
 
+`ContentValidation` carries an `InterpolationFormsCategory?` field (see `src/Precept/Language/Type.cs`) that identifies which interpolated-typed-constant form-grammar set applies to the type. Subtypes that always support interpolation hardcode their category (e.g., `MoneyValidation → InterpolationFormsCategory.Money`); polymorphic subtypes (`NodaTimeValidation`, `ClosedSetValidation`) accept it as an optional parameter. The type checker reads this field to dispatch to form arrays without a TypeKind switch — `null` means the type accepts typed-constant literals but not the interpolated form.
+
 ##### TypeRuntime — typed-lane registration (target runtime shape)
 
 The runtime design also uses per-type registration metadata for JSON ingress/egress and typed CLR lanes. That runtime registration shape is documented in `docs/runtime/runtime-api.md`; it is target-state documentation rather than a direct description of today's `TypeMeta` record.
@@ -1663,7 +1665,7 @@ The keyword `initial` appears on both states and events with different semantics
 
 ##### Field modifier applicability
 
-The applicability matrix is currently validated by ad-hoc logic in the type checker. The catalog makes it explicit: `nonnegative` applies to `Integer`, `Decimal`, `Number`; `notempty` applies to `String`, `Set`, `Queue`, `Stack`, `Log`, `Bag`, `List`, `Queue of T by P` (on collections it is equivalent to `mincount 1`); `mincount`/`maxcount` apply to `Set`, `Queue`, `Stack`; `maxplaces` applies to `Decimal` only; `ordered` applies to `Choice` only. The `HasValue` flag distinguishes value-carrying modifiers (`min 0`) from bare flags (`nonnegative`). `ApplicableTo` uses `TypeTarget[]` (see Supporting Types) for modifier-sensitive applicability.
+The applicability matrix is currently validated by ad-hoc logic in the type checker. The catalog makes it explicit: `nonnegative`, `nonzero`, and `positive` apply to `Integer`, `Decimal`, `Number`, `Money`, `Quantity`, `Price`, `ExchangeRate`, `Duration`, and `Period` (the `ZeroBoundNumericTypes` set — F-LANG-TEMP-03 added Duration and Period); `notempty` applies to `String`, `Set`, `Queue`, `Stack`, `Log`, `Bag`, `List`, `Queue of T by P` (on collections it is equivalent to `mincount 1`); `mincount`/`maxcount` apply to `Set`, `Queue`, `Stack`; `maxplaces` applies to `Decimal`, `Money`, `Quantity`, `Price`, and `ExchangeRate`; `ordered` applies to `Choice` only. The `HasValue` flag distinguishes value-carrying modifiers (`min 0`) from bare flags (`nonnegative`). `ApplicableTo` uses `TypeTarget[]` (see Supporting Types) for modifier-sensitive applicability.
 
 Field modifiers also apply in event arg positions (e.g., `event Submit(amount: money nonnegative)`). The modifier catalog declares type-level applicability; the *position* where a modifier can appear (field declaration vs event arg) is a parser/construct-level concern handled by the Constructs catalog.
 
@@ -1672,6 +1674,15 @@ Field modifiers also apply in event arg positions (e.g., `event Submit(amount: m
 `Subsumes` declares which weaker modifiers this modifier makes redundant. When a field has `positive`, it already implies `nonzero` and `nonnegative` — these need not be declared. The type checker uses `Subsumes` to detect redundant modifier declarations and emit a diagnostic. Roslyn analyzer enforces that `Subsumes` entries are always drawn from the correct subsumption chain (a modifier cannot claim to subsume something it doesn't structurally imply).
 
 Static relationships: `positive.Subsumes = [Nonnegative, Nonzero]`. All other modifiers: `Subsumes = []`.
+
+##### `Subsumes` vs `MutuallyExclusiveWith` — layered concerns
+
+`Subsumes` and `MutuallyExclusiveWith` operate at distinct layers and can co-exist on the same modifier pair:
+
+- **`Subsumes`** is **meaning-level**. It drives proof-obligation discharge (a stronger modifier discharges the obligation a weaker subsumed modifier would carry) and surface-level `RedundantModifier` reporting when both are declared.
+- **`MutuallyExclusiveWith`** is **syntax-level**. It drives the `ConflictingModifiers` error when both are declared, regardless of subsumption relationship.
+
+These are not redundant. A modifier pair like `nonnegative + positive` exercises both: `positive.Subsumes = [Nonnegative, Nonzero]` declares the meaning relationship, while `nonnegative.MutuallyExclusiveWith = [Positive]` declares the surface-syntax rule. Both fire by design — the author wrote two structural modifiers when one was sufficient, and that's worth surfacing as an error rather than silently accepting the redundancy. See F-LANG-PRIM-04 in `docs/Working/compiler-readiness-plan-2026-05-24.md § Resolved for Phase 3` for the rationale.
 
 ##### Implied modifiers (TypeMeta.ImpliedModifiers)
 

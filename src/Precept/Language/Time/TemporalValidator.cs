@@ -10,7 +10,7 @@ public static class TemporalValidator
         NodaTimeValidation validation,
         TypedConstantContext? context = null)
     {
-        var temporalResult = TemporalParser.Parse(validation.LiteralKind, rawText);
+        var temporalResult = TemporalParser.Parse(validation.LiteralKind, rawText, targetType);
         if (temporalResult.IsValid)
             return Success(validation.FormatDescription, temporalResult.Value, temporalResult.CanonicalText);
 

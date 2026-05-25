@@ -102,6 +102,7 @@ public class ModifiersTests
                 TypeKind.Integer, TypeKind.Decimal, TypeKind.Number,
                 TypeKind.Money, TypeKind.Quantity,
                 TypeKind.Price, TypeKind.ExchangeRate,
+                TypeKind.Duration, TypeKind.Period,
             ]);
     }
 

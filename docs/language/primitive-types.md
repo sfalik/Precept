@@ -194,7 +194,7 @@ field Priority as integer min 1 max 10
 
 **Widening:** `integer` implicitly widens to `decimal` (lossless) and `number` (lossless within safe integer range). See [Numeric Lane Rules](#numeric-lane-rules).
 
-**Constraints:** `nonnegative`, `positive`, `nonzero`, `min N`, `max N`, `optional`, `default N`.
+**Constraints:** `nonnegative`, `positive`, `nonzero`, `min N`, `max N`, `optional`, `default N`. Use `positive` OR `nonnegative`, not both — they conflict structurally (`positive` already subsumes `nonnegative`). See [catalog-system.md § Modifiers](catalog-system.md#modifiers) for the layered meaning-vs-syntax model.
 
 **Surfaces that produce `integer`:** `.count` (collections), `.length` (string), `floor()`, `ceil()`, `truncate()`, `round()` (no places).
 
@@ -227,7 +227,7 @@ field Balance as decimal default 0
 
 **Widening:** `decimal` does **not** implicitly widen to `number`. See [Numeric Lane Rules](#numeric-lane-rules).
 
-**Constraints:** `nonnegative`, `positive`, `nonzero`, `min N`, `max N`, `maxplaces N`, `optional`, `default N`.
+**Constraints:** `nonnegative`, `positive`, `nonzero`, `min N`, `max N`, `maxplaces N`, `optional`, `default N`. Use `positive` OR `nonnegative`, not both — they conflict structurally (`positive` already subsumes `nonnegative`). See [catalog-system.md § Modifiers](catalog-system.md#modifiers).
 
 **`maxplaces`:** Validation constraint, not auto-rounding. `field X as decimal maxplaces 2` — assigning `1.999` is a constraint violation. Only applicable to `decimal`.
 
@@ -262,7 +262,7 @@ field Coefficient as number default 1.0
 
 **Widening:** `number` is the terminal lane. Nothing widens to or from `number` implicitly (except `integer → number`). See [Numeric Lane Rules](#numeric-lane-rules).
 
-**Constraints:** `nonnegative`, `positive`, `nonzero`, `min N`, `max N`, `optional`, `default N`.
+**Constraints:** `nonnegative`, `positive`, `nonzero`, `min N`, `max N`, `optional`, `default N`. Use `positive` OR `nonnegative`, not both — they conflict structurally (`positive` already subsumes `nonnegative`). See [catalog-system.md § Modifiers](catalog-system.md#modifiers).
 
 **Number-lane-only functions:** `sqrt()` lives exclusively in the `number` lane. Authors with `decimal` values reach it via `sqrt(approximate(value))`. Future functions (`log`, `sin`, `cos`, `exp`) will also be number-lane-only.
 

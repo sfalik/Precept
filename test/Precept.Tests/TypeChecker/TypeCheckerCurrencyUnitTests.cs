@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Precept.Language;
+using Precept.Pipeline;
 using Xunit;
 
 namespace Precept.Tests.TypeChecker;
@@ -331,5 +332,122 @@ public class TypeCheckerCurrencyUnitTests
             """;
 
         TypeCheckerTestHelpers.CheckExpectingClean(precept);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  F-LANG-BIZ-03: currency accessors (.name / .minorUnit / .numericCode / .symbol)
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void CurrencyField_DotName_CompilesClean()
+    {
+        var index = TypeCheckerTestHelpers.CheckExpectingClean("""
+            precept Example
+            field C as currency default 'USD'
+            field N as string <- C.name
+            """);
+
+        index.FieldsByName["N"].ComputedExpression.Should().BeOfType<TypedMemberAccess>();
+    }
+
+    [Fact]
+    public void CurrencyField_DotSymbol_CompilesClean()
+    {
+        var index = TypeCheckerTestHelpers.CheckExpectingClean("""
+            precept Example
+            field C as currency default 'USD'
+            field S as string <- C.symbol
+            """);
+
+        index.FieldsByName["S"].ComputedExpression.Should().BeOfType<TypedMemberAccess>();
+    }
+
+    [Fact]
+    public void CurrencyField_DotMinorUnit_CompilesClean()
+    {
+        var index = TypeCheckerTestHelpers.CheckExpectingClean("""
+            precept Example
+            field C as currency default 'USD'
+            field M as integer <- C.minorUnit
+            """);
+
+        index.FieldsByName["M"].ComputedExpression.Should().BeOfType<TypedMemberAccess>();
+    }
+
+    [Fact]
+    public void CurrencyField_DotNumericCode_CompilesClean()
+    {
+        var index = TypeCheckerTestHelpers.CheckExpectingClean("""
+            precept Example
+            field C as currency default 'USD'
+            field Code as integer <- C.numericCode
+            """);
+
+        index.FieldsByName["Code"].ComputedExpression.Should().BeOfType<TypedMemberAccess>();
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  F-LANG-BIZ-03: interpolation-slot currency-member resolution (Frank case-9)
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void InterpolatedMoney_SameCurrencySlot_CompilesClean()
+    {
+        TypeCheckerTestHelpers.CheckExpectingClean("""
+            precept Example
+            field A as money in 'USD' default '1.00 USD'
+            field B as money in 'USD' <- '{A.amount} USD'
+            """);
+    }
+
+    [Fact]
+    public void InterpolatedMoney_CurrencySlotFromField_SameCurrency_CompilesClean()
+    {
+        TypeCheckerTestHelpers.CheckExpectingClean("""
+            precept Example
+            field A as money in 'USD' default '1.00 USD'
+            field B as money in 'USD' <- '{A.amount} {A.currency}'
+            """);
+    }
+
+    [Fact]
+    public void InterpolatedMoney_CurrencySlotFromField_CrossCurrency_EmitsError()
+    {
+        TypeCheckerTestHelpers.CheckExpectingError("""
+            precept Example
+            field A as money in 'USD' default '1.00 USD'
+            field B as money in 'EUR' <- '{A.amount} {A.currency}'
+            """, DiagnosticCode.CurrencyMismatchInCurrencySlot);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  F-LANG-BIZ-06: exchangerate implicit positive
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void ExchangeRate_ValidPositiveValue_CompilesClean()
+    {
+        TypeCheckerTestHelpers.CheckExpectingClean("""
+            precept Example
+            field FxRate as exchangerate default '1.25 USD/EUR'
+            """);
+    }
+
+    [Fact]
+    public void ExchangeRate_ZeroValue_EmitsPositiveViolation()
+    {
+        TypeCheckerTestHelpers.CheckExpectingError("""
+            precept Example
+            field FxRate as exchangerate default '0 USD/EUR'
+            """, DiagnosticCode.InvalidModifierValue);
+    }
+
+    [Fact]
+    public void ExchangeRate_NegativeValue_EmitsPositiveViolation()
+    {
+        TypeCheckerTestHelpers.CheckExpectingError("""
+            precept Example
+            field FxRate as exchangerate default '-1.0 USD/EUR'
+            """, DiagnosticCode.InvalidModifierValue);
     }
 }

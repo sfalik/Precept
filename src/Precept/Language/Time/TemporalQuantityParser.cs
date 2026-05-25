@@ -8,7 +8,7 @@ public static class TemporalQuantityParser
     private static readonly Regex PartPattern =
         new(@"^([+-]?\d+)\s+([A-Za-z]+)$", RegexOptions.Compiled);
 
-    public static TemporalParseResult Parse(string rawText)
+    public static TemporalParseResult Parse(string rawText, TypeKind? expectedType = null)
     {
         if (string.IsNullOrWhiteSpace(rawText))
             return TemporalParseResult.Failure(new TemporalDiagnostic("TEMP001", "Temporal quantity cannot be empty.", "Use '<integer> <unit>'."));
@@ -40,20 +40,47 @@ public static class TemporalQuantityParser
 
             if (unit.PeriodFactory is not null)
             {
+                // Calendar unit (year, month, week, day)
                 sawPeriodUnit = true;
-                AddPeriod(periodBuilder, unit.Singular, magnitude);
+                if (expectedType == TypeKind.Duration)
+                {
+                    var durationEquiv = CalendarUnitToDuration(unit.Singular, magnitude);
+                    if (durationEquiv is null)
+                        return TemporalParseResult.Failure(new TemporalDiagnostic("TEMP007",
+                            $"'{unit.Plural}' have variable length and cannot be used as a duration — months and years are calendar-relative.",
+                            "Use days, hours, minutes, or seconds for duration fields."));
+                    duration += durationEquiv.Value;
+                }
+                else
+                {
+                    AddPeriod(periodBuilder, unit.Singular, magnitude);
+                }
             }
             else if (unit.DurationFactory is not null)
             {
+                // Time unit (hour, minute, second)
                 sawDurationUnit = true;
-                duration += unit.DurationFactory(magnitude);
+                if (expectedType == TypeKind.Period)
+                    AddPeriodTimeComponent(periodBuilder, unit.Singular, magnitude);
+                else
+                    duration += unit.DurationFactory(magnitude);
             }
         }
 
-        if (sawPeriodUnit && sawDurationUnit)
-            return TemporalParseResult.Failure(new TemporalDiagnostic("TEMP005", "Temporal quantities cannot mix calendar units and time units.", "Keep years/months/weeks/days separate from hours/minutes/seconds."));
+        // Mixed-unit rejection applies only when context is ambiguous (no expectedType)
+        if (expectedType is null && sawPeriodUnit && sawDurationUnit)
+            return TemporalParseResult.Failure(new TemporalDiagnostic("TEMP005",
+                "Temporal quantities cannot mix calendar units and time units.",
+                "Keep years/months/weeks/days separate from hours/minutes/seconds."));
 
         var canonicalText = string.Join(" + ", normalizedParts);
+
+        if (expectedType == TypeKind.Period)
+            return TemporalParseResult.Success(periodBuilder.Build(), canonicalText);
+
+        if (expectedType == TypeKind.Duration)
+            return TemporalParseResult.Success(duration, canonicalText);
+
         if (sawPeriodUnit)
             return TemporalParseResult.Success(periodBuilder.Build(), canonicalText);
 
@@ -63,24 +90,33 @@ public static class TemporalQuantityParser
         return TemporalParseResult.Failure(new TemporalDiagnostic("TEMP006", "Temporal quantity did not resolve to a supported value.", null));
     }
 
+    private static Duration? CalendarUnitToDuration(string singularUnit, int magnitude) => singularUnit switch
+    {
+        "day"  => Duration.FromDays(magnitude),
+        "week" => Duration.FromDays(magnitude * 7),
+        _      => null, // month, year — variable length, no exact Duration equivalent
+    };
+
     private static void AddPeriod(PeriodBuilder builder, string singularUnit, int magnitude)
     {
         switch (singularUnit)
         {
-            case "year":
-                builder.Years += magnitude;
-                break;
-            case "month":
-                builder.Months += magnitude;
-                break;
-            case "week":
-                builder.Weeks += magnitude;
-                break;
-            case "day":
-                builder.Days += magnitude;
-                break;
-            default:
-                throw new InvalidOperationException($"Unsupported period unit '{singularUnit}'.");
+            case "year":  builder.Years  += magnitude; break;
+            case "month": builder.Months += magnitude; break;
+            case "week":  builder.Weeks  += magnitude; break;
+            case "day":   builder.Days   += magnitude; break;
+            default: throw new InvalidOperationException($"Unsupported period unit '{singularUnit}'.");
+        }
+    }
+
+    private static void AddPeriodTimeComponent(PeriodBuilder builder, string singularUnit, int magnitude)
+    {
+        switch (singularUnit)
+        {
+            case "hour":   builder.Hours   += magnitude; break;
+            case "minute": builder.Minutes += magnitude; break;
+            case "second": builder.Seconds += magnitude; break;
+            default: throw new InvalidOperationException($"Unsupported time unit for period: '{singularUnit}'.");
         }
     }
 }

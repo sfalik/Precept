@@ -123,6 +123,7 @@ internal static class DiagnosticCoverageAllowLists
         "CountBoundViolation",
         "CrossCountingUnitOperation",
         "CrossCurrencyArithmetic",
+        "CurrencyMismatchInCurrencySlot",
         "CrossDimensionArithmetic",
         "DeadEndState",
         "DefaultForwardReference",

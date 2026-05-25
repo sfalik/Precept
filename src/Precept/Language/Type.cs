@@ -128,6 +128,24 @@ public sealed record ElementParameterAccessor(
 // ── ContentValidation DU ───────────────────────────────────────────────────────
 
 /// <summary>
+/// Identifies the interpolation form-grammar set applicable to a typed constant type.
+/// Used by the type checker to dispatch to the correct segment-form array without a
+/// per-<see cref="TypeKind"/> switch — the category is declared in catalog metadata.
+/// Null on a <see cref="ContentValidation"/> means the type accepts typed-constant literals
+/// but does not support the interpolated form (e.g., formatted temporal types).
+/// </summary>
+public enum InterpolationFormsCategory
+{
+    Money           = 1,
+    Quantity        = 2,
+    Price           = 3,
+    ExchangeRate    = 4,
+    SingleComponent = 5,
+    UnitOfMeasure   = 6,
+    Temporal        = 7,
+}
+
+/// <summary>
 /// Describes how a typed constant's string content is validated for a given <see cref="TypeKind"/>.
 /// Subtypes carry the validation strategy: regex pattern, NodaTime temporal parsing, or closed set membership.
 /// <para>
@@ -135,12 +153,17 @@ public sealed record ElementParameterAccessor(
 /// emission: when validation fails, the type checker selects the domain-specific code declared here
 /// instead of the generic <c>InvalidTypedConstantContent</c> (PRE0053). Null means "fall back to generic."
 /// </para>
+/// <para>
+/// <see cref="InterpolationFormsCategory"/> declares the interpolation form-grammar set for this type.
+/// Null means the type does not support the interpolated typed-constant form.
+/// </para>
 /// </summary>
 public abstract record ContentValidation(
     string FormatDescription,
     string[] Examples,
     DiagnosticCode? FormatErrorCode = null,
-    DiagnosticCode? SemanticErrorCode = null);
+    DiagnosticCode? SemanticErrorCode = null,
+    InterpolationFormsCategory? InterpolationFormsCategory = null);
 
 /// <summary>
 /// Validates typed constant content against a regular expression pattern.
@@ -160,41 +183,51 @@ public sealed record NodaTimeValidation(
     string FormatDescription,
     string[] Examples,
     DiagnosticCode? FormatErrorCode = null,
-    DiagnosticCode? SemanticErrorCode = null
-) : ContentValidation(FormatDescription, Examples, FormatErrorCode, SemanticErrorCode);
+    DiagnosticCode? SemanticErrorCode = null,
+    InterpolationFormsCategory? InterpolationFormsCategory = null
+) : ContentValidation(FormatDescription, Examples, FormatErrorCode, SemanticErrorCode, InterpolationFormsCategory);
 
 public sealed record UcumValidation(
     string FormatDescription,
     string[] Examples
-) : ContentValidation(FormatDescription, Examples);
+) : ContentValidation(FormatDescription, Examples,
+    InterpolationFormsCategory: Language.InterpolationFormsCategory.UnitOfMeasure);
 
 public sealed record MoneyValidation(
     string FormatDescription,
     string[] Examples
-) : ContentValidation(FormatDescription, Examples);
+) : ContentValidation(FormatDescription, Examples,
+    InterpolationFormsCategory: Language.InterpolationFormsCategory.Money);
 
 public sealed record QuantityValidation(
     string FormatDescription,
     string[] Examples
-) : ContentValidation(FormatDescription, Examples);
+) : ContentValidation(FormatDescription, Examples,
+    InterpolationFormsCategory: Language.InterpolationFormsCategory.Quantity);
 
 public sealed record PriceValidation(
     string FormatDescription,
     string[] Examples
-) : ContentValidation(FormatDescription, Examples);
+) : ContentValidation(FormatDescription, Examples,
+    InterpolationFormsCategory: Language.InterpolationFormsCategory.Price);
 
 public sealed record ExchangeRateValidation(
     string FormatDescription,
     string[] Examples
-) : ContentValidation(FormatDescription, Examples);
+) : ContentValidation(FormatDescription, Examples,
+    InterpolationFormsCategory: Language.InterpolationFormsCategory.ExchangeRate);
 
 /// <summary>
 /// Validates typed constant content against a closed set of allowed string values.
 /// <see cref="SetName"/> is a human-readable label (e.g., "ISO 4217 currencies").
 /// </summary>
 public sealed record ClosedSetValidation(
-    string SetName, FrozenSet<string> AllowedValues, string FormatDescription, string[] Examples
-) : ContentValidation(FormatDescription, Examples);
+    string SetName,
+    FrozenSet<string> AllowedValues,
+    string FormatDescription,
+    string[] Examples,
+    InterpolationFormsCategory? InterpolationFormsCategory = null
+) : ContentValidation(FormatDescription, Examples, InterpolationFormsCategory: InterpolationFormsCategory);
 
 // ── TypeMeta ───────────────────────────────────────────────────────────────────
 

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using FluentAssertions;
 using Precept.Language;
 using Xunit;
@@ -42,4 +43,65 @@ public class CurrencyCatalogTests
     {
         CurrencyCatalog.All["XDR"].Symbol.Should().Be("XDR");
     }
+
+    [Fact]
+    public void Get_KnownCode_ReturnsEntry()
+    {
+        var entry = CurrencyCatalog.Get("USD");
+        entry.AlphaCode.Should().Be("USD");
+    }
+
+    [Fact]
+    public void Get_UnknownCode_Throws()
+    {
+        var act = () => CurrencyCatalog.Get("ZZZ");
+        act.Should().Throw<KeyNotFoundException>();
+    }
+
+    [Fact]
+    public void TryGet_KnownCode_ReturnsTrueWithEntry()
+    {
+        CurrencyCatalog.TryGet("USD", out var entry).Should().BeTrue();
+        entry.Should().NotBeNull();
+        entry!.AlphaCode.Should().Be("USD");
+    }
+
+    [Fact]
+    public void TryGet_UnknownCode_ReturnsFalse()
+    {
+        CurrencyCatalog.TryGet("ZZZ", out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public void GetByNumericCode_Usd_ReturnsEntry()
+    {
+        var entry = CurrencyCatalog.GetByNumericCode(840);
+        entry.Should().NotBeNull();
+        entry!.AlphaCode.Should().Be("USD");
+    }
+
+    [Fact]
+    public void GetByNumericCode_Unknown_ReturnsNull()
+    {
+        CurrencyCatalog.GetByNumericCode(999).Should().BeNull();
+    }
+
+    [Fact]
+    public void IsValid_KnownCode_ReturnsTrue() =>
+        CurrencyCatalog.IsValid("USD").Should().BeTrue();
+
+    [Fact]
+    public void IsValid_UnknownCode_ReturnsFalse() =>
+        CurrencyCatalog.IsValid("ZZZ").Should().BeFalse();
+
+    [Fact]
+    public void DataVersion_IsNonEmpty()
+    {
+        CurrencyCatalog.DataVersion.Should().NotBeNullOrEmpty();
+        CurrencyCatalog.DataVersion.Should().NotBe("unknown");
+    }
+
+    [Fact]
+    public void Default_IsNull() =>
+        CurrencyCatalog.Default.Should().BeNull();
 }

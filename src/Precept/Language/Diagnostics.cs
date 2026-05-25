@@ -534,7 +534,7 @@ public static class Diagnostics
         DiagnosticCode.InvalidTimezoneId              => new(nameof(DiagnosticCode.InvalidTimezoneId),              DiagnosticStage.Type,  Severity.Error,   "'{0}' is not a recognized timezone — use canonical IANA form like 'America/New_York'",                                                  DiagnosticCategory.Temporal,
             FixHint: "Use a canonical IANA timezone ID such as 'America/New_York' or 'Europe/London'",
             TriggerCondition: "A timezone constant contains an identifier that is not a recognized IANA timezone name.",
-            RecoverySteps: ["Use a canonical IANA timezone identifier such as 'America/New_York', 'Europe/London', or 'UTC'"],
+            RecoverySteps: ["Use a canonical IANA timezone identifier in 'Region/City' form, e.g. 'America/New_York'", "See precept_domains scope='temporal' for the recognized timezone list"],
             ExampleBefore: "precept Example\nfield Tz as timezone default 'US/East'",
             ExampleAfter: "precept Example\nfield Tz as timezone default 'America/New_York'"),
         DiagnosticCode.UnqualifiedPeriodArithmetic    => new(nameof(DiagnosticCode.UnqualifiedPeriodArithmetic),    DiagnosticStage.Type,  Severity.Error,   "Period field '{0}' may contain {1} components — use period of '{2}' to constrain it",                                                  DiagnosticCategory.Temporal,
@@ -1119,6 +1119,13 @@ public static class Diagnostics
             RecoverySteps: ["Use a field whose declared dimension matches the target field", "Remove the dimension qualifier from the target field if it should accept any dimension"],
             ExampleBefore: "precept Example\nfield f1 as quantity of 'length'\nfield f2 as quantity of 'mass'\nstate S initial\nevent E initial\non E\n-> set f1 = '1 kg'\n-> set f2 = '1 {f1.unit}'",
             ExampleAfter: "precept Example\nfield f1 as quantity of 'mass'\nfield f2 as quantity of 'mass'\nstate S initial\nevent E initial\non E\n-> set f1 = '1 kg'\n-> set f2 = '1 {f1.unit}'"),
+
+        DiagnosticCode.CurrencyMismatchInCurrencySlot => new(nameof(DiagnosticCode.CurrencyMismatchInCurrencySlot), DiagnosticStage.Type, Severity.Error,
+            "'{0}' is {1}, but this field requires {2} — use a source field with matching currency",
+            DiagnosticCategory.BusinessDomain,
+            FixHint: "Use a source field with a compatible currency qualifier, or change the target field's currency",
+            TriggerCondition: "A currency-slot hole expression resolves to a currency that conflicts with the target field's declared currency qualifier.",
+            RecoverySteps: ["Use a source field whose declared currency matches the target field", "Explicitly convert currencies using an exchange rate before building the interpolated value"]),
 
         // ── Proof (string/collection bounds) ─────────────────────────────────────
         DiagnosticCode.LengthBoundViolation => new(

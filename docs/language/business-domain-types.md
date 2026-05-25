@@ -83,7 +83,6 @@
   - [D7. `of` for category constraint — unified across `quantity` and `period`](#d7-of-for-category-constraint--unified-across-quantity-and-period)
   - [D8. Commensurable arithmetic with deterministic unit resolution](#d8-commensurable-arithmetic-with-deterministic-unit-resolution)
   - [D9. Open fields require discrete equality narrowing for arithmetic](#d9-open-fields-require-discrete-equality-narrowing-for-arithmetic)
-  - [D10. ISO 4217 default precision as implicit `maxplaces` for `money`](#d10-iso-4217-default-precision-as-implicit-maxplaces-for-money)
   - [D11. Cross-currency `money` arithmetic requires explicit `exchangerate`](#d11-cross-currency-money-arithmetic-requires-explicit-exchangerate)
   - [D12. `decimal` backing for all seven types](#d12-decimal-backing-for-all-seven-types)
   - [D13. Self-contained registries — no external library dependency for currency or units](#d13-self-contained-registries--no-external-library-dependency-for-currency-or-units)
@@ -498,9 +497,7 @@ field Budget as money in 'EUR' optional
 | `.currency` | `currency` | ISO 4217 code (`'USD'`, `'EUR'`) |
 | `.amount` | `decimal` | Magnitude (the numeric part) |
 
-**Constraints:** `in '<currency>'`, `optional`, `default '...'`, `nonnegative`. The `maxplaces` constraint overrides the ISO 4217 default when needed.
-
-**Default precision (D10):** `money in 'USD'` carries an implicit `maxplaces 2` (ISO 4217 minor units). `money in 'JPY'` → `maxplaces 0`. `money in 'BHD'` → `maxplaces 3`. This is a validation constraint, not auto-rounding — assigning `'1.999 USD'` to a 2-place field is a constraint violation. An explicit `maxplaces` on the field overrides the ISO default. See D10 for full semantics.
+**Constraints:** `in '<currency>'`, `optional`, `default '...'`, `nonnegative`, `maxplaces N`. `maxplaces` is explicit-only — `money in 'USD'` carries no implicit precision constraint. Authors who want ISO 4217-derived strictness write `maxplaces` explicitly (e.g., `money in 'USD' maxplaces 2`). ISO minor-unit data is available via `CurrencyCatalog.Get(code).MinorUnit` for reference.
 
 **Serialization:** `"100 USD"` (string — matches typed constant literal syntax). The runtime type handles `Parse`/`ToString` natively, like NodaTime types. No special JSON conversion logic in MCP or hosting layer.
 
@@ -600,7 +597,7 @@ public sealed class CurrencyCatalog
 | `IsValidExpression` | Yes | No — `IsValid(alphaCode)` only |
 | `Browse(tier, dimension)` | Yes | No — `All` suffices |
 
-The catalog architecture (embedded resource, singleton, load-once-at-startup) is the same. D10 reads `CurrencyCatalog.Default.Get(code).MinorUnit` as the canonical source for implicit `maxplaces` — no hardcoded minor-unit table anywhere in the pipeline.
+The catalog architecture (embedded resource, singleton, load-once-at-startup) is the same. `CurrencyCatalog.Get(code).MinorUnit` is the canonical source for ISO 4217 minor-unit data when authors need currency-derived precision in their own field declarations — no hardcoded minor-unit table anywhere in the pipeline.
 
 ---
 
@@ -1535,12 +1532,12 @@ The seven business-domain types reuse the existing field-constraint vocabulary f
 | `max N` | `Field <= N` | `(-∞, N]` | `field Score as quantity max 100` |
 | `maxplaces N` | Runtime enforcement | — | `field Amount as money in 'USD' maxplaces 2` |
 
-**`maxplaces` and ISO 4217:** `maxplaces` is available on all four magnitude types. `money in '<currency>'` carries an **implicit `maxplaces`** derived from ISO 4217 minor units (D10): `USD` → `maxplaces 2`, `JPY` → `maxplaces 0`, `BHD` → `maxplaces 3`. An explicit `maxplaces` on the field overrides the ISO default. No other magnitude type (`quantity`, `price`, `exchangerate`) has an implicit `maxplaces` — all other uses must be declared explicitly. Authors who need non-standard precision for `money` (e.g., forex platforms requiring 6 decimal places for USD) declare the override explicitly: `field Rate as money in 'USD' maxplaces 6`.
+**`maxplaces` and ISO 4217:** `maxplaces` is available on all four magnitude types and is **explicit-only** for all of them — including `money`. `money in '<currency>'` carries no implicit precision constraint. ISO 4217 minor-unit data (e.g., USD=2, JPY=0, BHD=3) is available via `CurrencyCatalog.Get(code).MinorUnit` for author-side rounding decisions. Authors who want ISO-derived strictness opt in explicitly: `field Cost as money in 'USD' maxplaces 2`. This also enables non-standard precision when the domain requires it (e.g., `field Rate as money in 'USD' maxplaces 6` for forex platforms) without needing an override concept.
 
 **`maxplaces` enforcement scope:** `maxplaces` is checked at three points:
 1. **Literal assignment (compile time):** `set Cost = '1.999 USD'` where `Cost` is `money in 'USD'` is a compile-time error — the literal's decimal places are statically known.
 2. **Event-arg input (runtime boundary):** `precept_fire`/`precept_update` validate event arg values at the input boundary. `{ "Amount": "1.999 USD" }` for a `maxplaces 2` field is rejected before the engine runs.
-3. **Arithmetic result assignment (runtime):** `set Cost = UnitPrice * Qty` where `UnitPrice = '1.333 USD/each'` and `Qty = '3 each'` produces exactly `'3.999 USD'` (exact `decimal` arithmetic — see D12). If `Cost` is `money in 'USD'` (implicit `maxplaces 2`), this is a constraint violation at `set` time. The author must apply `round()` explicitly: `set Cost = round(UnitPrice * Qty, 2)`.
+3. **Arithmetic result assignment (runtime):** `set Cost = UnitPrice * Qty` where `UnitPrice = '1.333 USD/each'` and `Qty = '3 each'` produces exactly `'3.999 USD'` (exact `decimal` arithmetic — see D12). If `Cost` is declared as `money in 'USD' maxplaces 2`, this is a constraint violation at `set` time. The author must apply `round()` explicitly: `set Cost = round(UnitPrice * Qty, 2)`.
 
 **Optional interaction:** Business-domain magnitude types follow the same optional pattern as `decimal` and `number`, with one addition: extracting a component (`.amount`, `.currency`, `.unit`) from an optional field without a null guard is a compile error.
 
@@ -1715,13 +1712,15 @@ For business-domain types, comparison operators carry domain preconditions. **Cr
 - **Precedent:** Same contract as optional narrowing. Same friction, same reason.
 - **Tradeoff accepted:** Authors who use open fields must write guards.
 
-### D10. ISO 4217 default precision as implicit `maxplaces` for `money`
+### ~~D10~~ — retired (Position 3: currency identity and value precision are decoupled)
 
-- **What:** `money in 'USD'` carries an implicit `maxplaces 2` derived from ISO 4217 minor units. `money in 'JPY'` carries `maxplaces 0`. `money in 'BHD'` carries `maxplaces 3`. An explicit `maxplaces` on the field overrides the ISO default. The implicit `maxplaces` is a **validation constraint, not an auto-rounding rule** — assigning `'1.999 USD'` to a field with `maxplaces 2` is a constraint violation (compile-time for literal assignments, at the fire/update boundary for event-arg inputs, and at `set` time for arithmetic results), not a silent truncation to `'2.00 USD'`. When the author wants rounding, they apply it explicitly. Default rounding mode for explicit rounding operations: half-even (banker's rounding).
-- **Why:** ISO 4217 defines the natural precision. Making it an implicit `maxplaces` means authors get correct precision by default without annotating every field, while preserving Precept's prevention guarantee — no silent data loss. Half-even eliminates systematic bias when authors do round.
-- **Alternatives rejected:** (A) Auto-round to ISO precision — hides precision loss, violates prevention guarantee. (B) `maxplaces` required on every money field — boilerplate when ISO already provides the answer. (C) Half-up rounding — upward bias. (D) No default precision — money fields accept arbitrary decimal places, defeating the purpose of ISO 4217 awareness.
-- **Precedent:** NMoneys, Java `Currency.getDefaultFractionDigits()`, Python `decimal`.
-- **Tradeoff accepted:** Non-standard precision requires explicit `maxplaces` override. Authors who need sub-cent precision (e.g., gas station pricing at `maxplaces 3`) must declare it. Arithmetic expressions can produce results with more decimal places than the target field allows (exact `decimal` arithmetic does not auto-round) — authors who compute monetary results should apply `round()` before assigning to a `maxplaces`-constrained field.
+`money in '<Cur>'` carries **no implicit `maxplaces` constraint**. Authors who want ISO 4217-derived strictness write `maxplaces` explicitly: `field Cost as money in 'USD' maxplaces 2`. ISO 4217 minor-unit data remains available via `CurrencyCatalog` (`.minorUnit` accessor on `CurrencyEntry`) for author-side rounding decisions.
+
+**Rationale:** External survey of Joda-Money, JSR-354, NodaMoney, Stripe/Square/Adyen, IFRS IAS 21, and US GAAP ASC 830 found that standards bodies are silent on currency-derived precision coupling. JSR-354 deliberately decoupled precision from currency identity after surveying Joda-Money. Payment APIs (Stripe, Square, Adyen) enforce precision at the wire boundary rather than in the type system. Intermediate calculations legitimately carry higher precision than the settlement currency's minor unit — forcing an implicit constraint at the field level would create spurious violations for perfectly valid arithmetic. See `research/architecture/compiler/currency-precision-coupling-survey.md` for the full survey.
+
+**Opt-in strict mode:** `maxplaces` is available on all four magnitude types (`money`, `quantity`, `price`, `exchangerate`). Authors who want Joda-Money-style strictness for a money field declare it explicitly. See `samples/insurance-claim-adjudication.precept` for a canonical example using `money in 'USD' maxplaces 2`.
+
+**Boundary enforcement (future):** Precision enforcement at persistence, `transition apply`, and external integration boundaries is filed as a separate finding (F-LANG-BIZ-09) targeting Phase 4+.
 
 ### D11. Cross-currency `money` arithmetic requires explicit `exchangerate`
 
@@ -1815,13 +1814,13 @@ For business-domain types, comparison operators carry domain preconditions. **Cr
   | `min(A, B)` / `max(A, B)` selection functions | `money`, `quantity`, `price` | Same ordering preconditions as `<`/`>`/`<=`/`>=` for that type (see bottom row). Return type is the same domain type as the operands. Blocked for `exchangerate` — see exception table. |
   | `positive`, `nonnegative`, `nonzero` field constraints | All four | `exchangerate` carries an implicit `positive` — see Corollary 2. Explicitly declaring `positive` or `nonzero` on an `exchangerate` field is redundant. |
   | `min N` / `max N` field constraints (lower/upper bound at declaration) | `money`, `quantity`, `price` | Bound constant `N` must be the same domain type as the field, with matching unit/currency. Blocked for `exchangerate` — these constraints require `>=`/`<=` comparison, which is not defined for `exchangerate`; use `positive` instead. |
-  | `maxplaces N` field constraint | All four | Only `money` carries an implicit ISO 4217 default (D10). For `quantity`, `price`, and `exchangerate`, `maxplaces` is an explicit-only constraint — no implicit default applies. |
+  | `maxplaces N` field constraint | All four | `maxplaces` is explicit-only for all four magnitude types. ISO 4217 minor-unit metadata is available via `CurrencyCatalog` (`.minorUnit` accessor) for author-side rounding when currency-derived precision is desired. |
   | `==`, `!=` | All four | **Domain precondition:** same currency / unit / currency-pair required. Cross-unit `==` is a **compile error**, not `false` — see exception table. |
   | `<`, `>`, `<=`, `>=` | `money`, `quantity`, `price` | `money`: same currency required. `quantity`: same dimension required — auto-converts within dimension per D8. `price`: same currency AND same denominator unit required. |
 
-  **Corollary 1 — Return type preservation:** Arithmetic functions applied to a business-domain magnitude type return the same domain type as their magnitude-bearing argument, with all unit, currency, and compound-unit annotations preserved. `abs('−100 USD') → money in 'USD'`; `round(UnitPrice, 2) → price in 'USD/each'` when `UnitPrice` is `price in 'USD/each'`; `clamp(Qty, '0 kg', '100 kg') → quantity in 'kg'`. If the result type did not preserve domain identity, subsequent assignment to a `money` or `quantity` field would be a type error — the design already assumes type-preservation in D10's `round()` examples.
+  **Corollary 1 — Return type preservation:** Arithmetic functions applied to a business-domain magnitude type return the same domain type as their magnitude-bearing argument, with all unit, currency, and compound-unit annotations preserved. `abs('−100 USD') → money in 'USD'`; `round(UnitPrice, 2) → price in 'USD/each'` when `UnitPrice` is `price in 'USD/each'`; `clamp(Qty, '0 kg', '100 kg') → quantity in 'kg'`. If the result type did not preserve domain identity, subsequent assignment to a `money` or `quantity` field would be a type error.
 
-  **Corollary 2 — `exchangerate` carries an implicit `positive` constraint:** Exchange rates are always positive by domain rule. A zero rate (`'0.000 USD/EUR'`) silently converts any amount to zero — a degenerate result indistinguishable from a modeling error. A negative rate has no economic meaning. `exchangerate` therefore carries an implicit `positive` constraint analogous to `money in 'USD'` carrying an implicit `maxplaces 2` via D10. Explicitly declaring `positive` or `nonzero` on an `exchangerate` field is redundant (compiler may warn). The implicit constraint is enforced at the same tiers as `in`-constraint enforcement (D14): literal assignment (compile), event-arg input (runtime boundary), and `set` time (runtime).
+  **Corollary 2 — `exchangerate` carries an implicit `positive` constraint:** Exchange rates are always positive by domain rule. A zero rate (`'0.000 USD/EUR'`) silently converts any amount to zero — a degenerate result indistinguishable from a modeling error. A negative rate has no economic meaning. `exchangerate` therefore carries an implicit `positive` constraint. Explicitly declaring `positive` or `nonzero` on an `exchangerate` field is redundant (compiler may warn). The implicit constraint is enforced at the same tiers as `in`-constraint enforcement (D14): literal assignment (compile), event-arg input (runtime boundary), and `set` time (runtime).
 
   **Exceptions — domain identity overrides:**
 
@@ -2022,7 +2021,7 @@ This document covers the design of the seven new business-domain types, the peri
 | `InvalidUnitString` | `set SelectedUnit = 'kg/m'` for an atomic-unit field |
 | `InvalidCurrencyCode` | `'USDX'` as a currency literal or `currency` field value |
 | `InvalidDimensionString` | `set AllowedDim = 'meters'` for a `dimension` field (use `'length'`) |
-| `MaxPlacesExceeded` | `'1.999 USD'` assigned to `money in 'USD'` (implicit `maxplaces 2`) |
+| `MaxPlacesExceeded` | `'1.999 USD'` assigned to `field Cost as money in 'USD' maxplaces 2` |
 
 ---
 

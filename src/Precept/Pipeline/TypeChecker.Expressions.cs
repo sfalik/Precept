@@ -824,9 +824,24 @@ internal static partial class TypeChecker
         var leftDiagEnd = ctx.Diagnostics.Count;
 
         // Proactive context propagation: when the right operand is a typed or interpolated typed constant,
-        // use the left operand's resolved type as expectedType context.
-        var right = (NeedsContextRetry(bin.Right) && left is not TypedErrorExpression)
-            ? Resolve(bin.Right, ctx, left.ResultType)
+        // infer the best expectedType from the operation catalog rather than always using left.ResultType.
+        // When exactly one unique RHS type exists for (op, lhsType), use it — this fixes cases like
+        // 'now() + '365 days'' where the correct context is Duration, not Instant.
+        // When multiple RHS types exist (e.g., Integer + ?), fall back to left.ResultType as a general hint.
+        TypeKind? rightContext = null;
+        if (NeedsContextRetry(bin.Right) && left is not TypedErrorExpression)
+        {
+            var distinctRhsTypes = Operations.All
+                .OfType<BinaryOperationMeta>()
+                .Where(o => o.Op == opMeta.Kind && o.Lhs.Kind == left.ResultType)
+                .Select(o => o.Rhs.Kind)
+                .Distinct()
+                .Take(2)
+                .ToList();
+            rightContext = distinctRhsTypes.Count == 1 ? distinctRhsTypes[0] : left.ResultType;
+        }
+        var right = rightContext.HasValue
+            ? Resolve(bin.Right, ctx, rightContext.Value)
             : Resolve(bin.Right, ctx);
 
         // Symmetric: retry left-side typed/interpolated typed constants with right's type as context.

@@ -205,6 +205,8 @@ public enum DiagnosticCode
     MultipleInitialEvents            = 147,
     /// <summary>A construction-row guard reads a field before the entity exists.</summary>
     ConstructionGuardReadsUninitializedField = 148,
+    /// <summary>A currency-slot hole carries a currency that conflicts with the target field's declared currency qualifier.</summary>
+    CurrencyMismatchInCurrencySlot       = 150,
 
     // ── Graph ────────────────────────────────────────────
     UnreachableState                   =  80,

@@ -17,7 +17,7 @@
 |---|---|---|---|---|---|
 | 1 | Doc foundation truthful + lifecycle skills + 16 Archive promotions | ~55 | 8 (✅ all settled 2026-05-24) | XL (~5-7 days) | ✅ **Complete 2026-05-24** (all 6 workstreams shipped; verification report at [`lifecycle-review-phase-1-2026-05-24.md`](lifecycle-review-phase-1-2026-05-24.md)) |
 | 2 | Green baseline + no crashes + Operations.Resolve + MCP-crash family | **12+** | 2 | **L (~4-5 days)** | ✅ **Complete 2026-05-25** (all 7 steps shipped: 2.1–2.7; MCP wrapper backstop + temporal-literal verified clean + LS URI-case fix + Operations.Resolve + generic SyntaxReference test; 6107/6108 Precept.Tests pass with the 1 failure as new BUG-013; 411/411 LS tests pass; 67/67 Mcp tests pass; 291/291 analyzer tests pass) |
-| 3 | Type system completeness | ~14 | 3 (✅ all settled 2026-05-25) | L | Planned, ready to execute |
+| 3 | Type system completeness | ~13 (F-LANG-BIZ-02 dropped → doc-only retire D10 + Frank's case-9 absorbed) | 4 (✅ all settled 2026-05-25, incl. F-LANG-BIZ-02 Position 3 post-research) | **M (~4-6 days)** | ✅ **Complete 2026-05-25** (all 14 findings closed; 6136/6137 Precept.Tests pass; 411/411 LS tests pass; 291/291 analyzer tests pass; BUG-010 fully fixed; D10 retired; F-TC-04 last TypeKind switch eliminated; F-LANG-BIZ-09 filed for Phase 4+) |
 | 4 | Collection completeness + BUG-002 | **~16** | 2 | L | Stub — TBD |
 | 5 | Proof engine satisfiability + BUG-004 + BUG-006 + BUG-012 + FieldNeverSet/unification | **~14** | 2 | XL | Partial — F-LANG-GRAPH-04 planned, rest stubbed |
 | 6 | `units` block + composite basis | 2 | 0 | L | Stub — TBD |
@@ -120,9 +120,27 @@ All three Phase-3-gating decisions are settled. Each carries the four-leg ration
   - Check `OperationsTests.cs` for any test that exercised these — remove or repurpose
   - Check proof engine, evaluator, and any samples for usage; samples shouldn't reference this pattern but verify
 
+**F-LANG-BIZ-02 — Implicit `maxplaces` per currency (Position 3, settled post-research)**
+
+- **Decision**: **Position 3 — decoupled at the default surface, with explicit `maxplaces N` as the opt-in strict-mode.** `money in '<Cur>'` carries NO implicit `maxplaces` constraint derived from ISO 4217 minor units. Authors who want Joda-Money-style strictness write `money in 'USD' maxplaces 2` explicitly. The Phase-3-original "synthesize implicit Maxplaces N at modifier resolution" work is dropped entirely. What lands in Phase 3 is the doc-only retirement of D10 from `business-domain-types.md` + a new follow-up finding (F-LANG-BIZ-09) for boundary-precision enforcement at persistence + `transition apply` + external integration.
+- **Rationale**: External research (`research/architecture/compiler/currency-precision-coupling-survey.md`) surveyed Joda-Money, JSR-354, NodaMoney, Stripe/Square/Adyen, COBOL, IFRS IAS 21, US GAAP ASC 830, SQL conventions. Standards bodies (IAS 21, ASC 830) are silent on currency-derived precision — they specify rounding *behavior*, not type-level *coupling*. JSR-354 deliberately decoupled currency identity from value precision after the Joda-Money authors and Java community surveyed the design space. NodaMoney's silent auto-round violates Precept's "honesty about approximation" principle. Intermediate calculations (tax = `1.50 USD * 0.0725` = `0.108750 USD`) genuinely need sub-cent precision that an implicit `maxplaces` would reject; the boundary is where precision must be enforced, not the type system.
+- **Alternatives considered and rejected**:
+  - **Position 1 — Structural constraint (D10 as designed)**: Implicit `maxplaces 2` on `money in 'USD'`. Rejected: contradicts industry practice, blocks legitimate intermediate-precision use cases, makes `money in '<Cur>'` non-uniform with `quantity of '<unit>'` (which has no implicit precision).
+  - **Position 2 — Soft default with silent override**: Implicit `maxplaces N` that any explicit override silently replaces. Rejected: hides the decision at the type level, surprises authors reading code that doesn't show what precision is in effect.
+- **Precedent**: JSR-354 (the post-Joda-Money Java Money standardization effort) explicitly decoupled currency identity from value precision. Joda-Money offers strict (`Money`) and lenient (`BigMoney`) variants — strictness is opt-in, not default. Stripe/Square/Adyen enforce minor-unit precision at the wire boundary (request/response validation), not in the application's type system. Half-even rounding is a behavioral default in IFRS/GAAP, not a type-level constraint.
+- **Tradeoff accepted**: Authors who want strict per-currency precision must opt in via explicit `maxplaces N`. The sample-corpus tidy (one canonical sample + tutorial walkthrough showing the opt-in idiom) makes the pattern discoverable. **Philosophy-tradeoff to surface to owner**: Position 3 partially relaxes "Prevention, not detection" at the type-system level — D10's implicit constraint WAS a prevention mechanism. Under Position 3, prevention RELOCATES to the wire boundary (Phase 4+ via F-LANG-BIZ-09) where authors cross into external state. Prevention as a principle is preserved; its enforcement point shifts.
+- **Doc actions for Phase 3 execution**:
+  - `docs/language/business-domain-types.md` — retire D10 (13 hits including the full D10 § at lines 1718-1721 and Corollary 2 at line 1824 which references D10 by analogy)
+  - File F-LANG-BIZ-09 (boundary-precision enforcement) for Phase 4+
+  - Lift research artifact to `research/architecture/compiler/currency-precision-coupling-survey.md`
+  - Sample-corpus tidy: one canonical sample uses explicit `maxplaces 2` idiom
+- **Settled by**: Conversation 2026-05-25 + external research via `/lifecycle-1-research` skill mid-planning. Recorded in heavyweight Phase 3 plan (commit follows).
+
 ### Still open — gating Phase 4+
 
 - F-LANG-SPEC-01 (`because` on ensures): enforce or amend Principle 9? Gates Phase 2 or 3 implementation work — currently unaddressed in the active plan; flagging for Phase 4 triage.
+- **F-LANG-BIZ-09** *(new finding, filed 2026-05-25 from F-LANG-BIZ-02 Position 3 spinoff)*: **Boundary-precision enforcement for money values at persistence + `transition apply` + external integration**. Under Position 3, `money in 'USD'` no longer carries an implicit `maxplaces 2` at the type system; the prevention guarantee for currency-derived precision must therefore relocate to the wire/persistence boundary. Stripe/Square/Adyen all enforce per-currency minor-unit precision at the API boundary (per the survey `research/architecture/compiler/currency-precision-coupling-survey.md`); Precept should provide a structural mechanism that enforces precision rules at boundaries where money values cross between Precept-governed and external state. **Scope**: design pass needed to define the boundary surface (`transition apply`? persistence layer? both?), the API for declaring per-field boundary-precision rules, and the diagnostic surface for boundary violations. **Cross-link**: research artifact's Open Question #1. **Target phase**: 4 or 5, owner picks during triage; non-blocking for either phase's existing scope.
+- 5 additional research follow-ups from the currency-precision survey's Open Questions section (opt-in syntax discoverability beyond samples; multi-currency arithmetic safety verification; hyperinflationary / non-ISO drift policy; Temenos T24 / core-banking comparator gap; crypto / non-fiat assets) — owner triages individually if/when each becomes blocking.
 - 15 additional decisions listed in `compiler-readiness-review-2026-05-24.md` § 6 (cited per-phase as work approaches).
 
 ---
@@ -511,31 +529,148 @@ Plus, since Phase 1's F-LANG-CAT-15 decision was "implement," `Operations.Resolv
 
 # Phase 3: Type system completeness
 
-**Goal**: Every documented capability of the primitive, temporal, and business-domain type systems is exercised by tests and works as the spec claims. Remove the per-`TypeKind` dispatch in `TypeChecker.Expressions.TypedConstants.cs` in favor of catalog-driven dispatch (catalog discipline).
+**Goal**: Every documented capability of the primitive, temporal, and business-domain type systems is exercised by tests and works as the spec claims. The last per-`TypeKind` dispatch in `TypeChecker.Expressions.TypedConstants.cs` is replaced with catalog-driven dispatch (catalog discipline).
 
-**Findings in scope** (~15):
-- ~~F-LANG-PRIM-01 (string ordering — **resolved by removal, not implementation**. `<`/`>`/`<=`/`>=` on `string`/`~string` is intentionally out of scope. False doc claims removed from `primitive-types.md`, `precept-language-spec.md`, and `collection-types.md`. Per-decision rationale added at `docs/language/primitive-types.md` § String Ordering — Out of Scope, grounded in the [string-ordering-broad-use-cases survey](../../research/language/expressiveness/string-ordering-broad-use-cases.md) and [string-ordering-external-survey](../../research/language/expressiveness/string-ordering-external-survey.md). Catalog already excluded the trait; no runtime work required.)~~
-- F-LANG-PRIM-04 (RedundantModifier warning vs error)
-- F-LANG-TEMP-01/02 (context-aware `'3 days'`/`'2 weeks'` parser)
-- F-LANG-TEMP-03 (nonzero/nonnegative on duration)
-- F-LANG-TEMP-05 (mixed temporal quantities — option a: relax parser)
-- F-LANG-TEMP-06/07 (timezone error messages)
-- F-LANG-TEMP-08 (zoneddatetime ± period — pick authoritative side)
-- F-LANG-BIZ-02 (ISO 4217 implicit `maxplaces` D10)
-- F-LANG-BIZ-03 (currency accessors `.name`/`.minorUnit`/`.numericCode`/`.symbol`)
-- F-LANG-BIZ-04 (`CurrencyCatalog` public API: `Default`, `Get`, `TryGet`, `GetByNumericCode`, `IsValid`, `DataVersion`)
-- F-LANG-BIZ-05 (quantity × quantity non-cancelling rejection verification)
+**Status**: ✅ **Complete 2026-05-25.** All 14 findings closed, 6136/6137 Precept.Tests pass (1 pre-existing BUG-013), 411/411 LS tests pass, 291/291 analyzer tests pass. BUG-010 fully fixed; D10 retired (Position 3); F-TC-04 last TypeKind dispatch eliminated; F-LANG-BIZ-09 filed for Phase 4+.
+
+## Findings in scope (~13)
+
+**Decision executions (3):**
+- F-LANG-PRIM-04 (doc clarification — error stays)
+- F-LANG-TEMP-08 (remove `OperationKind.ZonedDateTimePlusPeriod` + `MinusPeriod` from catalog)
+- F-LANG-PRIM-01 (already shipped by parallel session; Phase 3 verifies)
+
+**Temporal extensions (5):**
+- F-LANG-TEMP-01/02 (context-aware `TemporalQuantityParser`)
+- F-LANG-TEMP-03 (nonzero/nonnegative on duration + period)
+- F-LANG-TEMP-05 (mixed temporal quantities — relax conditional on context)
+- F-LANG-TEMP-06/07 (timezone error message + RecoverySteps)
+
+**Business-domain types (6):**
+- F-LANG-BIZ-02 — **dropped per Position 3 decision**; replaced by doc-only retire-D10 (Step 3.3b)
+- F-LANG-BIZ-03 (currency accessors `.name`/`.minorUnit`/`.numericCode`/`.symbol`) — **absorbs Frank's case-9** interpolation-slot resolution gap
+- F-LANG-BIZ-04 (`CurrencyCatalog` public API)
+- F-LANG-BIZ-05 (quantity × quantity non-cancelling rejection — verification)
 - F-LANG-BIZ-06 (exchangerate implicit `positive`)
-- F-LANG-BIZ-08 (discrete equality narrowing infrastructure verification)
-- F-TC-04 (per-`TypeKind` dispatch `GetFormsForType` → catalog-driven)
+- F-LANG-BIZ-08 (discrete equality narrowing — verification; likely files Phase 5)
 
-**Decisions required**:
-- ~~F-LANG-PRIM-01: resolved — documentation-only fix; dropped ordering claim from docs~~
-- F-LANG-PRIM-04: which severity for `nonnegative` + `positive` combination — warning (per doc, requires `Subsumes` mechanism) or error (per current catalog mutex)?
-- F-LANG-TEMP-08: catalog or doc authoritative for `zoneddatetime ± period`?
+**Catalog discipline (1):**
+- F-TC-04 (per-`TypeKind` dispatch in typed-constants → catalog-driven; also closes adjacent `InterpolationUnsupportedTypes` FrozenSet smell)
 
-**Status**: Stub — detailed execution plan TBD pending Phase 2 completion and the 2 remaining decisions.
-**Estimated effort**: L (~1 week — substantial catalog and parser work, especially F-LANG-TEMP-01/02 context-aware parsing and F-LANG-BIZ-04 CurrencyCatalog API).
+## Step-by-step execution
+
+### Step 3.1 — Decision executions (½ day, S)
+
+- **3.1a F-LANG-PRIM-04 doc clarification**: `docs/language/primitive-types.md` (sections at lines ~197, 230, 265) — add "use `positive` OR `nonnegative`, not both" note under each numeric-type modifier list. `docs/language/catalog-system.md` § Modifiers — add the meaning-vs-syntax layered-concerns note (`Subsumes` drives proof-obligation discharge + `RedundantModifier`; `MutuallyExclusiveWith` drives `ConflictingModifiers` error; both fire on `nonnegative + positive` intentionally).
+- **3.1b F-LANG-TEMP-08 catalog cleanup**: `src/Precept/Language/OperationKind.cs:91-92` delete `ZonedDateTimePlusPeriod` + `MinusPeriod`; `src/Precept/Language/Operations.cs:396-401` delete the two GetMeta arms. Pre-execution doc-touch grep: `grep -rn "ZonedDateTime.*Period\|operation count" docs/` to catch any spec-level docs needing update.
+- **3.1c F-LANG-PRIM-01 ratification**: verification only — confirm parallel-session work shipped at `docs/language/primitive-types.md § String Ordering — Out of Scope` and `precept-language-spec.md § 3.6`.
+
+### Step 3.2 — Temporal extensions (2-3 days, L)
+
+- **3.2a F-LANG-TEMP-01/02 (1-1.5 days)**: Add optional `TypeKind? expectedType` param to `TemporalQuantityParser.Parse` (`src/Precept/Language/Time/TemporalQuantityParser.cs:11-64`). Pass through `TemporalValidator.Validate()` (`TemporalValidator.cs:13`). Context flows: `Period` accepts any NodaTime-Period-admitted unit; `Duration` accepts any unit form; null preserves existing ambiguity heuristic. Tests: `field G as period default '3 days'` clean; `set X = now() + '365 days'` clean (closes BUG-010 type-inference residual).
+- **3.2b F-LANG-TEMP-03 (¼ day)**: `src/Precept/Language/Modifiers.cs:16-21` — add `Duration` + `Period` to `ZeroBoundNumericTypes`. Spot-check `ProofEngine.Strategies.cs` discharge paths (should already work since duration/period are numeric under the hood).
+- **3.2c F-LANG-TEMP-05 (¼ day)**: `TemporalQuantityParser.cs:54` — TEMP005 emission becomes conditional on `expectedType` being null/ambiguous. Mixed forms like `'1 day 2 hours'` accept under known context; preserve PRE0091 fallback for ambiguous.
+- **3.2d F-LANG-TEMP-06/07 (¼ day)**: `TemporalParser.cs:113-119` — better inline message (suggest IANA `Region/City` format). `Diagnostics.cs` — add RecoverySteps to the timezone-routing diagnostic.
+
+### Step 3.3 — Business-domain types (2-2.5 days, M)
+
+- **3.3a F-LANG-BIZ-04 (½ day)**: `src/Precept/Language/CurrencyCatalog.cs` — add `Default`/`Get`/`TryGet`/`GetByNumericCode`/`IsValid`/`DataVersion`. MCP doc-sync check: decide whether `DataVersion` lights up in `precept_domains scope=currencies`. Extend existing `CurrencyCatalogTests.cs` (5 `[Fact]`s already cover `.All`).
+- **3.3b F-LANG-BIZ-02 retire D10 (¼ day, doc-only)**: 13-site D10 hit map in `business-domain-types.md` (lines 86, 503, 603, 1538, 1543, 1718-1721 full §, 1737, 1818, 1822, 1824 Corollary 2 rewrite, 2025 teachable-example). Corollary 2 stands on its own (rates bidirectional; zero/negative meaningless) — drops the broken D10 analogy. Step 3.3d ratifies what Corollary 2 already states.
+- **3.3c F-LANG-BIZ-03 + Frank's case-9 (1-1.5 days, M)**: Part 1 — add 4 `FixedReturnAccessor` entries on Currency in `src/Precept/Language/Types.cs`. Part 2 — typed-constant interpolation-slot resolution: extend `TypeChecker.cs:MapInterpolatedQualifier` to resolve currency-member-access slots (mirror unit-slot pattern). Tests: same-currency `'{A.amount} {A.currency}'` clean; cross-currency emits PRE0068.
+- **3.3d F-LANG-BIZ-06 (¼ day)**: `src/Precept/Language/Types.cs` ExchangeRate entry — add `ImpliedModifiers: [ModifierKind.Positive]`. Uses existing infrastructure (Currency.notempty precedent).
+- **3.3e F-LANG-BIZ-05 (½ day, verification)**: scenario tests for quantity × quantity cross-dimension. If specific diagnostic missing, file for Phase 5.
+- **3.3f F-LANG-BIZ-08 (½ day, verification)**: equality-narrowing scenario tests. Likely files Phase 5 (proof-engine strategy addition).
+
+### Step 3.4 — F-TC-04 catalog-driven typed-constant dispatch (1 day, M)
+
+- Extend `ContentValidation` DU subtypes in `src/Precept/Language/Type.cs:139-197` with per-subtype `InterpolationForms` field.
+- Wire form tables into per-type `ContentValidation` declarations in `src/Precept/Language/Types.cs`.
+- Delete `GetFormsForType` kind-switch (`TypeChecker.Expressions.TypedConstants.cs:285-297`); replace call at line 482 with catalog lookup.
+- Close adjacent smell: `InterpolationUnsupportedTypes` FrozenSet (`TypeChecker.Expressions.TypedConstants.cs:92-96`) — replace `Contains(type)` with catalog lookup (`ContentValidation?.InterpolationForms is null`).
+- All existing typed-constant tests must pass identically — refactor is structural; behavior identical.
+
+### Step 3.5 — Verification + commit (½ day, S)
+
+- `dotnet build` 0 warnings/errors; `dotnet test` × 3 runs, no flakes
+- MCP probe battery (9 inputs ratifying TEMP-01/02/03/05/06/07/08 + BIZ-02 Position 3 + BIZ-03 + BIZ-06)
+- Catalog-discipline grep: no `GetFormsForType`, no `type switch` per-Kind dispatch in TypedConstants
+- Sample-corpus tidy: `samples/insurance-claim-adjudication.precept` + tutorial walkthrough use explicit `maxplaces 2` opt-in idiom (sample-edit-constraint exception documented in commit body)
+- One Phase 3 commit + tracker update (Phase 3 row ✅ Complete; BUG-010 fully Fixed)
+
+## Decisions required
+
+**None.** All 4 Phase-3-gating decisions are settled (see § "Resolved for Phase 3" above for four-leg rationale on each).
+
+**Open execution-time decisions** (non-gating, defaults below):
+- F-LANG-BIZ-04 `Default` semantics → recommend `null` (Precept doesn't pick currency on author's behalf)
+- F-LANG-BIZ-02 canonical-sample idiom → recommend `samples/insurance-claim-adjudication.precept` (sample-edit-constraint exception load-bearing for discoverability)
+- F-LANG-TEMP-03 Period applicability → recommend YES (Periods can be zero/negative in NodaTime)
+- F-LANG-BIZ-05/BIZ-08 gap reporting → if larger than Phase 3 scope, file for Phase 5 (don't expand)
+- F-LANG-TEMP-05 mixed-quantity period semantics → recommend permit (NodaTime supports it)
+
+## Dependencies
+
+- Phase 1 ✅ complete; Phase 2 ✅ complete
+- Sample-edit constraint: only the one canonical sample (`insurance-claim-adjudication.precept`) gets touched in Phase 3 for F-LANG-BIZ-02 discoverability; BUG-002 / BUG-012 sample workarounds persist until Phase 4/5
+
+## Exit criteria (testable, ≥13 conditions)
+
+- [ ] `dotnet build` 0 warnings, 0 errors
+- [ ] `dotnet test --no-build` 0 failures across all 4 projects (except BUG-013, parallel-session-owned); 3× run, no flakes
+- [ ] MCP probe battery (9 inputs) all return expected outcomes
+- [ ] `OperationKind` no longer contains `ZonedDateTimePlusPeriod` / `MinusPeriod`
+- [ ] `Modifiers.ZeroBoundNumericTypes` contains `Duration` and `Period`
+- [ ] `CurrencyCatalog` exposes 6 new public surface methods/properties
+- [ ] Currency TypeMeta has 4 accessors
+- [ ] Typed-constant interpolation resolves currency-member-access slots (Frank's case-9 closed)
+- [ ] ExchangeRate TypeMeta has `ImpliedModifiers: [Positive]`
+- [ ] **`money` TypeMeta has NO `ImpliedModifiers`** (Position 3 ratification)
+- [ ] D10 retired from `business-domain-types.md` (grep returns 0)
+- [ ] Research artifact at `research/architecture/compiler/currency-precision-coupling-survey.md`
+- [ ] F-LANG-BIZ-09 (boundary-precision) filed
+- [ ] Sample-corpus opt-in idiom: at least 1 canonical sample uses `maxplaces 2`
+- [ ] `GetFormsForType` switch eliminated; `InterpolationUnsupportedTypes` eliminated
+- [ ] `bugs.md` BUG-010 fully in ## Fixed
+- [ ] Doc-touches landed per CLAUDE.md routing table (primitive-types.md, business-domain-types.md, temporal-type-system.md, catalog-system.md, diagnostic-system.md, type-checker.md)
+
+## Estimated effort
+
+**M (~4-6 days)**. Was L 5-7 days; +1 day absorbed Frank's case-9 into 3.3c; then −1.5 days when F-LANG-BIZ-02's implicit-modifier work dropped under Position 3. The largest single subtask in 3.3 (implicit per-currency maxplaces) was also the only risk hotspot; both went away.
+
+| Step | Day-band |
+|---|---|
+| 3.1 — Decision executions | ½ day, S |
+| 3.2 — Temporal extensions | 2-3 days, L |
+| 3.3 — Business-domain types | 2-2.5 days, M |
+| 3.4 — Catalog-driven dispatch | 1 day, M |
+| 3.5 — Verification + commit | ½ day, S |
+
+## Doc-update obligations (per CLAUDE.md routing table)
+
+| Sub-step | Docs to update |
+|---|---|
+| 3.1a | `primitive-types.md`, `catalog-system.md` |
+| 3.1b | `temporal-type-system.md` (verify), `catalog-system.md` (operation count), pre-execution grep for spec-level docs |
+| 3.2a | `temporal-type-system.md`, `compiler/type-checker.md` |
+| 3.2b | `temporal-type-system.md`, `catalog-system.md` § Modifiers |
+| 3.2c | `temporal-type-system.md` |
+| 3.2d | `compiler/diagnostic-system.md` |
+| 3.3a | `business-domain-types.md` § CurrencyCatalog, `catalog-system.md`, `tools/Precept.Mcp/CatalogFormatters.cs` + `tooling/mcp.md` if `DataVersion` surfaces |
+| 3.3b | `business-domain-types.md` (retire D10 13 sites + Corollary 2 rewrite); F-LANG-BIZ-09 finding; new research artifact |
+| 3.3c | `business-domain-types.md` § Currency accessors + § Interpolation-slot resolution, `compiler/type-checker.md` |
+| 3.3d | `business-domain-types.md` § ExchangeRate-implicit-positive |
+| 3.3e/3.3f | `business-domain-types.md` or `bugs.md` (verify-then-file) |
+| 3.4 | `catalog-system.md` § ContentValidation DU shape, `compiler/type-checker.md` (catalog discipline restored) |
+| 3.5 | this plan (tracker), `bugs.md` (BUG-010 status) |
+
+## Discovered during planning
+
+1. **Frank's case-9 currency-member-access interpolation gap** absorbed into Step 3.3c (was case 9 of `frank-price-qualifier-full-analysis.md`). Adding currency accessors without extending interpolation-slot resolution would compound the silent gap. Step 3.3c grew ¼ day → 1-1.5 days; mirrors existing unit-slot resolution pattern.
+2. **F-LANG-BIZ-02 implicit-precision premise was wrong** — dropped via external research (`/lifecycle-1-research` skill, full survey in research artifact). Position 3 ratified; D10 retires doc-only; F-LANG-BIZ-09 filed for Phase 4+ boundary enforcement. Phase 3 effort drops L→M.
+3. **F-LANG-BIZ-08 narrowing is design-required for Phase 5** — confirmed proof engine has no choice-equality narrowing strategy today. Step 3.3f verify-then-file rather than absorbing into Phase 3.
+4. **5 additional research follow-ups** from the currency-precision survey's Open Questions (multi-currency arithmetic safety, hyperinflationary drift, core-banking comparator gap, crypto, opt-in discoverability) — to be filed alongside the F-LANG-BIZ-09 lift.
+
+Planning artifact: `/home/sfalik/.claude/plans/refactored-yawning-fern.md` (heavyweight Phase 3 plan, reviewer-audited 2026-05-25).
 
 ---
 

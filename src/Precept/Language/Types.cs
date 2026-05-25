@@ -101,19 +101,22 @@ public static class Types
         TemporalLiteralKind.TemporalQuantity,
         "quantity",
         "Temporal quantity: <integer> <unit> [+ <integer> <unit>]*",
-        ["72 hours", "2 hours + 30 minutes", "3600 seconds"]);
+        ["72 hours", "2 hours + 30 minutes", "3600 seconds"],
+        InterpolationFormsCategory: InterpolationFormsCategory.Temporal);
 
     private static readonly NodaTimeValidation PeriodValidation = new(
         TemporalLiteralKind.TemporalQuantity,
         "NormalizingIso",
         "Temporal quantity: <integer> <unit> [+ <integer> <unit>]*",
-        ["30 days", "2 years + 6 months", "P30D"]);
+        ["30 days", "2 years + 6 months", "P30D"],
+        InterpolationFormsCategory: InterpolationFormsCategory.Temporal);
 
     private static readonly ClosedSetValidation CurrencyValidation = new(
         "ISO 4217",
         CurrencyCatalog.All.Keys.ToFrozenSet(StringComparer.OrdinalIgnoreCase),
         "ISO 4217 currency code",
-        ["USD", "EUR", "GBP"]);
+        ["USD", "EUR", "GBP"],
+        InterpolationFormsCategory: InterpolationFormsCategory.SingleComponent);
 
     private static readonly UcumValidation UnitOfMeasureValidation = new(
         "UCUM expression",
@@ -123,7 +126,8 @@ public static class Types
         "recognized dimensions",
         DimensionCatalog.All.Keys.ToFrozenSet(StringComparer.OrdinalIgnoreCase),
         "Dimension family identifier",
-        ["length", "mass", "count"]);
+        ["length", "mass", "count"],
+        InterpolationFormsCategory: InterpolationFormsCategory.SingleComponent);
 
     private static readonly MoneyValidation MoneyLiteralValidation = new(
         "Monetary amount: <decimal> <ISO-4217>",
@@ -523,6 +527,13 @@ public static class Types
             TypeCategory.BusinessDomain,
             Traits: TypeTrait.EqualityComparable,
             ImpliedModifiers: [ModifierKind.Notempty],
+            Accessors:
+            [
+                new FixedReturnAccessor("name",        TypeKind.String,  "Currency display name"),
+                new FixedReturnAccessor("minorUnit",   TypeKind.Integer, "Minor-unit decimal places (e.g., 2 for USD)"),
+                new FixedReturnAccessor("numericCode", TypeKind.Integer, "ISO 4217 numeric code"),
+                new FixedReturnAccessor("symbol",      TypeKind.String,  "Currency symbol (e.g., '$')"),
+            ],
             DisplayName: "currency",
             HoverDescription: "An ISO 4217 currency code identifier such as 'USD' or 'EUR'. Carries notempty implicitly.",
             UsageExample: "field BaseCurrency as currency default 'USD'",
@@ -601,6 +612,7 @@ public static class Types
             "Currency exchange rate",
             TypeCategory.BusinessDomain,
             Traits: TypeTrait.EqualityComparable,
+            ImpliedModifiers: [ModifierKind.Positive],
             QualifierShape: QS_ExchangeRate,
             Accessors:
             [

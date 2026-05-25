@@ -139,6 +139,17 @@ surfaced for proper fixing.
   ```
   Yields PRE0116 on the right-hand `Amount` read even though `on Submit ensure Amount is set` provably establishes presence before the row body runs.
 
+### F-LANG-BIZ-08: Discrete equality narrowing for `choice of` fields is not implemented
+
+- **Discovered**: 2026-05-25 during Phase 3 Step 3.3f verification
+- **Affected**: any precept rule or guard that uses `choice == "literal"` and expects the proof engine to narrow the choice field to that value in the branch body
+- **Symptom**: `when Priority == "High"` does not narrow `Priority` to `"High"` inside the branch. The proof engine's narrowing strategies (Strategy 3 GuardInPath, Strategy 4 FlowNarrowing in `ProofEngine.Strategies.cs`) are numeric-only — no `BuildNarrowedDiscreteValues` analog exists for choice literals. The equality operator (`ChoiceEqualsChoice → Boolean`) resolves cleanly, but no narrowing strategy consumes the result.
+- **Root cause**: `ProofEngine.Strategies.cs` narrowing infrastructure handles numeric interval narrowing via `BuildNarrowedIntervals`. There is no corresponding mechanism to recognize `when X == "literal"` for a choice field and narrow `X`'s set of possible values to `{"literal"}` in the guard-true branch.
+- **Workaround used**: none needed for current samples — choice equality guards work as boolean conditions, they just don't enable further proof narrowing (e.g., proving that a subsequent use of the same field satisfies a constraint).
+- **Fix complexity**: design-required — requires (a) a new proof strategy that recognizes `choiceField == literal` guards and narrows the field's discrete value set, and (b) a discrete-value interval representation (analogous to `BuildNarrowedIntervals` for scalar types). Non-trivial proof-engine extension.
+- **Priority**: quality bar — narrowing for choice fields improves proof-engine completeness and reduces false-positive `UnprovedModifierRequirement` diagnostics in complex guard chains.
+- **Target phase**: Phase 5 (proof engine satisfiability)
+
 ## Fixed
 
 ### BUG-011: `timezone` and `time` fields with typed-constant default crash the compiler
@@ -152,12 +163,12 @@ surfaced for proper fixing.
 
 ### BUG-010: `now() + '<duration>'` expression crashes the compiler
 
-- **Status**: ⚠️ **Crash fixed by Phase 2 (2026-05-25, commit `38712543`); type-inference quirk deferred to Phase 4.** No crash anymore — `now() + '365 days'` returns a structured PRE0058 diagnostic (literal interpreted as instant rather than duration). Defense-in-depth wrapper in `McpToolSafeInvoke` covers any residual unexpected throw. Full type-inference fix (treating `'<duration literal>'` as a duration when arithmetic context demands one) is deferred to Phase 4 with the other typed-constant work. Scenario test in `test/Precept.Mcp.Tests/CompileTool_BugReproTests.cs` asserts the structured-diagnostic guarantee.
+- **Status**: ✅ **Fully fixed by Phase 3 (F-LANG-TEMP-01/02, context-aware temporal classification).** Phase 2 fixed the crash (commit `38712543`); Phase 3 fixed the type-inference quirk — `TemporalQuantityParser.Parse` now accepts an optional `TypeKind? expectedType` parameter, so `now() + '365 days'` in a duration arithmetic context correctly classifies the literal as a duration and compiles clean. Defense-in-depth wrapper in `McpToolSafeInvoke` remains for any future regression. Scenario test in `test/Precept.Mcp.Tests/CompileTool_BugReproTests.cs`.
 - **Discovered**: 2026-05-24 during sweep batch 6 refactor of `samples/saas-user-provisioning.precept` and `samples/saas-license-management.precept`
 - **Affected**: any precept that computes a future `instant` by adding a duration literal to `now()` — e.g. `set ExpirationDate = now() + '365 days'`, `now() + '30 days'`, `now() + '1 hour'`. The shape appears in `now() + '<duration literal>'` whether in a transition row body or an event ensure.
 - **Original symptom** (before Phase 2): `precept_compile` returned "An error occurred invoking 'precept_compile'." with no diagnostic, no PRE-code, no message. Now returns structured PRE0058 (type-inference quirk; no crash).
 - **Workaround used**: in batch 6, both `samples/saas-user-provisioning.precept` and `samples/saas-license-management.precept` carry the expiration date as an event argument supplied by the procurement/identity host. Cited inline with `# BUG-010:` comment in the file header.
-- **Post-fix cleanup** (after Phase 4 type-inference fix): restore server-side temporal derivation in `samples/saas-user-provisioning.precept` and `samples/saas-license-management.precept`: replace the `LicenseExpirationDate`/`ExpirationDate`/`NewExpirationDate` event-arg path with `set ExpirationDate = now() + '<term>'` row bodies (e.g. `'365 days'` for annual license, `'30 days'` for grace). **Scope-check**: sweep `grep -rn "# BUG-010" samples/` to find every cite site. Remove `# BUG-010` comments.
+- **Post-fix cleanup** (Phase 4 sample-restore): restore server-side temporal derivation in `samples/saas-user-provisioning.precept` and `samples/saas-license-management.precept`: replace the `LicenseExpirationDate`/`ExpirationDate`/`NewExpirationDate` event-arg path with `set ExpirationDate = now() + '<term>'` row bodies (e.g. `'365 days'` for annual license, `'30 days'` for grace). **Scope-check**: sweep `grep -rn "# BUG-010" samples/` to find every cite site. Remove `# BUG-010` comments.
 
 ### BUG-009: `precept_compile` MCP tool has an undocumented payload-size limit
 

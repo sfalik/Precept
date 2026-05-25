@@ -651,15 +651,16 @@ public class OperationsTests
     [Fact]
     public void Binary_Count()
     {
-        // 85 arithmetic + 104 comparison + 4 logical/membership pseudo-ops = 193 binary
-        Operations.All.OfType<BinaryOperationMeta>().Should().HaveCount(194);
+        // 83 arithmetic + 104 comparison + 4 logical/membership pseudo-ops + 1 ZonedDateTime − ZonedDateTime = 192 binary
+        // (was 194 prior to F-LANG-TEMP-08 removal of ZonedDateTime±Period; see compiler-readiness-plan-2026-05-24.md § Resolved for Phase 3)
+        Operations.All.OfType<BinaryOperationMeta>().Should().HaveCount(192);
     }
 
     [Fact]
     public void Total_Count()
     {
-        // 9 unary + 193 binary = 202 total
-        Operations.All.Should().HaveCount(203);
+        // 9 unary + 192 binary = 201 total
+        Operations.All.Should().HaveCount(201);
     }
 
     // ── Proof Requirements ──────────────────────────────────────────────────────

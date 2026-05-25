@@ -88,12 +88,8 @@ internal static partial class TypeChecker
     //  Interpolated typed constant resolution (Slice 2)
     // ════════════════════════════════════════════════════════════════════════
 
-    /// <summary>Types that do not support interpolation.</summary>
-    private static readonly FrozenSet<TypeKind> InterpolationUnsupportedTypes = new[]
-    {
-        TypeKind.Date, TypeKind.Time, TypeKind.Instant,
-        TypeKind.DateTime, TypeKind.ZonedDateTime, TypeKind.Timezone,
-    }.ToFrozenSet();
+    // InterpolationUnsupportedTypes FrozenSet eliminated (F-TC-04):
+    // replaced by catalog lookup: Types.GetMeta(type).ContentValidation is { InterpolationFormsCategory: null }
 
     private static readonly IReadOnlyDictionary<TypeKind, string> InterpolationUnsupportedGuidance =
         new Dictionary<TypeKind, string>
@@ -279,21 +275,17 @@ internal static partial class TypeChecker
     ];
 
     /// <summary>
-    /// Gets the applicable form patterns for a target type.
-    /// Returns null if the type doesn't support interpolation at all.
-    /// </summary>
-    private static SegmentForm[]? GetFormsForType(TypeKind type) => type switch
+    private static SegmentForm[]? GetFormsByCategory(InterpolationFormsCategory? category) => category switch
     {
-        TypeKind.Money         => MoneyForms,
-        TypeKind.Quantity      => QuantityForms,
-        TypeKind.Price         => PriceForms,
-        TypeKind.ExchangeRate  => ExchangeRateForms,
-        TypeKind.Currency      => SingleComponentForms,
-        TypeKind.UnitOfMeasure => UnitOfMeasureForms,
-        TypeKind.Dimension     => SingleComponentForms,
-        TypeKind.Duration      => TemporalSingleForms,
-        TypeKind.Period        => TemporalSingleForms,
-        _ => null,
+        InterpolationFormsCategory.Money          => MoneyForms,
+        InterpolationFormsCategory.Quantity        => QuantityForms,
+        InterpolationFormsCategory.Price           => PriceForms,
+        InterpolationFormsCategory.ExchangeRate    => ExchangeRateForms,
+        InterpolationFormsCategory.SingleComponent => SingleComponentForms,
+        InterpolationFormsCategory.UnitOfMeasure   => UnitOfMeasureForms,
+        InterpolationFormsCategory.Temporal        => TemporalSingleForms,
+        null                                       => null,
+        _                                          => null,
     };
 
     /// <summary>
@@ -465,13 +457,14 @@ internal static partial class TypeChecker
             return new TypedErrorExpression(expr.Span);
         }
 
-        // Step 3: Unsupported types
-        if (InterpolationUnsupportedTypes.Contains(targetType))
+        // Step 3: Unsupported types — has ContentValidation but no interpolation forms (e.g., formatted temporal types)
+        var typeMeta = Types.GetMeta(targetType);
+        if (typeMeta.ContentValidation is { InterpolationFormsCategory: null })
         {
             var guidance = InterpolationUnsupportedGuidance.GetValueOrDefault(targetType, "");
             ctx.Diagnostics.Add(
                 Diagnostics.Create(DiagnosticCode.InterpolationNotSupportedForType, expr.Span,
-                    Types.GetMeta(targetType).DisplayName, guidance));
+                    typeMeta.DisplayName, guidance));
             return new TypedErrorExpression(expr.Span);
         }
 
@@ -479,7 +472,7 @@ internal static partial class TypeChecker
         var segments = expr.Segments;
 
         // Step 5–6: Match against form grammars
-        var forms = GetFormsForType(targetType);
+        var forms = GetFormsByCategory(Types.GetMeta(targetType).ContentValidation?.InterpolationFormsCategory);
         if (forms is null)
         {
             ctx.Diagnostics.Add(
@@ -563,13 +556,29 @@ internal static partial class TypeChecker
 
         var typedSlotsArray = typedSlots.ToImmutable();
 
-        // Step 9: Dimension-unit consistency for unit-slot holes
+        // Step 9a: Dimension-unit consistency for unit-slot holes
         foreach (var slot in typedSlotsArray)
         {
             if (slot.SlotKind != InterpolationSlotKind.Unit) continue;
             if (slot.Expression.ResultType != TypeKind.UnitOfMeasure) continue;
 
             ValidateUnitSlotDimensionConsistency(slot.Expression, qualifiers, expr.Span, ctx);
+        }
+
+        // Step 9b: Currency consistency for currency-slot holes
+        foreach (var slot in typedSlotsArray)
+        {
+            var axis = slot.SlotKind switch
+            {
+                InterpolationSlotKind.Currency     => QualifierAxis.Currency,
+                InterpolationSlotKind.FromCurrency => QualifierAxis.FromCurrency,
+                InterpolationSlotKind.ToCurrency   => QualifierAxis.ToCurrency,
+                _ => (QualifierAxis?)null,
+            };
+            if (axis is null) continue;
+            if (slot.Expression.ResultType != TypeKind.Currency) continue;
+
+            ValidateCurrencySlotQualifierConsistency(slot.Expression, axis.Value, qualifiers, expr.Span, ctx);
         }
 
         return new InterpolatedTypedConstant(
@@ -785,6 +794,45 @@ internal static partial class TypeChecker
             ctx.Diagnostics.Add(
                 Diagnostics.Create(DiagnosticCode.DimensionMismatchInUnitSlot, span,
                     sourceName, sourceDimensionName, targetDimension));
+        }
+    }
+
+    /// <summary>
+    /// Currency consistency check for currency-slot holes in interpolated typed constants.
+    /// Mirrors ValidateUnitSlotDimensionConsistency for the currency axis.
+    /// </summary>
+    private static void ValidateCurrencySlotQualifierConsistency(
+        TypedExpression holeExpr,
+        QualifierAxis slotAxis,
+        ImmutableArray<DeclaredQualifierMeta>? qualifiers,
+        SourceSpan span,
+        CheckContext ctx)
+    {
+        var sourceCurrency = ResolveSlotSourceQualifierAxis(holeExpr, slotAxis, out var sourceName);
+        if (sourceCurrency.Kind != QualifierResolutionKind.Resolved
+            || sourceCurrency.Qualifier is null
+            || !TryGetQualifierText(sourceCurrency.Qualifier, slotAxis, out var sourceCurrencyCode)
+            || qualifiers is not { } tq
+            || tq.IsDefaultOrEmpty)
+        {
+            return;
+        }
+
+        var expandedTargetQualifiers = ExpandAssignmentTargetQualifiers(tq);
+        var targetCurrencyCode = expandedTargetQualifiers
+            .Select(q => ProjectQualifierForAxis(q, slotAxis))
+            .OfType<DeclaredQualifierMeta.Currency>()
+            .Select(q => q.CurrencyCode)
+            .FirstOrDefault();
+
+        if (targetCurrencyCode is null)
+            return;
+
+        if (!string.Equals(sourceCurrencyCode, targetCurrencyCode, StringComparison.OrdinalIgnoreCase))
+        {
+            ctx.Diagnostics.Add(
+                Diagnostics.Create(DiagnosticCode.CurrencyMismatchInCurrencySlot, span,
+                    sourceName, sourceCurrencyCode, targetCurrencyCode));
         }
     }
 
