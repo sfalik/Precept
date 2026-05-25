@@ -19,7 +19,7 @@
 | 2 | Green baseline + no crashes + Operations.Resolve + MCP-crash family | **12+** | 2 | **L (~4-5 days)** | ✅ **Complete 2026-05-25** (all 7 steps shipped: 2.1–2.7; MCP wrapper backstop + temporal-literal verified clean + LS URI-case fix + Operations.Resolve + generic SyntaxReference test; 6107/6108 Precept.Tests pass with the 1 failure as new BUG-013; 411/411 LS tests pass; 67/67 Mcp tests pass; 291/291 analyzer tests pass) |
 | 3 | Type system completeness | ~15 | 3 | L | Stub — TBD |
 | 4 | Collection completeness + BUG-002 | **~16** | 2 | L | Stub — TBD |
-| 5 | Proof engine satisfiability + BUG-004 + BUG-006 | **~12** | 2 | XL | Stub — TBD |
+| 5 | Proof engine satisfiability + BUG-004 + BUG-006 + BUG-012 + FieldNeverSet/unification | **~14** | 2 | XL | Partial — F-LANG-GRAPH-04 planned, rest stubbed |
 | 6 | `units` block + composite basis | 2 | 0 | L | Stub — TBD |
 | 7 | API surface solidity (typed descriptors) | ~6 | 1 | M-L | Stub — TBD |
 | 8 | Diagnostic completeness | ~7 | 3 | M | Stub — TBD |
@@ -29,6 +29,24 @@
 **Overall estimate**: 7-11 weeks of focused work (was 6-10; Phase 2 grew). Phase 1 includes (a) 5 lifecycle skill builds + rename, (b) 16 Archive promotion obligations, (c) CONTRIBUTING.md lifecycle updates. Phase 2 grew from ~2-3 days to ~4-5 days after integrating 10 active bugs from `bugs.md` (parallel sample-remediation session, 2026-05-24): 6 MCP-crash family bugs (BUG-003 period, -005 symptom, -007 domains, -008 duration, -010 now()+duration, -011 timezone+time), 1 MCP transport bug (BUG-009 payload limit), plus the original F-LANG-SPEC-10. Coordinated MCP-layer instrumentation pass catches the whole family in one fix. Phase 5 (proof engine satisfiability) remains the highest variance.
 
 **`bugs.md` as ongoing source**: parallel sample-authoring sessions continue to discover bugs that surface in real authoring workflows (not in code-vs-doc audits). Plan integrates bugs.md as a standing input. Phase-kickoff protocol includes "re-read bugs.md for new entries since last integration."
+
+**Bug-to-phase coverage map** (as of 2026-05-25, after Phase 2 commit `38712543`):
+
+| Bug | Status | Phase | Rationale |
+|---|---|---|---|
+| BUG-001 | ✅ Fixed | (earlier) | Proof engine narrowing — shipped pre-plan |
+| BUG-002 | Active | 4 | Lookup `remove` key dispatch — collection completeness |
+| BUG-003 | ✅ Fixed | 2 | Period typed-constant default crash |
+| BUG-004 | Active | 5 | Proof engine event-ensure body narrowing — same family as BUG-001 |
+| BUG-005 | Active (symptom-fixed) | 2 symptom + 4 root | Qualified inner types in lookup — full support is F-LANG-COLL-06 |
+| BUG-006 | Active | 5 | Proof engine guard + field-`max` interval composition |
+| BUG-007 | ✅ Fixed | 2 | `precept_domains` MCP crash |
+| BUG-008 | ✅ Fixed | 2 | Duration typed-constant default crash |
+| BUG-009 | ✅ Fixed | 2 | MCP payload-size — in-process verified clean; wire-level wrapper backstop |
+| BUG-010 | ✅ Fixed (crash) / open (type-inference) | 2 crash + 4 type-inference | `now() + '<duration>'` — structured diagnostic; full inference fix Phase 4 |
+| BUG-011 | ✅ Fixed | 2 | Timezone / time typed-constant default crash |
+| BUG-012 | Active | 5 | Ordered-choice + literal proof gap — same proof-engine-strategy family as BUG-004 / BUG-006 |
+| BUG-013 | Active (parallel-session owned) | n/a | `samples/Test.precept` missing; the test references a sample the parallel session didn't carry forward. **Parallel-session triage**: either re-add the fixture or rewrite the test inline. Not assigned to a numbered phase because the test-side fix is trivial and the sample-side ownership lives outside this plan. |
 
 ---
 
@@ -510,9 +528,9 @@ Plus, since Phase 1's F-LANG-CAT-15 decision was "implement," `Operations.Resolv
 
 # Phase 5: Proof engine satisfiability extensions
 
-**Goal**: Close § 0.6 of the spec — the proof engine delivers all 13 documented obligation types. Dead/contradictory/vacuous/tautological detection ships. Collection proof obligations (.at bounds, log-by uniqueness, insert/remove-at bounds) ship.
+**Goal**: Close § 0.6 of the spec — the proof engine delivers all 13 documented obligation types. Dead/contradictory/vacuous/tautological detection ships. Collection proof obligations (.at bounds, log-by uniqueness, insert/remove-at bounds) ship. Field-level dead-code detection (`FieldNeverSet`) ships, co-shipping with access-modifier unification (`writable` → `editable`).
 
-**Findings in scope** (~12, expanded after bugs.md integration):
+**Findings in scope** (~14, expanded after bugs.md integration + 2026-05-25 design lock):
 - F-LANG-SPEC-02 (dead-guard detection — `UnsatisfiableGuard` PRE0082)
 - F-LANG-SPEC-03 (contradictory rule detection — new diagnostic)
 - F-LANG-SPEC-04 (vacuous rule detection)
@@ -524,13 +542,150 @@ Plus, since Phase 1's F-LANG-CAT-15 decision was "implement," `Operations.Resolv
 - F-LANG-TEMP-04 (always-false period literal comparison — small constant-folding analyzer)
 - **BUG-004** — Proof engine ignores event ensures for transition-row body narrowing. Fix: extend guard-extraction switch in `ProofEngine.Strategies.cs` so event ensures on the row's event contribute their `is set` predicates to body narrowing. Mirrors the BUG-001 fix shape. Trivial-to-small.
 - **BUG-006** — Proof engine doesn't combine guard narrowing with field-level `max` for arithmetic interval inference. Fix: extend the interval-narrowing strategy to compose guard-derived field bounds with field-modifier-derived bounds across rows. Design-required; same architectural family as the new dead-guard / contradictory-rule machinery.
+- **BUG-012** — Ordinal comparison between an ordered-choice field and a choice-literal (`Severity <= 2`, `Tier <= "Medium"`) cannot be proved; the `Both choice operands must be declared ordered` obligation falls through to Unresolved when one operand is a literal. Fix: either (a) lift the `Ordered` modifier from the contextual choice-set type when one operand is a literal and the other a typed ordered-choice field, or (b) add a typed-literal strategy that infers the modifier from the operand's expected type. Small-to-medium; self-contained to the proof engine; no language surface change. Same architectural family as BUG-004 / BUG-006 (proof-engine strategy extension).
+- **F-LANG-GRAPH-04 (FieldNeverSet + access-modifier unification)** — fully planned 2026-05-25. Design: [`field-never-set-diagnostic.md`](field-never-set-diagnostic.md) v2. See § F-LANG-GRAPH-04 execution slices below.
 
 **Decisions required**:
 - F-LANG-TEMP-04: implement always-false period comparison warning or drop spec promise?
 - F-LANG-BIZ-01: add `MoneyDividePrice → Quantity` to catalog or accept asymmetric algebra?
+- F-LANG-GRAPH-04: **all 6 design decisions locked** — see design doc.
 
-**Status**: Stub — detailed execution plan TBD pending Phase 4 completion. **This is the highest-variance phase** — each new proof obligation involves design questions about completeness, soundness, and counterexample reporting. May spawn additional Phase 5.1, 5.2 work.
-**Estimated effort**: XL (~2-3 weeks — proof engine extensions are intrinsically design-heavy).
+**Status**: Partial plan — F-LANG-GRAPH-04 has detailed execution slices below; remaining findings stubbed pending Phase 4 completion. **This is the highest-variance phase** — each new proof obligation involves design questions about completeness, soundness, and counterexample reporting. May spawn additional Phase 5.1, 5.2 work.
+**Estimated effort**: XL (~2-3 weeks across all findings; F-LANG-GRAPH-04 is L within that envelope, ~5-7 days).
+
+## F-LANG-GRAPH-04 execution
+
+Design: [`field-never-set-diagnostic.md`](field-never-set-diagnostic.md) v2 (Locked 2026-05-25). Six locked decisions ground the work; all four legs filled. Ships two coupled deliverables: `FieldNeverSet` Warning diagnostic via a new graph-analyzer sub-pass, and an access-modifier unification refactor that retires `ModifierKind.Writable`, removes the keyword `writable`, and consolidates field-level write capability under `editable` (Access Modifier, now valid at both field-declaration and per-state `modify` row sites).
+
+### Slice tracker
+
+| # | Slice | Depends on | Effort | Parallelizable |
+|---|-------|------------|--------|----------------|
+| 1 | Access-modifier unification (catalog + parser + lexer + tokens) | — | M (~1d) | No |
+| 2 | Sample corpus mechanical rename (`writable` → `editable`) | 1 | S (~½d) | No |
+| 3 | `ActionMeta.WriteSemantics` catalog property | — | S (~½d) | Yes (with 1) |
+| 4 | `FieldNeverSet` diagnostic catalog entry + count corrections | — | S (~½d) | Yes (with 1, 3) |
+| 5 | `FieldWriteSiteAnalyzer` implementation | 1, 3, 4 | M (~1-1.5d) | No |
+| 6 | Sample corpus `FieldNeverSet` trip sweep | 2, 5 | M (~1-2d, high variance) | No |
+| 7 | Doc updates (full enumeration from design § Doc-update enumeration) | 1, 3, 4, 5 | M (~1d) | Yes (with 6) |
+| 8 | Verification + `/lifecycle-6-review --strict` | 6, 7 | S (~½d) | No |
+
+### Slice 1: Access-modifier unification
+
+Eliminate `ModifierKind.Writable` and the keyword `writable`; consolidate write-capability declaration under `editable` (Access Modifier) at both field-declaration and per-state `modify` positions. Per design Decision 5.
+
+Files: `ModifierKind.cs` (remove `Writable = 15`), `Modifiers.cs` (drop `Writable` arm, expand `Write` arm with `ApplicableDeclarationSites`), `AccessModifierMeta` (add `ApplicableDeclarationSites` field), `TokenKind.cs` (remove `Writable`), `Tokens.cs` (drop `Writable` entry), `Lexer.cs` (drop keyword recognition), `Parser.*.cs` (accept `editable` at field-declaration position), `DiagnosticCode.cs` (`WritableOnEventArg` → `EditableOnEventArg`, preserve ordinal), `Diagnostics.cs` (update message + examples). Regenerate `tmLanguage.json` from the catalog — do not hand-edit.
+
+Tests: `ModifierKindTests.Writable_IsRemoved`, `TokenKindTests.Writable_IsRemoved`, `AccessModifierMetaTests.Write_ValidAtFieldDeclaration`, `Write_ValidAtModifyRow`, `Parser/FieldModifierParsingTests` extensions.
+
+Exit: catalog reports `ModifierKind.Writable` undefined; `precept_modifiers` MCP no longer mentions `writable`.
+
+### Slice 2: Sample corpus mechanical rename
+
+`git grep -l '\bwritable\b' samples/` → `sed -i 's/\bwritable\b/editable/g' samples/*.precept` → diff review → `SampleCompilesCleanTests` clean. Watch for `writable` in comments where meaning is documentation, not keyword.
+
+Exit: zero `writable` keywords in corpus; 75 samples compile clean.
+
+### Slice 3: `ActionMeta.WriteSemantics` catalog property
+
+Make write-site classification catalog-driven. Per design Decision 6.
+
+Files: new `ActionWriteSemantics.cs` (`enum { None | EstablishesValue | MutatesContents | ClearsContents }`), `Action.cs`/`ActionMeta.cs` (add `WriteSemantics` field), `Actions.cs` (populate every entry).
+
+Classification table:
+- `EstablishesValue`: `set`, `put`, `add`, `enqueue`, `append`, `insert`
+- `ClearsContents`: `clear`, `remove`, `removeAt`, `dequeue`, `pop`
+- `None`: `reject`, `transition`, `no transition`
+
+Tests: `ActionMetaTests.WriteSemantics_PopulatedForEveryActionKind`, `ActionMetaTests.WriteSemantics_Classification` (parameterized).
+
+Exit: `precept_operations` (or actions equivalent) surfaces `WriteSemantics`; catalog tests pass.
+
+### Slice 4: Diagnostic catalog entry + count corrections
+
+`DiagnosticCode.cs`: add `FieldNeverSet = 150,` after current top `McpToolInternalError = 149`. `Diagnostics.cs`: full `GetMeta` entry (Severity.Warning, Stage.Graph, Category.Structure, message `"Field '{0}' has no write site — it can only hold its declared default or remain unset"`, FixHint, TriggerCondition, RecoverySteps, ExampleBefore/After, RelatedCodes: `[UnreachableState, UnhandledEvent]`). `DiagnosticCoverageAllowLists.cs`: register `FieldNeverSet` in `Gate2AllowList`.
+
+**Bundled doc count drift fix** (pre-existing 148→149 drift in `catalog-system.md` is also corrected here):
+- `docs/language/catalog-system.md` lines 290, 716, 1989, 1993 — bump count to **150**
+- `docs/Working/compiler-readiness-review-2026-05-24.md` — bump count to 150
+
+Tests: `DiagnosticCatalogTests` reflection gate covers via iteration; `Precept.Mcp.Tests` verifies `precept_diagnostic("FieldNeverSet")` returns full metadata.
+
+Exit: catalog reports 150 diagnostics everywhere; MCP tool surfaces the new code.
+
+### Slice 5: `FieldWriteSiteAnalyzer` implementation
+
+New partial-class extension `src/Precept/Pipeline/GraphAnalyzer.FieldWriteSites.cs` following the existing `Parser.Actions.cs`/`ProofEngine.Strategies.cs` convention. `AnalyzeFieldWriteSites(ctx)` walks the type-checked program:
+
+1. Initialize empty write-site set per declared field
+2. Transition-row actions: filter via `ActionMeta.WriteSemantics == EstablishesValue`
+3. State-entry hooks: same filter
+4. Computed-field declarations: implicit write
+5. Field-level Access Modifier: any field with `ModifierKind.Write` (= `editable`) at field-declaration site
+6. Per-state `modify F <mode>` rows: filter via `AccessModifierMeta.IsWritable == true`
+7. Construction-event arg → field assignments (reuse `TypeChecker.Validation.FieldState.cs` enumeration if convenient)
+8. Emit `FieldNeverSet` for each field with empty write-site set
+
+Wire into `GraphAnalyzer.cs` after reachability + completeness, before serialization.
+
+Tests: `FieldWriteSiteAnalyzerTests` (aggregator unit tests per shape); `FieldNeverSetEmissionTests` (`Trips_OnDeclaredButNeverSet`, `NoTrip_OnEachWriteSiteShape` parameterized over 8 shapes, `Trips_OnOptionalNoDefaultNoWrites`, `Trips_OnClearOnlyField`, `Trips_OnRemoveOnlyField`).
+
+Exit: all analyzer tests pass; expect new warnings on samples until Slice 6.
+
+### Slice 6: Sample corpus `FieldNeverSet` sweep
+
+Run analyzer against every `samples/*.precept` via `precept_compile`. For each warning, classify and fix:
+- Dead field (no purpose) → delete
+- Forgotten governance (should have been wired into Create or set in transition) → wire it
+- Should be computed → convert to `field X as T <- expr`
+- Data-only by intent → flag for deferred `FieldNeverRead` design; do not annotate this slice (FieldNeverSet doesn't false-positive on these)
+
+Known starting candidates (from this session's exploratory work):
+- `samples/production-order-tracking.precept:24` — `Priority` IS set via `Create.Priority`; will NOT trip `FieldNeverSet`; deferred to `FieldNeverRead` design.
+
+Other tripping samples enumerated by running the analyzer at slice start.
+
+Exit: `SampleCompilesCleanTests` (75 samples) passes — zero `FieldNeverSet` warnings.
+
+**High-variance slice**: if sweep surfaces > 15 samples needing fixes, escalate scope.
+
+### Slice 7: Doc updates
+
+Per design § Doc-update enumeration:
+
+For the diagnostic:
+- `docs/compiler/diagnostic-system.md` — add `FieldNeverSet`; rename `WritableOnEventArg` → `EditableOnEventArg`
+- `docs/compiler/graph-analyzer.md` § 6 — document `FieldWriteSites` sub-pass
+
+For the unification:
+- `docs/language/precept-language-spec.md` § 2.2 (lines ~996-1017) — rewrite to single `editable` Access Modifier
+- `docs/language/precept-language-spec.md` line 272 — drop `Writable` from keyword table; adjust `Write` description
+- `docs/language/precept-language-spec.md` lines 1647-1651 — rename `WritableOnEventArg` → `EditableOnEventArg`
+- `docs/language/primitive-types.md` — verify field-declaration examples reference `editable`
+- `docs/language/catalog-system.md` § Modifier Catalog — drop `Writable` from Value Modifier section; add field-declaration applicability to `Write` in Access Modifier section
+
+For the analyzer / catalog property:
+- `docs/language/catalog-system.md` § Action Catalog — document `WriteSemantics`
+- `docs/compiler/type-checker.md` — note `ActionMeta.WriteSemantics` if doc enumerates `ActionMeta` fields
+
+Exit: `/lifecycle-6-review --strict` reports no doc-update gaps.
+
+### Slice 8: Verification
+
+- `dotnet test` all suites green
+- `precept_compile` across `samples/` — zero `FieldNeverSet` warnings
+- `precept_diagnostic("FieldNeverSet")` — full metadata; `precept_diagnostic("WritableOnEventArg")` — not-found
+- `/lifecycle-6-review --strict` clean on PR
+- Spot-check regenerated `tmLanguage.json`
+- Manual smoke in VS Code: `field X as string editable` works; `field X as string writable` is a parser error
+
+Exit: all 12 design acceptance criteria pass; PR mergeable.
+
+### Risks
+
+- **Slice 6 scope creep**: sweep may surface unexpected dead fields. Budget M-L; escalate if > 15 samples affected.
+- **Grammar regen surfaces issues**: `tmLanguage.json` regeneration may expose latent generator bugs. Regen + diff before commit; log as separate bug if generator misbehaves.
+- **`WritableOnEventArg` rename misses references**: grep full codebase for `WritableOnEventArg` before merging Slice 1.
 
 ---
 
