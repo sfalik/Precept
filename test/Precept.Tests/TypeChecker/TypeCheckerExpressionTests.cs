@@ -1426,21 +1426,23 @@ public class TypeCheckerExpressionTests
     //    MoneyDivideMoneyCrossCurrency    (money ÷ money → exchangerate)
     //    QuantityDivideQuantityCrossDimension  (quantity ÷ quantity → quantity)
     //
-    //  However, DisambiguateCandidates in TypeChecker.cs always returns the
-    //  QualifierMatch.Same entry when candidates contain both Same and Different
-    //  options. Since both qualifier-disambiguated groups (money÷money,
-    //  quantity÷quantity) each contain a Same entry, the Different entry is
-    //  never selected. MapQualifierBinding(QualifierMatch.Different) → null is
-    //  therefore dead code at the type-checker level.
+    //  However, Operations.DisambiguateCandidates (in src/Precept/Language/
+    //  Operations.cs since Phase 2; was a private method on TypeChecker.Expressions
+    //  before commit 38712543) always returns the QualifierMatch.Same entry when
+    //  candidates contain both Same and Different options. Since both qualifier-
+    //  disambiguated groups (money÷money, quantity÷quantity) each contain a Same
+    //  entry, the Different entry is never selected. MapQualifierBinding(
+    //  QualifierMatch.Different) → null is therefore dead code at the type-checker
+    //  level.
     //
-    //  This path becomes testable when DisambiguateCandidates gains
+    //  This path becomes testable when Operations.DisambiguateCandidates gains
     //  qualifier-aware selection that can pick the Different candidate (e.g.,
     //  once the ProofEngine wires field-level qualifier tracking through to the
     //  type-checker disambiguation step).
     //
     //  TODO: Add BinaryOp_DifferentQualifierMoney_ResultQualifierReflectsDifferentPath
-    //        test once DisambiguateCandidates can select the Different candidate
-    //        and MapQualifierBinding(Different) → null is reachable.
+    //        test once Operations.DisambiguateCandidates can select the Different
+    //        candidate and MapQualifierBinding(Different) → null is reachable.
     //        See .squad/decisions/inbox/soup-nazi-g1-g4-tests-written.md §G2.
     // ════════════════════════════════════════════════════════════════════════
 

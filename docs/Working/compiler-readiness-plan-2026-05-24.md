@@ -72,10 +72,10 @@ From 2026-05-24 triage — **all 8 Phase-1-gating decisions settled**:
 7. F-LANG-CAT-26 (SemanticTokenTypes) — **14th catalog**; add § + resolve 13-vs-14 inconsistency
 8. F-LEX-02 (Four-leg rationale) — Prospective only via `/lifecycle-2-design`; grandfather existing; no required backfill
 
-### Still open — gating Phase 2
+### Resolved in Phase 2 (2026-05-25)
 
-- F-LANG-04 — failing `SyntaxReferenceTests` references non-existent pattern: rename test or re-add pattern?
-- F-X-01 — `F5TempVerify.cs` dev-only test in committed tree: delete or promote to permanent?
+- ✅ F-LANG-04 — **rewrote test as catalog-driven generic `[Theory]`** instead of either option. Replaced the broken `ConstructorPattern_ExistentialFields_DslSnippet_CompilesClean` with two generic tests (`CatalogSnippet_CompilesClean` + `CatalogSnippet_HasErrors`) driven by new `CommonPattern.IsFragment` / `AntiPattern.IsFragment` / `AntiPattern.BadCompilesClean` catalog metadata. Future renames touch only the catalog. See Phase 2 commit `38712543`.
+- ✅ F-X-01 — **promoted to permanent.** `F5TempVerify.cs` renamed to `SampleCompilesCleanTests.cs`; "TEMPORARY" docstring dropped; class now ships as the strict full-clean guarantee for `samples/*.precept` (complementary to the existing `SampleFieldStateRegressionTests` which checks only D130/131/132/143). 75 tests, all pass. See Phase 2 commit `38712543`.
 
 ### Still open — gating Phase 3+
 

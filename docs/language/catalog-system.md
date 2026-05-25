@@ -1341,7 +1341,7 @@ Typed operator combinations — each member is one legal `(operator, lhs TypeKin
 | Kind enum | `OperationKind` (~200 members: `NumberPlusNumber`, `MoneyPlusMoney`, `DatePlusPeriod`, `MoneyTimesDecimal`, `MoneyDivideMoneySameCurrency`, `MoneyDivideMoneyCrossCurrency`, ...) |
 | Meta record | `OperationMeta` — abstract DU with `UnaryOperationMeta` and `BinaryOperationMeta` sealed subtypes (see below) |
 | Discriminator enum | `QualifierMatch { Any, Same, Different }` |
-| Catalog class | `Operations` — `GetMeta()`, `All`, `FindCandidates(OperatorKind, TypeKind, TypeKind) → ReadOnlySpan<BinaryOperationMeta>`, `Resolve(OperatorKind, Type, Type) → OperationMeta?` |
+| Catalog class | `Operations` — `GetMeta()`, `All`, `FindCandidates(OperatorKind, TypeKind, TypeKind) → ReadOnlySpan<BinaryOperationMeta>`, `Resolve(OperatorKind, TypeKind, TypeKind) → BinaryOperationMeta?`, `DisambiguateCandidates(ReadOnlySpan<BinaryOperationMeta>) → BinaryOperationMeta?`, `FindUnary(OperatorKind, TypeKind) → UnaryOperationMeta?` |
 | Output type | None |
 
 ##### OperationMeta discriminated union
@@ -1431,66 +1431,46 @@ This keeps the catalog as the single source of truth: doc generation, MCP output
 
 ##### Resolution
 
-The internal index groups entries by `(Op, Lhs TypeKind, Rhs TypeKind)`. Most triples have one entry; the two branching operations have two.
+The internal index groups entries by `(Op, Lhs TypeKind, Rhs TypeKind)`. Most triples have one entry; the two branching operations (`MoneyDivideMoney`, `QuantityDivideQuantity`) have two — one for `QualifierMatch.Same`, one for `QualifierMatch.Different`.
 
 `FindCandidates` returns all entries for a given triple — the raw catalog data, usable by doc generators and MCP serialization.
 
-`Resolve` is the type-checker-facing method. It takes full `Type` objects (with qualifiers) and selects the correct entry:
+`Resolve` is the type-checker-facing method. It returns a single `BinaryOperationMeta?` by composing `FindCandidates` with `DisambiguateCandidates`:
 
 ```csharp
 public static class Operations
 {
-    private static readonly FrozenDictionary<(OperatorKind, TypeKind), UnaryOperationMeta> _unaryIndex =
-        All.OfType<UnaryOperationMeta>()
-           .ToFrozenDictionary(m => (m.Op, m.Operand.Kind));
-
-    private static readonly FrozenDictionary<(OperatorKind, TypeKind, TypeKind), BinaryOperationMeta[]> _binaryIndex =
-        All.OfType<BinaryOperationMeta>()
-           .GroupBy(m => (m.Op, m.Lhs.Kind, m.Rhs.Kind))
-           .ToFrozenDictionary(g => g.Key, g => g.ToArray());
-
     public static ReadOnlySpan<BinaryOperationMeta> FindCandidates(
-        OperatorKind op, TypeKind lhs, TypeKind rhs)
-        => _binaryIndex.TryGetValue((op, lhs, rhs), out var entries)
-            ? entries.AsSpan() : ReadOnlySpan<BinaryOperationMeta>.Empty;
+        OperatorKind op, TypeKind lhs, TypeKind rhs) =>
+        BinaryIndex.TryGetValue((op, lhs, rhs), out var entries)
+            ? entries.AsSpan()
+            : ReadOnlySpan<BinaryOperationMeta>.Empty;
 
-    public static OperationMeta? Resolve(OperatorKind op, Type lhs, Type rhs)
+    public static BinaryOperationMeta? Resolve(OperatorKind op, TypeKind lhs, TypeKind rhs)
+        => DisambiguateCandidates(FindCandidates(op, lhs, rhs));
+
+    public static BinaryOperationMeta? DisambiguateCandidates(
+        ReadOnlySpan<BinaryOperationMeta> candidates)
     {
-        var candidates = FindCandidates(op, lhs.Kind, rhs.Kind);
-        if (candidates.IsEmpty) return null;        // illegal combination
-        if (candidates.Length == 1) return candidates[0];  // fast path — vast majority
+        if (candidates.Length == 0) return null;
+        if (candidates.Length == 1) return candidates[0];
 
-        // Multiple candidates → qualifier dispatch
-        bool? match = lhs.QualifierEquals(rhs);
-        if (match == true)  return candidates.Single(c => c.Match == QualifierMatch.Same);
-        if (match == false) return candidates.Single(c => c.Match == QualifierMatch.Different);
-        return null;  // unknown qualifiers — can't resolve statically
+        // Multi-candidate: default to QualifierMatch.Same — the structurally safe assumption.
+        // ProofEngine adds obligations to verify qualifier compatibility at deeper analysis.
+        foreach (var c in candidates)
+            if (c.Match == QualifierMatch.Same) return c;
+        return candidates[0];
     }
 }
 ```
 
-When `Resolve` returns `null` for a multi-candidate triple (qualifiers unknown), the type checker either:
-- Uses assignment target context to disambiguate (assigning to `decimal` field → pick `Same`; assigning to `exchangerate` field → pick `Different`)
-- Emits a diagnostic: "Cannot determine result type — add a `when` guard or declare `in` constraints"
-- Flags a proof obligation for the proof engine
+**Shipped surface (2026-05-25, F-LANG-CAT-15 Decision 4):** the simple `(TypeKind, TypeKind)` signature. The richer `Resolve(OperatorKind, Type, Type) → OperationMeta?` design that took full `Type` objects with qualifier-equality dispatch via `Type.QualifierEquals` was deliberately deferred — it requires a `Type` (qualified) vs `TypeKind` (unqualified) distinction that does not exist in the current type representation. The shipped wrapper defaults to `QualifierMatch.Same` for multi-candidate dispatch and lets the proof engine verify qualifier compatibility via `ProofRequirementKind.QualifierCompatibility` obligations. See `OperationsTests.Resolve_*` for the contract.
 
-The catalog returns `OperationMeta?`, not `Type?`. The catalog doesn't know qualifier values — it can't construct a fully-qualified result type. The type checker reads `meta.Result` and constructs the result `Type` with appropriate qualifiers via the qualifier propagation patterns (see type checker design).
-
-##### Type.QualifierEquals — the qualifier comparison contract
-
-Each type with qualifiers implements `QualifierEquals(Type) → bool?` (three-valued: true/false/null for unknown):
-
-- `MoneyType`: compares `.Currency`
-- `QuantityType`: compares `.Dimension` (not specific unit — `km` and `m` are both `length` → `true`)
-- `PriceType`, `ExchangeRateType`, `PeriodType`: compare their respective qualifier axes
-
-Types without qualifiers (`DecimalType`, `IntegerType`, `DateType`, etc.) always return `true`.
+**Future:** when qualifier-aware `Type` objects ship (Phase 4 / Phase 5 with the qualified-inner-types work), `Resolve` can grow a `(Type, Type)` overload that performs static qualifier dispatch. The proof-obligation pathway remains in place as the fallback for runtime-determined qualifiers.
 
 **Consumers:** Type checker (legal combinations and result types via `Resolve`), doc generation (complete operation table including conditional branches), MCP vocabulary ("what operations are legal and what do they produce?"), LS hover (per-combination documentation), evaluator dispatch, AI grounding (full operation surface).
 
 **Relationship to Operators catalog:** Each `OperationMeta` references an `OperatorKind`. You can query "what operations use `Plus`?" by filtering `Operations.All` where `Op == OperatorKind.Plus`. The Operators catalog describes the symbols; the Operations catalog describes what those symbols can do with specific types.
-
-**Replaces `OperatorTable`:** The existing `OperatorTable.ResolveBinary(BinaryOp, Type, Type) → Type?` is absorbed by `Operations.Resolve`. The `OperatorTable` class becomes redundant once the Operations catalog is implemented.
 
 #### 6. Modifiers (✅ Implemented)
 

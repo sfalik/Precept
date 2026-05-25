@@ -94,6 +94,21 @@ Additional conventions:
 - `precept_types` and `precept_domains` return a markdown `Unsupported scope` response when passed an invalid `scope`.
 - `precept_operations` treats `category` as the normal path; unmatched categories still return the category list plus an empty `Matching Operations` section and `Count` of `0`.
 
+### 5.1 Internal-error contract (`McpToolInternalError` / PRE0149)
+
+Every MCP tool entry point is wrapped by `McpToolSafeInvoke` (`tools/Precept.Mcp/Tools/McpToolSafeInvoke.cs`). If a tool body throws an unhandled exception, the wrapper translates it into a structured response — **callers never see the raw `"An error occurred invoking '<tool>'."` MCP framework default**.
+
+| Tool return shape | Internal-error response |
+|---|---|
+| `string` (catalog/reference tools: `precept_quickstart`, `precept_syntax`, `precept_types`, `precept_operations`, `precept_domains`, `precept_patterns`, `precept_proofs`, `precept_diagnostic`, `precept_ping`) | `Error invoking '<tool>': <ExceptionType>: <Message>` — single-line plain text. Distinguishable from normal output by the `Error invoking` prefix. |
+| `CompileResultDto` (`precept_compile` only) | `CompileResultDto` with `success = false` and a single synthetic diagnostic carrying code `McpToolInternalError` (PRE0149), severity `Error`, message `"MCP tool '<tool>' threw <ExceptionType>: <Message>"`. Same shape as a normal compile diagnostic — downstream consumers parse it the same way. |
+
+**Diagnostic code:** `DiagnosticCode.McpToolInternalError` = 149 (PRE0149). Stage: see comment at `src/Precept/Language/Diagnostics.cs` — currently classified `Lex` as a catch-all because the wrapper error originates outside any pipeline stage; consumers that filter by stage should treat it as tooling-side rather than lexer-side.
+
+**When this fires in practice:** primarily as defense-in-depth against bugs in the tool wrappers or transitive dependencies. The Phase 2 verification confirmed the previously-reported MCP-crash bugs (BUG-003/-007/-008/-010/-011) all return structured diagnostics on the normal path; this contract guarantees that ANY future unexpected throw also returns a structured response rather than the raw framework error.
+
+**Test reference:** the `McpToolSafeInvoke` wrapper itself is exercised by direct unit-test scenarios in `test/Precept.Mcp.Tests/` (see `CompileTool_BugReproTests`, `DomainsTool_AllScopesTests`, `CompileTool_LargePayloadTests`).
+
 ## 5A. Design Rationale
 
 The MCP server's tool surface follows a deliberately mixed format model: **markdown/text for catalog and reference tools, minimal JSON only where structure is genuinely programmatic** (compile diagnostics, planned runtime orchestration tools). The reasoning below records the alternatives evaluated and the constraints that locked the chosen shape.

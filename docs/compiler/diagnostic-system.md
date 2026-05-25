@@ -156,6 +156,8 @@ public enum DiagnosticStage
 
 One value per pipeline stage. The lexer has its own stage — unterminated strings, invalid characters, and unrecognized tokens are `Lex` diagnostics, distinct from `Parse` (structural syntax) errors. This matches the actual pipeline shape: the lexer is a separate stage that can fail independently. NameBinder diagnostics use `DiagnosticStage.Type` — name binding is a pipeline stage but not a diagnostic stage. Adding a `Bind` stage would break the upstream-error suppression model in the LS.
 
+> **Tooling-side diagnostics.** A small set of diagnostics is emitted from **outside** the pipeline — currently just `McpToolInternalError` (PRE0149), which the MCP-tool wrapper produces when a tool body throws unhandled. These are classified `DiagnosticStage.Lex` as a catch-all because no Tooling/External stage exists yet; consumers that filter by stage should treat any tooling-side code as a non-stage diagnostic. If more tooling-side codes accumulate, a dedicated `Tooling` stage value would be the structural fix. See `mcp.md § 5.1` for the wrapper contract.
+
 ### Severity
 
 ```csharp

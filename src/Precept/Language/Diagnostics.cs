@@ -1165,6 +1165,15 @@ public static class Diagnostics
             ExampleAfter: "precept Example\nfield Cost as price in 'USD'"),
 
         // ── MCP tooling backstop ─────────────────────────────────────────────────
+        //
+        // Stage choice rationale: `McpToolInternalError` is emitted from OUTSIDE any
+        // pipeline stage (the McpToolSafeInvoke wrapper, when a tool body throws
+        // unhandled). DiagnosticStage has no Tooling/External value today; Lex is
+        // used as a catch-all so consumers that filter by stage still see it.
+        // If more tooling-side codes accumulate, a dedicated DiagnosticStage.Tooling
+        // value is the structural fix — would require updates to every consumer that
+        // pattern-matches on stage. See `docs/compiler/diagnostic-system.md`
+        // § Diagnostic Stages > Tooling-side diagnostics for the contract.
         DiagnosticCode.McpToolInternalError => new(
             nameof(DiagnosticCode.McpToolInternalError),
             DiagnosticStage.Lex, Severity.Error,

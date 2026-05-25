@@ -20,6 +20,12 @@ namespace Precept.Tests;
 /// </summary>
 public class SampleCompilesCleanTests(ITestOutputHelper output)
 {
+    // Minimum sample count to detect a silent corpus collapse — if the artifacts-path
+    // layout changes and SamplesRoot resolves wrong, Directory.GetFiles returns zero
+    // and a Theory with zero rows passes vacuously. Bump this when the corpus grows
+    // substantially; current corpus is 75 samples.
+    private const int MinimumExpectedSampleCount = 50;
+
     private static string SamplesRoot =>
         Path.GetFullPath(
             Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "samples"));
@@ -28,6 +34,18 @@ public class SampleCompilesCleanTests(ITestOutputHelper output)
         Directory.GetFiles(SamplesRoot, "*.precept")
                  .OrderBy(Path.GetFileName)
                  .Select(p => new object[] { Path.GetFileName(p), p });
+
+    [Fact]
+    public void SampleCorpus_DiscoveryFindsExpectedSampleCount()
+    {
+        // Guard against a silent failure mode where SamplesRoot resolves wrong and
+        // the corpus appears empty. If this fails, fix the relative-path resolution
+        // before trusting any Theory result.
+        var sampleCount = Directory.GetFiles(SamplesRoot, "*.precept").Length;
+        sampleCount.Should().BeGreaterThanOrEqualTo(
+            MinimumExpectedSampleCount,
+            $"SampleCompilesCleanTests must discover at least {MinimumExpectedSampleCount} samples in {SamplesRoot}");
+    }
 
     [Theory]
     [MemberData(nameof(SampleFiles))]

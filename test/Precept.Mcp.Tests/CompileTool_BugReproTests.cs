@@ -13,7 +13,7 @@ namespace Precept.Mcp.Tests;
 /// <c>"An error occurred invoking 'precept_compile'"</c> string.
 ///
 /// Coverage matrix mirrors the Phase 2 plan
-/// (<c>plans/refactored-yawning-fern.md</c> § Step 2.2b):
+/// (<c>docs/Working/compiler-readiness-plan-2026-05-24.md</c> Phase 2 Step 2.2b):
 ///
 /// | Bug              | Source                                                | Expected                              |
 /// |------------------|-------------------------------------------------------|---------------------------------------|

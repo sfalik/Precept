@@ -300,6 +300,10 @@ public enum DiagnosticCode
     /// An MCP tool entry point caught an unhandled exception and reported it
     /// as a structured diagnostic. Never emitted by the normal compile pipeline —
     /// only by the <c>McpToolSafeInvoke</c> wrapper in <c>tools/Precept.Mcp/</c>.
+    /// Classified <c>DiagnosticStage.Lex</c> as a catch-all because no Tooling/
+    /// External stage exists today; see the comment in <c>Diagnostics.cs</c> at
+    /// the GetMeta arm for the rationale, and <c>docs/compiler/diagnostic-system.md</c>
+    /// § Diagnostic Stages > Tooling-side diagnostics for the contract.
     /// </summary>
     McpToolInternalError            = 149,
 }
