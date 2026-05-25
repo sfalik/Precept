@@ -161,6 +161,43 @@ When the review target is a locked design doc (from `/lifecycle-2-design`):
 - Beyond verifying cited sources, look for **uncited sources the design should have consulted**. If a decision takes a position on, say, the modifier surface but didn't cite the modifier catalog, open the catalog yourself and check whether the design's enumeration is complete against what's actually there. Missing source citations the design clearly needed are findings.
 - "Source" is an open category — code files, doc sections, MCP tool outputs, sample files, test fixtures, bug entries, other design docs, research notes, RFCs, anything with a permanent address. Do not filter by source type.
 
+## Independent re-statement (preamble — required before findings)
+
+Before listing findings, write a 3-5 sentence **Independent re-statement** of what the design or diff is doing and why — in your own words, not the design's framing. Then compare your re-statement to the design's own framing. Mismatches between the two are first-class findings.
+
+Why this matters: the most common failure mode in design review is **shared blindspot** — designer and reviewer miss the same thing because they came in through the same door. Re-stating the design independently forces a different framing pass. When your re-statement says "this is a catalog-property change with a diagnostic as a consequence" but the design frames it as "this is a new diagnostic," the framing mismatch is itself a finding: the design has under-named what's actually moving.
+
+Format:
+
+```
+## Independent re-statement
+
+<3-5 sentences restating what the design does and why, in the reviewer's own words.>
+
+## Framing comparison
+
+<1-2 sentences naming any mismatch between the reviewer's restatement and the design's framing, OR explicit "Framings align" when they do.>
+```
+
+Mismatches surface as CONCERN findings: `CONCERN: Design frames this as X; reviewer's restatement frames it as Y — the framing mismatch suggests <implication>.`
+
+## Mandatory source-checking by change category
+
+Beyond verifying cited sources (§ 13), specific design-change categories require the reviewer to **always open** specific sources, regardless of whether the design cited them. Missing source-discovery is a process violation (reviewer skipped a category-required source), reported as a CONCERN against the review process.
+
+| Change category | Mandatorily check (in addition to design's citations) |
+|---|---|
+| Catalog member change | `src/Precept/Language/<Catalog>.cs` + the corresponding `docs/language/catalog-system.md` § <Catalog> |
+| Diagnostic change | `src/Precept/Language/Diagnostics.cs` + `docs/compiler/diagnostic-system.md` |
+| Modifier-keyword change | `Modifiers.cs`, `TokenKind.cs`, `Tokens.cs`, `Lexer.cs` |
+| Language-surface change | `docs/language/precept-language-spec.md § 0.1` (the eleven principles — run the principle-coverage check) + `precept-language-spec.md § 0.7` (Authoring Audience) |
+| Pipeline-stage change | `docs/compiler-and-runtime-design.md § Non-Negotiable Rules` + the relevant stage doc |
+| Runtime API change | `docs/runtime/runtime-api.md` + the type doc for any affected type |
+| MCP tool change | `docs/tooling/mcp.md` + `tools/Precept.Mcp/CatalogFormatters.cs` |
+| Type system change | All four type docs + `docs/language/catalog-system.md § Qualifier Propagation` |
+
+The reviewer reports the mandatorily-checked sources in its `sources-mandatorily-checked` frontmatter (alongside `sources-verified`). Missing entries for a triggered category is a process CONCERN.
+
 ## How to report findings
 
 For each finding:
@@ -182,6 +219,17 @@ Category error: <what layer this behavior belongs in> vs. <what layer it is inco
 - **BLOCKER** — clear violation of a non-negotiable rule. Must fix before merge.
 - **CONCERN** — likely violation, needs human judgment. May be a false positive — surface it anyway so the human can decide.
 - **NIT** — minor style/consistency issue. Worth noting, not blocking.
+
+**Strongest objection** (required even on APPROVED designs)
+
+Even when no BLOCKERs or CONCERNs apply, the reviewer names the **strongest reason a future engineer might regret this design**. Recorded as a NIT-level finding with the format:
+
+```
+NIT (Strongest objection) — <one sentence naming the strongest plausible regret>
+Trigger to revisit: <one sentence stating what observation would force re-consideration; align with the design's Falsifiers if present>
+```
+
+This is not a BLOCKER — the design has been approved. It is a marker for postmortem-style retrospectives if the design ages badly. Skipping it on an APPROVED design is a process omission, surfaced as a NIT against the review.
 
 If something looks suspicious but you can't tell from the diff alone, ask in your output rather than guessing. Example: *"I see `TokenKind.NewThing` referenced in `Parser.cs` but can't verify whether `Tokens` catalog has the corresponding entry — please verify or share the catalog diff."*
 

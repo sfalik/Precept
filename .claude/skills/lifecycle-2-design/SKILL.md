@@ -52,7 +52,7 @@ A markdown file at `docs/Working/<topic-slug>.md` with these sections:
 
 ```markdown
 ---
-status: Locked YYYY-MM-DD
+status: <Draft | Semantics-Stated | Externally-Grounded | Locked YYYY-MM-DD>
 phase-target: <Phase N from current readiness plan, or 'TBD'>
 sources-consulted:
   - <opaque source identifier>: <one-line note on what was checked>
@@ -303,10 +303,46 @@ Example:
 - `docs/compiler/<stage>.md` § Design Rationale and Decisions — design lift
 - `docs/language/catalog-system.md` § <catalog> — if new catalog entry
 
+## Operational dimensions
+
+[Optional section; required only when the design touches one or more of the
+prompts below. Auto-skip categories that don't apply.]
+
+- **Security** (required if the design touches source-text ingestion — lexer,
+  parser, MCP tool input): does this expand the attack surface? Does it
+  enable resource-exhaustion or pathological-input attacks? State the
+  defensive posture.
+- **Observability** (required if the design touches runtime evaluation or
+  diagnostic surface): when this construct misbehaves at runtime or surfaces
+  a diagnostic, how does the operator/author diagnose it? Does it propagate
+  to traces, logs, structured outcomes?
+- **Evolvability** (required if the design depends on an external standard —
+  NodaTime API, ICU, UCUM, ISO 4217, TZDB): what is the migration story when
+  the upstream changes? Is the version-pinning strategy stated? What breaks
+  if the upstream removes or renames a feature?
+
 ## Open questions
 Anything unresolved. The skill refuses to mark "Locked" if any open question
 remains. Either resolve or move to a separate Wave 0 triage doc.
 ```
+
+## Staged advancement
+
+A design advances through four states; each state has its own advancement
+criteria. Stages exist so process weight matches decision stakes — small
+severity choices go Draft → Locked in one session, while keyword retirements
+ladder through all four.
+
+| Status | Criteria to advance to next stage |
+|---|---|
+| **Draft** | Decision text written; stakes classified per decision. May skip directly to Locked for designs where every decision is `Stakes: low` and no language-surface change. |
+| **Semantics-Stated** | + Semantic Rules section present (if affected by guard 4) + Decision text + per-decision Rationale and Tradeoff |
+| **Externally-Grounded** | + Language Design Grounding (if affected by guard 2) + Architecture Grounding with external precedent (if affected by guard 5) + per-decision Sources consulted (with excerpts) + per-decision Counter-evidence (for high+ stakes) |
+| **Locked YYYY-MM-DD** | + Philosophy Alignment matrix filled + Audience and Teachability (if language surface) + Acceptance criteria + Doc-update enumeration + Falsifiers (if external-author-visible) + Reversibility / Blast radius legs (for high+ stakes) + No open questions |
+
+Cooling-off requirement: a design with any `Stakes: irreversible` decision must hold `status: Externally-Grounded` for at least 24 hours before advancing to `Locked`. The cooling-off is structural — it forces a second-pass review of the design after time away.
+
+**Lightweight path for low-stakes designs.** When every decision is `Stakes: low` and no language-surface or pipeline/catalog/API change is involved, the skill compresses Draft → Locked in one session. Required content shrinks accordingly (per the legs-by-stakes table). The skill flags any decision that looks high-stakes but is marked `low` — that's a stakes-classification error, not a fast-path.
 
 ## Behavioral guards
 
@@ -339,7 +375,11 @@ The skill enforces:
 
 12. **External URL citations must be reproducible.** When a citation is to an external URL (not an in-tree file): the excerpt must be the full verbatim quote (no paraphrasing or truncation); the citation must include the access date; for standards docs (RFCs, ISO docs, papers), a stable identifier (RFC#, DOI, title+venue+year) is required; mirroring to `research/references/` is strongly preferred over live URLs. Paraphrased URL citations or missing access dates are refused.
 
-13. **Irreversible decisions require cooling-off.** A decision marked `Stakes: irreversible` cannot advance from Draft to Locked in the same session. The doc carries `status: Stage-3-Externally-Grounded` for at least 24 hours before advancing. The cooling-off is a structural pause: re-reading the design after time away surfaces gaps the original session missed.
+13. **Irreversible decisions require cooling-off.** A decision marked `Stakes: irreversible` cannot advance from Draft to Locked in the same session. The doc carries `status: Externally-Grounded` for at least 24 hours before advancing. The cooling-off is a structural pause: re-reading the design after time away surfaces gaps the original session missed.
+
+14. **Staged advancement criteria apply.** Designs that touch language surface, pipeline/catalog/API, or evaluation/proof/typing must ladder through Draft → Semantics-Stated → Externally-Grounded → Locked, with each stage's advancement criteria satisfied before the status advances. The lightweight path (Draft → Locked in one session) is reserved for designs where every decision is `Stakes: low` and no language-surface change is involved. Skipping stages on a non-lightweight design is refused.
+
+15. **Operational dimensions required when triggered.** If the design touches source-text ingestion (lexer/parser/MCP input), a Security prompt must be addressed. If it touches runtime evaluation or diagnostic surface, an Observability prompt must be addressed. If it depends on an external standard (NodaTime, ICU, UCUM, ISO 4217, TZDB), an Evolvability prompt must be addressed. Skipping a triggered prompt without explicit "N/A — <reason>" is refused.
 
 ## Composability
 

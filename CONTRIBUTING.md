@@ -11,7 +11,7 @@ Every meaningful design or implementation decision moves through seven stages. T
 | 1 | Research / explore | `/lifecycle-1-research` | `research/` |
 | 2 | Lock a design | `/lifecycle-2-design` | `docs/Working/` |
 | 3 | Plan execution | `/lifecycle-3-plan` | `docs/Working/` (plan doc) |
-| 4 | Execute the plan | — (engineering work) | code + tests |
+| 4 | Execute the plan | `/lifecycle-4-execute` | code + tests + PR-body Implementation Plan |
 | 5 | Promote to canonical | `/lifecycle-5-promote` | canonical `docs/` updated; design moved to `docs/Working/Archive/` with cross-link |
 | 6 | End-of-lifecycle review | `/lifecycle-6-review` | one-shot completion check per work item |
 | 7 | Maintain | `/lifecycle-7-audit` (deferred to Phase 9) | canonical `docs/` |
@@ -79,7 +79,7 @@ When PR-and-issue workflow is in use (main branch development), the proposal lif
 - Stage 2 (Lock a design) corresponds to "Design Review" below + the design doc in Track B
 - Stage 3 (Plan execution) corresponds to "Implementation plan" in the PR body
 
-On spike branches without PRs (current `spike/Precept-V2-Radical` workflow), the lifecycle skills (`/lifecycle-1-research`, `/lifecycle-2-design`, `/lifecycle-3-plan`) handle the same transitions without the GitHub gates. The discipline is the same; the enforcement mechanism differs.
+On spike branches without PRs (current `spike/Precept-V2-Radical` workflow), the lifecycle skills (`/lifecycle-1-research`, `/lifecycle-2-design`, `/lifecycle-3-plan`, `/lifecycle-4-execute`) handle the same transitions without the GitHub gates. The discipline is the same; the enforcement mechanism differs.
 
 Stages 4-7 (execute, promote, review, maintain) are the same on both workflows.
 
@@ -324,7 +324,7 @@ The doc lifecycle (Stages 1-7) applies in full on spike branches. Without GitHub
 - `/lifecycle-1-research` — exploration in `research/`
 - `/lifecycle-2-design` — lock the design with four-leg rationale; refuses to lock without
 - `/lifecycle-3-plan` — phased execution plan with decisions surfaced as gates
-- (execute the plan)
+- `/lifecycle-4-execute` — vertical-slice discipline, PR-body update protocol, doc-sync per slice, catalog-first
 - `/lifecycle-5-promote` — lift "why" to canonical, archive with header. **Mandatory** — design docs cannot reach Archive without it (or the explicit historical-status header).
 - `/lifecycle-6-review` — one-shot end-of-lifecycle completion check before declaring a work item closed
 
