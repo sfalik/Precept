@@ -17,7 +17,7 @@
 |---|---|---|---|---|---|
 | 1 | Doc foundation truthful + lifecycle skills + 16 Archive promotions | ~55 | 8 (✅ all settled 2026-05-24) | XL (~5-7 days) | ✅ **Complete 2026-05-24** (all 6 workstreams shipped; verification report at [`lifecycle-review-phase-1-2026-05-24.md`](lifecycle-review-phase-1-2026-05-24.md)) |
 | 2 | Green baseline + no crashes + Operations.Resolve + MCP-crash family | **12+** | 2 | **L (~4-5 days)** | ✅ **Complete 2026-05-25** (all 7 steps shipped: 2.1–2.7; MCP wrapper backstop + temporal-literal verified clean + LS URI-case fix + Operations.Resolve + generic SyntaxReference test; 6107/6108 Precept.Tests pass with the 1 failure as new BUG-013; 411/411 LS tests pass; 67/67 Mcp tests pass; 291/291 analyzer tests pass) |
-| 3 | Type system completeness | ~15 | 3 | L | Stub — TBD |
+| 3 | Type system completeness | ~14 | 3 (✅ all settled 2026-05-25) | L | Planned, ready to execute |
 | 4 | Collection completeness + BUG-002 | **~16** | 2 | L | Stub — TBD |
 | 5 | Proof engine satisfiability + BUG-004 + BUG-006 + BUG-012 + FieldNeverSet/unification | **~14** | 2 | XL | Partial — F-LANG-GRAPH-04 planned, rest stubbed |
 | 6 | `units` block + composite basis | 2 | 0 | L | Stub — TBD |
@@ -77,10 +77,52 @@ From 2026-05-24 triage — **all 8 Phase-1-gating decisions settled**:
 - ✅ F-LANG-04 — **rewrote test as catalog-driven generic `[Theory]`** instead of either option. Replaced the broken `ConstructorPattern_ExistentialFields_DslSnippet_CompilesClean` with two generic tests (`CatalogSnippet_CompilesClean` + `CatalogSnippet_HasErrors`) driven by new `CommonPattern.IsFragment` / `AntiPattern.IsFragment` / `AntiPattern.BadCompilesClean` catalog metadata. Future renames touch only the catalog. See Phase 2 commit `38712543`.
 - ✅ F-X-01 — **promoted to permanent.** `F5TempVerify.cs` renamed to `SampleCompilesCleanTests.cs`; "TEMPORARY" docstring dropped; class now ships as the strict full-clean guarantee for `samples/*.precept` (complementary to the existing `SampleFieldStateRegressionTests` which checks only D130/131/132/143). 75 tests, all pass. See Phase 2 commit `38712543`.
 
-### Still open — gating Phase 3+
+### Resolved for Phase 3 (2026-05-25)
 
-- F-LANG-SPEC-01 (`because` on ensures): enforce or amend Principle 9?
-- F-LANG-TEMP-08 (`zoneddatetime ± period`): catalog or doc authoritative?
+All three Phase-3-gating decisions are settled. Each carries the four-leg rationale (Rationale + Alternatives + Precedent + Tradeoff) per the CLAUDE.md per-decision rationale rule.
+
+**F-LANG-PRIM-01 — String ordering**
+
+- **Decision**: String ordering (`<` `>` `<=` `>=` on `string` / `~string`) is **intentionally out of scope**. Type-error at the spec level. Idiomatic substitutes: `choice of T(...) ordered` (for tier/rank), `startsWith` (for prefix matching), numeric/temporal types (for inherently-orderable domains).
+- **Rationale**: Locale-aware string comparison is a runtime concern that's intrinsically environment-sensitive (collation rules, ICU version, normalization forms). Precept's compile-time-only proof model cannot ground claims about ordering without committing to a specific collation; committing to one would lock the language to a runtime that's wrong for many domains.
+- **Alternatives considered and rejected**:
+  - **Ordinal string `<` `>` shipped**: rejected — ordinal-only comparison surprises authors (e.g., `"B" < "a"` because uppercase B is U+0042, lowercase a is U+0061); makes the simple form a footgun.
+  - **Locale-aware string `<` `>` shipped**: rejected — runtime dependency, non-deterministic across hosts, violates the "Determinism" philosophy principle.
+  - **`~string` (CI) supports ordering**: rejected — would imply collation-aware ordering, same runtime-dependence problem.
+- **Precedent**: Documented in `research/language/expressiveness/` (6 research files surveying how other languages handle this); spec § 3.6 expression-typing table; `primitive-types.md` § String Ordering — Out of Scope (four-leg rationale block).
+- **Tradeoff accepted**: Tier/rank domains require the slightly more verbose `choice of string(...) ordered` shape (or equivalent integer ordering) instead of inline string comparison. Bug-012 surfaces a residual proof-engine gap when the field-vs-literal case isn't proved — tracked separately for Phase 5.
+- **Settled by**: Parallel session commit `090764d3` (2026-05-25).
+
+**F-LANG-PRIM-04 — `nonnegative` + `positive` mutex severity**
+
+- **Decision**: **Error stays.** Doc gets updated to say "use `positive` OR `nonnegative`, not both" — no catalog change. The current mutex in `Modifiers.cs:89` (`MutuallyExclusiveWith: [ModifierKind.Positive]` on Nonnegative) remains.
+- **Rationale**: Both forms are structural modifiers that participate in proof obligations; combining them is redundant because `positive` already implies `nonnegative` per the existing `Subsumes` relation. Erroring on the redundant combination is honest about intent — the author wrote two things and only one is load-bearing. A warning would tolerate noise that adds no information.
+- **Alternatives considered and rejected**:
+  - **Option A — Warn, not error** (recommended by reviewer but rejected by owner): would require new `RedundantModifier` warning diagnostic + dropping the mutex + a redundancy check that fires on `Subsumes`-related modifier pairs. More machinery to maintain a tolerance for noise.
+  - **Split: keep mutex on accidental double-spec but warn when one subsumes another**: rejected as over-engineered for a small surface.
+- **Precedent**: The `Subsumes` relation on `Positive` (`Modifiers.cs:94-95`) already declares `Positive ⊇ Nonnegative ⊇ Nonzero` — this is structural-meaning-level, not a permissions check. The mutex is the surface-syntax level: don't write both. The two layers can co-exist (Subsumes drives proof obligations, mutex drives surface checks).
+- **Tradeoff accepted**: Authors who mean "this is a positive number with the doubled-up emphasis of being non-negative" must pick one form. Doc + LS hover should explain the relationship; otherwise this is a one-time author-education moment.
+- **Doc action for Phase 3 execution**:
+  - `docs/language/primitive-types.md` — clarify the "use `positive` OR `nonnegative`, not both" rule under the modifier surface
+  - `docs/language/catalog-system.md` — note that the `Subsumes` relation is meaning-level (drives proof obligations) and the `MutuallyExclusiveWith` relation is syntax-level (drives surface checks); the two are distinct concerns and can co-exist
+
+**F-LANG-TEMP-08 — `zoneddatetime ± period`**
+
+- **Decision**: **Doc wins.** Remove `OperationKind.ZonedDateTimePlusPeriod` + `OperationKind.ZonedDateTimeMinusPeriod` from `src/Precept/Language/OperationKind.cs` (lines 91-92) and the corresponding `GetMeta` arms in `Operations.cs` (lines 396-401). `zoneddatetime ± period` becomes a compile error per the existing doc. Authors must navigate through `.datetime` first.
+- **Rationale**: Adding a `period` (calendar-aware: months, years) to a `zoneddatetime` is genuinely ambiguous because calendar arithmetic doesn't compose cleanly across timezones (DST transitions, leap-second windows, calendar rules that depend on the zone). NodaTime's discipline forces the navigate-through-`.LocalDateTime`-then-`.InZoneLeniently()` pattern for exactly this reason; Precept inherits that discipline.
+- **Alternatives considered and rejected**:
+  - **Option B — Catalog wins; update doc to describe defined semantics**: rejected — requires authoring + documenting DST-edge-case behavior; subtle bug magnet; readers who write `zdt + '1 month'` would not realize implicit DST conversion is happening.
+- **Precedent**: NodaTime's API design separates `Period` (calendar) from `Duration` (instant) and refuses to compose `Period` with `ZonedDateTime` directly. The doc has stated this since the temporal-type-system design (see `docs/language/temporal-type-system.md:919, 1158, 1305`); the catalog entries are vestigial and contradict the documented intent.
+- **Tradeoff accepted**: Author must write `(myZdt.datetime + myPeriod).inZone(myZdt.timezone)` for calendar-aware zoned arithmetic — slightly more verbose, but makes the DST-handling choice explicit. Aligns with the "Honesty about approximation" philosophy principle: approximate behavior (DST-edge handling) must be visible in the source.
+- **Code action for Phase 3 execution**:
+  - Remove the two `OperationKind` enum members (renumber if needed; check uses)
+  - Remove the two `GetMeta` arms in `Operations.cs`
+  - Check `OperationsTests.cs` for any test that exercised these — remove or repurpose
+  - Check proof engine, evaluator, and any samples for usage; samples shouldn't reference this pattern but verify
+
+### Still open — gating Phase 4+
+
+- F-LANG-SPEC-01 (`because` on ensures): enforce or amend Principle 9? Gates Phase 2 or 3 implementation work — currently unaddressed in the active plan; flagging for Phase 4 triage.
 - 15 additional decisions listed in `compiler-readiness-review-2026-05-24.md` § 6 (cited per-phase as work approaches).
 
 ---
