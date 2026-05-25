@@ -335,28 +335,33 @@ Total findings integrated: 33. Many overlap or reinforce each other; the phasing
 
 **Goal:** Reduce context cost and eliminate structural drift sources in the corpus.
 
-**Findings addressed:** **DC-F5**, **DC-F6**, **DC-F15**, **DC-F16**.
+**Findings addressed:** **DC-F5**, **DC-F6** (revised), **DC-F15**, **DC-F16** (revised).
+
+**Revisions from the original plan (recorded 2026-05-25):**
+- **DC-F6 revised** — No file moves. Runtime design docs stay in `docs/runtime/` because the *design* is canonical even when implementation is a stub. Phase 2 added implementation-state honesty to `docs/runtime/README.md` (banner) and individual docs' status fields. Phase 6 verifies each runtime doc's status field matches reality; no relocation. Reasons: (a) moving implies "up for revision," which weakens the public-surface contract; (b) `docs/Working/` is for in-flight work being argued, not designs awaiting implementation; (c) honesty is achieved via status fields and banner, not folder location; (d) moving breaks cross-references across the corpus.
+- **DC-F16 revised** — No split. Apply catalog-driven discipline to the doc about catalogs: the Level 3 Member Inventories section is parallel knowledge (the catalogs in `src/Precept/Language/*.cs` ARE the inventory; MCP catalog-reference tools surface it on demand). Remove the ~1500-line inventory section; keep architecture + integration together in `catalog-system.md`; ensure TOC is comprehensive. Single source of truth preserved; drift surface eliminated. The split-into-three would create cross-doc reference burden and split-the-baby moments where it's unclear which doc some content belongs to.
 
 ### Tasks
 
-1. **DC-F6 — Route runtime/ design proposals to `docs/Working/runtime/`.**
-   - Move pre-implementation design docs from `docs/runtime/` to `docs/Working/runtime/`: `evaluator.md` (2179 lines, Stub), `precept-builder.md` (973 lines, Stub), `descriptor-types.md` (206 lines, Stub), plus `result-types.md` and `fault-system.md` if pre-implementation (verify status).
-   - Keep in `docs/runtime/`: `runtime-api.md` (public surface contract is locked) with explicit "implementation state" banner.
-   - Update `docs/runtime/README.md` to reflect slimmer canonical set + point to `Working/runtime/`.
-
-2. **DC-F5 — Convert `docs/compiler-and-runtime-design.md` to a pointer-hub.** Target: ~30KB, down from 125KB.
+1. **DC-F5 — Convert `docs/compiler-and-runtime-design.md` to a pointer-hub.** Target: ~30KB, down from 125KB.
    - Keep: Mermaid pipeline diagram, Non-Negotiable Rules, artifact-flow narrative, Audience and "How to read this document" framing.
    - Replace per-stage sections (§§4-10) with one-paragraph summaries + pointers to `docs/compiler/<stage>.md`.
    - Replace runtime sections (§11) with pointer to `docs/runtime/`.
    - Replace tooling sections (§§13-15) with pointer to `docs/tooling/`.
+   - Preserve § anchor IDs for sections that remain as pointer-targets so existing fragment links still resolve.
 
-3. **DC-F16 — Split `catalog-system.md`** (4500+ lines) into three docs.
-   - `docs/language/catalog-system-architecture.md` — Architectural Identity, Vision, Completeness, Pattern Definition, Roslyn enforcement, Exhaustiveness strategies. ~1500 lines.
-   - `docs/language/catalog-inventory.md` — Catalogs by name, members, status, short descriptions. ~1500 lines.
-   - `docs/language/catalog-integration.md` — Pipeline stage integration patterns, Qualifier Propagation, Proof Obligations, Construct Slot Model. ~1500 lines.
-   - `catalog-system.md` becomes a thin index (~50 lines) pointing to three sub-docs.
-   - Update all cross-references atomically (CLAUDE.md, sub-area READMEs, other docs).
-   - Preserve § anchor IDs where possible to keep fragment links working.
+2. **DC-F6 (revised) — Verify implementation-state honesty across runtime docs.**
+   - No file moves; the design is canonical.
+   - Audit each `docs/runtime/*.md`: verify the status field accurately reflects implementation maturity (`Stub`, `Partial stub`, `Design — public surface locked`, etc., per the canonical taxonomy).
+   - Confirm the implementation-state banner added in Phase 2 to `docs/runtime/README.md` adequately signals the design-locked-but-implementation-pending pattern.
+   - If any individual runtime doc's status field is misleading, fix it.
+
+3. **DC-F16 (revised) — Trim `catalog-system.md`'s inventory section.**
+   - Remove the Level 3 Member Inventories section (~1500 lines).
+   - Replace with a single paragraph: "The canonical catalog inventory lives in `src/Precept/Language/*.cs`. Query the MCP catalog-reference tools (`precept_syntax`, `precept_types`, `precept_operations`, `precept_domains`, `precept_proofs`, `precept_patterns`) for current member lists with descriptions. This document deliberately does not maintain a parallel listing — applying the catalog-driven philosophy to the doc about the catalog system."
+   - Keep architecture + integration content (~3000 lines) together in `catalog-system.md`.
+   - Audit the Contents TOC at the top — verify every section has a stable anchor and is listed.
+   - No file split; preserves single-source-of-truth property.
 
 4. **DC-F15 — Add `docs/Working/Archive/README.md` decision-history index.**
    - One entry per archived doc: filename, date, topic, promoted-to (if applicable), one-line outcome.
@@ -365,24 +370,22 @@ Total findings integrated: 33. Many overlap or reinforce each other; the phasing
 
 ### Exit criteria
 
-- [ ] `docs/runtime/` contains only docs whose status is `Implemented`, `Active`, or `Canonical design — public surface locked`
 - [ ] `docs/compiler-and-runtime-design.md` is ≤40KB
-- [ ] `docs/language/catalog-system.md` is ≤100 lines (thin index); content lives in three sub-docs
-- [ ] `docs/Working/Archive/README.md` indexes all 46 archived docs
+- [ ] Every `docs/runtime/*.md` carries an implementation-state field that matches reality
+- [ ] `docs/language/catalog-system.md` no longer contains member inventories; target ~3000 lines (down from 4500); TOC complete with stable anchors
+- [ ] `docs/Working/Archive/README.md` indexes all archived docs
 
 ### Doc-touch obligations
 
-- `docs/runtime/` and `docs/Working/runtime/` — moves + status banner
-- `docs/runtime/README.md` — slimmer canonical scope
 - `docs/compiler-and-runtime-design.md` — pointer-hub conversion
-- `docs/language/catalog-system.md` → split into three docs (original becomes thin index)
-- All cross-references to `catalog-system.md` § X — update to point to correct sub-doc
+- `docs/runtime/*.md` — verify each doc's implementation-state field (most already correct from Phase 2)
+- `docs/language/catalog-system.md` — remove Member Inventories section + audit TOC
 - `docs/Working/Archive/README.md` — new
 - `.claude/skills/lifecycle-5-promote/SKILL.md` — Archive-index maintenance obligation
 
 ### Risk
 
-The catalog-system split touches every doc that references its sections. Mitigation: one atomic PR with all cross-reference updates landed together. Preserve § anchors to avoid breaking fragment links.
+The compiler-and-runtime-design.md pointer-hub conversion is the highest-risk change — many docs cite specific sections. Mitigation: preserve § anchor IDs for sections kept as pointers; verify cross-references resolve after the conversion. The catalog-system inventory removal is lower risk because consumers of inventory data already go through source / MCP tools.
 
 ---
 

@@ -45,10 +45,12 @@ The skill:
    - Canonical doc updates
    - Archive header on design doc: `**Promoted to:** <canonical>` (or multiple if multi-target)
    - If design doc not yet in Archive, moves it
+   - Appends an entry to `docs/Working/Archive/README.md` in the appropriate topic group: `| [filename.md](filename.md) | <Status> | <Promoted-to / outcome> |`
 8. Verification pass:
    - No "Status: Pending" / "TODO" markers for what was just lifted
    - All doc-touch obligations completed
    - Cross-links resolve correctly
+   - Archive index entry exists and matches the archived doc's status / promoted-to
 
 ## Behavioral guards
 
@@ -62,6 +64,8 @@ The skill enforces:
 2. **Pointer-philosophy applied to lifted content.** Per the catalog-system.md rewrite pattern: enumerable content (counts, member lists, field shapes) becomes pointers to code; only conceptual why-content is hand-lifted. Skill flags lifted content that looks enumerable and suggests converting to pointer.
 
 3. **Doc-touch verification.** Cross-checks against the design doc's "Doc-update enumeration" section. If the design said it would touch `docs/X.md` and `docs/Y.md`, the skill verifies both were updated. Surfaces gaps.
+
+3a. **Archive index maintenance is mandatory.** The skill refuses to complete the archival without appending an entry to `docs/Working/Archive/README.md` in the appropriate topic group. The index entry is the discovery aid for future agents investigating why a decision was made — without it, the doc joins the un-indexed mass that prompted the index's creation.
 
 4. **No fabrication.** If the source design lacks four-leg rationale (e.g., Archive-sourced pre-policy design), the skill lifts what's there honestly. Does not invent Alternatives/Precedent/Tradeoff to satisfy four-leg requirement.
 
