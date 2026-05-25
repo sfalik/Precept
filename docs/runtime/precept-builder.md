@@ -88,6 +88,19 @@ Source Text → Lexer → Parser → Name Binder → Type Checker → Graph Anal
 
 All three analysis artifacts arrive packaged as a `Compilation` object. `Precept.From(Compilation)` is the sole entry point and sole factory for the `Precept` executable model.
 
+### Restructuring, not renaming
+
+The runtime model is organized for execution, not for semantic analysis. **An implementer must NOT map `SemanticIndex` types 1:1 to runtime types.** The Precept Builder is a selective, restructuring transformation:
+
+- Constraint plans are grouped by **activation anchor** (always / state-anchored / event-anchored), not by source declaration order
+- Action plans are grouped by **transition row**, not by field
+- Expressions are lowered to **flat opcode arrays** addressed by slot index, not preserved as recursive trees
+- Descriptors are **first-class runtime identity**, not back-pointers to source declarations
+
+The runtime model is a dispatch-optimized index, not a renamed analysis model. The evaluator becomes a plan executor that does not reason about semantics at runtime because the build step has already resolved all semantic questions.
+
+The surveyed systems confirm this pattern: CEL's `Program` is a lowered `Interpretable` tree optimized for evaluation, not a copy of the checked AST; OPA's `Compiler` builds internal rule indexes that restructure policy for efficient top-down evaluation; XState v5 transforms machine configuration into a normalized internal model with precomputed transition maps.
+
 **Key design identity:** The builder restructures, not renames. The runtime model is organized for execution — constraint plans grouped by activation anchor, actions grouped by transition row, fields addressed by slot index. An implementer who copies `SemanticIndex` shapes 1:1 to the runtime model is violating this identity.
 
 **Key distinction:** The builder does NOT parse, type-check, or analyze. Those responsibilities belong to upstream stages. The builder reads already-resolved semantic facts and builds execution structures optimized for the evaluator's access patterns. Once the `Precept` is built, the analysis artifacts are no longer needed; the runtime operates entirely from the built model.

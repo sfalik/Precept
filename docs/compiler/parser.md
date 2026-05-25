@@ -158,6 +158,16 @@ The lexer produces `Token` records with `TokenKind`, `Text`, and `SourceSpan`. T
 
 The parser guarantees syntactic well-formedness: slots are populated according to catalog structure. The type checker validates semantic correctness: names resolve, types match, constraints hold.
 
+**Slot-shape alignment (resolved 2026-05-07).** The parser/type-checker slot contract is aligned in source:
+
+- `TypeExpressionSlot` carries `TypeMeta`
+- `ModifierListSlot` carries `ImmutableArray<ModifierKind>`
+- `BecauseClauseSlot` carries `string Message`
+- `AccessModeSlot` carries `TokenKind AccessMode`
+- Expression-carrying slots (`ComputeExpressionSlot`, `GuardClauseSlot`, `OutcomeSlot`, `EnsureClauseSlot`, `RuleExpressionSlot`) carry the parser-owned `ParsedExpression` DU
+
+The cross-stage kind-assignment table — which stage stamps which `*Kind` — lives in [`docs/compiler-and-runtime-design.md § 6`](../compiler-and-runtime-design.md#6-type-checker) (Earliest-knowable kind assignment).
+
 ---
 
 ## Right-Sizing
@@ -175,6 +185,16 @@ The parser does not:
 - Check constraint satisfiability
 
 These responsibilities live in later pipeline stages where full context is available.
+
+### Right-sized parser patterns (comparative rationale)
+
+Precept's grammar is a flat, keyword-anchored, line-oriented DSL — not a deeply nested general-purpose language. Surveyed DSL-scale systems confirm what works at this scale:
+
+- **Flat parse trees.** Precept's grammar has no deep nesting, no brace-delimited scopes, no expression statements. Red/green tree architectures (Roslyn, rust-analyzer) solve incremental reparsing of deeply nested, brace-delimited structures — a problem that does not exist in flat, line-oriented grammars. CEL produces a flat protobuf AST; OPA/Rego produces module-level `Rule` lists; Dhall and Jsonnet both produce single-expression trees with no incremental infrastructure.
+- **Declaration-boundary error recovery.** When the parser encounters a malformed construct, it skips to the next newline-anchored declaration keyword (`field`, `state`, `event`, `rule`, `from`, `in`, `to`, `on`). This is panic-mode recovery with synchronization at declaration boundaries. Token-level insertion/deletion with cost models (Roslyn, GCC) is designed for statement-level grammars where recovery points are ambiguous. Precept's keyword-anchored lines provide unambiguous synchronization. OPA's parser similarly synchronizes at rule boundaries; Pkl's tree-sitter grammar provides node-level error recovery.
+- **Expressions only in specific slots** — guards, action RHS, ensure clauses, computed fields, if/then/else, and because clauses. CEL is a single-expression language; OPA confines expressions to rule bodies and comprehensions. Precept follows the same containment pattern — the parser does not need a general-purpose expression parser for the full language.
+- **Operator precedence from metadata.** Operator precedence comes from `Operators.GetMeta()`, not a hardcoded table. The correct pattern is precedence-climbing — standard for expression parsing at this scale. CEL uses a similar approach in its ANTLR-generated parser with explicit precedence levels; OPA's parser embeds precedence in its recursive descent structure.
+- **LL(1) with single-token lookahead** in most positions, given the keyword-anchored, line-oriented design. Simpler than the LL(k) or GLR techniques general-purpose languages require.
 
 ---
 

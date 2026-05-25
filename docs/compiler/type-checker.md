@@ -274,7 +274,40 @@ After all expressions are resolved:
 
 ### 7.1 SemanticIndex Shape
 
-The SemanticIndex is governed by `docs/compiler-and-runtime-design.md §6`. This section specifies type-checker-specific record type details. See the governing doc for anti-mirroring rules, back-pointer discipline, and inventory organization principles.
+The SemanticIndex is the type checker's output artifact: a **flat semantic inventory** of typed fields, typed states, typed events, typed rules, and typed transitions. It is explicitly NOT a structural mirror of the parse tree — downstream stages (NameBinder, GraphAnalyzer, ProofEngine, PreceptBuilder, Evaluator) consume semantic data, not parser shape.
+
+This section specifies the type-checker-side record type details and discipline. The cross-stage Earliest-knowable kind assignment table — which stage stamps which `*Kind` — lives in [`docs/compiler-and-runtime-design.md § 6`](../compiler-and-runtime-design.md#6-type-checker).
+
+#### Anti-mirroring rules
+
+Four rules govern every record type in the SemanticIndex:
+
+1. **No structural shape mirroring.** `SemanticIndex` does not contain a tree-shaped representation of the parse output. Each typed record (TypedField, TypedState, TypedEvent, etc.) carries the semantic information its consumers need — name, resolved type, modifiers, default/computed expressions, source span — and nothing that exists solely because the parser produced a tree of that shape.
+2. **Back-pointers, not embedding.** Where a typed record needs to refer to its originating parse node (for diagnostics, hover text source spans, code-action source ranges), it carries a back-pointer to the `ParsedConstruct`. It does NOT embed a copy of the parse subtree. The back-pointer is the only legitimate link from SemanticIndex to parse data.
+3. **Back-pointers are TypeChecker-internal.** Downstream stages (GraphAnalyzer, ProofEngine, PreceptBuilder, Evaluator) MUST NOT traverse back-pointers to extract semantic data. If those stages need a piece of semantic data, it must be on the typed record itself. Walking back-pointers to read parse shape is the anti-pattern this rule names.
+4. **Flat inventory, not nested traversal.** Typed records are accessed via direct lookup (`SemanticIndex.Fields`, `FieldsByName[name]`, `States`, `StatesByName[name]`). There is no parent-child traversal. A consumer that needs "all fields anchored to state X" reads `TypedState.AnchoredFields` directly — not by walking from precept → state → field.
+
+A consumer that needs information not present on the flat typed records is signaling that the inventory is underspecified — add the field to the typed record. Walking back-pointers to fill the gap is a category error.
+
+#### Typed action family — three shapes only
+
+Action records use a discriminated union with exactly three subtypes, distinguished by what they target:
+
+| Action shape | Target | Examples |
+|---|---|---|
+| `TypedAction<Field>` | A specific field | `set Amount to 100`; `assign Quota to Compute.Quota` |
+| `TypedAction<State>` | A state (transition outcome) | `transition Active`; `no transition` |
+| `TypedAction<None>` | No target | `reject "<reason>"` (terminating, no field/state target) |
+
+The naming discipline matters:
+
+| Correct | Do not use |
+|---|---|
+| `TargetField`, `TargetState` | `Field`, `State` (ambiguous — could be the target or the declaration) |
+| `TypedAction<Field>` (one subtype) | `TypedFieldAction` (suggests a separate type hierarchy per target kind) |
+| `ActionKind Kind` on each subtype | A `Kind` enum that conflates target shape with action verb |
+
+The action verb (`set`, `assign`, `transition`, `no transition`, `reject`) is the `ActionKind`; the target shape (`Field`, `State`, `None`) is the generic parameter. Confusing the two creates parallel hierarchies and breaks the discriminated-union discipline.
 
 ### Collection Type Decision
 
@@ -1115,7 +1148,7 @@ All three open questions are now **locked** (2026-05-08).
 
 | Topic | Document |
 |---|---|
-| SemanticIndex governance, anti-mirroring rules, inventory shape | `docs/compiler-and-runtime-design.md §6` |
+| Cross-stage earliest-knowable kind assignment (parser↔type-checker contract) | `docs/compiler-and-runtime-design.md §6` |
 | All catalogs the type checker consumes | `docs/language/catalog-system.md` |
 | ConstructManifest input contract | `docs/compiler/parser.md` |
 | SemanticIndex consumer (graph) | `docs/compiler/graph-analyzer.md` |

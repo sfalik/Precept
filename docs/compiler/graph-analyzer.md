@@ -68,6 +68,8 @@ Source Text → Lexer → Parser → Name Binder → Type Checker → [Graph Ana
 
 The graph analyzer operates on fully resolved, well-typed declarations. It constructs the state-transition graph topology, partitions states by reachability, enforces catalog-driven modifier semantics (terminal, required, irreversible), and prepares proof-forwarding facts for downstream stages.
 
+**How it serves the structural guarantee.** The graph analyzer detects lifecycle defects — unreachable states, dead-end states, missing transitions, conflicting state-lifecycle modifiers — that would make the state machine unsound. These are structural problems in the **contract itself**, caught before any instance exists. The proof engine subsequently uses the graph's reachability partition to limit obligation scope to reachable states, so unreachable code does not generate spurious obligations. Without this stage, malformed lifecycle structure would surface as runtime faults during evaluation; with it, the compiler refuses to build a precept whose state graph is unsound.
+
 ---
 
 ## 2. Responsibilities and Boundaries
