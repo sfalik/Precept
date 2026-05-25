@@ -34,6 +34,13 @@
 - [Case-Insensitive Comparison](#case-insensitive-comparison)
   - [Usage examples](#usage-examples)
   - [Design rationale](#design-rationale)
+- [String Ordering — Out of Scope](#string-ordering--out-of-scope)
+  - [Idiomatic substitutes](#idiomatic-substitutes)
+  - [Design rationale](#design-rationale-1)
+  - [Alternatives considered and rejected](#alternatives-considered-and-rejected)
+  - [Precedent](#precedent)
+  - [Tradeoff accepted](#tradeoff-accepted)
+  - [Status](#status-1)
 - [Constraint Catalog](#constraint-catalog)
 - [Built-in Functions (Primitive)](#built-in-functions-primitive)
   - [Numeric functions](#numeric-functions)
@@ -85,7 +92,7 @@ field Notes as string optional
 | `string ~= string` | `boolean` | Ordinal, case-insensitive (`OrdinalIgnoreCase`). |
 | `string !~ string` | `boolean` | Ordinal, case-insensitive not-equals. |
 
-Arithmetic (`-`, `*`, `/`, `%`) is a type error. Logical operators are a type error.
+Arithmetic (`-`, `*`, `/`, `%`) is a type error. Logical operators are a type error. Ordering (`<`, `>`, `<=`, `>=`) is a type error — see [String Ordering — Out of Scope](#string-ordering--out-of-scope) for the rationale and idiomatic substitutes (`choice of T(...) ordered`, `startsWith`, `is in [...]`, numeric/temporal types).
 
 **Member access:**
 
@@ -438,8 +445,8 @@ Numeric literals do not carry an inherent lane. Context determines the type.
 
 | Type | `==` `!=` | `~=` `!~` | `< > <= >=` | `+` `-` `*` `/` `%` | `and` `or` `not` | `.length` / `.count` |
 |---|---|---|---|---|---|---|
-| `string` | ✓ ordinal | ✓ ordinal ignore-case | ✓ ordinal, lex | `+` only (concat) | ✗ | `.length → integer` |
-| `~string` | ✗ compile error — use `~=`/`!~` | ✓ | ✓ ordinal, lex | `+` → `string` (CI not preserved) | ✗ | `.length → integer` |
+| `string` | ✓ ordinal | ✓ ordinal ignore-case | ✗ — see [String Ordering — Out of Scope](#string-ordering--out-of-scope) | `+` only (concat) | ✗ | `.length → integer` |
+| `~string` | ✗ compile error — use `~=`/`!~` | ✓ | ✗ — see [String Ordering — Out of Scope](#string-ordering--out-of-scope) | `+` → `string` (CI not preserved) | ✗ | `.length → integer` |
 | `integer` | ✓ | ✗ type error | ✓ | ✓ (stays integer) | ✗ | — |
 | `decimal` | ✓ exact | ✗ type error | ✓ exact | ✓ (stays decimal) | ✗ | — |
 | `number` | ✓ IEEE 754 | ✗ type error | ✓ IEEE 754 | ✓ (stays number) | ✗ | — |
@@ -494,9 +501,51 @@ set Tier = if Category ~= "premium" then "Gold" else "Standard"
 1. **Domain-expert ergonomics.** The primary `.precept` author is a business analyst. In business domains — names, emails, addresses, department names — case-insensitive comparison is the common case, not the exception. Making the common case require `toLower(x) == toLower(y)` forces the domain expert to reason about string transformations to express what they consider an obvious comparison.
 2. **Explicitness over mechanism.** `~=` declares intent ("this comparison is case-insensitive") rather than mechanism (`toLower` + `==`). This parallels `approximate()` — the numeric bridge declares that a lossy crossing is happening rather than making the author perform the conversion manually.
 3. **`!=` stays.** The `!=` operator was a deliberate, researched decision (see `research/language/expressiveness/conditional-logic-strategy.md`). Symbols for comparison, keywords for logic. `!~` follows the same pattern — `!` negates within the comparison family. The `=` in `~=` disambiguates equality from the reserved `~` prefix (just as `==` disambiguates from `=`); once `!` is present the context is unambiguously a test, so the trailing `=` drops — matching the `!=` / `!==` precedent.
-4. **Tight operator surface.** Scalar CI operators: `~=` and `!~`. CI function variants: `~startsWith` and `~endsWith`. No `~<`, `~>`, `~<=`, `~>=` — CI ordering is rare; `toLower()` covers it when needed.
+4. **Tight operator surface.** Scalar CI operators: `~=` and `!~`. CI function variants: `~startsWith` and `~endsWith`. No `~<`, `~>`, `~<=`, `~>=` — non-CI string ordering is itself out of scope (see [§ String Ordering — Out of Scope](#string-ordering--out-of-scope)), so the CI variants are moot. Removing both surfaces in tandem keeps the language honest: there is no string-ordering question for `~` to vary on.
 5. **Ordinal is the default.** `OrdinalIgnoreCase` is the .NET ecosystem standard for programmatic comparison. No ambiguity about which folding to use.
 6. **No precedent for a dedicated CI operator exists** in any surveyed rule engine, validation framework, or expression language (see `research/language/expressiveness/case-insensitive-implementation-survey.md`). Precept adds one because its target audience is different — domain experts, not programmers — and the function-based idiom optimizes for the wrong author.
+
+---
+
+## String Ordering — Out of Scope
+
+`<`, `>`, `<=`, `>=` on `string` and `~string` are **intentionally a type error**. Lexicographic ordering of free-form text is not a supported business-rule operator in Precept. Authors who reach for it should use one of the substitutes documented below.
+
+### Idiomatic substitutes
+
+| Author intent | Use |
+|---|---|
+| Ranked enumeration (priority, severity, tier) | `field X as choice of string(...) ordered` — declaration-position rank, compile-time validated |
+| Prefix-bucket classification ("codes starting with 'C'") | `startsWith(field, "C")` — explicit, ordinal, no surprise |
+| Membership in a fixed set | `field in ["A","B","C"]` (or `set of string` field with `contains`) |
+| Numeric-shaped string (account number, score, ZIP as integer) | Declare the field as `integer` |
+| Date/time/instant string | Declare the field with the appropriate temporal type |
+| Code-range rule against a standardized code system (ICD-10, CPT, NAICS) | Enumerate prefixes with `startsWith`, or wait for a dedicated domain type if demand emerges |
+
+### Design rationale
+
+1. **No demand signal.** A cross-domain external survey of twelve business domains — CRM, manufacturing, finance, logistics, healthcare, e-commerce, no-code platforms, business rules engines — found zero practitioner evidence of domain experts authoring string `<`/`>` predicates. Every major rule-authoring platform designed for domain experts (Zendesk, Salesforce, HubSpot, Zapier, Make, Dynamics 365, ServiceNow, AppSheet) deliberately omits the operator from its condition surface. Where it exists in developer-facing engines (Drools, FEEL, Power Automate), the operator is documented as confusing and no real-world authoring examples were found. See [string-ordering-broad-use-cases](../../research/language/expressiveness/string-ordering-broad-use-cases.md) and [string-ordering-external-survey](../../research/language/expressiveness/string-ordering-external-survey.md).
+2. **Lexicographic surprise.** `"10" < "9"` is true ordinally (because `'1' < '9'`). An author who writes `<` on a string is almost always reasoning about a *domain* ordering — numeric, by-rank, by-date — that lexicographic comparison does not produce. The platforms that omit the operator do so because the result on free-form text is rarely the answer the author wanted.
+3. **Substitutes cover the legitimate cases.** Ranked enumerations belong in `choice of T(...) ordered` (compile-time-validated set, declaration-position rank, no enumeration drift). Temporal fields use `date`/`time`/`instant`. Numeric identifiers use `integer`. Prefix categorization uses `startsWith`. Set membership uses `is in [...]` or `contains`. Range specification (recall coverage, postal-code shipping zones) is modeled as structured from/to *data* in every real-world system surveyed (Oracle Product Recall, SAP serial-number ranges, WooCommerce shipping zones), not as free-standing predicates.
+4. **Removing the surface removes a hard CI question.** A `string < string` operator forces the language to answer "what is `~string < ~string`?" — CI ordering is unsupported in every system surveyed, and shipping it would compound the lexicographic-surprise problem with locale ambiguity.
+
+### Alternatives considered and rejected
+
+- *Ship non-CI string ordering for fixed-format standardized codes (ICD-10, ZIP, CPT, NAICS).* Rejected: the [gap analysis](../../research/language/expressiveness/string-ordering-gap-analysis.md) identified this as a theoretical use case, but follow-on external surveys found zero demand signal. Healthcare IT uses ValueSet membership; postal/shipping uses from/to data models; financial identifiers are point-lookup, not ordered. The theoretical case has no observed practitioner demand.
+- *Ship `string < string` only where the type checker can prove a fixed-width format.* Rejected: requires authoring a fixed-format type system (`zipcode`, `icd10`, `cpt`). If demand emerges, dedicated domain types are the right surface — not a generic ordering operator that authors will misapply to free-form text.
+- *Ship `between(a, b, c)` instead.* Held open. Serial-number recall and postal-code ranges are real but rare authoring needs. If demand surfaces, `between` is a cleaner shape than `<`/`>`: named endpoints, no cascade-operator surprise, parallel to how Oracle and SAP model the data.
+
+### Precedent
+
+Zendesk, Salesforce, HubSpot, Zapier, Make, Dynamics 365, ServiceNow, AppSheet — none surface string `<`/`>` as a domain-expert condition. Power Automate exposes it via expressions but explicitly documents the result as "hard to understand." Excel and Airtable support the operators in their formula languages but never in the condition GUIs that domain experts use. The convergent design decision across rule-authoring platforms is the strongest available evidence that string ordering is not what domain experts need.
+
+### Tradeoff accepted
+
+Authors who need an unbounded-end-of-range comparison on a fixed-format string code (e.g., "all ICD-10 codes ≥ 'D00'") must enumerate prefixes with `startsWith`, model the field as `integer` or `choice of T(...) ordered`, or wait for a dedicated domain type. The research shows this constraint matches what every other domain-expert rule-authoring system already enforces.
+
+### Status
+
+`TypeKind.String` does not carry `TypeTrait.Orderable`. No `StringLessThanString` operation exists in [`OperationKind.cs`](../../src/Precept/Language/OperationKind.cs). The operator surface is closed at the catalog level — there is nothing to remove from the runtime.
 
 ---
 

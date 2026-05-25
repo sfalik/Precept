@@ -1,0 +1,161 @@
+precept TeamInviteCampaign
+
+# A B2B "invite your team" campaign. An organization launches a campaign
+# bounded to one corporate email domain; the campaign owner invites
+# colleagues by email, recipients accept, and the campaign closes when
+# enough seats are filled.
+#
+# This precept is the corpus's canonical case-insensitive showcase. Email
+# addresses, promo codes, department codes, license-plate numbers — the
+# domains where case-mismatch bugs hide — share one pattern: two values
+# that differ only in casing must be the same value. In case-sensitive
+# systems, this is the bug that creates duplicate accounts, lets a coupon
+# get redeemed twice, and makes "Alice@…" and "alice@…" look like two
+# different people. Precept eliminates the bug structurally: every CI
+# field is declared `~string`, the type checker refuses `==` / `!=` on
+# those fields, sets and lookups key with `OrdinalIgnoreCase` so casing
+# never produces duplicates, and `~startsWith` / `~endsWith` give the
+# function-form CI surface for prefix and suffix tests.
+#
+# The flows below exercise all four CI surfaces in one place:
+#   • scalar `~=` and `!~`   — code match, owner self-invite guard
+#   • `~endsWith(...)`       — corporate-domain restriction on invites
+#   • `set of ~string`       — duplicate-invitation prevention
+#   • `lookup of ~string`    — per-invitee timestamps and roles
+
+# ── Identity ──────────────────────────────────────────────────────────────────
+field CampaignId as string notempty maxlength 50
+field CampaignName as string notempty maxlength 200
+
+# The corporate domain that bounds the campaign. Stored `~string` because
+# administrators may enter "Acme.com" while invitees type "acme.com" —
+# both are the same domain. The `~endsWith` guard on Invite reads from
+# this field with case-insensitive semantics.
+field OrganizationDomain as ~string notempty maxlength 100
+
+# The campaign owner. Receives bounce notifications and is barred from
+# inviting themselves. The `!~` comparison on Invite uses this field; if
+# OwnerEmail were plain `string`, an author could write `Invite.Email !=
+# OwnerEmail` and the bug would slip through whenever the email casings
+# disagreed.
+field OwnerEmail as ~string notempty maxlength 200
+
+# Optional public-facing code customers type to claim a seat. Compared
+# with `~=` below — "ACME-2026" and "acme-2026" both redeem.
+field InviteCode as ~string optional maxlength 50
+
+# Membership and timing. Two `set of ~string` and one `lookup of ~string`
+# carry every email reference in the campaign. The CI element comparer
+# means a re-invite of the same person with a different casing collapses
+# to one entry, and the `contains` guards below fire correctly regardless
+# of how the email was capitalized.
+field InvitedEmails as set of ~string
+field AcceptedEmails as set of ~string
+field InviteSentAt as lookup of ~string to instant
+
+field SeatTarget as integer positive max 1000
+field InviteCount as integer default 0 nonnegative
+field AcceptedCount as integer default 0 nonnegative
+
+field Log as log of string
+field CreatedAt as instant
+field LaunchedAt as instant optional
+field ClosedAt as instant optional
+
+rule InviteCount <= SeatTarget * 3 because "Campaigns may invite up to three times the seat target ({SeatTarget}); higher fan-out should split across campaigns"
+rule AcceptedCount <= InviteCount because "Acceptances cannot exceed invitations sent"
+
+# ── Lifecycle ─────────────────────────────────────────────────────────────────
+state Draft initial
+state Running
+state Closed terminal
+
+in Running ensure LaunchedAt is set because "A running campaign must record when it was launched"
+in Closed ensure ClosedAt is set because "A closed campaign must record when it was closed"
+
+# ── Events ────────────────────────────────────────────────────────────────────
+event Create(
+    CampaignId as string notempty maxlength 50,
+    CampaignName as string notempty maxlength 200,
+    OrganizationDomain as ~string notempty maxlength 100,
+    OwnerEmail as ~string notempty maxlength 200,
+    InviteCode as ~string optional maxlength 50,
+    SeatTarget as integer positive max 1000) initial
+
+event Invite(Email as ~string notempty maxlength 200)
+event Accept(Email as ~string notempty maxlength 200, CodeEntered as ~string optional maxlength 50)
+event Launch
+event Close
+
+# ── Event-arg preconditions ───────────────────────────────────────────────────
+# `~endsWith` is the function-form CI surface. Without it, an author who
+# needed case-insensitive suffix matching would have to write something
+# like `endsWith(toLower(Invite.Email), toLower("@" + OrganizationDomain))`
+# — easy to forget, hard to read, and the bug only surfaces when a
+# customer reports it. The `~` prefix declares intent.
+on Invite ensure ~endsWith(Invite.Email, "@" + OrganizationDomain) because "Invitation address {Invite.Email} is outside the organization domain {OrganizationDomain}"
+
+# Owner self-invite — declaratively rejected. `!~` is required because
+# OwnerEmail is `~string`; `!=` here is a compile error, which means the
+# author cannot accidentally make this guard case-sensitive.
+on Invite ensure Invite.Email !~ OwnerEmail because "The campaign owner cannot invite themselves to the campaign"
+
+# ── Construction ──────────────────────────────────────────────────────────────
+on Create
+    -> set CampaignId = Create.CampaignId
+    -> set CampaignName = Create.CampaignName
+    -> set OrganizationDomain = Create.OrganizationDomain
+    -> set OwnerEmail = Create.OwnerEmail
+    -> set InviteCode = Create.InviteCode
+    -> set SeatTarget = Create.SeatTarget
+    -> set CreatedAt = now()
+    -> append Log "Campaign {Create.CampaignId} drafted for {Create.OrganizationDomain} (target {Create.SeatTarget} seats)"
+
+# ── Entry hooks ───────────────────────────────────────────────────────────────
+to Running -> set LaunchedAt = now()
+to Closed -> set ClosedAt = now()
+
+from Draft on Launch
+    -> append Log "Campaign launched"
+    -> transition Running
+
+# ── Invite flow ───────────────────────────────────────────────────────────────
+# `InvitedEmails contains Invite.Email` runs the set's OrdinalIgnoreCase
+# comparer, so a caller who first invited "Alice@acme.com" and then tries
+# again as "alice@acme.com" or "ALICE@ACME.COM" is rejected here — before
+# the counter increments, before the lookup tombstone is written. That is
+# the case-mismatch bug, structurally eliminated.
+from Running on Invite when InvitedEmails contains Invite.Email
+    -> reject "Email {Invite.Email} has already been invited to this campaign"
+from Running on Invite
+    -> add InvitedEmails Invite.Email
+    -> put InviteSentAt Invite.Email = now()
+    -> set InviteCount = InviteCount + 1
+    -> append Log "Invited {Invite.Email}"
+    -> no transition
+
+# ── Accept flow ───────────────────────────────────────────────────────────────
+# Two CI guards stack here. First: the optional invite code must match
+# the campaign's stored InviteCode if one was set — `~=` makes this
+# case-insensitive without the author having to normalize either side.
+# Second: the inviter's casing of the email may not match what the
+# invitee typed at accept time; the `contains` check resolves both casings
+# to the same set element.
+from Running on Accept when InviteCode is set and Accept.CodeEntered is not set
+    -> reject "This campaign requires an invite code"
+from Running on Accept when InviteCode is set and Accept.CodeEntered !~ InviteCode
+    -> reject "Invite code {Accept.CodeEntered} does not match the campaign's code"
+from Running on Accept when not (InvitedEmails contains Accept.Email)
+    -> reject "Email {Accept.Email} was never invited to this campaign"
+from Running on Accept when AcceptedEmails contains Accept.Email
+    -> reject "Email {Accept.Email} has already accepted this invitation"
+from Running on Accept
+    -> add AcceptedEmails Accept.Email
+    -> set AcceptedCount = AcceptedCount + 1
+    -> append Log "Accepted by {Accept.Email}"
+    -> no transition
+
+# ── Close ─────────────────────────────────────────────────────────────────────
+from Running on Close
+    -> append Log "Campaign closed — {InviteCount} invited, {AcceptedCount} accepted"
+    -> transition Closed

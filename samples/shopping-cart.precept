@@ -31,8 +31,13 @@ field LineItems as list of string
 field ItemQuantities as lookup of string to integer
 
 # Promotions — lookup of promotion code to discount percent. Keyed by code so
-# the same promotion cannot be applied twice.
-field CartPromotions as lookup of string to decimal
+# the same promotion cannot be applied twice. Declared `lookup of ~string`
+# because promotion codes are case-insensitive by convention — a customer
+# who types "SAVE20" should not be able to also redeem "save20" for a
+# second discount on the same cart. The CI key resolves both casings to
+# one entry; the duplicate check in ApplyPromotion fires correctly
+# regardless of how the customer capitalized the code.
+field CartPromotions as lookup of ~string to decimal
 
 # Gift messages — FIFO queue, printed in the order the shopper attached them.
 field GiftMessages as queue of string
@@ -95,8 +100,8 @@ event UpdateQuantity(ItemId as string notempty, NewQuantity as integer positive 
 event ClearCart
 event ReorderItem(FromIndex as integer nonnegative, ToIndex as integer nonnegative)
 
-event ApplyPromotion(PromotionCode as string notempty, DiscountPercent as decimal positive max 100 maxplaces 2)
-event RemovePromotion(PromotionCode as string notempty, AppliedDiscount as decimal nonnegative max 100 maxplaces 2)
+event ApplyPromotion(PromotionCode as ~string notempty, DiscountPercent as decimal positive max 100 maxplaces 2)
+event RemovePromotion(PromotionCode as ~string notempty, AppliedDiscount as decimal nonnegative max 100 maxplaces 2)
 
 event AddGiftMessage(Message as string notempty)
 

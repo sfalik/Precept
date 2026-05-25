@@ -42,6 +42,8 @@ These files compare Precept against adjacent tools and systems. They are not pro
 |---|---|---|
 | [../references/cel-comparison.md](../references/cel-comparison.md) | Google CEL: expression model, type system, logical operators, extension model, safety guarantees | Expression expansion, keyword vs symbol surface |
 | [function-library-comparison.md](./function-library-comparison.md) | Excel, SQL, .NET `System.Math`: function-by-function mapping against Precept's proposed 23-signature library | `#16` built-in function library validation |
+| [string-ordering-external-survey.md](./string-ordering-external-survey.md) | External survey across Excel, Airtable, Drools, FEEL/DMN, HL7 CQL, and healthcare payer systems: do real practitioners use string `<`/`>` on standardized code fields? | String ordering decision (revises gap analysis) |
+| [string-ordering-broad-use-cases.md](./string-ordering-broad-use-cases.md) | Cross-domain survey (12 domains: CRM routing, serial number recalls, account classification, postal code zones, marketing automation, no-code platforms, logistics, finance, education, real estate): is string ordering a domain-expert-facing need outside healthcare? | Broad demand-signal check for string `<`/`>` feature decision |
 
 ## Cross-cutting analysis docs
 

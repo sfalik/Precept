@@ -39,6 +39,8 @@ Call `precept_patterns` before writing the first draft. **Imitate the patterns, 
 
 In particular: **prefer structural modifiers over separate rules.** A required string is `string notempty maxlength N`, not `string default "" + rule X != ""`. A nonnegative integer is `integer nonnegative`, not `integer default 0 + rule X >= 0`. The first form is structural and proved at compile time; the second is checked at runtime and weakens the contract.
 
+And on `maxlength` specifically: use it only when N is *structurally meaningful* — an industry standard (NPI = 10, ICD-10 ≤ 7, VIN = 17, ISO currency = 3), a DB-column convention (50 for IDs, 100 for labels, 200 for names, 320 for RFC 5321 email), a tight bound that prevents real misuse, or a bound a rule/ensure depends on. Do NOT bound free-text `Reason` / `Note` / `Description` fields with arbitrary 500/1000/2000+ values — those bounds are noise, not governance. When a non-obvious bound carries external semantics, cite the source in an inline comment (`# VIN is exactly 17 chars per ISO 3779`). Apply the same rule to event arguments that write into the field: if the field is unbounded, so is the arg.
+
 ## Step 5: Design the Model
 
 Before writing code, outline the domain model:

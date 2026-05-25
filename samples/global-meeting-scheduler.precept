@@ -20,14 +20,28 @@ precept GlobalMeetingScheduler
 # hours as time-of-day with comparison), `duration` (meeting length and
 # instant arithmetic to derive `MeetingEndUtc`), computed fields (`<-`) for
 # every derived view of the canonical instant, entry hooks (`to State -> set`)
-# for phase timestamps, and a `set of timezone` + `lookup of string to timezone`
+# for phase timestamps, and a `set of timezone` + `lookup of ~string to timezone`
 # pairing for per-participant region awareness.
+#
+# Case-insensitive identity. Every field that carries an email address is
+# declared `~string`. Email addresses are the textbook case-mismatch bug:
+# in case-sensitive systems, "Alice@example.com" and "alice@example.com"
+# become two separate participants — one shows up in the attendee count
+# twice, gets two invitation emails, and the timezone lookup stores two
+# entries that drift out of sync. Precept eliminates that bug structurally:
+# `set of ~string` collapses both casings to one element, `lookup of ~string`
+# resolves both forms to the same key, and the `==`/`!=` operators are
+# compile errors on a ~string field — the author cannot accidentally write
+# a case-sensitive comparison. The AddParticipant flow below shows the
+# pattern: a `contains` guard refuses a duplicate before the row's side
+# effects fire, and the CI semantics make that guard work regardless of
+# how the email was capitalized.
 
 # ── Meeting identity (existential — set at construction) ──────────────────────
 field MeetingId as string notempty maxlength 50
 field Title as string notempty maxlength 200
 field HostName as string notempty maxlength 200
-field HostEmail as string notempty maxlength 200
+field HostEmail as ~string notempty maxlength 200
 
 # ── Canonical time ─────────────────────────────────────────────────────────────
 # The single source of truth: the meeting starts at this UTC instant. Every
@@ -72,13 +86,18 @@ field IsWeekendForHost as boolean <- HostLocalDayOfWeek >= 6
 field ParticipantZones as set of timezone
 
 # Membership set — drives the existence check on RemoveParticipant. Pairs
-# with ParticipantZoneByEmail as the canonical record per email.
-field ParticipantEmails as set of string
+# with ParticipantZoneByEmail as the canonical record per email. Declared
+# `set of ~string` so that two events carrying the same email in different
+# casings ("Alice@…" and "ALICE@…") resolve to a single set element — the
+# proof obligation on AddParticipant's `not contains` guard is discharged
+# correctly regardless of the casing the caller used.
+field ParticipantEmails as set of ~string
 
 # Per-participant timezone map keyed by email — the source of truth that
 # feeds the rendering loop. The scheduler iterates this for the per-recipient
-# invite copy.
-field ParticipantZoneByEmail as lookup of string to timezone
+# invite copy. `lookup of ~string to timezone` keys case-insensitively, so
+# `put` and `for` always land on the same entry for a given person.
+field ParticipantZoneByEmail as lookup of ~string to timezone
 
 field ParticipantCount as integer default 0 nonnegative
 
@@ -130,7 +149,7 @@ event Create(
     MeetingId as string notempty maxlength 50,
     Title as string notempty maxlength 200,
     HostName as string notempty maxlength 200,
-    HostEmail as string notempty maxlength 200,
+    HostEmail as ~string notempty maxlength 200,
     HostTimezone as timezone,
     StartUtc as instant,
     Duration as duration,
@@ -141,8 +160,8 @@ on Create ensure Create.Duration.totalSeconds > 0 because "Meeting duration must
 on Create ensure Create.BizEnd > Create.BizStart because "Host business hours end must be after start"
 
 # ── Other events ──────────────────────────────────────────────────────────────
-event AddParticipant(Email as string notempty maxlength 200, Tz as timezone)
-event RemoveParticipant(Email as string notempty maxlength 200)
+event AddParticipant(Email as ~string notempty maxlength 200, Tz as timezone)
+event RemoveParticipant(Email as ~string notempty maxlength 200)
 event AcknowledgeAfterHours
 event Reschedule(NewStartUtc as instant, NewDuration as duration)
 event Schedule
@@ -175,6 +194,13 @@ to Completed -> set EndedAt = now()
 to Cancelled -> set CancelledAt = now()
 
 # ── Participant management ────────────────────────────────────────────────────
+# Duplicate guard. `ParticipantEmails contains AddParticipant.Email` is
+# evaluated case-insensitively because `ParticipantEmails` is `set of
+# ~string` — a caller who first added "Alice@example.com" and then tries
+# again as "alice@example.com" is rejected here, before the counter
+# increments and the lookup tombstone bloats.
+from Draft, Scheduled on AddParticipant when ParticipantEmails contains AddParticipant.Email
+    -> reject "Participant {AddParticipant.Email} is already on this meeting"
 from Draft, Scheduled on AddParticipant when ParticipantCount >= 500
     -> reject "Maximum 500 participants per meeting — current count is {ParticipantCount}"
 from Draft, Scheduled on AddParticipant
@@ -188,9 +214,12 @@ from Draft, Scheduled on AddParticipant
 # Note: lookup deletion is unsupported (BUG-002). The ParticipantEmails set
 # is the canonical membership record; the lookup entry stays as a tombstone
 # until the meeting record is itself archived. Reads should always filter
-# through ParticipantEmails.
-from Draft, Scheduled on RemoveParticipant when ParticipantCount == 0
-    -> reject "No participants to remove"
+# through ParticipantEmails. The `contains` guard below uses CI semantics
+# from `set of ~string`, so a caller who invited "Alice@…" can remove the
+# entry by typing "ALICE@…" without the system claiming they were never on
+# the meeting.
+from Draft, Scheduled on RemoveParticipant when not (ParticipantEmails contains RemoveParticipant.Email)
+    -> reject "Participant {RemoveParticipant.Email} is not on this meeting"
 from Draft, Scheduled on RemoveParticipant
     -> remove ParticipantEmails RemoveParticipant.Email
     -> set ParticipantCount = ParticipantCount - 1

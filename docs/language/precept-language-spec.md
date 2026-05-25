@@ -1318,6 +1318,7 @@ Event args are accessed via dotted notation: `EventName.ArgName`. The type check
 | `~endsWith` | `~string` | `string` | `boolean` | No — CI suffix test; compile error if first arg is not `~string` |
 | `<` `>` `<=` `>=` | numeric | numeric | `boolean` | Yes — `integer` widens to `decimal` or `number`; `decimal` vs `number` is a type error (see §3.2) |
 | `<` `>` `<=` `>=` | `choice of T` (ordered) | `choice of T` (ordered, same element type, order-preserving subsequence) | `boolean` | No (declaration-position rank) |
+| `<` `>` `<=` `>=` | `string` or `~string` | _any_ | _type error_ | String ordering is intentionally out of scope — see [Primitive Types · String Ordering — Out of Scope](primitive-types.md#string-ordering--out-of-scope) for the rationale and idiomatic substitutes (`choice of T(...) ordered`, `startsWith`, numeric/temporal types). |
 | `and` `or` | `boolean` | `boolean` | `boolean` | No |
 
 **Common numeric type:** When two numeric operands have different lanes, the result is the wider type: `integer op decimal` → `decimal`; `integer op number` → `number`. However, `decimal op number` is a **type error** — the author must use an explicit bridge function (`approximate(decimalValue)` to convert to `number`, or `round(numberValue, places)` to convert to `decimal`). There is no implicit `decimal → number` widening in any context — the conversion is lossy. See [Primitive Types · Numeric Lane Rules](primitive-types.md#numeric-lane-rules) for the complete conversion map and §3.7 for bridge function signatures.

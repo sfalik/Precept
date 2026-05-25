@@ -2,14 +2,37 @@ precept ItHelpdeskTicket
 
 # An IT helpdesk ticket from intake through assignment, customer interaction,
 # resolution, and closure. Tickets are progressively enriched: the requester
-# files an empty ticket, triage records the title and severity, and a shared
-# agent queue dispatches the next available agent. The queue is the demonstrative
-# focus — RegisterAgent fires from any active state to grow the on-call pool.
+# files an empty ticket and signals business urgency; the agent records the
+# title and technical severity at triage. Priority is computed from Severity
+# and Urgency, matching standard ITSM practice (impact x urgency -> priority).
+# A shared agent queue dispatches the next available agent — the queue is the
+# demonstrative focus, with RegisterAgent firing from any active state to grow
+# the on-call pool.
 
-# Identity and triage data — filled by the Triage event after intake.
+# Identity and triage data — title and severity are filled at Triage;
+# Urgency is settable by the requester while the ticket is New.
+# Severity: technical impact rank (1 = catastrophic outage, 5 = cosmetic).
+# Urgency: business urgency rank (1 = response needed now, 5 = whenever).
 field TicketTitle as string optional maxlength 200
-field Severity as integer default 3 min 1 max 5
-field Priority as choice of string("Low", "Medium", "High", "Critical") default "Low"
+field Severity as choice of integer(1, 2, 3, 4, 5) ordered default 3
+field Urgency as choice of integer(1, 2, 3, 4, 5) ordered default 3
+
+# Priority is derived from Severity x Urgency. Declare the choice in
+# ascending rank so future ordered comparisons (Priority >= "High", etc.)
+# read correctly. Equality-based cascade is used here instead of the more
+# natural ordinal form (`Severity <= 2 or Urgency <= 2 then "High"`, etc.)
+# because the proof engine cannot currently prove that a bare choice-set
+# literal carries the `ordered` modifier — see BUG-012 in docs/Working/bugs.md.
+# Mapping equivalence: this cascade matches the original ITSM table
+#   (S=1, U=1) -> Critical;
+#   any S or U at 1 or 2 (outside the above) -> High;
+#   any S or U at 5 (outside the above two tiers) -> Low;
+#   everything else -> Medium.
+field Priority as choice of string("Low", "Medium", "High", "Critical") ordered <-
+    if Severity == 1 and Urgency == 1 then "Critical"
+    else if Severity == 1 or Severity == 2 or Urgency == 1 or Urgency == 2 then "High"
+    else if Severity == 5 or Urgency == 5 then "Low"
+    else "Medium"
 
 # Assignment — populated when an agent is dispatched from the queue.
 field AssignedAgent as string optional maxlength 200
@@ -34,12 +57,12 @@ in Assigned ensure AssignedAgent is set because "An assigned ticket must name th
 in Assigned ensure TicketTitle is set because "An assigned ticket must have a triaged title — assignment without intake context produces unactionable work"
 in Resolved ensure ResolutionNote is set because "A resolved ticket must carry the resolution note so future readers understand how it was fixed"
 
-# Editable windows — the requester can adjust priority while the ticket is new.
-in New modify Priority editable
+# Editable windows — the requester signals business urgency before triage.
+in New modify Urgency editable
 
 # Events
 event RegisterAgent(AgentName as string notempty maxlength 200)
-event Triage(Title as string notempty maxlength 200, Level as integer min 1 max 5 default 3)
+event Triage(Title as string notempty maxlength 200, Level as choice of integer(1, 2, 3, 4, 5) ordered default 3, RequesterUrgency as choice of integer(1, 2, 3, 4, 5) ordered default 3)
 event Assign
 event CustomerReply
 event Resolve(Note as string notempty)
@@ -51,10 +74,13 @@ from New, Assigned, WaitingOnCustomer, Resolved on RegisterAgent
     -> enqueue AgentQueue RegisterAgent.AgentName
     -> no transition
 
-# Triage — title and severity are captured before assignment becomes possible.
+# Triage — title, technical severity, and business urgency are captured
+# before assignment becomes possible. The agent may override the requester's
+# urgency signal at triage.
 from New on Triage
     -> set TicketTitle = Triage.Title
     -> set Severity = Triage.Level
+    -> set Urgency = Triage.RequesterUrgency
     -> no transition
 
 # Assign — the next queued agent picks up the ticket. Title must already exist.

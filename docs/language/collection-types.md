@@ -98,7 +98,7 @@ field PendingInterviewers as set of string
 field AllowedDepartments as set of string default []
 ```
 
-**Behavior:** Unordered collection with no duplicate elements. Membership, deduplication, and ordering (for `.min`/`.max`) are governed by the inner type's comparer — ordinal for `string`, `OrdinalIgnoreCase` for `~string`, natural ordering for numeric types.
+**Behavior:** Unordered collection with no duplicate elements. Membership and deduplication are governed by the inner type's comparer — ordinal for `string`, `OrdinalIgnoreCase` for `~string`, value equality for numeric types. `.min`/`.max` are available only when the inner type is orderable (see below).
 
 **Actions:**
 
@@ -126,7 +126,7 @@ from Draft on RemoveFloor when RequestedFloors contains RemoveFloor.Floor
 | `.min` | `T` | `.count > 0` guard required | `T` must be orderable. Proof obligation: `UnguardedCollectionAccess`. |
 | `.max` | `T` | `.count > 0` guard required | `T` must be orderable. Proof obligation: `UnguardedCollectionAccess`. |
 
-"Orderable" means the inner type supports `<`/`>` comparison: all numeric types (`integer`, `decimal`, `number`), `string` (including `~string`, which uses `OrdinalIgnoreCase` ordering — deterministic), and `choice of T(...) ordered` (which defines rank by declaration position). `boolean` and unordered `choice of T(...)` are not orderable; `.min`/`.max` on `set of boolean` or `set of choice of T(...)` (without `ordered`) is a type error. On `set of choice of T(...) ordered`, `.min` returns the element with the lowest declaration position and `.max` returns the highest — these are safe when the `.count > 0` guard is satisfied.
+"Orderable" means the inner type supports `<`/`>` comparison: all numeric types (`integer`, `decimal`, `number`), temporal types (`date`, `time`, `instant`, `duration`, `datetime`), business-domain magnitude types (`money`, `quantity`, `price`, `exchangerate`), and `choice of T(...) ordered` (which defines rank by declaration position). `string`, `~string`, `boolean`, and unordered `choice of T(...)` are **not** orderable; `.min`/`.max` on `set of string`, `set of ~string`, `set of boolean`, or `set of choice of T(...)` (without `ordered`) is a type error. String ordering is intentionally out of scope — see [Primitive Types · String Ordering — Out of Scope](primitive-types.md#string-ordering--out-of-scope). On `set of choice of T(...) ordered`, `.min` returns the element with the lowest declaration position and `.max` returns the highest — these are safe when the `.count > 0` guard is satisfied.
 
 ```precept
 field RiskLevels as set of choice of string("low", "medium", "high") ordered
@@ -475,7 +475,7 @@ Collections of collections (`set of set of string`) are not supported. All Prece
 
 ### `~string` — case-insensitive inner type
 
-`~string` is valid as a collection inner type and as a scalar field type. As a collection inner type, it selects `StringComparer.OrdinalIgnoreCase` as the collection's comparer, governing membership testing, deduplication (for sets), and ordering (for `.min`/`.max`) consistently.
+`~string` is valid as a collection inner type and as a scalar field type. As a collection inner type, it selects `StringComparer.OrdinalIgnoreCase` as the collection's comparer, governing membership testing and deduplication (for sets) consistently. Neither `string` nor `~string` is orderable, so `.min`/`.max` are not available on string-typed collections — see [Primitive Types · String Ordering — Out of Scope](primitive-types.md#string-ordering--out-of-scope).
 
 ```precept
 field Tags   as set of string    # ordinal — "Apple" ≠ "apple", both coexist

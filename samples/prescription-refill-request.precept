@@ -29,7 +29,10 @@ field DrugInteractionSeverity as choice of string("None", "Mild", "Moderate", "S
 field HighestInteractionSeverity as choice of string("None", "Mild", "Moderate", "Severe") ordered default "None"
 field FlagInteractionDetails as string optional
 
-# Priority and review
+# Priority and review — Priority is set by the prescribing physician at the
+# time the script is written; it travels with the prescription unchanged and
+# is never adjusted post-creation. The default "Standard" only covers the
+# brief moment between precept construction and the CreateRefill row firing.
 field Priority as choice of string("Routine", "Standard", "Urgent", "Stat") ordered default "Standard"
 field ReviewNotes as string optional
 field ReviewedBy as string optional maxlength 200
@@ -91,6 +94,7 @@ event CreateRefill(
     RefillsRemaining as integer nonnegative,
     NextFillDate as date,
     PrescribingPhysician as string notempty,
+    Priority as choice of string("Routine", "Standard", "Urgent", "Stat") default "Standard",
     InsuranceProvider as string notempty,
     InsuranceBin as string optional,
     InsurancePcn as string optional,
@@ -112,6 +116,7 @@ on CreateRefill
     -> set RefillsRemaining = CreateRefill.RefillsRemaining
     -> set NextFillDate = CreateRefill.NextFillDate
     -> set PrescribingPhysician = CreateRefill.PrescribingPhysician
+    -> set Priority = CreateRefill.Priority
     -> set InsuranceProvider = CreateRefill.InsuranceProvider
     -> set InsuranceBin = CreateRefill.InsuranceBin
     -> set InsurancePcn = CreateRefill.InsurancePcn

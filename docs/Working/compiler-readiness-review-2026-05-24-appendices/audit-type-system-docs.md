@@ -32,10 +32,11 @@ Three docs read in full. Cross-checked against:
 **Fix**: Promote Doc maturity to "Full"/"Locked", or add explicit § Open Questions section.
 **Effort**: S
 
-### F-LANG-PRIM-01 — Doc claims `string` is orderable; catalog says it isn't [P2]
+### F-LANG-PRIM-01 — Doc claims `string` is orderable; catalog says it isn't [P2] — **RESOLVED 2026-05-24** (by removal)
 **Evidence**: `primitive-types.md:87-90,447` claim ordinal `<`/`>`/`<=`/`>=` on `string`. `Types.cs:300-302` declares `string` with `EqualityComparable | ChoiceElement` — no `Orderable`. `Operations.cs` has no `StringLessThanString` etc.
 **Fix**: Either remove ordering rows from doc, OR add `StringLessThan`/etc. + `TypeTrait.Orderable`.
 **Effort**: S (doc) or M (catalog + tests)
+**Resolution**: Removed from docs. String `<`/`>` is intentionally out of scope. Doc claims removed from `primitive-types.md`, `precept-language-spec.md`, and `collection-types.md`. New canonical section `primitive-types.md` § String Ordering — Out of Scope captures the per-decision rationale (no demand signal across 12 business domains; lexicographic surprise; substitutes cover legitimate cases). Research grounding: `research/language/expressiveness/string-ordering-broad-use-cases.md`, `string-ordering-external-survey.md`, `string-ordering-gap-analysis.md`, `string-ordering-vs-ordered-choice.md`, `string-ordering-architectural-analysis.md`, `business-string-ordering-use-cases.md`.
 
 ### F-LANG-PRIM-02 — `maxplaces` "decimal-only" narrowing in doc is incorrect [P2]
 **Evidence**: `primitive-types.md:231,520` "Only applicable to `decimal`". `Modifiers.cs:236-241` `BusinessMagnitudeTypes = [Decimal, Money, Quantity, Price, ExchangeRate]`.
