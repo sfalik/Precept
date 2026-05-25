@@ -5,8 +5,10 @@
 
 **How to read this document.** Sections 1–3 establish what Precept promises, its architectural approach (catalog-driven, purpose-built, unified pipeline), and the end-to-end pipeline overview — read these first for the design's spine. Sections 4–5 cover Lexer and Parser. Section 5b covers NameBinder. Sections 6–10 are the per-stage contracts (Type Checker through Precept Builder), each opening with how that stage serves the structural guarantee; read them in order for the compilation story, or jump to a specific stage when doing component work. Section 6 (Type Checker) also defines the `SemanticIndex` artifact — its flat semantic-inventory shape, syntax-node back-pointers, and the anti-mirroring rules that keep downstream consumers independent of source structure. Section 11 covers the runtime surface and operations. Section 12 covers type and immutability strategy — a cross-cutting architectural concern that governs every artifact in the pipeline; it is placed here because it is most meaningful after seeing the full compilation and runtime picture. Sections 13–15 cover tooling integration (TextMate grammar generation, MCP, language server) — the consumer-facing contracts that tie compilation output to real product surfaces.
 
+## Non-Negotiable Rules
+
 > [!IMPORTANT]
-> **Non-Negotiable Rules — Read Before Implementing**
+> **Read before implementing any pipeline stage:**
 >
 > - **Catalog-driven first** — language surface changes start in the catalogs; TextMate grammar, completions, hover, and MCP vocabulary derive from those catalog entries rather than separate hand-maintained lists. See [§2. Architectural approach](#2-architectural-approach), [§13. TextMate grammar generation](#13-textmate-grammar-generation), [§14. MCP integration](#14-mcp-integration), and [§15. Language-server integration](#15-language-server-integration).
 > - **Do not mirror syntax in semantics** — `SemanticIndex` is a flat semantic inventory, not a structural mirror of the parse tree, and the pipeline must not accumulate parallel intermediate tree nodes just to preserve parser shape. See [§6. Type Checker](#6-type-checker), [§SemanticIndex: flat semantic inventory, not a mirrored tree](#semanticindex-flat-semantic-inventory-not-a-mirrored-tree), and [§Anti-mirroring rules](#anti-mirroring-rules).
@@ -14,6 +16,7 @@
 
 ## Contents
 
+- [Non-Negotiable Rules](#non-negotiable-rules)
 - [1. What Precept promises](#1-what-precept-promises)
 - [2. Architectural approach](#2-architectural-approach)
   - [Catalog-driven design](#catalog-driven-design)

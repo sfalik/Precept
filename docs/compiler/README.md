@@ -1,14 +1,14 @@
 # compiler/ — Pipeline Stage Blueprints
 
 > [!IMPORTANT]
-> **Before implementing any pipeline stage, complete the [catalog-driven-checklist.md](../contributing/catalog-driven-checklist.md).** Key rules:
+> **Before implementing any pipeline stage, read [`compiler-and-runtime-design.md` — § Non-Negotiable Rules](../compiler-and-runtime-design.md#non-negotiable-rules).** Key rules:
 >
 > - New tokens, operators, and constructs go in the catalog — not inline sets or hardcoded conditions
 > - Parser lookahead uses `Constructs.ByLeadingToken` and `ConstructMeta.Entries` — derived from catalog, not re-encoded
 > - Operator binding power comes from the Operators catalog `BindingPower` property — not hardcoded in `ParseExpression`
 > - SemanticIndex is a flat semantic inventory — NOT a structural mirror of the parse tree
 >
-> See: **[catalog-system.md — § Architectural Identity](../language/catalog-system.md#architectural-identity-metadata-driven)**
+> See also: **[catalog-system.md — § Architectural Identity](../language/catalog-system.md#architectural-identity-metadata-driven)** for the full catalog pattern and enforcement model; **[catalog-driven-checklist.md](../contributing/catalog-driven-checklist.md)** for the pre-implementation verification gate.
 
 Implementation blueprints for each stage of the Precept compiler pipeline. Each doc follows the 16-section canonical template: Status → Overview → Responsibilities and Boundaries → Right-Sizing → Inputs and Outputs → Architecture → Component Mechanics → Dependencies and Integration Points → Failure Modes and Recovery → Contracts and Guarantees → Design Rationale and Decisions → Innovation → Open Questions / Implementation Notes → Deliberate Exclusions → Cross-References → Source Files.
 
@@ -33,7 +33,7 @@ Source string → Lexer.Lex → TokenStream → Parser.Parse → ConstructManife
 
 | Document | Purpose | Doc maturity |
 |----------|---------|--------------|
-| [compiler-and-runtime-design.md](../compiler-and-runtime-design.md) | How pipeline stages connect — artifact types, consumer contracts, LS integration strategy | Draft |
+| [compiler-and-runtime-design.md](../compiler-and-runtime-design.md) | How pipeline stages connect — artifact types, consumer contracts, LS integration strategy | Canonical design |
 | [diagnostic-system.md](diagnostic-system.md) | Diagnostic codes, severity, message templates, audience model, stage attribution | Draft |
 | [literal-system.md](literal-system.md) | How literals flow through every pipeline stage — lexer segmentation, parser assembly, type-checker resolution, evaluator materialization | Draft |
 | [tooling-surface.md](tooling-surface.md) | TextMate grammar generation, semantic token two-pass design, completion filtering | Full |

@@ -17,12 +17,11 @@ Precept is a domain integrity engine for .NET — a DSL runtime that governs how
 
 Precept is documentation-dense. Many design decisions live in `docs/` and `research/`, not in code comments. **Read the relevant docs before making non-trivial changes** — assume the answer exists in a doc until you've verified it doesn't.
 
-### Read first, every time, before pipeline work
+### Read first, every time
 
-- **`docs/language/catalog-system.md` — § Architectural Identity** — the non-negotiable architecture rules
-- **`docs/contributing/catalog-driven-checklist.md`** — pre-implementation checklist; answer every question before writing code
-
-`docs/README.md` flags both as required reading. Skipping them is the most common way to silently violate the metadata-driven architecture.
+- **`docs/philosophy.md`** — Precept's core commitments. Every design and implementation decision is evaluated against these.
+- **`docs/README.md`** — the doc landscape and navigation gateway. Know what exists before deciding what to read.
+- **`docs/language/README.md`** — the language surface: spec, canonical types, grammar, catalog as source of truth. Precept's design decisions are language decisions; this is the primary substance.
 
 ### Entry points
 
@@ -30,7 +29,9 @@ Each area has a README that catalogs its documents, status fields, and reading o
 
 | Area | Entry point |
 |---|---|
-| Top-level | `docs/README.md` — index, read-first rules, full reading order |
+| Philosophy | `docs/philosophy.md` — core commitments; read before any design decision |
+| Top-level | `docs/README.md` — doc landscape and navigation gateway |
+| Architecture overview | `docs/compiler-and-runtime-design.md` — full pipeline + runtime; read before pipeline or architecture work |
 | Language surface | `docs/language/README.md` — DSL spec and type system docs |
 | Compiler pipeline | `docs/compiler/README.md` — pipeline stage docs and cross-cutting infrastructure |
 | Runtime | `docs/runtime/README.md` — runtime API and component docs |
@@ -46,6 +47,7 @@ Pipeline stage docs follow a canonical 16-section template — see existing stag
 Every doc declares a status. Trust it for routing; verify against code when status is "Implemented":
 
 - **Implemented / Active** — describes shipped code
+- **Canonical design** — architectural reference; grounded in the implementation
 - **Design / Draft** — specification awaiting implementation
 - **Stub** — placeholder; design not yet fully written
 - **Archived** — superseded; reference only, do not update
@@ -149,6 +151,14 @@ When locking a decision that started as research:
 Delegate `.precept` file work to the **`precept-author` sub-agent** (`.claude/agents/precept-author.md`). It carries the precept MCP tools and the canonical authoring/debugging workflows — spawn it rather than authoring DSL inline.
 
 For inline snippets (a single line in an explanation, a short example in a comment), still: read at least one representative sample file from `samples/` first. Do not rely on memory or inference — read first, then write.
+
+## Language Surface Design (Non-Negotiable)
+
+New language surface — syntax, keywords, types, operators, modifiers, constructs, expression forms — must go through `/lifecycle-2-design`. Never propose or settle on a specific syntax approach in direct chat.
+
+If a user asks about syntax options, discuss tradeoffs briefly but **do not propose a specific design inline**. Route to the skill: "Let's run `/lifecycle-2-design` to work through this properly." A suggestion made in chat is brainstorming; it must not harden into a decision without the four-leg rationale, Language Design Grounding (broader field, not just Precept-internal), and Architecture Grounding the skill enforces.
+
+The risk: a casual inline suggestion — made without reading the spec, comparable systems, or the catalog — can become "the" design simply by being the first thing written down. The `/lifecycle-2-design` skill exists precisely to prevent this.
 
 ## Per-Decision Rationale (Non-Negotiable)
 
