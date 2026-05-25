@@ -85,8 +85,27 @@ Read `CLAUDE.md` at the repo root before doing anything else. It contains the ca
 - Never run `dotnet build` or `dotnet run` against `.precept` files — they're runtime-interpreted. If a PR adds such a command, that's a finding.
 - For DSL questions, use the precept MCP tools (`precept_syntax`, `precept_compile`, `precept_diagnostic`, `precept_patterns`) as authoritative — not source code grepping.
 
-### 9. Per-Decision Rationale
-- Locked design decisions in proposals must include: **rationale**, **alternatives considered and rejected**, **precedent from the research base**, **tradeoff accepted**. A WHAT without WHY is incomplete.
+### 9. Per-Decision Rationale and Stakes-Based Rigor
+- Every decision declares `Stakes: low | medium | high | irreversible`. Missing or implausible stakes classification is a CONCERN (the author may have misjudged the stakes — surface for human judgment).
+- Required legs scale with stakes (see `lifecycle-2-design/SKILL.md § Decisions § Required legs by stakes`):
+  - **low**: Rationale + Tradeoff
+  - **medium**: + Alternatives, Precedent, Sources consulted (with excerpt)
+  - **high**: + Strongest counter-evidence, Reversibility, Blast radius
+  - **irreversible**: + `## Falsifiers` section + 24-hour cooling-off period observed before Locked
+- A decision missing a stakes-required leg is a BLOCKER.
+- A decision whose stakes classification looks implausible given the change scope (e.g., a new public keyword marked `low`) is a CONCERN — flag for human judgment.
+- A WHAT without WHY remains incomplete. The expanded leg set is the WHY discipline at scale.
+
+### 9a. Citation Discipline
+- Every citation has `<source identifier> — <verbatim excerpt>`. Bare paths or section names without excerpt are BLOCKERs.
+- External URL citations must carry: full verbatim excerpt (no paraphrasing), access date, stable identifier for standards docs (RFC#, DOI, paper title+venue+year). Missing access date or paraphrased excerpts are CONCERNs (becomes BLOCKER if the source is load-bearing for the decision).
+- `sources-consulted` frontmatter ⊇ every source cited in any decision's `Sources consulted` leg. Mechanical set-membership check; missing entries are a BLOCKER.
+- Mirroring external sources to `research/references/` is preferred over live URLs. Live-URL-only citations for load-bearing decisions are CONCERNs.
+
+### 9b. Falsifiers (external-author-visible designs)
+- Designs that lock behavior visible to external authors (language surface, error messages, diagnostic codes, MCP vocabulary, public-API shape) must carry a `## Falsifiers` section with 2-5 specific, measurable, decision-changing observations.
+- Missing Falsifiers on an external-author-visible design is a BLOCKER.
+- Falsifiers that are vague ("if it doesn't work well", "if users complain") are CONCERNs; they must be concrete enough to act on.
 
 ### 10. Philosophy Alignment
 
@@ -120,7 +139,11 @@ Missing Audience and Teachability on a language-surface change is a BLOCKER.
 
 ### 12. Architecture Grounding
 
-For design-doc reviews involving pipeline/API/catalog changes: is the `## Architecture Grounding` section present? Does it address layer placement, cross-component propagation, and breaking changes? A missing sub-section is a BLOCKER.
+For design-doc reviews involving pipeline/API/catalog changes: is the `## Architecture Grounding` section present with both sub-sections?
+
+**Precept-internal placement** — layer placement + cross-component propagation (no blanks; explicit "None" required per category) + breaking changes. A missing sub-section or a blank propagation category is a BLOCKER.
+
+**External architectural precedent** — at least one comparable system's solution to the architectural problem this design touches, cited with excerpt, with Precept's divergence stated. Comparators to consider: Roslyn, TypeScript, CEL, OPA, CUE, Dhall, Rust, GHC, MLIR. A non-trivial architectural change without an external comparator is a CONCERN. "No precedent — novel architectural choice" is acceptable but requires explicit acknowledgment and a defensive paragraph for why the novelty is warranted.
 
 For all reviews: when a finding identifies a layer/abstraction placement error, frame it as a **category error** — name what layer the behavior belongs in, what layer it is incorrectly placed in, and why the boundary matters. "Wrong pattern" without explaining the architectural principle is an incomplete finding.
 
@@ -128,6 +151,7 @@ Check specifically:
 - Is behavior placed in pipeline code that belongs in catalog metadata?
 - Does a change to public API, diagnostic codes, or catalog member names constitute a breaking change that isn't flagged?
 - Does the cross-component propagation account for all three categories (Runtime / Tooling / MCP)?
+- Does the external comparator citation match Precept's actual architectural problem (not a superficially-similar but architecturally-distant comparison)?
 
 ### 13. Source Verification (design-doc reviews)
 When the review target is a locked design doc (from `/lifecycle-2-design`):

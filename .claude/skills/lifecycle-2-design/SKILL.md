@@ -154,6 +154,8 @@ For constructs that don't introduce expressions, state the binding rule, evaluat
 
 [Required when the design touches catalog structure, pipeline stage boundaries, public API contracts, or cross-component interfaces. Omit with an explicit one-line note for designs that don't touch these surfaces.]
 
+### Precept-internal placement
+
 **Layer placement:**
 Which layer does this behavior belong in — catalog metadata, pipeline stage, public API, tooling derivation? Why does it belong there and not in an adjacent layer? If behavior is being placed in pipeline code rather than catalog metadata, explain the structural limitation that requires it.
 
@@ -166,8 +168,24 @@ How does this change propagate across component boundaries? State the impact for
 **Breaking changes:**
 Does this change any public contract — API surface, diagnostic codes, catalog member names that flow to grammar/completions/MCP vocabulary? If yes, state explicitly.
 
-**General architecture:**
-What do comparable systems handle for this kind of design problem? What does Precept's approach take from or deliberately diverge from those patterns, and why?
+### External architectural precedent
+
+**Mandatory for non-trivial architectural changes.** Cite at least one comparable system's solution to the architectural problem this design touches, with excerpt, and explain Precept's divergence. Internal consistency is necessary but not sufficient — the project's own `compiler-and-runtime-design.md § 2` explicitly grounds the catalog-driven choice in CEL/OPA/CUE comparisons; locked designs must hold themselves to the same comparative standard.
+
+Comparators to consider (not exhaustive):
+- **Roslyn** — descriptor-based diagnostics, language-version axes, analyzer SDK separation
+- **TypeScript** — incremental type-checking model, structural typing
+- **CEL** — type registry, fluent expression evaluation, embedding model
+- **OPA** — compiler vs. evaluator boundary, partial evaluation
+- **CUE** — lattice-based evaluation, constraint propagation, schema/data unification
+- **Dhall** — total functional design, normalization-based type checking
+- **Rust** — trait system, macro hygiene, query-based compilation
+- **GHC** — desugaring pass, Core IR, type-class resolution
+- **MLIR / LLVM** — pluggable dialects, lowering strategy
+
+Pick the comparator most relevant to the design's architectural problem. Cite a specific section or quote of the comparator's docs/spec/source. State what Precept takes and what Precept deliberately diverges from, and why.
+
+Reviewer treats a missing external comparator on a non-trivial architectural change as a CONCERN. "No precedent — novel architectural choice" is acceptable but requires explicit acknowledgment and a paragraph defending why the novelty is warranted.
 
 ## Inventory of what will be built
 File-level detail: catalog entries, type/record shapes, file paths, test stubs.
@@ -176,28 +194,96 @@ does NOT apply here (this is the spec, not the canonical doc).
 
 ## Decisions
 
-For each locked design decision, all four legs are REQUIRED:
+Each decision is self-classified by stakes; the required-leg set scales with stakes.
 
+### Stakes classification
+
+| Stakes | Definition | Examples |
+|---|---|---|
+| **low** | Recoverable choice; reversal touches <5 docs/samples; no public-surface lock-in | Severity choice on a new diagnostic, RecoverySteps wording, NIT-level naming |
+| **medium** | Choice that affects more than one consumer but is reversible with bounded effort | New modifier semantics, new accessor, new diagnostic code |
+| **high** | Touches public-surface contracts (catalog member names, diagnostic codes, MCP vocabulary, keyword choices); reversal is costly | New keyword, new construct, new type, new operator, public API addition |
+| **irreversible** | Once shipped to external authors, reversal is effectively infinite cost | Keyword retirement, public-API breaking change, semantic change to existing operator, catalog enum renumbering |
+
+State the stakes explicitly: `**Stakes**: low | medium | high | irreversible`. The reviewer flags missing or implausible stakes classification.
+
+### Required legs by stakes
+
+| Leg | low | medium | high | irreversible |
+|---|---|---|---|---|
+| Rationale | ✓ | ✓ | ✓ | ✓ |
+| Tradeoff accepted | ✓ | ✓ | ✓ | ✓ |
+| Alternatives considered | — | ✓ | ✓ | ✓ |
+| Precedent | — | ✓ | ✓ | ✓ |
+| Sources consulted (with excerpt) | — | ✓ | ✓ | ✓ |
+| Counter-evidence | — | — | ✓ | ✓ |
+| Reversibility | — | — | ✓ | ✓ |
+| Blast radius | — | — | ✓ | ✓ |
+| Falsifiers (in companion section) | — | — | — | ✓ |
+| 24-hour cooling-off before Locked | — | — | — | ✓ |
+
+### Decision template
+
+```markdown
 ### Decision N: <one-line decision>
 
+**Stakes**: <low | medium | high | irreversible>
+
 - **Rationale**: why this choice
+- **Tradeoff accepted**: the known downside being taken on
 - **Alternatives considered**: each alternative + why it was rejected
+  [required for medium+]
 - **Precedent**: research / prior art / existing pattern that grounds the choice
   (or explicit "no precedent — novel choice, accepting risk")
-- **Tradeoff accepted**: the known downside being taken on
+  [required for medium+]
 - **Sources consulted for this decision**: one or more source identifiers
   with a short verbatim or near-verbatim excerpt that proves the source was
   read (e.g., `path/to/file.cs:L1-L20 — "<excerpt>"`, or `docs/foo.md § N —
-  "<excerpt>"`). Source identifier is opaque — anything with a permanent
-  address (code file with line range, doc section, MCP tool query, URL,
-  another design doc, test fixture, sample file, bug entry, RFC, etc.).
-  Honest "no sources consulted — pure-policy choice, no external state
-  informed this" is acceptable when true.
+  "<excerpt>"`).
+  [required for medium+]
+- **Strongest counter-evidence**: the source (internal or external) that most
+  plausibly argues against this decision, with excerpt, and a one-sentence
+  response. Honest "no counter-evidence found after looking" is acceptable
+  but must say where the author looked.
+  [required for high+]
+- **Reversibility**: `Easy` | `Hard` | `Effectively-irreversible-post-ship`,
+  with one-sentence justification.
+  [required for high+]
+- **Blast radius**: catalogs touched, docs touched, samples touched, external
+  consumers affected.
+  [required for high+]
+```
 
-The skill refuses to mark a design "Locked" if any decision is missing
-any of the five legs. Author must either fill the leg honestly or
-explicitly state "no precedent" / "no tradeoff identified — flag for review"
-/ "no sources consulted — pure-policy choice."
+### Honest-answer exits
+
+- "No precedent — novel choice, accepting risk" — acceptable answer for the Precedent leg. Novel decisions in language-design space are real; the skill does not invent precedent.
+- "No counter-evidence found after looking in X, Y, Z" — acceptable answer for the Counter-evidence leg. Names the search surface so the claim is falsifiable.
+- "No sources consulted — pure-policy choice, no external state informed this" — acceptable for the Sources leg when genuinely true.
+- "No tradeoff identified — flag for review" — discouraged; tradeoff is usually identifiable with thought. If used, the reviewer treats as a CONCERN that the author hasn't yet found the tradeoff.
+
+### Source-citation discipline
+
+Citations must be reproducible — a future reviewer can open the source and verify the excerpt. Two strengthening rules:
+
+1. **External URL citations** must (a) include the full quoted excerpt verbatim (no paraphrasing or truncation), (b) include the access date, and (c) be preferred only when no in-tree or paper-PDF equivalent exists. For standards documents (RFCs, ISO docs, papers), include a stable identifier (RFC#, DOI, paper title + venue + year). Prefer locally-mirrored copies in `research/references/` over live URLs.
+
+2. **Frontmatter aggregation**: `sources-consulted` in frontmatter must list every source identifier that appears in any decision's `Sources consulted` leg. Mechanical set-membership check at lock time.
+
+### Cooling-off for irreversible decisions
+
+Decisions with `Stakes: irreversible` cannot advance from Draft to Locked in the same session. The doc carries `status: Stage-3-Externally-Grounded` for at least 24 hours before advancing to `Locked`. The cooling-off forces a second pass — reading the design after time away surfaces gaps the original session missed. Falsifiers section (below) is also required.
+
+### Falsifiers (separate section, required for irreversible decisions and external-author-visible changes)
+
+For any design with an `irreversible` decision, or any design that locks behavior visible to external authors (language surface, error messages, diagnostic codes, MCP vocabulary, public-API shape), add a `## Falsifiers` section.
+
+Format: 2-5 specific observations that, if seen post-ship, would force a redesign. Concrete, measurable, decision-changing. Examples:
+
+- "If three or more samples in `samples/` need explicit-cast workarounds to satisfy the new typing rule, the rule is over-strict and should relax to <weaker form>."
+- "If `precept_compile` p99 latency exceeds 50ms on the median sample after this construct ships, the parser strategy is wrong and should be reconsidered."
+- "If a single domain expert in a usability test cannot author a working example using this feature within 10 minutes, the audience-fit claim is falsified."
+
+Falsifiers are paired with `/lifecycle-7-audit` for revisit discipline — periodic checks against the falsifier list catch designs that aged badly.
 
 ## Acceptance criteria
 Test-shaped. "This passes" / "this fails as expected" / "this is documented in Y."
@@ -234,20 +320,26 @@ The skill enforces:
 
 4. **Designs touching evaluation, proof, or typing require Semantic Rules.** If the design introduces a new expression form, modifies typing behavior, adds a proof obligation, or changes constraint semantics: the Semantic Rules section must be present with reduction/typing-rule sketches and a soundness-preservation claim naming the specific principles preserved. Prose descriptions without notation are refused for non-trivial cases.
 
-5. **Pipeline/API/catalog changes require Architecture Grounding.** If the design touches catalog structure, pipeline stage boundaries, public API contracts, or cross-component interfaces: all three sub-sections (layer placement, cross-component propagation, breaking changes) must be present and addressed. Any propagation category left blank rather than explicitly "None" is refused.
+5. **Pipeline/API/catalog changes require Architecture Grounding.** If the design touches catalog structure, pipeline stage boundaries, public API contracts, or cross-component interfaces: all sub-sections must be present. Precept-internal placement: layer placement + cross-component propagation (no blanks; explicit "None" required per category) + breaking changes. External architectural precedent: at least one comparator's solution cited with excerpt for non-trivial architectural changes. "No precedent — novel architectural choice" is acceptable but requires explicit acknowledgment.
 
-6. **No "Locked" status without four-leg decisions.** Every decision must carry Rationale + Alternatives + Precedent + Tradeoff. The skill checks for the four headers and asks the author to fill missing ones one at a time. Author can answer "no precedent — novel choice" or "no tradeoff identified — flag for review", but cannot skip the question.
+6. **Every decision carries stakes-appropriate legs.** Each decision declares `Stakes: low | medium | high | irreversible`. Required legs scale with stakes (see § Decisions § Required legs by stakes). High-stakes decisions require Counter-evidence, Reversibility, and Blast-radius legs. Irreversible decisions additionally require a `## Falsifiers` section and a 24-hour cooling-off period before advancing to `Locked`. Missing stakes classification or skipped legs are refused.
 
-7. **No "Locked" status with open questions.** Forces resolution before locking. If questions are too big to resolve in the session, the skill suggests creating a separate Wave 0 decision-triage doc.
+7. **External-author-visible changes require Falsifiers.** If the design locks behavior visible to external authors (language surface, error messages, diagnostic codes, MCP vocabulary, public-API shape), a `## Falsifiers` section is required with 2-5 specific observations that would force redesign post-ship. Missing Falsifiers on an external-author-visible change is refused.
 
-8. **Acceptance criteria must be test-shaped.** The skill refuses vague criteria like "works correctly." Prompts for specific testable conditions.
+8. **No "Locked" status with open questions.** Forces resolution before locking. If questions are too big to resolve in the session, the skill suggests creating a separate Wave 0 decision-triage doc.
 
-9. **Doc-update enumeration must be present.** The skill consults the CLAUDE.md routing table for the file paths the design touches and pre-populates the doc-update section. Author can edit or expand.
+9. **Acceptance criteria must be test-shaped.** The skill refuses vague criteria like "works correctly." Prompts for specific testable conditions.
 
-10. **Every decision must cite the sources that informed it — with proof-of-reading.** A citation is `<source identifier> — <short verbatim excerpt>`. The excerpt is the forcing function: it can't be fabricated without opening the source. Citations are listed per-decision (under the "Sources consulted for this decision" leg) AND aggregated in the frontmatter `sources-consulted` field. The skill checks two things at lock time:
+10. **Doc-update enumeration must be present.** The skill consults the CLAUDE.md routing table for the file paths the design touches and pre-populates the doc-update section. Author can edit or expand.
+
+11. **Every decision must cite the sources that informed it — with proof-of-reading.** A citation is `<source identifier> — <short verbatim excerpt>`. The excerpt is the forcing function: it can't be fabricated without opening the source. Citations are listed per-decision (under the "Sources consulted for this decision" leg) AND aggregated in the frontmatter `sources-consulted` field. The skill checks two things at lock time:
    - **Decision text vs. citations.** If a decision's prose names external state (a file path, a code identifier, a doc section, a tool, a sample, a bug ID, an enum, an interface, a precept feature, a research conclusion, another design doc) but the decision's `Sources consulted` leg is empty, refuse to lock. The author either cites what they consulted or explicitly declares "no sources consulted — pure-policy choice."
    - **Frontmatter aggregation.** `sources-consulted` in frontmatter must list every source identifier that appears in any decision's `Sources consulted` leg. The check is mechanical set membership — every per-decision citation also appears at the top of the doc.
    "Source" is an open category — anything with a permanent address that informed the design qualifies. The skill does NOT hardcode which source types are acceptable; the discipline is "cite what you read, regardless of what kind of thing it is."
+
+12. **External URL citations must be reproducible.** When a citation is to an external URL (not an in-tree file): the excerpt must be the full verbatim quote (no paraphrasing or truncation); the citation must include the access date; for standards docs (RFCs, ISO docs, papers), a stable identifier (RFC#, DOI, title+venue+year) is required; mirroring to `research/references/` is strongly preferred over live URLs. Paraphrased URL citations or missing access dates are refused.
+
+13. **Irreversible decisions require cooling-off.** A decision marked `Stakes: irreversible` cannot advance from Draft to Locked in the same session. The doc carries `status: Stage-3-Externally-Grounded` for at least 24 hours before advancing. The cooling-off is a structural pause: re-reading the design after time away surfaces gaps the original session missed.
 
 ## Composability
 
