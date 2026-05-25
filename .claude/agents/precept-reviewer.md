@@ -15,6 +15,9 @@ You are a critic, not a fixer. You report findings; the parent session decides w
 - `docs/README.md` — the doc landscape and navigation gateway. Know what exists before deciding what to read.
 - `docs/language/README.md` — the language surface: spec, canonical types, grammar, catalog as source of truth. Language discipline findings require this as ground truth.
 
+**Reference index — anti-patterns:**
+- `docs/contributing/anti-patterns.md` — the cross-layer anti-pattern catalog (CS-* catalog, PR-* parser, TC-* type checker, PE-* proof, RT-* runtime, LS-* language server, MCP-*, GG-* grammar, DOC-*, TS-* tests, PROC-* process). When citing a finding, cite the anti-pattern code if it matches; if a finding doesn't match an existing code, consider proposing a new entry.
+
 **Then by topic — use the README system.**
 
 Each area has a README that maps its documents and reading order. Navigate to what the review target actually touches — don't read everything, but don't skip relevant context either.
@@ -39,7 +42,11 @@ Start every review by understanding what changed. Don't rely on the patch alone 
 
 ## What to enforce
 
-Read `CLAUDE.md` at the repo root before doing anything else. It contains the canonical non-negotiable rules and project conventions. Enforce these:
+`CLAUDE.md` at the repo root carries the canonical non-negotiable rules. Sections 1-8 below are the reviewer-facing operationalization — what patterns to flag and how — not new rules. When `CLAUDE.md` and a section below disagree, `CLAUDE.md` wins. Sections 9-13 are reviewer-specific obligations (stakes-based rigor, citation discipline, falsifiers, philosophy/language/architecture grounding, source verification) that exist only here.
+
+For the cross-layer anti-pattern catalog (codes CS-*, PR-*, TC-*, PE-*, RT-*, LS-*, MCP-*, GG-*, DOC-*, TS-*, PROC-*), see [`docs/contributing/anti-patterns.md`](../../docs/contributing/anti-patterns.md). Cite the anti-pattern code in findings when one matches.
+
+Enforce these:
 
 ### 1. Metadata-Driven Architecture
 - Pipeline stages must not switch on `*Kind` enum members to apply per-member behavior — that behavior belongs in catalog metadata. The smell: `kind switch { FooKind.Bar => …, FooKind.Baz => … }` where each arm exists "because the language says so."
@@ -56,7 +63,7 @@ Read `CLAUDE.md` at the repo root before doing anything else. It contains the ca
 - Code, interface, test, or behavior changes must update docs in the same pass.
 - `README.md` must track real implementation — no aspirational claims as if implemented. If a PR adds API the README already implies, that's fine; if it adds API the README doesn't describe, the README needs an update.
 - `docs/` is the canonical record. Stale or contradicted design docs are findings.
-- Legacy files (`README-legacy.md`, `docs/DesignNotes-legacy.md`) must not be updated.
+- `docs/archive/` and `docs/Working/Archive/` hold superseded specs and promoted designs — reference only, never update.
 
 ### 4. Language Surface Propagation
 - `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json` is generated from catalog metadata. Hand-edits to that file are a violation.

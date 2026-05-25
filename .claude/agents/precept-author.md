@@ -10,19 +10,18 @@ Authoring Precept with AI is a core part of the product's value proposition. **B
 
 ## What Precept Is (and Is Not)
 
-Read this before you write a single line of DSL. Precept's identity shapes every authoring decision.
+Read [`docs/philosophy.md`](../../docs/philosophy.md) before you write a single line of DSL. Precept's identity shapes every authoring decision. The canonical commitments (prevention not detection, one file complete rules, determinism, honesty about approximation, governance not validation, stateless first-class, domain-expert primary author) live there — this body does not restate them.
 
-Precept governs an entity's **data integrity**. It is **not** a workflow engine and **not** a validator. It declares what an entity's data is allowed to become and enforces that structurally on every operation.
+**Authoring implications** of those commitments — what the philosophy means specifically when you sit down to write `.precept`:
 
-- **Prevention, not detection.** A rule does not "check" data after the fact — it makes invalid configurations structurally impossible.
-- **One file, complete rules.** Every field, rule, ensure, event, and transition lives in the `.precept` definition. No external logic, no escape hatches.
-- **Data and rules are primary; states are the mechanism.** A precept models an entity and its data integrity. States are the coordinate system that makes data integrity lifecycle-aware *when lifecycle is real*. **Stateless precepts are first-class** — if the entity has no meaningful lifecycle, do not invent one.
-- **Determinism.** Same definition + same data + same operation = same outcome. Always.
-- **Honesty about approximation.** Exact and approximate domains must be visible in the type system. `money` is exact; `number` admits approximation. Choose deliberately.
-- **Mandatory `because`.** Every rule, ensure, and `reject` outcome carries a rationale — a clear explanation of *why* the constraint exists, in domain terms. The rationale is part of the contract, not a comment.
-- **Primary author is the domain expert.** The DSL is for someone who reasons in terms of *what this data is allowed to become*. Write definitions that read clearly to that audience.
+- A rule never "checks" data after the fact — design the constraint to make invalid states structurally impossible.
+- No external escape hatches. If the rule belongs to the entity, it goes in the `.precept` file.
+- **Stateless precepts are first-class.** If the entity has no meaningful lifecycle, do not invent one. Data and rules are primary; states are the mechanism, not the point.
+- **Honesty about approximation lives in your type choices.** `money` is exact; `number` admits approximation. Choose deliberately. The type docs in `docs/language/` carry the Approximation Stance for each type family.
+- **Every rule, ensure, and `reject` outcome carries a `because`** — a clear domain-vocabulary rationale. The rationale is part of the contract, not a comment.
+- **The reader is the domain expert.** Write definitions that read clearly to someone who reasons in terms of *what this data is allowed to become*. See [`docs/language/precept-language-spec.md § 0.7 Authoring Audience`](../../docs/language/precept-language-spec.md) for the operational implications.
 
-Every line you author should be defensible against these commitments. The full grounding doc is `docs/philosophy.md` — read it when making design judgments, not just syntax choices.
+Every line you author should be defensible against the philosophy commitments. When you make design judgments — not just syntax choices — return to `docs/philosophy.md` and the type-doc Approximation Stance sections.
 
 ## Operating Mode
 
