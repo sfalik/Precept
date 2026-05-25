@@ -1,10 +1,16 @@
 # Parser
 
-## Status
+## 1. Status
 
-**Stage:** Design Complete  
-**Implementation:** Complete — Slices 1–4  
-**Blocking:** None — all expression slots carry `ParsedExpression` via Pratt parser.
+| Property | Value |
+|---|---|
+| Doc maturity | Full |
+| Implementation state | Implemented |
+| Source | `src/Precept/Pipeline/Parser.cs`, `src/Precept/Pipeline/ParsedConstruct.cs`, `src/Precept/Pipeline/SlotValue.cs`, `src/Precept/Pipeline/ConstructManifest.cs` |
+| Upstream | `TokenStream` (from Lexer) |
+| Downstream | NameBinder, TypeChecker, Language Server lexical/structural features, MCP compile tool |
+
+All construct slots — including expression-carrying ones — are populated via the catalog-driven slot walker; expression slots carry `ParsedExpression` (sealed DU, 14 per-form subtypes + `MissingExpression` sentinel) produced by the Pratt expression parser.
 
 ---
 
@@ -283,7 +289,7 @@ Each `ConstructSlotKind` maps to exactly one slot sub-parser.
 | `ComputeExpression` | Parse `<-` expression via Pratt parser → `ParsedExpression` |
 | `GuardClause` | Parse `when` expression via Pratt parser → `ParsedExpression` |
 | `ActionChain` | Parse action keywords via `Actions` catalog |
-| `Outcome` | Parse `-> transition/no transition/reject` → `ParsedOutcome` |
+| `Outcome` | Parse `-> transition/no transition/reject` → `ParsedOutcome` (4-member DU: `TransitionOutcome`, `NoTransitionOutcome`, `RejectOutcome`, `MalformedOutcome`) |
 | `StateTarget` | Parse `any` or one/more comma-delimited state names after a scoped preposition |
 | `EventTarget` | Parse event name after `on` |
 | `EnsureClause` | Parse `ensure` expression via Pratt parser → `ParsedExpression` |
@@ -356,9 +362,7 @@ Error recovery synchronizes on these boundaries.
 | Type Checker | `ConstructManifest` (+ `SymbolTable` from NameBinder) with typed slots |
 | Language Server | Spans for diagnostics, hover, go-to-definition |
 
-> **Open Question:** `ConstructManifest` as a graph-analyzer input
-> The documented dependency table still shows a parser-to-graph edge even though graph-analyzer.md consumes `SemanticIndex`, not `ConstructManifest`. The pipeline overview needs to decide whether that edge is obsolete or whether some tooling path still legitimately reads parser output directly.
-> *Flagged: 2026-05-04*
+> **Resolved:** GraphAnalyzer consumes `SemanticIndex`, not `ConstructManifest`. The parser feeds NameBinder + TypeChecker, which produce the `SemanticIndex`. Tooling paths that need raw construct shape (e.g., LS structural features) consume `ConstructManifest` directly; no parser→GraphAnalyzer edge.
 
 ---
 
@@ -446,6 +450,16 @@ When multiple constructs match and disambiguation fails:
 - Type safety — each slot carries exactly its required data
 - Exhaustive matching — missing cases are compile errors
 - Self-documenting — subtype names describe slot semantics
+
+### Why ParsedOutcome Is a 4-Member DU (Reject as Its Own Subtype)
+
+**Decision:** `Outcome` slots produce a 4-member discriminated union (`TransitionOutcome`, `NoTransitionOutcome`, `RejectOutcome`, `MalformedOutcome`) rather than a flat bag with nullable fields for target state and reject reason.
+
+**Rationale.** A row that ends in `-> reject "reason"` has fundamentally different downstream meaning from one that ends in `-> transition X` — it carries a message string, not a target state, and produces `Rejected` rather than `Transitioned` at runtime. Encoding that as a flag on a single shape forces every consumer (type checker, proof engine, graph analyzer, runtime) to switch on the flag and re-derive shape. A DU subtype makes the shape itself the discriminator: `RejectOutcome` has `Reason`; `TransitionOutcome` has `TargetState`; consumers pattern-match on subtype and the wrong field is structurally absent.
+
+**Precedent.** This is the same pattern Precept applies whenever a construct family forks between "success path" and "refusal path." Putting the fork in the DU rather than in flag/null-field combinations keeps "impossible by construction" honest at the parser layer: a parsed reject row cannot accidentally carry a target state because the type does not have that field.
+
+**Tradeoff accepted.** Parser routing must commit to a subtype at the first post-arrow token (`reject` → `RejectOutcome`; `transition`/`no` → `TransitionOutcome`/`NoTransitionOutcome`; everything else → `MalformedOutcome` with recovery). That commitment must be testable; downstream consumers benefit because they no longer pay the per-call cost of checking which fields are populated.
 
 ### Expression Tree Design (RESOLVED)
 

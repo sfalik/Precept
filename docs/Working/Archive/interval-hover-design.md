@@ -1,5 +1,8 @@
 # Precept Interval Hover Design
 
+> **Promoted to:** [`docs/tooling/language-server.md`](../../tooling/language-server.md) § 7.4 Hover Design (§ 7.4.4 Interval Hover Extension)  
+> **Status:** Promoted 2026-05-24 — content lifted to canonical; this file is preserved for historical reference. Do not edit.
+
 **By:** Elaine · **V1** · **2026-05-13T18:17:15.685-04:00** · VS Code markdown hover  
 **Extends:** `docs/working/hover-design.md` (V7) — does not replace  
 **Reference:** `docs/working/overflow-prevention-design-analysis.md` (Frank, interval arithmetic recommendation)

@@ -1,5 +1,8 @@
 # Precept Hover Design
 
+> **Promoted to:** [`docs/tooling/language-server.md`](../../tooling/language-server.md) § 7.4 Hover Design  
+> **Status:** Promoted 2026-05-24 — content lifted to canonical; this file is preserved for historical reference. Do not edit.
+
 **By:** Elaine · **V7** · **2026-05-12T18:25:28.876-04:00** · VS Code markdown hover
 
 ## 📊 V7 Alignment Tracker

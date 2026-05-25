@@ -416,6 +416,41 @@ dotnet build                        # Build everything
 dotnet test                         # Run all tests (xUnit + FluentAssertions)
 ```
 
+### Release-Only Builds (Non-Negotiable)
+
+Precept builds **Release-only**, with portable PDB symbols, across every project. `Directory.Build.props` at the repo root enforces this:
+
+```xml
+<Project>
+  <PropertyGroup>
+    <Configuration Condition="'$(Configuration)' == ''">Release</Configuration>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>portable</DebugType>
+  </PropertyGroup>
+</Project>
+```
+
+**Forbidden in pipeline code:**
+
+- `Debug.Assert(...)`, `Debug.Fail(...)` — these are stripped in Release. Any invariant that needs to hold in production must `throw new InvalidOperationException(...)` unconditionally.
+- `#if DEBUG` blocks around invariants — same reason.
+- `[Conditional("DEBUG")]` methods that guard invariants — same reason.
+
+**Conversion pattern when retrofitting:**
+
+```csharp
+// Wrong — stripped in Release
+Debug.Assert(condition, "message");
+
+// Right — survives Release; the invariant holds in production
+if (!condition)
+    throw new InvalidOperationException("message");
+```
+
+**Why a hard rule and not a guideline.** Precept's identity is structural prevention. An invariant that only fires in Debug is an invariant we cannot rely on at the customer site, because customers run Release. A "Debug.Assert here" silently degrades to "no check in production" — exactly the kind of approximation Precept rejects in the language it governs. Holding ourselves to the same standard keeps the runtime honest about which checks are real.
+
+**Diagnostic-emission corollary (D26).** Any pipeline path that produces a `TypedErrorExpression` must emit at least one Error-severity diagnostic on the same context. Returning an error-shaped typed node without a diagnostic is a silent failure that Release builds cannot catch via assertions. The right check is an unconditional throw at every error-construction site that lacks the matching diagnostic emit.
+
 ### First-time local setup
 
 1. Run task `build`.

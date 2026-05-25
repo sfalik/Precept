@@ -94,6 +94,43 @@ Additional conventions:
 - `precept_types` and `precept_domains` return a markdown `Unsupported scope` response when passed an invalid `scope`.
 - `precept_operations` treats `category` as the normal path; unmatched categories still return the category list plus an empty `Matching Operations` section and `Count` of `0`.
 
+## 5A. Design Rationale
+
+The MCP server's tool surface follows a deliberately mixed format model: **markdown/text for catalog and reference tools, minimal JSON only where structure is genuinely programmatic** (compile diagnostics, planned runtime orchestration tools). The reasoning below records the alternatives evaluated and the constraints that locked the chosen shape.
+
+### Why markdown for catalog/reference tools
+
+The MCP tools exist primarily so language-model agents can understand the language and runtime. AI legibility is a *contract concern*, not a polish concern — a tool whose output an agent cannot read reliably is a tool that produces wrong answers downstream. Markdown's per-section structure, bullet shape, and fenced-code conventions are the format agents handle most reliably. JSON shapes for catalogs would require agents to traverse object graphs and re-serialize the same information into prose anyway, paying double the token cost.
+
+### Alternatives evaluated and rejected
+
+**Approach 1 — Attribute-driven serialization on core types.** Annotate `src/Precept/` records with `System.Text.Json` attributes and custom converters; let MCP serialize core types directly.
+
+*Rejected because:* It moves the sync burden, it does not remove it. The core runtime becomes polluted with MCP transport concerns. Custom converters are stringly-typed and lose the compile-time safety that the original DTO records provided through constructors. The maintenance burden becomes scattered across the core runtime rather than concentrated in one MCP layer.
+
+**Approach 2 — `JsonNode` builder projection.** Replace DTO records with hand-built `JsonNode` trees that project from core types at tool-call time.
+
+*Rejected for catalog/reference tools because:* The sync problem is mostly unchanged — every node field must still be hand-maintained as core types evolve — and the projection layer loses both compile-time safety (`JsonNode` is stringly-typed) and the curated record types that previously documented the wire shape. Viable as a tactical option for one or two tools, but not a system-wide answer.
+
+**Approach 3 — Markdown/text for all tools, no JSON anywhere.** Push everything through markdown rendering.
+
+*Rejected for compile/runtime tools because:* Compile diagnostics and runtime orchestration outputs (planned `precept_fire`, `precept_create`, `precept_inspect`) are genuinely programmatic — consumers programmatically dispatch on outcome variants, count failures, look up diagnostic codes. Forcing those through markdown would force programmatic consumers to parse prose, which is exactly the failure mode strict typing exists to prevent.
+
+**Approach 4 — Hybrid (chosen).** Markdown for catalog and reference tools where the consumer is an agent reading vocabulary; minimal JSON for compile/runtime tools where the consumer dispatches on structure.
+
+### Locked architectural constraints
+
+These constraints govern all future MCP-surface decisions:
+
+1. **Raw core-type serialization is rejected.** The MCP surface remains a curated contract, not a dump of runtime records. `src/Precept/` types are not directly serialized.
+2. **No DTO generator.** No T4 templates, no source-generated contract layer, no code generation for the MCP wire format.
+3. **No serialization attributes pushed into the core runtime.** The `src/Precept/` core model does not absorb attributes/converters to satisfy the MCP transport layer. The single-direction dependency is MCP → core, never core → MCP.
+4. **Curated projection stays.** Tools project only author/agent-relevant fields. Internal pipeline state, debug-only structures, and runtime sentinels are filtered out at the MCP boundary.
+
+### Why these are constraints, not preferences
+
+If the runtime absorbs MCP-shaped serialization metadata, every future runtime change inherits an MCP-coupling tax. If the MCP layer dumps raw core types, every internal refactor breaks the agent contract silently. The hybrid model with strict directional dependency is the only shape that lets both layers evolve independently: core runtime evolves freely, MCP wire shape evolves freely, and the projection layer absorbs the impact at one well-known seam.
+
 ## 6. Tool contracts
 
 ### `precept_ping`

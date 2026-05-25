@@ -345,6 +345,34 @@ void AddIdentifierTokens(SemanticTokensBuilder builder, SemanticIndex index)
 
 If the type checker fails (compilation has errors), Pass 2 is skipped. The editor still gets Pass 1 lexical tokens — keywords, types, operators, and literals are highlighted correctly. Only identifier classification degrades.
 
+#### Why Two Passes (Architectural Rationale)
+
+The two-pass design exists because **semantic tokens should only override TextMate (TM) when they provide information TM cannot derive.** Getting that boundary wrong is the source of the "syntax coloring shifts when LS loads" bug class — a visible, jarring re-color of every keyword in the file the moment the language server connects.
+
+**The mechanics that make this a correctness problem.** VS Code has two independent colorization layers:
+
+1. **TextMate grammar** fires immediately on file open. It assigns TM scopes via regex; colors come from `tokenColorCustomizations.textMateRules`.
+2. **Semantic tokens** fire after the LS connects. They classify by semantic role; colors come from `editor.semanticTokenColorCustomizations.rules`.
+
+When semantic tokens arrive, they **replace** the TextMate classification at each position. If a semantic token resolves to a different color than the TM grammar assigned, the user sees an immediate visible shift on every affected token in the file.
+
+**The rule.** TM owns what regex can express; the LS owns what only the typed semantic model knows.
+
+| Layer | Owns |
+|---|---|
+| **TextMate** | Keyword classification, operator classification, punctuation, literal classification, comment classification |
+| **Language server (Pass 2 semantic tokens)** | Identifier classification — distinguishing a field reference from a state reference from an event reference, which requires the type checker's symbol table |
+
+**Why Pass 1 also exists then.** Pass 1 is the *lexical* semantic-token pass — it projects `TokenMeta.VisualCategory` for keyword/operator/literal tokens. It exists to fill three gaps that TM cannot serve:
+
+- **Custom semantic-token types are required for non-TM-grammarable distinctions** that downstream tooling (rename, references, hover) reads off the same token stream. Two keyword classes in Precept (`KeywordSemantic` for declaration/action/outcome verbs vs `KeywordGrammar` for prepositions/connectives) carry different visual treatment because they carry different semantic weight — but the difference is in the catalog metadata, not in the surface regex. Pass 1 lets the LS publish those visual classes consistently.
+- **Custom colors via `precept/semanticTokenColors` notification** require the LS to emit semantic tokens for every token whose color comes from the catalog. Without Pass 1, only identifiers would get catalog colors and keywords would fall back to theme defaults — visible inconsistency.
+- **Lexical tokens have no type-checker dependency**, so Pass 1 still works when the file has errors. The editor never goes "dark" on a compile error.
+
+**The contract that prevents drift.** Pass 1 and the TM grammar generator both read from the *same catalog* (`Tokens`, `SemanticTokenTypes`). The TextMate `.tmLanguage.json` is generated from `Tokens` + `Types` + `Constructs` — it is not hand-written. This guarantees the two passes cannot disagree about which scope a token belongs to: both derive from the same source. The "two independent classification systems making different decisions" bug class is structurally prevented by generating both classifiers from the same metadata.
+
+**The TM/semantic-tokens visible-shift bug class — root cause.** When the TM grammar assigns one scope (e.g. `keyword.declaration.precept` → indigo, no bold) and the semantic-token pass emits a different visual category (`preceptKeywordSemantic` → indigo, **bold**) for the same token, the user sees a bold-up flicker the instant the LS attaches. Earlier prior attempts fixed individual symptoms (one keyword, one color rule, one delta crash) without addressing the systemic problem — that two classification paths existed and were independently authored. The two-pass design with the shared catalog source is the structural fix: there is one source of truth for both layers, and the visible behavior follows from it.
+
 ### 7.3 Catalog-Driven Completions
 
 **Trigger:** `textDocument/completion`
@@ -479,13 +507,199 @@ Each catalog entry that appears in completions needs:
 | `SnippetTemplate` | Insert text with placeholders (optional) |
 | `ApplicableTo` | Filter by context (actions and value modifiers → current field/argument type) |
 
-### 7.4 Hover
+#### Typed-Literal Completion (Quoted Scalar Surface)
+
+Inside `'...'` typed-constant literals, completions belong to a **typed mini-mode**: once the cursor is inside the quotes, the dropdown belongs to the literal, not to the outer grammar. The UX contract is general across all quoted scalar types — `money`, `quantity`, `price`, `exchangerate`, `currency`, `unitofmeasure`, `dimension`, `text`, `boolean`, temporal — and it is qualifier-aware in every position.
+
+**Promoted from** `docs/Working/Archive/elaine-typed-literal-autocomplete-ux.md` (Elaine, 2026-05-10 UX spec) + `docs/Working/Archive/kramer-typed-literal-impl-plan.md` (Kramer, paired 5-slice implementation plan). Both are shipped; the design rationale below is the canonical record.
+
+**Design principles.** Two non-negotiable rules govern every typed-literal completion decision:
+
+1. **Prefer no completions over wrong completions.** `field`, `state`, function names, and general expression items must never appear inside a typed literal. If the expected type or required qualifier metadata cannot be resolved confidently, the surface stays quiet rather than guessing. A quiet surface is better than a misleading menu.
+2. **Treat this as the canonical UX for all quoted scalar literals.** The contract is type-driven, not currency-driven. Future quoted scalar types (e.g. URLs, geo coordinates, validated identifiers) inherit the same trigger semantics, the same qualifier-aware filtering, and the same slot-sensitive popup behavior. The LS does not branch on type identity for surface behavior — it branches on type *shape* (closed-set vs structured vs free-form).
+
+**Trigger semantics.** Three triggers, each with strict contracts:
+
+| Trigger | Behavior inside `'...'` |
+|---|---|
+| `'` (opening quote) | If expected type is known → open the type-aware surface (closed-set values for closed-set types; example full literals for structured types; recent/reused values only for free-form types). If expected type is unknown → show nothing. Do not fall back to top-level or expression completions. |
+| `space` | Slot-sensitive. Inside structured literals, only opens completions when the user has just transitioned into a slot with an enumerable vocabulary or continuation choice — e.g. after `<amount> ` in `money` (show currency codes), after `<number> ` in temporal (show temporal units), after a complete `<number> <temporal-unit>` segment (show only `+` continuation). Free-form text → no popup on space. Outside typed literals → existing behavior unchanged. |
+| `Ctrl+Space` | The recovery path. Always reopens the typed-literal surface for the current slot. Never escapes back to outer-language completions while the caret remains inside the quotes. Required for empty literals (`''`), partially typed units/currency codes, compound temporal continuation, and any case where the user dismissed the automatic popup. |
+
+**Why the strict trigger contract.** The LSP autocomplete machinery surfaces items by default — a typed-literal context that "leaks" outer-language items into the dropdown teaches users that the typed mini-mode is unreliable. Authors then either fight the menu (hitting Escape) or accept wrong completions (introducing bugs that the type checker may not catch if the resulting text happens to parse as another valid construct). Strict containment is correctness, not polish.
+
+**Qualifier-aware mode.** Any `in` or `of` qualifier on the field declaration **hard-filters** the candidate set before ranking. Examples:
+
+- `field Amount as money in 'USD'` — completions inside a literal assigning to `Amount` show only `USD` in the currency slot. `EUR`, `GBP`, etc. are filtered out before ranking, not demoted within ranking.
+- `field Weight as quantity of 'mass'` — completions in the unit slot show only mass units (`kg`, `g`, `mg`, `lb`, `oz`, `ton`); length/time/volume units are filtered out.
+- `field Rate as exchangerate` (no qualifier) — completions show all ISO 4217 codes, ranked by recency-in-file.
+
+Hard filter (not demotion) because soft-ranked wrong items still appear as the first three "obvious choices" when the user types quickly; they will be accepted. Filtering removes the failure mode.
+
+**Compound temporal continuation as first-class V1 flow.** After accepting a `<number> <temporal-unit>` segment in a `duration` or `period` literal, the LS offers exactly one continuation item: `+`. Accepting `+` inserts ` + ` (space-plus-space), positions the cursor for the next magnitude, and re-arms the temporal magnitude → unit → continuation cycle. This is not a deferred enhancement — compound forms like `'2 years + 6 months + 15 days'` are the canonical period syntax, and the completion surface must support authoring them without leaving the typed-literal mini-mode.
+
+**Per-type behavior summary.** The table below names each type's surface mode and the rationale for that mode. Full per-phase trigger tables (e.g. money "Phase 0/1/2/3") live in the archived Elaine UX spec; the matcher implements them as a single dispatch keyed on `(type, slot-position, qualifier-state)`.
+
+| Type | Surface mode | Rationale |
+|---|---|---|
+| `text` | Mostly free-form; reused values only | Aggressive autocomplete is noise; let the author type, surface domain repeats |
+| `boolean` | Strict closed set: `true`/`false` | Two values; no ambiguity; strict filter |
+| `integer` / `decimal` | Free-form numeric with light reused-value assist | Authors type the value; menu would be intrusive |
+| `money` | Two-phase: amount → currency code | Structured value with clear slot transitions; currency vocabulary is large but qualifier-filterable |
+| `quantity` | Two-phase: magnitude → unit | Same as money; unit vocabulary is filterable by `of <dimension>` |
+| `price` | Three-phase: magnitude → currency → unit (with `/` separator) | Compound qualifier type; each slot has distinct vocabulary |
+| `exchangerate` | Three-phase: magnitude → from-currency → to-currency | Compound qualifier type; positional slot identity from grammar, not text content |
+| Temporal (`duration`, `period`) | Repeating magnitude → unit → `+` continuation cycle | First-class compound support; the `+` continuation is itself a completion item |
+| `currency`, `unitofmeasure`, `dimension` | Closed-set, single slot, qualifier-filtered | Whole-content types; one slot, one vocabulary |
+| Formatted temporal (`date`, `time`, `instant`, etc.) | Format-template examples; no value-level guessing | Free-form within the format; example completions illustrate the shape |
+
+**Insert/replace edit semantics.** When the cursor is already inside a typed-constant slot fragment, completion items carry insert/replace edits so accepting a suggestion replaces the active fragment rather than inserting at the cursor. This prevents the common LSP pitfall where accepting "USD" in a half-typed "US|" produces "USDUS" instead of "USD".
+
+**What this enables.** Qualifier-aware completion lets `field Amount as money in 'USD'` constrain its assignment-site literals to the legal currency at edit time — the wrong currency cannot be authored in the first place, not just rejected after the fact. This is the typed-literal expression of Precept's prevention-not-detection identity: incorrect values are unauthorable, not flagged.
+
+#### Qualifier-Site Resolution (Architectural Rule)
+
+The completion handler must distinguish **qualifier-site literals** from **expression-site literals** before falling through to enclosing-field fallback. A declaration like `field q as quantity in '` puts the cursor in a qualifier slot on the `in` axis — the expected vocabulary is `UnitOfMeasure`, not `Quantity`. If the handler coerces every typed-constant entry to "expression literal" and routes to the enclosing field's type, it dispatches to the wrong subsystem (`GetQuantityLiteralItems` instead of unit completions), and the bug is invisible to weak "non-empty list" assertions.
+
+**The rule.** Resolve in this order:
+
+1. **Qualifier-site resolver.** Inspect the enclosing declared field/arg type, the `ParsedQualifier`, and the qualifier-shape metadata. If the cursor is on an active qualifier axis (`Unit`, `Dimension`, `Currency`, etc.), return a qualifier-slot context with the expected vocabulary type for that axis (e.g. `UnitOfMeasure` for `in '`, `Dimension` for `of '`).
+2. **Expression-site fallback.** Only if no qualifier site matched, fall through to `TryGetEnclosingField` and use the field's full value-type vocabulary.
+
+**Why the order matters.** A `quantity in '<cursor>'` cursor is structurally a qualifier site; the expression-site fallback returns `Quantity` as the expected type and produces magnitude+unit examples — semantically valid for *value* assignments but wrong for the qualifier-on-field declaration the author is actually editing. Reversing the resolution order or skipping the qualifier resolver lets the wrong subsystem answer, and the failure manifests as "completions appear but they're not what the author needs."
+
+**Companion rule: `DeclaredQualifiers` must flow through `TypedArgRef` / `TypedFieldRef`.** When the type checker normalizes a field or arg reference, the declared qualifiers (`in 'USD'`, `of 'mass'`) must be propagated onto the typed node so the completion handler — and proof engine, and hover — can read them without re-parsing the declaration syntax. A typed node that drops declared qualifiers forces every downstream consumer to re-derive them, which is both slow and a drift surface. The propagation is part of the typed-AST contract, not a per-consumer convenience.
+
+**Why regression tests need real-vocabulary assertions, not "non-empty" checks.** A bug where qualifier completion routes to the wrong vocabulary passes "list is non-empty and contains no keywords" because the wrong vocabulary is still non-empty and still not keywords. Completion tests must assert the *presence of specific expected items* (e.g. `"mass"` for `of '` on a `quantity`; `"kg"`, `"lb"` for `in '` on a `quantity of 'mass'`). Weak assertions hide the very class of bug that qualifier-site resolution is designed to prevent.
+
+### 7.4 Hover Design
 
 **Trigger:** `textDocument/hover`
 
-**Artifact:** `SemanticIndex` + catalog documentation
+**Artifact:** `SemanticIndex` + catalog documentation + `ProofLedger` + `StateGraph.EdgeProofStatuses`
 
-**Mechanics:**
+**Design intent.** Hover answers one question first: **what guarantee is Precept giving me here?** Every card leads with one of three guarantee states — `✅ Proven`, `⚡ Enforced`, or `⚠️ Gap` — then gives one concrete evidence line when proof is the issue. Compactness is a correctness rule: design for three lines, spend lines four–five only when proof evidence is the user's actual question.
+
+**Promoted from** `docs/Working/Archive/hover-design.md` (V7, Elaine, 2026-05-12) and `docs/Working/Archive/interval-hover-design.md` (V1, Elaine, 2026-05-13). Both designs are shipped (cards 1–13 + B4 state proof narrative locked in `29cd9938`); architectural rationale below is lifted from those archived designs.
+
+#### 7.4.1 Badge Vocabulary
+
+A small, fixed icon vocabulary replaces words on the leading line of every card. Icons are scan primitives, not decoration.
+
+| Icon | Meaning |
+|---|---|
+| ✅ | **Proven** — established statically before runtime |
+| ⚡ | **Enforced** — checked on mutation before commit |
+| ⚠️ | **Gap** — not proven; the next line says why |
+| 🔒 | Not mutable / structurally absent here |
+| ✏️ | Mutable here |
+| 🔁 | Transition / routing / from→to shape |
+| ⚖️ | Currency, unit, or comparison contract (includes declared numeric bounds) |
+| 📍 | Graph position — reachable, dead, terminal, required |
+| 🔬 | Calculation / proof check / expression / interval reasoning |
+
+**Rationale.** A single vocabulary across construct types lets users learn the language of hover once. Reusing `⚖️` for declared numeric bounds (a comparison contract `x ≥ min AND x ≤ max`) and `🔬` for interval arithmetic avoids icon proliferation; the existing vocabulary is sufficient for interval proof. *(Interval design D2, archived.)*
+
+#### 7.4.2 Card Catalog
+
+Hover emits one of these card kinds, each grounded in the canonical sample files (`inventory-item.precept`, `loan-application.precept`, `computed-tax-net.precept`, `sum-on-rhs-rule.precept`):
+
+| Card kind | Lead-line shape | Primary data sources |
+|---|---|---|
+| `field` (stored) | `⚡ Enforced · <name> · ⚖️ <qualifiers>` | type checker (`ResolvedType`, `Presence`, `DeclaredQualifiers`), access map (unconditional entries only in V1), proof (`ConstraintInfluenceEntry`) |
+| `field` (computed) | `⚡ Enforced · recomputed before commit` | type checker (`ResolvedType`, `ComputedExpression`), proof (`ProofLedger.Obligations`) |
+| `state` (standard + B4) | `✅ Proven · reachable from <state>` + `📍 <state> graph position` | graph (`ReachableStates`, `Edges`, `EdgeProofStatuses`), ensures + proof obligations |
+| `event` | `⚡ Enforced · args checked before route` | type checker (`TypedEvent.Args`), graph (`HandledInStates`) |
+| Transition row | `✅ Proven · <reason>` or `🔁 <from> → <to> on <event>` | transition row span + manifest (guard, outcome), graph reachability |
+| `rule` | `⚡ Enforced after every mutation` | type checker (guard + condition spans), proof, `because` text |
+| `ensure` | `⚡ <Residency|Entry|Exit|Arg> gate · <anchor>` | ensure kind/anchor, `because` text, proof |
+| `access` | `✅ Proven · write access declared in manifest` | `AccessModes` + state set |
+| `omit` | `✅ Proven · structurally absent in <state>` | manifest omit declarations, graph edges |
+| `reject` | `⚡ Enforced · event rejected` | transition row outcome + reject reason |
+| Qualifier (`of`/`in`/`to`) | `⚖️ Currency · <name>` | `QualifierHoverInfo` |
+| Proof expression (`TypedBinaryOp`) | `✅ Proven · result keeps <qualifier>` | `TypedBinaryOp`, `ProofLedger.Obligations` |
+| Diagnostic squiggle | `⚠️ <PRE-code> · <message>` | proof-stage diagnostic + matching obligation |
+| Interval (field/expression) | `✅ Proven · <expr> result <[lo .. hi]> fits <field>` | `PreceptField.Bounds`, interval solver result |
+
+**Per-card text shape is locked in archived designs.** Authors changing card text must edit cards consistently across the catalog so the badge-first / verdict-first contract holds — do not silently restyle one card without addressing the family.
+
+#### 7.4.3 B4 State Proof Narrative (Locked)
+
+A state hover appends a graph-position sub-card showing per-edge proof verdicts. Format:
+
+```md
+📍 <state> graph position
+
+⚠️ Gap · <from> --<event>--> <to> can't be proven
+```
+
+When no incident edge is unproven, the sub-card collapses to a single positive line:
+
+```md
+✅ Proven · all connected edges satisfy their proof obligations
+```
+
+(Or `✅ Proven · no connected edges carry proof obligations` when none are present.)
+
+**`EdgeProofStatus` projection.** Lives in `src/Precept/Pipeline/StateGraph.cs` as a graph-level projection record on `StateGraph.EdgeProofStatuses`. Each entry carries `FromState`, `EventName`, `ToState`, `HasObligations`, `IsProven`, `ImmutableArray<string> UnresolvedObligationSummaries`. `Compiler.EnrichGraphWithProofStatus(...)` populates it **after** `GraphAnalyzer.Analyze(...)` and `ProofEngine.Prove(...)`. Population rule: match `ProofLedger` obligations whose context is `TransitionRowContext` onto concrete `GraphEdge` instances, respect explicit-row-over-wildcard precedence, set `HasObligations` when any obligation matched the edge, de-duplicate unresolved `Requirement.Description`, then mark the edge proven when no unresolved summaries remain.
+
+**Why a projection on the graph and not a per-hover join.** Hover handlers should consume projections, not re-derive them. Putting `EdgeProofStatuses` on `StateGraph` keeps proof-vs-graph correlation in pipeline code (testable, deterministic) and gives every consumer — current hover, future inspect, future MCP surfaces — a single source of truth.
+
+**Routing rule.** A state hover reaches B4 only through the rich state-hover path (`HoverHandler` → `TypedState` → `RichHoverFactory.CreateStateHover`). It is part of the standard state card, not a separate hover kind. Global proof-first routing still applies: proof diagnostics and proof-expression hovers win earlier when the cursor is on those spans instead of the state symbol.
+
+#### 7.4.4 Interval Hover Extension
+
+Interval hover answers: **is this value's range safe?** It uses the existing badge vocabulary and the same three-line compact budget.
+
+**Notation.** All interval displays use bracket notation with two-dot separator: `[lo .. hi]`. Examples: `[0 .. 1 000]`, `[0 .. +∞]`, `[−∞ .. +∞]`. Use thin space as thousands separator above four digits.
+
+| Pattern | Meaning |
+|---|---|
+| `[lo .. hi]` | Fully bounded |
+| `[lo .. +∞]` | Lower-bounded only |
+| `[−∞ .. hi]` | Upper-bounded only |
+| `[−∞ .. +∞]` | Unbounded — no declared or inferred limit |
+
+**Origin labelling.** When origin is the proof-relevant question, label it: `declared: min 0 max 1 000` (from field annotation) vs. `inferred from arithmetic` (derived by the solver).
+
+**Gap taxonomy.** Three gap kinds, each with a distinct line-3 repair hint:
+
+| Gap type | Cause | Line-3 repair hint |
+|---|---|---|
+| Unbounded operand | Field has no declared bounds | Declare `min` / `max` on the unbounded field |
+| Result escapes bound | Arithmetic result interval exceeds target | Tighten operand bounds OR add guard that narrows the input |
+| Presence uncertainty | Optional field used in arithmetic without guard | Add presence guard before arithmetic |
+
+**Routing nuance — unbounded field shows `⚠️ Gap`, not `⚡ Enforced`.** Even though a runtime overflow check exists, the hover reflects static proof status. The runtime check is a fallback, not a guarantee — collapsing the distinction would teach users to trust runtime safety nets as proof.
+
+**Propagation chain compactness.** Compact form shows the full chain on one `🔬` line using `→` between steps: `[0..8 000] − [0..2 000] → [−2 000..8 000] × [0.05..0.20] → [−400..1 600]`. Expanded form (lines 4–5) uses one `🔬 Step N:` line per operator and ends with the containment verdict (`[result] ⊆ [target]`). Cap expansion at five lines total.
+
+**Repair hint belongs on line 3, not in the expanded view.** Users need to know what to do without expanding. Expanded view adds the mathematical detail, not the instruction.
+
+#### 7.4.5 Routing Rules
+
+Hover routing is strictly ordered. When multiple cards could fire on overlapping spans, the earlier rule wins.
+
+1. **Proof diagnostic span wins.** Interval-overflow diagnostics (`NumericOverflowOnAssignment`) are proof diagnostics and route here.
+2. **Smallest proof-bearing `TypedBinaryOp` wins next.** Includes interval proof-expression hovers when the cursor is on an arithmetic expression with an interval result.
+3. **Construct cards on declaration spans.**
+4. **Within construct cards:** `reject` beats generic transition; qualifier beats symbol hover on the qualifier span.
+5. **State symbols route to the rich state card**; B4 renders inside that card.
+6. **Otherwise** fall back to generic operator / function / type help.
+
+The strict ordering is itself a design decision: silent tie-breakers (last-write-wins, biggest-span-wins) produce non-determinism users can't reason about. Hover routing must be a function of the cursor span and the artifacts, not of evaluation order.
+
+#### 7.4.6 V1 Boundary
+
+The current rich-hover implementation ships with these inputs available:
+
+**Available:** `SemanticIndex` (fields, states, events, rules, ensures, access modes, transition rows, qualifier bindings); type summaries (declared type, presence, qualifiers, computed-expression spans, argument signatures); `StateGraph` (reachability, incoming/outgoing edges, handled states, terminal reachability, `EdgeProofStatuses`); `ProofLedger` + diagnostics (unresolved obligations, requirement kind, context, `ConstraintInfluenceEntry`); manifest snippets (guard text, action order, reject reasons, omit/access declarations); B4 state proof narrative; `PreceptField.Bounds` (declared interval); interval proof result + gap kind + failing operand intervals.
+
+**Not available in V1 (deferred):** runtime `Inspect` / `Fire` / `Update` facts; ordered mutation summaries beyond the current row; declaration → use qualifier index (and use-counts on qualifier cards); authored one-line proof explanations beyond what the proof model already exposes; final guarded-access maps (guarded entries are omitted from V1 mutability summaries); per-edge rendering of `UnresolvedObligationSummaries` inside the B4 card (the projection exists; V1 shows verdict lines only); step-by-step expanded interval propagation chain (requires the solver to expose intermediate intervals — V2); cross-field interval bounds (Tier 3 inference); guard-narrowed interval display.
+
+**Compact-helper philosophy.** Hover assumes compact helper projections, not new runtime surfaces. New facts go onto pipeline artifacts (graph, proof ledger, semantic index) so every consumer benefits — hover, inspect, MCP.
+
+#### 7.4.7 Mechanics
 
 Hover finds the symbol at the cursor position via `SemanticIndex`, then formats documentation from catalog metadata.
 

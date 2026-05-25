@@ -7,7 +7,7 @@
 | Property | Value |
 |---|---|
 | Doc maturity | Full |
-| Implementation state | Designed — type checker implementation pending |
+| Implementation state | Implemented |
 | Scope | Six primitive types: `string`, `integer`, `decimal`, `number`, `boolean`, `choice`; numeric lanes, conversion rules, built-in functions |
 | Related | [Temporal Type System](temporal-type-system.md) · [Business-Domain Types](business-domain-types.md) · [Literal System](../compiler/literal-system.md) |
 
@@ -84,10 +84,6 @@ field Notes as string optional
 | `string != string` | `boolean` | Ordinal, case-sensitive. |
 | `string ~= string` | `boolean` | Ordinal, case-insensitive (`OrdinalIgnoreCase`). |
 | `string !~ string` | `boolean` | Ordinal, case-insensitive not-equals. |
-| `string < string`  | `boolean` | Ordinal, case-sensitive. Lexicographic ordering. |
-| `string > string`  | `boolean` | Ordinal, case-sensitive. Lexicographic ordering. |
-| `string <= string` | `boolean` | Ordinal, case-sensitive. Lexicographic ordering. |
-| `string >= string` | `boolean` | Ordinal, case-sensitive. Lexicographic ordering. |
 
 Arithmetic (`-`, `*`, `/`, `%`) is a type error. Logical operators are a type error.
 
@@ -111,7 +107,7 @@ field Tags   as set of string    # ordinal — "Apple" ≠ "apple", both can coe
 field Labels as set of ~string   # OrdinalIgnoreCase — "Apple" and "apple" are the same element
 ```
 
-The `~` prefix selects `StringComparer.OrdinalIgnoreCase` for equality and membership operations. For collections, this governs deduplication and `.min`/`.max` ordering. For scalar fields, it carries a comparison obligation enforced at every use site.
+The `~` prefix selects `StringComparer.OrdinalIgnoreCase` for equality and membership operations. For collections, this governs deduplication. For scalar fields, it carries a comparison obligation enforced at every use site.
 
 #### When to use `~string`
 
@@ -156,9 +152,7 @@ Three rules apply when `field F as ~string` is declared. All three are required;
 
 > **Concatenation is different.** The table above applies to `if/then/else` branch unification (selection). The `+` concatenation operator follows a distinct rule: `~string + string → string` and `~string + ~string → string` — concatenation produces a new value with no lineage from its operands, so the CI qualifier does not survive regardless of whether one or both operands are `~string`. The `if/then/else` result IS one of the operands (selection), which is why CI is preserved; `+` creates a new string (transformation), which is why it is not.
 
-**String functions unaffected:**`trim`, `left`, `right`, `mid`, `toLower`, `toUpper` are always ordinal. CI semantics do not apply to these functions; no enforcement check.
-
-**Ordering operators:** `<`/`>`/`<=`/`>=` on a `~string` field use ordinal, case-sensitive lexicographic ordering — the same semantics as on any `string` field. The `~` modifier applies only to equality operators (`==`/`!=` → required to use `~=`/`!~`). There is no CI ordering variant; case-insensitive ordering is not part of the Precept operator surface.
+**String functions unaffected:** `trim`, `left`, `right`, `mid`, `toLower`, `toUpper` are always ordinal. CI semantics do not apply to these functions; no enforcement check.
 
 **`choice of ~string` is excluded.** `~string` is not a valid `ChoiceElementType`. `choice` guarantees the stored value IS the declared canonical string; `~string` never normalizes storage. These contracts are irreconcilable without new surface. Use `toLower(event.Arg)` at the ingestion boundary before assigning to a choice field. Attempting `choice of ~string(...)` produces an `ExpectedToken` parse error — `~string` is simply not in the `ChoiceElementType` grammar production.
 
@@ -500,7 +494,7 @@ set Tier = if Category ~= "premium" then "Gold" else "Standard"
 1. **Domain-expert ergonomics.** The primary `.precept` author is a business analyst. In business domains — names, emails, addresses, department names — case-insensitive comparison is the common case, not the exception. Making the common case require `toLower(x) == toLower(y)` forces the domain expert to reason about string transformations to express what they consider an obvious comparison.
 2. **Explicitness over mechanism.** `~=` declares intent ("this comparison is case-insensitive") rather than mechanism (`toLower` + `==`). This parallels `approximate()` — the numeric bridge declares that a lossy crossing is happening rather than making the author perform the conversion manually.
 3. **`!=` stays.** The `!=` operator was a deliberate, researched decision (see `research/language/expressiveness/conditional-logic-strategy.md`). Symbols for comparison, keywords for logic. `!~` follows the same pattern — `!` negates within the comparison family. The `=` in `~=` disambiguates equality from the reserved `~` prefix (just as `==` disambiguates from `=`); once `!` is present the context is unambiguously a test, so the trailing `=` drops — matching the `!=` / `!==` precedent.
-4. **No cascade.** Only `~=` and `!~` ship. No `~<`, `~>`, `~startsWith`. Case-insensitive ordering is rare; `toLower()` covers it. The operator surface stays tight.
+4. **Tight operator surface.** Scalar CI operators: `~=` and `!~`. CI function variants: `~startsWith` and `~endsWith`. No `~<`, `~>`, `~<=`, `~>=` — CI ordering is rare; `toLower()` covers it when needed.
 5. **Ordinal is the default.** `OrdinalIgnoreCase` is the .NET ecosystem standard for programmatic comparison. No ambiguity about which folding to use.
 6. **No precedent for a dedicated CI operator exists** in any surveyed rule engine, validation framework, or expression language (see `research/language/expressiveness/case-insensitive-implementation-survey.md`). Precept adds one because its target audience is different — domain experts, not programmers — and the function-based idiom optimizes for the wrong author.
 

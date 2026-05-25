@@ -5,12 +5,12 @@
 | Property | Value |
 |---|---|
 | Doc maturity | Full |
-| Implementation state | Grammar generator is implemented in `tools/Precept.GrammarGen/`; `precept.tmLanguage.json` is now catalog-generated; LS features (semantic tokens, completions, hover, go-to-definition) remain in the implementation states documented below |
+| Implementation state | Grammar generator implemented in `tools/Precept.GrammarGen/` (catalog-generated `precept.tmLanguage.json`); LS semantic tokens (Pass 1 + Pass 2), completions, hover, definition, and references all shipped via `tools/Precept.LanguageServer/`. Preview webview remains the lone placeholder (awaiting evaluator). |
 | Source | `tools/Precept.GrammarGen/`, `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json`, `tools/Precept.LanguageServer/` |
-| Upstream | Catalog metadata (Tokens, Types, Constructs, Operators, Actions, Modifiers) |
-| Downstream | VS Code syntax highlighting, LS semantic tokens, LS completions, LS hover |
+| Upstream | Catalog metadata (Tokens, Types, Constructs, Operators, Actions, Modifiers, SemanticTokenTypes) |
+| Downstream | VS Code syntax highlighting, LS semantic tokens, LS completions, LS hover, LS definition / references |
 
-**Implementation Note:** The grammar generator is now implemented in `tools/Precept.GrammarGen/`, and `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json` is generated from catalog metadata. This document still distinguishes shipped grammar generation from LS features that remain partial or pending.
+**Implementation Note:** Both build-time grammar generation and request-time LS features are shipped. The "Implementation State vs. Designed State" table in § 13 records the per-feature reconciliation; only the preview webview is still a placeholder (evaluator-blocked).
 
 ---
 
@@ -229,7 +229,7 @@ If any of these require manual tooling changes, the design is violated. The sing
 | Input | Output |
 |---|---|
 | `Compilation.TokenStream` + `TokenMeta.SemanticTokenType` | Pass 1: lexical token classifications |
-| `Compilation.SemanticIndex` | Pass 2: identifier classifications (blocked on TypeChecker) |
+| `Compilation.SemanticIndex` | Pass 2: identifier classifications (shipped) |
 
 **Completions:**
 
@@ -557,7 +557,7 @@ void AddIdentifierTokens(SemanticTokensBuilder builder, SemanticIndex index)
 
 **Graceful Degradation:** If TypeChecker fails (compilation has errors), Pass 2 is skipped. The editor still gets Pass 1 — all keywords, types, operators, and literals are highlighted correctly. Only identifier classification degrades.
 
-**Implementation Note:** Pass 2 is blocked until TypeChecker implementation produces `SemanticIndex`.
+**Implementation Note:** Pass 2 is shipped — `SemanticTokensHandler` walks the resolved `SemanticIndex` and reconstructs reference sites by pattern-matching `TypedFieldRef` / `TypedArgRef` / `TypedStateRef` / `TypedEventRef` nodes in the typed declaration tree.
 
 ### 7.3 Completion Design
 
@@ -1085,10 +1085,10 @@ This document describes the **designed** state. Current implementation differs i
 | TextMate grammar | Generated from catalogs | ✅ Implemented |
 | Grammar generator | TypeScript or .NET tool | ✅ Implemented as `tools/Precept.GrammarGen/` (.NET tool) |
 | Semantic tokens Pass 1 | Reads `TokenMeta.SemanticTokenType` | Implemented |
-| Semantic tokens Pass 2 | Reads `SemanticIndex` | **Blocked on TypeChecker** |
-| Completions | Catalog-driven with `SlotContext` | Partially implemented (basic keyword completions) |
-| Hover | Catalog + `SemanticIndex` | Partially implemented (keyword hover only) |
-| Preview panel | Live inspection via evaluator | **Placeholder only** ("Coming in v2") |
+| Semantic tokens Pass 2 | Reads `SemanticIndex` | ✅ Implemented (`SemanticTokensHandler` overlays Pass 1 with identifier classifications) |
+| Completions | Catalog-driven with `SlotContext` | ✅ Implemented (`CompletionHandler` — context-aware, qualifier-aware, typed-constant aware) |
+| Hover | Catalog + `SemanticIndex` | ✅ Implemented (`HoverHandler` + `RichHoverFactory` — catalog metadata + semantic context) |
+| Preview panel | Live inspection via evaluator | **Placeholder only** ("Coming in v2") — evaluator-blocked |
 
 ### Open Questions
 

@@ -1,5 +1,7 @@
 # Research: Conditional Construction in Programming Languages
 
+> **Relocated 2026-05-24** from `docs/Working/Archive/` to `research/language/` per the research-folder convention. Cited from [`docs/language/precept-language-spec.md`](../../docs/language/precept-language-spec.md) § 3A.5 Entity Construction.
+
 **Author:** Frank (Lead/Architect)  
 **Date:** 2026-05-15  
 **Context:** Precept's `on <Event>` construction rows support `reject` as a valid outcome (intake refusal). Guards on construction rows (`on FileClaim when FileClaim.Amount > 0 -> ...`) enable conditional construction paths with an unconditional `reject` fallback. This memo surveys whether this pattern has precedent.

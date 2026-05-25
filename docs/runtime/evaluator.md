@@ -258,6 +258,58 @@ internal struct PreceptValue
 
 **Rejected alternative — type-per-lane storage (Option F):** A split-lane model was analyzed where scalar types occupied a compact value lane and reference types occupied a separate reference lane. This was rejected: 23 of 32 `TypeKind` members still live in the reference lane regardless of the split, and business-domain types remain cross-lane participants. Adding a wider business-value lane only recreates `PreceptValue`'s struct-copy cost without gaining the unified operation surface that makes A+G simple. A NodaTime/date-time re-analysis changed some lane membership details but did not change the verdict — the split adds routing complexity for no meaningful reduction in cross-lane operations.
 
+### Two-Layer Value Architecture and Intake-Boundary Normalization
+
+The compile-time analysis layer and the runtime execution layer use **two different value representations on purpose**. The boundary between them is well-named and crossed exactly once per deploy.
+
+```
+ANALYSIS LAYER (per-keystroke, ProofEngine hot path)
+    TypedField.NormalizedDeclaredMin/Max : decimal?
+    NumericInterval bounds              : decimal
+    Why decimal: interval arithmetic (union, intersection, containment,
+    scaling) is structurally incompatible with PreceptValue. The ProofEngine
+    does abstract interpretation on ranges and needs the most direct
+    arithmetic representation.
+
+    ────── Builder (conversion boundary, once per deploy) ──────
+                  reads decimal → constructs PreceptValue
+
+EXECUTION LAYER (per-Fire/Update call, Evaluator hot path)
+    LoadLit.Value           : PreceptValue
+    Version.Slots           : PreceptValue[]
+    Stack frame             : Span<PreceptValue> (stackalloc)
+    BinaryOp.Executor       : Func<PreceptValue, PreceptValue, PreceptValue>
+    Why PreceptValue: the evaluator operates exclusively on PreceptValue.
+    A bound declared `max '5 kg'` IS a PreceptValue here — indistinguishable
+    from an arg collected at runtime.
+```
+
+**The Builder is the conversion boundary** (Pass 5 — Constraint Plan Pass). It reads `decimal` from the semantic model and wraps each bound into `PreceptValue.FromClr(...)` once. After this point, the bound and any runtime-collected arg value are indistinguishable to the evaluator.
+
+**Why not `PreceptValue` everywhere.** The ProofEngine runs on every keystroke and does interval arithmetic that has no `PreceptValue` analogue — `NumericInterval.Scale`, `NumericInterval.Intersect`, `NumericInterval.Contains` exist on `decimal`, not on `PreceptValue`. Storing bounds as `PreceptValue?` in the semantic model would force the ProofEngine to extract `decimal` on every interval operation, on every keystroke, for zero benefit. It would also couple the TypeChecker (a compile-time stage) to the runtime value type's internal layout — a wrong-direction dependency.
+
+**Why not `decimal` everywhere.** The evaluator's value currency IS `PreceptValue`. Opcode executors are typed `Func<PreceptValue, PreceptValue, PreceptValue>`. Pushing `decimal` into the evaluator would force per-opcode boxing/unboxing, defeating the 32-byte tagged-value-struct GC savings that drive the entire evaluation model.
+
+**The single conversion boundary is the right shape.** Each layer uses the representation native to its operations. The conversion happens once per deploy, not per keystroke and not per Fire call. Shane's consistency requirement — "a default value shouldn't be treated differently than a runtime value" — is fully satisfied at the execution layer where it matters; the analysis layer's representational difference is invisible to the runtime.
+
+#### Intake-Boundary Normalization (Runtime Arg Quantities)
+
+Runtime quantity args are normalized to UCUM base units at the **intake boundary**, not at compare time and not at write time.
+
+**Where it happens.** `TypeRuntimeMeta.ReadJson` (JSON lane) and `TypeRuntime<Quantity>.FromClr` (CLR lane) normalize quantity magnitudes to base units when constructing the `PreceptValue` that materializes the arg slot array. The materialization happens before the opcode loop begins; the evaluator never sees an un-normalized quantity.
+
+**Why on intake, not at compare or at write.**
+
+- **Normalize-at-compare** would require every comparison operator to re-check whether each operand needs normalization and to re-apply normalization. That's per-operator overhead in the hot path, with the same normalization done many times for the same value (once per comparison it participates in).
+- **Normalize-at-write** would catch field assignments but miss intermediate operations on event args and computed values. A quantity arg compared against a bound before being written would compare un-normalized — yielding wrong-unit comparison results in a path that never wrote anything.
+- **Normalize-on-intake** establishes one invariant: *every quantity inside the engine is in UCUM base units*. Compare, write, and arithmetic operators read this invariant and pay no per-operation normalization cost. The invariant holds because intake is the only boundary where a non-normalized magnitude can enter.
+
+**PreceptValue storage convention for quantities.** Inside `PreceptValue`, quantity magnitudes are stored as the normalized base-unit `decimal`. The unit identity is carried separately (as part of the quantity's metadata payload). Two quantities are equal at the value level iff their normalized magnitudes are equal and their dimensions match.
+
+**Counting units are not normalized.** Explicit counting-unit mismatches (`each` vs `box`) have no universal UCUM conversion factor and are intentionally left un-normalized. The compiler rejects cross-counting-unit comparisons at type-check time (PRE0137); the runtime preserves the per-unit identity so authored conversion factors (`quantity in 'each/case'`) can multiply across them.
+
+**Compiler↔runtime code-sharing seam.** The normalization logic (UCUM parser, scale factor lookup, dimension matching) lives in `src/Precept/Language/Time/` and `src/Precept/Quantities/` and is consumed by **both** the compile-time analysis layer (where the TypeChecker normalizes bound modifiers) and the runtime intake layer (where `TypeRuntime<Quantity>.FromClr` normalizes runtime values). Single source of truth; no risk of compile-time and runtime disagreeing on `'1 kg' vs '1000 g'`.
+
 ### Input Summary
 
 | Input | Source | Description |
@@ -434,7 +486,7 @@ public static class Evaluator
 │  Step 3: Candidate Resolution                                                 │
 │  Zero candidates → return Unmatched() or EventOutcome.ConstraintsFailed(violations)   │
 │  One candidate → commit working copy, return Transitioned/Applied             │
-│  Multiple candidates → return Fault (ambiguous dispatch — impossible path)    │
+│  Multiple candidates → first-match-wins per spec §1808 (no ambiguity fault)   │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -623,9 +675,11 @@ EventOutcome Fire(Precept precept, Version version, EventDescriptor @event, Fire
         return new EventOutcome.Unmatched(evaluatedRowTraces.ToImmutableArray());
     }
     
-    if (candidates.Count > 1)
-        return Fail(FaultCode.AmbiguousDispatch);  // Impossible in proven program — proof engine emits DiagnosticCode.AmbiguousDispatch (CC#13)
-    
+    // First-match-wins per spec §1808: when multiple candidates pass guards and
+    // ensures, the first row in declaration order is selected. The grammar split
+    // (Slice 8b action+reject routing) and the no-state-agnostic-handlers-in-stateful-precepts
+    // decision together eliminate the dispatch-ambiguity risk this branch previously
+    // guarded against, so no fault is raised.
     var (winningRow, finalSlots) = candidates[0];
     var newState = winningRow.TargetState ?? version.CurrentState;
     // CC#23: compute field-level diff against pre-mutation slots before constructing outcome
@@ -828,7 +882,7 @@ The commit path calls `EvaluateGuard(plan, slots, args)` → `bool`. The inspect
 
 **`ArgError` collection path:** At the `Version.InspectFire` API boundary, arg validation runs against `EventDescriptor.ArgDescriptors` before the evaluator is invoked. If validation produces errors, the evaluator is not called; the API returns `EventInspection(EventName, Impossible, DeclaredArgs, argErrors, [], [], [])` directly. This matches the commit path where `Fire` returns `EventOutcome.InvalidArgs(reason)` on arg validation failure.
 
-**Multiple-candidate handling:** When inspection finds more than one passing row, `overallProspect` is set to `Possible`. Inspection and commit must stay aligned — when the runtime would produce an `AmbiguousDispatch` fault, inspection reports `Possible` rather than `Certain`.
+**Multiple-candidate handling:** When inspection finds more than one passing row, `overallProspect` is set to `Possible`. Inspection and commit must stay aligned — when the runtime would select among multiple passing candidates via first-match-wins (spec §1808), inspection reports `Possible` rather than `Certain` because the realized outcome depends on declaration order rather than a single proven row.
 
 **Event-level ensures:** `EventEnsures` in `EventInspection` carries event-scoped constraint results (`on<event>` constraints). Population requires evaluating the event ensures against the post-mutation working copy — currently passes empty array until the constraint plan index is wired for inspection. **OQ-4 (pending):** whether `EventEnsures` should move inside `TransitionInspection` (per-row) or remain event-level. Pending Shane's call.
 
@@ -1553,7 +1607,6 @@ Impossible-path failures indicate bugs in upstream stages (compiler/builder) or 
 | Function arity mismatch | `FunctionArityMismatch` | Static signature checking |
 | Collection empty on access | `CollectionEmptyOnAccess` | Guard `when F.count > 0` |
 | Collection empty on mutation | `CollectionEmptyOnMutation` | Guard `when F.count > 0` |
-| Ambiguous dispatch | `AmbiguousDispatch` | Proof engine exclusivity analysis (`DiagnosticCode.AmbiguousDispatch`, CC#13) |
 
 Every `FaultCode` carries a `[StaticallyPreventable(DiagnosticCode)]` attribute linking it to the compiler diagnostic that should have caught it:
 
@@ -1978,8 +2031,6 @@ This enables progressive UIs: show users what actions become available as they f
 5. **`Version.Slots` storage representation** — `Version.Slots` is documented as `PreceptValue[]` with donation/copy-on-write semantics. The exact ownership model (raw array donation vs. immutable wrapper) is a pending implementation decision affecting snapshot semantics and zero-copy promotion reach.
 
 6. **`FieldDescriptor.AccessModes` structural shape** — Per-state access-mode lookup storage shape (dictionary vs. indexed) affects lookup cost and descriptor size. Pending implementation decision for the builder/descriptor pass.
-
-7. **`AmbiguousDispatch` FaultCode (CC#13)** — `FaultCode.AmbiguousDispatch` confirmed with `[StaticallyPreventable(DiagnosticCode.AmbiguousDispatch)]`. The evaluator call site `Fail(FaultCode.AmbiguousDispatch)` at the `candidates.Count > 1` branch is the correct runtime backstop; the proof engine's exclusivity analysis prevents this from firing on a cleanly-proven program.
 
 ### Resolved Design Questions
 

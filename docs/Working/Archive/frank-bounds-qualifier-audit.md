@@ -1,5 +1,9 @@
 # Frank audit: bounds qualifier comparability
 
+> **Promoted to:** [`docs/language/business-domain-types.md`](../../language/business-domain-types.md) § Bounds qualification rules  
+> **Status:** Promoted 2026-05-24 — bounds-qualifier rule + qualifier-compatibility rule lifted to canonical. Diagnostics PRE0133 (`BoundsRequireQualifier`) and PRE0134 (`BoundsQualifierMismatch`) shipped in `DiagnosticCode.cs`. This file is preserved for historical reference. Do not edit.
+
+
 ## Verdict
 
 The concern is confirmed and worse than suspected. `samples/Test.precept` line 3 (`field test as quantity max '5 kg'`) reveals two issues:

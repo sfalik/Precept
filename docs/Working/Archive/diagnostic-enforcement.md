@@ -1,5 +1,8 @@
 ﻿# Diagnostic Gap Closure and Enforcement
 
+> **Promoted to:** [`docs/language/catalog-system.md`](../../language/catalog-system.md) § Roslyn Enforcement Layer  
+> **Status:** Promoted 2026-05-24 — durable architectural rationale lifted to canonical catalog-system.md § Roslyn Enforcement Layer (Workstream B, 10-row categorized table). This file is preserved for historical reference. Do not edit.
+
 > **Status:** Design — Pending Shane Sign-off
 > **Author:** Frank (Lead/Architect)
 > **Date:** 2026-05-13

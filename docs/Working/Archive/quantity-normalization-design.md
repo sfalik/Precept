@@ -1,5 +1,12 @@
 # Quantity Normalization Design — Cross-Phase Unit-Aware Comparison
 
+> **Promoted to:**  
+> - [`docs/runtime/evaluator.md`](../../runtime/evaluator.md) § Two-Layer Value Architecture and Intake-Boundary Normalization (decimal-in-analysis vs PreceptValue-in-execution; Builder-as-conversion-boundary; normalize-on-intake rationale; compiler↔runtime code-sharing seam)  
+> - [`docs/compiler/proof-engine.md`](../../compiler/proof-engine.md) § Normalization boundary (already-shipped: TypeChecker normalizes bound modifiers to UCUM base units at field-typing time, with raw magnitudes preserved for diagnostic display)  
+> - [`docs/language/business-domain-types.md`](../../language/business-domain-types.md) § Bounds qualification rules (already-shipped: UCUM base-unit normalization for cross-unit interval containment proofs)  
+>  
+> **Status:** Promoted 2026-05-24 — durable architectural rationale lifted (two-layer value model, intake-boundary normalization, normalize-on-intake-vs-compare-vs-write rationale, compiler/runtime code-sharing seam). Per-slice implementation plans, UCUM scale table details, and per-section "George review incorporated" disposition history are historical execution record. This file is preserved for historical reference. Do not edit.
+
 **Author:** Frank (Lead Architect)
 **Status:** Draft — George's technical review incorporated (APPROVED WITH CONDITIONS, all conditions accepted/addressed), pending Shane sign-off
 **Date:** 2026-05-14 (George review incorporated: 2026-05-14)

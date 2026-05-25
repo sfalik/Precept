@@ -737,9 +737,9 @@ Most lexers handle string interpolation with a recursive scanner or a heap-alloc
 | Parser — TokenStream consumption, dual-use token disambiguation | `docs/compiler/parser.md` |
 | Diagnostics catalog — lex-phase error codes, message templates | `docs/compiler/diagnostic-system.md` |
 | Literal system — string/typed constant segmentation, escape tables | `docs/compiler/literal-system.md` |
-| Pipeline overview — stage ordering, artifact types | `docs/compiler/pipeline-overview.md` |
+| Compiler stage map — pipeline ordering and per-stage docs | `docs/compiler/README.md` |
 | Language spec — `set` disambiguation, interpolation syntax | `docs/language/precept-language-spec.md` §1.7, §1.8 |
-| Type system — typed constant validation, numeric interpretation | `docs/language/type-system.md` |
+| Type system — typed constant validation, numeric interpretation | `docs/language/primitive-types.md`, `docs/language/temporal-type-system.md`, `docs/language/business-domain-types.md` |
 
 ---
 
@@ -747,7 +747,7 @@ Most lexers handle string interpolation with a recursive scanner or a heap-alloc
 
 | File | Purpose |
 |------|---------|
-| `src/Precept/Pipeline/Lexer.cs` | Lexer implementation — `Lexer` static class, `Scanner` struct, `ModeState` struct, `LexerMode` enum (~687 lines) |
+| `src/Precept/Pipeline/Lexer.cs` | Lexer implementation — `Lexer` static class, `Scanner` struct, `ModeState` struct, `LexerMode` enum |
 | `src/Precept/Pipeline/TokenStream.cs` | `TokenStream` record — immutable token sequence and diagnostics artifact |
 | `src/Precept/Pipeline/SourceSpan.cs` | `SourceSpan` record struct — offset/length/line/column span type |
 | `src/Precept/Language/TokenKind.cs` | `TokenKind` enum — all token kind values |

@@ -1,11 +1,18 @@
 # Constructor Semantics — Consolidated Design
 
+> **Promoted to:**  
+> - [`docs/language/precept-language-spec.md`](../../language/precept-language-spec.md) § 3A.5 Entity Construction (cross-language precedent + on-Event rationale + structural-exclusion rationale + initial-keyword rationale + guards rationale + Decision 5 exclusion rationale)  
+> - [`docs/compiler/parser.md`](../../compiler/parser.md) § Design Rationale — "Why ParsedOutcome Is a 4-Member DU (Reject as Its Own Subtype)"  
+> - [`docs/compiler/type-checker.md`](../../compiler/type-checker.md) § Typed Records — "Construction-row classification" note on `TypedEventHandler`  
+>  
+> **Status:** Promoted 2026-05-24 — durable architectural rationale lifted to canonical; slice-by-slice implementation plans (§ 11) are historical record only. AmbiguousDispatch story was swept by Workstream B (catalog-system rewrite) and is not reintroduced here. This file is preserved for historical reference. Do not edit.
+
 > **Status:** Revised draft — reject mutual-exclusion locked; remaining open questions noted inline  
 > **Author:** Frank (Lead/Architect)  
 > **Date:** 2026-05-15  
 > **Last revision:** 2026-05-15 — OQ8 locked: construction renders via entry pseudo-node arrow  
 > **Source analyses:** Terminal constructor constraint, `on <Event>` syntax unification, guard restriction removal  
-> **Precedent research:** [`docs/working/research-conditional-construction.md`](research-conditional-construction.md)
+> **Precedent research:** [`research/language/research-conditional-construction.md`](../../../research/language/research-conditional-construction.md) (relocated 2026-05-24)
 
 ---
 

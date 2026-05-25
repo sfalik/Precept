@@ -1,7 +1,7 @@
 namespace Precept.Language;
 
 /// <summary>
-/// The five proof obligation kinds that catalog entries can declare.
+/// The ten proof obligation kinds that catalog entries can declare.
 /// </summary>
 public enum ProofRequirementKind
 {

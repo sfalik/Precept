@@ -2,6 +2,13 @@
 
 **Status:** Part A — ✅ Done (2B confirmed by audit, 2026-05-11) | Part B — Slices 7–12 ✅ Done, Slice 11B ✅ Done, Slice 13 ⛔ Closed | Part C — C1–C4 ✅ Done | Part D — D1–D4 ✅ Done | Part E — E1 + E4 ✅ Done | E2 ✅ Done (`8785d753`) | E3 ✅ Done (`d3f5aa98`) | Part F — F1 ✅ Done | F2 ✅ Done | F3 ✅ Done | F4 ✅ Done | F5 🔲 In Progress | Part G — G1 ✅ Done (`cb4fbf57`), G2 ✅ Done (2026-05-12T13:10:03.666-04:00) | **Part H — BUG-C reframed:** syntax already works; H1 ✅ Done, H2 ✅ Done, H3 ✅ Done
 
+> **Promoted to:**  
+> - [`docs/compiler/literal-system.md`](../../compiler/literal-system.md) § Type-grammar slot classification (Type-Grammar-Driven Slot Classification — matching algorithm, slot identities, `T(num) H[slot]` notation, structural-error rationale, alternatives-rejected analysis)  
+> - [`docs/language/business-domain-types.md`](../../language/business-domain-types.md) § Interpolation — any component, any position (cross-reference to slot classification + closed-grammar note)  
+> - [`docs/language/temporal-type-system.md`](../../language/temporal-type-system.md) § Temporal quantity construction (compound-form unit-hole prohibition + integer-magnitude requirement)  
+>  
+> **Status:** Promoted 2026-05-24 — durable architectural rationale lifted (Type-Grammar Slot Classification, per-type closed grammars, structural-error model, two rejected alternatives). Per-slice implementation tracker (Slices 1-6, Parts A-H, G1-G15 proof gaps) is historical execution record. This file is preserved for historical reference. Do not edit.
+
 ### Slice Status Tracker
 
 | Slice | Title | Status |

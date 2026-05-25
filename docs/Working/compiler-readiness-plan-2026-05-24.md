@@ -15,7 +15,7 @@
 
 | Phase | Goal | F-count | Decisions required | Effort | Status |
 |---|---|---|---|---|---|
-| 1 | Doc foundation truthful + lifecycle skills + 16 Archive promotions | ~55 | 8 (✅ all settled 2026-05-24) | XL (~5-7 days) | Planned, ready to execute |
+| 1 | Doc foundation truthful + lifecycle skills + 16 Archive promotions | ~55 | 8 (✅ all settled 2026-05-24) | XL (~5-7 days) | ✅ **Complete 2026-05-24** (all 6 workstreams shipped; verification report at [`lifecycle-review-phase-1-2026-05-24.md`](lifecycle-review-phase-1-2026-05-24.md)) |
 | 2 | Green baseline + no crashes + Operations.Resolve + MCP-crash family | **11+** | 2 | **L (~4-5 days)** | Planned |
 | 3 | Type system completeness | ~15 | 3 | L | Stub — TBD |
 | 4 | Collection completeness + BUG-002 | **~16** | 2 | L | Stub — TBD |
@@ -73,6 +73,17 @@ From 2026-05-24 triage — **all 8 Phase-1-gating decisions settled**:
 Every doc in `docs/language/`, `docs/compiler/`, and load-bearing per-stage docs accurately describes what the implementation does. No stale Status fields. No false "✅ Resolved" claims. Spec § 0.5 cleanly separates shipped from forward-looking. `catalog-system.md` count discrepancies eliminated. Add an institutional check so this kind of drift doesn't recur.
 
 This phase is doc-only (with the exception of any CC# items the owner decides to *implement* rather than *revert* — those become Phase 1.5 work). No code changes to pipeline / runtime / language server.
+
+## Workstream tracker
+
+| Workstream | Description | Status |
+|---|---|---|
+| A | Lifecycle skills + CONTRIBUTING.md + plan cleanup | ✅ Complete (commit `4c65ec08`, 2026-05-24) |
+| B | Catalog-system.md rewrite (Decisions 1, 2, 3, 5, 6, 7 + F-LANG-CAT-AGGREGATE) | ✅ Complete (this session; 15-catalog convention adopted) |
+| C | Stage doc Status truth-ups (parser, type-checker, lexer, tooling-surface, primitive/business/temporal types) | ✅ Complete (this session) |
+| D | Spec § 0.5 rewrite + graph-analyzer-roadmap.md + § 1.1/§ 1.5/§ 2.1 BackArrow + grammar doc enumeration | ✅ Complete (this session) |
+| E | 16 Archive promotions via `/lifecycle-5-promote --backfill` | ✅ Complete (this session; 13 ✅ Promoted, 2 📌 Header-only, 1 🔄 Relocated) |
+| F | `/lifecycle-6-review --strict` verification | ✅ Complete (this session) — report at [`lifecycle-review-phase-1-2026-05-24.md`](lifecycle-review-phase-1-2026-05-24.md) |
 
 ## Findings in scope (~40)
 
@@ -442,7 +453,7 @@ Plus, since Phase 1's F-LANG-CAT-15 decision was "implement," `Operations.Resolv
 **Goal**: Every documented capability of the primitive, temporal, and business-domain type systems is exercised by tests and works as the spec claims. Remove the per-`TypeKind` dispatch in `TypeChecker.Expressions.TypedConstants.cs` in favor of catalog-driven dispatch (catalog discipline).
 
 **Findings in scope** (~15):
-- F-LANG-PRIM-01 (string ordering — if "add ordering" decision)
+- ~~F-LANG-PRIM-01 (string ordering — resolved: false claims removed from docs; no implementation work required)~~
 - F-LANG-PRIM-04 (RedundantModifier warning vs error)
 - F-LANG-TEMP-01/02 (context-aware `'3 days'`/`'2 weeks'` parser)
 - F-LANG-TEMP-03 (nonzero/nonnegative on duration)
@@ -458,11 +469,11 @@ Plus, since Phase 1's F-LANG-CAT-15 decision was "implement," `Operations.Resolv
 - F-TC-04 (per-`TypeKind` dispatch `GetFormsForType` → catalog-driven)
 
 **Decisions required**:
-- F-LANG-PRIM-01: add `<`/`>`/`<=`/`>=` to `string` (and add `TypeTrait.Orderable`) OR drop ordering claim from doc?
+- ~~F-LANG-PRIM-01: resolved — documentation-only fix; dropped ordering claim from docs~~
 - F-LANG-PRIM-04: which severity for `nonnegative` + `positive` combination — warning (per doc, requires `Subsumes` mechanism) or error (per current catalog mutex)?
 - F-LANG-TEMP-08: catalog or doc authoritative for `zoneddatetime ± period`?
 
-**Status**: Stub — detailed execution plan TBD pending Phase 2 completion and the 3 listed decisions.
+**Status**: Stub — detailed execution plan TBD pending Phase 2 completion and the 2 remaining decisions.
 **Estimated effort**: L (~1 week — substantial catalog and parser work, especially F-LANG-TEMP-01/02 context-aware parsing and F-LANG-BIZ-04 CurrencyCatalog API).
 
 ---

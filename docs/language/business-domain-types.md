@@ -6,8 +6,8 @@
 
 | Property | Value |
 |---|---|
-| Doc maturity | Draft |
-| Implementation state | Proposal — not yet implemented; depends on temporal type system (Issue #107) |
+| Doc maturity | Full |
+| Implementation state | Implemented (with documented gaps — see Compiler Readiness Plan Phase 3 / F-LANG-BIZ findings) |
 | Grounding | `docs/language/precept-language-spec.md`; vision archived at `docs/archive/language-design/precept-language-vision.md` § Type System |
 | Prototype | `docs/CurrencyQuantityUomDesign.md` on `research/issue-95-currency-quantity-uom` branch |
 | Depends on | [Temporal Type System](temporal-type-system.md) (Issue #107) · [Issue #115](https://github.com/sfalik/Precept/issues/115) |
@@ -381,6 +381,28 @@ Time units (`s`, `min`, `h`, `d`) are excluded from the `quantity` category syst
 | `'date'` | years, months, weeks, days | `dateonly` | `LocalDate.Plus(Period)` throws on time components |
 | `'time'` | hours, minutes, seconds | `timeonly` | `LocalTime.Plus(Period)` throws on date components |
 | `'datetime'` | all components | (new) | `LocalDateTime.Plus(Period)` accepts all |
+
+### Bounds qualification rules
+
+Numeric bounds (`min`, `max`) on qualifier-bearing types are not legal in isolation. The bound value is a magnitude in some unit-or-currency context; without a matching qualifier on the field, the bound has no comparison basis and is silently meaningless.
+
+**The rule.** Declaring `min`/`max` on `money`, `quantity`, or `price` requires matching qualifier context on the field:
+
+| Field type | Required qualifier for bounds |
+|---|---|
+| `money` | `in <currency>` (so the bound is a currency-comparable amount) |
+| `price` | `in <currency>` (the numerator must be currency-bounded for the bound to compare) |
+| `quantity` | `in <unit>` or `of <dimension>` (so the bound has a comparable unit/dimension basis) |
+
+**What goes wrong without the rule.** `field test as quantity max '5 kg'` parses cleanly, but with no `in`/`of` on the field, the field admits values like `'3 ft'` whose comparison to `'5 kg'` is undefined — different dimensions are not orderable. The bound is accepted but never fires. Authors get false confidence; the compiler silently lies. The compiler must reject the form (`BoundsRequireQualifier`, PRE0133) and prompt the author to either drop the bound or add the qualifier context (e.g., `field test as quantity in 'kg' max '5 kg'`).
+
+**Bound expression interpretation.** Typed-constant bounds (`'5 kg'`, `'100 USD'`) are extracted into comparable `decimal` values for the interval-containment proof. Number-literal bounds (`5`, `-100`) are extracted unchanged. The extraction is exact; bounds never round.
+
+**Qualifier compatibility on the bound.** When the bound carries its own qualifier (typed constants always do), it must match the field's qualifier on the same axis. Mismatch is `BoundsQualifierMismatch` (PRE0134): `field amt as money in 'USD' max '100 EUR'` is rejected — comparing USD-bounded amounts against an EUR bound is not a sound proof obligation. The exception is unit-conversion within the same UCUM dimension on `quantity` fields, where interval containment normalizes both sides to UCUM base units before comparison (see § 5 in the proof engine — `max '5 kg'` with `set field = '6 [lb_av]'` is correctly proved safe because 6 lb ≈ 2.72 kg < 5 kg).
+
+**Why a structural rule and not a runtime check.** A bound that cannot be evaluated at compile time is an unprovable governance claim. Precept's identity is structural prevention, not runtime detection — if the bound cannot participate in a proof, accepting it would silently weaken the governance guarantee on the field. The diagnostic surfaces the gap at definition time so the author either fixes the qualifier or honestly drops the bound.
+
+---
 
 ### Admission vs arithmetic
 
@@ -1383,6 +1405,8 @@ The non-ambiguity invariant (Issue #115) guarantees exactly one resolution per l
 ### Interpolation — any component, any position
 
 `{expr}` interpolation can substitute any positional component of a typed constant or any declaration-site constraint. This section is the canonical reference for all interpolation in the business-domain types.
+
+The set of valid interpolated shapes per type is a **closed type grammar**, not a free-form template. The type checker matches each interpolated constant against the listed valid forms for the target type and assigns a *slot identity* (`magnitude`, `currency`, `unit`, `from-currency`, `to-currency`) to each hole. Forms that do not match any listed pattern are rejected as `InvalidInterpolatedTypedConstantForm` — a structural error, not a per-hole type mismatch. For the matching algorithm, slot-classification rationale, and the `T(num) H[slot]` grammar notation, see [`docs/compiler/literal-system.md`](../compiler/literal-system.md) § Type-grammar slot classification.
 
 #### Expression-position interpolation (typed constants)
 

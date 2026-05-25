@@ -179,6 +179,7 @@ public sealed record TypedFunctionCall(
     FunctionKind ResolvedFunction,
     ImmutableArray<TypedExpression> Arguments,
     ImmutableArray<ProofRequirement> ProofRequirements,  // ← from FunctionOverload
+    ImmutableArray<DeclaredQualifierMeta>? ResultQualifiers,  // ← propagated for QualifierMatch.Same overloads
     SourceSpan Span
 ) : TypedExpression(ResultType, Span);
 
@@ -443,6 +444,20 @@ The proof engine operates in two sequential passes:
 │                            ProofLedger                               │
 └─────────────────────────────────────────────────────────────────────┘
 ```
+
+### Obligation Generation Contract
+
+The proof engine is a generic consumer of catalog-stamped obligations. Four rules govern obligation generation across the pipeline, in priority order:
+
+1. **Derive emission from modifier metadata, not from `TypeKind` checks.** If `ModifierMeta.ProofSatisfactions` declares a satisfaction mapping for a constraint modifier, the type checker must emit the corresponding obligation on every mutation path where that constraint applies — regardless of which type carries the field. The check `kind switch { TypeKind.Decimal => …, TypeKind.Number => …, _ => skip }` in obligation-emission code is the violation pattern; the right shape reads `ModifierMeta.ApplicableTypes` and `ModifierMeta.ProofSatisfactions` and lets the catalog gate emission.
+
+2. **Emit obligations for all declared constraints with proof semantics.** A field declared `field x as string minlength 3` must produce a length-containment obligation on every assignment to `x`; `field c as set of string maxcount 10` must produce a count-containment obligation on every mutation that grows `c`. The author's declaration is the proof contract; silently omitting obligation emission for some constraint families is a governance gap.
+
+3. **Per-family integration tests are required.** Numeric, business-qualified numeric, string, and collection constraint families each get integration tests that verify "constraint declared → obligation emitted → discharge succeeds or fails as expected." A regression that silently drops one family's emission must be caught by tests that walk the full pipeline, not by unit tests on the emission helper.
+
+4. **Keep the architecture metadata-driven on both sides.** The discharge side (`ProofEngine.Strategies.cs`) already reads `ProofSatisfactions` broadly. The emission side must do the same. Asymmetry between discharge (catalog-driven) and emission (hardcoded) is the source of "declared constraint silently not enforced" bugs — keeping both sides metadata-driven means adding a new constrained type or modifier flows through one catalog edit, not a hunt across pipeline stages.
+
+**Why this is a contract, not a guideline.** The proof engine's correctness depends on completeness of obligation generation. A missing obligation means a constraint that an author declared is silently not enforced — exactly the prevention-vs-detection failure mode Precept exists to prevent in user code. The same standard applies internally: if the catalog says a constraint has proof semantics, the pipeline must obligate the proof.
 
 ### Catalog-Driven Obligation Instantiation
 
@@ -1662,7 +1677,44 @@ Before that table is consulted, `SatisfactionCovers` also requires:
 
 The key difference is upper-bound coverage. `SatisfactionCovers` has dedicated generalized `LessThan → LessThan` and `LessThanOrEqual → LessThanOrEqual` rows, while `NumericConstraintSubsumes` only accepts those operator pairs through its exact-match fallback. The source therefore documents a deliberate conservative asymmetry: declaration metadata can cover some upper-bound obligations more broadly than guard extraction currently does, but the code does not claim full symmetry.
 
-#### 7.5 — Constant Folder: Zero-Denominator Conservative Guard
+#### 7.5 — Two Parallel Qualifier-Resolution Subsystems (Design Rationale)
+
+Two qualifier-resolution paths exist in the compiler and are deliberately kept separate:
+
+| Subsystem | Entry point | Return type | Consumer |
+|---|---|---|---|
+| **TypeChecker assignment path** | `ResolveAssignmentQualifierAxis` in `TypeChecker.Expressions.AssignmentQualifiers.cs` | `ResolvedQualifierAxis` — tri-state DU (`Resolved` / `Unknown` / `Absent` + qualifier when Resolved) | Assignment validation (PRE0141 family) — needs to distinguish "field is genuinely unconstrained on this axis" from "source cannot be resolved" to emit the right diagnostic |
+| **ProofEngine path** | `ResolveQualifierFromExpression` in `ProofEngine.Qualifiers.cs` | `DeclaredQualifierMeta?` — nullable (`null` collapses Unknown and Absent) | Strategy 5 binary-op proof obligations — needs symbolic equality between operands; conservatively treats both `null` cases as "cannot prove" |
+
+**Why two and not one.** The two contracts differ:
+
+- **Assignment validation** must emit *different* diagnostics for the two failure modes. An assignment from a bare `money` field into a `money in 'USD'` field is `Unknown` (source has the axis but doesn't constrain it) and reports as "currency unproven — add `in '<currency>'` to the source or a guard at the assignment site." An assignment from an `integer` literal into the same field is `Absent` (source type doesn't carry the axis at all) and reports as a type-level mismatch. Collapsing these to `null` would conflate two distinct authoring fixes.
+- **Proof discharge** compares two operand qualifiers for *symbolic equality* (`QualifiersAreCompatible`, `QualifiersSymbolicallyEqual`, `ChainQualifiersMatch`). The proof system is sound by treating both `Unknown` and `Absent` as "cannot prove" — neither side can supply a qualifier to compare against. Forcing tri-state onto proof consumers would add ceremony with no behavioral change.
+
+**What MUST stay aligned between the two.** Returning differently is fine. *Reading the same facts* must be guaranteed. Two cross-subsystem invariants:
+
+1. **Implied-qualifier parity.** Both subsystems consult `Types.GetMeta(resultType).ImpliedQualifiers` after the declared-qualifier chain. A `duration` field has implied `TemporalDimension(Time)`; if one resolver sees it and the other does not, assignment validation and proof discharge will disagree on the same expression. The proof engine has consulted implied qualifiers since inception; the assignment-path resolver was retrofitted to do the same.
+2. **Compound-cancellation alignment.** UCUM compound cancellation (`'kg.m/s'` simplifying to `'kg.m/s'` vs `'m'` after `/'kg/s'`) must use the same structural decomposition in both subsystems. The shared helper lives in `UnitDimensionHelper`; both subsystems route through it rather than implementing parallel string-splitting.
+
+**Why not full unification.** Full unification would require either making `ResolveAssignmentQualifierAxis` take `SemanticIndex` (currently it doesn't need it because `TypedFieldRef.DeclaredQualifiers` is already populated), or stripping `SemanticIndex` dependency from the proof path (would lose implied-qualifier lookup and field-by-name resolution for proof subjects that resolve through `ResolveFieldQualifier`). Neither serves the actual consumers. The architectural commitment is **"two subsystems, one source of facts"** — different return shapes, identical underlying truth.
+
+#### 7.6 — `TypedFunctionCall.ResultQualifiers` Propagation Contract
+
+`TypedFunctionCall.ResultQualifiers` propagates qualifier information through function calls that preserve their input qualifiers. Population is driven by `FunctionOverload.QualifierMatch`:
+
+| `QualifierMatch` value | Population behavior |
+|---|---|
+| `null` (default for most overloads) | `ResultQualifiers = null` — function does not carry qualifier reasoning |
+| `Same` | `ResultQualifiers = TryGetStaticQualifiers(args[0])` — output inherits the shared input qualifier |
+| `Different` | Currently not consumed by `TypedFunctionCall` — Different applies to binary operations only |
+
+**Functions with `Match == Same`.** `abs`, `min`, `max`, `clamp`, and `round(value, places)` on `money` and `quantity` overloads. Numeric/string/temporal overloads carry `Match = null` because their inputs/outputs are not qualifier-bearing types.
+
+**Why not a separate `FunctionOverload.QualifierPreservation` flag.** `QualifierMatch.Same` IS the declaration that the result's qualifier equals the input's qualifier. Adding a parallel flag would duplicate metadata and admit drift. The resolver reads `Match` at `CreateTypedFunctionCall` time and populates `ResultQualifiers` directly — single source of truth, derived through the contract that already exists.
+
+**Why the propagation lives on the typed expression and not on the meta.** `ResultQualifiers` carries *instance* data (the actual qualifiers from this call site's arguments), not *type* data (which would belong on `FunctionMeta`). Two `abs(...)` calls with different argument qualifiers produce different `ResultQualifiers` — the catalog declares the propagation rule, the typed node carries the realized result.
+
+#### 7.7 — Constant Folder: Zero-Denominator Conservative Guard
 
 `ConstantFold` delegates arithmetic folding to `FoldValue`, which delegates binary arithmetic to `EvaluateBinaryOp`. Inside `EvaluateBinaryOp`, numeric operands (`decimal`, `int`, `long`) are normalized to decimals and then evaluated.
 

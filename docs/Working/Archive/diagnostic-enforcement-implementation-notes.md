@@ -1,5 +1,8 @@
 # Diagnostic Enforcement — Implementation Notes
 
+> **Promoted to:** [`docs/language/catalog-system.md`](../../language/catalog-system.md) § Roslyn Enforcement Layer  
+> **Status:** Promoted 2026-05-24 — companion to `diagnostic-enforcement.md`; architectural rationale already lifted to canonical via Workstream B. Implementation-notes detail (per-analyzer file paths, dated commit references) is historical record only. This file is preserved for historical reference. Do not edit.
+
 > **Status:** Complete (mission closed 2026-05-14)
 > **Plan doc:** `docs/Working/diagnostic-enforcement.md`
 > **Branch:** `spike/Precept-V2-Radical`

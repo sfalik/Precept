@@ -1,3 +1,6 @@
+> **Promoted to:** [`docs/tooling/language-server.md`](../../tooling/language-server.md) § 7.3 → "Typed-Literal Completion (Quoted Scalar Surface)"  
+> **Status:** Promoted 2026-05-24 — design principles ("prefer no completions over wrong completions", "treat as canonical UX for all quoted scalar literals"), trigger semantics, qualifier-aware mode, compound temporal continuation flow, and per-type behavior table all lifted to canonical. Per-phase trigger tables (money Phase 0/1/2/3, etc.) remain here as the detailed UX reference. This file is preserved for historical reference. Do not edit.
+
 ### 2026-05-10T23:12:47.080-04:00: Typed Literal Autocomplete UX Design
 **By:** Elaine (UX Designer)
 **What:** Design spec for typed literal autocomplete experience

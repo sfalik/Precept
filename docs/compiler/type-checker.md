@@ -46,7 +46,7 @@
   - [What the Checker Reads](#what-the-checker-reads)
   - [Catalog-Driven vs Structural Logic (~70/30 Split)](#catalog-driven-vs-structural-logic-7030-split)
 - [Catalog Gaps (part of §13)](#catalog-gaps-part-of-13)
-  - [Gap 1: ContentValidation DU on TypeMeta — HIGH](#gap-1-contentvalidation-du-on-typemeta--high)
+  - [Gap 1: ContentValidation DU on TypeMeta — RESOLVED](#gap-1-contentvalidation-du-on-typemeta--resolved)
   - [Gap 3: TypedActionShape on ActionMeta — LOW (deprioritized)](#gap-3-typedactionshape-on-actionmeta--low-deprioritized)
   - [Gap 4: ~string CI Enforcement — LOW (acceptable as checker logic)](#gap-4-string-ci-enforcement--low-acceptable-as-checker-logic)
 - [8. Dependencies and Integration Points](#8-dependencies-and-integration-points)
@@ -414,6 +414,13 @@ public sealed record TypedEventHandler(
     ImmutableArray<TypedAction> Actions,
     ParsedConstruct Syntax
 );
+```
+
+**Construction-row classification.** `TypedEventHandler` is the unified shape for both stateful construction rows and stateless event handlers. The parser produces the same `EventRow` construct for both — there is no separate `ConstructionRow` parse kind. Classification happens in the type checker, by reading `resolvedEvent.IsInitial` on the bound event. A row whose event has the `initial` modifier is a construction row (subject to construction-only diagnostics like `InitialEventInTransitionRow`, `ZeroConstructionRows`, hollow-context field-read validation, and `AlwaysRejecting` severity promotion); a row whose event lacks `initial` is a stateless event handler (subject to `EventRowInStatefulPrecept`/PRE0092 for non-initial uses in stateful precepts).
+
+*Rationale.* Parser-time classification would require the parser to depend on the event's resolved modifier, which is type-checker information. Pushing the classification into the type checker keeps the parser a pure grammar interpreter and locates the "is this construction?" question where the semantic model is built. The same row shape on disk maps to two semantic categories cleanly, with no grammar duplication.
+
+```csharp
 
 /// Placeholder for stateless-precept edit declarations (edit all / edit Field1, Field2).
 public sealed record TypedEditDeclaration(
@@ -484,6 +491,7 @@ public sealed record TypedFieldRef(
     TypeKind ResultType,
     string FieldName,
     bool IsCaseInsensitive,    // carries ~string flag
+    ImmutableArray<DeclaredQualifierMeta>? DeclaredQualifiers,  // propagated from the field declaration
     SourceSpan Span
 ) : TypedExpression(ResultType, Span);
 
@@ -491,6 +499,7 @@ public sealed record TypedArgRef(
     TypeKind ResultType,
     string EventName,
     string ArgName,
+    ImmutableArray<DeclaredQualifierMeta>? DeclaredQualifiers,  // propagated from the arg declaration
     SourceSpan Span
 ) : TypedExpression(ResultType, Span);
 
@@ -522,6 +531,7 @@ public sealed record TypedFunctionCall(
     FunctionKind ResolvedFunction,
     ImmutableArray<TypedExpression> Arguments,
     ImmutableArray<ProofRequirement> ProofRequirements,
+    ImmutableArray<DeclaredQualifierMeta>? ResultQualifiers,  // propagated when overload.Match == QualifierMatch.Same
     SourceSpan Span
 ) : TypedExpression(ResultType, Span);
 
@@ -856,30 +866,11 @@ The structural logic clusters in: name resolution (symbol tables), scope managem
 
 ## Catalog Gaps (part of §13)
 
-### Gap 1: ContentValidation DU on TypeMeta — HIGH
+### Gap 1: ContentValidation DU on TypeMeta — RESOLVED
 
-**Status:** Design locked, implementation pending (separate PR)
+**Status:** ✅ Implemented. `TypeMeta.ContentValidation` is a sealed DU on `src/Precept/Language/Type.cs:139`; per-form subtypes (`RegexValidation`, `NodaTimeValidation`, `ClosedSetValidation`, plus typed-constant content shapes) drive typed-constant validation without per-`TypeKind` dispatch in the checker.
 
-The typed constant content validation patterns (date = YYYY-MM-DD, money = `<number> <currency>`, etc.) need catalog representation to avoid a per-`TypeKind` switch in the checker.
-
-**Locked shape:**
-
-```csharp
-// New field on TypeMeta
-ContentValidation? ContentValidation = null
-
-// DU shape:
-public abstract record ContentValidation(string FormatDescription, string[] Examples);
-public sealed record RegexValidation(string Pattern, string FormatDescription, string[] Examples) : ContentValidation(...);
-public sealed record NodaTimeValidation(string NodaTimePattern, string FormatDescription, string[] Examples) : ContentValidation(...);
-public sealed record ClosedSetValidation(string SetName, string FormatDescription, string[] Examples) : ContentValidation(...);
-```
-
-- `RegexValidation` — freeform patterns
-- `NodaTimeValidation` — date, time, datetime, period types (delegates to NodaTime parser)
-- `ClosedSetValidation` — currency (ISO 4217), unit (UCUM) (membership check)
-
-**Dependency:** Slice 4 (Typed Constants). If not landed before Slice 4, use a hardcoded per-TypeKind dispatch table with a TODO referencing this gap.
+The remaining per-`TypeKind` dispatch surface in `TypeChecker.Expressions.TypedConstants.cs` is tracked separately (see F-TC-04 in the Compiler Readiness Plan, Phase 3) — that work converts the residual `GetFormsForType` switch to catalog-driven lookup. ContentValidation itself is no longer the gap.
 
 ### Gap 3: TypedActionShape on ActionMeta — LOW (deprioritized)
 

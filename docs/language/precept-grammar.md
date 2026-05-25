@@ -60,7 +60,7 @@
   - [Invariant 5: Block bodies are explicitly permitted — not implied by indentation](#invariant-5-block-bodies-are-explicitly-permitted--not-implied-by-indentation)
   - [Invariant 6: New constructs must fit an existing family or start a new family with a fresh keyword](#invariant-6-new-constructs-must-fit-an-existing-family-or-start-a-new-family-with-a-fresh-keyword)
 - [§9. The Catalog as Grammar Specification](#9-the-catalog-as-grammar-specification)
-  - [The 13 catalogs as a grammar](#the-13-catalogs-as-a-grammar)
+  - [The 14 catalogs as a grammar](#the-14-catalogs-as-a-grammar)
   - [The catalog is the grammar — not a reflection of it](#the-catalog-is-the-grammar--not-a-reflection-of-it)
   - [Implication for language evolution](#implication-for-language-evolution)
 - [Appendix: Quick Reference](#appendix-quick-reference)
@@ -208,7 +208,7 @@ The critical property of this hierarchy: **the construct level is flat**. Expres
 
 ### What a construct is
 
-A construct is a complete declaration — a "sentence" in the DSL. There are 14 construct kinds, each mapped to a `ConstructMeta` entry in the Constructs catalog:
+A construct is a complete declaration — a "sentence" in the DSL. There are 15 construct kinds, each mapped to a `ConstructMeta` entry in the Constructs catalog:
 
 | Construct | Leading keyword | Description |
 |-----------|----------------|-------------|
@@ -224,8 +224,11 @@ A construct is a complete declaration — a "sentence" in the DSL. There are 14 
 | `OmitDeclaration` | `in` + `omit` | Declares field omission in a state |
 | `StateAction` | `to`/`from` + `->` | Declares a state entry or exit action hook |
 | `EventEnsure` | `on` + `ensure` | Declares an event precondition |
-| `EventRow` | `on` + `->` | Declares an event row on the success path (action chain only) |
-| `EventRowReject` | `on` + `->` | Declares an event row on the reject path (reject clause only) |
+| `EventRow` | `on` + `->` | Declares an event row on the success path (action chain only); the type checker promotes a row to construction-success classification when the resolved event carries `IsInitial` |
+| `ConstructionRowReject` | `on` + `->` `reject` | Declares an event row on the construction reject path; produced from `EventRow` by reject-variant resolution, not via direct parser disambiguation |
+| `TransitionRowReject` | `from` + `on` + `->` `reject` | Declares an event row on the transition reject path; same resolution model as `ConstructionRowReject` |
+
+> **Note — `ConstructionRow` (kind 19).** The catalog still defines `ConstructionRow` for historical compatibility, but Slice 8b removed it from the parser surface: every on-row now parses as `EventRow`, and the type checker classifies construction-vs-handler via `resolvedEvent.IsInitial`. The kind is retained as a vestigial DU member to avoid breaking downstream consumers that pattern-match on it; new code should not produce it. See `Constructs.cs:188` for the in-catalog note.
 
 ### The flat model
 
@@ -295,13 +298,16 @@ state  Draft  initial
 ```
 
 ```
-event  Submit  (Amount as number, Note as string optional)
-  │       │                     │
- [1]     [2]                  [3]                           [4] (if present)
+event  Submit (Amount as number, Note as string optional)  [initial]
+  │       │                                                    │
+ [1]     [2]──────────────────────────────────────────────────[2]
 [1] Leading token: `event`
-[2] IdentifierList slot — the event name
-[3] ArgumentList slot (optional) — the parenthesized typed parameter list
-[4] InitialMarker slot (optional) — `initial` keyword, marks the event as the entry-point event
+[2] EventEntryList slot — a single composite list slot that carries one or more
+    comma-separated entries of shape `Name [(Args)] [initial]`. The argument list
+    and `initial` marker are entry-internal — they are NOT separate top-level
+    slots on `EventDeclaration`. Multi-name declarations like
+    `event Foo, Bar(X as number), Baz initial` are all expressed inside this
+    single slot.
 ```
 
 ```
@@ -479,21 +485,22 @@ The second keyword (`ensure` vs `->`) is the disambiguation token. After `->`, t
 #### The `from` family (StateScoped)
 
 ```
-from  [AnchorState[, ...] | any]  on  EventName  [when Guard]  -> ActionChain -> ResolutionOutcome  → TransitionRow
-from  [AnchorState[, ...] | any]  on  EventName  [when Guard]  -> reject "reason"                 → TransitionRowReject
-from  [AnchorState[, ...] | any]  [when Guard]  ensure  Expr  [because  "..."]                    → StateEnsure
-from  [AnchorState[, ...] | any]  [when Guard]  ->  actions                                       → StateAction
+from  [AnchorState[, ...] | any]  on  EventName  [when Guard]  -> ActionChain -> Outcome   → TransitionRow
+from  [AnchorState[, ...] | any]  on  EventName  [when Guard]  -> reject "reason"          → TransitionRowReject
+from  [AnchorState[, ...] | any]  [when Guard]  ensure  Expr  [because  "..."]             → StateEnsure
+from  [AnchorState[, ...] | any]  [when Guard]  ->  actions                                → StateAction
 ```
 
 The second keyword (`on`, `ensure`, or `->`) is the disambiguation token. `on` leads to the transition row family; `ensure` leads `StateEnsure` (exit constraint); `->` leads `StateAction` (exit hook).
 
 Within the `on` sub-family, after the parser resolves through the guard and reaches `->`, it inspects the next token: if it is `reject`, the construct is `TransitionRowReject`; otherwise it is `TransitionRow`. `TransitionRow` is the unmarked success path; `TransitionRowReject` is the explicitly-marked reject path.
 
-**`ResolutionOutcome`** is the narrowed outcome for mutation rows — only `transition StateName` or `no transition` are valid. The `reject` outcome is structurally excluded; reject is its own construct.
+**`Outcome` slot on `TransitionRow`.** The terminal-disposition slot uses the broader `Outcome` slot kind (kind 9 — admits `transition` / `no transition` / `reject` in general). Reject on a `TransitionRow` is structurally excluded by routing: when the parser sees `-> reject` it produces `TransitionRowReject` instead, which uses a dedicated `RejectClause` slot. The result is the same surface grammar a "success-only outcome" implies; the slot kind `SuccessOutcome` (kind 19) exists as a narrower alternative but is not the kind the `TransitionRow` catalog entry uses today.
 
 ```
-ResolutionOutcome  =  'transition' StateName  |  'no' 'transition'
+Outcome          =  'transition' StateName  |  'no' 'transition'  |  'reject' StringLiteral
 RejectClause     =  'reject' StringLiteral
+SuccessOutcome   =  'transition' StateName  |  'no' 'transition'
 ```
 
 #### The `to` family (StateScoped)
@@ -531,37 +538,41 @@ A slot is a named, typed position in a construct's grammar, defined by `Construc
 
 ### Slot kinds
 
-The 18 `ConstructSlotKind` values cover every distinct slot type in the language:
+The 20 `ConstructSlotKind` values cover every distinct slot type in the language:
 
 | Kind | What it holds | Where it appears |
 |------|---------------|-----------------|
-| `IdentifierList` | One or more names (field, state, event) | `field Name`, `event Submit` |
+| `IdentifierList` | One or more names (field, state, event) | `field Name`, `rule …` |
 | `TypeExpression` | A type reference (type keyword + qualifiers) | `as decimal`, `as set of string` |
 | `ModifierList` | Zero or more modifier keywords (some with values) | `nonnegative maxplaces 2 default 0` |
 | `StateEntryList` | Comma-separated (name modifier*) pairs for state declarations | `Draft initial, Submitted, Approved terminal success` |
-| `ArgumentList` | Typed parameter list | `(Amount as number, Note as string optional)` |
+| `ArgumentList` | Typed parameter list (legacy slot, retained for non-Event consumers) | `(Amount as number, Note as string optional)` |
 | `ComputeExpression` | Computed field body expression | `<- UnitPrice * Quantity` |
 | `GuardClause` | Optional `when` condition expression | `when DocumentsVerified and CreditScore >= 680` |
 | `ActionChain` | Sequence of `-> action` steps | `-> set ApprovedAmount = ...` |
-| `ResolutionOutcome` | Narrowed transition outcome (success only) | `-> transition Approved` / `-> no transition` |
+| `Outcome` | Terminal mutation outcome (transition / no transition / reject) — used by mutation rows that allow either path on a single slot | `-> transition Approved`, `-> no transition`, `-> reject "…"` |
+| `SuccessOutcome` | Narrowed success-only outcome (no reject form) | `-> transition Approved` / `-> no transition` |
 | `RejectClause` | Rejection with reason string | `-> reject "reason"` |
 | `StateTarget` | State name(s) or `any` wildcard | `from Draft`, `from Draft, Pending`, `to Approved` |
 | `EventTarget` | An event name reference | `on Submit` |
+| `EventEntryList` | Composite list slot for `EventDeclaration` — carries `Name [(Args)] [initial]` entries, comma-separated | `event Foo, Bar(X as number), Baz initial` |
 | `EnsureClause` | Constraint expression | `ensure ApprovedAmount > 0` |
 | `BecauseClause` | Reason string literal | `because "Approved amount must be positive"` |
 | `AccessModeKeyword` | Access mode for a field | `editable`, `readonly` |
 | `FieldTarget` | A field name reference | `modify DecisionNote` |
 | `RuleExpression` | The rule's boolean expression | `rule amount > 0` |
-| `InitialMarker` | Optional `initial` keyword on event declarations | `event Submit initial` |
+| `InitialMarker` | Optional `initial` keyword (carried inside `EventEntryList`; retained as a top-level slot kind for legacy consumers) | (nested in `EventEntryList`) |
+
+> **`Outcome` vs `SuccessOutcome`.** `Outcome` is the broader slot — it admits `transition`, `no transition`, **and** `reject` and is used where a single mutation row can either succeed or reject on the same slot. `SuccessOutcome` is the narrowed variant used where the catalog forbids reject in that slot (rejects route through a dedicated `RejectClause` on a sibling construct). The two slot kinds are distinct because the parser's terminator sets and the type checker's outcome validation differ; consumers that pattern-match on slot kind must handle both.
 
 ### Slot positions in a real construct
 
 Here is the complete slot sequence for a `TransitionRow`:
 
 ```
-from   Draft   on   Submit   when   Expr   -> action* -> ResolutionOutcome
-  │      │      │     │        │      │         │              │
- [1]    [2]    [3]   [4]      [5]   [6]        [7]            [8]
+from   Draft   on   Submit   when   Expr   -> action* -> Outcome
+  │      │      │     │        │      │         │           │
+ [1]    [2]    [3]   [4]      [5]   [6]        [7]         [8]
 
 Slot # │ Kind             │ Required │ Notes
 ───────┼──────────────────┼──────────┼────────────────────────────────────────
@@ -572,7 +583,7 @@ Slot # │ Kind             │ Required │ Notes
   [5]  │ (slot marker)    │  no      │ `when` keyword — slot delimiter
   [6]  │ GuardClause      │  no      │ Guard expression
   [7]  │ ActionChain      │  no      │ Mutation verbs (zero or more)
-  [8]  │ ResolutionOutcome  │  yes     │ Terminal disposition: `transition StateName` or `no transition`
+  [8]  │ Outcome          │  yes     │ Terminal disposition: `transition StateName` or `no transition` (reject is structurally excluded — see `TransitionRowReject`)
 ```
 
 Here is the complete slot sequence for a `TransitionRowReject`:
@@ -617,7 +628,7 @@ No counting positions. No consulting a function signature. **The keyword markers
 
 ### Where expressions appear
 
-Expressions appear **only** in expression-typed slots. The seven expression-typed slot kinds are:
+Expressions appear **only** in expression-typed slots. The expression-typed slot kinds are:
 
 | Slot kind | Where it appears | Example |
 |-----------|-----------------|---------|
@@ -626,7 +637,8 @@ Expressions appear **only** in expression-typed slots. The seven expression-type
 | `EnsureClause` | State/event constraint expression | `ensure ApprovedAmount > 0` |
 | `RuleExpression` | Rule body | `rule ExistingDebt <= AnnualIncome * 3` |
 | `ActionChain` | Action assignments | `-> set ApprovedAmount = min(Approve.Amount, RequestedAmount)` |
-| `ResolutionOutcome` | Terminal mutation outcome | `-> transition Approved` / `-> no transition` |
+| `Outcome` | Terminal mutation outcome (transition / no transition / reject) | `-> transition Approved`, `-> no transition`, `-> reject "…"` |
+| `SuccessOutcome` | Narrowed success-only outcome (reject excluded) | `-> transition Approved` / `-> no transition` |
 | `RejectClause` | Rejection with reason | `-> reject "reason"` |
 
 ### Expression as a value, not a statement
@@ -642,7 +654,7 @@ An expression is always embedded inside a slot, inside a construct. This constra
 
 ### Expression kinds
 
-The 14 `ExpressionFormKind` values (from the ExpressionForms catalog) cover the full expression grammar:
+The 15 `ExpressionFormKind` values (from the ExpressionForms catalog) cover the full expression grammar:
 
 | Category | Kinds | Examples |
 |----------|-------|---------|
@@ -651,7 +663,7 @@ The 14 `ExpressionFormKind` values (from the ExpressionForms catalog) cover the 
 | **Invocation** | `FunctionCall`, `MethodCall`, `CIFunctionCall` | `min(a, b)`, `amount.currency`, `~startsWith(Name, "val")` |
 | **Collection** | `ListLiteral` | `[1, 2, 3]` |
 | **Quantifier** | `Quantifier` | `each item in Items satisfies item > 0` |
-| **Interpolated** | `InterpolatedString` | `"Order {OrderId} total: {Amount}"` |
+| **Interpolated** | `InterpolatedString`, `InterpolatedTypedConstant` | `"Order {OrderId} total: {Amount}"`, `'{Year}-{Month}-{Day}'` |
 
 Note: the table groups forms by surface structure for documentation purposes. The runtime uses 4 `ExpressionCategory` values (`Atom`, `Composite`, `Invocation`, `Collection`) which classify forms differently.
 
@@ -669,9 +681,9 @@ field  TaxAmount  as  number  <-  TaxableAmount  *  TaxRate  /  100
 
 The `<-` is the slot marker for a `ComputeExpression` slot. Everything to its right is the expression — parsed as a tree, but contained entirely within the slot.
 
-### The open design question on expression trees
+### Expression tree representation
 
-Expression-carrying slots currently carry only a `SourceSpan` (source location) in the parser's output. Full expression tree representation is deferred pending design work on the `ExpressionNode` hierarchy. See `docs/compiler/parser.md` § Expression Tree Design for the open design question and context.
+Expression-carrying slots carry a full `ParsedExpression` tree — a sealed abstract record DU with per-form sealed subtypes (one per `ExpressionFormKind` member plus a `MissingExpression` sentinel). The Pratt expression parser in `src/Precept/Pipeline/Parser.Expressions.cs` builds the tree; the type checker resolves it into the parallel `TypedExpression` DU. See `docs/compiler/parser.md` § "Expression Tree Design (RESOLVED)" for the full shape.
 
 ### Why expressions stay inside slots
 
@@ -795,9 +807,9 @@ It cannot reuse an existing leading token with disambiguation that conflicts wit
 
 ## §9. The Catalog as Grammar Specification
 
-### The 13 catalogs as a grammar
+### The 14 catalogs as a grammar
 
-The Constructs catalog is not the only catalog that defines the grammar — it is the entry point. The 13 catalogs together form a complete, machine-readable grammar specification:
+The Constructs catalog is not the only catalog that defines the grammar — it is the entry point. The 14 grammar-relevant catalogs together form a complete, machine-readable grammar specification:
 
 ```
 CATALOG                 GRAMMAR ROLE
@@ -805,12 +817,13 @@ CATALOG                 GRAMMAR ROLE
 Tokens                  The lexical vocabulary — every keyword, operator,
                         punctuation, and identifier kind.
 
-Constructs              The construct inventory — 12 construct kinds with leading
+Constructs              The construct inventory — 15 construct kinds with leading
                         tokens, slot sequences, and disambiguation entries.
                         Constructs.ByLeadingToken is the parser's dispatch table.
 
-ExpressionForms         The expression grammar — 14 node kinds covering atoms,
-                        composites, invocations, and quantifiers.
+ExpressionForms         The expression grammar — 15 node kinds covering atoms,
+                        composites, invocations, quantifiers, and interpolated
+                        string / typed-constant forms.
 
 Types                   What type names are valid in TypeExpression slots.
 
@@ -827,6 +840,10 @@ Modifiers               What modifier keywords are valid in ModifierList slots,
 
 Actions                 What action verbs are valid in ActionChain slots.
 
+Outcomes                What terminal-outcome shapes (transition / no transition /
+                        reject) are valid in Outcome / SuccessOutcome / RejectClause
+                        slots. Drives terminal-outcome dispatch in parser + TC.
+
 Constraints             What constraint forms are valid in EnsureClause and
                         RuleExpression slots.
 
@@ -840,6 +857,8 @@ Faults                  What runtime errors the evaluator can produce —
                         defensive coverage for paths the compiler proved safe.
 ────────────────────────────────────────────────────────────────────────────────
 ```
+
+> The `SemanticTokenTypes` catalog (14th-or-15th depending on how you count) and the `Quickstart` catalog are tooling-adjacent — they project into editor surfaces rather than into the on-disk grammar. See `docs/language/catalog-system.md` for the full catalog inventory.
 
 ### The catalog is the grammar — not a reflection of it
 
@@ -912,8 +931,9 @@ IdentifierList            no  — names only
 TypeExpression            no  — type keyword + qualifiers
 ModifierList              no  — modifier keywords + values
 StateEntryList            no  — (name modifier*) pairs
-InitialMarker             no  — keyword only
-ArgumentList              no  — name:type pairs
+EventEntryList            no  — (name [(args)] [initial])* entries
+InitialMarker             no  — keyword only (carried inside EventEntryList)
+ArgumentList              no  — name:type pairs (legacy slot kind)
 StateTarget               no  — state name(s) or wildcard
 EventTarget               no  — event name
 BecauseClause             no  — string literal only
@@ -923,7 +943,10 @@ ComputeExpression         YES — arbitrary expression
 GuardClause               YES — boolean expression
 EnsureClause              YES — boolean expression
 RuleExpression            YES — boolean expression
-Outcome / ActionChain     YES — expressions within action assignments / reject reason
+ActionChain               YES — sequence of -> action steps
+Outcome                   YES — transition / no transition / reject (broad)
+SuccessOutcome            YES — transition / no transition (narrowed)
+RejectClause              YES — reject "reason" (string literal)
 ```
 
 ### Grammar invariants at a glance

@@ -367,7 +367,6 @@ public static partial class Parser
                 // ── Guard gate: TransitionRow pre-event guard rejection ──────────
                 // If a 'when' appears before the disambiguation 'on' token in a
                 // TransitionRow, it's a misplaced guard. Emit PRE0015 and skip it.
-                // TODO(allow-list): remove PRE0015 from allow-list after Slice 0 ships
                 if (meta.Kind == ConstructKind.TransitionRow
                     && i > 0 && !disambConsumed
                     && Peek().Kind == TokenKind.When)
@@ -393,7 +392,6 @@ public static partial class Parser
             }
 
             // ── Guard gates: post-slot rejection for constructs that forbid guards ──
-            // TODO(allow-list): remove PRE0013 from allow-list after Slice 0 ships
             if (Peek().Kind == TokenKind.When)
             {
                 if (meta.Kind == ConstructKind.OmitDeclaration)

@@ -1,5 +1,8 @@
 # Pipeline Audit Fix Plan
 
+> **Promoted to:** [`CONTRIBUTING.md`](../../../CONTRIBUTING.md) § Build & Test → "Release-Only Builds (Non-Negotiable)"  
+> **Status:** Promoted 2026-05-24 — Release-only build mandate, `Debug.Assert` prohibition, and D26 diagnostic-emission corollary lifted to CONTRIBUTING.md. The 7 specific Debug.Assert conversion sites are historical execution record. This file is preserved for historical reference. Do not edit.
+
 **Status:** ✅ All 7 fixes implemented  
 **Implemented by:** George  
 **Tests:** 4,598/4,598 passing

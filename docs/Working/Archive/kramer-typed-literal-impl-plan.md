@@ -1,5 +1,8 @@
 # Implementation Plan: Typed Literal Autocomplete
 
+> **Promoted to:** [`docs/tooling/language-server.md`](../../tooling/language-server.md) § 7.3 → "Typed-Literal Completion (Quoted Scalar Surface)" (paired with Elaine UX spec)  
+> **Status:** Promoted 2026-05-24 — implementation-architecture decisions (insert/replace edit semantics, qualifier-aware hard filter, slot-sensitive trigger dispatch) lifted to canonical. Per-slice implementation plan (5 slices) is historical execution record. This file is preserved for historical reference. Do not edit.
+
 **For:** Kramer
 **Reviewed by:** Frank (Architect)
 **UX Spec:** `docs/Working/elaine-typed-literal-autocomplete-ux.md`

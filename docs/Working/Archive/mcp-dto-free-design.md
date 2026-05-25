@@ -1,5 +1,8 @@
 # MCP DTO-Free Design
 
+> **Promoted to:** [`docs/tooling/mcp.md`](../../tooling/mcp.md) § 5A Design Rationale (markdown-for-catalogs choice, 4 alternatives evaluated with rejection rationale, 4 locked architectural constraints)  
+> **Status:** Promoted 2026-05-24 — durable design rationale + locked constraints lifted to canonical. Per-tool projection breakdown and per-phase implementation plan are historical execution record. This file is preserved for historical reference. Do not edit.
+
 **Owner:** Frank (Lead)
 **Status:** Approved for implementation
 **Last Updated:** 2026-05-12

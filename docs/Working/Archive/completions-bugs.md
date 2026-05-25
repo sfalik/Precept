@@ -1,5 +1,11 @@
 # Typed Literal Completions — Bug Tracker
 
+> **Promoted to:**  
+> - [`docs/tooling/language-server.md`](../../tooling/language-server.md) § 7.3 → "Qualifier-Site Resolution (Architectural Rule)" — qualifier-site-before-expression-site resolver, real-vocabulary regression-test rule  
+> - [`docs/compiler/type-checker.md`](../../compiler/type-checker.md) § Typed Records — `TypedFieldRef.DeclaredQualifiers` and `TypedArgRef.DeclaredQualifiers` propagation shape correction  
+>  
+> **Status:** Promoted 2026-05-24 — architectural rules lifted to canonical (qualifier-site coercion ban, `DeclaredQualifiers` propagation contract, weak-assertion regression-test critique). Per-bug root-cause and per-bug fix detail is historical execution record. This file is preserved for historical reference. Do not edit.
+
 **Feature:** Typed literal autocomplete (Kramer's implementation, `be2afdde`)  
 **Spec:** `docs/Working/elaine-typed-literal-autocomplete-ux.md`  
 **Prior review:** Frank-6 — spec compliance BLOCKED (F1, F2)  

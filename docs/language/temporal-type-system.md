@@ -6,7 +6,7 @@
 
 | Property | Value |
 |---|---|
-| Doc maturity | Draft |
+| Doc maturity | Full |
 | Implementation state | Implemented in `src/Precept/Language/Time/` and wired into typed-constant validation |
 | Grounding | `docs/language/precept-language-spec.md`; vision archived at `docs/archive/language-design/precept-language-vision.md` § Type System |
 | Prototype | `docs/TemporalTypeSystemDesign.md` on `research/nodatime-type-alignment` branch (PR #114) |
@@ -122,6 +122,10 @@ Add eight temporal types to the Precept DSL — `date`, `time`, `instant`, `dura
 - **Static quantities:** `'30 days'`, `'72 hours'`, `'12 months'` — value + unit name inside `'...'`
 - **Interpolated quantities:** `'{GraceDays} days'`, `'{X + 5} hours'` — `{expr}` interpolation inside `'...'`
 - **Combined quantities:** `'2 years + 6 months + 15 days'` — `+` combination inside `'...'`
+
+The set of valid interpolated shapes for `duration` and `period` is a closed type grammar: single-component (`H[magnitude] T(' ') T(temporal-unit)` and `H[magnitude] T(' ') H[unit]`) and compound forms (`H[magnitude₁] T(' ') T(tu₁) T(' + ') H[magnitude₂] T(' ') T(tu₂)` extending to N components). **Unit holes are not supported inside compound forms** — each compound component must name its unit literally. `'{n} years + {m} months'` is valid; `'{n} {u₁} + {m} {u₂}'` is not. Rationale: `+` semantics depend on knowing which units are being combined; dynamic unit names would require runtime reassembly of the quantity structure. For the per-type grammar tables and the slot-classification algorithm, see [`docs/compiler/literal-system.md`](../compiler/literal-system.md) § Type-grammar slot classification.
+
+**Temporal magnitudes must resolve to `integer`** (`'0.5 days'` is a compile error). `decimal` and `number` are rejected in temporal magnitude slots. This restriction is per-domain — non-temporal quantity domains may support non-integer magnitudes if their backing types accept them.
 
 **Formatted temporal constants** use the single-quoted `'...'` delimiter — the typed constant delimiter — with type determined by expression context. Temporal types are the first inhabitants of this mechanism; the delimiter is not temporal-specific:
 - `'2026-06-01'` (date), `'14:30:00'` (time), `'2026-04-13T14:30:00Z'` (instant), `'2026-04-13T09:00:00'` (datetime), `'2026-04-13T14:30:00[America/New_York]'` (zoneddatetime), `'America/New_York'` (timezone)

@@ -1,4 +1,8 @@
 # Catalog Compliance Audit — Pipeline Stages
+
+> **Promoted to:** [`docs/language/catalog-system.md`](../../language/catalog-system.md) § Architectural Violation Patterns  
+> **Status:** Promoted 2026-05-24 — Pattern A-H taxonomy lifted to canonical catalog-system.md as durable reviewer vocabulary. The per-stage violation inventory, Missing Catalog Fields master list, and BUG-001..054 linkage remain here as historical record (all listed BUGs are fixed via toolchain-plan Slices 1-13). This file is preserved for historical reference. Do not edit.
+
 **Date:** 2026-05-09
 **Auditor:** Frank
 **Scope:** All compiler pipeline stages in `src/Precept/`

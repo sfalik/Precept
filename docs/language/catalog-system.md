@@ -7,8 +7,10 @@
 | Property | Value |
 |---|---|
 | Doc maturity | Full |
-| Implementation state | Implemented — all 14 catalogs in `src/Precept/`; team review complete (2026-04-25) |
+| Implementation state | Implemented — all 15 catalogs in `src/Precept/`; team review complete (2026-04-25) |
 | Related | `docs/compiler/diagnostic-system.md` · `docs/runtime/fault-system.md` · `docs/compiler-and-runtime-design.md` |
+
+> **Catalog count convention (15 total).** Twelve catalogs describe what the language IS (Tokens, Types, Functions, Operators, Operations, Modifiers, Actions, Constructs, ExpressionForms, Constraints, ProofRequirements, Outcomes). Two describe how it reports failures (Diagnostics, Faults). One is tooling-adjacent: **SemanticTokenTypes**, which carries visual classification metadata consumed by the TextMate grammar generator and the LSP semantic-tokens handler. Some readers count only the language-surface 12+2 = 14; others include the tooling-adjacent SemanticTokenTypes for 15. This document uses 15 throughout. The Slice-10 architectural decision (`docs/Working/Archive/language-server-implementation-plan.md:641, 645`) treats SemanticTokenTypes as a first-class catalog rather than a hardcoded TokenMeta → scope mapping.
 
 > [!IMPORTANT]
 > **Non-Negotiable Rules — Read Before Implementing**
@@ -87,30 +89,29 @@
   - [ValueModifierMeta.ProofSatisfactions](#valuemodifiermetaproofsatisfactions)
   - [ConstructMeta.ModelContribution (Candidate)](#constructmetamodelcontribution-candidate)
   - [FieldDescriptor.AccessModes](#fielddescriptoraccessmodes)
-  - [FaultCode.AmbiguousDispatch](#faultcodeambiguousdispatch)
-  - [Catalog documentation strings (HoverDescription / SnippetTemplate)](#catalog-documentation-strings-hoverdescription--snippettemplate)
+  - [Catalog documentation strings (HoverDescription) — CC#19](#catalog-documentation-strings-hoverdescription--cc19)
 - [Cross-References](#cross-references)
 
 ## Overview
 
-The catalog system is the **authoritative machine-readable definition of the Precept language.** Fourteen catalogs — twelve describing what the language IS, two describing how it reports failures — form a closed, compiler-enforced registry. This document defines the catalog pattern, the fourteen-catalog inventory, their shapes, cross-catalog derivation relationships, and future opportunities.
+The catalog system is the **authoritative machine-readable definition of the Precept language.** Fifteen catalogs — twelve describing what the language IS, two describing how it reports failures, and one tooling-adjacent (SemanticTokenTypes for visual classification) — form a closed, compiler-enforced registry. This document defines the catalog pattern, the fifteen-catalog inventory, their shapes, cross-catalog derivation relationships, and future opportunities. (See the Status note above on the 14-vs-15 convention.)
 
 ## Vision: Metadata for the Entire Language
 
-Every aspect of Precept — its keywords, types, functions, operators, operations, modifiers, actions, grammar forms, expression forms, constraints, proof requirements, outcome forms, diagnostics, and faults — is defined as structured metadata in a static, compiler-enforced catalog. Fourteen catalogs cover the complete language surface. Their union IS the language specification in machine-readable form.
+Every aspect of Precept — its keywords, types, functions, operators, operations, modifiers, actions, grammar forms, expression forms, constraints, proof requirements, outcome forms, diagnostics, faults, and visual classification — is defined as structured metadata in a static, compiler-enforced catalog. Fifteen catalogs cover the complete language surface (twelve language-definition + two failure-mode + one tooling-adjacent). Their union IS the language specification in machine-readable form.
 
 Every consumer reads from these catalogs:
 
 | Consumer | What it reads |
 |----------|---------------|
 | MCP `precept_language` | All keywords, types, operators, operations, functions, constraints, grammar forms, outcome forms |
-| TextMate grammar | Token keyword alternations, type name alternations, construct slot patterns |
+| TextMate grammar | Token keyword alternations, type name alternations, construct slot patterns, `SemanticTokenTypeMeta.TextMateScope` |
 | LS completions | Types, functions, modifiers, actions, outcome forms — context-dependent |
 | LS hover | Type documentation, function signatures, operator descriptions, outcome descriptions |
-| LS semantic tokens | Token categories |
+| LS semantic tokens | `TokenMeta.VisualCategory` → `SemanticTokenTypeMeta.CustomType` |
 | Type checker | Modifier applicability, function signatures, operation legality |
 | Parser (outcome dispatch) | `Outcomes.ByLeadingToken`, `OutcomeMeta.ArgumentKind` |
-| AI grounding | All 14 catalogs — complete language knowledge |
+| AI grounding | All 15 catalogs — complete language knowledge |
 | Reference docs | All 12 language definition catalogs |
 
 No consumer maintains its own parallel copy. Adding a language feature to an enum is the single atomic act that propagates it to every surface. The compiler refuses to build if any member is missing metadata.
@@ -121,7 +122,7 @@ No consumer maintains its own parallel copy. Adding a language feature to an enu
 
 The test: **if I enumerated every catalog's `All` property, would I have a complete description of Precept?** The catalogs needed are those whose union covers the entire language surface.
 
-Fourteen catalogs in two groups.
+Fifteen catalogs in three groups (12 language-definition + 2 failure-mode + 1 tooling-adjacent).
 
 **Language Definition (what the language IS):**
 
@@ -137,7 +138,7 @@ Fourteen catalogs in two groups.
 | 8 | **Constructs** | Grammar forms / declaration shapes |
 | 9 | **ExpressionForms** | Expression grammar forms — expression node kinds (literal, identifier, binary op, function call, quantifier, CI function call, etc.) |
 | 10 | **Constraints** | Constraint declaration forms — invariant, state-anchored, event precondition (DU as identity) |
-| 11 | **ProofRequirements** | Proof obligation kinds — numeric, presence, dimension, modifier, qualifier compatibility (DU as identity) |
+| 11 | **ProofRequirements** | Proof obligation kinds — 10 members (numeric, presence, dimension, modifier, qualifier compatibility, qualifier chain, interval / length / count containment, key presence) — DU as identity; see § 11 ProofRequirements for the full inventory |
 | 12 | **Outcomes** | Transition-row outcome forms — transition, no transition, reject (closed 3-member vocabulary) |
 
 **Failure Modes (how it tells you what's wrong):**
@@ -147,7 +148,13 @@ Fourteen catalogs in two groups.
 | 13 | **Diagnostics** | Compile-time rules |
 | 14 | **Faults** | Runtime failure modes |
 
-If a fifteenth aspect of the language emerges that isn't covered by these fourteen, it needs a catalog. The system is complete when the catalogs are.
+**Tooling-Adjacent (visual classification):**
+
+| # | Catalog | What it covers |
+|---|---------|----------------|
+| 15 | **SemanticTokenTypes** | LSP semantic-token custom types and TextMate scopes for visual classification — the single-axis bridge `TokenMeta.VisualCategory → SemanticTokenTypeMeta` that powers both the TextMate grammar generator and the LSP semantic-tokens handler |
+
+If a sixteenth aspect of the language emerges that isn't covered by these fifteen, it needs a catalog. The system is complete when the catalogs are.
 
 ### Enums that remain bare
 
@@ -178,7 +185,7 @@ This inverts the traditional compiler model:
 | What tests verify | Implementation behavior | Metadata completeness and correctness |
 | What consumers read | Their own parallel copies | The single source of truth |
 
-The thirteen catalogs are expressions of this principle — not the principle itself. The principle is: **if something is domain knowledge, it is metadata; if it is metadata, it has a declared shape; if shapes vary by kind, the shape is a discriminated union.** Pipeline stages, tooling, and consumers derive from the metadata — they never maintain parallel copies or encode domain knowledge in their own logic.
+The fifteen catalogs are expressions of this principle — not the principle itself. The principle is: **if something is domain knowledge, it is metadata; if it is metadata, it has a declared shape; if shapes vary by kind, the shape is a discriminated union.** Pipeline stages, tooling, and consumers derive from the metadata — they never maintain parallel copies or encode domain knowledge in their own logic.
 
 **External reference data is distinct from catalogs.** ISO 4217 and UCUM are authoritative third-party data sources that Precept validates against, but they are not themselves part of the Precept language specification. They ship as embedded XML resources with lazy loaders because the data belongs to the outside world. The test is: *is this part of a complete description of Precept?* `TypeMeta` for `currency` is Precept. The 159 currently admitted currency codes are not.
 
@@ -221,13 +228,32 @@ The exhaustive switch is the enforcement — the C# compiler refuses to build if
 
 ### Derive, never duplicate
 
-The thirteen catalogs cover vocabulary, types, functions, operators, operations, modifiers, actions, grammar constructs, expression forms, constraints, proof requirements, compile-time rules, and runtime failure modes. Their union is the language. Every downstream artifact — grammar, completions, hover, MCP output, documentation — derives from catalog metadata. No consumer maintains a parallel copy. Adding a language feature to an enum is the single atomic act that propagates it to every surface.
+The fifteen catalogs cover vocabulary, types, functions, operators, operations, modifiers, actions, grammar constructs, expression forms, constraints, proof requirements, outcome forms, compile-time rules, runtime failure modes, and visual classification. Their union is the language. Every downstream artifact — grammar, completions, hover, MCP output, documentation — derives from catalog metadata. No consumer maintains a parallel copy. Adding a language feature to an enum is the single atomic act that propagates it to every surface.
+
+### Architectural Violation Patterns
+
+Pipeline-stage code that violates the catalog-driven contract reliably falls into one of eight recurring shapes. Naming them gives reviewers a shared vocabulary for spotting drift and gives authors a checklist to consult before writing pipeline code that "looks fine but answers a language question locally."
+
+| Pattern | Symptom | Catalog remediation |
+|---|---|---|
+| **A — Hardcoded token allowlist** | A method whitelists specific `TokenKind` values when deciding whether to start parsing an expression, modifier value, or message body. | Derive the allowlist from catalog metadata such as `ExpressionStartTokens`, `TokenMeta.IsMessagePosition`, or per-construct slot start sets. |
+| **B — Enum-identity switch on `*Kind` to dispatch per-member behavior** | `kind switch { FooKind.Bar => …, FooKind.Baz => … }` where each arm exists "because the language says so." Per-member behavior leaks from metadata into the consumer. | Move the behavior onto the catalog's meta record; consumer becomes a generic walker. (Switching on a DU **subtype** remains correct — the subtype IS the metadata shape.) |
+| **C — Bypassed metadata shape** | A specialized path parses or validates a construct using a stripped-down grammar that ignores the catalog's declared shape (e.g., event-argument modifiers skipping `ValueModifierMeta.HasValue`). | Reuse the shared metadata-driven path. Specializations of grammar are catalog gaps; encode them on the meta record. |
+| **D — Hardcoded language fact** | An operator-implication table, type-default table, collection-suffix table, or operator-folding table lives in C# code. The next reader has to discover the table. | Promote to catalog metadata (`OperatorMeta.InverseComparison`, `TypeMeta.AbstractDefaultValue`, `TypeMeta.CollectionSyntax`, etc.). |
+| **E — Sentinel-encoded semantics** | A wildcard or broadcast target is carried as `null`, `"any"`, or a magic string instead of a typed metadata field. Consumers re-derive its meaning by literal comparison. | Add a typed metadata field (`TokenMeta.IsStateWildcard`, `FieldTargetKind`, broadcast policy on transition rows). The sentinel disappears. |
+| **F — Proof-engine local knowledge** | Proof discharge, diagnostic mapping, or guard reasoning encodes operator/accessor/requirement semantics in handwritten switches. | Add proof metadata to the relevant catalog (`ProofRequirementMeta.FailureDiagnostic`, `OperatorMeta.SatisfactionCovers`, accessor-level `LogicalRole`). The discharge engine becomes generic. |
+| **G — Reserved** | (Reserved — no representative violations in current audit; kept for taxonomy stability.) | — |
+| **H — Out-of-band classification axis** | A consumer maintains a side-channel taxonomy (`if mod == X || mod == Y` checks for "initial-ish" modifiers, paired-bound modifier checks) rather than reading a metadata flag. | Add the semantic role flag to the catalog (`Modifiers.BoundCounterpart`, `MarksInitial`, `AffectsPresence`, `AffectsWritability`). |
+
+**Reviewer rule.** Any new pipeline-stage code that adds switch statements over `*Kind`, parses tokens by hand-crafted allowlists, or encodes language facts as local C# tables should be referred back to the catalog. If the catalog cannot express the needed metadata, the gap is the actual deliverable — not a workaround in the consumer.
+
+These eight patterns originated in the 2026-05 catalog compliance audit. See [`docs/Working/Archive/catalog-compliance-audit.md`](../Working/Archive/catalog-compliance-audit.md) for the historical violation inventory and bug map.
 
 ---
 
 ## Catalog Schema
 
-Three levels of detail. Use the overview map to see the full 13-catalog topology at a glance, the schema anatomy sections to understand the structurally complex catalogs, and the reference tables for complete member inventories.
+Three levels of detail. Use the overview map to see the full 15-catalog topology at a glance, the schema anatomy sections to understand the structurally complex catalogs, and the reference tables for complete member inventories.
 
 ---
 
@@ -244,8 +270,8 @@ flowchart TB
     end
 
     subgraph L2["② Grammar / structure"]
-        Constructs["Constructs (12)"]
-        ExpressionForms["ExpressionForms (14)"]
+        Constructs["Constructs (15)"]
+        ExpressionForms["ExpressionForms (15)"]
         Outcomes["Outcomes (3)"]
         Constraints["Constraints (5)"]
     end
@@ -253,16 +279,20 @@ flowchart TB
     subgraph L3["③ Semantic / behavior"]
         Types["Types (32)"]
         Operators["Operators (21)"]
-        Operations["Operations (198)"]
+        Operations["Operations (203)"]
         Functions["Functions (23)"]
         Modifiers["Modifiers (29)"]
         Actions["Actions (15)"]
-        ProofRequirements["ProofRequirements (5)"]
+        ProofRequirements["ProofRequirements (10)"]
     end
 
     subgraph L4["④ Failure modes"]
-        Diagnostics["Diagnostics (106)"]
-        Faults["Faults (13)"]
+        Diagnostics["Diagnostics (148)"]
+        Faults["Faults (15)"]
+    end
+
+    subgraph L5["⑤ Tooling-adjacent"]
+        SemanticTokenTypes["SemanticTokenTypes (13)"]
     end
 
     %% Seven catalogs anchor to Tokens
@@ -355,7 +385,8 @@ flowchart LR
 - **Types** and **Constructs** are the twin semantic hubs — Types for runtime behavior, Constructs for grammar schema.
 - **Operations** is the typed-legality hub — it ties Operators + Types + ProofRequirements together.
 - **Diagnostics ↔ Faults** is the only bidirectional pair — each points to the other via `PreventsFault` / `[StaticallyPreventable]`.
-- `ConstructSlotKind` is a helper enum embedded in the Constructs schema surface, not a catalog — it carries no `GetMeta()` or `All`; see Level 3 for its 17-member inventory.
+- **SemanticTokenTypes** is tooling-adjacent — `TokenMeta.VisualCategory` points upward to it, and both the TextMate grammar generator and the LSP semantic-tokens handler read its metadata. See §Catalog Inventory → SemanticTokenTypes for the one-field architecture rationale.
+- `ConstructSlotKind` is a helper enum embedded in the Constructs schema surface, not a catalog — it carries no `GetMeta()` or `All`; see Level 3 for its 20-member inventory and the `SlotVocabulary` enum that pairs with it.
 - In the consumer diagram, each layer box aggregates multiple catalogs. Solid arrows = pipeline stages; dashed arrows = tooling. No consumer maintains its own parallel list — all derive from catalog `All` properties.
 
 ---
@@ -383,10 +414,14 @@ ConstructMeta
 └── SnippetTemplate   : string?                               optional LS completion snippet
 
 ConstructSlot
-├── Kind              : ConstructSlotKind                ◄── 17-member helper enum (see Level 3)
-├── IsRequired        : bool                                  whether slot is mandatory
-├── Description       : string?                               optional hint
-└── TerminationTokens : TokenKind[]?                          optional slot-local Pratt terminators
+├── Kind                 : ConstructSlotKind                ◄── 20-member helper enum (see Level 3)
+├── IsRequired           : bool                                  whether slot is mandatory
+├── Description          : string?                               optional hint
+├── TerminationTokens    : TokenKind[]?                          optional slot-local Pratt terminators
+├── IsList               : bool                                  slot accepts comma- or introducer-separated items
+├── IsChainable          : bool                                  slot accepts an arrow chain (action chains)
+├── ItemIntroducerToken  : TokenKind?                            separator/introducer token between list items
+└── Vocabulary           : SlotVocabulary                        completion vocabulary (13-member enum) for this slot position
 
 DisambiguationEntry
 ├── LeadingToken      : TokenKind                        ◄── anchors to Tokens catalog
@@ -468,7 +503,7 @@ classDiagram
 
 #### Operations — typed-legality hub
 
-`OperationMeta` is a discriminated union with **2 sealed subtypes**. 198 entries cover every legal `(operator, operand type(s)) → result type` combination in the language.
+`OperationMeta` is a discriminated union with **2 sealed subtypes**. 203 entries cover every legal `(operator, operand type(s)) → result type` combination in the language.
 
 ```mermaid
 classDiagram
@@ -494,7 +529,7 @@ classDiagram
         Name : string?
     }
     OperationMeta <|-- UnaryOperationMeta : 9 unary
-    OperationMeta <|-- BinaryOperationMeta : 189 binary
+    OperationMeta <|-- BinaryOperationMeta : 194 binary
     UnaryOperationMeta --> ParameterMeta : Operand
     BinaryOperationMeta --> ParameterMeta : Lhs
     BinaryOperationMeta --> ParameterMeta : Rhs
@@ -508,9 +543,9 @@ classDiagram
 
 #### ProofRequirements — catalog meta vs. obligation instances
 
-Two separate type hierarchies: **catalog meta** (static identity, 5 members in `ProofRequirements.All`) and **obligation instances** (per-use payload, carried inside other catalog entries that declare requirements).
+Two separate type hierarchies: **catalog meta** (static identity, 10 members in `ProofRequirements.All`) and **obligation instances** (per-use payload, carried inside other catalog entries that declare requirements).
 
-**Catalog meta — DU as identity (5 members):**
+**Catalog meta — DU as identity (10 members):**
 
 ```mermaid
 classDiagram
@@ -518,18 +553,31 @@ classDiagram
         <<abstract>>
         Kind : ProofRequirementKind
         Description : string
+        DiagnosticCode : DiagnosticCode?
     }
     class Numeric { }
     class Presence { }
     class Dimension { }
     class Modifier { }
     class QualifierCompatibility { }
+    class QualifierChain { }
+    class IntervalContainment { }
+    class LengthContainment { }
+    class CountContainment { }
+    class KeyPresence { }
     ProofRequirementMeta <|-- Numeric
     ProofRequirementMeta <|-- Presence
     ProofRequirementMeta <|-- Dimension
     ProofRequirementMeta <|-- Modifier
     ProofRequirementMeta <|-- QualifierCompatibility
+    ProofRequirementMeta <|-- QualifierChain
+    ProofRequirementMeta <|-- IntervalContainment
+    ProofRequirementMeta <|-- LengthContainment
+    ProofRequirementMeta <|-- CountContainment
+    ProofRequirementMeta <|-- KeyPresence
 ```
+
+The base record carries a `DiagnosticCode? DiagnosticCode` field (F-LANG-CAT-09) — the catalog-mediated diagnostic emitted when this obligation kind fails. Null only for `Numeric` (1:many mapping; routes to `DivisionByZero`, `SqrtOfNegative`, `UnguardedCollectionAccess`, or `UnguardedCollectionMutation` depending on context) and `KeyPresence` (routes to `PRE0099` or `PRE0101` depending on `RequireAbsence`). Source: `src/Precept/Language/ProofRequirement.cs:204`.
 
 **Obligation instances — DU with per-kind payloads:**
 
@@ -557,18 +605,49 @@ classDiagram
         RightSubject : ProofSubject
         Axis : QualifierAxis
     }
+    class QualifierChainProofRequirement {
+        LeftSubject : ProofSubject
+        LeftAxis : QualifierAxis
+        RightSubject : ProofSubject
+        RightAxis : QualifierAxis
+    }
     class ModifierRequirement {
         Subject : ProofSubject
         Required : ModifierKind
+    }
+    class IntervalContainmentProofRequirement {
+        Subject : ProofSubject
+        TargetField : string
+        DeclaredMin/Max : decimal?
+        AuthoredMin/Max : decimal?
+    }
+    class LengthContainmentProofRequirement {
+        Subject : ProofSubject
+        TargetField : string
+        DeclaredMinLength/MaxLength : int?
+    }
+    class CountContainmentProofRequirement {
+        Subject : ProofSubject
+        TargetField : string
+        DeclaredMinCount/MaxCount : int?
+    }
+    class KeyPresenceProofRequirement {
+        Subject : ProofSubject
+        RequireAbsence : bool
     }
     ProofRequirement <|-- NumericProofRequirement
     ProofRequirement <|-- PresenceProofRequirement
     ProofRequirement <|-- DimensionProofRequirement
     ProofRequirement <|-- QualifierCompatibilityProofRequirement
+    ProofRequirement <|-- QualifierChainProofRequirement
     ProofRequirement <|-- ModifierRequirement
+    ProofRequirement <|-- IntervalContainmentProofRequirement
+    ProofRequirement <|-- LengthContainmentProofRequirement
+    ProofRequirement <|-- CountContainmentProofRequirement
+    ProofRequirement <|-- KeyPresenceProofRequirement
 ```
 
-`QualifierCompatibilityProofRequirement` is the only dual-subject kind — it carries both `LeftSubject` and `RightSubject` independently. Consumers check `meta is ProofRequirementMeta.QualifierCompatibility` to detect dual-subject obligations without a `SubjectArity` field.
+`QualifierCompatibilityProofRequirement` and `QualifierChainProofRequirement` are dual-subject — they carry both `LeftSubject` and `RightSubject` independently. Consumers check `meta is ProofRequirementMeta.QualifierCompatibility` (or `.QualifierChain`) to detect dual-subject obligations without a `SubjectArity` field. Source: `src/Precept/Language/ProofRequirement.cs`.
 
 Obligation instances are declared **inside other catalog entries** (`BinaryOperationMeta.ProofRequirements`, `FunctionOverload.ProofRequirements`, `TypeAccessor.ProofRequirements`, `ActionMeta.ProofRequirements`). The `ProofRequirementMeta` catalog describes obligation *kinds* — the instances are the actual declared obligations attached to specific catalog entries.
 
@@ -579,19 +658,31 @@ Obligation instances are declared **inside other catalog entries** (`BinaryOpera
 The only bidirectional catalog pair. Each catalog points to the other.
 
 ```
-DiagnosticMeta                                   FaultMeta
-─────────────────────────────────────────        ─────────────────────────────────────
-Code            : string                         Code            : string
-Stage           : DiagnosticStage                MessageTemplate : string
-Severity        : Severity                       Severity        : FaultSeverity
-MessageTemplate : string                         RecoveryHint    : string?
-Category        : DiagnosticCategory
-RelatedCodes    : DiagnosticCode[]?
-FixHint         : string?
-PreventsFault   : FaultCode?     ──────────►
-                                                 FaultCode enum members decorated with:
-                             ◄─────────────────  [StaticallyPreventable(DiagnosticCode.X)]
+DiagnosticMeta                                       FaultMeta
+─────────────────────────────────────────────        ─────────────────────────────────────
+Code              : string                           Code            : string
+Stage             : DiagnosticStage                  MessageTemplate : string
+Severity          : Severity                         Severity        : FaultSeverity = Fatal
+MessageTemplate   : string                           RecoveryHint    : string?
+Category          : DiagnosticCategory
+RelatedCodes      : DiagnosticCode[]?
+FixHint           : string?
+PreventsFault     : FaultCode?         ──────────►
+SuggestionSources : SuggestionSource[]?              FaultCode enum members decorated with:
+TriggerCondition  : string?                ◄─────── [StaticallyPreventable(DiagnosticCode.X)]
+RecoverySteps     : string[]?
+ExampleBefore     : string?
+ExampleAfter      : string?
 ```
+
+`DiagnosticMeta` (source: `src/Precept/Language/Diagnostics.cs:23`) carries 13 fields. Beyond the original 8 above, five additional fields drive richer LS / MCP surfacing (F-LANG-CAT-12):
+
+- **`SuggestionSources : SuggestionSource[]?`** — identifies the symbol namespaces the language server searches for "did you mean?" suggestions. The `SuggestionSource` enum has 4 members: `UserFields`, `UserStates`, `UserEvents`, `FunctionCatalog`.
+- **`TriggerCondition : string?`** — human-readable description of the exact source-code condition that triggers this diagnostic. Surfaced by MCP `precept_diagnostic` for AI grounding.
+- **`RecoverySteps : string[]?`** — ordered remediation steps shown to users when the diagnostic fires.
+- **`ExampleBefore : string?`** / **`ExampleAfter : string?`** — minimal source-text examples bracketing the fix. MCP and LS both surface these.
+
+`FaultMeta` (source: `src/Precept/Language/Faults.cs:3`) carries 4 fields: `Code`, `MessageTemplate`, `Severity` (`FaultSeverity.Fatal` for every shipping fault — the field exists so non-fatal severities are representable when the runtime grows them; F-LANG-CAT-14), and a per-fault `RecoveryHint` populated on every member.
 
 **Two enforcement layers close the loop:**
 
@@ -614,18 +705,19 @@ Complete enum counts and key groupings. See source files for the full member lis
 | **Types** | `TypeKind` | 32 | Scalar (6: `string`, `boolean`, `integer`, `decimal`, `number`, `choice`), Temporal (8), Business-domain (7), Collection (3), Special (2: `error`, `stateref`) | `TypeKind.cs` |
 | **Functions** | `FunctionKind` | 23 | Numeric (12), String (8), Temporal (1), CI variants (2) | `FunctionKind.cs` |
 | **Operators** | `OperatorKind` | 21 | Arithmetic (5: `+`, `-`, `*`, `/`, `%`), Comparison (8), Logical (3), Membership (1), Negation (1), CI (2) | `OperatorKind.cs` |
-| **Operations** | `OperationKind` | 198 | Unary (9), Binary: arithmetic, comparison, logical, business-type (money/quantity/price/exchangerate/period), CI string | `OperationKind.cs` |
-| **Modifiers** | `ModifierKind` | 29 | Field (15), State (7), Event (1), Access (4), Anchor (3) — see DU anatomy above | `ModifierKind.cs` |
+| **Operations** | `OperationKind` | 203 | Unary (9), Binary: arithmetic, comparison, logical, business-type (money/quantity/price/exchangerate/period), CI string | `OperationKind.cs` |
+| **Modifiers** | `ModifierKind` | 29 | Field/Value (15), State (7), Event (1), Access (3), Anchor (3) — see DU anatomy above | `ModifierKind.cs` |
 | **Actions** | `ActionKind` | 15 | Scalar (1: `set`), Set collection (3), Queue (4), Stack (3), Universal (1: `clear`), Compound (3: `append`, `insert`, `put`) | `ActionKind.cs` |
-| **Constructs** | `ConstructKind` | 12 | Header (1), Direct declarations (4), State-scoped (5), Event-scoped (2) | `ConstructKind.cs` |
-| **ExpressionForms** | `ExpressionFormKind` | 14 | Atoms (3: literal, identifier, grouped), Composites (5), Invocations (3), Collections (1: list), Quantifier (1), InterpolatedString (1) | `ExpressionForms.cs` |
+| **Constructs** | `ConstructKind` | 15 | Header (1), Direct declarations (4), State-scoped (5), Event-scoped (2), Stateless (1: `EventRow`), Construction rows (2), Transition-reject (1) | `ConstructKind.cs` |
+| **ExpressionForms** | `ExpressionFormKind` | 15 | Atoms (3: literal, identifier, grouped), Composites (5), Invocations (3: function/method/CI-function), Collection (1: list), Quantifier (1), InterpolatedString (1), InterpolatedTypedConstant (1) | `ExpressionForms.cs` |
 | **Outcomes** | `OutcomeKind` | 3 | Transition (1), NoTransition (1), Reject (1) | `Outcomes.cs` |
 | **Constraints** | `ConstraintKind` | 5 | Invariant (1), StateAnchored (3: resident/entry/exit), EventPrecondition (1) | `ConstraintKind.cs` |
-| **ProofRequirements** | `ProofRequirementKind` | 5 | Numeric, Presence, Dimension, Modifier, QualifierCompatibility | `ProofRequirementKind.cs` |
-| **Diagnostics** | `DiagnosticCode` | 106 | By stage — Lex (8), Parse (7+), Type (50+), Graph (2+), Proof (3+) | `DiagnosticCode.cs` |
-| **Faults** | `FaultCode` | 13 | Arithmetic (2), Type/field (4), Collection (2), Qualifier (1), Numeric (2), Dispatch (1), Range (1) | `FaultCode.cs` |
+| **ProofRequirements** | `ProofRequirementKind` | 10 | Numeric, Presence, Dimension, Modifier, QualifierCompatibility, QualifierChain, IntervalContainment, LengthContainment, CountContainment, KeyPresence | `ProofRequirementKind.cs` |
+| **Diagnostics** | `DiagnosticCode` | 148 | By stage — Lex (8), Parse (7+), Type (60+), Graph (2+), Proof (3+); see `DiagnosticCode.cs` for the canonical breakdown | `DiagnosticCode.cs` |
+| **Faults** | `FaultCode` | 15 | Arithmetic (2: `DivisionByZero`, `SqrtOfNegative`), Type/field (4), Collection (2), Qualifier (1), Numeric (2), Range/bound (3: `OutOfRange`, `LengthBoundViolation`, `CountBoundViolation`), `FunctionArityMismatch` + `FunctionArgConstraintViolation` | `FaultCode.cs` |
+| **SemanticTokenTypes** | `SemanticTokenTypeKind` | 13 | Visual classification — name/state/event/field/argument identifiers, semantic vs grammar keywords, operator, type, value, message, comment, typed literal | `SemanticTokenTypes.cs` |
 
-> **`ConstructSlotKind`** (17 members — `IdentifierList`, `TypeExpression`, `ModifierList`, `StateEntryList`, `ArgumentList`, `ComputeExpression`, `GuardClause`, `ActionChain`, `Outcome`, `StateTarget`, `EventTarget`, `EnsureClause`, `BecauseClause`, `AccessModeKeyword`, `FieldTarget`, `RuleExpression`, `InitialMarker`) is a helper enum in the Constructs schema surface, not a catalog. Source: `ConstructSlot.cs`.
+> **`ConstructSlotKind`** (20 members — `IdentifierList`, `TypeExpression`, `ModifierList`, `StateEntryList`, `ArgumentList`, `ComputeExpression`, `GuardClause`, `ActionChain`, `Outcome`, `StateTarget`, `EventTarget`, `EnsureClause`, `BecauseClause`, `AccessModeKeyword`, `FieldTarget`, `RuleExpression`, `InitialMarker`, `RejectClause`, `SuccessOutcome`, `EventEntryList`) is a helper enum in the Constructs schema surface, not a catalog. The paired **`SlotVocabulary`** enum (13 members: `None`, `StateNames`, `EventNames`, `FieldNames`, `ActionVerbs`, `TypeKeywords`, `Modifiers`, `Expression`, `TopLevel`, `OutcomeKeywords`, `AccessModes`, `StateEntryNames`, `RejectReason`) declares what completion vocabulary each slot offers — it drives `CompletionHandler` dispatch once `SlotPositionResolver` ships (Slice 3). Source: `ConstructSlot.cs`.
 
 ---
 
@@ -802,38 +894,37 @@ The trade-off: the switch is more verbose than attributes. At Precept's scale (5
 
 ## Roslyn Enforcement Layer
 
-The exhaustive switch enforces **catalog completeness** — every enum member must have metadata. Two of the eleven catalogs — Diagnostics and Faults — also produce output values (`Diagnostic`, `Fault`) with string fields derived from metadata via `nameof()` in the switch. If code bypasses the `Create()` factory for these types, it introduces arbitrary strings that escape the registry. Roslyn analyzers enforce this **construction discipline** for the catalogs that need it.
+The exhaustive switch (CS8509) enforces catalog completeness — every enum member must have metadata. But the catalog system has obligations the C# compiler cannot see: that every `FaultCode` member is linked to a preventing diagnostic; that the `Diagnostic` and `Fault` output values are constructed via their factory rather than with arbitrary string codes; that `ParamSubject` parameter references stay reference-equal to the owning overload's `ParameterMeta` instances; that every catalog DU base is sealed and every subtype is exhaustively pattern-matched. These cross-file, semantic obligations require analyzers.
 
-### Implemented Rules
+**Why two gates exist.** The analyzer family enforces a single architectural guarantee: **the catalog's declared promises are kept and stay kept.** Adding a new diagnostic code without an emission site silently degrades user experience — the spec advertises a compiler check the compiler does not run. Adding an emission site without a test allows regressions to slip through. **Gate 1** (`PRECEPT0027`) requires every declared `DiagnosticCode` either to have an emission site (direct `Diagnostics.Create(...)` call, catalog-mediated `CIDiagnosticCode`, or proof-engine dispatch) or to be on the allow-list with a tracking comment. **Gate 2** (`PRECEPT0028`) requires every emitted code to be referenced in at least one test file. The allow-list hygiene rules (`PRECEPT0029`, `PRECEPT0030`) prevent the allow-list itself from becoming a quiet dumping ground for unmet obligations — every allow-list entry must be a tracked, time-bounded debt. Together this is the answer to "how do we know the catalog's promises are kept?"
 
-| Rule | Invariant | What it prevents |
-|------|-----------|-----------------|
-| **PRECEPT0001** | `Fail()` must pass a `FaultCode` as its first argument | Unclassified evaluator failure paths |
-| **PRECEPT0002** | Every `FaultCode` member must carry `[StaticallyPreventable(DiagnosticCode.X)]` | A runtime fault with no corresponding compile-time diagnostic |
-| **PRECEPT0003** | `Diagnostic` must be constructed via `Diagnostics.Create()` | Direct `new Diagnostic(...)` with arbitrary string codes |
-| **PRECEPT0004** | `Fault` must be constructed via `Faults.Create()` | Direct `new Fault(...)` with arbitrary string codes |
+**Catalog DU discipline.** A catalog whose meta is a discriminated union (`ModifierMeta`, `OperationMeta`, `ConstraintMeta`, `ProofRequirementMeta`, etc.) only delivers its safety guarantee when the hierarchy is **sealed** (no out-of-tree subclassing can bypass the catalog) and when every consumer pattern-matches the base type **exhaustively** (no `_ => default` wildcard arm that silently swallows a new subtype). `PRECEPT0025` forbids wildcard arms on catalog DU pattern matches, and `PRECEPT0026` verifies every concrete subtype has a corresponding arm. Without these, the DU degrades to "switch-on-enum with an inert subtype hierarchy" — the failure mode the DU exists to prevent.
 
-All four are `DiagnosticSeverity.Error` with `isEnabledByDefault: true`. Combined with `<TreatWarningsAsErrors>`, they are build-breaking.
+### Enforcement Rules — Categorized
 
-### Two-Layer Enforcement Model
+The ten categories below cover every analyzer rule currently shipping in `src/Precept.Analyzers/`. Each row points to the source file(s) for the per-rule mechanics — this table intentionally does not duplicate them.
+
+| # | Category | What it enforces (one line) | Rule prefix(es) | Source file(s) |
+|---|---|---|---|---|
+| 1 | Fault / diagnostic conventions | `Fail(...)` must pass a `FaultCode` first; output values (`Diagnostic`, `Fault`) must go through the `Create()` factory; every `FaultCode` carries `[StaticallyPreventable(DiagnosticCode.X)]`. | `PRECEPT0001`–`PRECEPT0004` | `Precept0001FailMustUseFaultCode.cs`, `Precept0002FaultCodeMustHaveStaticallyPreventable.cs`, `Precept0003DiagnosticMustUseCreate.cs`, `Precept0004FaultMustUseCreate.cs` |
+| 2 | `GetMeta` exhaustiveness | Every catalog's `GetMeta(...)` switch covers every enum member; missing arms are a build error rather than a runtime throw. | `PRECEPT0007` | `Precept0007GetMetaExhaustiveness.cs` |
+| 3 | Per-catalog cross-reference integrity | Every cross-catalog reference is resolvable and consistent — `Types ↔ Tokens`, `Operations ↔ Operators`, `Modifiers ↔ TypeTarget`, `Functions ↔ Types`, `Actions ↔ TypeTarget`, `Constructs ↔ TokenKind`, `Diagnostics ↔ FaultCode`, `Faults ↔ DiagnosticCode`, `Operators ↔ TokenKind`. | `PRECEPT0008`–`PRECEPT0017` (subset) | `Precept0008TypesCrossRef.cs`, `Precept0009OperationsCrossRef.cs`, `Precept0011ModifiersCrossRef.cs`, `Precept0012FunctionsCrossRef.cs`, `Precept0013ActionsCrossRef.cs`, `Precept0014ConstructsCrossRef.cs`, `Precept0015DiagnosticsCrossRef.cs`, `Precept0016FaultsCrossRef.cs`, `Precept0017OperatorsCrossRef.cs` |
+| 4 | Semantic enum zero-slot enforcement | An enum used as a semantic axis must explicitly declare a sentinel zero member (or carry the `[AllowZeroDefault]` annotation), preventing a silently-defaulted zero from becoming an unintended axis value. | `PRECEPT0018` | `Precept0018SemanticEnumZeroSlot.cs` |
+| 5 | Pipeline exhaustiveness (`[HandlesCatalogExhaustively]`) | A class decorated with `[HandlesCatalogExhaustively(typeof(Kind))]` must carry `[HandlesCatalogMember(Kind.X)]` annotations whose union covers every member of the catalog. Used where dispatch is distributed across multiple methods and CS8509 cannot see across the split (canonical example: `ExpressionFormKind` in the Pratt parser). | `PRECEPT0019` | `Precept0019PipelineCoverageExhaustiveness.cs` |
+| 6 | Operator / token integrity | An operator's token reference is unique (no two `OperatorMeta` instances share a token); no `TokenMeta.Text` collisions across the Tokens catalog; operator metadata is declared via the canonical `Operators.cs` factory rather than inline; `OperatorMeta` DU shape invariants are upheld. | `PRECEPT0020`–`PRECEPT0023` | `Precept0020OperatorsTokenCollision.cs`, `Precept0021TokensDuplicateText.cs`, `Precept0022OperatorsInlineToken.cs`, `Precept0023OperatorsDUShapeInvariants.cs` |
+| 7 | Catalog DU discipline (sealed hierarchies + completeness) | Catalog DU base records must be sealed at the family root (no wildcard `_ => default` arms); every concrete subtype must have a pattern-match arm at every consumer site. Drives the DU-as-identity safety guarantee. | `PRECEPT0024`–`PRECEPT0026` | `Precept0024AntiMirroringEnforcement.cs`, `Precept0025CatalogDUWildcard.cs`, `Precept0026CatalogDUCompleteness.cs` |
+| 8 | Diagnostic emission gate (Gate 1) | Every `DiagnosticCode` member must have at least one emission site (direct `Diagnostics.Create(...)`, catalog-mediated `CIDiagnosticCode`, or proof-engine dispatch) — or be allow-listed with a tracking entry. Prevents catalog-declared diagnostics from advertising checks the compiler does not actually run. | `PRECEPT0027` | `Precept0027DiagnosticEmissionCoverage.cs`, `DiagnosticCoverageScanner.cs` |
+| 9 | Diagnostic test gate (Gate 2) | Every emitted `DiagnosticCode` must be referenced in at least one test file. Scoped to codes that pass Gate 1 — codes on the Gate 1 allow-list have no test obligation. Prevents emitted diagnostics from regressing untested. | `PRECEPT0028` | `Precept0028DiagnosticTestCoverage.cs`, `DiagnosticCoverageScanner.cs` |
+| 10 | Allow-list hygiene | Allow-list entries for Gate 1 / Gate 2 must carry tracking metadata (issue link or deadline marker) and must not be stale; analyzer flags entries that have been on the list past their tracking horizon. | `PRECEPT0029`, `PRECEPT0030` | `DiagnosticCoverageAllowLists.cs` |
+
+**Two-layer enforcement model.** The C# compiler enforces metadata completeness through CS8509 on every `GetMeta()` switch (no analyzer needed — the switch IS the catalog). The Roslyn layer enforces everything CS8509 cannot see: cross-file references, factory discipline, distributed dispatch coverage, catalog DU hierarchy invariants, and the catalog-promises-are-kept gates.
 
 | Layer | Mechanism | What it enforces | Scope |
 |-------|-----------|-----------------|-------|
-| **Compiler** | CS8509 (exhaustive switch) | Every enum member has a metadata entry | All 13 catalogs |
-| **Roslyn** | PRECEPT0001–PRECEPT0004 | Output values go through the factory; cross-catalog linkage is present | Diagnostics and Faults only |
+| **Compiler** | CS8509 (exhaustive switch) | Every enum member has a metadata entry in its catalog's `GetMeta()` switch | All 15 catalogs |
+| **Roslyn** | `PRECEPT0001`–`PRECEPT0030` | The 10 categories above | Diagnostics + Faults + cross-catalog references + DU discipline + emission/test gates |
 
-Most catalogs (Tokens, Types, Functions, Operators, Operations, Modifiers, Actions, Constructs, ExpressionForms, Constraints, ProofRequirements) have no output type with metadata-derived strings — `GetMeta()` and `All` are their entire surface. The compiler layer alone covers them. The Roslyn layer is specific to the two failure-mode catalogs whose output types carry strings that must stay within the registry.
-
-### Future Rules
-
-When the Functions and Operators catalogs land, they will likely need dispatch-enforcement rules:
-
-| Planned rule | Invariant |
-|-------------|-----------|
-| Functions: evaluator must dispatch through catalog | Evaluator calls the catalog's evaluation delegate, not a hand-coded function switch |
-| Operators: evaluator must dispatch through OperatorTable | Evaluator calls the dispatch table, not independent type×operator logic |
-| **PRECEPT0005** | `ParamSubject.Parameter` must be reference-equal to a `ParameterMeta` instance declared in the same overload's or operation's parameter list. Prevents stale references after parameter changes. |
-| **PRECEPT0006** | `ParamSubject` must not appear in `TypeAccessor.ProofRequirements` or `ActionMeta.ProofRequirements`. `SelfSubject` must not appear in `BinaryOperationMeta.ProofRequirements`. Subject type must be valid for the containing catalog entry. `DimensionProofRequirement` is only valid on `BinaryOperationMeta.ProofRequirements` — a build error if placed on `FunctionOverload`, `TypeAccessor`, or `ActionMeta`. |
+For per-rule mechanics — error message, severity, code shape, suppression mechanism, allow-list format — read the source files cited above. They are short and self-contained; duplicating their text here is the failure mode the pointer-philosophy rewrite is meant to prevent.
 
 ## Exhaustiveness Enforcement Strategies
 
@@ -905,7 +996,7 @@ Implementation dispatchers (TypeChecker, ProofEngine, Evaluator, etc.) follow th
 
 ### Language Definition Catalogs
 
-These eleven catalogs describe what the Precept language IS.
+These twelve catalogs describe what the Precept language IS.
 
 #### 1. Tokens (✅ Implemented)
 
@@ -971,10 +1062,18 @@ public record TypeMeta(
 );
 ```
 
-> **✅ Resolved (CC#16):** `IsUserFacing` is a first-class catalog field — domain knowledge about whether a type appears in user-facing completion lists. Default `true`. `Error` and `StateRef` are `false`. Derived filtering from `Token == null` is insufficient because `StateRef` has no token but is meaningfully distinct from `Error`.
-> *Resolved: 2026-05-06 — CC#16*
+> **✅ Resolved (CC#16) — user-facing filter is structural, not a field.** No `IsUserFacing` boolean was added to `TypeMeta`. The architectural conclusion: `Token` nullability *is* the user-facing signal. The two internal types (`TypeKind.Error`, `TypeKind.StateRef`) carry `Token: null`; every user-facing type carries a non-null `TokenMeta` reference because every surface type has a surface keyword. Filtering on `meta.Token is not null` therefore picks out exactly the user-facing types — the structural equivalent of an `IsUserFacing` flag without the duplication or drift risk. The canonical filter site is `tools/Precept.LanguageServer/Handlers/CompletionHandler.cs:518` (`Types.All.Where(meta => meta.Token is not null)`). This is the permanent solution — the original CC#16 question is closed.
 
-The `Token` fieldholds a direct reference to the `TokenMeta` instance from the Tokens catalog (nullable for special types like `Error` and `StateRef` that have no surface keyword). Consumers access the keyword text via `typeMeta.Token.Text` — no string duplication, no cross-catalog lookup. The Tokens catalog initializes first; all other catalogs reference its instances.
+The `Token` field holds a direct reference to the `TokenMeta` instance from the Tokens catalog (nullable for special types like `Error` and `StateRef` that have no surface keyword). Consumers access the keyword text via `typeMeta.Token.Text` — no string duplication, no cross-catalog lookup. The Tokens catalog initializes first; all other catalogs reference its instances.
+
+##### TypeMeta — undocumented fields (F-LANG-CAT-21)
+
+The `TypeMeta` constructor (see `src/Precept/Language/Type.cs:207`) carries two additional fields the prose above did not call out:
+
+- **`ImpliedQualifiers : DeclaredQualifierMeta[]?`** — qualifier metadata intrinsically carried by this type regardless of explicit field declarations. Used by the proof engine's `ResolveQualifierOnAxis` after declared qualifiers are exhausted. Example: `duration` carries an implied `TemporalDimension(Time, Baseline)` because duration is intrinsically a time-dimension measurement. Defaults to empty.
+- **`RequiredBoundQualifierAxes : IReadOnlyList<QualifierAxis>?`** — qualifier axes that must be present when `min`/`max` bounds are declared on this type. Empty means bounds do not require qualifier context.
+
+Both fields shipped in the same window as the qualifier-axis additions documented in §Qualifier Propagation; including them here keeps the meta-shape claim complete.
 
 > **Static initialization constraint:** No catalog in Layers ②–④ may reference `Tokens` static members in its own static field initializers or cctor — this is the normal downward direction and is safe. The reverse — `Tokens` referencing a downstream catalog's static members — must use `Lazy<T>` to defer materialization past cctor completion. Currently, `Tokens.KeywordsValidAsMemberName` is the only such reverse reference (deferred via `Lazy<FrozenSet<TokenKind>>`). This constraint exists because .NET's cctor re-entrancy returns `null` for a static field that hasn't been assigned yet on the same thread — a reverse reference in a field initializer will silently receive `null` rather than a valid value.
 
@@ -1066,8 +1165,11 @@ public enum QualifierAxis
     Timezone,
     TemporalDimension,  // period of 'date' / period of 'time' (category)
     TemporalUnit,       // period in 'days' / period in 'months' (specific unit)
+    PriceIn,            // polymorphic 'in' axis for price — value may be currency, UCUM unit, or compound currency/unit
 }
 ```
+
+`QualifierAxis` ships **10 members** (see `src/Precept/Language/Type.cs:39`). `PriceIn` is the polymorphic axis for `price`: the value may be an ISO 4217 currency code, a UCUM unit code, or a compound `currency/unit` expression. The type checker disambiguates at check time via `DeclaredQualifierMeta.CompoundPrice`.
 
 ##### QualifierShape — the in/of qualification system
 
@@ -1076,11 +1178,12 @@ public sealed record QualifierSlot(TokenKind Preposition, QualifierAxis Axis);
 
 public sealed record QualifierShape(
     IReadOnlyList<QualifierSlot> Slots,
-    bool InOfExclusive = false
+    bool InOfExclusive = false,
+    bool OfRequiresCurrencyIn = false
 );
 ```
 
-`QualifierShape` defines which qualifiers a type accepts. Each `QualifierSlot` pairs a preposition keyword (`in`, `of`, `to`) with a semantic axis. `InOfExclusive` declares whether `in` and `of` are mutually exclusive (only one can appear) or can coexist.
+`QualifierShape` defines which qualifiers a type accepts. Each `QualifierSlot` pairs a preposition keyword (`in`, `of`, `to`) with a semantic axis. `InOfExclusive` declares whether `in` and `of` are mutually exclusive (only one can appear) or can coexist. `OfRequiresCurrencyIn` (used by `price`) declares that the `of` qualifier is valid only when `in` resolves to a currency-only value (not a unit or compound price); the type checker enforces this gating at check time. Source: `src/Precept/Language/Type.cs:77`.
 
 Shared shapes in the Types catalog:
 
@@ -1260,17 +1363,31 @@ public sealed record UnaryOperationMeta(
 ) : OperationMeta(Kind, Op, Result, Description);
 
 public sealed record BinaryOperationMeta(
-    OperationKind      Kind,
-    OperatorKind       Op,
-    ParameterMeta      Lhs,
-    ParameterMeta      Rhs,
-    TypeKind           Result,
-    string             Description,
-    bool               BidirectionalLookup = false,
-    QualifierMatch     Match               = QualifierMatch.Any,
-    ProofRequirement[] ProofRequirements   = []
-) : OperationMeta(Kind, Op, Result, Description);
+    OperationKind         Kind,
+    OperatorKind          Op,
+    ParameterMeta         Lhs,
+    ParameterMeta         Rhs,
+    TypeKind              Result,
+    string                Description,
+    bool                  BidirectionalLookup    = false,
+    QualifierMatch        Match                  = QualifierMatch.Any,
+    ProofRequirement[]?   ProofRequirements      = null,
+    bool                  HasCIVariant           = false,
+    DiagnosticCode?       CIDiagnosticCode       = null,
+    ResultQualifierPolicy ResultQualifierPolicy  = ResultQualifierPolicy.None
+) : OperationMeta(Kind, Op, Result, Description)
+{
+    /// <summary>Interval transfer function for compile-time overflow analysis (init-only).</summary>
+    public IntervalTransferFn? IntervalTransfer { get; init; }
+}
 ```
+
+Source: `src/Precept/Language/Operation.cs:76`. Three additional fields beyond the original (F-LANG-CAT-17):
+
+- **`HasCIVariant : bool`** — marks the canonical case-sensitive operation that has a CI-qualified partner; consumed by `ValidateCIEnforcement` during type checking.
+- **`CIDiagnosticCode : DiagnosticCode?`** — catalog-mediated diagnostic for CI-misuse on this operation. The Gate 1 emission scanner treats this as a valid catalog-mediated emission site (see Roslyn Enforcement Layer § Gate 1).
+- **`ResultQualifierPolicy : ResultQualifierPolicy`** — declares how the result's qualifier identity is derived when the operation produces structured qualifier identity beyond raw `QualifierMatch`. Enum (`src/Precept/Language/Operation.cs:28`): `None`, `CompoundUnitCancellation`, `InheritFromQualifiedOperand` (e.g. `money × decimal → money` with same qualifier), `CurrencyConversion` (e.g. `ExchangeRateTimesMoney` — result currency is the rate's ToCurrency), `CompoundDimensionElevation` (e.g. `PriceDivideQuantity` — currency inherited from price, unit dimension elevated from compound-quantity numerator).
+- **`IntervalTransfer : IntervalTransferFn?`** (init-only) — optional delegate transferring numeric intervals through the operation for compile-time overflow analysis. The unary subtype carries an analogous `UnaryIntervalTransferFn?` slot.
 
 `BidirectionalLookup = true` marks operations where `(op, lhs, rhs)` and `(op, rhs, lhs)` are the same entry — the index registers both key orderings so type-checking commutative operations doesn't require two entries (e.g., `money * decimal` and `decimal * money`).
 
@@ -1407,12 +1524,15 @@ The DU also absorbs 4 bare enums (`StateModifierKind`, `AccessMode`, `EnsureAnch
 
 ```csharp
 // ── Base ──────────────────────────────────────────────────
+// Source: src/Precept/Language/Modifier.cs:98
 public abstract record ModifierMeta(
     ModifierKind      Kind,
-    TokenMeta         Token,                       // object reference to Tokens catalog entry
+    TokenMeta         Token,                          // object reference to Tokens catalog entry
     string            Description,
-    ModifierCategory  Category,                    // Structural, Semantic, Severity
-    ModifierKind[]?   MutuallyExclusiveWith = null // at most one of the group may appear on a declaration
+    ModifierCategory  Category,                       // Structural, Semantic, Severity
+    bool              DesugarsToRule        = false, // when true, modifier is syntactic sugar for a rule construct
+                                                      // and is highlighted in the message-position gold color
+    ModifierKind[]?   MutuallyExclusiveWith = null    // at most one of the group may appear on a declaration
 );
 
 // ── Value modifiers (15) ─────────────────────────────────
@@ -1437,8 +1557,7 @@ public sealed record ValueModifierMeta(
 
 /// <summary>
 /// A positive carrier fact that can satisfy a <see cref="ProofRequirement"/>.
-/// DU: <see cref="Numeric"/> carries projection, comparison, and bound; other subtypes are
-/// presence/dimension/modifier/qualifier sentinels.
+/// Source: src/Precept/Language/ProofRequirement.cs:280
 /// </summary>
 public abstract record ProofSatisfaction(ProofRequirementKind RequirementKind)
 {
@@ -1447,10 +1566,31 @@ public abstract record ProofSatisfaction(ProofRequirementKind RequirementKind)
         OperatorKind           Comparison,
         NumericBoundSource     Bound)
         : ProofSatisfaction(ProofRequirementKind.Numeric);
-    public sealed record Presence()              : ProofSatisfaction(ProofRequirementKind.Presence);
-    public sealed record Dimension()             : ProofSatisfaction(ProofRequirementKind.Dimension);
-    public sealed record Modifier()              : ProofSatisfaction(ProofRequirementKind.Modifier);
-    public sealed record QualifierCompatibility(): ProofSatisfaction(ProofRequirementKind.QualifierCompatibility);
+    public sealed record Presence()                       : ProofSatisfaction(ProofRequirementKind.Presence);
+    public sealed record Dimension(DimensionSource Source) : ProofSatisfaction(ProofRequirementKind.Dimension);
+    public sealed record Modifier(ModifierKind RequiredModifier) : ProofSatisfaction(ProofRequirementKind.Modifier);
+    public sealed record QualifierCompatibility(QualifierAxis Axis) : ProofSatisfaction(ProofRequirementKind.QualifierCompatibility);
+    public sealed record IntervalContainment()            : ProofSatisfaction(ProofRequirementKind.IntervalContainment);
+    public sealed record LengthContainment()              : ProofSatisfaction(ProofRequirementKind.LengthContainment);
+    public sealed record CountContainment()               : ProofSatisfaction(ProofRequirementKind.CountContainment);
+    public sealed record KeyPresence(bool Negated)        : ProofSatisfaction(ProofRequirementKind.KeyPresence);
+}
+
+// Supporting DUs (source: same file):
+public abstract record SatisfactionProjection
+{
+    public sealed record SelfValue() : SatisfactionProjection;
+    public sealed record Accessor(string Name) : SatisfactionProjection;
+}
+public abstract record NumericBoundSource
+{
+    public sealed record Constant(decimal Value) : NumericBoundSource;
+    public sealed record DeclarationValue() : NumericBoundSource;
+}
+public abstract record DimensionSource
+{
+    public sealed record Constant(PeriodDimension Value) : DimensionSource;
+    public sealed record DeclaredTemporalDimension() : DimensionSource;
 }
 
 // ── State modifiers (7) ─────────────────────────────────
@@ -1514,25 +1654,19 @@ public enum ModifierCategory { Structural, Semantic, Severity }
 
 ##### GraphAnalysisKind (for EventModifierMeta)
 
-Maps each event modifier to the graph reasoning the compiler must perform:
+Maps each event modifier to the graph reasoning the compiler must perform. `GraphAnalysisKind` is the enum the catalog uses to drive that analysis; only the analysis kinds invoked by **shipping** event modifiers are surfaced today (F-LANG-CAT-19).
 
 ```csharp
 public enum GraphAnalysisKind { None, IncomingEdge, OutcomeType, Reachability, InitialEventCompatibility }
 ```
 
-| Event modifier | GraphAnalysisKind | What the compiler checks |
-|---|---|---|
-| `initial` (event) | `None` | Keyword match only — no graph analysis |
-| `entry` | `IncomingEdge` | Event fires only from the initial state |
-| `advancing` | `OutcomeType` | Every successful outcome is a state transition |
-| `settling` | `OutcomeType` | Every successful outcome is no-transition |
-| `completing` | `OutcomeType` | Transitions only to terminal states |
-| `absorbing` | `OutcomeType` | Event handlers never transition out |
-| `guarded` | `IncomingEdge` | All incoming transitions have guards |
-| `isolated` | `IncomingEdge` | Event fires from exactly one state |
-| `universal` | `Reachability` | Event fires from every reachable non-terminal state |
+**Shipping event modifier (1 — catalog member):**
 
-Future event modifiers are deferred but the `GraphAnalysisKind` enum is shaped to accommodate them.
+| Event modifier | `ModifierKind` | GraphAnalysisKind | What the compiler checks |
+|---|---|---|---|
+| `initial` (event) | `InitialEvent` | `InitialEventCompatibility` | Every transition triggered by the initial event targets the state marked `initial` |
+
+The remaining graph-property event modifiers (`entry`, `advancing`, `settling`, `completing`, `absorbing`, `guarded`, `isolated`, `universal`, and the state-side `sealed after` / `writeonce`) are **deferred to Compiler 1.1** per the graph-analyzer roadmap — they are not catalog members today and are not enforced by the type checker. The `GraphAnalysisKind` enum carries `IncomingEdge`, `OutcomeType`, and `Reachability` as forward-compatible analysis hooks so that adding any of these modifiers as catalog members later is purely additive. See **`docs/language/graph-analyzer-roadmap.md`** for the full deferred-modifier inventory, the graph-property semantics each one would assert, and the sequencing decision (none require runtime support — every modifier is a pure compile-time graph property; metadata exposure on descriptors is additive when they ship).
 
 ##### AnchorScope and AnchorTarget
 
@@ -1580,7 +1714,7 @@ State-machine action verbs — the keywords that appear after `->` in transition
 | Part | Type |
 |------|------|
 | Kind enum | `ActionKind` (15 members) |
-| Meta record | `ActionMeta(Kind, Token, Description, ApplicableTo TypeTarget[], SyntaxShape ActionSyntaxShape, ValueRequired bool, ProofRequirements[], AllowedIn ConstructKind[], HoverDescription?, SnippetTemplate?, PrimaryActionKind ActionKind?)` — `Token` is a `TokenMeta` object reference; see full shape below |
+| Meta record | `ActionMeta(Kind, Token, Description, ApplicableTo TypeTarget[], SyntaxShape ActionSyntaxShape, ValueRequired bool, ProofRequirements[]?, AllowedIn ConstructKind[]?, HoverDescription?, UsageExample?, SnippetTemplate?, PrimaryActionKind ActionKind?, DynamicObligationGenerator?)` — `Token` is a `TokenMeta` object reference; `DynamicObligationGenerator` is an optional context-aware proof-obligation generator (F-LANG-CAT-24); see full shape below |
 | Catalog class | `Actions` — `GetMeta()`, `All` |
 | Output type | None |
 
@@ -1611,23 +1745,27 @@ State-machine action verbs — the keywords that appear after `->` in transition
 ##### ActionMeta — full shape
 
 ```csharp
+// Source: src/Precept/Language/Action.cs:11
 public sealed record ActionMeta(
-    ActionKind         Kind,
-    TokenMeta          Token,             // object reference to Tokens catalog entry
-    string             Description,
-    TypeTarget[]       ApplicableTo      = [],
-    ActionSyntaxShape  SyntaxShape,
-    bool               ValueRequired     = false,
-    ProofRequirement[] ProofRequirements = [],
-    ConstructKind[]    AllowedIn         = [],
-    string?            HoverDescription  = null,
-    string?            UsageExample      = null,
-    string?            SnippetTemplate   = null,
-    ActionKind?        PrimaryActionKind = null   // non-null for secondary-dispatch actions sharing a token
+    ActionKind          Kind,
+    TokenMeta           Token,             // object reference to Tokens catalog entry
+    string              Description,
+    TypeTarget[]        ApplicableTo,
+    ActionSyntaxShape   SyntaxShape,
+    bool                ValueRequired      = false,
+    ProofRequirement[]? ProofRequirements  = null,
+    ConstructKind[]?    AllowedIn          = null,
+    string?             HoverDescription   = null,
+    string?             UsageExample       = null,
+    string?             SnippetTemplate    = null,
+    ActionKind?         PrimaryActionKind  = null,   // non-null for secondary-dispatch actions sharing a token
+    Func<TypedAction, SemanticIndex, ImmutableArray<ProofObligation>>? DynamicObligationGenerator = null
 );
 ```
 
 Consumers access the action keyword text via `action.Token.Text`. `ActionMeta.SyntaxShape` encodes the action's operand form — the parser reads `Actions.GetShapeMeta(SyntaxShape)` to get an `ActionShapeMeta` with the ordered slot list. `PrimaryActionKind` is non-null for secondary-dispatch actions that share a leading token with a primary action (e.g., `AppendBy` shares `append` with `Append`); the parser consults target type to disambiguate. The type checker reads `SyntaxShape` to dispatch the corresponding `TypedAction` subtype, and PreceptBuilder reads it to choose the emitted action-plan opcode.
+
+**`DynamicObligationGenerator`** (F-LANG-CAT-24) is an optional delegate that generates proof obligations whose shape depends on runtime context the catalog cannot statically encode — e.g., interval-containment obligations whose declared bounds depend on the specific target field's `min`/`max` modifiers. Returns an empty array when no dynamic obligations apply. The proof engine invokes it during obligation collection for actions that need per-call-site shape; static `ProofRequirements` cover obligations whose shape is the same at every call site.
 
 ##### ActionShapeMeta, ActionSyntaxSlot, and ActionSlotRole
 
@@ -1681,16 +1819,18 @@ Grammar forms / declaration shapes.
 
 | Part | Type |
 |------|------|
-| Kind enum | `ConstructKind` (12 members) |
+| Kind enum | `ConstructKind` (15 members) |
 | Meta record | `ConstructMeta(Kind, Name, Description, UsageExample, AllowedIn[], Slots[], Entries, RoutingFamily, SnippetTemplate?, ModifierDomain, IsOutlineNode, OutlineSymbolTag?)` — see full shape below |
-| Supporting types | `ConstructSlot(Kind, IsRequired, Description?)`, `ConstructSlotKind` (17-member enum) |
+| Supporting types | `ConstructSlot(Kind, IsRequired, Description?, TerminationTokens?, IsList, IsChainable, ItemIntroducerToken?, Vocabulary)`, `ConstructSlotKind` (20-member enum), `SlotVocabulary` (13-member enum, completion vocabulary per slot) |
 
 | Catalog class | `Constructs` — `GetMeta()`, `All` |
 | Output type | None |
 
 **Members (from `precept-language-spec.md` §2.2 top-level dispatch):**
 
-`PreceptHeader`, `FieldDeclaration`, `StateDeclaration`, `EventDeclaration`, `RuleDeclaration`, `TransitionRow`, `StateEnsure`, `EventEnsure`, `AccessMode`, `OmitDeclaration`, `StateAction`, `EventHandler`
+`PreceptHeader`, `FieldDeclaration`, `StateDeclaration`, `EventDeclaration`, `RuleDeclaration`, `TransitionRow`, `StateEnsure`, `EventEnsure`, `AccessMode`, `OmitDeclaration`, `StateAction`, `EventRow` (stateless precept event row), `ConstructionRow`, `ConstructionRowReject`, `TransitionRowReject`
+
+(Source: `src/Precept/Language/ConstructKind.cs` — 15 members.)
 
 **Consumers:** MCP vocabulary (grammar reference), LS completions (context-sensitive construct suggestions), TextMate grammar (derivable from slot arrays), reference documentation, parser validation tests.
 
@@ -1716,27 +1856,41 @@ public sealed record ConstructMeta(
 
 public sealed record ConstructSlot(
     ConstructSlotKind Kind,
-    bool              IsRequired       = true,
-    string?           Description      = null,
-    TokenKind[]?      TerminationTokens = null
+    bool              IsRequired          = true,
+    string?           Description         = null,
+    TokenKind[]?      TerminationTokens   = null,
+    bool              IsList              = false,
+    bool              IsChainable         = false,
+    TokenKind?        ItemIntroducerToken = null,
+    SlotVocabulary    Vocabulary          = SlotVocabulary.None
 );
 
-// 17-member enum: IdentifierList, TypeExpression, ModifierList, StateEntryList,
-// ArgumentList, ComputeExpression, GuardClause, ActionChain, Outcome,
-// StateTarget, EventTarget, EnsureClause, BecauseClause, AccessModeKeyword,
-// FieldTarget, RuleExpression, InitialMarker
+// 20-member helper enum (source: ConstructSlot.cs):
+//   IdentifierList, TypeExpression, ModifierList, StateEntryList, ArgumentList,
+//   ComputeExpression, GuardClause, ActionChain, Outcome, StateTarget, EventTarget,
+//   EnsureClause, BecauseClause, AccessModeKeyword, FieldTarget, RuleExpression,
+//   InitialMarker, RejectClause, SuccessOutcome, EventEntryList
 public enum ConstructSlotKind { ... }
+
+// 13-member paired enum (source: ConstructSlot.cs) — declares the completion
+// vocabulary a slot offers; drives CompletionHandler dispatch once SlotPositionResolver
+// ships (Slice 3):
+//   None, StateNames, EventNames, FieldNames, ActionVerbs, TypeKeywords, Modifiers,
+//   Expression, TopLevel, OutcomeKeywords, AccessModes, StateEntryNames, RejectReason
+public enum SlotVocabulary { ... }
 ```
 
 `AllowedIn` declares where a construct can appear: empty means the construct is valid at precept body level (top-level declarations); populated means the construct is only valid nested inside one of the listed parent construct kinds. `LeadingToken` identifies the keyword that starts the construct — used by the grammar generator to emit keyword-anchored rules from catalog metadata. LS completions use `AllowedIn` to filter context-sensitive suggestions: "which constructs have the current cursor's parent construct kind in their `AllowedIn`?"
 
+The four additional `ConstructSlot` fields beyond the basic `(Kind, IsRequired, Description, TerminationTokens)` quartet (`IsList`, `IsChainable`, `ItemIntroducerToken`, `Vocabulary`) drive list-recognition (comma-separated state/event entries, field target lists), action-chain recognition (the `->` arrow chain in state actions and event handlers), and per-slot LS completion dispatch. The `Vocabulary` field is the bridge from slot position to the completion candidates the language server offers when the cursor lands in that slot.
+
 #### 9. ExpressionForms (✅ Implemented)
 
-Expression grammar forms — the 14-member taxonomy of what the Pratt parser can construct and what role each form plays (null-denotation atom vs. left-denotation extension).
+Expression grammar forms — the 15-member taxonomy of what the Pratt parser can construct and what role each form plays (null-denotation atom vs. left-denotation extension).
 
 | Part | Type |
 |------|------|
-| Kind enum | `ExpressionFormKind` (14 members) |
+| Kind enum | `ExpressionFormKind` (15 members) |
 | Meta record | `ExpressionFormMeta(Kind, Category, IsLeftDenotation, LeadTokens, HoverDocs, BindingPower?)` |
 | Supporting type | `ExpressionCategory` (4 members: `Atom`, `Composite`, `Invocation`, `Collection`) |
 | Catalog class | `ExpressionForms` — `GetMeta()`, `All` |
@@ -1744,7 +1898,7 @@ Expression grammar forms — the 14-member taxonomy of what the Pratt parser can
 
 **Members:**
 
-`Literal`, `Identifier`, `Grouped` (atoms — null-denotation); `BinaryOperation`, `UnaryOperation`, `MemberAccess`, `Conditional`, `PostfixOperation` (composites); `FunctionCall`, `MethodCall`, `CIFunctionCall` (invocations); `ListLiteral` (collection); `Quantifier`
+`Literal`, `Identifier`, `Grouped` (atoms — null-denotation); `BinaryOperation`, `UnaryOperation`, `MemberAccess`, `Conditional`, `PostfixOperation` (composites); `FunctionCall`, `MethodCall`, `CIFunctionCall` (invocations); `ListLiteral` (collection); `Quantifier`, `InterpolatedString`, `InterpolatedTypedConstant`
 
 **Consumers:** parser coverage enforcement (via `[HandlesCatalogMember]`/`[HandlesCatalogExhaustively]` annotations), Pratt led binding-power lookup for non-operator forms such as member access, MCP vocabulary, reference documentation.
 
@@ -1783,33 +1937,20 @@ The `StateAnchored` intermediate layer allows consumers to check `meta is Constr
 
 #### 11. ProofRequirements (✅ Implemented)
 
-The five proof obligation kinds that catalog entries can declare. Used by the proof engine to determine what must be proven before an operation, function, accessor, or action can execute.
+The **10** proof obligation kinds that catalog entries can declare. Used by the proof engine to determine what must be proven before an operation, function, accessor, or action can execute.
 
 | Part | Type |
 |------|------|
-| Kind enum | `ProofRequirementKind` (5 members: `Numeric`, `Presence`, `Dimension`, `Modifier`, `QualifierCompatibility`) |
-| Meta record | `ProofRequirementMeta` — DU as identity (see below) |
+| Kind enum | `ProofRequirementKind` (10 members: `Numeric`, `Presence`, `Dimension`, `Modifier`, `QualifierCompatibility`, `QualifierChain`, `IntervalContainment`, `LengthContainment`, `CountContainment`, `KeyPresence`) |
+| Meta record | `ProofRequirementMeta(Kind, Description, DiagnosticCode?)` — DU as identity with a `DiagnosticCode?` field that names the catalog-mediated diagnostic for the obligation (null for `Numeric` and `KeyPresence`, which use context-dependent dispatch); see Schema Anatomy § ProofRequirements |
 | Catalog class | `ProofRequirements` — `GetMeta()`, `All` |
-| Instance values | `ProofRequirement` abstract record + 5 sealed subtypes — per-use obligation instances carried in `ActionMeta.ProofRequirements`, `FunctionOverload.ProofRequirements`, etc. |
+| Instance values | `ProofRequirement` abstract record + 10 sealed subtypes (`NumericProofRequirement`, `PresenceProofRequirement`, `DimensionProofRequirement`, `QualifierCompatibilityProofRequirement`, `QualifierChainProofRequirement`, `ModifierRequirement`, `IntervalContainmentProofRequirement`, `LengthContainmentProofRequirement`, `CountContainmentProofRequirement`, `KeyPresenceProofRequirement`) — per-use obligation instances carried in `ActionMeta.ProofRequirements`, `FunctionOverload.ProofRequirements`, `BinaryOperationMeta.ProofRequirements`, `TypeAccessor.ProofRequirements` |
 
-**Meta shape — DU as identity:**
+**Instance vs meta separation:** The `ProofRequirementMeta` DU describes the KIND statically (`ProofRequirements.All` enumerates them). The `ProofRequirement` instance record hierarchy carries per-use data — specific subjects, thresholds, comparisons, target field names, declared bounds — and lives in the catalog entries that declare obligations. The base `ProofRequirement` record carries `Kind` (catalog membership) and `Description`; subtypes carry kind-specific subjects and payloads. See Schema Anatomy § ProofRequirements for the full per-subtype shape table.
 
-```csharp
-public abstract record ProofRequirementMeta(ProofRequirementKind Kind, string Description)
-{
-    public sealed record Numeric()                : ProofRequirementMeta(...);
-    public sealed record Presence()               : ProofRequirementMeta(...);
-    public sealed record Dimension()              : ProofRequirementMeta(...);
-    public sealed record Modifier()               : ProofRequirementMeta(...);
-    public sealed record QualifierCompatibility() : ProofRequirementMeta(...);  // dual-subject
-}
-```
+**Dual-subject kinds:** `QualifierCompatibility` and `QualifierChain` are the only dual-subject kinds — their obligation instances carry both `LeftSubject` and `RightSubject`. Consumers check `meta is ProofRequirementMeta.QualifierCompatibility` (or `.QualifierChain`) rather than inspecting a `SubjectArity` field.
 
-`QualifierCompatibility` is the only dual-subject kind — its obligation instances carry both `LeftSubject` and `RightSubject`. Consumers can check `meta is ProofRequirementMeta.QualifierCompatibility` rather than inspecting a `SubjectArity` field.
-
-**Instance vs meta separation:** The `ProofRequirementMeta` DU describes the KIND statically (`ProofRequirements.All` enumerates them). The `ProofRequirement` instance record hierarchy carries per-use data — specific subjects, thresholds, comparisons — and lives in the catalog entries that declare obligations (`ActionMeta.ProofRequirements`, `FunctionOverload.ProofRequirements`, etc.). The base `ProofRequirement` record carries `Kind` (catalog membership) and `Description`; subtypes carry kind-specific subjects.
-
-**Consumers:** proof engine (obligation dispatch), type checker, Roslyn analyzers (PRECEPT0005/0006), MCP vocabulary.
+**Consumers:** proof engine (obligation dispatch), type checker, Roslyn analyzers (`PRECEPT0005`, `PRECEPT0006`), MCP vocabulary.
 
 #### 12. Outcomes (✅ Implemented)
 
@@ -1845,33 +1986,56 @@ The three transition-row outcome forms — the ways a transition row can conclud
 
 #### 13. Diagnostics (✅ Implemented)
 
-Compile-time rules — every error and warning the pipeline can produce. Currently 78 members across Lex (8), Parse (5), Type (35+16+2), Graph (2), and Proof (3) stages.
+Compile-time rules — every error and warning the pipeline can produce. **148 members** as of the current build, spanning Lex, Parse, Type, Graph, and Proof stages. See `src/Precept/Language/DiagnosticCode.cs` for the canonical list and `docs/compiler/diagnostic-system.md` for the per-code documentation.
 
 | Part | Type |
 |------|------|
-| Kind enum | `DiagnosticCode` |
-| Meta record | `DiagnosticMeta(Code, Stage, Severity, Category, MessageTemplate)` |
-| Supporting enums | `DiagnosticStage { Lex, Parse, Type, Graph, Proof }`, `Severity { Info, Warning, Error }`, `DiagnosticCategory { Naming, TypeSystem, Temporal, BusinessDomain, Structure, Safety, Proof }` |
+| Kind enum | `DiagnosticCode` (148 members) |
+| Meta record | `DiagnosticMeta(Code, Stage, Severity, MessageTemplate, Category, RelatedCodes?, FixHint?, PreventsFault?, SuggestionSources?, TriggerCondition?, RecoverySteps?, ExampleBefore?, ExampleAfter?)` — see the Diagnostics/Faults schema-anatomy section for field-by-field semantics; source `src/Precept/Language/Diagnostics.cs:23` |
+| Supporting enums | `DiagnosticStage { Lex, Parse, Type, Graph, Proof }`, `Severity { Info, Warning, Error }`, `DiagnosticCategory { Naming, TypeSystem, Temporal, BusinessDomain, Structure, Safety, Proof }`, `SuggestionSource { UserFields, UserStates, UserEvents, FunctionCatalog }` (drives "did you mean?" candidate search) |
 | Catalog class | `Diagnostics` — `GetMeta()`, `All`, `Create()` |
-| Output type | `Diagnostic(Severity, Stage, Code, Message, Span)` |
+| Output type | `Diagnostic(Severity, Stage, Code, Message, Span, Args)` — `Args` is an `ImmutableArray<string>` of the message-template arguments; `RelatedSpans : ImmutableArray<RelatedSpan>` is an init-only extra carrying secondary source spans (`RelatedSpan(Span, Message)`) when a diagnostic refers to multiple locations (F-LANG-CAT-25). Source: `src/Precept/Language/Diagnostic.cs:47` |
 
 `DiagnosticCategory` describes *what* a diagnostic is about, complementing `DiagnosticStage` which describes *when* it fires. Used by the language server for filtering, documentation generation, and AI grounding.
 
 #### 14. Faults (✅ Implemented)
 
-Runtime failure modes — every fault the evaluator can produce. Currently 13 members. Each `FaultCode` carries a `[StaticallyPreventable(DiagnosticCode)]` attribute linking it to the compile-time rule that should prevent that site.
+Runtime failure modes — every fault the evaluator can produce. Currently 15 members. Each `FaultCode` carries a `[StaticallyPreventable(DiagnosticCode)]` attribute linking it to the compile-time rule that should prevent that site.
 
 | Part | Type |
 |------|------|
-| Kind enum | `FaultCode` (13 members: `DivisionByZero`, `SqrtOfNegative`, `TypeMismatch`, `UndeclaredField`, `UnexpectedNull`, `InvalidMemberAccess`, `FunctionArityMismatch`, `FunctionArgConstraintViolation`, `CollectionEmptyOnAccess`, `CollectionEmptyOnMutation`, `QualifierMismatch`, `NumericOverflow`, `OutOfRange`) |
-| Meta record | `FaultMeta(Code, MessageTemplate)` |
+| Kind enum | `FaultCode` (15 members — see `src/Precept/Language/FaultCode.cs` for the canonical list; covers division/sqrt safety, type/field resolution, function arity/argument constraints, collection emptiness on access and mutation, qualifier compatibility, numeric overflow, range/length/count bounds) |
+| Meta record | `FaultMeta(Code, MessageTemplate, Severity = FaultSeverity.Fatal, RecoveryHint?)` — `Severity` is `FaultSeverity.Fatal` for every shipping fault (transition aborts, no state changes committed); the field exists to make non-fatal severities representable when the runtime grows them. `RecoveryHint` is a per-fault user-facing remediation string, set on every member (see `src/Precept/Language/Faults.cs`). |
 | Catalog class | `Faults` — `GetMeta()`, `All`, `Create()` |
-| Output type | `Fault(Code, CodeName, Message)` — `CodeName` is the `nameof`-derived stable identity string used for logging and MCP reporting |
-
-> **✅ Resolved (CC#13):** `FaultCode.AmbiguousDispatch` is confirmed. Added to both `FaultCode` enum and `DiagnosticCode` enum with the full `[StaticallyPreventable]` chain. See `docs/compiler/diagnostic-system.md`. The `DiagnosticCode` reference is `AmbiguousDispatch` (not `AmbiguousTransition`). Updated FaultCode member count is 11.
-> *Resolved: 2026-05-06 — CC#13*
+| Output type | `Fault(Code, CodeName, Message, ExpressionContext?, InputValues?)` — `CodeName` is the `nameof`-derived stable identity string used for logging and MCP reporting; `ExpressionContext` (`SourceSpan?`) and `InputValues` (field/arg values at fault time) are optional structured context attached via `with` expressions at evaluator call sites that have the relevant payload available. |
 
 **Consumers:** MCP fire/inspect, runtime outcome reporting.
+
+---
+
+#### 15. SemanticTokenTypes (✅ Implemented — tooling-adjacent)
+
+The visual-classification catalog — the LSP custom semantic-token types and TextMate scopes that drive Precept's editor presentation. The 14th-vs-15th catalog by convention; see the Status note at the top of this document.
+
+| Part | Type |
+|------|------|
+| Kind enum | `SemanticTokenTypeKind` (13 members — `Name`, `KeywordSemantic`, `KeywordGrammar`, `Operator`, `State`, `Event`, `Type`, `Value`, `FieldName`, `ArgName`, `Message`, `Comment`, `TypedLiteral`) |
+| Meta record | `SemanticTokenTypeMeta(Kind, CustomType, TextMateScope, Description, ForegroundHex, Bold, Italic, SupportsConstrainedModifier)` — every member declares both an LSP custom token type string (e.g. `preceptState`) and a TextMate scope (e.g. `entity.name.type.state.precept`) in a single record. |
+| Catalog class | `SemanticTokenTypes` — `GetMeta()`, `All` |
+| Output type | None — consumers read meta directly |
+
+**One-field architecture.** The bridge from the lexical surface to the visual surface is a single field — `TokenMeta.VisualCategory : SemanticTokenTypeKind?` — pointing upward into this catalog. There is no per-`TokenKind` switch in tooling code, no parallel TextMate scope dictionary in the grammar generator, no per-token color hex in the language server. A token's visual identity is `tokens.GetMeta(kind).VisualCategory → SemanticTokenTypes.GetMeta(visualCategory)`; the resulting `SemanticTokenTypeMeta` carries every consumer's view (LSP custom type, TextMate scope, foreground hex, bold/italic, constrained-modifier support) on one record. Adding a visual category means adding one enum member and one switch arm; both downstream consumers pick it up automatically.
+
+**Two-consumer note.** The catalog serves two distinct surfaces with the same metadata:
+
+- **TextMate grammar generator** reads `TextMateScope` (plus `Bold`/`Italic`/`ForegroundHex` for the matching VS Code theme file) to emit scope-anchored patterns. The grammar is static — every member produces grammar output.
+- **LSP semantic-tokens handler** reads `CustomType` (the LSP token-type string) to encode tokens on the wire. The encoding is dynamic — only tokens with a non-null `TokenMeta.VisualCategory` are emitted as semantic tokens.
+
+**Why it's a catalog rather than a hardcoded mapping.** A hardcoded TextMate template + a separate LSP enum drifts. A catalog with one record per visual category keeps the LSP and TextMate views structurally aligned and lets the grammar generator regenerate from one source. Without this catalog the two surfaces would mention the same color/scope/type-string facts independently and would inevitably diverge — exactly the failure mode the catalog system exists to prevent. The Slice-10 design decision (`docs/Working/Archive/language-server-implementation-plan.md:641, 645`) makes this explicit.
+
+**Membership and meta.** Source: `src/Precept/Language/SemanticTokenTypes.cs`. Membership, per-member hex/scope/customType values, and the meta record shape are canonical there — not enumerated here.
+
+**Consumers:** TextMate grammar generator (`tools/Precept.LanguageServer.GrammarGenerator/`), LSP semantic-tokens handler (`tools/Precept.LanguageServer/SemanticTokens/`), VS Code theme file generator, MCP visual-classification surface.
 
 ---
 
@@ -2040,34 +2204,23 @@ Enforced by Roslyn analyzer — see PRECEPT0005/PRECEPT0006.
 
 ## Construct Slot Model
 
-Precept has **no brace-delimited blocks** — all constructs are line-oriented declarations or arrow chains. This means the grammar is structurally simpler than languages with nested block syntax.
+**Precept has no block-structured constructs.** Every declaration is line-oriented — a single line introduced by a leading keyword (`field`, `state`, `on`, `from`, `rule`, …) followed by an ordered sequence of slots. There is no `{ … }` body that nests further declarations. The lone brace-delimited form in the language is **interpolation** — `"… {expr} …"` and `'… {expr} …'` inside string and typed-constant literals — which holds an embedded **expression**, not a nested construct. This is why `ConstructMeta.Slots` is a flat ordered list rather than a tree, and why grammar generation is single-pass.
 
-Each construct is modeled as an ordered sequence of **slots**:
+The construct slot model is the machine-readable form of this fact. Each entry in `Constructs.GetMeta(...)` declares an ordered list of `ConstructSlot` records describing the slots a parser must fill to recognize the construct.
 
-```csharp
-public record ConstructSlot(
-    SlotKind  Kind,
-    string    TextMateScope,
-    string?   Pattern,
-    bool      Required,
-    bool      Repeatable
-);
-```
+**Canonical sources:**
 
-**SlotKind** values: `Keyword`, `Identifier`, `TypeRef`, `Expression`, `Modifier`, `Arrow`, `StateTarget`, `Separator`
+- **`src/Precept/Language/ConstructSlot.cs`** — the canonical record shape, the `ConstructSlotKind` enum (20 members), the paired `SlotVocabulary` enum (13 members) declaring per-slot completion vocabulary, and the optional fields (`IsList`, `IsChainable`, `ItemIntroducerToken`, `Vocabulary`) that govern parser dispatch and LS completion behavior.
+- **`docs/compiler/grammar-generator.md`** — the canonical grammar-generation rules: how slot arrays + Tokens + Types compose into TextMate patterns, how termination tokens (`SlotGuardClause`, `SlotEnsureClause`) constrain Pratt parsing, how `ItemIntroducerToken` drives list-slot recognition.
 
-Example — `FieldDeclaration`:
+**Two-layer visual-classification story** (TextMate vs LSP semantic tokens):
 
-```
-field Identifier ("," Identifier)* as TypeRef Modifier* ("<-" Expr)?
-```
+| Surface | Built from | Generator |
+|---|---|---|
+| **TextMate grammar** | `Tokens × SemanticTokenTypes` — every `TokenMeta.VisualCategory` resolves to a `SemanticTokenTypeMeta.TextMateScope`, and the grammar generator emits one alternation per visual category. | The grammar generator in `tools/Precept.LanguageServer.GrammarGenerator/` (see `docs/compiler/grammar-generator.md`). |
+| **LSP semantic tokens** | `SemanticIndex` + interpolation traversal — the LS walks the resolved semantic index for declaration-position tokens and re-tokenizes interpolated expressions inside `"…{…}…"` and `'…{…}…'` literals. | `tools/Precept.LanguageServer/SemanticTokens/` (see `docs/tooling/language-server.md`). |
 
-Modeled as:
-```
-Keyword("field")  Identifier  Separator(",", repeatable)  Keyword("as")  TypeRef  Modifier(repeatable)  BackArrow("<-", optional)  Expression(optional)
-```
-
-**Why this matters:** Because Precept is entirely line-oriented, construct slot arrays can model 100% of the grammar. Slots reference other catalogs — `TypeRef` slots enumerate `Types.All` for type alternation, `Keyword` slots reference `Tokens`. The entire TextMate grammar is derivable from: Constructs (slot patterns) × Tokens (keyword alternations) × Types (type name alternations).
+The TextMate layer is **catalog-driven and static** — every member of `Tokens` × `SemanticTokenTypes` is enumerable, and the grammar is regenerated whenever either catalog changes. The LSP layer is **AST-driven and dynamic** — it needs the resolved meaning of an identifier (state name vs event name vs field name) and the recursive expression structure inside interpolations, neither of which is statically expressible in TextMate. The two layers cover complementary surfaces of the same visual model; both read `SemanticTokenTypes` for the visual category lookup.
 
 ---
 
@@ -2086,7 +2239,7 @@ Currency codes and measurement units are validated at type-check time, but they 
 
 ## Syntax Reference
 
-The 13 catalogs cover the language's *vocabulary* exhaustively. The language also has *grammar meta-rules* — singular facts about how source text is structured — that consumers need but that have no per-member enum. These are language-level constants, not catalogs.
+The 15 catalogs cover the language's *vocabulary* exhaustively. The language also has *grammar meta-rules* — singular facts about how source text is structured — that consumers need but that have no per-member enum. These are language-level constants, not catalogs.
 
 `SyntaxReference` is a static class with typed properties, part of the same metadata-driven source of truth:
 
@@ -2124,7 +2277,7 @@ The test of completeness: every cell should trace back to a catalog, never to ha
 | Consumer surface | Catalogs read | How |
 |------------------|---------------|-----|
 | **TextMate grammar** | Constructs → Tokens → Types | **Generated** from catalog metadata. Construct slot arrays generate patterns; token keywords generate keyword alternations; type keywords via `Types.All` filtered by `Token.Text`. No hand-maintained alternation lists. Tests verify the generator produces correct output. |
-| **MCP `precept_language`** | All 13 catalogs' `.All` + `SyntaxReference` | Union of all catalog enumerations IS the language spec. MCP tool iterates each and serializes. `SyntaxReference` adds grammar meta-rules. |
+| **MCP `precept_language`** | All 15 catalogs' `.All` + `SyntaxReference` | Union of all catalog enumerations IS the language spec. MCP tool iterates each and serializes. `SyntaxReference` adds grammar meta-rules. |
 | **LS completions** | Tokens + Types + Functions + Modifiers + Actions | **Generated** from catalog metadata. Context-filtered: type position → `Types.All`; expression → `Functions.All`; after type → `Modifiers.All` filtered by `ApplicableTo`; event body → `Actions.All`. No hand-maintained completion lists. |
 | **LS hover** | Types + Functions + Operators + Operations + Constraints | Per-member descriptions from catalog metadata. `ConstraintMeta.Description` populates hover for `rule`/`ensure` declarations. |
 | **LS semantic tokens** | Tokens (via `TokenMeta.Categories`) | Token categories map directly to semantic token types |
@@ -2135,8 +2288,8 @@ The test of completeness: every cell should trace back to a catalog, never to ha
 | **Evaluator dispatch** | Functions + Operations + Constraints | Binary/unary dispatch: builder embeds `static readonly` executor delegates (from `TypeRuntimeMeta.BinaryExecutors`/`UnaryExecutors`) directly in `BinaryOp`/`UnaryOp` opcodes at compile time; evaluator calls `opcode.Executor(l, r)` — no lookup, no switch. `Constraints.GetMeta()` drives constraint activation timing — no hardcoded per-kind activation logic. Function execution dispatch delegate design is pending. |
 | **Typed constant dispatcher** | Types | `TypedConstantValidation.Validate(...)` reads `TypeMeta.ContentValidation` and dispatches on the DU subtype. No parallel validator registry. |
 | **Runtime boundary validation** | Modifiers | `ValueModifierMeta.ApplicableTo` and `HasValue` drive boundary checks. No `switch` on `ModifierKind`. |
-| **Reference documentation** | All 11 language definition catalogs + `SyntaxReference` | **Generated** from catalog metadata. Tables, syntax sections, grammar reference all derived from `All` properties. |
-| **AI grounding** | All 13 catalogs + `SyntaxReference` | Complete, always-accurate language reference — AI grounded on catalog output cannot hallucinate features |
+| **Reference documentation** | All 12 language-definition catalogs + `SyntaxReference` | **Generated** from catalog metadata. Tables, syntax sections, grammar reference all derived from `All` properties. |
+| **AI grounding** | All 15 catalogs + `SyntaxReference` | Complete, always-accurate language reference — AI grounded on catalog output cannot hallucinate features |
 
 No consumer surface maintains its own parallel list. Every fact comes from a catalog `All` property, `GetMeta()` call, or `SyntaxReference` property. TextMate grammar, LS completions, and reference documentation are **generated** from catalogs — not hand-maintained. Tests verify the generators produce correct output.
 
@@ -2343,7 +2496,7 @@ The language server produces editor artifacts from catalog metadata and compiler
 | Completion candidates — modifier position | `Modifiers.All` filtered by `ApplicableTo(constructKind)` |
 | Completion candidates — action verb position | `Actions.All` |
 | Completion candidates — function position | `Functions.All` |
-| Hover text for keywords | `TokenMeta.HoverDescription` |
+| Hover text for keywords | Routed to higher-level catalog: `TypeMeta` / `ValueModifierMeta` / `OperatorMeta` / `ActionMeta` / `FunctionMeta` `.HoverDescription` per CC#19 (`TokenMeta` carries no `HoverDescription` field by design) |
 | Hover text for types | `TypeMeta.HoverDescription` |
 | Hover text for functions | `FunctionMeta.HoverDescription` |
 | TextMate grammar patterns | `TokenMeta.VisualCategory` + `SemanticTokenTypes.GetMeta(...).TextMateScope` (plus grammar-local structural patterns where needed) |
@@ -2435,37 +2588,26 @@ IReadOnlyDictionary<StateDescriptor?, AccessMode> AccessModes
 
 ---
 
-### FaultCode.AmbiguousDispatch
+### Catalog documentation strings (HoverDescription) — CC#19
 
-**Source:** `docs/runtime/evaluator.md` §7 Fire dispatch
+**Source:** `docs/tooling/language-server.md` § 7.4 Hover Design
 
-**Status:** ✅ Resolved (CC#13, 2026-05-06)
+**Status:** ✅ Resolved (CC#19, 2026-05-06) — TokenMeta.HoverDescription deliberately NOT added.
 
-`FaultCode.AmbiguousDispatch` added with `[StaticallyPreventable(DiagnosticCode.AmbiguousDispatch)]`. `DiagnosticCode.AmbiguousDispatch` added (Proof stage, Error severity). Full shape in `docs/compiler/diagnostic-system.md`. The linked `DiagnosticCode` is `AmbiguousDispatch`, not `AmbiguousTransition`.
+`HoverDescription` ships on **5 of the 6 catalogs** that feed LS hover:
 
-**Implementation checklist:**
-- [x] `DiagnosticCode.AmbiguousDispatch` added to `DiagnosticCode` enum
-- [x] `Diagnostics.GetMeta()` switch arm added
-- [x] `FaultCode.AmbiguousDispatch` added with `[StaticallyPreventable]`
-- [x] `Faults.GetMeta()` switch arm added
-- [ ] Evaluator call site `Fail(FaultCode.AmbiguousDispatch)` confirmed in implementation
+| Catalog | `HoverDescription` field | Source |
+|---|---|---|
+| `TypeMeta` | ✅ present (nullable string) | `src/Precept/Language/Type.cs:218` |
+| `FunctionMeta` | ✅ present (nullable string) | `src/Precept/Language/Function.cs:46` |
+| `OperatorMeta` (and `SingleTokenOp`/`MultiTokenOp` subtypes) | ✅ present (nullable string) | `src/Precept/Language/Operator.cs:47, 66, 87` |
+| `ValueModifierMeta` | ✅ present (nullable string) | `src/Precept/Language/Modifier.cs:137` |
+| `ActionMeta` | ✅ present (nullable string) | `src/Precept/Language/Action.cs:20` |
+| `TokenMeta` | ❌ **deliberately absent** | `src/Precept/Language/Token.cs` (no field) |
 
----
+**Structural reason for the asymmetry.** Token-level hover routes through the higher-level catalog that the token resolves to, not through `TokenMeta` directly. When the editor hovers a keyword in source, the language server resolves the token to its semantic referent — a type keyword (`money`) routes to `TypeMeta.HoverDescription`; a modifier keyword (`nonnegative`) routes to `ValueModifierMeta.HoverDescription`; an operator (`==`) routes to `OperatorMeta.HoverDescription`; an action verb (`add`) routes to `ActionMeta.HoverDescription`. There is no token whose hover content is *only* expressible at the token level: every keyword is either a type, a modifier, an operator, an action, or a structural keyword whose role is described by the construct that contains it. Adding a `HoverDescription` field to `TokenMeta` would duplicate the catalog-level descriptions and create a per-token override site whose drift would silently degrade hover quality. The fall-through default (`meta.HoverDescription ?? meta.Description`) at every hover-provider site uses the higher-level catalog's `Description` when no per-member `HoverDescription` is authored — making the route to `TokenMeta`-only content structurally unnecessary.
 
-### Catalog documentation strings (HoverDescription / SnippetTemplate)
-
-**Source:** `docs/tooling/language-server.md` §7.3 Completions, §7.4 Hover
-
-**Status:** ✅ Partially resolved — CC#19 closed `TokenMeta.HoverDescription` (2026-05-06)
-
-`string? HoverDescription` added to `TokenMeta` as a first-class catalog field (see `TokenMeta` shape definition above). `ValueModifierMeta.HoverDescription` already existed. `TypeMeta.HoverDescription`, `FunctionMeta.HoverDescription`, `OperatorMeta.HoverDescription` already existed. The field is consistent across all meta types that feed LS completions and hover.
-
-**Implementation checklist:**
-- [x] `TokenMeta.HoverDescription` added (CC#19)
-- [x] `ValueModifierMeta.HoverDescription` exists
-- [x] `TypeMeta.HoverDescription` exists
-- [ ] Update catalog entries with documentation strings (incremental — implementation task)
-- [ ] Update MCP vocabulary if exposed to AI tooling
+**Hover routing canonical doc:** see `docs/tooling/language-server.md § 7.4 Hover Design` for the full per-token-category dispatch table and interval-hover (proof-engine bound display) behavior. Both `hover-design.md` and `interval-hover-design.md` from the Archive are promoted there.
 
 ---
 
@@ -2474,8 +2616,10 @@ IReadOnlyDictionary<StateDescriptor?, AccessMode> AccessModes
 | Document | Relationship |
 |---|---|
 | [Compiler and Runtime Design](../compiler-and-runtime-design.md) | Architectural grounding — metadata-driven identity established here |
-| [Diagnostic System](../compiler/diagnostic-system.md) | Catalog 12 — `DiagnosticCode` + `DiagnosticMeta` shapes defined there |
-| [Fault System](../runtime/fault-system.md) | Catalog 13 — `FaultCode` + `FaultMeta` shapes; StaticallyPreventable chain |
+| [Diagnostic System](../compiler/diagnostic-system.md) | Catalog 13 — `DiagnosticCode` + `DiagnosticMeta` shapes defined there |
+| [Fault System](../runtime/fault-system.md) | Catalog 14 — `FaultCode` + `FaultMeta` shapes; StaticallyPreventable chain |
+| [Graph Analyzer Roadmap](graph-analyzer-roadmap.md) | Deferred event/state graph-property modifiers — referenced from §6 Modifiers > GraphAnalysisKind |
+| [Language Server](../tooling/language-server.md) | § 7.4 Hover Design — token-level hover routing (referenced from §Open Questions > CC#19) |
 | [Language Spec](precept-language-spec.md) | Consumers of catalog metadata for each pipeline stage |
 | [Primitive Types](primitive-types.md) | `Types` catalog is the machine-readable version of primitive type rules |
 

@@ -1,5 +1,9 @@
 # Frank audit: catalog-driven obligation generation
 
+> **Promoted to:** [`docs/compiler/proof-engine.md`](../../compiler/proof-engine.md) § Obligation Generation Contract (4-rule architectural contract — derive emission from modifier metadata, emit for all declared constraints, per-family integration tests, keep both sides metadata-driven)  
+> **Status:** Promoted 2026-05-24 — architectural contract lifted to canonical. Companion shipped via interval-proof-engine-design.md Slice 7. This file is preserved for historical reference. Do not edit.
+
+
 ## Core fix direction
 
 Replace type hardcoding with a catalog-driven obligation generator based on modifier metadata (`ApplicableTypes`, `ProofSatisfactions`) so any declared constraint on any supported type gets compile-time proof obligations automatically.

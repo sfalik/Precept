@@ -1,5 +1,8 @@
 # Syntax Coloring Fix Design — Deep Analysis
 
+> **Promoted to:** [`docs/tooling/language-server.md`](../../tooling/language-server.md) § 7.2 → "Why Two Passes (Architectural Rationale)" (TM-owns-keyword-classification / LS-owns-identifier-classification rule; visible-shift bug-class root cause; shared-catalog-source contract that prevents drift)  
+> **Status:** Promoted 2026-05-24 — architectural rule + bug-class diagnosis lifted to canonical. Per-mismatch detail tables (RC-1..5) and the prior-attempts timeline are historical record of how the bug class was identified. This file is preserved for historical reference. Do not edit.
+
 > **Author:** Frank (Lead/Architect)
 > **Date:** 2026-05-12
 > **Status:** Design — pending review

@@ -349,7 +349,7 @@ public enum DiagnosticCode
 }
 ```
 
-**145 total diagnostic codes** across the five diagnostic stages. Note: `AmbiguousDispatch` from the original proof-engine design was replaced by richer per-domain diagnostics during TypeChecker implementation.
+**148 total diagnostic codes** across the five diagnostic stages.
 
 The enum **is** the complete set of diagnostic rules. It is a closed set — you cannot produce a diagnostic that is not a member. Adding a member without completing the catalog chain causes a build failure (see the FaultCode → DiagnosticCode Chain section below).
 

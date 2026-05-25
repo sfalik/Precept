@@ -272,6 +272,50 @@ set SlaLimit = CreatedAt + '{SlaHours * 2} hours'
 
 Interpolation inside `'...'` uses the same `{expr}` syntax as strings. The expression is evaluated, the result is substituted into the content, and then the full content is validated against the context-determined type.
 
+#### Type-grammar slot classification
+
+Each typed constant type that supports interpolation defines a **closed set of valid segment-sequence patterns** — a *type grammar*. The interpolation is not a free-form template; it is one of a small enumerated set of shapes per type, and each shape assigns a *slot identity* (`magnitude`, `currency`, `unit`, `from-currency`, `to-currency`, `whole-value`) to each hole.
+
+**Notation.** Patterns are described with `T(...)` for a TextSegment and `H[slot]` for a HoleSegment:
+
+- `T(num)` — text segment containing a numeric literal
+- `T(unit)` — text segment containing a valid unit name
+- `T(curr)` — text segment containing a valid ISO 4217 currency code
+- `T(' ')`, `T('/')`, `T(' + ')` — fixed text separators
+- `H[slot]` — hole assigned the named slot identity on a match
+
+**Example — `money` (four valid forms):**
+
+| Pattern | Example | Slots |
+|---|---|---|
+| `H[whole-value]` | `'{x}'` | whole-value |
+| `H[magnitude] T(' ') T(curr)` | `'{Amt} USD'` | magnitude |
+| `T(num) T(' ') H[currency]` | `'100 {Curr}'` | currency |
+| `H[magnitude] T(' ') H[currency]` | `'{Amt} {Curr}'` | magnitude, currency |
+
+The full per-type grammars (currency, money, quantity, price, exchangerate, duration, period, currency, unitofmeasure, dimension) live in [`business-domain-types.md`](../language/business-domain-types.md) and [`temporal-type-system.md`](../language/temporal-type-system.md). The type checker mirrors the per-type tables 1:1 — adding a new typed-constant type is a coordinated edit of the canonical doc and the matcher.
+
+**Matching algorithm.** The type checker:
+
+1. Knows the target type from context-sensitive resolution.
+2. Extracts the segment sequence from the parsed `InterpolatedTypedConstantExpression` (alternating `TextSegment` and `HoleSegment` nodes).
+3. Matches the segment sequence against the target type's valid-form grammar.
+4. On match, assigns each hole's slot identity.
+5. On no match, emits `InvalidInterpolatedTypedConstantForm` — a *structural* error, distinct from per-hole type mismatch.
+6. For each matched hole, checks the resolved expression type against the slot's compatibility table.
+
+**Why type-grammar matching and not position-text heuristics.** The prior model classified holes by examining surrounding text fragments ("is the next text a unit name?"). That approach fails on:
+
+- **Compound qualifier types** (`price`, `exchangerate`) where `'{Rate} {Curr}/{Unit}'` has three holes whose semantic identities cannot be distinguished by neighbor text alone — both surrounding contexts look "currency-shaped" or "unit-shaped" to a local heuristic.
+- **Compound periods** like `'{n} years + {m} months'`, where two magnitude holes are separated by `+`. No analogue in the position-text model.
+- **Structurally invalid forms** like `'1 {x} kg'`. The old model had no mechanism to *reject* forms that don't match any valid pattern — it would either guess a slot identity or silently accept the form with an unhelpful per-hole error.
+
+**Why not parser-level slot classification.** The parser doesn't know the target type. Slot identity is inherently type-dependent (the same `'{x} {y}'` shape is magnitude+currency for `money` but magnitude+unit for `quantity`). The parser's job is structure (segments); the type checker's job is semantics (slots). Pushing slot classification into the parser would force the parser to consume target-type context that it does not have.
+
+**Why a structural error for no-match.** When no pattern matches, the failure is at the form level (`'1 {x} kg'` has no valid `money`/`quantity`/`price` shape), not at any single hole. A per-hole diagnostic would point the author at a symptom (`{x}` has wrong type) rather than the cause (the interpolated form isn't a valid shape for this type). `InvalidInterpolatedTypedConstantForm` (PRE codes assigned per type) names the cause and lets the diagnostic enumerate the valid shapes for the target type.
+
+**Compositional implication.** Interpolated typed constants now carry per-hole slot identities through the typed AST. Downstream consumers — proof engine qualifier resolution, completion item generation, hover narration — read slot identities directly rather than re-deriving them from text fragments. The slot enum is the contract; text fragments are the input, not the runtime substrate.
+
 ### Quantity unit names
 
 The following unit names are recognized inside typed constants:

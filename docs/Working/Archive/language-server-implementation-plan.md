@@ -1,5 +1,8 @@
 # Language Server Implementation Plan
 
+> **Promoted to:** [`docs/language/catalog-system.md`](../../language/catalog-system.md) § 15. SemanticTokenTypes (Slice 10 architectural decision — first-class catalog rather than hardcoded TokenMeta → scope mapping)  
+> **Status:** Promoted 2026-05-24 — Slice 10's durable architectural rationale lifted to canonical via Workstream B. The remaining slice-by-slice implementation plan (Slices 1–9, 11+) is historical execution record only — completed work. This file is preserved for historical reference. Do not edit.
+
 > **Author:** Frank (Lead Architect) · **Date:** 2026-05-09 · **Branch:** Precept-V2-Radical  
 > **Design source:** `docs/tooling/language-server.md` (Full maturity) · **Upstream research:** `research/architecture/compiler/language-server-integration-survey.md`
 

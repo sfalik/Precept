@@ -1,5 +1,12 @@
 # Qualifier Deferred Items — Implementation Scoping
 
+> **Promoted to:**  
+> - [`docs/compiler/proof-engine.md`](../../compiler/proof-engine.md) § 7.5 (Two Parallel Qualifier-Resolution Subsystems — tri-state model + cross-subsystem alignment invariants)  
+> - [`docs/compiler/proof-engine.md`](../../compiler/proof-engine.md) § 7.6 (`TypedFunctionCall.ResultQualifiers` Propagation Contract)  
+> - [`docs/compiler/type-checker.md`](../../compiler/type-checker.md) § Typed Records (`TypedFunctionCall.ResultQualifiers` shape update)  
+>  
+> **Status:** Promoted 2026-05-24 — durable architectural rationale lifted (parallel-subsystems model, implied-qualifier parity invariant, `QualifierMatch.Same` propagation contract). Slice-by-slice implementation specs (3 items × `### Spec`/`### Tests Required`/`### Scope Decision` subsections) are historical record of shipped work. This file is preserved for historical reference. Do not edit.
+
 **By:** Frank  
 **Date:** 2026-05-15T18:09:58-04:00  
 **Status:** Scoping spec — governs implementation of three items deferred from PRE0141 enforcement work  

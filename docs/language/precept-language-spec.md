@@ -173,24 +173,22 @@ These properties are the reason the language can support tractable compile-time 
 
 ### 0.5 Graph Analyzer Design Contract
 
-> **Design contract.** This section captures the language's requirements for the graph analyzer. §4 is implemented. These requirements define the contract the implementation satisfies.
+> **Design contract.** This section captures the language's shipped graph-analyzer guarantees. §4 is the implementation. Capabilities listed here are the contract the implementation satisfies; capabilities planned for a future graph-analyzer expansion are documented separately in [`graph-analyzer-roadmap.md`](graph-analyzer-roadmap.md).
 
 The compiler must build and reason over the full state transition graph at compile time. The graph is constructed from declared states, events, and transition rows. This is a first-class language requirement, not an optional optimization.
 
-The graph analysis surface must support at least these reasoning capabilities:
+The shipped graph-analysis surface supports these reasoning capabilities:
 
-1. **BFS/DFS reachability from initial.** Required to detect unreachable states (C48) and to define the reachable state set that other modifiers reason over. `initial` provides the root.
-2. **Terminal state identification.** States with no outgoing transition rows. Required to anchor path analysis and to validate `terminal` modifier declarations.
-3. **Dead-end state detection.** Non-terminal states where all outgoing rows reject or produce no-transition. These have transition machinery that never succeeds — likely authoring mistakes (C50).
-4. **Incoming/outgoing edge analysis.** Per-state: which events fire into this state, which events fire out. Required for `guarded` (all incoming transitions have guards), `entry` (event fires only from initial), `isolated` (event fires from exactly one state), `universal` (event fires from every reachable non-terminal state).
-5. **Dominator analysis.** Required for `required`/`milestone` — the modifier asserts that all initial→terminal paths must visit this state. Dominator analysis (O(V+E) via Lengauer-Tarjan) determines whether a state is on every such path.
-6. **Reverse-reachability.** Required for `irreversible` (no path from this state back to any ancestor state in the initial→forward ordering) and `sealed after <State>` (no mutation after the named state is entered — requires reachability analysis from the named state forward).
-7. **Row-partition analysis.** Required for `writeonce` (field set at most once across all reachable transition rows) and `sealed after` (no row reachable after the named state assigns to the field).
-8. **Outcome-type analysis.** Per (state, event) pair: do all rows produce `transition`? `no transition`? All `reject`? Required for `advancing` (every success is a state transition), `settling` (every success is no-transition), `completing` (transitions only to terminal states), `absorbing` (event handlers never transition out), and for existing diagnostics like C51 (reject-only pairs) and C52 (events that never succeed).
+1. **BFS/DFS reachability from initial.** Detects unreachable states (PRE-coded diagnostic) and defines the reachable state set that other modifiers reason over. `initial` provides the root.
+2. **Terminal state identification.** States with no outgoing transition rows. Anchors path analysis and validates `terminal` modifier declarations.
+3. **Dead-end state detection.** Non-terminal states where all outgoing rows reject or produce no-transition — transition machinery that never succeeds. Reported as a structural diagnostic.
+4. **Dominator analysis.** Required for the `required` modifier — the author asserts that all initial→terminal paths must visit this state. Dominator analysis (O(V+E) via Lengauer-Tarjan) confirms or refutes that claim.
+5. **Reverse-reachability.** Required for `irreversible` — there is no path from this state back to any ancestor state in the initial→forward ordering.
+6. **Outcome-classification diagnostics.** Per (state, event) pair the analyzer recognizes reject-only pairs and events whose every row is reject/no-transition, surfacing the relevant structural diagnostics.
 
 **Overapproximation rule.** Structural graph analysis treats all edges as traversable regardless of `when` guards — it overapproximates reachability. This is sound: structural guarantees cannot account for guard-dependent path selection because guard satisfaction depends on runtime data. A modifier that claims "all paths visit this state" means all *structurally declared* paths, not all guard-satisfiable paths. This is the correct tradeoff for compile-time analysis.
 
-**Interaction with existing diagnostics.** The graph analysis that modifiers require is an extension of the analysis the compiler already performs for C48 (unreachable states), C49 (orphaned events), C50 (dead-end states), C51 (reject-only pairs), and C52 (events that never succeed). Modifiers do not replace these diagnostics — they make them stronger by adding author-declared intent that the compiler can cross-check against the graph structure.
+**Forward-looking graph-analysis work.** Additional modifier-driven analyses — `guarded`, `entry`, `isolated`, `universal`, `sealed after`, `writeonce`, `advancing`, `settling`, `completing`, `absorbing` — are deferred to a future graph-analyzer roadmap. They are pure compile-time graph properties (no runtime support required) and can ship additively after the runtime gate opens. See [`graph-analyzer-roadmap.md`](graph-analyzer-roadmap.md) for the deferred set and the analyses each one requires.
 
 ### 0.6 Proof Engine Design Contract
 
@@ -231,6 +229,20 @@ The proof layer is governed by these requirements, which are language-level comm
 6. **Proof attribution is required, not optional.** Every proven range must carry its source attribution — the field constraints, rules, and guards that contributed. Authors must see what the engine proved, what it could not prove, and why. Proof results flow as structured data, not parsed prose — tooling and agents consume the proof model directly, never by parsing diagnostic message text.
 
 7. **Sequential proof flow.** Actions in a chain are sequenced — each subsequent action sees the proof state left by all preceding actions. When a field is reassigned, prior proof facts about that field are invalidated before the new assignment's facts are stored. This is a language semantic that ensures proof reasoning tracks the actual mutation sequence.
+
+#### Implementation status
+
+The proof-engine obligations enumerated above describe the full language-level contract. As of 2026-05-24 the following obligations are **specification-only** — the runtime gate does not depend on them, and the Compiler Readiness Plan (Phase 5) tracks the work to ship each one:
+
+| # | Obligation | Status | Tracking ID |
+|---|---|---|---|
+| 7 | Contradictory rule detection | Specification-only | F-LANG-SPEC-03 (Phase 5) |
+| 8 | Vacuous rule detection | Specification-only | F-LANG-SPEC-04 (Phase 5) |
+| 9 | Dead guard detection (`UnsatisfiableGuard` PRE0082) | Specification-only | F-LANG-SPEC-02 (Phase 5) |
+| 10 | Tautological guard detection | Specification-only | F-LANG-SPEC-05 (Phase 5) |
+| 12 | Sharpened reachability/routing diagnostics from proven-dead guards | Specification-only — depends on #9 + #10 | F-LANG-SPEC-12 (Phase 5) |
+
+All other obligations (numeric intervals, relational reasoning, divisor safety, non-negative obligations, unit-aware comparison, assignment-range impossibility, default-violation enforcement, proof attribution, sequential proof flow) are implemented and exercised by the proof-engine test suite. Authors who depend on the specification-only obligations today must supply the equivalent hand-written constraints (an explicit `rule` or `ensure`) until Phase 5 ships them.
 
 ---
 
@@ -440,11 +452,12 @@ Every token the lexer can produce. Organized by category to match the `TokenKind
 | `Slash` | `/` | Arithmetic |
 | `Percent` | `%` | Arithmetic (modulo) |
 | `Arrow` | `->` | Action chain / outcome separator |
+| `BackArrow` | `<-` | Computed field derivation arrow — structural separator on `field` declarations (not an expression-tree operator) |
 | `CaseInsensitiveEquals` | `~=` | Case-insensitive comparison (string-only) |
 | `CaseInsensitiveNotEquals` | `!~` | Case-insensitive not-equals (string-only) |
 | `Tilde` | `~` | Case-insensitive modifier — collection inner type (`set of ~string`) or scalar field type qualifier (`field Email as ~string`) |
 
-**Scan order for operators:** Multi-character operators must be attempted before their single-character prefixes: `!~` before `!=` before `!` (if ever reintroduced), `~=` before `~`, `->` before `-`, `==` before `=`, `>=` before `>`, `<=` before `<`. The `Tilde` token is always emitted wherever `~` appears. Invalid uses (e.g., `~` before a non-`string` type, `~` before an identifier that is not `startsWith`/`endsWith`) are caught by the parser or type checker, not the lexer.
+**Scan order for operators:** Multi-character operators must be attempted before their single-character prefixes: `!~` before `!=` before `!` (if ever reintroduced), `~=` before `~`, `->` before `-`, `<-` before `<=` and `<`, `==` before `=`, `>=` before `>`, `<=` before `<`. The `Tilde` token is always emitted wherever `~` appears. Invalid uses (e.g., `~` before a non-`string` type, `~` before an identifier that is not `startsWith`/`endsWith`) are caught by the parser or type checker, not the lexer.
 
 **`~startsWith` and `~endsWith`** are not single tokens. They lex as two tokens: `Tilde` followed by the identifier `startsWith` or `endsWith`. The parser recognizes `Tilde` in null-denotation (prefix) position immediately before one of these identifiers as a CI function call. This is distinct from `~=` and `!~`, which are single compound tokens scanned as units. The Tilde token in expression prefix position is only valid before `startsWith`/`endsWith` identifiers. If `Tilde` in expression position is followed by any identifier other than `startsWith` or `endsWith`, the parser emits `ExpectedToken` with `{0}` = `'startsWith or endsWith'`, `{1}` = the actual identifier text, and highlights the `Tilde` + identifier span.
 
@@ -619,18 +632,19 @@ Operators and punctuation are scanned after attempting keyword/identifier matche
 **Scan priority (highest first):**
 
 1. `->` (Arrow)
-2. `~=` (CaseInsensitiveEquals) — before lone `~`
-3. `!~` (CaseInsensitiveNotEquals) — before `!=`
-4. `==` (DoubleEquals)
-5. `!=` (NotEquals)
-6. `>=` (GreaterThanOrEqual)
-7. `<=` (LessThanOrEqual)
-8. `~` (Tilde) — after `~=`, so lone tilde is only reached when `~=` did not match
-9. `=` (Assign)
-10. `>` (GreaterThan)
-11. `<` (LessThan)
-12. `+`, `-`, `*`, `/`, `%` (Arithmetic)
-13. `.`, `,`, `(`, `)`, `[`, `]` (Punctuation)
+2. `<-` (BackArrow) — before `<=` and lone `<`
+3. `~=` (CaseInsensitiveEquals) — before lone `~`
+4. `!~` (CaseInsensitiveNotEquals) — before `!=`
+5. `==` (DoubleEquals)
+6. `!=` (NotEquals)
+7. `>=` (GreaterThanOrEqual)
+8. `<=` (LessThanOrEqual)
+9. `~` (Tilde) — after `~=`, so lone tilde is only reached when `~=` did not match
+10. `=` (Assign)
+11. `>` (GreaterThan)
+12. `<` (LessThan)
+13. `+`, `-`, `*`, `/`, `%` (Arithmetic)
+14. `.`, `,`, `(`, `)`, `[`, `]` (Punctuation)
 
 ### 1.6 Dual-Use Token Disambiguation
 
@@ -773,6 +787,8 @@ The parser always runs to end-of-source. On malformed input it emits diagnostics
 **Non-associative operators:** Comparison operators (`==`, `!=`, etc.) and `contains` are non-associative — chaining (`A == B == C`, `A contains B contains C`) is a parse error. The parser detects when the left operand is already a non-associative binary expression and emits a `NonAssociativeComparison` diagnostic. (Right-binding powers P+1 prevent right-chaining; the explicit left-operand check prevents left-chaining.) **Postfix `is set`/`is not set`** are non-associative — a presence-test result is a `boolean`, not a collection, so chaining is always a type error regardless. At precedence 60 they share a level with `*`/`/`/`%`; the Pratt `nextMinPrec = 61` when parsing a multiplicative right operand ensures `A * B is set` parses as `(A * B) is set`, not `A * (B is set)`.
 
 *Implementation note:* The expression parser uses Pratt parsing (top-down operator precedence). `ParseExpression(int minBp)` parses a complete expression, stopping when it encounters a token whose left-binding power is ≤ `minBp`.
+
+**Structural separators (not expression operators):** `->` (action / outcome separator) and `<-` (computed-field derivation arrow on `field` declarations) are lexed as operator tokens but are not part of expression precedence — they delimit declaration slots and are consumed by the construct walker, never by the Pratt parser. `<-` appears only between a field's modifier list and the computed-expression body (see [§ 2.2 Declaration Grammar](#22-declaration-grammar)).
 
 #### Null-denotation (atoms and prefix)
 
@@ -1301,7 +1317,6 @@ Event args are accessed via dotted notation: `EventName.ArgName`. The type check
 | `~startsWith` | `~string` | `string` | `boolean` | No — CI prefix test; compile error if first arg is not `~string` |
 | `~endsWith` | `~string` | `string` | `boolean` | No — CI suffix test; compile error if first arg is not `~string` |
 | `<` `>` `<=` `>=` | numeric | numeric | `boolean` | Yes — `integer` widens to `decimal` or `number`; `decimal` vs `number` is a type error (see §3.2) |
-| `<` `>` `<=` `>=` | `string` or `~string` | `string` or `~string` | `boolean` | No — ordinal lexicographic; `~string` ordering is ordinal same as `string`; no CI ordering variant |
 | `<` `>` `<=` `>=` | `choice of T` (ordered) | `choice of T` (ordered, same element type, order-preserving subsequence) | `boolean` | No (declaration-position rank) |
 | `and` `or` | `boolean` | `boolean` | `boolean` | No |
 
@@ -1958,6 +1973,41 @@ No special "construction constraint" form is needed. `to <InitialState> ensure` 
 - **`UninitializedCrossFieldReadInInitialAssignment`:** An initial-event assignment reads another required field before that other field's first assignment in the same action chain establishes a value.
 
 **Design rationale:** Construction goes through the full event pipeline because entities must satisfy their constraints from the moment they exist. A parameterless construction path cannot enforce business invariants at intake. By modeling construction as an event, the language reuses all existing machinery — guards can discriminate construction routing, ensures validate args, `reject` can refuse intake, and the caller uses the same pattern matching they use for every event.
+
+**Why `on <Event>` and not `from <InitialState> on <Event>`.** `from State on Event` means "when the entity IS IN this state and this event fires." At construction time, the entity is not yet in any state — it is being brought into existence. The `from` prefix would be misinformation, dressing unconditional genesis as state-dispatched transition. Removing it makes the syntax honest: `on Create -> ...` means "when the act of creation happens, do this."
+
+**Why `transition` is structurally excluded from construction rows.** When construction is structurally terminal, `initial` on both state and event means "origin" — consistent, learnable, single-meaning. If construction could route elsewhere, "initial state" would degrade to "where the dispatch table starts and then immediately leaves." Structural exclusion via grammar is superior to a type-checker rejection diagnostic: you cannot write what the grammar does not express. Authors get a parse error, not a downstream diagnostic, and tooling will not offer `transition` completions in construction context.
+
+**Why the same `EventRow` construct serves stateful construction, stateless construction, and stateless event handlers.** A row that begins with `on <Event>` always means "fire actions when this event is invoked, with no state precondition." Construction is a special case (the entity is not yet in any state); stateless precepts always have this shape. Promoting the row shape to a single construct keeps the grammar smaller and lets the type checker decide *which kind* of row it is from the event's `initial` modifier, rather than the parser inventing parallel construct trees for what is one shape.
+
+**Why `initial` is not renamed to `constructor`.** With structural exclusion in place, `initial state` and `initial event` both mean "origin" — same word, coherent semantics. A rename adds vocabulary without adding clarity; the keyword overload that motivated a rename proposal disappears once `transition` is grammar-excluded from construction rows.
+
+**Why guards on `on <Event>` are allowed.** `on Event when condition -> actions` is semantically coherent. Multiple guarded construction rows provide first-match routing at intake — directly analogous to Swift's `guard … else { return nil }` inside `init?`, but declarative and exhaustive rather than imperative. The earlier "no guards on `on Event`" restriction was a parser simplification with no semantic backing; removing it costs a small bump in `EventRowDeclaration` complexity and unlocks guarded construction.
+
+**Why non-initial events cannot use `on <Event>` form in stateful precepts.** Three independent reasons:
+
+1. **Redundancy.** `from any on Event -> no transition` already expresses state-agnostic handling in stateful precepts.
+2. **Execution-order ambiguity.** Mixing bare `on Event` handlers with `from State on Event` rows in the same precept creates an ambiguous execution model (before? after? instead of?). No resolution rule is obvious.
+3. **Pseudo-lifecycle antipattern.** Bare event handlers that mutate fields without participating in state topology make the lifecycle underdeclared. Stateful precepts derive their guarantees from explicit transitions; side-channel handlers undermine that.
+
+The construction-row exception (`initial` events via `on <Event>`) is justified because no prior state exists to dispatch from — the restriction's rationale does not apply at construction time.
+
+**Cross-language precedent.** Conditional construction is the established norm across surveyed languages. The "constructors shouldn't fail" position is a ghost — a misreading of C++ exception-safety advice that no modern language community holds.
+
+| Language | Mechanism | Precedent for Precept's `reject` |
+|---|---|---|
+| Swift | `init?` / `init throws` | Failable initializer with `guard ... else { return nil }` — closest syntactic analogue to guarded construction rows |
+| Rust | `TryFrom` / `new() -> Result<T,E>` | Fallibility as a type-level property of construction |
+| Haskell/ML | Smart constructors returning `Maybe`/`Either` | The settled functional idiom — construction IS validation |
+| Go | `New*() (*T, error)` | The *only* construction idiom — always conditional |
+| C++ | Throw from constructor (Core Guidelines C.42) | "If you can't establish invariants, throw" |
+| DDD | Evans/Vernon: factory must refuse invalid aggregates | Domain-level mandate, mechanism-agnostic |
+
+Full cross-language survey: see [`research/language/research-conditional-construction.md`](../../research/language/research-conditional-construction.md).
+
+**Precept's contribution over surveyed mechanisms.** The construction decision matrix is *declarative*, *exhaustive*, and *provably complete*. Swift's `init?` is imperative; Rust's `TryFrom` is imperative. Precept's `when` guards + `reject` outcome make the construction decision space inspectable, analyzable, and formally verifiable. `reject` takes a message string (`-> reject "Claims require a positive amount"`), giving it the error-context richness of Swift's `init throws` while retaining the declarative structure of `init?` — so the gap that split Swift's failable construction into two mechanisms does not exist in Precept.
+
+**"Construction must always be possible."** Swift requires every `init?` to have at least one success path (the compiler warns on `init?` that always returns nil). C++ Core Guidelines C.42 says throw when you can't establish invariants — the corollary is that if you can't establish them on any path, the type is broken. Precept's requirement that at least one construction row can produce `Created` (enforced by `AlwaysRejecting` promoted to Error severity for initial events) is the structural version of this universal principle: forced exhaustiveness over construction outcomes.
 
 #### Fire-once guarantee
 
