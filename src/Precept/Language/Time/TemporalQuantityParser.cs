@@ -44,7 +44,7 @@ public static class TemporalQuantityParser
                 sawPeriodUnit = true;
                 if (expectedType == TypeKind.Duration)
                 {
-                    var durationEquiv = CalendarUnitToDuration(unit.Singular, magnitude);
+                    var durationEquiv = unit.ExactDurationFactory?.Invoke(magnitude);
                     if (durationEquiv is null)
                         return TemporalParseResult.Failure(new TemporalDiagnostic("TEMP007",
                             $"'{unit.Plural}' have variable length and cannot be used as a duration — months and years are calendar-relative.",
@@ -89,13 +89,6 @@ public static class TemporalQuantityParser
 
         return TemporalParseResult.Failure(new TemporalDiagnostic("TEMP006", "Temporal quantity did not resolve to a supported value.", null));
     }
-
-    private static Duration? CalendarUnitToDuration(string singularUnit, int magnitude) => singularUnit switch
-    {
-        "day"  => Duration.FromDays(magnitude),
-        "week" => Duration.FromDays(magnitude * 7),
-        _      => null, // month, year — variable length, no exact Duration equivalent
-    };
 
     private static void AddPeriod(PeriodBuilder builder, string singularUnit, int magnitude)
     {
