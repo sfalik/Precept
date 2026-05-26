@@ -139,8 +139,17 @@ public static partial class Parser
                     lastSpan = Advance().Span;
             }
 
+            // Consume trailing `ordered` — uniform across field-scope and collection-inner-scope.
+            // Pulls the modifier into the type reference so accessor-return propagation can carry it.
+            var ordered = false;
+            if (Peek().Kind == TokenKind.Ordered)
+            {
+                ordered = true;
+                lastSpan = Advance().Span;
+            }
+
             var span = SourceSpan.Covering(typeSpan, lastSpan);
-            return new ChoiceTypeReference(choiceMeta, elementType, domain.ToImmutable(), span);
+            return new ChoiceTypeReference(choiceMeta, elementType, domain.ToImmutable(), ordered, span);
         }
 
         private ParsedTypeReference ParseCollectionType(TypeMeta collectionMeta, SourceSpan typeSpan)
@@ -229,6 +238,12 @@ public static partial class Parser
             if (Types.ByToken.TryGetValue(lookupTokenKind, out var typeMeta))
             {
                 var typeToken = Advance();
+
+                if (typeMeta.Kind == TypeKind.Choice)
+                {
+                    return ParseChoiceType(typeMeta, typeToken.Span);
+                }
+
                 var simpleRef = new SimpleTypeReference(typeMeta, typeToken.Span);
                 return TryParseQualifiers(simpleRef, typeMeta);
             }

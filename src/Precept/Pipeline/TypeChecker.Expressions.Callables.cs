@@ -983,14 +983,24 @@ internal static partial class TypeChecker
             return new TypedErrorExpression(expr.Span);
         }
 
-        // PRE0104: Check RequiredTraits — e.g., .min/.max require Orderable element type
+        // PRE0104: Check RequiredTraits — e.g., .min/.max require Orderable element type.
+        // For choice elements, Orderable is per-instance (declared via 'ordered' on the
+        // inner choice), not a static type trait. Discharge from the element-level Ordered
+        // bit when present; fall back to the static traits otherwise.
         if (accessor.RequiredTraits != TypeTrait.None)
         {
             var elementType = GetElementType(receiver, ctx);
             if (elementType is not null)
             {
                 var elementMeta = Types.GetMeta(elementType.Value);
-                if ((elementMeta.Traits & accessor.RequiredTraits) != accessor.RequiredTraits)
+                var staticTraits = elementMeta.Traits;
+                if (elementType.Value == TypeKind.Choice
+                    && GetElementTypeRef(receiver, ctx) is TypedChoiceElement { Ordered: true })
+                {
+                    staticTraits |= TypeTrait.Orderable;
+                }
+
+                if ((staticTraits & accessor.RequiredTraits) != accessor.RequiredTraits)
                 {
                     ctx.Diagnostics.Add(
                         Diagnostics.Create(DiagnosticCode.RequiredTraitViolation, expr.Span,
@@ -1135,6 +1145,22 @@ internal static partial class TypeChecker
         if (receiver is TypedFieldRef fieldRef &&
             ctx.FieldLookup.TryGetValue(fieldRef.FieldName, out var field))
             return field.ElementType?.ResolvedTypeKind;
+
+        return null;
+    }
+
+    /// <summary>
+    /// Returns the richer <see cref="TypedElementType"/> for a collection receiver, preserving
+    /// element-level metadata (qualifiers, choice-ordered bit) that the bare TypeKind drops.
+    /// Used by trait checks where the element's per-instance metadata determines applicability
+    /// (e.g., choice elements satisfy <c>Orderable</c> only when the inner type carries
+    /// <c>ordered</c>).
+    /// </summary>
+    private static TypedElementType? GetElementTypeRef(TypedExpression receiver, CheckContext ctx)
+    {
+        if (receiver is TypedFieldRef fieldRef &&
+            ctx.FieldLookup.TryGetValue(fieldRef.FieldName, out var field))
+            return field.ElementType;
 
         return null;
     }

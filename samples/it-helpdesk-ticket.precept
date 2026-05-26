@@ -18,21 +18,17 @@ field Severity as choice of integer(1, 2, 3, 4, 5) ordered default 3
 field Urgency as choice of integer(1, 2, 3, 4, 5) ordered default 3
 
 # Priority is derived from Severity x Urgency. Declare the choice in
-# ascending rank so future ordered comparisons (Priority >= "High", etc.)
-# read correctly. Equality-based cascade is used here instead of the more
-# natural ordinal form (`Severity <= 2 or Urgency <= 2 then "High"`, etc.)
-# because the proof engine cannot currently prove that a bare choice-set
-# literal carries the `ordered` modifier — see BUG-012 in docs/Working/bugs.md.
-# Mapping equivalence: this cascade matches the original ITSM table
-#   (S=1, U=1) -> Critical;
-#   any S or U at 1 or 2 (outside the above) -> High;
-#   any S or U at 5 (outside the above two tiers) -> Low;
-#   everything else -> Medium.
+# ascending rank so ordered comparisons (Priority >= "High", etc.) read
+# correctly. Ordinal form mirrors the standard ITSM impact x urgency table:
+#   (S<=1 and U<=1) -> Critical
+#   (S<=2 or  U<=2) -> High
+#   (S<=4 and U<=4) -> Medium
+#   else            -> Low
 field Priority as choice of string("Low", "Medium", "High", "Critical") ordered <-
-    if Severity == 1 and Urgency == 1 then "Critical"
-    else if Severity == 1 or Severity == 2 or Urgency == 1 or Urgency == 2 then "High"
-    else if Severity == 5 or Urgency == 5 then "Low"
-    else "Medium"
+    if Severity <= 1 and Urgency <= 1 then "Critical"
+    else if Severity <= 2 or Urgency <= 2 then "High"
+    else if Severity <= 4 and Urgency <= 4 then "Medium"
+    else "Low"
 
 # Assignment — populated when an agent is dispatched from the queue.
 field AssignedAgent as string optional maxlength 200

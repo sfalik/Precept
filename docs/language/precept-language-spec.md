@@ -1704,7 +1704,7 @@ Type errors: applying a set operation to a non-set field, a queue operation to a
 | Element type mismatch | `choice of integer` arg to `choice of string` field | `ChoiceElementTypeMismatch` |
 | Rank conflict | `choice("Med","Low")` arg to `choice("Low","Med","High")` field — order not preserved | `ChoiceRankConflict` |
 
-**v1 limits:** Negative numeric literals (e.g., `choice of integer(-1, 0, 1)`) are supported via parser constant-folding. Typed choice nested inside a collection element type (e.g., `set of choice of string(...)`) is not supported in v1 — the inner type must be a simple scalar.
+**v1 notes:** Negative numeric literals (e.g., `choice of integer(-1, 0, 1)`) are supported via parser constant-folding. Typed choice nested inside a collection element type (e.g., `set of choice of string("Low","High") ordered`) is supported; the `ordered` modifier on the inner choice propagates through accessors (`.min`, `.max`, `.first`, `.last`) so ordinal proofs discharge cleanly.
 
 #### List literal validation
 

@@ -53,14 +53,17 @@ public sealed record CollectionTypeReference(
     : ParsedTypeReference(Span);
 
 /// <summary>
-/// A choice type with an explicit domain: choice of string("Draft", "Submitted").
+/// A choice type with an explicit domain: choice of string("Draft", "Submitted") [ordered].
 /// ElementType captures the element type (string, integer, boolean, etc.).
 /// Domain contains the literal values as they appear in source.
+/// Ordered is true when the source carries a trailing `ordered` keyword — uniform
+/// across field-scope and collection-inner-scope ChoiceType occurrences.
 /// </summary>
 public sealed record ChoiceTypeReference(
     TypeMeta Type,
     TypeMeta? ElementType,
     ImmutableArray<string> Domain,
+    bool Ordered,
     SourceSpan Span)
     : ParsedTypeReference(Span);
 

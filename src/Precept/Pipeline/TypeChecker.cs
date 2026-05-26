@@ -126,11 +126,18 @@ internal static partial class TypeChecker
     {
         if (elementTypeKind is null) return null;
 
-        if (fieldType is CollectionTypeReference coll &&
-            coll.ElementType is QualifiedTypeReference qualifiedInner)
+        if (fieldType is CollectionTypeReference coll)
         {
-            var innerQualifiers = ExtractQualifiers(qualifiedInner, ctx);
-            return new TypedQualifiedElement(elementTypeKind.Value, innerQualifiers);
+            if (coll.ElementType is QualifiedTypeReference qualifiedInner)
+            {
+                var innerQualifiers = ExtractQualifiers(qualifiedInner, ctx);
+                return new TypedQualifiedElement(elementTypeKind.Value, innerQualifiers);
+            }
+
+            if (coll.ElementType is ChoiceTypeReference choiceInner)
+            {
+                return new TypedChoiceElement(elementTypeKind.Value, choiceInner.Ordered);
+            }
         }
 
         return new TypedScalarElement(elementTypeKind.Value);
@@ -454,10 +461,15 @@ internal static partial class TypeChecker
             var (resolvedType, elementType, keyType) = ResolveTypeKind(declared.Type);
             var typedElementType = BuildTypedElementType(declared.Type, elementType, ctx);
 
-            // Declared modifiers: extract ModifierKind values from ParsedModifier list
-            var modifiers = declared.Modifiers
-                .Select(m => m.Kind)
-                .ToImmutableArray();
+            // Declared modifiers: extract ModifierKind values from ParsedModifier list.
+            // When the parsed type carries `ordered` on a scalar choice, lift it into the modifier
+            // list so downstream consumers (proof discharge for ChoiceLessThanChoice, etc.) keep a
+            // single point of truth. Collection-inner-choice `ordered` flows via TypedChoiceElement,
+            // not via the field-level modifier list.
+            var declaredModifierKinds = declared.Modifiers.Select(m => m.Kind);
+            if (declared.Type is ChoiceTypeReference { Ordered: true })
+                declaredModifierKinds = declaredModifierKinds.Append(ModifierKind.Ordered);
+            var modifiers = declaredModifierKinds.ToImmutableArray();
 
             // Implied modifiers from the Types catalog (D3: catalog-driven, no inline logic)
             var impliedModifiers = resolvedType != TypeKind.Error

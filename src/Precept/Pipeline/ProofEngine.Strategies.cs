@@ -52,10 +52,34 @@ public static partial class ProofEngine
         // Modifier arm
         if (obligation.Requirement is ModifierRequirement modReq)
         {
+            // Typed-literal inference: when the subject resolves to a literal/typed-constant
+            // operand of a binary op, lift the modifier from the contextual sibling operand.
+            // A choice literal carries the modifiers of the choice type that gives it meaning;
+            // the operator's same-set requirement already established the typing link.
+            if (obligation.Site is TypedBinaryOp binSite
+                && ResolveSubject(modReq.Subject, binSite) is TypedExpression resolvedSubject
+                && IsTypedLiteral(resolvedSubject))
+            {
+                var sibling = ReferenceEquals(resolvedSubject, binSite.Right) ? binSite.Left : binSite.Right;
+                if (OperandSatisfiesModifier(sibling, modReq.Required, semantics))
+                    return true;
+            }
+
             var fieldName = GetFieldName(modReq.Subject, obligation.Site);
             if (fieldName is null) return false;
             if (!semantics.FieldsByName.TryGetValue(fieldName, out var field)) return false;
-            return field.Modifiers.Contains(modReq.Required);
+            if (field.Modifiers.Contains(modReq.Required)) return true;
+
+            // Collection-inner choice ordering: when the obligation is Ordered on a choice
+            // returned from a collection accessor (.first/.last/.at), discharge from the
+            // element-type's Ordered bit instead of the field-level modifier list.
+            if (modReq.Required == ModifierKind.Ordered
+                && field.ElementType is TypedChoiceElement { Ordered: true })
+            {
+                return true;
+            }
+
+            return false;
         }
 
         // Numeric/Presence arm — walk effective modifiers
@@ -727,4 +751,34 @@ public static partial class ProofEngine
         return false;
     }
 
+    private static bool IsTypedLiteral(TypedExpression expr) => expr switch
+    {
+        TypedLiteral => true,
+        TypedTypedConstant => true,
+        InterpolatedTypedConstant => true,
+        _ => false,
+    };
+
+    /// <summary>
+    /// True when an operand of a binary op satisfies <paramref name="required"/> in its own right.
+    /// Mirrors the per-operand discharge a separate obligation would compute, without re-emitting
+    /// one. Used to lift a literal-side modifier from the sibling field/accessor in
+    /// <see cref="TryDeclarationAttributeProof"/>.
+    /// </summary>
+    private static bool OperandSatisfiesModifier(
+        TypedExpression operand, ModifierKind required, SemanticIndex semantics)
+    {
+        var fieldName = GetFieldName(operand);
+        if (fieldName is null) return false;
+        if (!semantics.FieldsByName.TryGetValue(fieldName, out var field)) return false;
+        if (field.Modifiers.Contains(required)) return true;
+
+        if (required == ModifierKind.Ordered
+            && field.ElementType is TypedChoiceElement { Ordered: true })
+        {
+            return true;
+        }
+
+        return false;
+    }
 }

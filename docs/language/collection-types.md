@@ -80,7 +80,7 @@ CollectionType  :=  (set | queue | stack) of ScalarType
 DirectionModifier := ascending | descending
 ```
 
-The inner type `T` must be a scalar type — any primitive type (`string`, `integer`, `decimal`, `number`, `boolean`, `choice`) or the special `~string` variant. Collections of collections are not supported.
+The inner type `T` must be a scalar type — any primitive type (`string`, `integer`, `decimal`, `number`, `boolean`), a qualifier-bearing business-domain type (`money in 'USD'`, `quantity of 'mass'`, etc.), a parameterised `choice of T(...)` (optionally `ordered`), or the special `~string` variant. Collections of collections are not supported.
 
 **Common surface:** All nine kinds share `.count`. `set`, `queue`, `stack`, `bag`, `log`, and `list` share `contains` for value membership. `lookup` uses `contains` for key membership; `queue of T by P` uses `contains` for value membership. `set`, `queue`, `stack`, `bag`, `log`, and `list` support `mincount`/`maxcount` constraints and list literal defaults (except `queue of T by P` and `lookup of K to V` — see per-type constraint notes). `clear` applies to `set`, `queue`, `stack`, `bag`, `list`, `queue of T by P`, and `lookup` — but not log types (append-only). Kind-specific operations are documented per section below.
 
@@ -486,9 +486,7 @@ ChoiceElementType :=  string | integer | decimal | number | boolean
 ChoiceValueExpr   :=  StringLiteral | NumberLiteral | BooleanLiteral
 ```
 
-**v1 limit:** `set of choice of string(...)` is not supported in v1. The collection inner type must be a simple scalar, not a parameterized choice type. Nesting typed choice inside a collection requires a separate AST/parser slice.
-
-Collections of collections (`set of set of string`) are not supported. All Precept scalar types — including temporal and business-domain types — are valid inner types. See §Temporal and Business-Domain Inner Types below for ordering constraints and qualified type syntax.
+Collections of collections (`set of set of string`) are not supported. All Precept scalar types — including temporal and business-domain types — are valid inner types. See §Temporal and Business-Domain Inner Types below for ordering constraints and qualified type syntax. Parameterised choice as a collection inner type (`set of choice of string("Low","High") ordered`) is supported: the `ordered` modifier on the inner choice flows through accessors so `.min`/`.max`/`.first`/`.last` discharge cleanly.
 
 ### `~string` — case-insensitive inner type
 
