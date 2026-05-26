@@ -124,6 +124,13 @@ internal static partial class TypeChecker
         TypeKind? elementTypeKind,
         CheckContext ctx)
     {
+        // Top-level choice — scalar field whose type-ref is ChoiceTypeReference. Project
+        // the Ordered bit into TypedChoiceElement so the proof engine and trait checks
+        // consult a single uniform shape across scalar and collection-inner positions
+        // (ChoiceTypeReference.Ordered remains the single source of truth).
+        if (fieldType is ChoiceTypeReference scalarChoice)
+            return new TypedChoiceElement(TypeKind.Choice, scalarChoice.Ordered);
+
         if (elementTypeKind is null) return null;
 
         if (fieldType is CollectionTypeReference coll)
@@ -462,14 +469,12 @@ internal static partial class TypeChecker
             var typedElementType = BuildTypedElementType(declared.Type, elementType, ctx);
 
             // Declared modifiers: extract ModifierKind values from ParsedModifier list.
-            // When the parsed type carries `ordered` on a scalar choice, lift it into the modifier
-            // list so downstream consumers (proof discharge for ChoiceLessThanChoice, etc.) keep a
-            // single point of truth. Collection-inner-choice `ordered` flows via TypedChoiceElement,
-            // not via the field-level modifier list.
-            var declaredModifierKinds = declared.Modifiers.Select(m => m.Kind);
-            if (declared.Type is ChoiceTypeReference { Ordered: true })
-                declaredModifierKinds = declaredModifierKinds.Append(ModifierKind.Ordered);
-            var modifiers = declaredModifierKinds.ToImmutableArray();
+            // `ordered` on `choice of T(...)` is NOT a field-level modifier — it lives on
+            // ChoiceTypeReference and is projected into TypedField.ElementType via
+            // BuildTypedElementType. The proof engine and trait checks consult ElementType.
+            var modifiers = declared.Modifiers
+                .Select(m => m.Kind)
+                .ToImmutableArray();
 
             // Implied modifiers from the Types catalog (D3: catalog-driven, no inline logic)
             var impliedModifiers = resolvedType != TypeKind.Error

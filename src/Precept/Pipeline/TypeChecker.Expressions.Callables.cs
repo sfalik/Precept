@@ -572,8 +572,33 @@ internal static partial class TypeChecker
             return new TypedErrorExpression(expr.Span);
         }
 
-        return new TypedConditional(resultType, condition, thenBranch, elseBranch, expr.Span);
+        // Propagate choice metadata when both branches return choice-typed values with
+        // compatible ordered-ness — keeps the ordered bit reachable for a conditional
+        // result feeding an ordered-choice comparison (e.g., `(if c then HighTier else LowTier) <= Threshold`).
+        var thenMeta = ChoiceMetadataOf(thenBranch);
+        var elseMeta = ChoiceMetadataOf(elseBranch);
+        TypedChoiceElement? branchMetadata = (thenMeta, elseMeta) switch
+        {
+            ({ Ordered: true }, { Ordered: true }) => thenMeta,
+            _ => null,
+        };
+
+        return new TypedConditional(resultType, condition, thenBranch, elseBranch, expr.Span, branchMetadata);
     }
+
+    /// <summary>
+    /// Reads choice-element metadata that has been propagated onto a typed expression.
+    /// Generalization of <c>GetElementTypeRef</c> — works on accessor chains (via
+    /// <see cref="TypedMemberAccess.ChoiceMetadata"/>) and conditionals (via
+    /// <see cref="TypedConditional.ChoiceMetadata"/>) in addition to direct field refs.
+    /// Returns <c>null</c> when no metadata is reachable.
+    /// </summary>
+    private static TypedChoiceElement? ChoiceMetadataOf(TypedExpression expr) => expr switch
+    {
+        TypedMemberAccess ma         => ma.ChoiceMetadata,
+        TypedConditional cond        => cond.ChoiceMetadata,
+        _                            => null,
+    };
 
     /// <summary>
     /// Resolve a list literal expression: resolve each element, unify element types
@@ -993,14 +1018,13 @@ internal static partial class TypeChecker
             if (elementType is not null)
             {
                 var elementMeta = Types.GetMeta(elementType.Value);
-                var staticTraits = elementMeta.Traits;
-                if (elementType.Value == TypeKind.Choice
-                    && GetElementTypeRef(receiver, ctx) is TypedChoiceElement { Ordered: true })
+                var effectiveTraits = elementMeta.Traits;
+                if (GetElementTypeRef(receiver, ctx) is TypedChoiceElement { Ordered: true })
                 {
-                    staticTraits |= TypeTrait.Orderable;
+                    effectiveTraits |= TypeTrait.Orderable;
                 }
 
-                if ((staticTraits & accessor.RequiredTraits) != accessor.RequiredTraits)
+                if ((effectiveTraits & accessor.RequiredTraits) != accessor.RequiredTraits)
                 {
                     ctx.Diagnostics.Add(
                         Diagnostics.Create(DiagnosticCode.RequiredTraitViolation, expr.Span,
@@ -1015,7 +1039,8 @@ internal static partial class TypeChecker
             receiver,
             accessor,
             accessor.ProofRequirements.ToImmutableArray(),
-            expr.Span);
+            expr.Span,
+            ResolveAccessorChoiceMetadata(accessor, receiver, ctx));
     }
 
     /// <summary>
@@ -1082,14 +1107,20 @@ internal static partial class TypeChecker
             return new TypedErrorExpression(expr.Span);
         }
 
-        // PRE0104: Check RequiredTraits — e.g., .min/.max require Orderable element type
+        // PRE0104: Check RequiredTraits — symmetric with ResolveMemberAccess.
         if (accessor.RequiredTraits != TypeTrait.None)
         {
             var elementType = GetElementType(receiver, ctx);
             if (elementType is not null)
             {
                 var elementMeta = Types.GetMeta(elementType.Value);
-                if ((elementMeta.Traits & accessor.RequiredTraits) != accessor.RequiredTraits)
+                var effectiveTraits = elementMeta.Traits;
+                if (GetElementTypeRef(receiver, ctx) is TypedChoiceElement { Ordered: true })
+                {
+                    effectiveTraits |= TypeTrait.Orderable;
+                }
+
+                if ((effectiveTraits & accessor.RequiredTraits) != accessor.RequiredTraits)
                 {
                     ctx.Diagnostics.Add(
                         Diagnostics.Create(DiagnosticCode.RequiredTraitViolation, expr.Span,
@@ -1104,7 +1135,8 @@ internal static partial class TypeChecker
             receiver,
             accessor,
             accessor.ProofRequirements.ToImmutableArray(),
-            expr.Span);
+            expr.Span,
+            ResolveAccessorChoiceMetadata(accessor, receiver, ctx));
     }
 
     /// <summary>
@@ -1124,6 +1156,24 @@ internal static partial class TypeChecker
             ElementParameterAccessor  => TypeKind.Integer,
             _                         => GetElementType(receiver, ctx) ?? TypeKind.Error,
         };
+    }
+
+    /// <summary>
+    /// When the accessor returns the receiver's element type and that element carries
+    /// choice metadata, propagate it onto the resulting <see cref="TypedMemberAccess"/>
+    /// so downstream consumers (proof discharge, trait checks on chained accessors)
+    /// can read the ordered bit without walking back through the expression tree.
+    /// Returns <c>null</c> for accessors with fixed return types
+    /// (<see cref="FixedReturnAccessor"/>, <see cref="ElementParameterAccessor"/>) — those
+    /// don't return choice-typed values that inherit element-level metadata.
+    /// </summary>
+    private static TypedChoiceElement? ResolveAccessorChoiceMetadata(
+        TypeAccessor accessor, TypedExpression receiver, CheckContext ctx)
+    {
+        if (accessor is FixedReturnAccessor or ElementParameterAccessor)
+            return null;
+
+        return GetElementTypeRef(receiver, ctx) as TypedChoiceElement;
     }
 
     /// <summary>

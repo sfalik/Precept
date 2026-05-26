@@ -77,22 +77,36 @@ public sealed record TypedFunctionCall(
     SourceSpan Span
 ) : TypedExpression(ResultType, Span);
 
-/// <summary>A resolved member access or method call with accessor from the Types catalog.</summary>
+/// <summary>
+/// A resolved member access or method call with accessor from the Types catalog.
+/// <see cref="ChoiceMetadata"/> carries the receiver's choice-element metadata
+/// (ordered bit, etc.) when the accessor returns the element type of an ordered-choice
+/// collection — needed so accessor chains, list-literal accessors, and conditional
+/// receivers can discharge ordered-choice proof requirements without walking back
+/// through arbitrary expression trees (see F-LANG-COLL-03 design D-3 Option A).
+/// </summary>
 public sealed record TypedMemberAccess(
     TypeKind ResultType,
     TypedExpression Object,
     TypeAccessor ResolvedAccessor,
     ImmutableArray<ProofRequirement> ProofRequirements,
-    SourceSpan Span
+    SourceSpan Span,
+    TypedChoiceElement? ChoiceMetadata = null
 ) : TypedExpression(ResultType, Span);
 
-/// <summary>A resolved if/then/else conditional expression.</summary>
+/// <summary>
+/// A resolved if/then/else conditional expression.
+/// <see cref="ChoiceMetadata"/> carries the branches' shared choice-element metadata
+/// when both branches return choice-typed values with compatible ordered-ness — see
+/// <see cref="TypedMemberAccess.ChoiceMetadata"/> for rationale.
+/// </summary>
 public sealed record TypedConditional(
     TypeKind ResultType,
     TypedExpression Condition,
     TypedExpression ThenBranch,
     TypedExpression ElseBranch,
-    SourceSpan Span
+    SourceSpan Span,
+    TypedChoiceElement? ChoiceMetadata = null
 ) : TypedExpression(ResultType, Span);
 
 /// <summary>

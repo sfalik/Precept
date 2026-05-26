@@ -1068,15 +1068,16 @@ ScalarType  :=  ~string | string | number | integer | decimal | boolean
              |  money | currency | quantity | unitofmeasure
              |  dimension | price | exchangerate
 
-CollectionType  :=  (set | queue | stack) of ScalarType TypeQualifier?
-                |   bag of ScalarType TypeQualifier?
-                |   list of ScalarType TypeQualifier?
-                |   log of ScalarType TypeQualifier?
-                |   log of ScalarType by ScalarType TypeQualifier?
-                |   queue of ScalarType by ScalarType DirectionModifier?
-                |   lookup of ScalarType to ScalarType
+CollectionType  :=  (set | queue | stack) of CollectionInnerType TypeQualifier?
+                |   bag of CollectionInnerType TypeQualifier?
+                |   list of CollectionInnerType TypeQualifier?
+                |   log of CollectionInnerType TypeQualifier?
+                |   log of CollectionInnerType by CollectionInnerType TypeQualifier?
+                |   queue of CollectionInnerType by CollectionInnerType DirectionModifier?
+                |   lookup of CollectionInnerType to CollectionInnerType
+CollectionInnerType  :=  ScalarType | ChoiceType
 DirectionModifier  :=  ascending | descending
-ChoiceType        :=  choice "of" ChoiceElementType "(" ChoiceValueExpr ("," ChoiceValueExpr)* ")"
+ChoiceType        :=  choice "of" ChoiceElementType "(" ChoiceValueExpr ("," ChoiceValueExpr)* ")" ordered?
 ChoiceElementType :=  string | integer | decimal | number | boolean
 ChoiceValueExpr   :=  StringLiteral | NumberLiteral | true | false
 TypeQualifier   :=  (in | of | to) Expr

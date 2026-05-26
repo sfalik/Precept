@@ -56,11 +56,30 @@ public static partial class ProofEngine
             // operand of a binary op, lift the modifier from the contextual sibling operand.
             // A choice literal carries the modifiers of the choice type that gives it meaning;
             // the operator's same-set requirement already established the typing link.
-            if (obligation.Site is TypedBinaryOp binSite
-                && ResolveSubject(modReq.Subject, binSite) is TypedExpression resolvedSubject
-                && IsTypedLiteral(resolvedSubject))
+            //
+            // Scope-cut: only fires for binary-op sites. This is exhaustive for the current
+            // catalog — `ModifierKind.Ordered` is emitted only by ChoiceLessThanChoice and
+            // siblings in Operations.cs, all binary ops. A future op that emits an Ordered
+            // requirement at a function-call or member-access site would silently miss this
+            // inference; the assertion-style coverage at OperationOrderedRequirementShapeTests
+            // catches that drift in CI.
+            var resolved = ResolveSubject(modReq.Subject, obligation.Site);
+
+            // Accessor / conditional result with inline choice metadata — discharge directly
+            // from the propagated TypedChoiceElement slot. Covers cases where GetFieldName
+            // can't reach a declaration (accessor chains, conditional receivers).
+            if (modReq.Required == ModifierKind.Ordered
+                && resolved is TypedExpression resolvedExpr
+                && ChoiceMetadataOf(resolvedExpr) is { Ordered: true })
             {
-                var sibling = ReferenceEquals(resolvedSubject, binSite.Right) ? binSite.Left : binSite.Right;
+                return true;
+            }
+
+            if (obligation.Site is TypedBinaryOp binSite
+                && resolved is TypedExpression literalSubject
+                && IsTypedLiteral(literalSubject))
+            {
+                var sibling = ReferenceEquals(literalSubject, binSite.Right) ? binSite.Left : binSite.Right;
                 if (OperandSatisfiesModifier(sibling, modReq.Required, semantics))
                     return true;
             }
@@ -70,9 +89,10 @@ public static partial class ProofEngine
             if (!semantics.FieldsByName.TryGetValue(fieldName, out var field)) return false;
             if (field.Modifiers.Contains(modReq.Required)) return true;
 
-            // Collection-inner choice ordering: when the obligation is Ordered on a choice
-            // returned from a collection accessor (.first/.last/.at), discharge from the
-            // element-type's Ordered bit instead of the field-level modifier list.
+            // Field-level choice ordering: when the obligation is Ordered on a choice
+            // (scalar field) or a choice returned from a collection accessor
+            // (.first/.last/.at on `set of choice of T(...) ordered`), discharge from the
+            // field's TypedChoiceElement — the single source of truth for choice ordering.
             if (modReq.Required == ModifierKind.Ordered
                 && field.ElementType is TypedChoiceElement { Ordered: true })
             {
@@ -768,6 +788,14 @@ public static partial class ProofEngine
     private static bool OperandSatisfiesModifier(
         TypedExpression operand, ModifierKind required, SemanticIndex semantics)
     {
+        // Accessor / conditional results propagate choice-element metadata directly on the
+        // typed expression — read the slot before walking back to a field declaration.
+        if (required == ModifierKind.Ordered
+            && ChoiceMetadataOf(operand) is { Ordered: true })
+        {
+            return true;
+        }
+
         var fieldName = GetFieldName(operand);
         if (fieldName is null) return false;
         if (!semantics.FieldsByName.TryGetValue(fieldName, out var field)) return false;
@@ -781,4 +809,17 @@ public static partial class ProofEngine
 
         return false;
     }
+
+    /// <summary>
+    /// Reads choice-element metadata propagated onto a typed expression. Returns the slot
+    /// on <see cref="TypedMemberAccess"/> and <see cref="TypedConditional"/>; <c>null</c>
+    /// for expression shapes without an inline metadata carrier (the caller can fall back
+    /// to walking to a field declaration).
+    /// </summary>
+    private static TypedChoiceElement? ChoiceMetadataOf(TypedExpression expr) => expr switch
+    {
+        TypedMemberAccess ma         => ma.ChoiceMetadata,
+        TypedConditional cond        => cond.ChoiceMetadata,
+        _                            => null,
+    };
 }

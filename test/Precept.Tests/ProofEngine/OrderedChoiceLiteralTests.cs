@@ -83,4 +83,67 @@ public class OrderedChoiceLiteralTests
             .Where(o => o.Disposition == ProofDisposition.Unresolved)
             .Should().NotBeEmpty(because: "an unordered choice field cannot lift Ordered onto a literal sibling");
     }
+
+    [Fact]
+    public void IntegerOrderedChoice_LiteralLeftFieldRight_AlsoDischarges()
+    {
+        // Inverted operand order — literal on the left, field on the right. The
+        // resolver returns the Right operand first, so this exercises the direct
+        // field-discharge path (not the literal-inference fallback), confirming
+        // ordered-choice comparison works regardless of literal position.
+        var ledger = Prove("""
+            precept Repro
+            field Severity as choice of integer(1, 2, 3, 4, 5) ordered default 3
+            field IsCritical as boolean <- 2 >= Severity
+            state Open initial
+            """);
+
+        ledger.Obligations
+            .Where(o => o.Disposition == ProofDisposition.Unresolved)
+            .Should().BeEmpty(because: "inverted-operand-order ordered-choice comparisons still lift the modifier symmetrically");
+    }
+
+    [Fact]
+    public void OrderedChoiceCollectionAccessor_VsField_DischargesViaElementType()
+    {
+        // Accessor return-type for `Tiers.min` on `set of choice of T(...) ordered`
+        // must discharge the Ordered requirement on the field-vs-accessor comparison.
+        // The accessor result propagates ordered-ness via TypedMemberAccess.ChoiceMetadata
+        // (D-3 Option A) — exercises the inline-slot path.
+        var ledger = Prove("""
+            precept Repro
+            field Severities as set of choice of string("Info", "Warn", "Error") ordered
+            field Threshold as choice of string("Info", "Warn", "Error") ordered default "Info"
+            field IsHigh as boolean <- Severities.min >= Threshold
+            state Open initial
+            """);
+
+        ledger.Obligations
+            .Where(o => o.Requirement is ModifierRequirement { Required: ModifierKind.Ordered })
+            .Where(o => o.Disposition == ProofDisposition.Unresolved)
+            .Should().BeEmpty(because: "the .min accessor on an ordered choice set discharges Ordered via TypedMemberAccess.ChoiceMetadata");
+    }
+
+    [Fact]
+    public void OrderedChoiceConditional_VsField_DischargesViaInlineMetadata()
+    {
+        // Conditional whose branches are both ordered-choice fields propagates the
+        // ordered bit onto TypedConditional.ChoiceMetadata; comparing the conditional
+        // result against a same-set field discharges without walking back to a single
+        // field declaration.
+        var ledger = Prove("""
+            precept Repro
+            field PrimaryTier as choice of string("Low", "Medium", "High") ordered default "Low"
+            field BackupTier as choice of string("Low", "Medium", "High") ordered default "Low"
+            field UseBackup as boolean default false
+            field Threshold as choice of string("Low", "Medium", "High") ordered default "Low"
+            field IsHigh as boolean <- (if UseBackup then BackupTier else PrimaryTier) >= Threshold
+            state Open initial
+            """);
+
+        ledger.Obligations
+            .Where(o => o.Requirement is ModifierRequirement { Required: ModifierKind.Ordered })
+            .Where(o => o.Disposition == ProofDisposition.Unresolved)
+            .Should().BeEmpty(because: "both branches return an ordered-choice; TypedConditional.ChoiceMetadata carries the bit forward");
+    }
 }
