@@ -16,13 +16,19 @@ namespace Precept.Pipeline;
 /// </summary>
 public abstract record TypedExpression(TypeKind ResultType, SourceSpan Span);
 
-/// <summary>A resolved reference to a field declaration.</summary>
+/// <summary>
+/// A resolved reference to a field declaration. Also used as the surface for
+/// quantifier-binding identifiers; when the binding is over a <c>queue of T by P</c>
+/// or <c>log of T by P</c>, <see cref="KeyType"/> carries the ordering type so that
+/// <c>binding.value</c> and <c>binding.by</c> member accesses can dispatch correctly.
+/// </summary>
 public sealed record TypedFieldRef(
     TypeKind ResultType,
     string FieldName,
     bool IsCaseInsensitive,
     ImmutableArray<DeclaredQualifierMeta>? DeclaredQualifiers,
-    SourceSpan Span
+    SourceSpan Span,
+    TypeKind? KeyType = null
 ) : TypedExpression(ResultType, Span);
 
 /// <summary>A resolved reference to an event argument.</summary>

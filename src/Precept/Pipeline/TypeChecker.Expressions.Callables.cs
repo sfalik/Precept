@@ -483,9 +483,16 @@ internal static partial class TypeChecker
             return new TypedErrorExpression(expr.Span);
         }
 
-        // 3. Push binding variable into scope (shadows event args and fields)
+        // 3. Push binding variable into scope (shadows event args and fields).
+        // For `queue of T by P` / `log of T by P`, also capture the ordering key type
+        // so the binding identifier exposes `.value: T` and `.by: P` member accessors.
         var isCaseInsensitiveBinding = IsCaseInsensitiveCollectionElement(collection, ctx);
-        ctx.QuantifierBindings.Push((expr.BindingName, elementType.Value, isCaseInsensitiveBinding));
+        TypeKind? keyType = collection is TypedFieldRef bindingFieldRef
+            && ctx.FieldLookup.TryGetValue(bindingFieldRef.FieldName, out var bindingField)
+            && (bindingField.ResolvedType == TypeKind.QueueBy || bindingField.ResolvedType == TypeKind.LogBy)
+            ? bindingField.KeyType
+            : null;
+        ctx.QuantifierBindings.Push((expr.BindingName, elementType.Value, keyType, isCaseInsensitiveBinding));
 
         // 4. Resolve predicate with binding in scope
         var predicate = Resolve(expr.Predicate, ctx);
@@ -928,6 +935,32 @@ internal static partial class TypeChecker
         var receiver = Resolve(expr.Target, ctx);
         if (receiver is TypedErrorExpression)
             return new TypedErrorExpression(expr.Span);
+
+        // Quantifier-binding two-axis projection: when the receiver is a quantifier
+        // binding over a `queue of T by P` or `log of T by P`, `.value` returns T and
+        // `.by` returns P. The bare identifier already resolves to T (single-axis
+        // single-type behavior); `.value` is an explicit alias for that path.
+        if (receiver is TypedFieldRef { KeyType: { } bindingKeyType } qbRef)
+        {
+            if (string.Equals(expr.MemberName, "value", StringComparison.Ordinal))
+            {
+                return new TypedMemberAccess(
+                    qbRef.ResultType, qbRef,
+                    new TypeAccessor("value", "Quantifier binding element value"),
+                    ImmutableArray<ProofRequirement>.Empty,
+                    expr.Span);
+            }
+            if (string.Equals(expr.MemberName, "by", StringComparison.Ordinal))
+            {
+                return new TypedMemberAccess(
+                    bindingKeyType, qbRef,
+                    new TypeAccessor("by", "Quantifier binding ordering key"),
+                    ImmutableArray<ProofRequirement>.Empty,
+                    expr.Span);
+            }
+            // Fall through for other member names — the standard accessor catalog on
+            // the element type may still apply (e.g., `binding.length` on string elements).
+        }
 
         var typeMeta = Types.GetMeta(receiver.ResultType);
         var accessor = typeMeta.Accessors.FirstOrDefault(a =>

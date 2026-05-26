@@ -237,6 +237,14 @@ public static class Types
                 new NumericProofRequirement(new SelfSubject(CollectionCountAccessor), OperatorKind.GreaterThan, 0m,
                     "Index must be within bounds"),
             ]),
+        // Quantifier-binding two-axis projection: in `each entry in MyLogBy (...)`,
+        // `entry.value` is the element (T) and `entry.by` is the ordering key (P).
+        // Type-driven dispatch in ResolveMemberAccess routes these to the binding's
+        // captured types; the catalog entries here exist so the parser admits the
+        // `by` keyword after `.` (KeywordsValidAsMemberName is derived from accessor
+        // names) and so `precept_types` surfaces them.
+        new TypeAccessor("value", "Quantifier-binding element value (T)"),
+        new TypeAccessor("by", "Quantifier-binding ordering key (P)"),
     ];
 
     private static readonly TypeAccessor[] BagAccessors =
@@ -284,6 +292,14 @@ public static class Types
                 new NumericProofRequirement(new SelfSubject(CollectionCountAccessor), OperatorKind.GreaterThan, 0m,
                     "Queue must be non-empty"),
             ]),
+        // Quantifier-binding two-axis projection: in `each task in MyQueueBy (...)`,
+        // `task.value` is the element (T) and `task.by` is the ordering key (P).
+        // Type-driven dispatch in ResolveMemberAccess routes these to the binding's
+        // captured types; the catalog entries here exist so the parser admits the
+        // `by` keyword after `.` (KeywordsValidAsMemberName is derived from accessor
+        // names) and so `precept_types` surfaces them.
+        new TypeAccessor("value", "Quantifier-binding element value (T)"),
+        new TypeAccessor("by", "Quantifier-binding ordering key (P)"),
     ];
 
     private static readonly TypeAccessor[] LookupAccessors =

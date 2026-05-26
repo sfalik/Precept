@@ -750,7 +750,7 @@ internal static partial class TypeChecker
         foreach (var binding in ctx.QuantifierBindings)
         {
             if (string.Equals(binding.Name, name, StringComparison.Ordinal))
-                return new TypedFieldRef(binding.Type, name, binding.IsCaseInsensitive, null, id.Span);
+                return new TypedFieldRef(binding.ValueType, name, binding.IsCaseInsensitive, null, id.Span, binding.KeyType);
         }
 
         // 2. Event args (second priority)
