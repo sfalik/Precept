@@ -34,7 +34,7 @@ Total findings integrated: 48. Many overlap or reinforce each other; the phasing
 | 8 | Operationalize Phase 4 — close rhetorical-vs-real gap (retrofit + skill text; no tooling) | RS-F1, RS-F9 | 1-2 days | ✅ Complete (`2e62d006`) |
 | 9 | Strengthen `lifecycle-1-research` into a real Stage 1 (skill text) | RS-F2, RS-F3, RS-F8, RS-F12, RS-F13, RS-F14 | 2 days | ✅ Complete (`990293da`) |
 | 10 | Promote-or-cite enforcement + corpus archival sweep (audit + skill text; no tooling) | RS-F5, RS-F7, RS-F10 | 2 days | ✅ Complete (`59917e25`) |
-| **11** | **Research-adequacy gate at design lock** (skill text + reviewer table; no tooling) | **RS-F6, RS-F15** | **1 day** | **Planned** |
+| 11 | Research-adequacy gate at design lock (skill text + reviewer table; no tooling) | RS-F6, RS-F15 | 1 day | ✅ Complete (`3d6578cc`) |
 
 **Total remaining estimate:** ~5-7 days focused work for Phases 8-11 (Phase 0 out of scope; Phases 1-7 complete). Smaller than originally proposed because all `docs-lint` tooling tasks are out of scope along with Phase 0.
 **Minimum viable Phase 8+ improvement:** Phase 8 alone (1-2 days) closes the most damaging finding — that Phase 4's locked-design rules are universally unenforced in-tree — by retrofitting the one in-tree locked design.
