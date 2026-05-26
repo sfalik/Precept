@@ -1,3 +1,12 @@
+---
+status: Active — horizon groundwork
+authored: 2026-04-19
+author: Frank (Lead/Architect)
+topic: parser architecture; Superpower / PEG / ANTLR / recursive descent / Roslyn scalability
+external-engagement: strong
+note: Currently filed under research/language/; Phase 10 of the corpus-improvement plan relocates this to research/architecture/compiler/ (compiler-architecture investigation, not language research).
+---
+
 # Parser Combinator Scalability: Superpower, PEG Limits, and Migration Options
 
 **Date:** 2026-04-19

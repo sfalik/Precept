@@ -1,3 +1,12 @@
+---
+status: Active — horizon groundwork
+authored: 2026-04-19
+author: Frank (Lead/Architect)
+topic: domain integrity formal concept; C.J. Date / Fowler / Greg Young / DDD lineage
+external-engagement: strong
+note: Substantive philosophy grounding; promotion to docs/philosophy.md as a "philosophy heritage" section or related-work reference is pending.
+---
+
 # Domain Integrity: Formal Concept vs. Precept's Positioning
 
 **Date:** 2026-04-19

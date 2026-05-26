@@ -209,6 +209,60 @@ If the design's `sources-consulted` frontmatter doesn't include the topic's rese
 
 The reviewer reports its checks in `sources-mandatorily-checked` frontmatter (alongside `sources-verified`). Missing entries for a triggered topic is a process CONCERN against the review.
 
+### 14. Stage-1 Research-Doc Review Path (Phase 9 addition)
+
+When the review target is a research file (`research/*.md` rather than `docs/Working/*.md`), the reviewer applies the `lifecycle-1-research` behavioral guards mechanically. The research skill has 10 numbered guards; the reviewer's job is to check each. Use grep before reading prose:
+
+**Frontmatter checks (BLOCKER if missing):**
+
+```bash
+# Status field present
+grep -A1 "^status:" <research-file>     # must match one of: Active | Promoted to: ... | Cited | Stale | Superseded by: ... | Archived
+
+# External-engagement declaration present
+grep "^external-engagement:" <research-file>   # must match one of: strong | partial | purely-internal
+
+# Authored date present
+grep "^authored:" <research-file>
+```
+
+**Section checks (BLOCKER if missing on a research file that proposes conclusions):**
+
+```bash
+grep -c "^## Methodology" <research-file>                       # ≥1 required
+grep -c "^## Findings" <research-file>                          # ≥1 required
+grep -c "^## Threats to Validity" <research-file>               # ≥1 required
+grep -c "^## What would change this conclusion" <research-file> # ≥1 required if Conclusions section present; honest exit "purely exploratory" allowed
+grep -c "^## Sources" <research-file>                           # ≥1 required
+```
+
+**Citation discipline checks (per-citation):**
+
+For each external citation in the Findings section:
+
+- **Verbatim excerpt present?** Look for `>` blockquote following the citation. Bare prose claims with no excerpt are BLOCKERs on load-bearing claims, CONCERNs elsewhere.
+- **Stable identifier?** RFC#, DOI, ISO#, ISBN, paper title+venue+year, or library release version + URL. Live-URL-only with no version pin is a CONCERN.
+- **Access date?** For URL sources, an access date must be declared. Missing access date is a CONCERN.
+- **Source grade declared?** Primary / Secondary / Tertiary — either inline per-citation or in the Sources section. Missing grade is a NIT (encourages explicit honesty).
+
+**Source-verification (parallel to § 13 for design docs):**
+
+Open at least 3 external citations from the research file and verify the excerpts. If the source is unfetchable (404 / 429 / paywall), check whether the research's Threats to Validity section declares this. Unfetchable + undeclared is a BLOCKER (the discipline says "if a source can't be fetched, the claim's grade drops to Tertiary and Threats to Validity declares it"). Unfetchable + declared = correct discipline.
+
+**Promote-or-cite check:**
+
+Look for inbound citations to this research file from `docs/` or from other `research/` files. If none found, check the research file's frontmatter status:
+
+- `Promoted to: <link>` → verify the link resolves and the canonical doc actually adopts the conclusion.
+- `Cited` → verify ≥1 inbound citation exists somewhere.
+- `Active` with horizon-groundwork → verify the file documents the intended downstream consumer.
+- `Archived` → the file should be in `research/archive/`; if not, that's a process error.
+- None of the above + no inbound citations → **shadow policy**. Report as BLOCKER or CONCERN depending on the file's load-bearing weight.
+
+**Sub-folder taxonomy check:**
+
+Compare the file's actual folder location against the topic-to-folder table in `lifecycle-1-research/SKILL.md § Step 2`. Mis-filed research (e.g., compiler-architecture research in `research/language/` instead of `research/architecture/compiler/`) is a CONCERN.
+
 ## Independent re-statement (preamble — required before findings)
 
 Before listing findings, write a 3-5 sentence **Independent re-statement** of what the design or diff is doing and why — in your own words, not the design's framing. Then compare your re-statement to the design's own framing. Mismatches between the two are first-class findings.

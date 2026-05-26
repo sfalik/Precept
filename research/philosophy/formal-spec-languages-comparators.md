@@ -1,3 +1,12 @@
+---
+status: Active — horizon groundwork
+authored: 2026-04-19
+author: Frank (Lead/Architect)
+topic: formal specification languages; Alloy / TLA+ / Event-B / Z notation as comparators
+external-engagement: strong
+note: Verdict is "no — philosophy.md should not add formal-spec comparators." This decision currently lives only in this research file; promotion to a docs/philosophy.md ADR or explicit non-decision entry is pending.
+---
+
 # Formal Specification Languages as Comparators for Precept
 
 **Date:** 2026-04-19

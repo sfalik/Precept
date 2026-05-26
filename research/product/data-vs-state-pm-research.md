@@ -1,3 +1,12 @@
+---
+status: Active — horizon groundwork
+authored: 2026-04-04
+author: Steinbrenner (PM Champion)
+topic: data-first vs state-first positioning; "states as vehicles" framing
+external-engagement: partial
+note: PM-perspective research on the data-vs-state positioning conversation. No inbound citations from docs/philosophy.md or docs/README.md yet; promotion path (e.g., positioning ADR) or explicit horizon-groundwork status is a Phase 10 categorization item.
+---
+
 # Data-First vs. State-First Positioning — PM Research
 ## Evaluating Shane's "States Are Vehicles" Proposal
 

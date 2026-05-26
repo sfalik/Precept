@@ -1,3 +1,12 @@
+---
+status: Cited
+authored: 2026-04-19
+author: Frank (Lead/Architect)
+topic: case-insensitive comparison operator; ~= operator precedent across 15+ languages and DSLs
+external-engagement: strong
+note: Grounds the case-insensitive comparison decision in primitive-types.md and the operator catalog. Inbound citations to be verified in Phase 10 corpus sweep.
+---
+
 # Case-Insensitive Comparison Operator Survey
 
 **Research question:** Is there precedent for `~=` as a case-insensitive comparison operator? How do languages and DSLs handle case-insensitive string comparison? What are the cascade implications?

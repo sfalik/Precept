@@ -1,3 +1,12 @@
+---
+status: Active — horizon groundwork
+authored: 2026-04-08
+author: Uncle Leo (Security Champion)
+topic: security landscape; OWASP / SLSA / supply chain; threats to compile-time and runtime surfaces
+external-engagement: strong
+note: No inbound citations from docs/ yet; no docs/security/ canonical doc exists. Phase 10 will decide whether to promote (write docs/security/ canonical) or formally categorize as horizon-groundwork pending Phase N feature work.
+---
+
 # Security Landscape — Precept
 
 **Date:** 2026-04-08  

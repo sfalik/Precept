@@ -1,3 +1,14 @@
+---
+status: Cited
+authored: 2026-05-25
+author: Frank (Lead/Architect)
+topic: currency precision; ISO 4217 minor-unit; money / currency type coupling
+external-engagement: strong
+cited-from:
+  - docs/language/business-domain-types.md:1740
+  - docs/Working/compiler-readiness-plan-2026-05-24.md:126
+---
+
 # Currency Precision Coupling — External Survey
 
 > Across the prevailing money libraries, financial APIs, accounting standards, and database conventions, currency identity (ISO 4217) and value precision are almost universally **operationally coupled** but **rarely structurally enforced at construction**; the strongest precedents for type-level enforcement are Joda-Money's `Money` (strict scale rejection) and NodaMoney (auto-rounding by default), while JSR-354's `Money`, Fowler's PoEAA pattern as canonically described, SQL conventions, and ORM mappings deliberately decouple them.

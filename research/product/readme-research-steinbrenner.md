@@ -1,3 +1,12 @@
+---
+status: Active — horizon groundwork
+authored: 2026-04-04
+author: Steinbrenner (PM Champion)
+topic: README adoption research; product positioning from PM perspective
+external-engagement: partial
+note: PM-perspective research on README adoption signal. No inbound citations from README.md or docs/philosophy.md; promotion path or explicit horizon-groundwork status is a Phase 10 categorization item.
+---
+
 # README Research — PM/Product Adoption Perspective (Steinbrenner)
 
 **Date:** 2026-04-04  

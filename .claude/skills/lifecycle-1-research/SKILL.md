@@ -75,9 +75,17 @@ The sub-agent does the heavy lifting in isolation; you stay in the parent sessio
 
 ## Step 4: Document Structure
 
-Every research file follows this shape (adapt to topic, but keep these sections):
+Every research file follows this shape. The frontmatter and four sections (Methodology, Findings, Threats to Validity, Sources) are **required**; the others apply to research that proposes conclusions.
 
 ```markdown
+---
+status: Active | Promoted to: <canonical-link> | Cited | Stale | Superseded by: <link> | Archived
+authored: YYYY-MM-DD
+author: <name or role>
+topic: <one-line topic — used for cross-folder INDEX discoverability>
+external-engagement: <strong | partial | purely-internal — see Behavioral Guards § G1>
+---
+
 # <Title>
 
 > One-sentence framing of what this research investigates and why it matters.
@@ -89,18 +97,57 @@ upstream research that motivated it.
 
 ## Methodology
 
-How the investigation was conducted — sources consulted, criteria applied,
-what was deliberately excluded. Short.
+How the investigation was conducted. **Required content:**
+
+- **Research question** — the specific question being answered.
+- **Search strategy** — what was searched (catalogs, source code, web, academic
+  databases, library docs). Name the venues.
+- **Inclusion / exclusion criteria** — what counted as relevant, what was
+  deliberately excluded.
+- **Source-grade declaration** — Primary / Secondary / Tertiary mix (see
+  § Source Grading below).
+- **Time bounds** — when the investigation ran. Source-fetch dates matter
+  for evolving external state (vendor docs, library behavior).
+
+A research file without a Methodology section is, structurally, advocacy
+for a position the author reached. Methodology is the discipline that
+distinguishes survey from opinion.
 
 ## Findings
 
-The substance. Citation-rich. Each claim grounded in a source (link, quote,
-or named precedent).
+The substance. Citation-rich. Each load-bearing claim grounded in a source
+with **verbatim excerpt** (see § Citation Discipline below).
+
+For comparator surveys (the most common shape), use a table format:
+each row is a comparator system; each column is a property; each cell
+links to or quotes a specific source.
+
+## Threats to Validity
+
+**Required.** What might be wrong with this research's conclusions?
+
+- **Sources that couldn't be fetched** — if a primary source returned 404 /
+  429 / paywall and was "supplemented from knowledge," declare it here.
+  Knowledge-from-training-data is Tertiary; if a load-bearing claim rests
+  on it, that's a threat.
+- **Selection bias** — comparators chosen because the author already knew
+  them, vs comprehensive enumeration of the comparator space.
+- **Recency** — the source material may have changed since fetch. State the
+  fetch dates explicitly.
+- **Domain mismatch** — the comparators surveyed solve adjacent problems,
+  not the exact problem.
+- **Other knowable gaps** — anything else a careful reader would flag as
+  weakening the conclusion.
+
+Honest exit: `## Threats to Validity` with the single sentence "No threats
+identified — flag for review" is acceptable when true. The section being
+absent is not acceptable.
 
 ## Implications for Precept
 
-How the findings bear on Precept's design, architecture, or positioning. Make
-the bridge explicit — research that doesn't connect back is just trivia.
+How the findings bear on Precept's design, architecture, or positioning.
+Make the bridge explicit — research that doesn't connect back is just
+trivia.
 
 ## Conclusions
 
@@ -113,6 +160,25 @@ For each conclusion you're proposing the team adopt, include all four:
 
 A conclusion that states WHAT without WHY is incomplete. Flag it as draft.
 
+## What would change this conclusion
+
+**Required when the research proposes conclusions.** 2-3 observations or
+evidence-shapes that, if encountered, would force re-investigation. Parallel
+to the `## Falsifiers` section in `lifecycle-2-design` — Hillel Wayne's
+"what would change my mind" school.
+
+Examples:
+
+- "If three or more comparator systems we initially excluded turn out to do
+  X, the conclusion 'no comparable system does X' is wrong."
+- "If a benchmark in environment Y shows the proposed approach is 10x slower
+  than the alternative, the feasibility claim falls."
+- "If domain experts in usability testing can't successfully use the proposed
+  surface within 10 minutes, the readability claim is wrong."
+
+Honest exit: "purely exploratory; no conclusions proposed" is acceptable
+when the research is exploratory; in that case this section may be omitted.
+
 ## Open Questions
 
 What this research did not resolve. What would need further investigation,
@@ -120,8 +186,18 @@ and roughly what shape that would take.
 
 ## Sources
 
-Inline citations are preferred; this section is a backstop bibliography for
-sources cited multiple times or worth promoting.
+Backstop bibliography. Every external source cited in Findings appears here
+with:
+
+- **Title**
+- **Author / org**
+- **Stable identifier** (DOI / RFC# / ISO# / ISBN / venue+year / library
+  release version + URL)
+- **Source grade** (Primary / Secondary / Tertiary — see § Source Grading)
+- **Access date** for any URL-based source
+- **Mirrored to** path if the source has been snapshotted to
+  `research/references/<topic>/` (load-bearing external sources should be
+  mirrored to defend against URL rot)
 ```
 
 The Per-Decision Rationale shape (rationale + alternatives + precedent + tradeoff) is required by `CLAUDE.md` for any locked decision. Research that proposes conclusions must satisfy it; research that's purely exploratory can defer it to the proposal that consumes the research.
@@ -144,12 +220,90 @@ Research only earns its keep if it gets read.
 
 ## Step 7: Promote-or-Cite Rule
 
-Research does not become policy by sitting on disk. There are exactly two valid endpoints:
+Research does not become policy by sitting on disk. There are exactly **four** valid endpoint states, declared in the frontmatter `status` field:
 
-1. **Promoted** — the conclusions are adopted, and the decision is written into a spec, design doc, or `docs/philosophy.md` change (with owner approval for philosophy). The research file remains as evidence; the spec is the policy.
-2. **Cited** — the research is referenced from a proposal issue, decision document, or another research file. It's load-bearing for something concrete.
+1. **`Promoted to: <canonical-link>`** — the conclusions are adopted, and the decision is written into a spec, design doc, or `docs/philosophy.md` change (with owner approval for philosophy). The research file remains as evidence; the canonical doc is the policy.
+2. **`Cited`** — the research is referenced from a proposal issue, decision document, or another research file. It's load-bearing for something concrete.
+3. **`Active`** with explicit horizon-groundwork declaration — research the project intentionally produces before downstream decisions need it. Use sparingly; overuse re-creates the shadow-policy problem under a different label. Document the intended consumer in the file (e.g., "feeds Phase N proposal for X").
+4. **`Archived`** — moved to `research/archive/` with a `archived: YYYY-MM-DD — <reason>` line in frontmatter explaining why it didn't ship.
 
-If research is neither promoted nor cited, it's shadow policy — claims with no governance. Don't let it sit there. Either promote it, cite it, or move it to `research/archive/` with a one-line note on why it didn't ship.
+A `Stale` or `Superseded by: <link>` status is also valid for research that's been overtaken by later work; the file remains in place as historical context.
+
+A research file with `status: Active` and no horizon-groundwork declaration that lacks inbound citations from `docs/` or another `research/` file is **shadow policy** by the skill's definition. The Promote-or-Cite expectation is the file-completion gate the author runs before declaring the research complete.
+
+## Source Grading
+
+Different evidence has different weight. The skill enforces three grades:
+
+| Grade | Definition | Examples |
+|---|---|---|
+| **Primary** | Standards, peer-reviewed papers, authoritative library docs with public versioning, official language specifications, RFCs, ISO standards | TC39 spec, ECMA-262, RFC 3339, ISO 4217, POPL paper, Joda-Money Javadoc, Rust Reference, TypeScript Handbook, NodaTime API docs |
+| **Secondary** | Vendor documentation, community implementations, prominent blog posts by named authors with subject-matter expertise | Stripe API docs, AWS API reference, Hillel Wayne blog posts, named-author technical articles |
+| **Tertiary** | Forum posts, knowledge claims supplemented when source is unfetchable, casual commentary | Stack Overflow answers, GitHub issue comments, training-data knowledge with no canonical source, anonymous blog posts |
+
+**Discipline:**
+
+- Designs with **only Tertiary sources** on a load-bearing decision are CONCERNs in `precept-reviewer` review.
+- The Sources section must declare the grade per source, OR the grade must be inferable from the identifier shape (RFC# → Primary, vendor URL → Secondary, training-data → Tertiary).
+- Mixing grades is normal and acceptable; the discipline is **honesty about which is which**.
+- Knowledge-from-training-data on a load-bearing claim is Tertiary and must be flagged in `## Threats to Validity`.
+
+## Citation Discipline
+
+Every external citation in Findings or Conclusions must carry:
+
+1. **Verbatim excerpt** — a short direct quote from the source (no paraphrasing, no truncation that changes meaning). The excerpt is the forcing function: it cannot be fabricated without opening the source.
+2. **Stable identifier** — for standards/academic: RFC#, DOI, ISO#, ISBN, or paper title + venue + year. For library/vendor docs: the documented version or release tag plus a URL.
+3. **Access date** — when the URL was fetched. URLs rot; access dates make claims falsifiable later.
+4. **Source grade** — declared inline or in the Sources section (see § Source Grading above).
+5. **Mirrored path** — for load-bearing external sources, the snapshot at `research/references/<topic>/<source-name>.md`. The mirror defends against URL rot and lets the reviewer verify the excerpt without re-fetching.
+
+**Unfetchable sources.** If a primary source returns 404 / 429 / paywall at fetch time, two options:
+
+- **Use a different source.** A library's Javadoc disagrees with a vendor blog? The Javadoc wins; cite it instead.
+- **Mark the claim as Tertiary and flag in Threats to Validity.** Document the failed fetch, name what was substituted (knowledge / mirror / different source), and surface that the load-bearing claim now rests on weaker evidence. Future investigation can upgrade the source.
+
+**Citation format example:**
+
+```markdown
+**JSR-354 deliberate decoupling** [Primary; access date 2026-04-13;
+mirrored to `research/references/jsr-354/user-guide-§3.2.md`]:
+
+> "JSR-354 provides MonetaryAmount as an interface, deliberately allowing
+> implementations to vary in precision and rounding model. The reference
+> implementation Moneta is capable of supporting arbitrary precision
+> and scale."
+> — JSR-354 User Guide § 3.2 Precision and Rounding
+> (https://javamoney.github.io/ri-1.4/, accessed 2026-04-13)
+```
+
+Bare citations without excerpt (e.g., "see JSR-354" or "Stripe docs confirm this") are insufficient — the verbatim excerpt is the discipline.
+
+## Behavioral Guards
+
+The skill enforces these as **refusal gates**. The skill refuses to mark a research file complete (status `Cited` / `Promoted` / `Active`) if any guard fails. Honest "no" answers are acceptable but must be declared, not skipped.
+
+1. **No status field is refused.** Every research file's frontmatter must carry a `status:` field. Missing status is a draft, not a complete artifact.
+
+2. **External-engagement declaration is required.** Research must declare `external-engagement: strong | partial | purely-internal` in frontmatter. `purely-internal` is acceptable when the research is genuinely about Precept-internal state (e.g., catalog enumeration), but must be declared explicitly. Refuse to mark complete if the question has external answers and `external-engagement: purely-internal` is declared — that's dishonest framing.
+
+3. **Verbatim excerpts on load-bearing claims.** Each claim about an external system that grounds a conclusion must carry a verbatim excerpt from the source per § Citation Discipline. Bare prose claims ("Stripe handles this by X") with no excerpt are refused.
+
+4. **`## Methodology` section is required.** Refuse research without an explicit Methodology section naming research question, search strategy, inclusion/exclusion criteria, source-grade mix, and time bounds. A single-paragraph methodology is acceptable; absence is not.
+
+5. **`## Threats to Validity` section is required.** Refuse research without an explicit Threats to Validity section. Lists the strongest reasons this conclusion might be wrong (unfetchable sources, selection bias, recency, domain mismatch). Honest exit: "No threats identified — flag for review" is acceptable when true.
+
+6. **`## What would change this conclusion` is required for research that proposes conclusions.** Refuse research that promotes a conclusion without 2-3 falsifying observations. Exploratory research that proposes no conclusion may omit this section if explicitly marked exploratory.
+
+7. **Source-grading must be honest.** Refuse research that grades training-data knowledge as Primary, or grades vendor blog posts as Primary. The grading is a discipline check; mis-grading is the same failure mode as paraphrasing a quote.
+
+8. **Promote-or-Cite at file completion.** Before declaring the research complete, the author verifies one of: inbound citation from `docs/` exists or is added in the same change-set, inbound citation from another `research/` file exists or is added, `status: Active` with horizon-groundwork declaration is documented, or the file moves to `research/archive/`. New shadow-policy files are refused.
+
+9. **Sub-folder taxonomy is enforced.** Research filed in the wrong folder per the table in § Step 2 is refused. Use the folder for the topic, not the folder convenient to the author's session.
+
+10. **Mirror load-bearing external sources.** External URLs that ground a load-bearing claim should be snapshotted to `research/references/<topic>/`. Live-URL-only citations for load-bearing decisions are CONCERNs in `precept-reviewer` review.
+
+**Honest limitation**: without docs-lint (Phase 0 out of scope), these guards depend on (a) skill text gating author behavior, (b) `precept-reviewer` post-hoc verification when invoked, (c) author discipline. The guards are obligations the skill spells out; the reviewer enforces them mechanically via grep when reviewing research-doc PRs.
 
 ## What NOT to Do
 
