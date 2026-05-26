@@ -111,6 +111,33 @@ internal static partial class TypeChecker
         };
 
     /// <summary>
+    /// Builds the resolved element-type DU for a collection field. Inspects the parsed type
+    /// reference for inner-type qualifier metadata (e.g., <c>set of money in 'USD'</c>) and
+    /// returns the appropriate <see cref="TypedElementType"/> subtype. Returns <c>null</c> for
+    /// non-collection fields (where <paramref name="elementTypeKind"/> is <c>null</c>).
+    ///
+    /// Phase 4 W-C (F-LANG-COLL-06): TypedQualifiedElement is constructed when the parser produced
+    /// a <see cref="QualifiedTypeReference"/> as the collection's element type. Phase 4 W-G adds
+    /// the <see cref="TypedChoiceElement"/> branch when the inner is a <see cref="ChoiceTypeReference"/>.
+    /// </summary>
+    private static TypedElementType? BuildTypedElementType(
+        ParsedTypeReference fieldType,
+        TypeKind? elementTypeKind,
+        CheckContext ctx)
+    {
+        if (elementTypeKind is null) return null;
+
+        if (fieldType is CollectionTypeReference coll &&
+            coll.ElementType is QualifiedTypeReference qualifiedInner)
+        {
+            var innerQualifiers = ExtractQualifiers(qualifiedInner, ctx);
+            return new TypedQualifiedElement(elementTypeKind.Value, innerQualifiers);
+        }
+
+        return new TypedScalarElement(elementTypeKind.Value);
+    }
+
+    /// <summary>
     /// Extracts <see cref="DeclaredQualifierMeta"/> values from a <see cref="QualifiedTypeReference"/>,
     /// validating each qualifier value against its catalog and emitting diagnostics for invalid values.
     /// Enforces <c>in</c>/<c>of</c> mutual exclusion for types with <see cref="QualifierShape.InOfExclusive"/>.
@@ -426,6 +453,7 @@ internal static partial class TypeChecker
         foreach (var declared in symbols.Fields)
         {
             var (resolvedType, elementType, keyType) = ResolveTypeKind(declared.Type);
+            var typedElementType = BuildTypedElementType(declared.Type, elementType, ctx);
 
             // Declared modifiers: extract ModifierKind values from ParsedModifier list
             var modifiers = declared.Modifiers
@@ -463,7 +491,7 @@ internal static partial class TypeChecker
             var typedField = new TypedField(
                 Name: declared.Name,
                 ResolvedType: resolvedType,
-                ElementType: elementType,
+                ElementType: typedElementType,
                 KeyType: keyType,
                 Modifiers: modifiers,
                 ImpliedModifiers: impliedModifiers,

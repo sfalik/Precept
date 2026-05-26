@@ -1139,7 +1139,7 @@ internal static class RichHoverFactory
             return $"`{EscapeInline(field.Name)}` · ⚖️ {qualifierSummary}";
         }
 
-        return $"`{EscapeInline(field.Name)}` · `{EscapeInline(FormatType(field.ResolvedType, field.ElementType, field.KeyType))}`";
+        return $"`{EscapeInline(field.Name)}` · `{EscapeInline(FormatType(field.ResolvedType, field.ElementType?.ResolvedTypeKind, field.KeyType))}`";
     }
 
     private static bool TryFormatCompactQualifierSummary(TypeKind ownerType, ImmutableArray<DeclaredQualifierMeta> qualifiers, out string summary)

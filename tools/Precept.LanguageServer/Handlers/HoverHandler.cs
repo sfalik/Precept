@@ -599,7 +599,7 @@ internal sealed class HoverHandler : IHoverHandler
         var lines = new List<string>
         {
             $"**field `{field.Name}`**",
-            $"Type: `{FormatType(field.ResolvedType, field.ElementType, field.KeyType)}`",
+            $"Type: `{FormatType(field.ResolvedType, field.ElementType?.ResolvedTypeKind, field.KeyType)}`",
         };
 
         if (!field.Modifiers.IsDefaultOrEmpty)

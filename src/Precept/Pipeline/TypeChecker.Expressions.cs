@@ -722,10 +722,10 @@ internal static partial class TypeChecker
             case TypeKind.Bag:
             case TypeKind.List:
             case TypeKind.QueueBy:
-                primaryType = field.ElementType ?? TypeKind.Error;
+                primaryType = field.ElementType?.ResolvedTypeKind ?? TypeKind.Error;
                 return field.ElementType is not null;
             case TypeKind.LogBy:
-                primaryType = field.ElementType ?? TypeKind.Error;
+                primaryType = field.ElementType?.ResolvedTypeKind ?? TypeKind.Error;
                 alternateType = field.KeyType;
                 return field.ElementType is not null || field.KeyType is not null;
             case TypeKind.Lookup:

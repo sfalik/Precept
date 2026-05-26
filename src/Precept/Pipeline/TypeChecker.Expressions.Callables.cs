@@ -199,7 +199,7 @@ internal static partial class TypeChecker
                 var valueExpectedType = ctx.FieldLookup.TryGetValue(fieldName, out var fieldMeta)
                     ? (colVal.Kind == ActionKind.Remove && fieldType == TypeKind.Lookup
                         ? fieldMeta.KeyType
-                        : fieldMeta.ElementType)
+                        : fieldMeta.ElementType?.ResolvedTypeKind)
                     : null;
                 var value = Resolve(colVal.Value, ctx, valueExpectedType);
 
@@ -254,7 +254,7 @@ internal static partial class TypeChecker
                 (fieldName, fieldType) = ResolveActionTarget(colBy.Target, ctx);
                 ValidateActionApplicability(colBy.Kind, fieldName, fieldType, colBy.Target.Span, ctx);
                 var valueExpectedType = ctx.FieldLookup.TryGetValue(fieldName, out var fieldMeta)
-                    ? fieldMeta.ElementType
+                    ? fieldMeta.ElementType?.ResolvedTypeKind
                     : null;
                 var keyExpectedType = ctx.FieldLookup.TryGetValue(fieldName, out var keyFieldMeta)
                     ? keyFieldMeta.KeyType
@@ -278,7 +278,7 @@ internal static partial class TypeChecker
                 (fieldName, fieldType) = ResolveActionTarget(insertAt.Target, ctx);
                 ValidateActionApplicability(insertAt.Kind, fieldName, fieldType, insertAt.Target.Span, ctx);
                 var valueExpectedType = ctx.FieldLookup.TryGetValue(fieldName, out var fieldMeta)
-                    ? fieldMeta.ElementType
+                    ? fieldMeta.ElementType?.ResolvedTypeKind
                     : null;
                 var value = Resolve(insertAt.Value, ctx, valueExpectedType);
                 var index = Resolve(insertAt.Index, ctx, TypeKind.Integer);
@@ -314,7 +314,7 @@ internal static partial class TypeChecker
                 (fieldName, fieldType) = ResolveActionTarget(put.Target, ctx);
                 ValidateActionApplicability(put.Kind, fieldName, fieldType, put.Target.Span, ctx);
                 var valueExpectedType = ctx.FieldLookup.TryGetValue(fieldName, out var fieldMeta)
-                    ? fieldMeta.ElementType
+                    ? fieldMeta.ElementType?.ResolvedTypeKind
                     : null;
                 var keyExpectedType = ctx.FieldLookup.TryGetValue(fieldName, out var keyFieldMeta)
                     ? keyFieldMeta.KeyType
@@ -1094,7 +1094,7 @@ internal static partial class TypeChecker
 
         if (receiver is TypedFieldRef fieldRef &&
             ctx.FieldLookup.TryGetValue(fieldRef.FieldName, out var field))
-            return field.ElementType;
+            return field.ElementType?.ResolvedTypeKind;
 
         return null;
     }

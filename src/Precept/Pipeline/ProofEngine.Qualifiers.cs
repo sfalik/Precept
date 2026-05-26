@@ -382,6 +382,16 @@ public static partial class ProofEngine
             case TypedMemberAccess { Object: TypedFieldRef fieldRef2 }:
                 return ResolveFieldQualifier(fieldRef2.FieldName, axis, semantics);
 
+            // Phase 4 W-C (F-LANG-COLL-06): lookup-access result inherits the lookup's
+            // element-type qualifier metadata. `(AddOnFees for K)` where AddOnFees is
+            // declared `lookup of string to money in 'USD'` resolves to a money value
+            // carrying the 'USD' currency qualifier. The lookup-access TypedBinaryOp
+            // doesn't carry a ResultQualifier today (catalog ResultType is Error +
+            // ResultTypePolicy.ElementType); the proof engine walks to the lookup field
+            // and consults its `ElementType` (TypedElementType DU).
+            case TypedBinaryOp { ResolvedOp: OperationKind.LookupAccess, Left: TypedFieldRef lookupFieldRef }:
+                return ResolveElementQualifier(lookupFieldRef.FieldName, axis, semantics);
+
             case InterpolatedTypedConstant itc:
                 return ResolveQualifierFromInterpolatedConstant(itc, axis);
 
@@ -676,6 +686,27 @@ public static partial class ProofEngine
         QualifierUnitHelpers.TryDeriveUnitDimensionName(unitCode, out dimensionName);
 
     /// <summary>Look up a field's qualifier on a specific axis (with standard fallbacks).</summary>
+    /// <summary>
+    /// Resolves a qualifier on the element-type of a collection field. Used for lookup-access
+    /// and (future W-G) element-returning accessors on qualified-inner-type collections.
+    /// Returns the matching qualifier from <see cref="TypedQualifiedElement.DeclaredQualifiers"/>
+    /// when the element type is qualified; <c>null</c> otherwise.
+    /// </summary>
+    private static DeclaredQualifierMeta? ResolveElementQualifier(
+        string fieldName, QualifierAxis axis, SemanticIndex semantics)
+    {
+        if (!semantics.FieldsByName.TryGetValue(fieldName, out var field))
+            return null;
+
+        if (field.ElementType is TypedQualifiedElement qualifiedElement)
+        {
+            foreach (var q in qualifiedElement.DeclaredQualifiers)
+                if (q.Axis == axis) return q;
+        }
+
+        return null;
+    }
+
     private static DeclaredQualifierMeta? ResolveFieldQualifier(
         string fieldName, QualifierAxis axis, SemanticIndex semantics)
     {

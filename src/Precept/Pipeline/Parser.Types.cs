@@ -163,43 +163,8 @@ public static partial class Parser
             {
                 Advance(); // consume 'to'
                 keyType = elementType; // In lookup, the first type is the key
-                elementType = ParseInnerTypeReference(); // second is value
+                elementType = ParseInnerTypeReference(); // second is value (Phase 4 W-C: qualifier-bearing)
                 lastSpan = elementType.Span;
-
-                // Symptom fix (BUG-005): full qualified-inner-type support is
-                // deferred to F-LANG-COLL-06 (Phase 4). Until then, accepting a
-                // trailing `in '...'` or `of '...'` qualifier on the value type
-                // would either cascade as parser noise (currency case: `money in 'USD'`)
-                // or hand a stray preposition back to the declaration parser
-                // (dimension case: `quantity of 'mass'`). Detect that shape here,
-                // emit a single PRE0105 CollectionInnerTypeError, and consume the
-                // qualifier tokens so the surrounding parse stays clean.
-                if (Peek().Kind is TokenKind.In or TokenKind.Of)
-                {
-                    var qualifierStart = Peek().Span;
-                    var qualifierEnd = qualifierStart;
-                    var elementMeta = elementType is SimpleTypeReference simple ? simple.Type : null;
-                    var elementName = elementMeta?.DisplayName ?? "value";
-
-                    while (Peek().Kind is TokenKind.In or TokenKind.Of)
-                    {
-                        qualifierEnd = Advance().Span; // consume preposition
-                        if (Peek().Kind is TokenKind.TypedConstant or TokenKind.StringLiteral
-                            or TokenKind.Identifier)
-                        {
-                            qualifierEnd = Advance().Span; // consume qualifier value
-                        }
-                    }
-
-                    var qualifierSpan = SourceSpan.Covering(qualifierStart, qualifierEnd);
-                    _diagnostics.Add(DiagnosticsCatalog.Create(
-                        DiagnosticCode.CollectionInnerTypeError,
-                        qualifierSpan,
-                        $"unqualified {elementName}",
-                        "lookup value",
-                        $"qualified {elementName}"));
-                    lastSpan = qualifierSpan;
-                }
             }
             else if ((collectionMeta.Kind is TypeKind.LogBy or TypeKind.QueueBy) && Peek().Kind == TokenKind.By)
             {
@@ -233,7 +198,13 @@ public static partial class Parser
         }
 
         /// <summary>
-        /// Parses a simple inner type (no nested collections) for collection element types.
+        /// Parses an inner type (no nested collections) for collection element types.
+        /// Phase 4 W-C (F-LANG-COLL-06): a simple inner type that has a <see cref="QualifierShape"/>
+        /// (money / quantity / price / exchangerate) accepts a trailing qualifier list
+        /// (<c>set of money in 'USD'</c>, <c>lookup of K to quantity of 'mass'</c>, etc.).
+        /// The qualifier-bearing form is parsed via the same <see cref="TryParseQualifiers"/>
+        /// helper used at top-level type position; the type checker resolves the qualifier
+        /// metadata into a <see cref="TypedQualifiedElement"/> on the typed field.
         /// </summary>
         private ParsedTypeReference ParseInnerTypeReference()
         {
@@ -258,7 +229,8 @@ public static partial class Parser
             if (Types.ByToken.TryGetValue(lookupTokenKind, out var typeMeta))
             {
                 var typeToken = Advance();
-                return new SimpleTypeReference(typeMeta, typeToken.Span);
+                var simpleRef = new SimpleTypeReference(typeMeta, typeToken.Span);
+                return TryParseQualifiers(simpleRef, typeMeta);
             }
 
             return new MissingTypeReference(peekToken.Span);

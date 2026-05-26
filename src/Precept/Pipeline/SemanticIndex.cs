@@ -297,6 +297,48 @@ public sealed record TypedBindingAction(
 ) : TypedAction(Kind, FieldName, FieldType, ProofRequirements, Span);
 
 // ════════════════════════════════════════════════════════════════════════════
+//  TypedElementType DU — resolved element-type metadata for collection inner types
+//
+//  Discriminated union (Phase 4 W-C, COLL-02/03 design D-2). The bare TypeKind?
+//  that previously occupied this slot couldn't carry qualifier metadata for
+//  qualified inner types (set of money in 'USD', lookup of K to quantity of
+//  'mass', etc.) nor the Ordered bit for ordered-choice inner types. The DU
+//  unifies all three cases:
+//   - TypedScalarElement   — plain scalar/business/temporal element (no extra metadata)
+//   - TypedChoiceElement   — choice-element with optional Ordered trait (W-G)
+//   - TypedQualifiedElement — element with qualifier metadata (W-C: COLL-06)
+//
+//  Consumers that only need the resolved TypeKind read `.ResolvedTypeKind` on
+//  the base. Consumers that need qualifier or ordering metadata pattern-match
+//  on the subtype.
+// ════════════════════════════════════════════════════════════════════════════
+
+/// <summary>Base of the resolved element-type DU for collection inner types.</summary>
+public abstract record TypedElementType(TypeKind ResolvedTypeKind);
+
+/// <summary>Plain scalar/business/temporal element type — no qualifier or trait metadata.</summary>
+public sealed record TypedScalarElement(TypeKind ResolvedTypeKind)
+    : TypedElementType(ResolvedTypeKind);
+
+/// <summary>
+/// Choice-element type. <c>Ordered</c> reflects the inner type's <c>ordered</c>
+/// modifier (Phase 4 W-G), carried at the type level so accessor return types
+/// can propagate it through <c>.first</c>/<c>.last</c>/<c>.at(N)</c>/<c>.min</c>/<c>.max</c>.
+/// </summary>
+public sealed record TypedChoiceElement(TypeKind ResolvedTypeKind, bool Ordered)
+    : TypedElementType(ResolvedTypeKind);
+
+/// <summary>
+/// Qualified element type — carries the qualifier metadata declared on the
+/// inner type (e.g., <c>set of money in 'USD'</c> → <c>TypedQualifiedElement(Money, [Currency(USD)])</c>).
+/// Phase 4 W-C (F-LANG-COLL-06).
+/// </summary>
+public sealed record TypedQualifiedElement(
+    TypeKind ResolvedTypeKind,
+    ImmutableArray<DeclaredQualifierMeta> DeclaredQualifiers)
+    : TypedElementType(ResolvedTypeKind);
+
+// ════════════════════════════════════════════════════════════════════════════
 //  Symbol records
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -304,7 +346,7 @@ public sealed record TypedBindingAction(
 public sealed record TypedField(
     string Name,
     TypeKind ResolvedType,
-    TypeKind? ElementType,
+    TypedElementType? ElementType,
     TypeKind? KeyType,
     ImmutableArray<ModifierKind> Modifiers,
     ImmutableArray<ModifierKind> ImpliedModifiers,

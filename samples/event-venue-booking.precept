@@ -12,11 +12,11 @@ precept EventVenueBooking
 #
 # Free-Construction: the venue coordinator enriches a Draft over time.
 # Required-at-inquiry fields are declared optional and gated by SubmitInquiry's
-# event ensures. Add-on services are tracked as a `set of string` for
-# membership; the per-service fee lookup that the canonical pattern would pair
-# alongside is omitted because of BUG-005 (`lookup of string to money in 'USD'`
-# crashes the compiler). Instead, RemoveService takes the fee back as an event
-# argument so AddOnTotal can be decremented directly.
+# event ensures. Add-on services use the canonical paired pattern: a `set of
+# string` AddOnServices for membership, plus a `lookup of string to money in
+# 'USD'` AddOnFees for per-service amounts. (Phase 4 W-C / F-LANG-COLL-06 ships
+# qualified inner types in collections, unblocking the lookup-of-qualified-money
+# pattern that was previously workarounded with an event-arg-carried fee.)
 
 # Identity
 field BookingId as string optional maxlength 50
@@ -53,12 +53,13 @@ field FinalPayment as money in 'USD' default '0.00 USD'
 field AmountPaid as money in 'USD' <- DepositPaid + FinalPayment
 field OutstandingBalance as money in 'USD' <- QuotedTotal - AmountPaid
 
-# Add-on services — set tracks membership. The companion per-service fee
-# lookup that this pattern usually pairs alongside is omitted because of
-# BUG-005 (lookup of K to qualified-money crashes the compiler). RemoveService
-# takes the fee back as an event argument so the row can decrement AddOnTotal
-# without consulting a per-key table.
+# Add-on services — set tracks membership; lookup carries per-service fees.
+# AddOnServices is the source of truth for "what's currently on the booking";
+# AddOnFees maps service name → fee. Both are kept in sync by the AddService /
+# RemoveService rows; reads flow through `AddOnServices contains` guards so
+# AddOnFees entries are never accessed without key-presence proof.
 field AddOnServices as set of string
+field AddOnFees as lookup of string to money in 'USD'
 field AddOnCount as integer default 0 nonnegative
 
 # Refund-window state — flipped by host events when calendar boundaries pass.
@@ -139,7 +140,7 @@ in Booked modify SetupStartTime, CleanupEndTime editable
 event SubmitInquiry
 event DeclineInquiry(Reason as string notempty)
 event AddService(ServiceName as string notempty, Fee as money in 'USD')
-event RemoveService(ServiceName as string notempty, Fee as money in 'USD')
+event RemoveService(ServiceName as string notempty)
 event Quote(BaseFee as money in 'USD', PerGuest as money in 'USD', Deposit as money in 'USD')
 event PayDeposit(Amount as money in 'USD')
 event ConfirmBooking
@@ -163,7 +164,6 @@ on SubmitInquiry ensure ExpectedGuestCount is set because "Expected guest count 
 on SubmitInquiry ensure VenueSpace is set because "Venue space must be chosen before inquiry"
 
 on AddService ensure AddService.Fee >= '0.00 USD' because "Add-on service fee cannot be negative"
-on RemoveService ensure RemoveService.Fee >= '0.00 USD' because "Removed-service fee cannot be negative"
 
 on Quote ensure Quote.BaseFee > '0.00 USD' because "Base venue fee must be positive"
 on Quote ensure Quote.PerGuest >= '0.00 USD' because "Per-guest fee cannot be negative"
@@ -200,21 +200,22 @@ from Inquiry, Quoted on AddService when AddOnServices contains AddService.Servic
     -> reject "Service {AddService.ServiceName} already added — remove it first if the fee needs to change"
 from Inquiry, Quoted on AddService
     -> add AddOnServices AddService.ServiceName
+    -> put AddOnFees AddService.ServiceName = AddService.Fee
     -> set AddOnTotal = AddOnTotal + AddService.Fee
     -> set AddOnCount = AddOnCount + 1
     -> append BookingLog AddService.ServiceName
     -> no transition
 
-# Remove a service — host supplies the original fee so AddOnTotal can be
-# decremented without a per-service fee lookup (see BUG-005 note at top of file).
+# Remove a service — reads the fee back from AddOnFees so AddOnTotal can be
+# decremented without trusting an event-arg. The membership guard on
+# AddOnServices discharges key-presence proof for the AddOnFees read.
 from Inquiry, Quoted on RemoveService when not (AddOnServices contains RemoveService.ServiceName)
     -> reject "Service {RemoveService.ServiceName} not on this booking — nothing to remove"
-from Inquiry, Quoted on RemoveService when RemoveService.Fee > AddOnTotal
-    -> reject "Removed-service fee {RemoveService.Fee} exceeds current add-on total {AddOnTotal} — supplied fee doesn't match the original add"
 from Inquiry, Quoted on RemoveService
-    -> set AddOnTotal = AddOnTotal - RemoveService.Fee
+    -> set AddOnTotal = AddOnTotal - (AddOnFees for RemoveService.ServiceName)
     -> set AddOnCount = AddOnCount - 1
     -> remove AddOnServices RemoveService.ServiceName
+    -> remove AddOnFees RemoveService.ServiceName
     -> append BookingLog RemoveService.ServiceName
     -> no transition
 

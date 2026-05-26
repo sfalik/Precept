@@ -174,34 +174,34 @@ public class CompileTool_BugReproTests
     }
 
     [Fact]
-    public void Bug005_LookupOfMoneyInCurrency_EmitsCollectionInnerTypeError()
+    public void Bug005_LookupOfMoneyInCurrency_CompilesClean()
     {
-        // BUG-005 symptom fix (Step 2.2c): full qualified-inner-type support is
-        // deferred to F-LANG-COLL-06 (Phase 4). Until then the parser emits a
-        // single PRE0105 instead of cascading three garbled parse diagnostics
-        // or crashing the compiler.
+        // BUG-005 root-cause fix (Phase 4 W-C, F-LANG-COLL-06): qualified inner types
+        // in collections now compile clean. Was a parser symptom-fix in Phase 2 emitting
+        // PRE0105; Phase 4 W-C lifted the qualifier rejection by extending
+        // ParseInnerTypeReference to call TryParseQualifiers and the type checker to
+        // build TypedQualifiedElement.
         var result = CompileTool.Compile(
             "precept Repro\n" +
             "field F as lookup of string to money in 'USD'\n" +
             "state Draft initial terminal\n");
 
-        result.Success.Should().BeFalse();
-        result.Diagnostics.Should().ContainSingle(d => d.Code == "PRE0105");
+        result.Success.Should().BeTrue();
+        result.Diagnostics.Should().BeEmpty();
     }
 
     [Fact]
-    public void Bug005_LookupOfQuantityOfDimension_EmitsCollectionInnerTypeError()
+    public void Bug005_LookupOfQuantityOfDimension_CompilesClean()
     {
-        // Symmetric to the currency case — both qualified-inner-type shapes now
-        // yield the same single PRE0105 instead of the dimension-cascade noise
-        // they produced before Step 2.2c.
+        // Symmetric to the currency case — Phase 4 W-C lifts the qualifier rejection
+        // for both 'in <currency>' and 'of <dimension>' shapes.
         var result = CompileTool.Compile(
             "precept Repro\n" +
             "field F as lookup of string to quantity of 'mass'\n" +
             "state Draft initial terminal\n");
 
-        result.Success.Should().BeFalse();
-        result.Diagnostics.Should().ContainSingle(d => d.Code == "PRE0105");
+        result.Success.Should().BeTrue();
+        result.Diagnostics.Should().BeEmpty();
     }
 
     [Fact]

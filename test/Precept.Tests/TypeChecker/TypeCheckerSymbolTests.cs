@@ -142,7 +142,7 @@ public class TypeCheckerSymbolTests
         var field = index.Fields.Single(f => f.Name == "Items");
 
         field.ResolvedType.Should().Be(TypeKind.Set);
-        field.ElementType.Should().Be(TypeKind.String);
+        field.ElementType?.ResolvedTypeKind.Should().Be(TypeKind.String);
     }
 
     [Fact]
@@ -158,7 +158,7 @@ public class TypeCheckerSymbolTests
         var field = index.Fields.Single(f => f.Name == "Pending");
 
         field.ResolvedType.Should().Be(TypeKind.Queue);
-        field.ElementType.Should().Be(TypeKind.Number);
+        field.ElementType?.ResolvedTypeKind.Should().Be(TypeKind.Number);
     }
 
     [Fact]
@@ -174,7 +174,7 @@ public class TypeCheckerSymbolTests
         var field = index.Fields.Single(f => f.Name == "Steps");
 
         field.ResolvedType.Should().Be(TypeKind.Stack);
-        field.ElementType.Should().Be(TypeKind.Boolean);
+        field.ElementType?.ResolvedTypeKind.Should().Be(TypeKind.Boolean);
     }
 
     [Fact]
@@ -190,7 +190,7 @@ public class TypeCheckerSymbolTests
         var field = index.Fields.Single(f => f.Name == "AuditTrail");
 
         field.ResolvedType.Should().Be(TypeKind.Log);
-        field.ElementType.Should().Be(TypeKind.String);
+        field.ElementType?.ResolvedTypeKind.Should().Be(TypeKind.String);
     }
 
     [Fact]
@@ -206,7 +206,7 @@ public class TypeCheckerSymbolTests
         var field = index.Fields.Single(f => f.Name == "Approvers");
 
         field.ResolvedType.Should().Be(TypeKind.List);
-        field.ElementType.Should().Be(TypeKind.Integer);
+        field.ElementType?.ResolvedTypeKind.Should().Be(TypeKind.Integer);
     }
 
     [Fact]
@@ -222,7 +222,7 @@ public class TypeCheckerSymbolTests
         var field = index.Fields.Single(f => f.Name == "CartItems");
 
         field.ResolvedType.Should().Be(TypeKind.Bag);
-        field.ElementType.Should().Be(TypeKind.String);
+        field.ElementType?.ResolvedTypeKind.Should().Be(TypeKind.String);
     }
 
     [Fact]
