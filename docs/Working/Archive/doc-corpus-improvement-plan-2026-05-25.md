@@ -1,9 +1,9 @@
 ---
 status: Draft plan — 2026-05-25 (extended with Phases 8-11 from research-system evaluation)
 sources:
-  - docs/Working/doc-corpus-evaluation-opus.md
-  - docs/Working/skills-rigor-evaluation-opus.md
-  - docs/Working/research-system-evaluation-opus.md
+  - docs/Working/Archive/doc-corpus-evaluation-opus.md
+  - docs/Working/Archive/skills-rigor-evaluation-opus.md
+  - docs/Working/Archive/research-system-evaluation-opus.md
 purpose: Execute the combined improvements surfaced by three Opus evaluations — restore corpus trust, scaffold AI-agent discovery, operationalize philosophy alignment, strengthen design and review rigor, reduce structural drift, and close the rhetorical-vs-real gap in research/citation discipline
 ---
 

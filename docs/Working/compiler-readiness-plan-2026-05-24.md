@@ -281,7 +281,7 @@ Phase 1 has 6 parallelizable workstreams. Skills enable later workstreams (build
 - Used to verify Phase 1 itself at end (meta-consistent)
 
 #### Step A.6 — Apply CONTRIBUTING.md updates (~30-45 min)
-- Apply `docs/Working/contributing-updates-draft.md` per its embedded "Implementation notes for Phase 1"
+- Apply `docs/Working/Archive/contributing-updates-draft.md` per its embedded "Implementation notes for Phase 1" (archived 2026-05-25 — content has shipped into `CONTRIBUTING.md`)
 - Cross-link from CLAUDE.md "Documentation Sync (Non-Negotiable)" section
 - Verify all 5 lifecycle skill names appear in CONTRIBUTING.md
 

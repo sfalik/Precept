@@ -120,7 +120,7 @@ The lifecycle skills are the corpus's structural ambition. They are doing real w
 
 But three structural issues:
 
-1. **The skills are advisory, not enforcing.** The previous evaluation (`docs/Working/skills-rigor-evaluation-opus.md`) already documented this with in-tree evidence (`field-never-set-diagnostic.md` locked without any required sections). I'll note it only: until a lint pass exists, the discipline is rhetorical. This is the most important single observation about the skill system.
+1. **The skills are advisory, not enforcing.** The previous evaluation (`docs/Working/Archive/skills-rigor-evaluation-opus.md`) already documented this with in-tree evidence (`field-never-set-diagnostic.md` locked without any required sections). I'll note it only: until a lint pass exists, the discipline is rhetorical. This is the most important single observation about the skill system.
 
 2. **The skills are agent-targeted but written as if for humans.** They use second-person prose ("Read these before writing any section"), narrative explanations of why discipline matters, and behavioral guards stated as "refuses to do X". An agent reads these and forms an intent; whether the intent translates to behavior depends on whether the agent re-reads the skill at the right moment. The skills could be more agent-friendly with explicit checklists, decision trees, and stop-points written as imperative actions rather than principles.
 
@@ -235,7 +235,7 @@ But three structural issues:
 **Severity:** CRITICAL  
 **Comparison:** Rust RFC discipline is enforced by FCP team review; TC39 stage advancement is a vote — both have mechanical gates the skill system here lacks.
 
-**What:** The lifecycle skills say "refuses to lock without N" multiple times but cannot enforce. (Detailed in `docs/Working/skills-rigor-evaluation-opus.md`.) Carried here only to note it as the largest single ceiling on the skill system's value.  
+**What:** The lifecycle skills say "refuses to lock without N" multiple times but cannot enforce. (Detailed in `docs/Working/Archive/skills-rigor-evaluation-opus.md`.) Carried here only to note it as the largest single ceiling on the skill system's value.  
 **Why it matters for AI-agent work:** All downstream rigor (four-leg rationale, citation-with-excerpt, doc-touch enumeration) is forfeited the moment a Locked status can be applied without those checks. Agents will internalize the rhetorical level as the actual bar.  
 **Evidence:** Previous evaluation, F-1 in that doc.  
 **Recommendation:** As in previous evaluation — ship a `lifecycle-2-lint` companion. Not redundant with this evaluation; the doc-corpus side needs the same forcing function (a doc-corpus lint that catches catalog count drift, dangling references, status-taxonomy violations, etc.).

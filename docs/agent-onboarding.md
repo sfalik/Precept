@@ -58,7 +58,7 @@ Precept work flows through a 7-stage engineering lifecycle, each backed by a ski
 
 ### Concept 4: Pointer-philosophy and doc-sync
 
-Canonical content is **pointed-to**, not duplicated. The catalog system enforces this in code; the doc corpus follows the same discipline. When two docs both describe the SemanticIndex, one of them is canonical and the other points to it. Drift between docs is a real failure mode and the corpus has had episodes of it ([the doc-corpus evaluation](Working/doc-corpus-evaluation-opus.md) catalogued them).
+Canonical content is **pointed-to**, not duplicated. The catalog system enforces this in code; the doc corpus follows the same discipline. When two docs both describe the SemanticIndex, one of them is canonical and the other points to it. Drift between docs is a real failure mode and the corpus has had episodes of it ([the doc-corpus evaluation](Working/Archive/doc-corpus-evaluation-opus.md) catalogued them).
 
 **Doc-sync rule:** code, interface, test, or behavior changes update docs **in the same pass**. Implementations and the docs that describe them ship together; aspirational claims in a `Implemented` doc are drift that must be fixed in the same edit. The CLAUDE.md § Documentation Sync routing table tells you which doc to update for which kind of change.
 

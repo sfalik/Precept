@@ -4,8 +4,8 @@ evaluator: Opus 4.7 (independent)
 subject: Precept research system — research/ corpus + lifecycle-1-research skill + Stage 1→2 handoff
 purpose: Assess whether design decisions are actually grounded in research as claimed; surface Phase 8+ candidates for the corpus-improvement plan
 prior-evaluations:
-  - docs/Working/skills-rigor-evaluation-opus.md
-  - docs/Working/doc-corpus-evaluation-opus.md
+  - docs/Working/Archive/skills-rigor-evaluation-opus.md
+  - docs/Working/Archive/doc-corpus-evaluation-opus.md
 ---
 
 # Research System Evaluation
