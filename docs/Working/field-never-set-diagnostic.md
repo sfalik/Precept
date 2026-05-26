@@ -1,6 +1,7 @@
 ---
 status: Externally-Grounded 2026-05-25 (v3 — Phase 8 Phase-4 retrofit; demoted from Locked pending pre-implementation comparator survey for Decision 5)
 phase-target: Phase 5 (Proof engine satisfiability — dead-code family); access-modifier unification co-ships
+comparable-systems-research-status: partial — Decision 5 (keyword unification, `Stakes: irreversible`) cites TypeScript and Kotlin precedent inline with verifiable excerpts; Rust and SQL claims need full survey before re-Lock. Per `lifecycle-2-design § Research-adequacy gate`, the gate exit is `partial`; the `next-step` under `research-status` below names the Phase 8/10 prerequisite (Stage-1 research file at `research/language/expressiveness/access-modifier-keyword-unification.md`).
 supersedes: v1 (2026-05-25 morning), v2 (2026-05-25 evening — Locked without Phase 4 leg structure)
 sources-consulted:
   - docs/Working/Archive/field-state-guarantees-v2.md — originating design (v1) — Layer 1 / Layer 2 composition model

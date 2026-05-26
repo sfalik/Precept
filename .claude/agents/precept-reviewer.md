@@ -300,6 +300,40 @@ Beyond verifying cited sources (§ 13), specific design-change categories requir
 
 The reviewer reports the mandatorily-checked sources in its `sources-mandatorily-checked` frontmatter (alongside `sources-verified`). Missing entries for a triggered category is a process CONCERN.
 
+## Mandatory comparator-checking by topic (Phase 11 addition — irreversible-decision designs)
+
+When reviewing a design with any `Stakes: irreversible` decision (per `lifecycle-2-design` § Research-adequacy gate), the reviewer always checks the design covers the expected external comparators for each topic its prose touches. This is parallel to "Mandatory source-checking by change category" above, but the unit is **comparator system** rather than **in-tree file** — the comparators are the prior art the design must engage with to defend an irreversible choice.
+
+The design clears this check by one of three exits (per the design skill's `comparable-systems-research-status` frontmatter field):
+
+- **`strong`**: the design cites a research file in `research/` that surveyed the comparators with verbatim excerpts. The reviewer follows the citation, verifies the comparator coverage matches the topic, and verifies the research meets Stage-1 quality.
+- **`partial`**: the design carries an inline survey per decision. The reviewer verifies each comparator named in the table has a corresponding inline excerpt + access date + stable identifier somewhere in the design's per-decision legs.
+- **`not-applicable`**: declared in frontmatter with one-line justification. The reviewer cross-checks against the topic's prose — if the design names external systems while declaring `not-applicable`, the declaration is incoherent and that's a CONCERN.
+
+| Topic the design touches | Mandatory comparators (design cites these — research file OR inline survey OR explicit "not-applicable") |
+|---|---|
+| **Access modifiers** (writable / readonly / visibility) | Rust references, TypeScript references, Kotlin references, Java references |
+| **Temporal types** (datetime / date / time / duration / period / timezone) | Joda-Time / java.time, Python `datetime`, NodaTime, Rust `chrono`, Pendulum |
+| **Money / currency** (precision, rounding, currency identity) | Joda-Money, JSR-354, NodaMoney, Stripe API, Adyen API |
+| **Constraint composition** (rules, ensures, validation) | CEL, OPA / Rego, CUE, FluentValidation |
+| **State machines** (states, transitions, lifecycle) | xstate, Stateless.NET, SCXML |
+| **Parser architecture** (PEG / recursive descent / Pratt / combinators) | Roslyn, ANTLR, Pratt (original Pratt 1973), PEG (Ford 2004), Superpower |
+| **Proof systems** (SMT / bounded discharge / refinement types) | Dafny, Liquid Haskell, SPARK Ada, CBMC, Frama-C |
+| **Quantity / units of measure** (UoM / dimensional analysis) | UCUM, NIST SP 811, Pint (Python), units library (Haskell), F# `[<Measure>]` |
+| **Type system** (subtyping / variance / qualifier propagation) | Roslyn, TypeScript, Rust trait system, Scala 3 |
+| **Diagnostic surface** (error messages / recovery / classification) | Roslyn analyzer SDK, rustc error model, Elm compiler error design |
+
+**How the reviewer uses this table:**
+
+1. Scan the design's prose for topic-keywords. Mark which rows of the table the design touches.
+2. For each marked row, check that the design either (a) cites a research file whose `sources-consulted` covers the listed comparators, OR (b) carries inline survey legs naming the comparators with verbatim excerpts + access dates + stable identifiers, OR (c) declares `not-applicable` in frontmatter with a justification that's coherent against the design's prose.
+3. Missing comparators on an irreversible decision → BLOCKER. Missing comparators on a high-stakes (non-irreversible) decision → CONCERN. Missing comparators where the design's prose names the comparator but no citation exists → CONCERN regardless of stakes.
+4. Report findings in `comparators-checked` frontmatter (alongside `sources-verified` and `sources-mandatorily-checked`): list each row of the table the design touched, and the resolution (cited via research / inline survey / not-applicable / missing).
+
+**Honest limitation**: this table will become stale as Precept's scope evolves. Maintenance obligation: `/lifecycle-7-audit` (when shipped) periodically reviews the table against the current scope. Until then, the table is updated opportunistically when a design surfaces a new topic that doesn't have a row.
+
+**Cross-link**: the design-side enforcement lives in `.claude/skills/lifecycle-2-design/SKILL.md § Staged advancement § Research-adequacy gate` and Behavioral Guard 16.
+
 ## How to report findings
 
 For each finding:

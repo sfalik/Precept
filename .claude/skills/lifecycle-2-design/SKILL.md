@@ -54,6 +54,7 @@ A markdown file at `docs/Working/<topic-slug>.md` with these sections:
 ---
 status: <Draft | Semantics-Stated | Externally-Grounded | Locked YYYY-MM-DD>
 phase-target: <Phase N from current readiness plan, or 'TBD'>
+comparable-systems-research-status: <strong | partial | not-applicable — <one-line justification>>
 sources-consulted:
   - <opaque source identifier>: <one-line note on what was checked>
   - <opaque source identifier>: <one-line note>
@@ -338,9 +339,21 @@ ladder through all four.
 | **Draft** | Decision text written; stakes classified per decision. May skip directly to Locked for designs where every decision is `Stakes: low` and no language-surface change. |
 | **Semantics-Stated** | + Semantic Rules section present (if affected by guard 4) + Decision text + per-decision Rationale and Tradeoff |
 | **Externally-Grounded** | + Language Design Grounding (if affected by guard 2) + Architecture Grounding with external precedent (if affected by guard 5) + per-decision Sources consulted (with excerpts) + per-decision Counter-evidence (for high+ stakes) |
-| **Locked YYYY-MM-DD** | + Philosophy Alignment matrix filled + Audience and Teachability (if language surface) + Acceptance criteria + Doc-update enumeration + Falsifiers (if external-author-visible) + Reversibility / Blast radius legs (for high+ stakes) + No open questions |
+| **Locked YYYY-MM-DD** | + Philosophy Alignment matrix filled + Audience and Teachability (if language surface) + Acceptance criteria + Doc-update enumeration + Falsifiers (if external-author-visible) + Reversibility / Blast radius legs (for high+ stakes) + No open questions + **Research-adequacy verified (if any `Stakes: irreversible` decision)** |
 
 Cooling-off requirement: a design with any `Stakes: irreversible` decision must hold `status: Externally-Grounded` for at least 24 hours before advancing to `Locked`. The cooling-off is structural — it forces a second-pass review of the design after time away.
+
+### Research-adequacy gate (irreversible decisions)
+
+Designs with at least one `Stakes: irreversible` decision must clear a research-adequacy check before advancing to `Locked`. The gate has three honest exits, exactly one of which must apply:
+
+- **(a) Research-cited**: the design cites a research file in `research/` that surveyed the relevant comparable systems with verbatim excerpts and meets `/lifecycle-1-research` Stage-1 quality. The cited file must appear in `sources-consulted` and in at least one per-decision `Sources consulted for this decision:` leg. Frontmatter declares `comparable-systems-research-status: strong`.
+- **(b) Inline-survey**: per-decision comparable-systems survey is carried inline — for each external system named in the decision's prose, the leg supplies a verbatim excerpt, an access date, and a stable identifier (file path, RFC#, DOI, paper title + venue + year, or live URL with mirror). The inline survey meets the same discipline as a Stage-1 research artifact; the cumulative legs across decisions cover every comparator named. Frontmatter declares `comparable-systems-research-status: partial`.
+- **(c) Not-applicable**: the design genuinely makes no comparable-systems claims. The frontmatter declares `comparable-systems-research-status: not-applicable — <one-line justification>` (e.g., "purely Precept-internal placement decision; no language-surface or architectural-precedent claim"). Reviewer treats this exit as a CONCERN if the design's prose nonetheless names external systems.
+
+The gate is enforced by skill-text obligation + reviewer-agent invocation (see `.claude/agents/precept-reviewer.md § Mandatory comparator-checking by topic`). Without docs-lint (Phase 0 deferred), authors who skip the reviewer can ship past the gate; the discipline is author-side + reviewer-side, not build-time.
+
+See `research/INDEX.md` for the cross-corpus topic-to-file map when looking for a citable research file. The reviewer's topic-to-comparator table lists the comparators expected for each topic surface.
 
 **Lightweight path for low-stakes designs.** When every decision is `Stakes: low` and no language-surface or pipeline/catalog/API change is involved, the skill compresses Draft → Locked in one session. Required content shrinks accordingly (per the legs-by-stakes table). The skill flags any decision that looks high-stakes but is marked `low` — that's a stakes-classification error, not a fast-path.
 
@@ -381,6 +394,8 @@ The skill enforces:
 
 15. **Operational dimensions required when triggered.** If the design touches source-text ingestion (lexer/parser/MCP input), a Security prompt must be addressed. If it touches runtime evaluation or diagnostic surface, an Observability prompt must be addressed. If it depends on an external standard (NodaTime, ICU, UCUM, ISO 4217, TZDB), an Evolvability prompt must be addressed. Skipping a triggered prompt without explicit "N/A — <reason>" is refused.
 
+16. **Research-adequacy gate for irreversible decisions.** A design with any `Stakes: irreversible` decision cannot advance to `Locked` until research-adequacy is verified (see § Staged advancement § Research-adequacy gate). The author must declare exactly one of: `comparable-systems-research-status: strong` (cites a Stage-1 research file in `research/`), `partial` (inline survey per decision meets Stage-1 discipline), or `not-applicable` (with one-line justification). Missing `comparable-systems-research-status` frontmatter on an irreversible-decision design is refused. The gate is cross-checked against the reviewer's `Mandatory comparator-checking by topic` table; topics named in decision prose that lack the expected comparator citations are flagged as a CONCERN.
+
 ## Composability
 
 - **Input**: human-discipline obligation — if a `research/` file exists for the design's topic, the author must read it before locking, cite it in `sources-consulted`, and copy verbatim excerpts into per-decision `Sources consulted for this decision:` legs for any claim the research grounds. The historical `--from <research-doc>` flag was a rhetorical claim — no implementation; designs that cited it produced no operational difference. Removed in Phase 8 (2026-05-25) along with the empirical finding that no in-tree design had ever used it.
@@ -417,3 +432,5 @@ The skill enforces:
 | Language Design Grounding cites only Precept-internal docs | Refuse; require engagement with broader field (comparable systems or PLT) |
 | Pipeline/API/catalog change with no Architecture Grounding | Refuse; require layer placement + propagation + breaking change assessment |
 | Architecture Grounding propagation category left blank | Refuse; require explicit "None" or impact description per category |
+| Irreversible decision with no `comparable-systems-research-status` frontmatter | Refuse; require one of `strong` / `partial` / `not-applicable — <justification>` |
+| Decision prose names external systems but no comparator citations | Refuse; require either Stage-1 research citation or inline survey legs |
