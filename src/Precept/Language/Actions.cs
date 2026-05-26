@@ -148,6 +148,11 @@ public static class Actions
             "Append an element with an ordering key to a log-by",
             [new(TypeKind.LogBy)],
             ActionSyntaxShape.CollectionValueBy, ValueRequired: true,
+            ProofRequirements:
+            [
+                new KeyPresenceProofRequirement(new SelfSubject(), RequireAbsence: true,
+                    "Ordering key must not already exist in the log-by (uniqueness)"),
+            ],
             AllowedIn: AllActionContexts,
             PrimaryActionKind: ActionKind.Append,
             HoverDescription: "Appends an element with an explicit ordering key to a log-by field. Requires 'when not (F contains P)' guard."),

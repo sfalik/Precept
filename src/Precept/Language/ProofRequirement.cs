@@ -187,6 +187,29 @@ public sealed record KeyPresenceProofRequirement(
     string Description
 ) : ProofRequirement(ProofRequirementKind.KeyPresence, Description);
 
+/// <summary>Bounds inclusion mode for an <see cref="IndexBoundsProofRequirement"/>.</summary>
+public enum IndexBoundsMode
+{
+    /// <summary>Index N must satisfy <c>0 &lt;= N &lt; F.count</c> — for <c>.at(N)</c> and <c>remove at N</c>.</summary>
+    StrictlyBefore = 1,
+
+    /// <summary>Index N must satisfy <c>0 &lt;= N &lt;= F.count</c> — for <c>insert at N</c> (positions 0..count are insertable).</summary>
+    AtOrBefore = 2,
+}
+
+/// <summary>
+/// Index bounds proof: a parameter (an index N) must satisfy <c>0 &lt;= N &lt; F.count</c>
+/// (or <c>0 &lt;= N &lt;= F.count</c> per <see cref="Mode"/>) before access/mutation at that
+/// index is safe. <see cref="Subject"/> resolves to the index parameter; the upper-bound
+/// receiver is the action/accessor's <c>SelfSubject</c> via the <see cref="UpperBoundAccessor"/>.
+/// </summary>
+public sealed record IndexBoundsProofRequirement(
+    ProofSubject Subject,
+    IndexBoundsMode Mode,
+    TypeAccessor UpperBoundAccessor,
+    string Description
+) : ProofRequirement(ProofRequirementKind.IndexBounds, Description);
+
 // ════════════════════════════════════════════════════════════════════════════════
 //  ProofRequirementMeta — catalog meta (DU as identity)
 // ════════════════════════════════════════════════════════════════════════════════
@@ -274,6 +297,12 @@ public abstract record ProofRequirementMeta(
         : ProofRequirementMeta(ProofRequirementKind.KeyPresence,
             "Key presence — collection must contain or not contain a specific element",
             null);  // Routes to PRE0099 or PRE0101 depending on RequireAbsence
+
+    /// <summary>Index bounds — parameter (an index N) must satisfy bounds against a collection's count.</summary>
+    public sealed record IndexBounds()
+        : ProofRequirementMeta(ProofRequirementKind.IndexBounds,
+            "Index bounds — parameter (index N) must satisfy 0 <= N < F.count (or <= F.count for inserts)",
+            Language.DiagnosticCode.UnguardedCollectionAccess);
 }
 
 // ProofSatisfaction DU — positive carrier fact that can satisfy a ProofRequirement

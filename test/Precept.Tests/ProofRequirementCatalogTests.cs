@@ -41,8 +41,8 @@ public class ProofRequirementCatalogTests
     [Fact]
     public void Total_Count()
     {
-        // KeyPresence = 10 brings the total catalog count to 10.
-        ProofRequirements.All.Should().HaveCount(10);
+        // IndexBounds = 11 brings the total catalog count to 11.
+        ProofRequirements.All.Should().HaveCount(11);
     }
 
     // ── DU subtype correctness ──────────────────────────────────────────────────
@@ -102,12 +102,12 @@ public class ProofRequirementCatalogTests
     [Fact]
     public void FiveKinds_AreSingleSubject()
     {
-        // KeyPresence brings the single-subject kind total to 8.
+        // IndexBounds brings the single-subject kind total to 9.
         var singleSubject = ProofRequirements.All
             .Where(m => m is not ProofRequirementMeta.QualifierCompatibility
                         and not ProofRequirementMeta.QualifierChain)
             .ToList();
-        singleSubject.Should().HaveCount(8);
+        singleSubject.Should().HaveCount(9);
     }
 
     // ── Instance Kind property matches catalog ──────────────────────────────────
@@ -207,14 +207,15 @@ public class ProofRequirementCatalogTests
     [Fact]
     public void SingleSubjectKinds_NowIncludesIntervalContainment()
     {
-        // Single-subject kinds total 8:
-        // Numeric, Presence, Dimension, Modifier, IntervalContainment, LengthContainment, CountContainment, KeyPresence.
+        // Single-subject kinds total 9:
+        // Numeric, Presence, Dimension, Modifier, IntervalContainment, LengthContainment,
+        // CountContainment, KeyPresence, IndexBounds.
         var singleSubject = ProofRequirements.All
             .Where(m => m is not ProofRequirementMeta.QualifierCompatibility
                         and not ProofRequirementMeta.QualifierChain)
             .ToList();
-        singleSubject.Should().HaveCount(8,
-            "KeyPresence joins IntervalContainment, LengthContainment, CountContainment, Numeric, Presence, Dimension, Modifier as single-subject");
+        singleSubject.Should().HaveCount(9,
+            "IndexBounds joins the existing single-subject kinds");
     }
 
     // ── Catalog-mediated DiagnosticCode ──────────────────────────────

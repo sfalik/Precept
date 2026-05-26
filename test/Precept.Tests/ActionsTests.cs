@@ -317,11 +317,13 @@ public class ActionsTests
     [Fact]
     public void AllActions_ProofRequirements_DefaultEmpty()
     {
-        // Dequeue, Pop, Insert, RemoveAt, and DequeueBy carry non-empty proof requirements; all others default to empty
+        // Dequeue, Pop, Insert, RemoveAt, DequeueBy, and AppendBy carry non-empty proof
+        // requirements; all others default to empty
         var actionsWithRequirements = new HashSet<ActionKind>
         {
             ActionKind.Dequeue, ActionKind.Pop,
             ActionKind.Insert, ActionKind.RemoveAt, ActionKind.DequeueBy,
+            ActionKind.AppendBy,
         };
         foreach (var meta in Actions.All.Where(a => !actionsWithRequirements.Contains(a.Kind)))
         {
@@ -349,11 +351,14 @@ public class ActionsTests
     [Fact]
     public void NonMutatingActions_HaveNoProofRequirements()
     {
+        // AppendBy is excluded here — it carries a KeyPresence(RequireAbsence) obligation
+        // for log-by uniqueness, which is structurally different from the non-empty proof
+        // pattern this test covers.
         var nonMutating = new[]
         {
             ActionKind.Set, ActionKind.Add, ActionKind.Remove,
             ActionKind.Enqueue, ActionKind.Push, ActionKind.Clear,
-            ActionKind.Append, ActionKind.AppendBy, ActionKind.Put, ActionKind.EnqueueBy,
+            ActionKind.Append, ActionKind.Put, ActionKind.EnqueueBy,
         };
         foreach (var kind in nonMutating)
         {

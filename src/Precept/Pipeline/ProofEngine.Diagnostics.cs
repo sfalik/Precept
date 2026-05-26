@@ -118,6 +118,14 @@ public static partial class ProofEngine
                     fieldName,
                     "element");
             }
+
+            case IndexBoundsProofRequirement indexReq:
+            {
+                var fieldName = obligation.Site is TypedFieldRef fr2 ? fr2.FieldName : "?";
+                return Diagnostics.Create(DiagnosticCode.UnguardedCollectionAccess, obligation.Site.Span,
+                    fieldName,
+                    contextClause);
+            }
         }
 
         throw new InvalidOperationException($"Unexpected proof requirement type '{obligation.Requirement.GetType().FullName}'.");

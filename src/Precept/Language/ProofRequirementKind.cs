@@ -1,7 +1,7 @@
 namespace Precept.Language;
 
 /// <summary>
-/// The ten proof obligation kinds that catalog entries can declare.
+/// The eleven proof obligation kinds that catalog entries can declare.
 /// </summary>
 public enum ProofRequirementKind
 {
@@ -35,4 +35,7 @@ public enum ProofRequirementKind
 
     /// <summary>Key presence check — collection must contain (or not contain) a specific key before access/mutation.</summary>
     KeyPresence            = 10,
+
+    /// <summary>Index bounds check — parameter (an index N) must satisfy 0 &lt;= N &lt; F.count (or 0 &lt;= N &lt;= F.count for inserts).</summary>
+    IndexBounds            = 11,
 }

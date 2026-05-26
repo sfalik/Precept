@@ -9,6 +9,8 @@ public sealed class ActionSecondaryDispatchRegressionTests
     [Fact]
     public void AppendBy_Form_CompilesCleanly()
     {
+        // Per F-LANG-COLL-05 (Phase 4 W-E), AppendBy on `log of T by P` requires a
+        // `when not (F contains P)` guard for ordering-key uniqueness.
         var compilation = Compiler.Compile("""
             precept AppendByRegression
             field Steps as log of string by string
@@ -16,7 +18,10 @@ public sealed class ActionSecondaryDispatchRegressionTests
             state Done terminal
             event Record(Value as string, Key as string)
             event Finish
-            from Active on Record -> append Steps Record.Value by Record.Key -> no transition
+            from Active on Record
+                when not (Steps contains Record.Key)
+                -> append Steps Record.Value by Record.Key
+                -> no transition
             from Active on Finish -> transition Done
             """);
 

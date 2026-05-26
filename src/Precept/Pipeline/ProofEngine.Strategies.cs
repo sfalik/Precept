@@ -312,6 +312,40 @@ public static partial class ProofEngine
 
     // ── Strategy 3: Guard-in-Path Proof ───────────────────────────────────────
 
+    /// <summary>
+    /// Discharges a <see cref="KeyPresenceProofRequirement"/> by matching the row/handler
+    /// guard against a <c>F contains X</c> (or <c>not (F contains X)</c> when
+    /// <c>RequireAbsence</c>) check. The field name is recovered from the obligation
+    /// subject; the contains check must reference the same field.
+    /// </summary>
+    private static bool TryKeyPresenceProof(
+        KeyPresenceProofRequirement req,
+        ProofObligation obligation,
+        SemanticIndex semantics)
+    {
+        var fieldName = GetFieldName(req.Subject, obligation.Site);
+        if (fieldName is null) return false;
+
+        var guard = obligation.Context switch
+        {
+            TransitionRowContext t => t.Row.Guard,
+            StateHookContext s => s.Hook.Guard,
+            EventHandlerContext h => h.Handler.Guard,
+            _ => null,
+        };
+        if (guard is null) return false;
+
+        var branches = ExtractGuardBranches(guard);
+        if (branches.Length == 0) return false;
+
+        foreach (var branchConstraints in branches)
+        {
+            if (!GuardHasContainsCheck(guard, fieldName, requireNegated: req.RequireAbsence))
+                return false;
+        }
+        return true;
+    }
+
     private static bool TryGuardInPathProof(ProofObligation obligation, SemanticIndex semantics)
     {
         var guard = obligation.Context switch

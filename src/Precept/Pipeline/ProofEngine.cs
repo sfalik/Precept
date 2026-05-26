@@ -407,7 +407,9 @@ public static partial class ProofEngine
     {
         if (requirement is NumericProofRequirement { Subject: SelfSubject }
             || requirement is ModifierRequirement { Subject: SelfSubject }
-            || requirement is PresenceProofRequirement { Subject: SelfSubject })
+            || requirement is PresenceProofRequirement { Subject: SelfSubject }
+            || requirement is KeyPresenceProofRequirement { Subject: SelfSubject }
+            || requirement is IndexBoundsProofRequirement)
         {
             return new TypedFieldRef(action.FieldType, action.FieldName, false, null, action.Span);
         }
@@ -611,6 +613,15 @@ public static partial class ProofEngine
             var result = TryCountContainmentProof(countReq, obligation.Site);
             if (result == true)
                 return (ProofDisposition.Proved, ProofStrategy.CountContainment);
+        }
+
+        // Key presence: collection contains (or doesn't contain) a specific element/key.
+        // Discharged by a guard expression that pattern-matches the contains check —
+        // e.g. `when not (F contains P)` for AppendBy uniqueness on `log of T by P`.
+        if (obligation.Requirement is KeyPresenceProofRequirement keyReq)
+        {
+            if (TryKeyPresenceProof(keyReq, obligation, semantics))
+                return (ProofDisposition.Proved, ProofStrategy.GuardInPath);
         }
 
         return (ProofDisposition.Unresolved, null);
