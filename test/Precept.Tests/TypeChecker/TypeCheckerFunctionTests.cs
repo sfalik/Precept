@@ -9,7 +9,7 @@ using Xunit;
 namespace Precept.Tests.TypeChecker;
 
 /// <summary>
-/// Slice 3 — Function Resolution, Member Access, and Interpolated Strings.
+/// Function Resolution, Member Access, and Interpolated Strings.
 /// Covers TypedFunctionCall (overload selection, arity/type errors, CI variants),
 /// TypedMemberAccess (per-type accessors, invalid access), and
 /// TypedInterpolatedString (segment resolution, ErrorType propagation).

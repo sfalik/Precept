@@ -9,7 +9,7 @@ using Xunit;
 namespace Precept.Tests;
 
 /// <summary>
-/// Slice 11B — Temporal Price Denominator Type System Extension.
+/// Temporal Price Denominator Type System Extension.
 /// Covers:
 ///   A. ExtractQualifiers temporal routing for price (of 'time'/'date' → TemporalDimension)
 ///   B. ExtractComparableValue temporal arms (TemporalUnit, TemporalDimension)
@@ -196,7 +196,7 @@ public class Slice11B_TemporalPriceDenominatorTests
     [Fact]
     public void Regression_Non_Duration_Types_Have_No_ImpliedQualifiers()
     {
-        // Only duration should have implied qualifiers from Slice 11B.
+        // Only duration carries implied qualifiers among temporal/value types.
         foreach (var kind in new[] { TypeKind.Period, TypeKind.Money, TypeKind.Price, TypeKind.Quantity })
         {
             Types.GetMeta(kind).ImpliedQualifiers

@@ -5,13 +5,10 @@ using Xunit;
 namespace Precept.Mcp.Tests;
 
 /// <summary>
-/// Scenario coverage for <see cref="DomainsTool"/> — BUG-007 follow-up.
+/// Scenario coverage for <see cref="DomainsTool"/>.
 ///
-/// Earlier reports indicated that <c>precept_domains</c> returned the raw
-/// "An error occurred invoking 'precept_domains'" string for every scope.
-/// As of the Phase 2 robustness sweep the underlying formatter succeeds
-/// for all four scope arguments; these tests pin that behavior in place
-/// and verify the markdown payload carries the section markers each scope
+/// Verifies that <c>precept_domains</c> succeeds for every scope argument
+/// and that the markdown payload carries the section markers each scope
 /// is supposed to emit.
 /// </summary>
 public class DomainsTool_AllScopesTests

@@ -9,9 +9,9 @@ using Xunit;
 namespace Precept.Tests.TypeChecker;
 
 /// <summary>
-/// Slice 10 — Final Assembly + D26 Global Assert.
+/// Final Assembly + Global Assert.
 /// Validates SemanticIndex completeness (all 16 primaries + 4 FrozenDictionary secondaries),
-/// D26 invariant (TypedErrorExpression ↔ Error diagnostic), FrozenDictionary D4 compliance,
+/// the TypedErrorExpression ↔ Error diagnostic invariant, FrozenDictionary compliance,
 /// end-to-end pipeline integration, and zero NotImplementedException stubs.
 /// </summary>
 public class TypeCheckerAssemblyTests
@@ -756,7 +756,7 @@ public class TypeCheckerAssemblyTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Slice 9 — Ensure guard preservation
+    //  Ensure guard preservation
     // ════════════════════════════════════════════════════════════════════════
 
     [Fact]

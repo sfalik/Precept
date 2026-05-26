@@ -8,10 +8,10 @@ using Xunit;
 namespace Precept.Tests.TypeChecker;
 
 /// <summary>
-/// Slice 1 — Typed Symbol Population.
-/// Covers TypeKind resolution, collection ElementType (D2), optional modifier,
-/// modifier preservation, ImpliedModifiers (D3), state modifier flags,
-/// event arg types, and initial/terminal diagnostic cases (D7).
+/// Typed Symbol Population.
+/// Covers TypeKind resolution, collection ElementType, optional modifier,
+/// modifier preservation, ImpliedModifiers, state modifier flags,
+/// event arg types, and initial/terminal diagnostic cases.
 /// </summary>
 public class TypeCheckerSymbolTests
 {

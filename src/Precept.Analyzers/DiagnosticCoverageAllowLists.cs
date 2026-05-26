@@ -11,59 +11,34 @@ internal static class DiagnosticCoverageAllowLists
 {
     /// <summary>
     /// Gate 1 allow-list: DiagnosticCode members with no emission site.
-    /// Each entry must have a root-cause comment. Entries are removed as gap-closure slices ship.
-    /// Cross-plan dependency: PRE0078 is removed when interval proof engine Slice 2 ships.
+    /// Each entry carries a root-cause comment; entries are removed when the corresponding
+    /// emission wires up.
     /// </summary>
     internal static readonly HashSet<string> Gate1AllowList = new()
     {
-        // ── Root Cause B1 — Temporal Constant Precision ──────────────────────────
-        // PRE0055–0058 removed by Slice 9B (catalog-mediated emission via TypedConstantFamilyMeta)
-        "InvalidTimezoneId",                  // B1: catch-all fires instead of specific code
-        "UnqualifiedPeriodArithmetic",        // B1: temporal arithmetic rules not wired
-        "MissingTemporalUnit",               // B1: temporal arithmetic rules not wired
-        "FractionalUnitValue",               // B1: temporal arithmetic rules not wired
+        // ── Temporal Constant Precision ─────────────────────────────────────────
+        "InvalidTimezoneId",                  // catch-all fires instead of specific code
+        "UnqualifiedPeriodArithmetic",        // temporal arithmetic rules not wired
+        "MissingTemporalUnit",                // temporal arithmetic rules not wired
+        "FractionalUnitValue",                // temporal arithmetic rules not wired
 
+        // ── Collection Safety Extensions ────────────────────────────────────────
+        "KeyPresenceSafety",                  // obligation generator not yet on lookup accessor
+        "KeyUniquenessGuard",                 // obligation generator not yet on lookup put action
 
-        // ── Root Cause B3 — Choice Value Validation ──────────────────────────────
-        // PRE0086, PRE0087, PRE0089 removed by Slice 2 (choice literal/arg validation wired)
+        // ── Retired diagnostics (pending removal) ───────────────────────────────
+        "EventHandlerDoesNotSupportGuard",    // retired — guards are now valid on all on-rows
 
-        // ── Root Cause B4 — Collection Safety Extensions ─────────────────────────
-        "KeyPresenceSafety",                  // B4: obligation generator not yet on lookup accessor
-        "KeyUniquenessGuard",                 // B4: obligation generator not yet on lookup put action
+        // ── Parser Expression Precision ─────────────────────────────────────────
+        "UnexpectedKeyword",                  // parser emits generic ExpectedToken instead
+        "InvalidCallTarget",                  // parser emits generic ExpectedToken instead
 
-        // ── Root Cause C — Structural Single-Check Gaps ──────────────────────────
-        // EventHandlerInStatefulPrecept — wired (Slice 8)
+        // ── Scattered TypeChecker Gaps ──────────────────────────────────────────
+        "NullInNonNullableContext",           // retired, subsumed by PRE0116 (pending removal)
+        "FunctionArgConstraintViolation",     // TypeMismatch fires instead (precision upgrade)
+        "InvalidInterpolationCoercion",       // TypeMismatch fires instead (precision upgrade)
 
-        // ── Retired diagnostics (pending removal) ────────────────────────────────
-        "EventHandlerDoesNotSupportGuard",    // Slice 8b: retired — guards are now valid on all on-rows
-
-        // ── Root Cause D1 — Parser Expression Precision ──────────────────────────
-        "UnexpectedKeyword",                  // D1: parser emits generic ExpectedToken instead
-        "InvalidCallTarget",                  // D1: parser emits generic ExpectedToken instead
-
-        // ── Root Cause D2 — Scattered TypeChecker Gaps ───────────────────────────
-        "NullInNonNullableContext",           // D2: retired, subsumed by PRE0116 (pending removal)
-        "FunctionArgConstraintViolation",     // D2: TypeMismatch fires instead (precision upgrade)
-        // DuplicateArgName — wired (Slice 8)
-        // InvalidModifierValue — wired (Slice 8)
-        // ComputedFieldWithDefault — wired (Slice 8)
-        // ConflictingAccessModes — wired (Slice 8)
-        // RedundantAccessMode — wired (Slice 8)
-        // ListLiteralOutsideDefault — wired (Slice 8)
-        // ScalarOperationOnCollection — wired (Phase 4 W-A, F-LANG-COLL-08)
-        // CollectionOperationOnScalar — wired (Phase 4 W-A, F-LANG-COLL-08)
-        // EventArgOutOfScope — wired (Slice 8)
-        "InvalidInterpolationCoercion",       // D2: TypeMismatch fires instead (precision upgrade)
-        // MaxPlacesExceeded — wired (Slice 8)
-        // NonChoiceAssignedToChoice — wired (Slice 8)
-        // CollectionInnerTypeError — wired (Slice 8)
-
-        // ── Root Cause D3 — ProofEngine Gap (Interval Engine Dependency) ─────────
-        // NumericOverflow — already has emission site in ProofEngine Strategy 7
-
-        // OutOfRange — wired (default-value-violates-numeric-modifier check)
-
-        // ── Catalog-mediated fallthrough emission ────────────────────────────────
+        // ── Catalog-mediated fallthrough emission ───────────────────────────────
         // InvalidTypedConstantContent is emitted from the SelectDiagnosticCode
         // coalesce fallback in TypeChecker.Expressions.cs when a typed-constant
         // family declares neither FormatErrorCode nor SemanticErrorCode. The
@@ -72,8 +47,8 @@ internal static class DiagnosticCoverageAllowLists
         // exercise the path via NodaTime-validated families.
         "InvalidTypedConstantContent",
 
-        // ── Pre-existing gaps (not in Slice 8 scope) ─────────────────────────────
-        "MissingOrderingKey",                 // reserved 2026-05-26 (W-F COLL-11 rename); reserved for missing-`by` emission, not yet specialized
+        // ── Pre-existing gaps ───────────────────────────────────────────────────
+        "MissingOrderingKey",                 // reserved for missing-`by` clause emission; not yet specialized (currently ScalarOperationOnCollection catches it as a generic applicability mismatch)
         "NonOrderableCollectionExtreme",      // no emission site wired
         "UnsatisfiableGuard",                 // no emission site wired
         "DivisionByZero",                     // no emission site wired

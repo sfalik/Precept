@@ -36,18 +36,18 @@ internal static partial class TypeChecker
         PopulateStates(symbols, ctx);
         PopulateEvents(symbols, ctx);
 
-        // Pass 1b: resolve field default/computed expressions (B1)
+        // Pass 1b: resolve field default/computed expressions
         ResolveFieldExpressions(symbols, ctx);
 
-        // Pass 1c: resolve event arg default expressions (Slice 26)
+        // Pass 1c: resolve event arg default expressions
         ResolveEventArgExpressions(symbols, ctx);
 
-        // Pass 2: normalize transition rows and event handlers (Slice 5)
+        // Pass 2: normalize transition rows and event handlers
         PopulateTransitionRows(manifest, ctx);
         PopulateEventHandlers(manifest, ctx);
         PopulateRules(manifest, ctx);
 
-        // Pass 2b: normalize ensures, access modes, state hooks, and edit declarations (B2)
+        // Pass 2b: normalize ensures, access modes, state hooks, and edit declarations
         PopulateEnsures(manifest, ctx);
         PopulateAccessModes(manifest, ctx);
         PopulateStateHooks(manifest, ctx);
@@ -56,22 +56,22 @@ internal static partial class TypeChecker
         // Field-state omit lookup (prerequisite for ValidateFieldStateGuarantees)
         BuildOmitLookup(manifest, ctx);
 
-        // Modifier validation (Slice 7) — depends only on Pass 1 symbols
+        // Modifier validation — depends only on Pass 1 symbols
         ValidateModifiers(ctx);
 
-        // Structural validation (Slice 6) — runs after Pass 2; reads ComputedDeps
+        // Structural validation — runs after Pass 2; reads ComputedDeps
         // (populated during expression resolution) for cycle detection.
         ValidateStructural(ctx);
 
-        // Field-state guarantees (D130, D131, D132, D143) — Slice 3-5 + follow-up gap closure.
+        // Field-state guarantees on transitions.
         ValidateFieldStateGuarantees(ctx);
 
-        // Construction-time field guarantees (D93, D94, D142, D144, D148) — Slice 10-11 + follow-up gap closure.
+        // Construction-time field guarantees.
         ValidateConstructionGuarantees(ctx);
         ValidateConstructionGuardFieldAccess(ctx);
         ValidateInitialAssignmentSelfReads(ctx);
 
-        // CI enforcement (Slice 8) — runs after all expression resolution;
+        // CI enforcement — runs after all expression resolution;
         // walks resolved expression trees for ~string consistency violations.
         ValidateCIEnforcement(ctx);
 
@@ -79,7 +79,7 @@ internal static partial class TypeChecker
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Pass 1 — typed symbol population (Slice 1)
+    //  Pass 1 — typed symbol population
     // ════════════════════════════════════════════════════════════════════════
 
     /// <summary>
@@ -115,10 +115,9 @@ internal static partial class TypeChecker
     /// reference for inner-type qualifier metadata (e.g., <c>set of money in 'USD'</c>) and
     /// returns the appropriate <see cref="TypedElementType"/> subtype. Returns <c>null</c> for
     /// non-collection fields (where <paramref name="elementTypeKind"/> is <c>null</c>).
-    ///
-    /// Phase 4 W-C (F-LANG-COLL-06): TypedQualifiedElement is constructed when the parser produced
-    /// a <see cref="QualifiedTypeReference"/> as the collection's element type. Phase 4 W-G adds
-    /// the <see cref="TypedChoiceElement"/> branch when the inner is a <see cref="ChoiceTypeReference"/>.
+    /// <see cref="TypedQualifiedElement"/> is constructed when the parser produced a
+    /// <see cref="QualifiedTypeReference"/> as the collection's element type.
+    /// <see cref="TypedChoiceElement"/> is reserved for choice-typed inner elements.
     /// </summary>
     private static TypedElementType? BuildTypedElementType(
         ParsedTypeReference fieldType,
@@ -495,9 +494,9 @@ internal static partial class TypeChecker
                 KeyType: keyType,
                 Modifiers: modifiers,
                 ImpliedModifiers: impliedModifiers,
-                DefaultExpression: null,   // Slice 2+
-                ComputedExpression: null,  // Slice 2+
-                Qualifier: null,           // Slice 2+
+                DefaultExpression: null,   // resolved in Pass 1b
+                ComputedExpression: null,  // resolved in Pass 1b
+                Qualifier: null,           // resolved in Pass 1b
                 IsComputed: declared.IsComputed,
                 IsOptional: isOptional,
                 IsWritable: isWritable,
@@ -521,13 +520,13 @@ internal static partial class TypeChecker
             ctx.Fields.Add(typedField);
             ctx.FieldLookup[declared.Name] = typedField;
 
-            // CI tracking (Slice 8): record ~string fields and ~string-element collections
+            // CI tracking: record ~string fields and ~string-element collections
             if (declared.Type is CITypeReference)
                 ctx.CIFields.Add(declared.Name);
             else if (declared.Type is CollectionTypeReference { ElementType: CITypeReference })
                 ctx.CIElementCollections.Add(declared.Name);
 
-            // Choice domain validation (Slice 6): empty domain and duplicate values
+            // Choice domain validation: empty domain and duplicate values
             if (declared.Type is ChoiceTypeReference choiceRef)
             {
                 if (choiceRef.Domain.IsEmpty)
@@ -638,7 +637,7 @@ internal static partial class TypeChecker
                     ResolvedType: resolvedType,
                     ElementType: null, // event arg element types deferred until arg type parsing is richer
                     Modifiers: arg.Modifiers,
-                    DefaultExpression: null, // Slice 2+
+                    DefaultExpression: null, // resolved in Pass 1c
                     IsOptional: arg.Modifiers.Contains(ModifierKind.Optional),
                     Presence: arg.Modifiers.Contains(ModifierKind.Optional)
                         ? new DeclaredPresenceMeta.Optional()
@@ -834,7 +833,7 @@ internal static partial class TypeChecker
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Pass 1c — event arg expression resolution (Slice 26)
+    //  Pass 1c — event arg expression resolution
     // ════════════════════════════════════════════════════════════════════════
 
     /// <summary>
@@ -1206,8 +1205,8 @@ internal static partial class TypeChecker
             }
         }
 
-        // Classification: construction rows are identified by the event's IsInitial flag (Slice 8b).
-        // The parser no longer distinguishes construction rows from event rows at parse time.
+        // Classification: construction rows are identified by the event's IsInitial flag.
+        // The parser does not distinguish construction rows from event rows at parse time.
         bool isConstruction = resolvedEvent?.IsInitial ?? false;
 
         // —— Set event args scope ——
@@ -1314,7 +1313,7 @@ internal static partial class TypeChecker
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Final assembly (Slice 10)
+    //  Final assembly
     // ════════════════════════════════════════════════════════════════════════
 
     /// <summary>

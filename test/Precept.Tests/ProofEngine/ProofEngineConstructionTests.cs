@@ -9,7 +9,7 @@ using Xunit;
 namespace Precept.Tests;
 
 /// <summary>
-/// Slice 7 — Proof engine construction row context tests.
+/// Proof engine construction row context tests.
 /// Verifies that guard-aware proof strategies (Strategy 3 GuardInPath, Strategy 4 FlowNarrowing,
 /// and BuildNarrowedIntervals for interval containment) handle EventHandlerContext from
 /// construction rows (<c>on EventName when ...</c>) symmetrically with transition rows.

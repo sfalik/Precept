@@ -309,12 +309,12 @@ public enum DiagnosticCode
     /// </summary>
     McpToolInternalError            = 149,
 
-    // ── Reserved for missing-`by` clause on append (Phase 4 W-F, F-LANG-COLL-11) ──
+    // ── Reserved: missing `by P` clause on append to log-by ────────────────────
     /// <summary>
     /// Missing `by P` ordering key on an append to a `log of T by P` field.
-    /// Reserved 2026-05-26 in W-F's PRE0104 rename slice; emission not yet wired
-    /// (currently PRE0048 catches this as a generic ApplicableTo mismatch).
-    /// Specialization to a teachable message is deferred to a future W-F follow-up.
+    /// Reserved for a specialized teachable message; emission not yet wired.
+    /// Currently ScalarOperationOnCollection catches this as a generic
+    /// applicability mismatch.
     /// </summary>
     MissingOrderingKey              = 151,
 }

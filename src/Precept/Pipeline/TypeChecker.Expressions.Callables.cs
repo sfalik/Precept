@@ -191,11 +191,12 @@ internal static partial class TypeChecker
             {
                 (fieldName, fieldType) = ResolveActionTarget(colVal.Target, ctx);
                 ValidateActionApplicability(colVal.Kind, fieldName, fieldType, colVal.Target.Span, ctx);
-                // BUG-002: `remove F K` on a lookup expects the lookup's KEY type, not the element type.
-                // The action surface is `verb F E` for set/bag/list/lookup uniformly, but the meaning
-                // of `E` differs by target kind. Per spec § 1666 / collection-types.md:901:
-                // `remove F K (lookup)` expects K matching the lookup's key type. Type-driven dispatch
-                // happens here rather than in the catalog because the syntax is identical across kinds.
+                // `remove F K` on a lookup expects the lookup's KEY type, not the element type.
+                // The action surface is `verb F E` for set/bag/list/lookup uniformly, but the
+                // meaning of `E` differs by target kind. Per the language spec, `remove F K`
+                // on a lookup expects K matching the lookup's key type. Type-driven dispatch
+                // happens here rather than in the catalog because the syntax is identical
+                // across kinds.
                 var valueExpectedType = ctx.FieldLookup.TryGetValue(fieldName, out var fieldMeta)
                     ? (colVal.Kind == ActionKind.Remove && fieldType == TypeKind.Lookup
                         ? fieldMeta.KeyType
@@ -730,7 +731,7 @@ internal static partial class TypeChecker
             return CreateTypedFunctionCall(bestKind!.Value, bestOverload, resolvedArgs, span, ctx);
         }
 
-        // Slice 4: context retry — re-resolve literal args with each candidate's parameter type
+        // Context retry — re-resolve literal args with each candidate's parameter type
         if (parsedArgs.Length > 0)
         {
             var retryResult = TryContextRetryOverload(candidates, resolvedArgs, parsedArgs, ctx);
@@ -1087,12 +1088,11 @@ internal static partial class TypeChecker
     /// looks up the field in <see cref="CheckContext.FieldLookup"/>.
     /// Returns null if element type cannot be determined.
     ///
-    /// TODO(W-G): widen the return type to <c>TypedElementType?</c> so accessor return-type
-    /// propagation (<c>.first</c> / <c>.last</c> / <c>.at(N)</c> / <c>.min</c> / <c>.max</c>)
-    /// can flow qualifier + ordered metadata through to <c>TypedMemberAccess</c> per the locked
-    /// COLL-02/03 design D-3 Option A (`docs/Working/choice-inner-and-ordered-propagation-design.md`).
-    /// Today the bare-kind return is sufficient because qualifier propagation is shipped only
-    /// for the lookup-access binary-op path (W-C); accessor-result qualifier propagation lands in W-G.
+    /// TODO: return <c>TypedElementType?</c> so accessor return-type propagation
+    /// (<c>.first</c> / <c>.last</c> / <c>.at(N)</c> / <c>.min</c> / <c>.max</c>) can flow
+    /// qualifier and ordered metadata through to <see cref="TypedMemberAccess"/>. Today the
+    /// bare-kind return is sufficient because element-qualifier propagation flows only
+    /// through the proof engine's lookup-access path.
     /// </summary>
     private static TypeKind? GetElementType(TypedExpression receiver, CheckContext ctx)
     {

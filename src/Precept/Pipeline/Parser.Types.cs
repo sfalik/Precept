@@ -163,7 +163,7 @@ public static partial class Parser
             {
                 Advance(); // consume 'to'
                 keyType = elementType; // In lookup, the first type is the key
-                elementType = ParseInnerTypeReference(); // second is value (Phase 4 W-C: qualifier-bearing)
+                elementType = ParseInnerTypeReference(); // second is value (qualifier-bearing per ParseInnerTypeReference)
                 lastSpan = elementType.Span;
             }
             else if ((collectionMeta.Kind is TypeKind.LogBy or TypeKind.QueueBy) && Peek().Kind == TokenKind.By)
@@ -199,12 +199,12 @@ public static partial class Parser
 
         /// <summary>
         /// Parses an inner type (no nested collections) for collection element types.
-        /// Phase 4 W-C (F-LANG-COLL-06): a simple inner type that has a <see cref="QualifierShape"/>
-        /// (money / quantity / price / exchangerate) accepts a trailing qualifier list
-        /// (<c>set of money in 'USD'</c>, <c>lookup of K to quantity of 'mass'</c>, etc.).
-        /// The qualifier-bearing form is parsed via the same <see cref="TryParseQualifiers"/>
-        /// helper used at top-level type position; the type checker resolves the qualifier
-        /// metadata into a <see cref="TypedQualifiedElement"/> on the typed field.
+        /// A simple inner type that has a <see cref="QualifierShape"/> (money / quantity /
+        /// price / exchangerate) accepts a trailing qualifier list — <c>set of money in 'USD'</c>,
+        /// <c>lookup of K to quantity of 'mass'</c>, etc. The qualifier-bearing form is parsed
+        /// via the same <see cref="TryParseQualifiers"/> helper used at top-level type
+        /// position; the type checker resolves the qualifier metadata into a
+        /// <see cref="TypedQualifiedElement"/> on the typed field.
         /// </summary>
         private ParsedTypeReference ParseInnerTypeReference()
         {

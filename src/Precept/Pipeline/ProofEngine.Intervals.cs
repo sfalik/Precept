@@ -10,7 +10,7 @@ public static partial class ProofEngine
     // Interval proof methods are in this file
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Slice 2: Interval Computation and Obligation Collection
+    //  Interval Computation and Obligation Collection
     // ════════════════════════════════════════════════════════════════════════
 
     private static NumericInterval IntervalOf(TypedExpression expr, SemanticIndex semantics)
@@ -34,8 +34,8 @@ public static partial class ProofEngine
 
             case InterpolatedTypedConstant interpolated:
             {
-                // Slice 19 (quantity) + Slice 24 (money, price):
-                // Single-slot interpolations where the slot carries the full numeric value.
+                // Single-slot interpolations (quantity / money / price) where the slot
+                // carries the full numeric value.
                 if (interpolated.Slots.Length == 1)
                 {
                     var slot = interpolated.Slots[0];
@@ -399,7 +399,7 @@ public static partial class ProofEngine
         var branches = ExtractGuardBranches(guard);
         if (branches.IsEmpty) return null;
 
-        // Use the first branch for now (Slice 3 handles single-branch guards)
+        // Use the first branch only — single-branch guards.
         var builder = ImmutableDictionary.CreateBuilder<string, NumericInterval>(StringComparer.Ordinal);
 
         foreach (var branch in branches)

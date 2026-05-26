@@ -9,16 +9,16 @@ using Xunit;
 namespace Precept.Tests.TypeChecker;
 
 /// <summary>
-/// Slice 5 — Transition Row + EventHandler Normalization.
-/// Covers FromState/ToState resolution, wildcard FromState (D10), guard expression scope,
-/// action target resolution, ActionSecondaryRole invariant (D5), EventHandler event resolution,
-/// StateReference/EventReference recording, and D26 assert coverage.
+/// Transition Row + EventHandler Normalization.
+/// Covers FromState/ToState resolution, wildcard FromState, guard expression scope,
+/// action target resolution, ActionSecondaryRole invariant, EventHandler event resolution,
+/// StateReference/EventReference recording, and global assert coverage.
 /// </summary>
 /// <remarks>
-/// REGRESSION NOTE: Slice 5 introduced a regression where <c>EventName.ArgName</c> accessor
+/// REGRESSION NOTE: there is a known regression where <c>EventName.ArgName</c> accessor
 /// expressions (e.g. <c>set Name = Submit.Label</c>) emit <c>UndeclaredField</c> for the event
 /// name. Tests that require <c>EventName.ArgName</c> in "expecting clean" assertions are marked
-/// as TYPE B (known red) and documented. See <c>.squad/decisions/inbox/soup-nazi-slice-5-regression.md</c>.
+/// as TYPE B (known red) and documented.
 /// </remarks>
 public class TypeCheckerTransitionTests
 {

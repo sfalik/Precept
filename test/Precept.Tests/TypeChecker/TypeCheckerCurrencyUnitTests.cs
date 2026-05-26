@@ -6,7 +6,7 @@ using Xunit;
 namespace Precept.Tests.TypeChecker;
 
 /// <summary>
-/// Slice 1 — B2: Currency/Unit Arithmetic Safety (PRE0070–0074).
+/// Currency/Unit Arithmetic Safety (PRE0070–0074).
 /// Validates that the TypeChecker emits qualifier mismatch diagnostics when
 /// static qualifiers on binary operation operands are incompatible.
 /// </summary>
@@ -307,7 +307,7 @@ public class TypeCheckerCurrencyUnitTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Slice 8: MaxPlacesExceeded (PRE0067)
+    //  MaxPlacesExceeded (PRE0067)
     // ════════════════════════════════════════════════════════════════════════
 
     [Fact]
@@ -335,7 +335,7 @@ public class TypeCheckerCurrencyUnitTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  F-LANG-BIZ-03: currency accessors (.name / .minorUnit / .numericCode / .symbol)
+    //  Currency accessors (.name / .minorUnit / .numericCode / .symbol)
     // ════════════════════════════════════════════════════════════════════════
 
     [Fact]
@@ -387,7 +387,7 @@ public class TypeCheckerCurrencyUnitTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  F-LANG-BIZ-03: interpolation-slot currency-member resolution (Frank case-9)
+    //  Interpolation-slot currency-member resolution
     // ════════════════════════════════════════════════════════════════════════
 
     [Fact]
@@ -421,7 +421,7 @@ public class TypeCheckerCurrencyUnitTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  F-LANG-BIZ-06: exchangerate implicit positive
+    //  exchangerate implicit positive
     // ════════════════════════════════════════════════════════════════════════
 
     [Fact]

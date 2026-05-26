@@ -89,14 +89,14 @@ internal static partial class TypeChecker
         // ── Unary operation ──
         UnaryOperationExpression un => ResolveUnaryOp(un, ctx),
 
-        // ── Slice 3: functions, accessors, method calls, interpolated strings ──
+        // ── functions, accessors, method calls, interpolated strings ──
         FunctionCallExpression func         => ResolveFunctionCall(func, ctx),
         CIFunctionCallExpression ciFunc     => ResolveCIFunctionCall(ciFunc, ctx),
         MemberAccessExpression mem          => ResolveMemberAccess(mem, ctx),
         MethodCallExpression meth           => ResolveMethodCall(meth, ctx),
         InterpolatedStringExpression interp => ResolveInterpolatedString(interp, ctx),
 
-        // Interpolated typed constant — full type-grammar matching (Slice 2)
+        // Interpolated typed constant — full type-grammar matching
         InterpolatedTypedConstantExpression interpTyped =>
             ResolveInterpolatedTypedConstant(interpTyped, ctx, expectedType, qualifiers),
 
@@ -211,7 +211,7 @@ internal static partial class TypeChecker
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Typed constant resolution (Slice 4)
+    //  Typed constant resolution
     // ════════════════════════════════════════════════════════════════════════
 
     /// <summary>
@@ -511,7 +511,7 @@ internal static partial class TypeChecker
     }
 
 
-    //  Context retry for binary operations (Slice 4)
+    //  Context retry for binary operations
     // ════════════════════════════════════════════════════════════════════════
 
     /// <summary>
@@ -876,7 +876,7 @@ internal static partial class TypeChecker
         if (catalogResolved is not null)
             return catalogResolved;
 
-        // Slice 4: context retry — re-resolve literal operands with the other side's type as context
+        // Context retry — re-resolve literal operands with the other side's type as context
         var retried = TryContextRetryBinaryOp(bin, left, right, opMeta, ctx);
         if (retried is not null)
             return retried;

@@ -45,7 +45,7 @@ public static class Tokens
     /// <summary>'as' and 'into' appear after Identifier (field name or event arg name).</summary>
     private static readonly TokenKind[] VA_AfterIdent = [TokenKind.Identifier];
 
-    /// <summary>'all' follows modify or omit keyword (e.g. modify all, omit all). write/read and write all retired in B4 (2026-04-28).</summary>
+    /// <summary>'all' follows modify or omit keyword (e.g. modify all, omit all).</summary>
     private static readonly TokenKind[] VA_AllQuantifier = [TokenKind.Modify, TokenKind.Omit];
 
     /// <summary>'any' follows prepositions as a state wildcard (in any, from any, to any).</summary>
@@ -167,8 +167,8 @@ public static class Tokens
         TokenKind.Reject      => new(kind, "reject",      Cat_Out, "Rejection outcome",
             VisualCategory: SemanticTokenTypeKind.KeywordSemantic, ValidAfter: VA_AfterArrow, IsMessagePosition: true),
 
-        // ── Keywords: Access Modes (B4 — 2026-04-28) ──────────────────
-        // Write and Read retired: vocabulary locked B4. New: modify/readonly/editable.
+        // ── Keywords: Access Modes ──────────────────
+        // Vocabulary: modify / readonly / editable.
         TokenKind.Modify        => new(kind, "modify",        Cat_Acc, "Access mode verb: declare field access constraint",
             VisualCategory: SemanticTokenTypeKind.KeywordSemantic),
         TokenKind.Readonly      => new(kind, "readonly",      Cat_Acc, "Access mode adjective: field is read-only in this state",

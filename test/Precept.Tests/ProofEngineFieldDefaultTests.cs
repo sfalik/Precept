@@ -8,7 +8,7 @@ using Xunit;
 namespace Precept.Tests;
 
 /// <summary>
-/// Slice 25 — field-default proof coverage for interpolated typed constants.
+/// Field-default proof coverage for interpolated typed constants.
 /// Verifies that <c>CollectDefaultObligations</c> generates
 /// <see cref="IntervalContainmentProofRequirement"/> obligations for fields whose
 /// <see cref="TypedField.DefaultExpression"/> is an <see cref="InterpolatedTypedConstant"/>,

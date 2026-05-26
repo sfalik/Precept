@@ -256,7 +256,7 @@ public class ProofEngineTypedArgQualifierTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Slice 23 — Static qualifier routing: proof-engine PRE0114 suppression
+    //  Static qualifier routing: proof-engine PRE0114 suppression
     // ════════════════════════════════════════════════════════════════════════
 
     [Fact]

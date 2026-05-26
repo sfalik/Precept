@@ -9,7 +9,7 @@ namespace Precept.Tests.TypeChecker;
 /// Enforces the catalog-declared <see cref="ActionMeta.ApplicableTo"/> contract for every
 /// state-machine action verb. Verifies PRE0047 (CollectionOperationOnScalar) fires on
 /// scalar targets where the action expects a collection, and PRE0048 (ScalarOperationOnCollection)
-/// fires on wrong-kind collection targets. Phase 4 W-A (F-LANG-COLL-08).
+/// fires on wrong-kind collection targets.
 /// </summary>
 public class ActionApplicabilityTests
 {

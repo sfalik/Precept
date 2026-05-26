@@ -7,17 +7,10 @@ using Xunit;
 namespace Precept.Tests;
 
 // ════════════════════════════════════════════════════════════════════════════════
-//  Slice 1 — NumericInterval struct unit tests
+//  NumericInterval struct unit tests
 //
-//  Design reference: docs/Working/interval-proof-engine-design.md
-//    §2.1 Interval Semantics
-//    §8.2 Slice 1 — Catalog Foundation + NumericInterval struct
-//    §9.1 Section A — NumericInterval struct unit tests (~50 tests)
-//
-//  ⚠️  These tests reference Precept.Pipeline.NumericInterval which is created
-//  by George in Slice 1 (src/Precept/Pipeline/ProofEngine.Intervals.cs).
-//  This file is intentionally RED until that implementation ships.
-//  Completion gate: dotnet build clean + all tests pass → Slice 1 done.
+//  Covers Precept.Pipeline.NumericInterval (src/Precept/Pipeline/ProofEngine.Intervals.cs):
+//  interval semantics, struct construction, and special values.
 // ════════════════════════════════════════════════════════════════════════════════
 
 public class ProofEngineIntervalTests
@@ -639,7 +632,7 @@ public class ProofEngineIntervalTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Slice 37 — affine interval shift coverage
+    //  Affine interval shift coverage
     // ════════════════════════════════════════════════════════════════════════
 
     [Fact]

@@ -387,7 +387,7 @@ public class ConstructsTests
             $"{kind} dispatch must begin with {expectedToken}");
     }
 
-    // ── Slice 1.2: PrimaryLeadingToken bridge ──────────────────────────────────
+    // ── PrimaryLeadingToken bridge ──────────────────────────────────
 
     [Theory]
     [InlineData(ConstructKind.PreceptHeader,    TokenKind.Precept)]
@@ -410,7 +410,7 @@ public class ConstructsTests
     [Fact]
     public void Entries_IsNotEmpty_ForAllConstructs()
     {
-        // Slice 8b: ConstructionRow and ConstructionRowReject are parser-internal kinds with no
+        // ConstructionRow and ConstructionRowReject are parser-internal kinds with no
         // disambiguation entries — they are produced by ResolveRejectVariant, not by direct
         // parser dispatch. All other constructs must have at least one entry.
         var parserInternalKinds = new HashSet<ConstructKind>
@@ -425,12 +425,12 @@ public class ConstructsTests
         }
     }
 
-    // ── Slice 1.4: Entries, slots, disambiguation ──────────────────────────────
+    // ── Entries, slots, disambiguation ──────────────────────────────
 
     [Fact]
     public void AllConstructsHaveAtLeastOneEntry()
     {
-        // Slice 8b: ConstructionRow and ConstructionRowReject are parser-internal kinds with no
+        // ConstructionRow and ConstructionRowReject are parser-internal kinds with no
         // disambiguation entries — they are produced by ResolveRejectVariant, not by direct
         // parser dispatch. All other constructs must have at least one entry.
         var parserInternalKinds = new HashSet<ConstructKind>
@@ -546,7 +546,7 @@ public class ConstructsTests
         }
     }
 
-    // ── Slice 1.5: Derived indexes ─────────────────────────────────────────────
+    // ── Derived indexes ─────────────────────────────────────────────
 
     [Fact]
     public void EveryLeadingTokenMapsToAtLeastOneConstruct()
@@ -590,7 +590,7 @@ public class ConstructsTests
     [InlineData(TokenKind.In,   3)]
     [InlineData(TokenKind.To,   2)]
     [InlineData(TokenKind.From, 4)]
-    [InlineData(TokenKind.On,   2)]  // Slice 8b: ConstructionRow/ConstructionRowReject removed from parser dispatch
+    [InlineData(TokenKind.On,   2)]  // ConstructionRow/ConstructionRowReject are parser-internal, not dispatched
     public void SharedLeadingTokens_HaveCorrectCandidateCount(TokenKind token, int expectedCount)
     {
         Constructs.ByLeadingToken[token].Length.Should().Be(expectedCount,

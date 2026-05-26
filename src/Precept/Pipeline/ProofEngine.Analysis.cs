@@ -206,7 +206,7 @@ public static partial class ProofEngine
 
     /// <summary>
     /// Returns the first implied qualifier matching <paramref name="axis"/> for <paramref name="type"/>.
-    /// Tests Slice 11B's Duration implied-qualifier path without requiring proof pipeline setup.
+    /// Tests the Duration implied-qualifier path without requiring proof pipeline setup.
     /// </summary>
     internal static DeclaredQualifierMeta? GetImpliedQualifierOnAxis(TypeKind type, QualifierAxis axis)
     {
@@ -388,7 +388,7 @@ public static partial class ProofEngine
     }
 
     // ════════════════════════════════════════════════════════════════════════════
-    //  Part B — Default obligation collector (Slice 25)
+    //  Part B — Default obligation collector
     // ════════════════════════════════════════════════════════════════════════════
 
     /// <summary>
@@ -436,7 +436,7 @@ public static partial class ProofEngine
     }
 
     // ════════════════════════════════════════════════════════════════════════════
-    //  Part C — Arg default obligation collector (Slice 26)
+    //  Part C — Arg default obligation collector
     // ════════════════════════════════════════════════════════════════════════════
 
     /// <summary>

@@ -10,15 +10,11 @@ using Xunit;
 namespace Precept.Tests;
 
 // ════════════════════════════════════════════════════════════════════════════════
-//  Slice 13 — Type-Family Coverage Regression Suite
+//  Type-Family Coverage Regression Suite
 //
-//  Design reference: docs/Working/interval-proof-engine-design.md
-//    §12    Type-Family Coverage Matrix
-//    §12.1  Principle: No Silent Constraint Ignoring
-//    §8.2   Slice 13 spec
-//
-//  Coverage: one positive test + one negative companion per §12 matrix row,
+//  Coverage: one positive test + one negative companion per type-family matrix row,
 //  plus two meta-tests that verify the coverage holds at the catalog level.
+//  Principle: no silent constraint ignoring.
 //
 //  §12 matrix rows (all covered):
 //    decimal         — min/max    → IntervalContainment obligation
@@ -87,7 +83,7 @@ from Active on Adjust
     [Fact]
     public void NumberField_WithBounds_GeneratesIntervalObligation()
     {
-        // §12 row: number | min, max | IntervalContainment ✅ Covered (Slice 4)
+        // §12 row: number | min, max | IntervalContainment ✅ Covered
         const string precept = @"
 precept NumberCoverage
 field Score as number min 0 max 100
@@ -183,7 +179,7 @@ from Active on Increment
     [Fact]
     public void MoneyField_WithQualifiedBounds_GeneratesIntervalObligation()
     {
-        // §12 row: money | min, max | IntervalContainment ✅ Covered (Slice 7 + Slices 8–10)
+        // §12 row: money | min, max | IntervalContainment ✅ Covered
         // Typed-constant bounds require matching currency qualifier — e.g., '0 USD' / '100000 USD'
         const string precept = @"
 precept MoneyCoverage
@@ -232,7 +228,7 @@ from Active on Recalculate
     [Fact]
     public void QuantityField_WithQualifiedBounds_GeneratesIntervalObligation()
     {
-        // §12 row: quantity | min, max | IntervalContainment ✅ Covered (Slice 7 + Slices 8–10)
+        // §12 row: quantity | min, max | IntervalContainment ✅ Covered
         const string precept = @"
 precept QuantityCoverage
 field Weight as quantity in 'kg' min '1 kg' max '100 kg'
@@ -280,7 +276,7 @@ from Active on Recalculate
     [Fact]
     public void PriceField_WithQualifiedBounds_GeneratesIntervalObligation()
     {
-        // §12 row: price | min, max | IntervalContainment ✅ Covered (Slice 7 + Slices 8–10)
+        // §12 row: price | min, max | IntervalContainment ✅ Covered
         const string precept = @"
 precept PriceCoverage
 field UnitPrice as price in 'USD/each' min '1 USD/each' max '1000 USD/each'
@@ -373,7 +369,7 @@ state Active initial";
     [Fact]
     public void StringField_WithLengthBounds_GeneratesLengthObligation()
     {
-        // §12 row: string | minlength, maxlength | LengthContainment ✅ Covered (Slice 11)
+        // §12 row: string | minlength, maxlength | LengthContainment ✅ Covered
         // V1 strategy: literal string assignments to bounded string fields generate obligations.
         const string precept = @"
 precept StringCoverage
@@ -421,7 +417,7 @@ from Draft on Submit -> set Note = ""Some text"" -> transition Done";
     [Fact]
     public void CollectionField_WithCountBounds_BoundsExtractedNoObligationInV1()
     {
-        // §12 row: collection | mincount, maxcount | CountContainment ✅ Covered (Slice 11)
+        // §12 row: collection | mincount, maxcount | CountContainment ✅ Covered
         // V1: bounds are extracted (not silently lost) but no obligation is generated yet.
         const string precept = @"
 precept CollectionCoverage
@@ -494,7 +490,7 @@ state Active initial";
     [Fact]
     public void OptionalField_InValuePosition_GeneratesPresenceObligation()
     {
-        // §12 row: optional (any type) | optional modifier | Presence ✅ Covered (Slice 12)
+        // §12 row: optional (any type) | optional modifier | Presence ✅ Covered
         // §12.1: optional field referenced in a value position must produce
         //        PresenceProofRequirement — not silently ignored.
         const string precept = @"
@@ -587,7 +583,7 @@ from Active on Adjust
     }
 
     // ════════════════════════════════════════════════════════════════════════════
-    //  Cross-family regression: all per-family tests remain green (§8.2 Slice 13)
+    //  Cross-family regression: all per-family tests remain green
     // ════════════════════════════════════════════════════════════════════════════
 
     [Fact]

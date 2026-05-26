@@ -8,8 +8,6 @@ namespace Precept.Tests.TypeChecker;
 /// Regression anchors for the money/quantity modifier extension.
 /// Covers: zero-bound modifiers (nonnegative, positive, nonzero) and ranged
 /// bound modifiers (min, max) on money and quantity fields.
-///
-/// Design reference: docs/Working/frank-money-modifiers.md § D
 /// </summary>
 public class MoneyQuantityModifierRegressionTests
 {

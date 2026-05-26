@@ -5,7 +5,7 @@ namespace Precept.Pipeline;
 public static partial class ProofEngine
 {
     // ════════════════════════════════════════════════════════════════════════
-    //  Slice 11: String Length Containment and Collection Count Containment
+    //  String Length Containment and Collection Count Containment
     // ════════════════════════════════════════════════════════════════════════
 
     /// <summary>

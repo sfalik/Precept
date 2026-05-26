@@ -9,10 +9,9 @@ using Xunit;
 namespace Precept.Tests.TypeChecker;
 
 /// <summary>
-/// Slice 21 — interpolated typed-constant quantity integration coverage.
+/// Interpolated typed-constant quantity integration coverage.
 /// Covers magnitude-with-static-unit, WholeValue, and dynamic-unit paths through
-/// the interval proof engine (ProofEngine.Intervals.cs, Slices 19+20).
-/// Missing implementation should fail honestly — no skipped tests.
+/// the interval proof engine (ProofEngine.Intervals.cs).
 /// </summary>
 public class TypeCheckerInterpolatedQuantityTests
 {
@@ -176,7 +175,7 @@ public class TypeCheckerInterpolatedQuantityTests
             because: "amount max 200 exceeds the money bound of 100 USD");
     }
 
-    // ── Test 10: Price with static denominator unit — Slice 24 ───────────────────────
+    // ── Test 10: Price with static denominator unit ───────────────────────
 
     [Fact]
     public void InterpolatedPrice_StaticDenominatorUnit_MagnitudeWithinMax_DoesNotEmitNumericOverflow()
@@ -257,7 +256,7 @@ public class TypeCheckerInterpolatedQuantityTests
                        + "without re-applying the lb→kg scale factor (HasSingleMagnitudeSlot guard)");
     }
 
-    // ── Tests 11–12: WholeValue slot for money and price (Slice 24 W1) ──────────────
+    // ── Tests 11–12: WholeValue slot for money and price ──────────────
 
     [Fact]
     public void InterpolatedMoney_WholeValueSlot_SourceFieldWithinMax_DoesNotEmitNumericOverflow()
@@ -265,7 +264,7 @@ public class TypeCheckerInterpolatedQuantityTests
         // '{moneyRef}' → single WholeValue slot; IntervalOfNarrowed recurses into moneyRef.
         // moneyRef max '50 USD' → interval [−∞..50]; target max '100 USD' → 50 ≤ 100 → Proved.
         // This exercises the WholeValue path in InterpolatedTypedConstant case of IntervalOfNarrowed
-        // for money (Slice 24): no unit scaling is applied since currencies are not UCUM-convertible.
+        // for money: no unit scaling is applied since currencies are not UCUM-convertible.
         var result = CompileGeneral(
             targetDeclaration: "field x as money in 'USD' max '100 USD' default '0 USD'",
             assignment: "'{moneyRef}'",
@@ -288,7 +287,7 @@ public class TypeCheckerInterpolatedQuantityTests
     {
         // '{priceRef}' → single WholeValue slot; IntervalOfNarrowed recurses into priceRef.
         // priceRef max '10 USD/kg' → interval [−∞..10]; target max '20 USD/kg' → 10 ≤ 20 → Proved.
-        // This exercises the WholeValue path for price (Slice 24): the Magnitude-only guard
+        // This exercises the WholeValue path for price: the Magnitude-only guard
         // (line 49–52) does NOT apply to WholeValue slots, so the slot recurses normally.
         var result = CompileGeneral(
             targetDeclaration: "field x as price in 'USD' of 'mass' max '20 USD/kg' default '0 USD/kg'",
@@ -307,7 +306,7 @@ public class TypeCheckerInterpolatedQuantityTests
                 because: "WholeValue price slot reads source field bounds directly without inverse unit scaling");
     }
 
-    // ── Test 13: Same-unit price regression anchor — no inverse scaling (Slice 24 W2) ─
+    // ── Test 13: Same-unit price regression anchor — no inverse scaling ─
 
     [Fact]
     public void InterpolatedPrice_SameUnit_MagnitudeWithinMax_DoesNotEmitNumericOverflow()
@@ -316,7 +315,7 @@ public class TypeCheckerInterpolatedQuantityTests
         // IntervalOfNarrowed recurses on n → [MinValue..3] (n has no explicit min, only max 3).
         // ApplyStaticUnitScaling: kg is the denominator unit; scale_kg = 1 → interval.Scale(1/1) = [MinValue..3].
         // No inverse scaling amplification for same-unit case. Target max '10 USD/kg' → 3 ≤ 10 → Proved.
-        // This is the same-unit regression anchor: ensures the Slice 24 price path does NOT
+        // This is the same-unit regression anchor: ensures the price path does NOT
         // accidentally apply inverse scaling when the assignment unit already matches the field unit.
         var result = CompileGeneral(
             targetDeclaration: "field x as price in 'USD' of 'mass' max '10 USD/kg' default '0 USD/kg'",

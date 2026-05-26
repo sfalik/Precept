@@ -53,10 +53,10 @@ internal static class CatalogAnalysisHelpers
 
     /// <summary>
     /// Known catalog enum type names that appear as <c>GetMeta</c> switch discriminants.
+    /// ConstraintKind and ProofRequirementKind GetMeta switches are exhaustive — all
+    /// members have explicit arms (the _ => throw fallback is present but PRECEPT0007
+    /// only reports missing members, so it does not fire on these switches).
     /// </summary>
-    // Phase 3 (enabled): ConstraintKind and ProofRequirementKind GetMeta switches are now
-    // exhaustive — all members have explicit arms (the _ => throw fallback is present but
-    // PRECEPT0007 only reports missing members, so it does not fire on these switches).
     private static readonly HashSet<string> CatalogEnumNames = new()
     {
         "TypeKind", "TokenKind", "OperatorKind", "OperationKind",

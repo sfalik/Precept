@@ -7,7 +7,7 @@ using Xunit;
 namespace Precept.Tests.TypeChecker;
 
 /// <summary>
-/// Slice 6 — Structural Validation.
+/// Structural Validation.
 /// Covers IsSet/IsNotSet postfix op resolution on optional fields (IsSetOnNonOptional),
 /// computed-field cycle detection via three-color DFS (CircularComputedField),
 /// choice domain validation (EmptyChoice, DuplicateChoiceValue),
@@ -136,9 +136,9 @@ public class TypeCheckerStructuralTests
     // ════════════════════════════════════════════════════════════════════════
     //
     // NOTE: ComputedDeps is currently empty because computed expression resolution
-    // is not yet wired (Slice 2+ deferred). These tests document the expected behavior
-    // once computed expressions populate ComputedDeps. Until then, cycle detection
-    // and forward-ref checks are no-ops (correct behavior per george-slice-6-done.md).
+    // is not yet wired. These tests document the expected behavior once computed
+    // expressions populate ComputedDeps. Until then, cycle detection and forward-ref
+    // checks are no-ops.
 
     [Fact]
     public void TwoFields_NoCycle_NoDiagnostic()
@@ -517,7 +517,7 @@ public class TypeCheckerStructuralTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Slice 8: ComputedFieldWithDefault (PRE0039)
+    //  ComputedFieldWithDefault (PRE0039)
     // ════════════════════════════════════════════════════════════════════════
 
     [Fact]
@@ -547,7 +547,7 @@ public class TypeCheckerStructuralTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Slice 8: DuplicateArgName (PRE0027)
+    //  DuplicateArgName (PRE0027)
     // ════════════════════════════════════════════════════════════════════════
 
     [Fact]
@@ -581,7 +581,7 @@ public class TypeCheckerStructuralTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Slice 8: NonChoiceAssignedToChoice / ValueNotInChoiceSet (PRE0085)
+    //  NonChoiceAssignedToChoice / ValueNotInChoiceSet (PRE0085)
     // ════════════════════════════════════════════════════════════════════════
 
     [Fact]

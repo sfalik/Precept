@@ -41,7 +41,7 @@ public class ProofRequirementCatalogTests
     [Fact]
     public void Total_Count()
     {
-        // Updated for Slice 6: +1 kind (KeyPresence = 10)
+        // KeyPresence = 10 brings the total catalog count to 10.
         ProofRequirements.All.Should().HaveCount(10);
     }
 
@@ -102,7 +102,7 @@ public class ProofRequirementCatalogTests
     [Fact]
     public void FiveKinds_AreSingleSubject()
     {
-        // Updated for Slice 6: +1 single-subject kind (KeyPresence)
+        // KeyPresence brings the single-subject kind total to 8.
         var singleSubject = ProofRequirements.All
             .Where(m => m is not ProofRequirementMeta.QualifierCompatibility
                         and not ProofRequirementMeta.QualifierChain)
@@ -173,14 +173,12 @@ public class ProofRequirementCatalogTests
         req.RightSubject.Should().BeSameAs(rightSubject);
     }
 
-    // ── Slice 1 regression anchors — IntervalContainment catalog entry ──────────
-    // ⚠️  Tests below are RED until George's Slice 1 adds IntervalContainment = 7
-    // to ProofRequirementKind and updates ProofRequirements.GetMeta.
+    // ── Regression anchors — IntervalContainment catalog entry ──────────
 
     [Fact]
     public void IntervalContainment_KindExistsInEnum()
     {
-        // Regression anchor § 9.4 #11: enum value must be 7
+        // IntervalContainment enum value must be 7.
         var kind = ProofRequirementKind.IntervalContainment;
         ((int)kind).Should().Be(7);
     }
@@ -209,8 +207,8 @@ public class ProofRequirementCatalogTests
     [Fact]
     public void SingleSubjectKinds_NowIncludesIntervalContainment()
     {
-        // Updated for Slice 6: single-subject kinds are now 8
-        // (Numeric, Presence, Dimension, Modifier, IntervalContainment, LengthContainment, CountContainment, KeyPresence)
+        // Single-subject kinds total 8:
+        // Numeric, Presence, Dimension, Modifier, IntervalContainment, LengthContainment, CountContainment, KeyPresence.
         var singleSubject = ProofRequirements.All
             .Where(m => m is not ProofRequirementMeta.QualifierCompatibility
                         and not ProofRequirementMeta.QualifierChain)
@@ -219,7 +217,7 @@ public class ProofRequirementCatalogTests
             "KeyPresence joins IntervalContainment, LengthContainment, CountContainment, Numeric, Presence, Dimension, Modifier as single-subject");
     }
 
-    // ── Slice 9C — Catalog-mediated DiagnosticCode ──────────────────────────────
+    // ── Catalog-mediated DiagnosticCode ──────────────────────────────
 
     [Fact]
     public void IntervalContainment_DiagnosticCode_IsNumericOverflow()

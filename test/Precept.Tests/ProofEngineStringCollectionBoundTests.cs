@@ -8,14 +8,11 @@ using Xunit;
 namespace Precept.Tests;
 
 // ════════════════════════════════════════════════════════════════════════════════
-//  Slice 11 — String/Collection Constraint Obligation Tests
-//
-//  Design reference: docs/Working/interval-proof-engine-design.md
-//    §8.2  Slice 11 spec (LengthContainment / CountContainment obligations)
+//  String/Collection Constraint Obligation Tests
 //
 //  Strategy: only literal string assignments to bounded string fields generate
 //  obligations. Non-literal assignments (arg refs, field refs) produce no
-//  obligation (correct: conservative V1 approach to avoid false positives on
+//  obligation (conservative V1 approach to avoid false positives on
 //  dynamically-provided values).
 // ════════════════════════════════════════════════════════════════════════════════
 

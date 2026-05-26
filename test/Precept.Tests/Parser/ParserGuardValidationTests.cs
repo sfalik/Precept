@@ -7,9 +7,8 @@ using Xunit;
 namespace Precept.Tests.Parser;
 
 /// <summary>
-/// Tests for Slice 7 guard gate diagnostics:
+/// Tests for guard gate diagnostics:
 ///   PRE0013 OmitDoesNotSupportGuard
-///   PRE0014 EventHandlerDoesNotSupportGuard
 ///   PRE0015 PreEventGuardNotAllowed
 ///
 /// These validate that the parser emits precise, actionable diagnostics when
@@ -64,7 +63,7 @@ public class ParserGuardValidationTests
     }
 
     // ════════════════════════════════════════════════════════════════════════════
-    //  §2. EventHandler guard gate (PRE0014 removed in Slice 8b)
+    //  §2. EventHandler guards are accepted (no PRE0014 diagnostic)
     // ════════════════════════════════════════════════════════════════════════════
 
     [Fact]

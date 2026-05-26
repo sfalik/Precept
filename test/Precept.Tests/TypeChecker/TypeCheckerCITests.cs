@@ -7,8 +7,8 @@ using Xunit;
 namespace Precept.Tests.TypeChecker;
 
 /// <summary>
-/// Slice 8 — Case-Insensitive (CI) Enforcement.
-/// Covers all 5 CI rules from §3.8: valid + violation cases per rule,
+/// Case-Insensitive (CI) Enforcement.
+/// Covers all 5 CI rules: valid + violation cases per rule,
 /// TypedFieldRef.IsCaseInsensitive population, CI variant function selection,
 /// non-CI function in CI-required context enforcement, and multi-violation emission.
 /// </summary>

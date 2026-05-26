@@ -652,7 +652,6 @@ public class OperationsTests
     public void Binary_Count()
     {
         // 83 arithmetic + 104 comparison + 4 logical/membership pseudo-ops + 1 ZonedDateTime − ZonedDateTime = 192 binary
-        // (was 194 prior to F-LANG-TEMP-08 removal of ZonedDateTime±Period; see compiler-readiness-plan-2026-05-24.md § Resolved for Phase 3)
         Operations.All.OfType<BinaryOperationMeta>().Should().HaveCount(192);
     }
 

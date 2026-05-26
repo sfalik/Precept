@@ -10,10 +10,10 @@ using Xunit;
 namespace Precept.Tests.TypeChecker;
 
 /// <summary>
-/// Slice 9 — Quantifier + List Literal Resolution.
-/// Covers TypedQuantifier (each/any/no binding scope, element TypeKind per D2,
+/// Quantifier + List Literal Resolution.
+/// Covers TypedQuantifier (each/any/no binding scope, element TypeKind,
 /// scope pop verification), TypedListLiteral (type unification with widening,
-/// incompatible type errors), and ErrorType propagation (D13).
+/// incompatible type errors), and ErrorType propagation.
 /// </summary>
 public class TypeCheckerQuantifierTests
 {

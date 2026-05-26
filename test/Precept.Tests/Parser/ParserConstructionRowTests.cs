@@ -7,9 +7,9 @@ using Xunit;
 namespace Precept.Tests.Parser;
 
 /// <summary>
-/// Slice 2 tests: Parser routing for construction rows (ConstructionRowReject),
+/// Parser routing for construction rows (ConstructionRowReject),
 /// TransitionRowReject, guard support for all on-rows, and RejectClause slot emission.
-/// Slice 8b: ConstructionRow is no longer produced by the parser — all on-rows parse as EventRow.
+/// ConstructionRow is not produced by the parser — all on-rows parse as EventRow.
 /// </summary>
 public class ParserConstructionRowTests
 {
@@ -23,8 +23,8 @@ public class ParserConstructionRowTests
     [Fact]
     public void ConstructionRow_EmitsCorrectKind()
     {
-        // Slice 8b: 'on <event> -> <actions>' (initial classification happens at type-check time)
-        // must produce EventRow — ConstructionRow is no longer emitted by the parser.
+        // 'on <event> -> <actions>' (initial classification happens at type-check time)
+        // must produce EventRow — ConstructionRow is not emitted by the parser.
         var manifest = Parse("on Start -> set status = \"active\"");
 
         manifest.Constructs.Should().ContainSingle(
@@ -35,7 +35,7 @@ public class ParserConstructionRowTests
     [Fact]
     public void ConstructionRowReject_EmitsCorrectKind()
     {
-        // Slice 8b: 'on <event> when <cond> -> reject "msg"' must produce ConstructionRowReject.
+        // 'on <event> when <cond> -> reject "msg"' must produce ConstructionRowReject.
         var manifest = Parse("on Start when amount > 0 -> reject \"too low\"");
 
         manifest.Constructs.Should().ContainSingle(
@@ -46,7 +46,7 @@ public class ParserConstructionRowTests
     [Fact]
     public void ConstructionRow_AllowsGuard()
     {
-        // Slice 8b: guards are now valid on all on-rows — PRE0014 must not fire.
+        // Guards are valid on all on-rows — PRE0014 must not fire.
         var manifest = Parse("on Start when amount > 0 -> set status = \"active\"");
 
         manifest.Diagnostics

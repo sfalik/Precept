@@ -8,12 +8,11 @@ using static Precept.Tests.TypeChecker.TypeCheckerTestHelpers;
 namespace Precept.Tests.Parser;
 
 /// <summary>
-/// Phase 4 W-C / F-LANG-COLL-06: qualified inner types in collections.
+/// Qualified inner types in collections.
 /// Set, bag, list, queue, log, and lookup-value can carry qualifier metadata
 /// (`set of money in 'USD'`, `lookup of K to quantity of 'mass'`, etc.). The
 /// parser routes inner types through <see cref="TryParseQualifiers"/>; the
 /// type checker builds a <see cref="TypedQualifiedElement"/> on the typed field.
-/// Root-cause fix for BUG-005 (was symptom-fix-emit-PRE0105 in Phase 2).
 /// </summary>
 public class QualifiedInnerTypeTests
 {

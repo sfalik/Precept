@@ -10,7 +10,7 @@ using Xunit;
 namespace Precept.Tests.Parser;
 
 /// <summary>
-/// Slice 4 integration tests — parse all 28 sample .precept files end-to-end
+/// Integration tests — parse all 28 sample .precept files end-to-end
 /// and verify structural guarantees across the full corpus.
 ///
 /// §1  Sample file smoke tests (28 files, [Theory])

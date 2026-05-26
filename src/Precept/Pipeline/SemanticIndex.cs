@@ -299,18 +299,17 @@ public sealed record TypedBindingAction(
 // ════════════════════════════════════════════════════════════════════════════
 //  TypedElementType DU — resolved element-type metadata for collection inner types
 //
-//  Discriminated union (Phase 4 W-C, COLL-02/03 design D-2). The bare TypeKind?
-//  that previously occupied this slot couldn't carry qualifier metadata for
-//  qualified inner types (set of money in 'USD', lookup of K to quantity of
-//  'mass', etc.) nor the Ordered bit for ordered-choice inner types. The DU
-//  unifies all three cases:
-//   - TypedScalarElement   — plain scalar/business/temporal element (no extra metadata)
-//   - TypedChoiceElement   — choice-element with optional Ordered trait (W-G)
-//   - TypedQualifiedElement — element with qualifier metadata (W-C: COLL-06)
+//  Discriminated union for the element-type slot on a collection field. A bare
+//  TypeKind? cannot carry qualifier metadata for qualified inner types (set of
+//  money in 'USD', lookup of K to quantity of 'mass') nor the Ordered bit for
+//  ordered-choice inner types. The DU unifies the three cases:
+//   - TypedScalarElement    — plain scalar / business / temporal element
+//   - TypedChoiceElement    — choice element; Ordered reflects the inner-type modifier
+//   - TypedQualifiedElement — element with qualifier metadata
 //
-//  Consumers that only need the resolved TypeKind read `.ResolvedTypeKind` on
-//  the base. Consumers that need qualifier or ordering metadata pattern-match
-//  on the subtype.
+//  Consumers that only need the resolved TypeKind read .ResolvedTypeKind on the
+//  base. Consumers that need qualifier or ordering metadata pattern-match on
+//  the subtype.
 // ════════════════════════════════════════════════════════════════════════════
 
 /// <summary>Base of the resolved element-type DU for collection inner types.</summary>
@@ -322,16 +321,16 @@ public sealed record TypedScalarElement(TypeKind ResolvedTypeKind)
 
 /// <summary>
 /// Choice-element type. <c>Ordered</c> reflects the inner type's <c>ordered</c>
-/// modifier (Phase 4 W-G), carried at the type level so accessor return types
-/// can propagate it through <c>.first</c>/<c>.last</c>/<c>.at(N)</c>/<c>.min</c>/<c>.max</c>.
+/// modifier, carried at the type level so accessor return types can propagate it
+/// through <c>.first</c>/<c>.last</c>/<c>.at(N)</c>/<c>.min</c>/<c>.max</c>.
 /// </summary>
 public sealed record TypedChoiceElement(TypeKind ResolvedTypeKind, bool Ordered)
     : TypedElementType(ResolvedTypeKind);
 
 /// <summary>
 /// Qualified element type — carries the qualifier metadata declared on the
-/// inner type (e.g., <c>set of money in 'USD'</c> → <c>TypedQualifiedElement(Money, [Currency(USD)])</c>).
-/// Phase 4 W-C (F-LANG-COLL-06).
+/// inner type. <c>set of money in 'USD'</c> resolves to
+/// <c>TypedQualifiedElement(Money, [Currency(USD)])</c>.
 /// </summary>
 public sealed record TypedQualifiedElement(
     TypeKind ResolvedTypeKind,
@@ -618,9 +617,9 @@ public sealed record ArgReference(TypedArg Arg, SourceSpan Site);
 /// <c>ImmutableDictionary</c> as primary storage.
 /// </para>
 /// <para>
-/// <b>D26 (Slice 10):</b> If any <see cref="TypedErrorExpression"/> is present in any typed expression
+/// <b>Invariant:</b> if any <see cref="TypedErrorExpression"/> is present in any typed expression
 /// reachable from this index, at least one <see cref="Severity.Error"/> diagnostic must also be present.
-/// Enforced by unconditional <c>throw</c> at construction time in Slice 10.
+/// Enforced by unconditional <c>throw</c> at construction time.
 /// </para>
 /// </summary>
 public sealed record SemanticIndex(

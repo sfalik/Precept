@@ -7,12 +7,7 @@ using Xunit;
 namespace Precept.Tests.Parser;
 
 /// <summary>
-/// Tests for the Slice 3 Pratt expression parser.
-///
-/// Tests are RED-E — they describe the expression AST shapes that
-/// <c>Parser.Parse</c> must produce once Slice 3 is implemented. Every test
-/// method that exercises expression-slot content is marked with
-/// <c>// RED-E: Slice 3 — expression parsing</c> in its body.
+/// Tests for the Pratt expression parser.
 ///
 /// All 13 <see cref="ExpressionFormKind"/> members are covered across:
 ///   §0  Lexer smoke tests (GREEN)
@@ -145,7 +140,6 @@ public class ParserExpressionTests
     [Fact]
     public void Literal_NumberZero_InRuleExpression_ProducesLiteralExpression()
     {
-        // RED-E: Slice 3 — expression parsing
         var expr = GetRuleExpression("rule 0 because \"msg\"");
 
         expr.Should().BeOfType<LiteralExpression>();
@@ -157,7 +151,6 @@ public class ParserExpressionTests
     [Fact]
     public void Literal_BooleanTrue_InRuleExpression_ProducesLiteralExpression_WithTrueKind()
     {
-        // RED-E: Slice 3 — expression parsing
         var expr = GetRuleExpression("rule true because \"msg\"");
 
         expr.Should().BeOfType<LiteralExpression>();
@@ -168,7 +161,6 @@ public class ParserExpressionTests
     [Fact]
     public void Literal_BooleanFalse_InRuleExpression_ProducesLiteralExpression_WithFalseKind()
     {
-        // RED-E: Slice 3 — expression parsing
         var expr = GetRuleExpression("rule false because \"msg\"");
 
         expr.Should().BeOfType<LiteralExpression>();
@@ -179,7 +171,6 @@ public class ParserExpressionTests
     [Fact]
     public void Literal_StringLiteral_InComputeExpression_ProducesLiteralExpression()
     {
-        // RED-E: Slice 3 — expression parsing
         var expr = GetCompute("field label as string <- \"hello\"");
 
         expr.Should().BeOfType<LiteralExpression>();
@@ -192,7 +183,6 @@ public class ParserExpressionTests
     [Fact]
     public void Literal_TypedConstant_InComputeExpression_ProducesLiteralExpression()
     {
-        // RED-E: Slice 3 — expression parsing
         var expr = GetCompute("field dt as date <- '2026-01-01'");
 
         expr.Should().BeOfType<LiteralExpression>();
@@ -205,7 +195,6 @@ public class ParserExpressionTests
     [Fact]
     public void Literal_NumberInBinaryRhs_TextMatchesSource()
     {
-        // RED-E: Slice 3 — expression parsing
         var expr = GetRuleExpression("rule x == 42 because \"num\"");
 
         var bin = (BinaryOperationExpression)expr;
@@ -220,7 +209,6 @@ public class ParserExpressionTests
     [Fact]
     public void Identifier_LeftOperandOfComparison_ProducesIdentifierExpression()
     {
-        // RED-E: Slice 3 — expression parsing
         var expr = GetRuleExpression("rule amount > 0 because \"msg\"");
 
         expr.Should().BeOfType<BinaryOperationExpression>();
@@ -233,7 +221,6 @@ public class ParserExpressionTests
     [Fact]
     public void Identifier_RightOperandOfBinaryOp_NameIsPreserved()
     {
-        // RED-E: Slice 3 — expression parsing
         var expr = GetRuleExpression("rule a > b because \"msg\"");
 
         var bin = (BinaryOperationExpression)expr;
@@ -244,7 +231,6 @@ public class ParserExpressionTests
     [Fact]
     public void Identifier_StandaloneInRuleExpression_ProducesIdentifierExpression()
     {
-        // RED-E: Slice 3 — expression parsing
         // A bare identifier is a valid boolean-position expression; the type checker
         // enforces boolean, but the parser must accept and produce IdentifierExpression.
         var expr = GetRuleExpression("rule active because \"must be active\"");
@@ -260,7 +246,6 @@ public class ParserExpressionTests
     [Fact]
     public void BinaryOp_Precedence_MultiplicationBindsTighterThanAddition()
     {
-        // RED-E: Slice 3 — expression parsing
         // a + b * c  ->  a + (b * c) — * has precedence 60, + has precedence 50
         var expr = GetRuleExpression("rule a + b * c because \"msg\"");
 
@@ -276,7 +261,6 @@ public class ParserExpressionTests
     [Fact]
     public void BinaryOp_LeftAssociativity_AdditionGroupsLeftToRight()
     {
-        // RED-E: Slice 3 — expression parsing
         // a + b + c  ->  (a + b) + c  — left-to-right grouping
         var expr = GetRuleExpression("rule a + b + c because \"msg\"");
 
@@ -292,7 +276,6 @@ public class ParserExpressionTests
     [Fact]
     public void BinaryOp_AndOrPrecedence_AndBindsTighterThanOr()
     {
-        // RED-E: Slice 3 — expression parsing
         // a or b and c  ->  a or (b and c)  — and (prec 20) > or (prec 10)
         var expr = GetRuleExpression("rule a or b and c because \"msg\"");
 
@@ -306,7 +289,6 @@ public class ParserExpressionTests
     [Fact]
     public void BinaryOp_GreaterThan_ProducesCorrectToken()
     {
-        // RED-E: Slice 3 — expression parsing
         ((BinaryOperationExpression)GetRuleExpression("rule a > b because \"msg\""))
             .Operator.Should().Be(TokenKind.GreaterThan);
     }
@@ -314,7 +296,6 @@ public class ParserExpressionTests
     [Fact]
     public void BinaryOp_LessThan_ProducesCorrectToken()
     {
-        // RED-E: Slice 3 — expression parsing
         ((BinaryOperationExpression)GetRuleExpression("rule a < b because \"msg\""))
             .Operator.Should().Be(TokenKind.LessThan);
     }
@@ -322,7 +303,6 @@ public class ParserExpressionTests
     [Fact]
     public void BinaryOp_LessThanOrEqual_ProducesCorrectToken()
     {
-        // RED-E: Slice 3 — expression parsing
         ((BinaryOperationExpression)GetRuleExpression("rule a <= b because \"msg\""))
             .Operator.Should().Be(TokenKind.LessThanOrEqual);
     }
@@ -330,7 +310,6 @@ public class ParserExpressionTests
     [Fact]
     public void BinaryOp_GreaterThanOrEqual_ProducesCorrectToken()
     {
-        // RED-E: Slice 3 — expression parsing
         ((BinaryOperationExpression)GetRuleExpression("rule a >= b because \"msg\""))
             .Operator.Should().Be(TokenKind.GreaterThanOrEqual);
     }
@@ -338,7 +317,6 @@ public class ParserExpressionTests
     [Fact]
     public void BinaryOp_DoubleEquals_ProducesCorrectToken()
     {
-        // RED-E: Slice 3 — expression parsing
         ((BinaryOperationExpression)GetRuleExpression("rule a == b because \"msg\""))
             .Operator.Should().Be(TokenKind.DoubleEquals);
     }
@@ -346,7 +324,6 @@ public class ParserExpressionTests
     [Fact]
     public void BinaryOp_NotEquals_ProducesCorrectToken()
     {
-        // RED-E: Slice 3 — expression parsing
         ((BinaryOperationExpression)GetRuleExpression("rule a != b because \"msg\""))
             .Operator.Should().Be(TokenKind.NotEquals);
     }
@@ -354,7 +331,6 @@ public class ParserExpressionTests
     [Fact]
     public void BinaryOp_Plus_ProducesCorrectToken()
     {
-        // RED-E: Slice 3 — expression parsing
         ((BinaryOperationExpression)GetRuleExpression("rule a + b because \"msg\""))
             .Operator.Should().Be(TokenKind.Plus);
     }
@@ -362,7 +338,6 @@ public class ParserExpressionTests
     [Fact]
     public void BinaryOp_Minus_ProducesCorrectToken()
     {
-        // RED-E: Slice 3 — expression parsing
         ((BinaryOperationExpression)GetRuleExpression("rule a - b because \"msg\""))
             .Operator.Should().Be(TokenKind.Minus);
     }
@@ -370,7 +345,6 @@ public class ParserExpressionTests
     [Fact]
     public void BinaryOp_Star_ProducesCorrectToken()
     {
-        // RED-E: Slice 3 — expression parsing
         ((BinaryOperationExpression)GetRuleExpression("rule a * b because \"msg\""))
             .Operator.Should().Be(TokenKind.Star);
     }
@@ -378,7 +352,6 @@ public class ParserExpressionTests
     [Fact]
     public void BinaryOp_Slash_ProducesCorrectToken()
     {
-        // RED-E: Slice 3 — expression parsing
         ((BinaryOperationExpression)GetRuleExpression("rule a / b because \"msg\""))
             .Operator.Should().Be(TokenKind.Slash);
     }
@@ -386,7 +359,6 @@ public class ParserExpressionTests
     [Fact]
     public void BinaryOp_Percent_ProducesCorrectToken()
     {
-        // RED-E: Slice 3 — expression parsing
         ((BinaryOperationExpression)GetRuleExpression("rule a % b because \"msg\""))
             .Operator.Should().Be(TokenKind.Percent);
     }
@@ -394,7 +366,6 @@ public class ParserExpressionTests
     [Fact]
     public void BinaryOp_And_ProducesCorrectToken()
     {
-        // RED-E: Slice 3 — expression parsing
         ((BinaryOperationExpression)GetRuleExpression("rule a and b because \"msg\""))
             .Operator.Should().Be(TokenKind.And);
     }
@@ -402,7 +373,6 @@ public class ParserExpressionTests
     [Fact]
     public void BinaryOp_Or_ProducesCorrectToken()
     {
-        // RED-E: Slice 3 — expression parsing
         ((BinaryOperationExpression)GetRuleExpression("rule a or b because \"msg\""))
             .Operator.Should().Be(TokenKind.Or);
     }
@@ -410,7 +380,6 @@ public class ParserExpressionTests
     [Fact]
     public void BinaryOp_CaseInsensitiveEquals_ProducesCorrectToken()
     {
-        // RED-E: Slice 3 — expression parsing
         ((BinaryOperationExpression)GetRuleExpression("rule a ~= \"test\" because \"ci\""))
             .Operator.Should().Be(TokenKind.CaseInsensitiveEquals);
     }
@@ -418,7 +387,6 @@ public class ParserExpressionTests
     [Fact]
     public void BinaryOp_Contains_ProducesCorrectToken()
     {
-        // RED-E: Slice 3 — expression parsing
         ((BinaryOperationExpression)GetRuleExpression("rule tags contains \"x\" because \"msg\""))
             .Operator.Should().Be(TokenKind.Contains);
     }
@@ -426,7 +394,6 @@ public class ParserExpressionTests
     [Fact]
     public void BinaryOp_ArithmeticPrecedence_MulRhsOfAdd_IsNestedCorrectly()
     {
-        // RED-E: Slice 3 — expression parsing
         // rule a + b * c > 0  ->  top: >(+(a, *(b,c)), 0)
         var expr = GetRuleExpression("rule a + b * c > 0 because \"arith\"");
 
@@ -445,7 +412,6 @@ public class ParserExpressionTests
     [Fact]
     public void Unary_Not_InRuleExpression_ProducesUnaryOperationExpression()
     {
-        // RED-E: Slice 3 — expression parsing
         var expr = GetRuleExpression("rule not valid because \"msg\"");
 
         var unary = expr.Should().BeOfType<UnaryOperationExpression>().Subject;
@@ -458,7 +424,6 @@ public class ParserExpressionTests
     [Fact]
     public void Unary_LogicalNot_OperandIsPreserved()
     {
-        // RED-E: Slice 3 — expression parsing
         var expr = GetRuleExpression("rule not done because \"not done\"");
 
         var unary = expr.Should().BeOfType<UnaryOperationExpression>().Subject;
@@ -470,7 +435,6 @@ public class ParserExpressionTests
     [Fact]
     public void Unary_Negate_BeforeIdentifier_ProducesMinusOperator()
     {
-        // RED-E: Slice 3 — expression parsing
         // Unary minus before an identifier must produce UnaryOperationExpression.
         // Per spec §1.3, only '-' followed by a NumberLiteral is constant-folded;
         // '-identifier' remains a runtime negate.
@@ -485,7 +449,6 @@ public class ParserExpressionTests
     [Fact]
     public void Unary_Negate_InBinaryContext_IsLeftOperandOfGreaterThan()
     {
-        // RED-E: Slice 3 — expression parsing
         var expr = GetRuleExpression("rule -x > 0 because \"neg\"");
 
         var bin = expr.Should().BeOfType<BinaryOperationExpression>().Subject;
@@ -500,7 +463,6 @@ public class ParserExpressionTests
     [Fact]
     public void Grouped_ParenthesizedAddition_BecomesLeftOperandOfMultiplication()
     {
-        // RED-E: Slice 3 — expression parsing
         // (a + b) * c  ->  top is *(GroupedExpr(+(a,b)), c)
         var expr = GetRuleExpression("rule (a + b) * c because \"msg\"");
 
@@ -513,7 +475,6 @@ public class ParserExpressionTests
     [Fact]
     public void Grouped_InnerExpression_IsAdditionOfTwoIdentifiers()
     {
-        // RED-E: Slice 3 — expression parsing
         var expr = GetRuleExpression("rule (a + b) * c because \"msg\"");
 
         var times = (BinaryOperationExpression)expr;
@@ -527,7 +488,6 @@ public class ParserExpressionTests
     [Fact]
     public void Grouped_OrInsideParens_BecomesLeftOperandOfAnd()
     {
-        // RED-E: Slice 3 — expression parsing
         // (a or b) and c — parentheses override the lower precedence of 'or'
         var expr = GetRuleExpression("rule (a or b) and c because \"grouped\"");
 
@@ -544,7 +504,6 @@ public class ParserExpressionTests
     [Fact]
     public void MemberAccess_DotAccess_ProducesMemberAccessExpression()
     {
-        // RED-E: Slice 3 — expression parsing
         var expr = GetRuleExpression("rule loan.amount > 0 because \"msg\"");
 
         var bin = expr.Should().BeOfType<BinaryOperationExpression>().Subject;
@@ -555,7 +514,6 @@ public class ParserExpressionTests
     [Fact]
     public void MemberAccess_TargetAndMemberName_ArePreserved()
     {
-        // RED-E: Slice 3 — expression parsing
         var expr = GetRuleExpression("rule loan.amount > 0 because \"msg\"");
 
         var member = (MemberAccessExpression)((BinaryOperationExpression)expr).Left;
@@ -567,7 +525,6 @@ public class ParserExpressionTests
     [Fact]
     public void MemberAccess_MemberTokenKind_IsIdentifier()
     {
-        // RED-E: Slice 3 — expression parsing
         var expr = GetRuleExpression("rule loan.amount > 0 because \"msg\"");
 
         var member = (MemberAccessExpression)((BinaryOperationExpression)expr).Left;
@@ -578,7 +535,6 @@ public class ParserExpressionTests
     [Fact]
     public void MemberAccess_DotMinOnCollection_MemberName_IsPreserved()
     {
-        // RED-E: Slice 3 — expression parsing
         var expr = GetRuleExpression("rule items.min == \"a\" because \"min\"");
 
         var bin = expr.Should().BeOfType<BinaryOperationExpression>().Subject;
@@ -593,7 +549,6 @@ public class ParserExpressionTests
     [Fact]
     public void MethodCall_DotMethodWithArgs_ProducesMethodCallExpression()
     {
-        // RED-E: Slice 3 — expression parsing
         // loan.amount.round(2) -> MethodCallExpression
         var expr = GetRuleExpression("rule loan.amount.round(2) > 0 because \"msg\"");
 
@@ -605,7 +560,6 @@ public class ParserExpressionTests
     [Fact]
     public void MethodCall_MethodName_IsPreserved()
     {
-        // RED-E: Slice 3 — expression parsing
         var expr = GetRuleExpression("rule loan.amount.round(2) > 0 because \"msg\"");
 
         var call = (MethodCallExpression)((BinaryOperationExpression)expr).Left;
@@ -615,7 +569,6 @@ public class ParserExpressionTests
     [Fact]
     public void MethodCall_Target_IsTheMemberAccessReceiverBeforeTheMethodName()
     {
-        // RED-E: Slice 3 — expression parsing
         // loan.amount.round(2) — Target is loan.amount; MethodName is round
         var expr = GetRuleExpression("rule loan.amount.round(2) > 0 because \"msg\"");
 
@@ -628,7 +581,6 @@ public class ParserExpressionTests
     [Fact]
     public void MethodCall_Arguments_ContainExactlyOneNumberLiteralArg()
     {
-        // RED-E: Slice 3 — expression parsing
         var expr = GetRuleExpression("rule loan.amount.round(2) > 0 because \"msg\"");
 
         var call = (MethodCallExpression)((BinaryOperationExpression)expr).Left;
@@ -644,7 +596,6 @@ public class ParserExpressionTests
     [Fact]
     public void FunctionCall_BareIdentifierCallSyntax_ProducesFunctionCallExpression()
     {
-        // RED-E: Slice 3 — expression parsing
         var expr = GetRuleExpression("rule round(2.5) > 0 because \"msg\"");
 
         var bin = expr.Should().BeOfType<BinaryOperationExpression>().Subject;
@@ -655,7 +606,6 @@ public class ParserExpressionTests
     [Fact]
     public void FunctionCall_FunctionName_IsPreserved()
     {
-        // RED-E: Slice 3 — expression parsing
         var expr = GetRuleExpression("rule round(2.5) > 0 because \"msg\"");
 
         var call = (FunctionCallExpression)((BinaryOperationExpression)expr).Left;
@@ -665,7 +615,6 @@ public class ParserExpressionTests
     [Fact]
     public void FunctionCall_Arguments_ContainSingleNumberLiteralArg()
     {
-        // RED-E: Slice 3 — expression parsing
         var expr = GetRuleExpression("rule round(2.5) > 0 because \"msg\"");
 
         var call = (FunctionCallExpression)((BinaryOperationExpression)expr).Left;
@@ -677,7 +626,6 @@ public class ParserExpressionTests
     [Fact]
     public void FunctionCall_Approximate_FunctionNamePreserved()
     {
-        // RED-E: Slice 3 — expression parsing
         var expr = GetRuleExpression("rule approximate(x) == 0 because \"zero\"");
 
         var bin = expr.Should().BeOfType<BinaryOperationExpression>().Subject;
@@ -692,7 +640,6 @@ public class ParserExpressionTests
     [Fact]
     public void Conditional_StandaloneIfThenElse_ProducesConditionalExpression()
     {
-        // RED-E: Slice 3 — expression parsing
         // rule if x > 0 then true else false — top-level is ConditionalExpression
         var expr = GetRuleExpression("rule if x > 0 then true else false because \"cond\"");
 
@@ -702,7 +649,6 @@ public class ParserExpressionTests
     [Fact]
     public void Conditional_ConditionBranch_IsABinaryComparison()
     {
-        // RED-E: Slice 3 — expression parsing
         var expr = GetRuleExpression("rule if x > 0 then true else false because \"cond\"");
 
         ((ConditionalExpression)expr).Condition
@@ -712,7 +658,6 @@ public class ParserExpressionTests
     [Fact]
     public void Conditional_ThenElseBranches_AreLiteralExpressions()
     {
-        // RED-E: Slice 3 — expression parsing
         var expr = GetRuleExpression("rule if x > 0 then true else false because \"cond\"");
 
         var cond = (ConditionalExpression)expr;
@@ -723,7 +668,6 @@ public class ParserExpressionTests
     [Fact]
     public void Conditional_GroupedIfThenElse_OuterIsGreaterThan_InnerIsConditional()
     {
-        // RED-E: Slice 3 — expression parsing
         // (if amount > 0 then amount else 0) > 0  ->  top: >(GroupedExpr(Conditional), 0)
         var expr = GetRuleExpression("rule (if amount > 0 then amount else 0) > 0 because \"msg\"");
 
@@ -739,7 +683,6 @@ public class ParserExpressionTests
     [Fact]
     public void ListLiteral_ThreeElementList_InComputeExpression_ProducesListLiteralExpression()
     {
-        // RED-E: Slice 3 — expression parsing
         var expr = GetCompute("field tags as number <- [1, 2, 3]");
 
         expr.Should().BeOfType<ListLiteralExpression>();
@@ -750,7 +693,6 @@ public class ParserExpressionTests
     [Fact]
     public void ListLiteral_AllElements_AreLiteralExpressions()
     {
-        // RED-E: Slice 3 — expression parsing
         var expr = GetCompute("field tags as number <- [1, 2, 3]");
 
         var list = (ListLiteralExpression)expr;
@@ -761,7 +703,6 @@ public class ParserExpressionTests
     [Fact]
     public void ListLiteral_Empty_ProducesListLiteralExpressionWithNoElements()
     {
-        // RED-E: Slice 3 — expression parsing
         var expr = GetCompute("field tags as number <- []");
 
         expr.Should().BeOfType<ListLiteralExpression>();
@@ -771,7 +712,6 @@ public class ParserExpressionTests
     [Fact]
     public void ListLiteral_AsRightOperandOfContains_TwoStringElements()
     {
-        // RED-E: Slice 3 — expression parsing
         var expr = GetRuleExpression("rule tags contains [\"a\", \"b\"] because \"list\"");
 
         var bin = expr.Should().BeOfType<BinaryOperationExpression>().Subject;
@@ -786,7 +726,6 @@ public class ParserExpressionTests
     [Fact]
     public void Postfix_IsSet_ProducesPostfixOperationExpression_WithIsNegatedFalse()
     {
-        // RED-E: Slice 3 — expression parsing
         var expr = GetRuleExpression("rule amount is set because \"msg\"");
 
         var postfix = expr.Should().BeOfType<PostfixOperationExpression>().Subject;
@@ -797,7 +736,6 @@ public class ParserExpressionTests
     [Fact]
     public void Postfix_IsNotSet_ProducesPostfixOperationExpression_WithIsNegatedTrue()
     {
-        // RED-E: Slice 3 — expression parsing
         var expr = GetRuleExpression("rule amount is not set because \"msg\"");
 
         var postfix = expr.Should().BeOfType<PostfixOperationExpression>().Subject;
@@ -822,7 +760,6 @@ public class ParserExpressionTests
     [Fact]
     public void Postfix_IsSetHasHigherPrecedenceThanAnd_IsLeftOperandOfAnd()
     {
-        // RED-E: Slice 3 — expression parsing
         // 'amount is set and total > 0'
         // is-set (prec 60) > and (prec 20), so top is 'and', left is 'amount is set'
         var expr = GetRuleExpression("rule amount is set and total > 0 because \"msg\"");
@@ -837,7 +774,6 @@ public class ParserExpressionTests
     [Fact]
     public void Postfix_IsSet_Operand_IsIdentifierExpression_WithCorrectName()
     {
-        // RED-E: Slice 3 — expression parsing
         var expr = GetRuleExpression("rule name is set because \"needed\"");
 
         var postfix = expr.Should().BeOfType<PostfixOperationExpression>().Subject;
@@ -852,7 +788,6 @@ public class ParserExpressionTests
     [Fact]
     public void Quantifier_Each_ProducesQuantifierExpression_WithEachToken()
     {
-        // RED-E: Slice 3 — expression parsing
         var expr = GetRuleExpression("rule each item in items (item > 0) because \"msg\"");
 
         var quant = expr.Should().BeOfType<QuantifierExpression>().Subject;
@@ -864,7 +799,6 @@ public class ParserExpressionTests
     [Fact]
     public void Quantifier_Each_CollectionIsIdentifier_PredicateIsBinaryOp()
     {
-        // RED-E: Slice 3 — expression parsing
         var expr = GetRuleExpression("rule each item in items (item > 0) because \"msg\"");
 
         var quant = (QuantifierExpression)expr;
@@ -878,7 +812,6 @@ public class ParserExpressionTests
     [Fact]
     public void Quantifier_Any_ProducesQuantifierExpression_WithAnyToken()
     {
-        // RED-E: Slice 3 — expression parsing
         var expr = GetRuleExpression("rule any item in items (item > 0) because \"msg\"");
 
         expr.Should().BeOfType<QuantifierExpression>();
@@ -888,7 +821,6 @@ public class ParserExpressionTests
     [Fact]
     public void Quantifier_No_ProducesQuantifierExpression_WithNoToken()
     {
-        // RED-E: Slice 3 — expression parsing
         // 'no item in items (...)' is disambiguated as a quantifier by lookahead:
         // Identifier followed by 'in' followed by CollectionRef followed by '(' -> quantifier.
         var expr = GetRuleExpression("rule no item in items (item > 0) because \"msg\"");
@@ -904,7 +836,6 @@ public class ParserExpressionTests
     [Fact]
     public void CIFunctionCall_TildeStartsWith_ProducesCIFunctionCallExpression_NotFunctionCallExpression()
     {
-        // RED-E: Slice 3 — expression parsing
         var expr = GetRuleExpression("rule ~startsWith(name, \"A\") because \"msg\"");
 
         expr.Should().BeOfType<CIFunctionCallExpression>(
@@ -914,7 +845,6 @@ public class ParserExpressionTests
     [Fact]
     public void CIFunctionCall_StartsWith_FunctionName_IsStartsWith()
     {
-        // RED-E: Slice 3 — expression parsing
         var expr = GetRuleExpression("rule ~startsWith(name, \"A\") because \"msg\"");
 
         ((CIFunctionCallExpression)expr).FunctionName.Should().Be("startsWith");
@@ -923,7 +853,6 @@ public class ParserExpressionTests
     [Fact]
     public void CIFunctionCall_StartsWith_HasExactlyTwoArguments()
     {
-        // RED-E: Slice 3 — expression parsing
         var expr = GetRuleExpression("rule ~startsWith(name, \"A\") because \"msg\"");
 
         var ci = (CIFunctionCallExpression)expr;
@@ -936,7 +865,6 @@ public class ParserExpressionTests
     [Fact]
     public void CIFunctionCall_TildeEndsWith_FunctionName_IsEndsWith()
     {
-        // RED-E: Slice 3 — expression parsing
         var expr = GetRuleExpression("rule ~endsWith(name, \"Z\") because \"msg\"");
 
         expr.Should().BeOfType<CIFunctionCallExpression>();
@@ -946,7 +874,6 @@ public class ParserExpressionTests
     [Fact]
     public void CIFunctionCall_EndsWith_HasExactlyTwoArguments()
     {
-        // RED-E: Slice 3 — expression parsing
         var expr = GetRuleExpression("rule ~endsWith(name, \"Z\") because \"msg\"");
 
         ((CIFunctionCallExpression)expr).Arguments.Should().HaveCount(2,
@@ -962,7 +889,6 @@ public class ParserExpressionTests
     [Fact]
     public void SlotPlumbing_TransitionRow_GuardClauseSlot_IsPresentAndContainsBinaryOp()
     {
-        // RED-E: Slice 3 — expression parsing
         const string source = "from Draft on Submit when amount > 0 -> transition Approved";
         var manifest = Precept.Pipeline.Parser.Parse(Lexer.Lex(source));
 
@@ -978,7 +904,6 @@ public class ParserExpressionTests
     [Fact]
     public void SlotPlumbing_FieldDeclaration_ComputeExpressionSlot_IsPresentAndContainsBinaryOp()
     {
-        // RED-E: Slice 3 — expression parsing
         const string source = "field tax as number <- subtotal * 0.1";
         var manifest = Precept.Pipeline.Parser.Parse(Lexer.Lex(source));
 
@@ -994,7 +919,6 @@ public class ParserExpressionTests
     [Fact]
     public void SlotPlumbing_StateEnsure_EnsureClauseSlot_IsPresentAndContainsBinaryOp()
     {
-        // RED-E: Slice 3 — expression parsing
         const string source = "in Draft ensure amount > 0 because \"msg\"";
         var manifest = Precept.Pipeline.Parser.Parse(Lexer.Lex(source));
 
@@ -1027,7 +951,6 @@ public class ParserExpressionTests
     [Fact]
     public void SlotPlumbing_TransitionGuard_CanContainComplexLogicalExpression()
     {
-        // RED-E: Slice 3 — expression parsing
         const string source = "from Draft on Submit when x > 0 and y -> transition Approved";
         var guardExpr = GetTransitionGuard(source);
 
@@ -1042,7 +965,6 @@ public class ParserExpressionTests
     [Fact]
     public void Termination_RuleExpression_DoesNotConsumeWhenKeyword()
     {
-        // RED-E: Slice 3 — expression parsing
         // rule amount > 0 when active because "msg"
         // RuleExpression must be 'amount > 0', not extend to include 'active'
         var expr = GetRuleExpression("rule amount > 0 when active because \"msg\"");
@@ -1058,7 +980,6 @@ public class ParserExpressionTests
     [Fact]
     public void Termination_GuardClause_IsDistinctSlotFromRuleExpression()
     {
-        // RED-E: Slice 3 — expression parsing
         const string source = "rule amount > 0 when active because \"msg\"";
         var manifest = Precept.Pipeline.Parser.Parse(Lexer.Lex(source));
 
@@ -1076,7 +997,6 @@ public class ParserExpressionTests
     [Fact]
     public void Termination_BecauseClauseSlot_ContainsCorrectMessage()
     {
-        // RED-E: Slice 3 — expression parsing
         const string source = "rule amount > 0 because \"Amount must be positive\"";
         var manifest = Precept.Pipeline.Parser.Parse(Lexer.Lex(source));
 
@@ -1091,7 +1011,6 @@ public class ParserExpressionTests
     [Fact]
     public void Termination_NoPlaceholder_NonTrivialRuleIsNotLiteralTrue()
     {
-        // RED-E: Slice 3 — expression parsing
         // A compound rule expression must NOT degrade to the stub LiteralExpression(True, "true").
         var expr = GetRuleExpression("rule x > 0 because \"pos\"");
 

@@ -86,7 +86,7 @@ public class ModifierValidationTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  F-LANG-TEMP-03: nonnegative / nonzero / positive on duration + period
+    //  nonnegative / nonzero / positive on duration + period
     // ════════════════════════════════════════════════════════════════════════
 
     [Fact]

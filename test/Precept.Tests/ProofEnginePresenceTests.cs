@@ -9,10 +9,7 @@ using Xunit;
 namespace Precept.Tests;
 
 // ════════════════════════════════════════════════════════════════════════════════
-//  Slice 12 — Presence Obligation Generation Tests
-//
-//  Design reference: docs/Working/interval-proof-engine-design.md
-//    §8.2  Slice 12 spec (PresenceProofRequirement generation for optional field refs)
+//  Presence Obligation Generation Tests
 //
 //  Coverage:
 //  - Direct set action: optional field as value source (unguarded → PRE0116)

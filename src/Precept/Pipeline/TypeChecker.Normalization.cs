@@ -6,7 +6,7 @@ namespace Precept.Pipeline;
 internal static partial class TypeChecker
 {
     // ════════════════════════════════════════════════════════════════════════
-    //  Pass 2 — transition row + event handler normalization (Slice 5)
+    //  Pass 2 — transition row + event handler normalization
     // ════════════════════════════════════════════════════════════════════════
 
     /// <summary>
@@ -44,8 +44,8 @@ internal static partial class TypeChecker
     /// <summary>
     /// Iterate all <see cref="ConstructKind.EventRow"/> and <see cref="ConstructKind.ConstructionRowReject"/>
     /// constructs from the manifest, resolve each to a <see cref="TypedEventRow"/>, and accumulate into
-    /// <see cref="CheckContext.EventHandlers"/>. Slice 8b removed parser production of
-    /// <see cref="ConstructKind.ConstructionRow"/> — success-path construction rows now arrive as
+    /// <see cref="CheckContext.EventHandlers"/>. The parser does not produce
+    /// <see cref="ConstructKind.ConstructionRow"/> — success-path construction rows arrive as
     /// <see cref="ConstructKind.EventRow"/> and are classified semantically via the bound event's
     /// <c>IsInitial</c> flag in <c>NormalizeEventHandler</c>.
     /// Records <see cref="EventReference"/> sites for LS navigation.

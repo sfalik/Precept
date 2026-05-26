@@ -6,7 +6,7 @@ using Xunit;
 namespace Precept.Tests.TypeChecker;
 
 /// <summary>
-/// Slice 7 — Modifier Validation.
+/// Modifier Validation.
 /// Covers type-applicability (catalog-driven), duplicate detection, mutual exclusivity,
 /// subsumption redundancy, implied-modifier redundancy, writable-on-event-arg,
 /// and computed-field-not-writable diagnostics.
@@ -637,7 +637,7 @@ public class TypeCheckerModifierTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Slice 8: ConflictingAccessModes (PRE0042)
+    //  ConflictingAccessModes (PRE0042)
     // ════════════════════════════════════════════════════════════════════════
 
     [Fact]
@@ -674,7 +674,7 @@ public class TypeCheckerModifierTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Slice 8: RedundantAccessMode (PRE0043)
+    //  RedundantAccessMode (PRE0043)
     // ════════════════════════════════════════════════════════════════════════
 
     [Fact]
@@ -707,7 +707,7 @@ public class TypeCheckerModifierTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Slice 8: InvalidModifierValue (PRE0035)
+    //  InvalidModifierValue (PRE0035)
     // ════════════════════════════════════════════════════════════════════════
 
     [Fact]

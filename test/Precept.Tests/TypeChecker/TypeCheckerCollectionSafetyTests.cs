@@ -104,7 +104,7 @@ public class TypeCheckerCollectionSafetyTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Slice 8: CollectionInnerTypeError (PRE0105)
+    //  CollectionInnerTypeError (PRE0105)
     // ════════════════════════════════════════════════════════════════════════
 
     [Fact]

@@ -964,7 +964,7 @@ public class LexerTests
     }
 
     // ════════════════════════════════════════════════════════════════════════════
-    //  Slice 9 — New collection type keywords and quantifier keywords
+    //  Collection type keywords and quantifier keywords
     // ════════════════════════════════════════════════════════════════════════════
 
     [Fact]

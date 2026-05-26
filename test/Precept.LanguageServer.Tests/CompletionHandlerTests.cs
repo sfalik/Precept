@@ -1224,7 +1224,7 @@ public class CompletionHandlerTests
         string.CompareOrdinal(items[1].SortText, function.SortText).Should().BeLessThan(0);
     }
 
-    // ─── Slice 1 — Type-Branching on ' Trigger ──────────────────────────────────
+    // ─── Type-Branching on ' Trigger ──────────────────────────────────
 
     [Fact]
     public async Task TypedConstant_Boolean_ShowsTrueAndFalse()
@@ -1399,7 +1399,7 @@ public class CompletionHandlerTests
         labels.Should().NotContain(["field", "state", "event", "rule"], "DSL keywords must not appear inside timezone typed constants");
     }
 
-    // ─── Slice 2 — Space Trigger Slot Detection ──────────────────────────────────
+    // ─── Space Trigger Slot Detection ──────────────────────────────────
 
     [Fact]
     public async Task TypedConstant_SpaceTrigger_Temporal_AfterNumber_ShowsUnits()
@@ -1451,7 +1451,7 @@ public class CompletionHandlerTests
         labels.Should().Contain("+");
     }
 
-    // ─── Slice 3 — Qualifier-Aware Filtering ─────────────────────────────────────
+    // ─── Qualifier-Aware Filtering ─────────────────────────────────────
 
     [Fact]
     public async Task TypedConstant_Qualifier_Money_InUSD_SpaceAfterAmount_ShowsOnlyUSD()
@@ -1483,7 +1483,7 @@ public class CompletionHandlerTests
             "qualifier 'in days' must hard-filter temporal units to the declared unit only");
     }
 
-    // ─── Slice 4 — Compound Temporal Full Cycle ───────────────────────────────────
+    // ─── Compound Temporal Full Cycle ───────────────────────────────────
 
     [Fact]
     public async Task TypedConstant_Compound_AfterFirstSegment_ShowsPlus()
@@ -1533,7 +1533,7 @@ public class CompletionHandlerTests
         labels.Should().Contain(unitPluralNames);
     }
 
-    // ─── Slice 5 — Edge Cases ─────────────────────────────────────────────────────
+    // ─── Edge Cases ─────────────────────────────────────────────────────
 
     [Fact]
     public async Task TypedConstant_SpaceInsideText_NoCompletions()
@@ -1629,7 +1629,7 @@ public class CompletionHandlerTests
         keywords.Should().BeEmpty($"top-level construct keywords must never appear inside a {typeName} typed constant");
     }
 
-    // ─── Slice 5 — Ctrl+Space Recovery ───────────────────────────────────────────
+    // ─── Ctrl+Space Recovery ───────────────────────────────────────────
 
     // ─── Deferred: Quote-Close Logic ─────────────────────────────────────────────
 
@@ -1922,7 +1922,7 @@ public class CompletionHandlerTests
         labels.Should().NotContain(["field", "state", "event", "rule"]);
     }
 
-    // ─── Slice 3 — Completions inside typed constant holes ───────────────────────
+    // ─── Completions inside typed constant holes ───────────────────────
 
     [Fact]
     public async Task HoleCompletion_Quantity_MagnitudeHole_ShowsNumericFieldsAndArgsOnly()
@@ -2165,7 +2165,7 @@ public class CompletionHandlerTests
     }
 
     // Regression: existing ' trigger tests are exercised by the full suite —
-    // verify that the typed-constant snippet-format preservation from Slice 0 still holds.
+    // verify that the typed-constant snippet-format preservation still holds.
     [Fact]
     public void Completions_BraceTrigger_Regression_SingleQuoteTrigger_SnippetFormatPreserved()
     {

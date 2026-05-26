@@ -6,15 +6,14 @@ namespace Precept.Tests.TypeChecker;
 
 /// <summary>
 /// Falsifier and regression-guard tests for the default-value-vs-numeric-modifier
-/// enforcement path (PRE0067 MaxPlacesExceeded + PRE0079 OutOfRange). Closes
-/// F-LANG-BIZ-02 Position 3 (explicit maxplaces opt-in on business-magnitude
-/// types), F-LANG-BIZ-06 (ExchangeRate Positive implied), F-LANG-TEMP-03
-/// (Duration/Period in ZeroBoundNumericTypes), and the parallel pre-existing
-/// silent gap on bare decimal modifiers.
+/// enforcement path (PRE0067 MaxPlacesExceeded + PRE0079 OutOfRange). Covers
+/// explicit maxplaces opt-in on business-magnitude types, ExchangeRate's implied
+/// Positive, Duration/Period zero-bound enforcement, and the parallel bare-decimal
+/// modifier path.
 /// </summary>
 public class DefaultValueModifierEnforcementTests
 {
-    // ── PRE0067 MaxPlacesExceeded × business-magnitude (F-LANG-BIZ-02 Position 3) ──
+    // ── PRE0067 MaxPlacesExceeded × business-magnitude ──
 
     [Fact]
     public void Money_MaxplacesExceeded_DefaultEmitsDiagnostic() =>
@@ -44,7 +43,7 @@ public class DefaultValueModifierEnforcementTests
             field A as exchangerate maxplaces 4 default '1.99999 USD/EUR'
             """, DiagnosticCode.MaxPlacesExceeded);
 
-    // ── PRE0079 OutOfRange × Money/Quantity/Price (F-LANG-BIZ-06 + symmetric) ────
+    // ── PRE0079 OutOfRange × Money/Quantity/Price ────
 
     [Fact]
     public void Money_NonnegativeViolatedByNegativeDefault_EmitsOutOfRange() =>
@@ -81,7 +80,7 @@ public class DefaultValueModifierEnforcementTests
             field A as price in 'USD' of 'length' positive default '0 USD/m'
             """, DiagnosticCode.OutOfRange);
 
-    // ── PRE0079 OutOfRange × ExchangeRate implied Positive (F-LANG-BIZ-06) ───────
+    // ── PRE0079 OutOfRange × ExchangeRate implied Positive ───────
 
     [Fact]
     public void ExchangeRate_ImpliedPositiveViolatedByZeroDefault_EmitsOutOfRange() =>
@@ -97,7 +96,7 @@ public class DefaultValueModifierEnforcementTests
             field A as exchangerate default '-1.0 USD/EUR'
             """, DiagnosticCode.OutOfRange);
 
-    // ── PRE0079 OutOfRange × Duration/Period (F-LANG-TEMP-03) ────────────────────
+    // ── PRE0079 OutOfRange × Duration/Period ────────────────────
 
     [Fact]
     public void Duration_NonnegativeViolatedByNegativeDefault_EmitsOutOfRange() =>

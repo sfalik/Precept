@@ -215,16 +215,16 @@ public static partial class ProofEngine
             }
         }
 
-        // Fields[].DefaultExpression (Slice 25: interval containment for interpolated defaults)
+        // Fields[].DefaultExpression — interval containment for interpolated defaults
         CollectDefaultObligations(semantics, obligations);
 
-        // Events[].Args[].DefaultExpression (Slice 26: interval containment for arg defaults)
+        // Events[].Args[].DefaultExpression — interval containment for arg defaults
         CollectArgDefaultObligations(semantics, obligations);
 
         return obligations;
     }
 
-    // Slice 12: SemanticIndex is threaded through WalkExpression so that optional field
+    // SemanticIndex is threaded through WalkExpression so that optional field
     // refs in value positions can generate PresenceProofRequirement obligations, including
     // interpolated typed-constant holes.
     private static void WalkExpression(
@@ -237,7 +237,7 @@ public static partial class ProofEngine
         switch (expr)
         {
             case TypedFieldRef fieldRef:
-                // Slice 12 — Presence Obligation Generation:
+                // Presence Obligation Generation:
                 // Every reference to an optional field in a value position generates a
                 // PresenceProofRequirement. Strategy 2 (Guaranteed presence) and Strategy 3
                 // (when X is set guard-in-path) discharge these obligations; unresolved

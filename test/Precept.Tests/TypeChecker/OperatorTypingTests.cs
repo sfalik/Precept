@@ -155,7 +155,7 @@ public class OperatorTypingTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  F-LANG-TEMP-01/02: context-aware temporal-quantity inference (BUG-010)
+    //  Context-aware temporal-quantity inference (BUG-010)
     // ════════════════════════════════════════════════════════════════════════
 
     [Fact]
@@ -198,7 +198,7 @@ public class OperatorTypingTests
     [Fact]
     public void PeriodFieldDefault_WithMixedUnitsLiteral_CompilesClean()
     {
-        // F-LANG-TEMP-05: mixed calendar+time units accepted under Period context
+        // Mixed calendar+time units accepted under Period context
         TypeCheckerTestHelpers.CheckExpectingClean("""
             precept Shift
             field StandardShift as period default '1 day + 8 hours'

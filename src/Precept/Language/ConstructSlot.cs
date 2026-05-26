@@ -30,7 +30,7 @@ public enum ConstructSlotKind
 
 /// <summary>
 /// Declares what completion vocabulary a slot offers.
-/// Drives CompletionHandler dispatch once SlotPositionResolver ships (Slice 3).
+/// Drives CompletionHandler dispatch via SlotPositionResolver.
 /// </summary>
 public enum SlotVocabulary
 {

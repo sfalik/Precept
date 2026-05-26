@@ -83,7 +83,7 @@ public class WritableSurfaceTests(ITestOutputHelper output)
     [Fact]
     public void Case3_ModifyEditable_LexesCorrectly()
     {
-        // write all retired in B4 (2026-04-28). New surface: in State modify Field editable.
+        // Modify-editable surface: `in State modify Field editable`.
         var src =
             "precept TestModify\n" +
             "field Amount as money\n" +

@@ -9,7 +9,7 @@ using Xunit;
 namespace Precept.Tests.Construction;
 
 /// <summary>
-/// Slice 6 tests: graph analyzer construction-row awareness.
+/// Graph analyzer construction-row awareness.
 /// AlwaysRejecting is promoted to Error severity for all-reject construction paths.
 /// </summary>
 public class GraphAnalyzerConstructionTests
@@ -94,7 +94,7 @@ public class GraphAnalyzerConstructionTests
     [Fact]
     public void PRE0081_NotEmitted_InitialEventWithConstructionRow()
     {
-        // Slice 8b: initial events handled via construction rows (EventHandlers) must not trigger
+        // Initial events handled via construction rows (EventHandlers) must not trigger
         // PRE0081 (UnhandledEvent). Construction rows don't generate graph edges, but the event IS handled.
         var (_, _, graph) = AnalyzeAllowingDiagnostics("""
             precept Widget

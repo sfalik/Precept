@@ -8,7 +8,7 @@ using Xunit;
 namespace Precept.Tests.TypeChecker;
 
 /// <summary>
-/// Slice 26 — event arg default resolution and proof coverage.
+/// Event arg default resolution and proof coverage.
 /// Verifies that <c>TypedArg.DefaultExpression</c> is resolved, type-checked against
 /// the arg's declared type and bounds, and participates in interval-containment proof coverage.
 /// </summary>

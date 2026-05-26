@@ -5,28 +5,26 @@ using Xunit;
 namespace Precept.Mcp.Tests;
 
 /// <summary>
-/// Scenario tests covering the Phase 2 Step 2.2 compile-path robustness sweep.
+/// Scenario tests covering compile-path robustness for known bug repros.
 ///
-/// Confirms that every bug repro from <c>docs/Working/bugs.md</c> § Active
-/// produces a structured diagnostic (or compiles clean for the valid cases),
-/// rather than crashing the compiler or returning the raw
-/// <c>"An error occurred invoking 'precept_compile'"</c> string.
+/// Confirms that each repro produces a structured diagnostic (or compiles
+/// clean for the valid cases), rather than crashing the compiler or
+/// returning the raw <c>"An error occurred invoking 'precept_compile'"</c> string.
 ///
-/// Coverage matrix mirrors the Phase 2 plan
-/// (<c>docs/Working/compiler-readiness-plan-2026-05-24.md</c> Phase 2 Step 2.2b):
+/// Coverage matrix:
 ///
-/// | Bug              | Source                                                | Expected                              |
-/// |------------------|-------------------------------------------------------|---------------------------------------|
-/// | F-LANG-SPEC-10   | date default '2026-13-01'                             | InvalidDateValue                      |
-/// | F-LANG-SPEC-10   | time default '25:00:00'                               | InvalidTimeValue                      |
-/// | F-LANG-SPEC-10   | instant default '2026-99-99T99:99:99Z'                | InvalidInstantFormat                  |
-/// | BUG-003          | period default '1 year'                               | clean                                 |
-/// | BUG-003          | period default '1 bogus'                              | InvalidTypedConstantContent           |
-/// | BUG-008          | duration default '14 days'                            | clean                                 |
-/// | BUG-010          | set X = now() + '365 days'                            | clean (or structured diagnostic)      |
-/// | BUG-011          | timezone default 'America/New_York'                   | clean                                 |
-/// | BUG-011          | time default '09:00'                                  | clean                                 |
-/// | BUG-005          | lookup of string to money in 'USD'                    | CollectionInnerTypeError              |
+/// | Source                                                | Expected                              |
+/// |-------------------------------------------------------|---------------------------------------|
+/// | date default '2026-13-01'                             | InvalidDateValue                      |
+/// | time default '25:00:00'                               | InvalidTimeValue                      |
+/// | instant default '2026-99-99T99:99:99Z'                | InvalidInstantFormat                  |
+/// | period default '1 year'                               | clean                                 |
+/// | period default '1 bogus'                              | InvalidTypedConstantContent           |
+/// | duration default '14 days'                            | clean                                 |
+/// | set X = now() + '365 days'                            | clean (or structured diagnostic)      |
+/// | timezone default 'America/New_York'                   | clean                                 |
+/// | time default '09:00'                                  | clean                                 |
+/// | lookup of string to money in 'USD'                    | CollectionInnerTypeError              |
 /// </summary>
 public class CompileTool_BugReproTests
 {
@@ -123,12 +121,10 @@ public class CompileTool_BugReproTests
     [Fact]
     public void Bug010_NowPlusDuration_ProducesStructuredResponse()
     {
-        // BUG-010: the typed-constant inference path picks instant rather than
-        // duration for '365 days'. The crash is gone (no raw exception), but a
-        // type-inference upgrade is tracked separately in Phase 4.
-        // The robustness contract for Phase 2 is "no raw exception"; this
-        // assertion validates the structured-diagnostic shape rather than the
-        // success outcome.
+        // The typed-constant inference path picks instant rather than
+        // duration for '365 days'. The robustness contract here is "no raw
+        // exception"; this assertion validates the structured-diagnostic
+        // shape rather than the success outcome.
         var result = CompileTool.Compile(
             "precept Repro\n" +
             "field X as instant optional\n" +
@@ -176,11 +172,9 @@ public class CompileTool_BugReproTests
     [Fact]
     public void Bug005_LookupOfMoneyInCurrency_CompilesClean()
     {
-        // BUG-005 root-cause fix (Phase 4 W-C, F-LANG-COLL-06): qualified inner types
-        // in collections now compile clean. Was a parser symptom-fix in Phase 2 emitting
-        // PRE0105; Phase 4 W-C lifted the qualifier rejection by extending
-        // ParseInnerTypeReference to call TryParseQualifiers and the type checker to
-        // build TypedQualifiedElement.
+        // Qualified inner types in collections compile clean —
+        // ParseInnerTypeReference calls TryParseQualifiers and the type checker
+        // builds TypedQualifiedElement.
         var result = CompileTool.Compile(
             "precept Repro\n" +
             "field F as lookup of string to money in 'USD'\n" +
@@ -193,8 +187,8 @@ public class CompileTool_BugReproTests
     [Fact]
     public void Bug005_LookupOfQuantityOfDimension_CompilesClean()
     {
-        // Symmetric to the currency case — Phase 4 W-C lifts the qualifier rejection
-        // for both 'in <currency>' and 'of <dimension>' shapes.
+        // Symmetric to the currency case — qualifier acceptance applies to
+        // both 'in <currency>' and 'of <dimension>' shapes.
         var result = CompileTool.Compile(
             "precept Repro\n" +
             "field F as lookup of string to quantity of 'mass'\n" +

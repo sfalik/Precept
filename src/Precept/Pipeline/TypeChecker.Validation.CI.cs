@@ -4,7 +4,7 @@ namespace Precept.Pipeline;
 internal static partial class TypeChecker
 {
     /// <summary>
-    /// CI enforcement sub-pass (Slice 8): validate <c>~string</c> usage consistency.
+    /// CI enforcement sub-pass — validates <c>~string</c> usage consistency.
     /// Walks all resolved expression trees and checks the 5 CI enforcement rules
     /// from the language spec §3.8. Rules 1–2 fire on <c>==</c> / <c>!=</c> with a
     /// <c>~string</c> operand. Rules 3 fires on <c>contains</c> with a <c>~string</c>

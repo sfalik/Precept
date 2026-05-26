@@ -8,7 +8,7 @@ using Xunit;
 namespace Precept.Tests.Runtime;
 
 /// <summary>
-/// Slice 8 runtime tests: EventOutcome.Created, Precept.Create(),
+/// Runtime construction tests: EventOutcome.Created, Precept.Create(),
 /// Version.AvailableEvents filtering, and fire-once enforcement.
 /// </summary>
 public class RuntimeConstructionTests

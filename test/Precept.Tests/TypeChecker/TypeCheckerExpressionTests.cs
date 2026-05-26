@@ -11,10 +11,10 @@ using Xunit;
 namespace Precept.Tests.TypeChecker;
 
 /// <summary>
-/// Slice 2 — Scalar Expression Resolution.
+/// Scalar Expression Resolution.
 /// Covers TypedLiteral (all scalar kinds), TypedFieldRef/ArgRef (scope priority,
-/// forward-ref D8), TypedBinaryOp (FindCandidates, widening D11, ErrorType
-/// propagation D13), TypedUnaryOp (FindUnary D12), and stub arm contracts.
+/// forward-ref handling), TypedBinaryOp (FindCandidates, widening, ErrorType
+/// propagation), TypedUnaryOp (FindUnary), and stub arm contracts.
 /// </summary>
 public class TypeCheckerExpressionTests
 {
@@ -1427,8 +1427,7 @@ public class TypeCheckerExpressionTests
     //    QuantityDivideQuantityCrossDimension  (quantity ÷ quantity → quantity)
     //
     //  However, Operations.DisambiguateCandidates (in src/Precept/Language/
-    //  Operations.cs since Phase 2; was a private method on TypeChecker.Expressions
-    //  before commit 38712543) always returns the QualifierMatch.Same entry when
+    //  Operations.cs) always returns the QualifierMatch.Same entry when
     //  candidates contain both Same and Different options. Since both qualifier-
     //  disambiguated groups (money÷money, quantity÷quantity) each contain a Same
     //  entry, the Different entry is never selected. MapQualifierBinding(
@@ -1487,7 +1486,7 @@ public class TypeCheckerExpressionTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Slice 8: ListLiteralOutsideDefault (PRE0044)
+    //  ListLiteralOutsideDefault (PRE0044)
     // ════════════════════════════════════════════════════════════════════════
 
     [Fact]
@@ -1518,7 +1517,7 @@ public class TypeCheckerExpressionTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Slice 8: EventArgOutOfScope (PRE0050)
+    //  EventArgOutOfScope (PRE0050)
     // ════════════════════════════════════════════════════════════════════════
 
     [Fact]

@@ -48,10 +48,9 @@ public enum TokenKind
     No          =  32,
     Reject      =  33,
 
-    // ── Keywords: Access Modes (B4 — 2026-04-28) ──────────────────
-    // Write and Read retired: vocabulary locked B4 (2026-04-28).
-    // New surface: in State modify Field readonly|editable [when Guard]
-    //              in State omit Field
+    // ── Keywords: Access Modes ──────────────────
+    // Surface: in State modify Field readonly|editable [when Guard]
+    //          in State omit Field
     Modify      =  34,
     Readonly    =  35,
     Editable    =  36,

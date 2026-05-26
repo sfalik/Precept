@@ -149,6 +149,36 @@ When making any code, interface, test, or behavior change, keep documentation in
 - `design/prototypes/` — durable design prototypes. Hot, code-near prototypes may live near their owning tool surface but should be promoted here when durable.
 - `docs/archive/` holds superseded specs; reference only, never update.
 
+### Transient vs Canonical references (Non-Negotiable)
+
+**Code comments must reference only canonical, stable material.** Project-state references (the current task, workstream labels, phase numbers, finding IDs, design-doc Decision numbers, working-doc paths, audit dates) rot as the codebase evolves and belong in commit messages / PR descriptions, not in code that survives the project state.
+
+**Canonical (OK to reference from code)**:
+- `docs/language/*.md`, `docs/compiler/*.md`, `docs/runtime/*.md`, `docs/tooling/*.md` — canonical specs and per-stage docs
+- `docs/philosophy.md` — locked philosophy
+- `CLAUDE.md` — load-bearing project rules
+- Catalog and source files (e.g. `Modifiers.cs`, `Tokens.cs`, `Operations.cs`)
+- Spec line numbers when stable (e.g. `precept-language-spec.md:1662`)
+
+**Transient (do NOT reference from code)**:
+- `docs/Working/` — in-flight design proposals; promote-or-archive lifecycle means content moves
+- `bugs.md` — tracking surface; entries move from Active to Fixed and eventually archive
+- Design-doc internal structure (`Decision 2`, `D-3`, `Option A/B/C`)
+- Workstream labels (`W-A`, `W-G`), phase labels (`Phase 4`), slice labels (`Slice 8`, `Slice 12`)
+- Finding IDs (`F-LANG-COLL-06`, `F-LANG-BIZ-10`)
+- Audit/review references (`precept-reviewer audit (2026-MM-DD)`), date stamps
+
+`BUG-NNN` cites are a deliberate exception: the bugs.md convention pairs each inline cite with a planned removal (the workaround comes out when the bug closes). Add a new `BUG-NNN` cite only when there's a matching workaround in the code or sample.
+
+**Rewriting rule**: if a comment had load-bearing WHY content mixed with transient refs, preserve the WHY in terms of the language/architecture; drop the project-task scaffolding.
+
+- Bad: `// Slice 8 wires PRE0048 emission for action-applicability mismatches per F-LANG-COLL-08`
+- Good: `// PRE0048 emission for action-applicability mismatches`
+- Bad: `// TODO(W-G): widen return per COLL-02/03 design D-3 Option A (docs/Working/...).`
+- Good: `// TODO: return TypedElementType? so accessor return-type propagation can flow qualifier metadata.`
+
+This rule supplements the generic "don't reference the current task" comment-discipline rule with the project-specific list of which surfaces are stable vs transient.
+
 ### When research is involved
 
 When locking a decision that started as research:

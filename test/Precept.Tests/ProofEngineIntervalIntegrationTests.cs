@@ -9,20 +9,13 @@ using Xunit;
 namespace Precept.Tests;
 
 // ════════════════════════════════════════════════════════════════════════════════
-//  Slice 2–3 — Interval containment proof engine integration tests
+//  Interval containment proof engine integration tests
 //
-//  Design reference: docs/Working/interval-proof-engine-design.md
-//    §9.2  Integration Test Scenarios
-//    §9.3  Edge Case Coverage
-//    §9.4  Regression Anchors
-//    §8.2  Slice 2 required tests (end-to-end obligation collection + dispatch)
-//
-//  These tests compile against EXISTING types and assert on observable behavior
+//  Compile against existing types and assert on observable behavior
 //  (DiagnosticCode.NumericOverflow, ProofRequirementKind count, obligation count).
-//  They are intentionally RED until George ships Slices 2–3. No skips.
 //
 //  Companion positive tests (prove succeeds on safe expressions) are paired
-//  with each negative test — per §9.1 Section E quality bar.
+//  with each negative test.
 // ════════════════════════════════════════════════════════════════════════════════
 
 public class ProofEngineIntervalIntegrationTests
@@ -31,13 +24,13 @@ public class ProofEngineIntervalIntegrationTests
         ProofRequirementKind.IntervalContainment;
 
     // ════════════════════════════════════════════════════════════════════════
-    //  TypeChecker bounds extraction validation (Phase 1 - B1 diagnostic)
+    //  TypeChecker bounds extraction validation
     // ════════════════════════════════════════════════════════════════════════
 
     [Fact]
     public void TypeChecker_FieldWithBounds_PopulatesDeclaredMinMax()
     {
-        // Phase 1 B1: Verify TypeChecker correctly extracts min/max modifiers
+        // Verify TypeChecker correctly extracts min/max modifiers.
         // If this test fails, bounds extraction is broken at TypeChecker.cs:378-383
         const string precept = @"
 precept BoundsTest
@@ -268,13 +261,13 @@ from offState on toggle
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Catalog-driven architecture validation (Phase 2 - B2 diagnostic)
+    //  Catalog-driven architecture validation
     // ════════════════════════════════════════════════════════════════════════
 
     [Fact]
     public void SetAction_HasDynamicObligationGenerator_FromCatalog()
     {
-        // Phase 2 B2: Verify Set action metadata declares dynamic obligation generation
+        // Verify Set action metadata declares dynamic obligation generation.
         // This confirms the interval containment logic is catalog-driven, not hardcoded.
         var setActionMeta = Precept.Language.Actions.GetMeta(Precept.Language.ActionKind.Set);
         
@@ -285,7 +278,7 @@ from offState on toggle
     [Fact]
     public void SetAction_GeneratesIntervalObligation_ForBoundedDecimalField()
     {
-        // Phase 2 B2: Verify that the Set action's DynamicObligationGenerator correctly
+        // Verify that the Set action's DynamicObligationGenerator correctly
         // creates interval containment obligations for bounded decimal/number fields.
         const string precept = @"
 precept IntervalTest
@@ -573,14 +566,13 @@ from Open on Accrue
 
     // ════════════════════════════════════════════════════════════════════════
     //  Scenario 3 — Guarded bounded field, guards sufficient → proved
-    //  (Requires Slice 3 guard-narrowing integration)
+    //  (Requires guard-narrowing integration)
     // ════════════════════════════════════════════════════════════════════════
 
     [Fact]
     public void GuardedBoundedField_GuardsSufficient_NoNumericOverflow()
     {
-        // § 9.2 Scenario 3 / § 8.2 Slice 3 completion gate:
-        // guard 'when balance >= 100' narrows balance to [100..1000000];
+        // Guard 'when balance >= 100' narrows balance to [100..1000000];
         // MakePayment.Amount max 100 → balance - Amount ∈ [0..1000000] ⊆ [0..1000000]
         var result = Compiler.Compile(GuardedAmountPrecept);
 
@@ -739,13 +731,13 @@ from Open on Accrue
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Slice 2 named tests from §8.2
+    //  Named interval containment tests
     // ════════════════════════════════════════════════════════════════════════
 
     [Fact]
     public void IntervalContainment_BothBoundsDeclaredAndFit_Proved()
     {
-        // §8.2 Slice 2: IntervalContainment_BothBoundsDeclairedAndFit_Proved
+        // IntervalContainment_BothBoundsDeclairedAndFit_Proved
         var source = @"
 precept Simple
 field balance as decimal min 0 max 100
@@ -765,7 +757,7 @@ from Active on Credit
     [Fact]
     public void IntervalContainment_MaxExceeded_EmitsNumericOverflow()
     {
-        // §8.2 Slice 2: IntervalContainment_MaxExceeded_EmitsNumericOverflow
+        // IntervalContainment_MaxExceeded_EmitsNumericOverflow
         var source = @"
 precept Simple
 field total as decimal min 0 max 100
@@ -784,7 +776,7 @@ from Active on Add
     [Fact]
     public void IntervalContainment_MinViolated_EmitsNumericOverflow()
     {
-        // §8.2 Slice 2: IntervalContainment_MinViolated_EmitsNumericOverflow
+        // IntervalContainment_MinViolated_EmitsNumericOverflow
         var source = @"
 precept Simple
 field balance as decimal min 0 max 1000
@@ -803,7 +795,7 @@ from Active on Withdraw
     [Fact]
     public void IntervalContainment_OnlyMaxDeclared_ChecksMaxOnly()
     {
-        // §8.2 Slice 2: one-sided check — only max declared, min is unbounded
+        // one-sided check — only max declared, min is unbounded
         var source = @"
 precept OneSided
 field value as decimal max 100
@@ -823,7 +815,7 @@ from Active on Set
     [Fact]
     public void IntervalContainment_OnlyMinDeclared_ChecksMinOnly()
     {
-        // §8.2 Slice 2: one-sided check — only min declared, max is unbounded
+        // one-sided check — only min declared, max is unbounded
         var source = @"
 precept OneSided
 field value as decimal min 0
@@ -843,7 +835,7 @@ from Active on Set
     [Fact]
     public void IntervalContainment_NoBoundsDeclared_NoObligationGenerated()
     {
-        // §8.2 Slice 2: decimal target with NO min/max → no obligation → no diagnostic
+        // decimal target with NO min/max → no obligation → no diagnostic
         var source = @"
 precept NoBounds
 field x as decimal
@@ -863,7 +855,7 @@ from Active on Combine
     [Fact]
     public void IntervalContainment_IntegerTarget_NoObligationGenerated()
     {
-        // §8.2 Slice 2: integer target → no obligation (§4.3)
+        // integer target → no obligation (§4.3)
         var source = @"
 precept IntTarget
 field counter as integer
@@ -972,7 +964,7 @@ from Active on Reduce
         var result = Compiler.Compile(source);
 
         // [0..1000] - [0..500] = [-500..1000] — lower bound -500 < min 0 → overflow
-        // (guard narrowing would prove it, but without Slice 3 it stays unresolved)
+        // (guard narrowing would prove it, but absent narrowing it stays unresolved)
         result.Proof.Obligations
             .Where(o => o.Requirement.Kind == IntervalContainment)
             .Should().NotBeEmpty(
@@ -1034,13 +1026,13 @@ from Active on Apply
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Guard Narrowing Integration Tests (Slice 3 end-to-end validation)
+    //  Guard Narrowing Integration Tests
     // ════════════════════════════════════════════════════════════════════════
 
     [Fact]
     public void GuardNarrowing_MultiBranchGuard_ProvesSafety()
     {
-        // Slice 3: Multi-branch guard - test that BuildNarrowedIntervals handles disjunctions
+        // Multi-branch guard: test that BuildNarrowedIntervals handles disjunctions.
         // The current implementation processes all branches and unions their narrowings.
         // This test ensures that the narrowing logic correctly combines multiple guard branches.
         const string multiGuardTest = @"
@@ -1063,8 +1055,8 @@ from Active on Withdraw1 when balance >= 5000
     [Fact]
     public void GuardNarrowing_FieldConstraint_ProvesSafety()
     {
-        // Slice 3: Guard uses field-to-field constraint 'principal + interest <= 110000'
-        // This directly proves total assignment is safe without separate interval calculation
+        // Guard uses field-to-field constraint 'principal + interest <= 110000'.
+        // This directly proves total assignment is safe without separate interval calculation.
         var result = Compiler.Compile(FieldConstraintPrecept);
         
         result.Diagnostics
@@ -1074,7 +1066,7 @@ from Active on Withdraw1 when balance >= 5000
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Regression Tests — Slice 3 narrowing logic validation
+    //  Regression Tests — narrowing logic validation
     // ════════════════════════════════════════════════════════════════════════
 
     [Fact]
@@ -1102,7 +1094,7 @@ from Active on Update when 1 == 1
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Slice 37 — affine cross-temperature proof cases
+    //  Affine cross-temperature proof cases
     // ════════════════════════════════════════════════════════════════════════
 
     [Fact]

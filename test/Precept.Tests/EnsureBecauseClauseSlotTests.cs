@@ -196,9 +196,8 @@ public class EnsureBecauseClauseSlotTests
     [Fact]
     public void StateEnsure_BecauseClauseSlot_IsRequired()
     {
-        // F-LANG-SPEC-01: Principle 9 (precept-language-spec.md:107) — the `because` clause is
-        // syntactically required on every rule AND ensure. A prior implementation departure
-        // (commit 16f866a2, 2026-05-03) introduced an optional slot; reverted in Phase 4 W-F.
+        // Principle 9 (precept-language-spec.md:107) — the `because` clause is
+        // syntactically required on every rule AND ensure.
         var slots = Constructs.GetMeta(ConstructKind.StateEnsure).Slots;
         slots[3].Kind.Should().Be(ConstructSlotKind.BecauseClause);
         slots[3].IsRequired.Should().BeTrue(
@@ -267,9 +266,8 @@ public class EnsureBecauseClauseSlotTests
     [Fact]
     public void EventEnsure_BecauseClauseSlot_IsRequired()
     {
-        // F-LANG-SPEC-01: Principle 9 (precept-language-spec.md:107) — the `because` clause is
-        // syntactically required on every rule AND ensure. A prior implementation departure
-        // (commit 16f866a2, 2026-05-03) introduced an optional slot; reverted in Phase 4 W-F.
+        // Principle 9 (precept-language-spec.md:107) — the `because` clause is
+        // syntactically required on every rule AND ensure.
         var slots = Constructs.GetMeta(ConstructKind.EventEnsure).Slots;
         slots[3].Kind.Should().Be(ConstructSlotKind.BecauseClause);
         slots[3].IsRequired.Should().BeTrue(
@@ -353,9 +351,9 @@ public class EnsureBecauseClauseSlotTests
     [Fact]
     public void Parser_StateEnsure_WithoutBecause_ProducesParseError()
     {
-        // F-LANG-SPEC-01: Principle 9 (precept-language-spec.md:107) — the `because` clause is
+        // Principle 9 (precept-language-spec.md:107) — the `because` clause is
         // syntactically required on every rule AND ensure. State-ensure without because must
-        // produce a parse diagnostic. Slot is required, not optional (reverted in Phase 4 W-F).
+        // produce a parse diagnostic.
         var src =
             "precept OrderFulfillment\n" +
             "field amount as number\n" +
@@ -405,7 +403,7 @@ public class EnsureBecauseClauseSlotTests
     [Fact]
     public void Parser_EventEnsure_WithoutBecause_ProducesParseError()
     {
-        // F-LANG-SPEC-01: Principle 9 — the `because` clause is required on every event ensure.
+        // Principle 9 — the `because` clause is required on every event ensure.
         var src =
             "precept OrderFulfillment\n" +
             "field reviewer as string\n" +
@@ -544,9 +542,9 @@ public class EnsureBecauseClauseSlotTests
     [Fact]
     public void Compile_StateEnsure_WithoutBecause_FailsCompilation()
     {
-        // F-LANG-SPEC-01: Principle 9 — ensure-without-because is rejected at parse time,
-        // so the runtime is unreachable. The previous "runtime must not crash on absent slot"
-        // test is obsolete; the slot can never be absent in a successfully-compiled precept.
+        // Principle 9 — ensure-without-because is rejected at parse time,
+        // so the runtime is unreachable. The slot can never be absent in a
+        // successfully-compiled precept.
         var src =
             "precept OrderFulfillment\n" +
             "field amount as number default 0\n" +
@@ -563,7 +561,7 @@ public class EnsureBecauseClauseSlotTests
     [Fact]
     public void Compile_EventEnsure_WithoutBecause_FailsCompilation()
     {
-        // F-LANG-SPEC-01: Principle 9 — see Compile_StateEnsure_WithoutBecause_FailsCompilation.
+        // Principle 9 — see Compile_StateEnsure_WithoutBecause_FailsCompilation.
         var src =
             "precept OrderFulfillment\n" +
             "field reviewer as string default \"\"\n" +

@@ -11,8 +11,7 @@ using Xunit;
 namespace Precept.Tests;
 
 /// <summary>
-/// Tests for <see cref="ProofEngine.Prove"/> covering all 13 implementation slices.
-/// Nested classes map 1:1 to slices from docs/Working/frank-pe-implementation-plan.md Phase 2.
+/// Tests for <see cref="ProofEngine.Prove"/>.
 /// </summary>
 public class ProofEngineTests
 {
@@ -149,7 +148,7 @@ public class ProofEngineTests
         => new(AnchorScope.OnEntry, stateName, guard, actions.ToImmutableArray(), MakeSyntax(ConstructKind.StateAction));
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Slice 1 — Pass 1: Obligation Collection
+    //  Pass 1: Obligation Collection
     // ════════════════════════════════════════════════════════════════════════
 
     public class Slice1_ObligationCollection
@@ -303,7 +302,7 @@ public class ProofEngineTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Slice 2 — Subject Resolution (tested via observed proof behavior)
+    //  Subject Resolution (tested via observed proof behavior)
     // ════════════════════════════════════════════════════════════════════════
 
     public class Slice2_SubjectResolution
@@ -418,7 +417,7 @@ public class ProofEngineTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Slice 3 — Strategy 1: Literal Proof
+    //  Strategy 1: Literal Proof
     // ════════════════════════════════════════════════════════════════════════
 
     public class Slice3_LiteralProof
@@ -540,7 +539,7 @@ public class ProofEngineTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Slice 4 — Strategy 2: Declaration Attribute Proof
+    //  Strategy 2: Declaration Attribute Proof
     // ════════════════════════════════════════════════════════════════════════
 
     public class Slice4_DeclarationAttributeProof
@@ -728,7 +727,7 @@ public class ProofEngineTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Slice 5 — Strategy 3: Guard-in-Path Proof
+    //  Strategy 3: Guard-in-Path Proof
     // ════════════════════════════════════════════════════════════════════════
 
     public class Slice5_GuardInPathProof
@@ -1112,7 +1111,7 @@ public class ProofEngineTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Slice 6 — Strategy 4: Flow Narrowing
+    //  Strategy 4: Flow Narrowing
     // ════════════════════════════════════════════════════════════════════════
 
     public class Slice6_FlowNarrowing
@@ -1338,7 +1337,7 @@ public class ProofEngineTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Slice 7 — Strategy 5: Qualifier Compatibility Proof
+    //  Strategy 5: Qualifier Compatibility Proof
     // ════════════════════════════════════════════════════════════════════════
 
     public class Slice7_QualifierCompatibilityProof
@@ -1514,7 +1513,7 @@ public class ProofEngineTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Slice 8 — Error-Tainted Obligation Suppression (PE-G13)
+    //  Error-Tainted Obligation Suppression (PE-G13)
     // ════════════════════════════════════════════════════════════════════════
 
     public class Slice8_ErrorTaintedSuppression
@@ -1611,7 +1610,7 @@ public class ProofEngineTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Slice 9 — Diagnostic Emission and FaultSiteLink Production
+    //  Diagnostic Emission and FaultSiteLink Production
     // ════════════════════════════════════════════════════════════════════════
 
     public class Slice9_DiagnosticsAndFaultSiteLinks
@@ -1912,7 +1911,7 @@ public class ProofEngineTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Slice 10 — Constraint Influence Analysis
+    //  Constraint Influence Analysis
     // ════════════════════════════════════════════════════════════════════════
 
     public class Slice10_ConstraintInfluence
@@ -1994,7 +1993,7 @@ public class ProofEngineTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Slice 11 — Initial-State Satisfiability
+    //  Initial-State Satisfiability
     // ════════════════════════════════════════════════════════════════════════
 
     public class Slice11_InitialStateSatisfiability
@@ -2149,7 +2148,7 @@ public class ProofEngineTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Slice 12 — ProofForwardingFact Consumption
+    //  ProofForwardingFact Consumption
     // ════════════════════════════════════════════════════════════════════════
 
     public class Slice12_ProofForwardingFacts
@@ -2328,7 +2327,7 @@ public class ProofEngineTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Slice 13 — Stateless Precept Handling + Integration
+    //  Stateless Precept Handling + Integration
     // ════════════════════════════════════════════════════════════════════════
 
     public class Slice13_StatelessAndIntegration
@@ -2603,7 +2602,7 @@ public class ProofEngineTests
 
     public class RequiredNameInventory
     {
-        // ── Slice 1 aliases ──────────────────────────────────────────────────
+        // ── Obligation collection aliases ──────────────────────────────────────────────────
 
         [Fact]
         public void CollectObligations_EventHandlerWithAction_CreatesObligation()
@@ -2685,7 +2684,7 @@ public class ProofEngineTests
             ledger.Obligations.Any(o => o.Context is TransitionRowContext).Should().BeTrue();
         }
 
-        // ── Slice 2 — subject resolution / GetFieldName ──────────────────────
+        // ── Subject resolution / GetFieldName ──────────────────────
 
         [Fact]
         public void ResolveSubject_ParamSubject_BinaryOp_ResolvesToLeftOperand()
@@ -4775,7 +4774,7 @@ public class ProofEngineTests
             compilation.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.UnprovedQualifierCompatibility));
         }
     }
-
+
     // ════════════════════════════════════════════════════════════════════════
     //  P2 — Symbolic Qualifier Equality via SourceFieldName
     // ════════════════════════════════════════════════════════════════════════
@@ -5007,7 +5006,7 @@ public class ProofEngineTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Slice 9 — OR / ProofEngine Disjunction Support
+    //  OR / ProofEngine Disjunction Support
     // ════════════════════════════════════════════════════════════════════════
 
     public class Slice9_OrDisjunctionSupport

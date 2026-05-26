@@ -382,22 +382,19 @@ public static partial class ProofEngine
             case TypedMemberAccess { Object: TypedFieldRef fieldRef2 }:
                 return ResolveFieldQualifier(fieldRef2.FieldName, axis, semantics);
 
-            // Phase 4 W-C (F-LANG-COLL-06): lookup-access result inherits the lookup's
-            // element-type qualifier metadata. `(AddOnFees for K)` where AddOnFees is
-            // declared `lookup of string to money in 'USD'` resolves to a money value
-            // carrying the 'USD' currency qualifier. The lookup-access TypedBinaryOp
-            // doesn't carry a ResultQualifier today (catalog ResultType is Error +
-            // ResultTypePolicy.ElementType); the proof engine walks to the lookup field
-            // and consults its `ElementType` (TypedElementType DU).
+            // Lookup-access result inherits the lookup's element-type qualifier metadata.
+            // `(AddOnFees for K)` on a `lookup of K to money in 'USD'` resolves to a money
+            // value carrying USD. The lookup-access TypedBinaryOp has no ResultQualifier
+            // (catalog ResultType is Error + ResultTypePolicy.ElementType); the proof engine
+            // walks to the lookup field and consults its ElementType DU.
             //
-            // TODO(W-G): collapse this OperationKind-keyed arm into a catalog-driven
-            // `ResultQualifier.ElementInheritedFromLookupField` subtype + a new
-            // `ResultQualifierPolicy.ElementInherited` declared on the LookupAccess
-            // operation in Operations.cs. The dispatch then reads the policy (subtype-DU
-            // pattern this file's other cases use) instead of switching on OperationKind
-            // identity. Per the W-C precept-reviewer audit (2026-05-26): the current
-            // shortcut is acceptable as a single arm but must not be extended to
-            // .first/.last/.at(N)/.min/.max in W-G — those propagations belong on the
+            // TODO: collapse this OperationKind-keyed arm into a catalog-driven path —
+            // declare a `ResultQualifier.ElementInheritedFromLookupField` subtype + an
+            // `ResultQualifierPolicy.ElementInherited` on LookupAccess in Operations.cs;
+            // the dispatch then reads the ResultQualifier subtype (the pattern this
+            // file's other cases use) instead of switching on OperationKind identity.
+            // Acceptable as a single arm; must not be extended to other accessor
+            // operations (.first / .last / .at(N) / .min / .max) — those belong on the
             // catalog-driven path.
             case TypedBinaryOp { ResolvedOp: OperationKind.LookupAccess, Left: TypedFieldRef lookupFieldRef }:
                 return ResolveElementQualifier(lookupFieldRef.FieldName, axis, semantics);
@@ -698,7 +695,7 @@ public static partial class ProofEngine
     /// <summary>Look up a field's qualifier on a specific axis (with standard fallbacks).</summary>
     /// <summary>
     /// Resolves a qualifier on the element-type of a collection field. Used for lookup-access
-    /// and (future W-G) element-returning accessors on qualified-inner-type collections.
+    /// (and future element-returning accessors on qualified-inner-type collections).
     /// Returns the matching qualifier from <see cref="TypedQualifiedElement.DeclaredQualifiers"/>
     /// when the element type is qualified; <c>null</c> otherwise.
     /// </summary>

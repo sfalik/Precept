@@ -12,7 +12,7 @@ using Xunit;
 namespace Precept.Tests.TypeChecker;
 
 /// <summary>
-/// Slice 4 — TypedConstants + ContentValidation.
+/// TypedConstants + ContentValidation.
 /// Covers TypedTypedConstant resolution via ClosedSetValidation (currency, unit, dimension),
 /// NodaTimeValidation (date, time, datetime, period), TypedLiteral fallback for non-typed-constant
 /// contexts, and ErrorType propagation for unresolved typed constants.
@@ -500,7 +500,7 @@ public class TypeCheckerTypedConstantTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  11. Slice 2 — Interpolated typed constant form grammar matching
+    //  11. Interpolated typed constant form grammar matching
     // ════════════════════════════════════════════════════════════════════════
 
     // ── Structural validity (InvalidInterpolatedTypedConstantForm) ────────
@@ -1483,7 +1483,7 @@ public class TypeCheckerTypedConstantTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Slice 9B — Catalog-Mediated Temporal Diagnostics (PRE0055–0058)
+    //  Catalog-Mediated Temporal Diagnostics (PRE0055–0058)
     // ════════════════════════════════════════════════════════════════════════
 
     [Fact]
@@ -1615,7 +1615,7 @@ public class TypeCheckerTypedConstantTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Slice 5A — PRE0091: Ambiguous Typed Constant Resolution
+    //  PRE0091: Ambiguous Typed Constant Resolution
     // ════════════════════════════════════════════════════════════════════════
 
     [Fact]

@@ -5,7 +5,7 @@ using Xunit;
 namespace Precept.Tests.TypeChecker;
 
 /// <summary>
-/// Slice 10 — Qualifier Compatibility Checks.
+/// Qualifier Compatibility Checks.
 /// Enforces that when both a field and its bound carry qualifiers, those qualifiers must match.
 /// Emits <see cref="DiagnosticCode.BoundsQualifierMismatch"/> on mismatch.
 /// Also enforces <see cref="DiagnosticCode.BoundsRequireQualifier"/> for ambiguous plain numeric bounds.

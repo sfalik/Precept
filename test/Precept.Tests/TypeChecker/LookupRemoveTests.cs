@@ -6,10 +6,10 @@ using static Precept.Tests.TypeChecker.TypeCheckerTestHelpers;
 namespace Precept.Tests.TypeChecker;
 
 /// <summary>
-/// Phase 4 W-B / BUG-002: `remove F K` on a `lookup of K to V` field must type-check the
-/// argument against the lookup's KEY type, not the value type. Pre-fix, the type checker
-/// reused the element-type dispatch and rejected legitimate `remove Lookup Key` shapes
-/// while accepting incoherent `remove Lookup Value` shapes.
+/// `remove F K` on a `lookup of K to V` field must type-check the argument against
+/// the lookup's KEY type, not the value type — otherwise the dispatch would reject
+/// legitimate `remove Lookup Key` shapes and accept incoherent `remove Lookup Value`
+/// shapes.
 /// </summary>
 public class LookupRemoveTests
 {
@@ -73,7 +73,7 @@ public class LookupRemoveTests
     [Fact]
     public void Remove_OnSet_StillAcceptsElementType()
     {
-        // Regression guard: Phase 4 W-B's lookup branch must not break the set/bag/list path.
+        // Regression guard: lookup-key dispatch must not break the set/bag/list path.
         var precept = """
             precept Widget
             field Tags as set of string

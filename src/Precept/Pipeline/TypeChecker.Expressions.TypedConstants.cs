@@ -8,7 +8,7 @@ namespace Precept.Pipeline;
 internal static partial class TypeChecker
 {
     // ════════════════════════════════════════════════════════════════════════
-    //  Expression resolution — Slice 3: Functions, Accessors, Interpolated Strings
+    //  Expression resolution — Functions, Accessors, Interpolated Strings
     // ════════════════════════════════════════════════════════════════════════
 
     private static bool TryMatchCompoundUnitCancellation(
@@ -85,7 +85,7 @@ internal static partial class TypeChecker
         QualifierUnitHelpers.TryDeriveUnitDimensionName(unitCode, out dimensionName);
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Interpolated typed constant resolution (Slice 2)
+    //  Interpolated typed constant resolution
     // ════════════════════════════════════════════════════════════════════════
 
     // InterpolationUnsupportedTypes FrozenSet eliminated (F-TC-04):

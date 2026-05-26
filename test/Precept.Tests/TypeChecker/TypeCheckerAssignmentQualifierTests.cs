@@ -11,14 +11,14 @@ using Xunit;
 namespace Precept.Tests.TypeChecker;
 
 /// <summary>
-/// Slice 11 (G9): Exchange rate assignment qualifier validation — FromCurrency/ToCurrency
-/// Slice 10 (G7): Assignment expression qualifier propagation — binary expression operands
-/// Regression: plain price typed constants must surface assignment qualifiers
+/// Exchange rate assignment qualifier validation — FromCurrency/ToCurrency.
+/// Assignment expression qualifier propagation — binary expression operands.
+/// Regression: plain price typed constants must surface assignment qualifiers.
 /// </summary>
 public class TypeCheckerAssignmentQualifierTests
 {
     // ════════════════════════════════════════════════════════════════════════
-    //  Slice 11 (G9) — Exchange Rate assignment qualifier validation
+    //  Exchange Rate assignment qualifier validation
     // ════════════════════════════════════════════════════════════════════════
 
     [Fact]
@@ -121,7 +121,7 @@ public class TypeCheckerAssignmentQualifierTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Slice 10 (G7) — Assignment expression qualifier propagation
+    //  Assignment expression qualifier propagation
     // ════════════════════════════════════════════════════════════════════════
 
     [Fact]
@@ -218,7 +218,7 @@ public class TypeCheckerAssignmentQualifierTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Slice 23 — Static qualifier routing: assignment validation
+    //  Static qualifier routing: assignment validation
     // ════════════════════════════════════════════════════════════════════════
 
     [Fact]

@@ -36,7 +36,7 @@ public class TemporalQuantityParserTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  F-LANG-TEMP-01/02: Context-aware classification (expectedType)
+    //  Context-aware classification (expectedType)
     // ════════════════════════════════════════════════════════════════════════
 
     [Fact]
@@ -88,7 +88,7 @@ public class TemporalQuantityParserTests
     [Fact]
     public void Parse_WithPeriodContext_AcceptsMixedUnits()
     {
-        // F-LANG-TEMP-05: mixed units accepted when expectedType is Period
+        // Mixed units accepted when expectedType is Period
         var result = TemporalQuantityParser.Parse("1 day + 2 hours", TypeKind.Period);
 
         result.IsValid.Should().BeTrue();
@@ -99,7 +99,7 @@ public class TemporalQuantityParserTests
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  F-LANG-TEMP-05: TEMP005 gated on ambiguous context
+    //  TEMP005 gated on ambiguous context
     // ════════════════════════════════════════════════════════════════════════
 
     [Fact]

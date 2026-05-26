@@ -9,8 +9,7 @@ using Xunit;
 namespace Precept.Tests.TypeChecker;
 
 /// <summary>
-/// Slice 17 — quantity normalization integration coverage.
-/// These tests are intentionally allowed to stay red until the normalization path lands.
+/// Quantity normalization integration coverage.
 /// </summary>
 public class TypeCheckerQuantityNormalizationTests
 {
@@ -151,7 +150,7 @@ public class TypeCheckerQuantityNormalizationTests
         // NOTE (§5.5.2 double-normalization risk): The WholeValue path extracts the source field's
         // interval which is ALREADY in base units. ApplyStaticUnitScaling must not re-scale it.
         // Both bounds use 'kg' (the SI base for mass) so scale = 1.0 here — if this test turns red
-        // due to double-normalization on a non-base-unit variant, that is Slice 19's problem.
+        // due to double-normalization on a non-base-unit variant, the normalization path needs review.
         var result = CompileAssignment(
             targetDeclaration: "field weight as quantity of 'mass' max '5 kg' default '0 kg'",
             assignment: "'{qtyField}'",

@@ -7,22 +7,12 @@ using Xunit;
 namespace Precept.Tests.Parser;
 
 /// <summary>
-/// Tests for the Slice 2 scoped construct family:
+/// Tests for the scoped construct family:
 ///   TransitionRow, StateEnsure, AccessMode, OmitDeclaration,
 ///   StateAction, EventEnsure, EventHandler.
 ///
-/// Complements Slice 1 direct construct tests in ParserDirectConstructTests.cs.
-/// Does NOT duplicate RED-P tests already in EnsureBecauseClauseSlotTests.cs:
-///   - Parser_StateEnsure_WithBecause_ProducesBecauseClauseSlotAtIndex2
-///   - Parser_StateEnsure_WithoutBecause_HasNoBecauseClauseSlot
-///   - Parser_StateEnsure_BecauseMissingString_ProducesParseError
-///   - Parser_EventEnsure_WithBecause_ProducesBecauseClauseSlotAtIndex2
-///   - Parser_EventEnsure_WithoutBecause_HasNoBecauseClauseSlot
-///   - Parser_EventEnsure_BecauseMissingString_ProducesParseError
-///
-/// Test status at time of writing:
-///   GREEN  — catalog metadata tests; pass immediately (no parser dependency)
-///   RED-P  — parser behavioral tests; red until Parser.Parse replaces the stub
+/// Complements direct construct tests in ParserDirectConstructTests.cs.
+/// Does NOT duplicate ensure-because slot tests already in EnsureBecauseClauseSlotTests.cs.
 /// </summary>
 public class ParserScopedConstructTests
 {
@@ -216,8 +206,8 @@ public class ParserScopedConstructTests
     [Fact]
     public void EventHandler_CatalogSlotOrder_IsEventTarget_GuardClause_ActionChain()
     {
-        // GREEN — Slice 8b: EventRow now carries an optional guard (SlotPreVerbGuardArrow)
-        // between EventTarget and ActionChain, matching ConstructionRow's former slot layout.
+        // EventRow carries an optional guard (SlotPreVerbGuardArrow)
+        // between EventTarget and ActionChain.
         var slots = Constructs.GetMeta(ConstructKind.EventRow).Slots;
         slots[0].Kind.Should().Be(ConstructSlotKind.EventTarget, "Slots[0]: event name");
         slots[1].Kind.Should().Be(ConstructSlotKind.GuardClause, "Slots[1]: optional pre-verb when-guard");
@@ -595,8 +585,7 @@ public class ParserScopedConstructTests
     [Fact]
     public void StateEnsure_WithFromLeadingToken_WithBecause_BecauseClauseSlot_IsPresent()
     {
-        // F-LANG-SPEC-01 (Phase 4 W-F): `because` is required on every ensure per Principle 9.
-        // Prior test asserted optional-absent behavior; that path is now a parse error.
+        // Principle 9: `because` is required on every ensure.
         var tokens = Lexer.Lex("from Draft ensure amount > 0 because \"required\"");
         var manifest = Precept.Pipeline.Parser.Parse(tokens);
 

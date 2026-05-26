@@ -7,15 +7,11 @@ using Xunit;
 namespace Precept.Tests.Parser;
 
 /// <summary>
-/// Tests for the Slice 1 direct construct family:
+/// Tests for the direct construct family:
 ///   PreceptHeader, FieldDeclaration, StateDeclaration, EventDeclaration, RuleDeclaration.
 ///
-/// Scoped constructs (TransitionRow, StateEnsure, EventEnsure, EventHandler, etc.) are Slice 2 — not tested here.
-/// RED-P tests for StateEnsure / EventEnsure already live in EnsureBecauseClauseSlotTests.cs — not duplicated.
-///
-/// Test status at time of writing:
-///   GREEN  — catalog metadata tests; pass immediately (no parser dependency)
-///   RED-P  — parser behavioral tests; red until Parser.Parse replaces the stub
+/// Scoped constructs (TransitionRow, StateEnsure, EventEnsure, EventHandler, etc.) are tested elsewhere.
+/// Tests for StateEnsure / EventEnsure live in EnsureBecauseClauseSlotTests.cs — not duplicated.
 /// </summary>
 public class ParserDirectConstructTests
 {
