@@ -10,11 +10,12 @@ This folder is the durable, domain-first research map for Precept language work.
 
 | If you need... | Start with |
 |---|---|
+| **Cross-corpus topic index** | **[`../INDEX.md`](../INDEX.md)** — first stop for "has this been researched?" |
 | The full domain map | [domain-map.md](./domain-map.md) |
 | Research execution order | [domain-research-batches.md](./domain-research-batches.md) |
 | Domain packets and comparative research | [expressiveness/README.md](./expressiveness/README.md) |
 | Theory and formal reference work | [references/README.md](./references/README.md) |
-| Parser / grammar scalability analysis | [parser-combinator-scalability.md](./parser-combinator-scalability.md) |
+| Parser / grammar scalability analysis | [parser-combinator-scalability.md](../architecture/compiler/parser-combinator-scalability.md) — *moved to `research/architecture/compiler/` in Phase 10* |
 
 ## Domain index
 

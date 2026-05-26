@@ -214,6 +214,7 @@ The Per-Decision Rationale shape (rationale + alternatives + precedent + tradeof
 
 Research only earns its keep if it gets read.
 
+- **Add the new file to `research/INDEX.md`** in the appropriate topic section (this is the mandatory final step of every research-completion change-set). If a new topic doesn't exist, create a new `## Topic name` section in the appropriate position. The INDEX is the cross-corpus discovery surface; without an entry there, future agents won't find the file.
 - If the research informs a GitHub proposal issue, **link from the issue body** to the research file.
 - If `research/language/README.md` (or another subfolder README) maintains an issue map, **update it** to connect the new research to its consuming proposal.
 - If the research promotes a conclusion that becomes a locked decision, that decision lives in a spec or design doc — **not** in the research file. The research is the evidence; the decision is the policy.
@@ -297,7 +298,7 @@ The skill enforces these as **refusal gates**. The skill refuses to mark a resea
 
 7. **Source-grading must be honest.** Refuse research that grades training-data knowledge as Primary, or grades vendor blog posts as Primary. The grading is a discipline check; mis-grading is the same failure mode as paraphrasing a quote.
 
-8. **Promote-or-Cite at file completion.** Before declaring the research complete, the author verifies one of: inbound citation from `docs/` exists or is added in the same change-set, inbound citation from another `research/` file exists or is added, `status: Active` with horizon-groundwork declaration is documented, or the file moves to `research/archive/`. New shadow-policy files are refused.
+8. **Promote-or-Cite at file completion + INDEX update.** Before declaring the research complete, the author verifies one of: inbound citation from `docs/` exists or is added in the same change-set, inbound citation from another `research/` file exists or is added, `status: Active` with horizon-groundwork declaration is documented, or the file moves to `research/archive/`. New shadow-policy files are refused. **AND**: the new file must appear in `research/INDEX.md` under its topic. Missing INDEX entry is refused even if the file is otherwise complete.
 
 9. **Sub-folder taxonomy is enforced.** Research filed in the wrong folder per the table in § Step 2 is refused. Use the folder for the topic, not the folder convenient to the author's session.
 

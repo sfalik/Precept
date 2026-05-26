@@ -2,12 +2,17 @@
 
 External research on architectural patterns for Precept's clean-room redesign. All files are raw research — no Precept-specific interpretations, no design conclusions, no implementation recommendations.
 
+## Start here
+
+- **[`../INDEX.md`](../INDEX.md)** — cross-corpus topic-to-file map. First stop for "has this been researched?".
+
 ## Structure
 
 | Location | Purpose |
 |----------|---------|
-| `compiler/` | 15-survey external research corpus for the clean-room compiler redesign. Covers pipeline architecture, proof systems, type systems, numeric/temporal/unit types, state graph analysis, LS integration, and runtime APIs. See [compiler/README.md](compiler/README.md) for reading order. |
+| `compiler/` | External research corpus for the clean-room compiler redesign. Covers pipeline architecture, proof systems, type systems, numeric/temporal/unit types, state graph analysis, LS integration, and runtime APIs. See [compiler/README.md](compiler/README.md) for reading order. |
 | `runtime/` | Runtime evaluator architecture survey covering 10 external systems across 8 dimensions (object architecture, evaluator design, fault representation, compile-time/runtime fault correspondence, versioning, inspect/preview, result types, constraint evaluation). See [runtime/README.md](runtime/README.md). |
+| `tooling/` | Tooling-architecture audits (MCP, language-server, grammar generator) — moved in Phase 10 from `research/language/`. |
 - ✅ Stateless validation justifies our `static partial` choice (vs. Roslyn's instance partials, which chain through binder context)
 
 **Where we diverge from precedent (minor, not blocking):**

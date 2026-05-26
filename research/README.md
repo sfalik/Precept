@@ -6,7 +6,9 @@ Research lives in this repository. Proposal decisions and canonical proposal bod
 
 ## Start here
 
+- **[`research/INDEX.md`](INDEX.md)** — cross-corpus topic-to-file map. First stop for "has the team already researched X?". Spans every sub-folder.
 - `research/language/README.md` — entry point for language research, issue map, and reading order
+- `research/architecture/compiler/README.md` — entry point for compiler-architecture research (if present)
 
 ## Structure
 

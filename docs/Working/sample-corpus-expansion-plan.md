@@ -1337,7 +1337,7 @@ Each new sample must:
 | **GDPR** | Data Privacy | Compliance patterns | regulatory-compliance-audit |
 | **PCI-DSS** | Payment Card Industry | Compliance patterns | regulatory-compliance-audit |
 | **SOC2** | Service Organization Control | Compliance patterns | regulatory-compliance-audit |
-| **UCUM (Unified Code for Units of Measure)** | Units of Measure | `research/language/ucum-tier1-curation.md` | unit-of-measure-reference |
+| **UCUM (Unified Code for Units of Measure)** | Units of Measure | `research/language/references/ucum-tier1-curation.md` | unit-of-measure-reference |
 | **ISO 4217** | Currency Codes | Type system domain survey | currency-exchange-rates |
 | **2 CFR 200** | Federal Grants | Grant management patterns | grant-disbursement |
 
