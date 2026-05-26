@@ -46,12 +46,12 @@ public enum ConstructKind
     /// <summary><c>on Event -> Actions</c> (no state machine)</summary>
     EventRow          = 12,
 
-    // ── Construction rows ────────────────────────────────────────────
-    /// <summary><c>on Event [when Guard] -> Actions</c> (construction success path)</summary>
-    ConstructionRow        = 19,
-
-    /// <summary><c>on Event [when Guard] -> reject "reason"</c> (construction reject path)</summary>
-    ConstructionRowReject  = 20,
+    // ── Event-row reject ─────────────────────────────────────────────
+    // (ordinal 19 retired — formerly held a vestigial construction-row variant
+    // that the parser no longer produces; classification of construction-vs-handler
+    // moved to the type checker via `resolvedEvent.IsInitial`.)
+    /// <summary><c>on Event [when Guard] -> reject "reason"</c> (reject path produced by ResolveRejectVariant for both stateless and construction events; success-path peer is EventRow=12).</summary>
+    EventRowReject         = 20,
 
     // ── Transition reject ────────────────────────────────────────────
     /// <summary><c>from State on Event [when Guard] -> reject "reason"</c> (transition reject path)</summary>

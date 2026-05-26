@@ -7,44 +7,46 @@ using Xunit;
 namespace Precept.Tests.Parser;
 
 /// <summary>
-/// Parser routing for construction rows (ConstructionRowReject),
+/// Parser routing for initial-event rows (the on-row family that includes both
+/// stateless event handlers and entity-construction rows), EventRowReject,
 /// TransitionRowReject, guard support for all on-rows, and RejectClause slot emission.
-/// ConstructionRow is not produced by the parser — all on-rows parse as EventRow.
+/// All on-rows parse as EventRow; construction-vs-handler classification happens in
+/// the type checker via resolvedEvent.IsInitial.
 /// </summary>
-public class ParserConstructionRowTests
+public class ParserInitialEventRowTests
 {
     private static ConstructManifest Parse(string source) =>
         Pipeline.Parser.Parse(Lexer.Lex(source));
 
     // ════════════════════════════════════════════════════════════════════════════
-    //  §1. Construction row routing
+    //  §1. on-row routing
     // ════════════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public void ConstructionRow_EmitsCorrectKind()
+    public void OnRow_NoReject_RoutesToEventRow()
     {
-        // 'on <event> -> <actions>' (initial classification happens at type-check time)
-        // must produce EventRow — ConstructionRow is not emitted by the parser.
+        // 'on <event> -> <actions>' parses as EventRow regardless of whether the
+        // bound event is initial (type checker classifies via resolvedEvent.IsInitial).
         var manifest = Parse("on Start -> set status = \"active\"");
 
         manifest.Constructs.Should().ContainSingle(
             c => c.Meta.Kind == ConstructKind.EventRow,
-            "'on Start -> set ...' must route to EventRow (construction classification via type checker)");
+            "'on Start -> set ...' must route to EventRow");
     }
 
     [Fact]
-    public void ConstructionRowReject_EmitsCorrectKind()
+    public void OnRow_WithReject_RoutesToEventRowReject()
     {
-        // 'on <event> when <cond> -> reject "msg"' must produce ConstructionRowReject.
+        // 'on <event> when <cond> -> reject "msg"' must produce EventRowReject.
         var manifest = Parse("on Start when amount > 0 -> reject \"too low\"");
 
         manifest.Constructs.Should().ContainSingle(
-            c => c.Meta.Kind == ConstructKind.ConstructionRowReject,
-            "'on Start when ... -> reject ...' must route to ConstructionRowReject");
+            c => c.Meta.Kind == ConstructKind.EventRowReject,
+            "'on Start when ... -> reject ...' must route to EventRowReject");
     }
 
     [Fact]
-    public void ConstructionRow_AllowsGuard()
+    public void OnRow_AllowsGuard()
     {
         // Guards are valid on all on-rows — PRE0014 must not fire.
         var manifest = Parse("on Start when amount > 0 -> set status = \"active\"");
@@ -58,7 +60,7 @@ public class ParserConstructionRowTests
     }
 
     [Fact]
-    public void EventRow_NoInitial_EmitsEventRow()
+    public void OnRow_NoInitial_RoutesToEventRow()
     {
         // 'on <event> -> <actions>' must produce EventRow.
         var manifest = Parse("on Pause -> set paused = true");

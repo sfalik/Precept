@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Precept.Tests.TypeChecker;
 
-public class TypeCheckerConstructionStructuralTests
+public class TypeCheckerInitialEventStructuralTests
 {
     [Fact]
     public void PRE0092_AllowsInitialEventOnStatefulPrecept()

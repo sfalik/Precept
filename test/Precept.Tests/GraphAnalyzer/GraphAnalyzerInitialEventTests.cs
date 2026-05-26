@@ -12,12 +12,12 @@ namespace Precept.Tests.Construction;
 /// Graph analyzer construction-row awareness.
 /// AlwaysRejecting is promoted to Error severity for all-reject construction paths.
 /// </summary>
-public class GraphAnalyzerConstructionTests
+public class GraphAnalyzerInitialEventTests
 {
     [Fact]
     public void AlwaysRejecting_ConstructionRow_IsError()
     {
-        // A single ConstructionRowReject with a guard means the only construction
+        // A single EventRowReject with a guard means the only construction
         // path always rejects — the precept can never be created.
         var (_, _, graph) = AnalyzeAllowingDiagnostics("""
             precept Widget

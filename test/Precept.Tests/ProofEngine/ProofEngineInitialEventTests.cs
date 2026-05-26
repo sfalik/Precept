@@ -14,7 +14,7 @@ namespace Precept.Tests;
 /// and BuildNarrowedIntervals for interval containment) handle EventHandlerContext from
 /// construction rows (<c>on EventName when ...</c>) symmetrically with transition rows.
 /// </summary>
-public class ProofEngineConstructionTests
+public class ProofEngineInitialEventTests
 {
     private static ProofLedger Prove(string source)
     {

@@ -296,7 +296,7 @@ public static partial class Parser
                     {
                         return baseKind switch
                         {
-                            ConstructKind.EventRow => ConstructKind.ConstructionRowReject,
+                            ConstructKind.EventRow => ConstructKind.EventRowReject,
                             ConstructKind.TransitionRow => ConstructKind.TransitionRowReject,
                             _ => baseKind,
                         };

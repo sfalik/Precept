@@ -45,7 +45,7 @@ public class ConstructsTests
     [Fact]
     public void Total_Count()
     {
-        Constructs.All.Should().HaveCount(15);
+        Constructs.All.Should().HaveCount(14);
     }
 
     [Fact]
@@ -173,7 +173,7 @@ public class ConstructsTests
     [Fact]
     public void TopLevel_Count()
     {
-        Constructs.All.Count(c => c.AllowedIn.Length == 0).Should().Be(12);
+        Constructs.All.Count(c => c.AllowedIn.Length == 0).Should().Be(11);
     }
 
     [Fact]
@@ -410,13 +410,12 @@ public class ConstructsTests
     [Fact]
     public void Entries_IsNotEmpty_ForAllConstructs()
     {
-        // ConstructionRow and ConstructionRowReject are parser-internal kinds with no
-        // disambiguation entries — they are produced by ResolveRejectVariant, not by direct
-        // parser dispatch. All other constructs must have at least one entry.
+        // EventRowReject is a parser-internal kind with no disambiguation entries —
+        // it is produced by ResolveRejectVariant, not by direct parser dispatch.
+        // All other constructs must have at least one entry.
         var parserInternalKinds = new HashSet<ConstructKind>
         {
-            ConstructKind.ConstructionRow,
-            ConstructKind.ConstructionRowReject,
+            ConstructKind.EventRowReject,
         };
 
         foreach (var meta in Constructs.All.Where(m => !parserInternalKinds.Contains(m.Kind)))
@@ -430,13 +429,12 @@ public class ConstructsTests
     [Fact]
     public void AllConstructsHaveAtLeastOneEntry()
     {
-        // ConstructionRow and ConstructionRowReject are parser-internal kinds with no
-        // disambiguation entries — they are produced by ResolveRejectVariant, not by direct
-        // parser dispatch. All other constructs must have at least one entry.
+        // EventRowReject is a parser-internal kind with no disambiguation entries —
+        // it is produced by ResolveRejectVariant, not by direct parser dispatch.
+        // All other constructs must have at least one entry.
         var parserInternalKinds = new HashSet<ConstructKind>
         {
-            ConstructKind.ConstructionRow,
-            ConstructKind.ConstructionRowReject,
+            ConstructKind.EventRowReject,
         };
 
         foreach (var meta in Constructs.All.Where(m => !parserInternalKinds.Contains(m.Kind)))
@@ -590,7 +588,7 @@ public class ConstructsTests
     [InlineData(TokenKind.In,   3)]
     [InlineData(TokenKind.To,   2)]
     [InlineData(TokenKind.From, 4)]
-    [InlineData(TokenKind.On,   2)]  // ConstructionRow/ConstructionRowReject are parser-internal, not dispatched
+    [InlineData(TokenKind.On,   2)]  // EventRowReject is parser-internal (produced by ResolveRejectVariant), not dispatched
     public void SharedLeadingTokens_HaveCorrectCandidateCount(TokenKind token, int expectedCount)
     {
         Constructs.ByLeadingToken[token].Length.Should().Be(expectedCount,

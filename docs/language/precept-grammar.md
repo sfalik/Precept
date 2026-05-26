@@ -225,10 +225,8 @@ A construct is a complete declaration — a "sentence" in the DSL. There are 15 
 | `StateAction` | `to`/`from` + `->` | Declares a state entry or exit action hook |
 | `EventEnsure` | `on` + `ensure` | Declares an event precondition |
 | `EventRow` | `on` + `->` | Declares an event row on the success path (action chain only); the type checker promotes a row to construction-success classification when the resolved event carries `IsInitial` |
-| `ConstructionRowReject` | `on` + `->` `reject` | Declares an event row on the construction reject path; produced from `EventRow` by reject-variant resolution, not via direct parser disambiguation |
-| `TransitionRowReject` | `from` + `on` + `->` `reject` | Declares an event row on the transition reject path; same resolution model as `ConstructionRowReject` |
-
-> **Note — `ConstructionRow` (kind 19).** The catalog still defines `ConstructionRow` for historical compatibility, but Slice 8b removed it from the parser surface: every on-row now parses as `EventRow`, and the type checker classifies construction-vs-handler via `resolvedEvent.IsInitial`. The kind is retained as a vestigial DU member to avoid breaking downstream consumers that pattern-match on it; new code should not produce it. See `Constructs.cs:188` for the in-catalog note.
+| `EventRowReject` | `on` + `->` `reject` | Declares an event row on the reject path; produced from `EventRow` by reject-variant resolution, not via direct parser disambiguation |
+| `TransitionRowReject` | `from` + `on` + `->` `reject` | Declares an event row on the transition reject path; same resolution model as `EventRowReject` |
 
 ### The flat model
 

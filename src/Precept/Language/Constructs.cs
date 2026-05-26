@@ -184,19 +184,9 @@ public static class Constructs
             [new(TokenKind.On, [TokenKind.Arrow])],
             RoutingFamily.EventScoped),
 
-        ConstructKind.ConstructionRow => new(
+        ConstructKind.EventRowReject => new(
             kind,
-            "construction row",
-            "Construction success path (Slice 8b: no longer produced by parser; all on-rows parse as EventRow and are promoted by the type checker via resolvedEvent.IsInitial)",
-            "on Create -> set status = \"active\"",
-            [],
-            [SlotEventTarget, SlotPreVerbGuardArrow, SlotActionChain],
-            [],
-            RoutingFamily.EventScoped),
-
-        ConstructKind.ConstructionRowReject => new(
-            kind,
-            "construction row reject",
+            "event row reject",
             "Reject path for on-rows: refuses event with a reason (produced by ResolveRejectVariant from EventRow, not via direct disambiguation)",
             "on Create when amount <= 0 -> reject \"Amount must be positive\"",
             [],
