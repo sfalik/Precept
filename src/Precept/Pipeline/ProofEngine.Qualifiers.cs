@@ -389,6 +389,16 @@ public static partial class ProofEngine
             // doesn't carry a ResultQualifier today (catalog ResultType is Error +
             // ResultTypePolicy.ElementType); the proof engine walks to the lookup field
             // and consults its `ElementType` (TypedElementType DU).
+            //
+            // TODO(W-G): collapse this OperationKind-keyed arm into a catalog-driven
+            // `ResultQualifier.ElementInheritedFromLookupField` subtype + a new
+            // `ResultQualifierPolicy.ElementInherited` declared on the LookupAccess
+            // operation in Operations.cs. The dispatch then reads the policy (subtype-DU
+            // pattern this file's other cases use) instead of switching on OperationKind
+            // identity. Per the W-C precept-reviewer audit (2026-05-26): the current
+            // shortcut is acceptable as a single arm but must not be extended to
+            // .first/.last/.at(N)/.min/.max in W-G — those propagations belong on the
+            // catalog-driven path.
             case TypedBinaryOp { ResolvedOp: OperationKind.LookupAccess, Left: TypedFieldRef lookupFieldRef }:
                 return ResolveElementQualifier(lookupFieldRef.FieldName, axis, semantics);
 

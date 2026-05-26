@@ -337,7 +337,7 @@ Same pattern for states, events, args. `ImmutableDictionary` is **not used** as 
 public sealed record TypedField(
     string Name,
     TypeKind ResolvedType,
-    TypeKind? ElementType,            // for collections: the inner type
+    TypedElementType? ElementType,    // for collections: resolved element-type DU (Phase 4 W-C)
     TypeKind? KeyType,                // for lookup/logBy/queueBy: the key type
     ImmutableArray<ModifierKind> Modifiers,
     ImmutableArray<ModifierKind> ImpliedModifiers,  // from TypeMeta.ImpliedModifiers
@@ -350,6 +350,14 @@ public sealed record TypedField(
     ParsedConstruct Syntax            // back-pointer to source construct
 );
 ```
+
+The `ElementType` slot is the resolved element-type **DU** (Phase 4 W-C, F-LANG-COLL-06), not a bare `TypeKind?`. Subtypes:
+
+- `TypedScalarElement(TypeKind ResolvedTypeKind)` — plain scalar/business/temporal element with no qualifier or trait metadata.
+- `TypedChoiceElement(TypeKind ResolvedTypeKind, bool Ordered)` — choice-element with the `ordered` modifier carried at the type level so accessor return types can propagate it (Phase 4 W-G).
+- `TypedQualifiedElement(TypeKind, ImmutableArray<DeclaredQualifierMeta> DeclaredQualifiers)` — element with qualifier metadata. `set of money in 'USD'` resolves to `TypedQualifiedElement(Money, [Currency(USD)])`.
+
+Consumers that only need the resolved kind read `.ResolvedTypeKind` on the base. Consumers that need qualifier or ordering metadata pattern-match on the subtype.
 
 
 

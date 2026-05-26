@@ -1086,6 +1086,13 @@ internal static partial class TypeChecker
     /// Extract the element type from a receiver expression. For <see cref="TypedFieldRef"/>,
     /// looks up the field in <see cref="CheckContext.FieldLookup"/>.
     /// Returns null if element type cannot be determined.
+    ///
+    /// TODO(W-G): widen the return type to <c>TypedElementType?</c> so accessor return-type
+    /// propagation (<c>.first</c> / <c>.last</c> / <c>.at(N)</c> / <c>.min</c> / <c>.max</c>)
+    /// can flow qualifier + ordered metadata through to <c>TypedMemberAccess</c> per the locked
+    /// COLL-02/03 design D-3 Option A (`docs/Working/choice-inner-and-ordered-propagation-design.md`).
+    /// Today the bare-kind return is sufficient because qualifier propagation is shipped only
+    /// for the lookup-access binary-op path (W-C); accessor-result qualifier propagation lands in W-G.
     /// </summary>
     private static TypeKind? GetElementType(TypedExpression receiver, CheckContext ctx)
     {
