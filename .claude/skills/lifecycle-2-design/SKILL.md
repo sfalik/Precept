@@ -383,7 +383,7 @@ The skill enforces:
 
 ## Composability
 
-- **Input**: optional `--from <research-doc>` flag — extracts research conclusions and pre-populates the Decisions section's Rationale and Precedent legs from the research findings.
+- **Input**: human-discipline obligation — if a `research/` file exists for the design's topic, the author must read it before locking, cite it in `sources-consulted`, and copy verbatim excerpts into per-decision `Sources consulted for this decision:` legs for any claim the research grounds. The historical `--from <research-doc>` flag was a rhetorical claim — no implementation; designs that cited it produced no operational difference. Removed in Phase 8 (2026-05-25) along with the empirical finding that no in-tree design had ever used it.
 - **Output**: locked design at `docs/Working/<slug>.md` — consumed by `/lifecycle-3-plan` for phase planning, and later by `/lifecycle-5-promote` for canonical doc updates.
 
 ## Anti-patterns to refuse

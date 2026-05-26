@@ -103,6 +103,29 @@ Enforce these:
 - A decision whose stakes classification looks implausible given the change scope (e.g., a new public keyword marked `low`) is a CONCERN — flag for human judgment.
 - A WHAT without WHY remains incomplete. The expanded leg set is the WHY discipline at scale.
 
+**Mechanical leg-checking (grep-based discipline — no docs-lint required).** When reviewing a `status: Locked` design doc, the reviewer mechanically verifies each required leg via grep before reading prose. Commands:
+
+```bash
+# Frontmatter
+grep -A1 "^sources-consulted:" <design.md>
+
+# Stakes on every decision
+grep -B1 "^\*\*Stakes\*\*:" <design.md>      # should equal one match per ### Decision N: heading
+
+# Per-decision Sources consulted leg (medium+)
+grep -c "Sources consulted for this decision:" <design.md>
+
+# Per-decision Counter-evidence / Reversibility / Blast radius (high+)
+grep -c "Strongest counter-evidence:" <design.md>
+grep -c "\*\*Reversibility\*\*:" <design.md>
+grep -c "\*\*Blast radius\*\*:" <design.md>
+
+# Falsifiers section (irreversible decisions OR external-author-visible)
+grep -c "^## Falsifiers" <design.md>     # should be ≥1
+```
+
+Each missing leg on a stakes-applicable decision is a BLOCKER, reported as `BLOCKER: Decision N missing required leg X (Stakes: <level>) — grep returned 0 matches`. The mechanical check is the post-hoc gate that substitutes for the deferred Phase 0 docs-lint tooling.
+
 ### 9a. Citation Discipline
 - Every citation has `<source identifier> — <verbatim excerpt>`. Bare paths or section names without excerpt are BLOCKERs.
 - External URL citations must carry: full verbatim excerpt (no paraphrasing), access date, stable identifier for standards docs (RFC#, DOI, paper title+venue+year). Missing access date or paraphrased excerpts are CONCERNs (becomes BLOCKER if the source is load-bearing for the decision).
@@ -167,6 +190,24 @@ When the review target is a locked design doc (from `/lifecycle-2-design`):
 - The review report MUST emit its own `sources-verified` frontmatter listing every source actually opened, with a one-line note on what was checked. The lint: `sources-verified ⊇ sources-consulted`. If the design cited a source the reviewer didn't open, that's a process violation (reviewer skipped a citation) — report it as a CONCERN against the review process, not against the design.
 - Beyond verifying cited sources, look for **uncited sources the design should have consulted**. If a decision takes a position on, say, the modifier surface but didn't cite the modifier catalog, open the catalog yourself and check whether the design's enumeration is complete against what's actually there. Missing source citations the design clearly needed are findings.
 - "Source" is an open category — code files, doc sections, MCP tool outputs, sample files, test fixtures, bug entries, other design docs, research notes, RFCs, anything with a permanent address. Do not filter by source type.
+
+**Research-citation check (Phase 8 addition).** When the design touches a topic with existing `research/` content, the reviewer mechanically verifies that the design cites that research:
+
+| Design touches | Reviewer always opens / checks the design cites |
+|---|---|
+| Temporal types, durations, periods, timezones | `research/language/expressiveness/temporal-type-*.md`, `research/architecture/compiler/temporal-type-hierarchy-survey.md` |
+| Money, currency, precision | `research/architecture/compiler/currency-precision-coupling-survey.md` |
+| Quantity, units of measure | `research/architecture/compiler/units-of-measure-dimensional-analysis-survey.md`, `research/architecture/compiler/quantity-normalization-design-survey.md`, `research/language/ucum-tier1-curation.md` |
+| Access modifiers, keyword unification (`writable`/`editable`, `readonly`/`mut`, etc.) | A standalone comparator survey under `research/language/expressiveness/` (filename TBD). If no survey exists for the comparator question the design poses, the design's precedent leg is **incomplete** — CONCERN at minimum; BLOCKER if the decision is `Stakes: irreversible`. |
+| Parser architecture, PEG vs recursive descent | `research/language/parser-combinator-scalability.md` (currently in `language/`, will move to `architecture/compiler/` in Phase 10) |
+| Proof systems, SMT vs bounded discharge | `research/philosophy/formal-spec-languages-comparators.md` and any proof-engine surveys under `research/architecture/compiler/` |
+| Constraint composition, FluentValidation / CEL / OPA / CUE | `research/language/references/cel-comparison.md`, `research/language/research-conditional-construction.md` |
+| State machines | `research/language/expressiveness/xstate.md`, related surveys |
+| Domain-integrity / DDD / formal modeling | `research/philosophy/domain-integrity-formal-concept.md` |
+
+If the design's `sources-consulted` frontmatter doesn't include the topic's research file(s), the reviewer either (a) confirms via `Read` that the file doesn't exist (the topic genuinely lacks research — surface to author as "research-shaped gap" CONCERN) or (b) reports the missing citation as a BLOCKER on irreversible decisions / CONCERN on high-stakes decisions.
+
+The reviewer reports its checks in `sources-mandatorily-checked` frontmatter (alongside `sources-verified`). Missing entries for a triggered topic is a process CONCERN against the review.
 
 ## Independent re-statement (preamble — required before findings)
 
