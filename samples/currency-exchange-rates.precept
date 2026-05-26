@@ -21,7 +21,7 @@ field QuoteCurrency as currency default 'EUR' writable
 # rate value the host application assigns has its qualifier currencies match
 # BaseCurrency and QuoteCurrency. Optional because a record may be created
 # before the first quote is posted.
-field Rate as exchangerate in '{BaseCurrency}' to '{QuoteCurrency}' optional positive maxplaces 8 writable
+field Rate as exchangerate in '{BaseCurrency}' to '{QuoteCurrency}' optional maxplaces 8 writable
 
 field EffectiveAt as instant optional writable
 field ExpiresAt as instant optional writable

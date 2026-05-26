@@ -60,8 +60,7 @@ internal static class DiagnosticCoverageAllowLists
         // ── Root Cause D3 — ProofEngine Gap (Interval Engine Dependency) ─────────
         // NumericOverflow — already has emission site in ProofEngine Strategy 7
 
-        // ── Deferred — OutOfRange ────────────────────────────────────────────────
-        "OutOfRange",                         // Deferred: constant-literal bounds check not wired
+        // OutOfRange — wired (default-value-violates-numeric-modifier check)
 
         // ── Catalog-mediated fallthrough emission ────────────────────────────────
         // InvalidTypedConstantContent is emitted from the SelectDiagnosticCode
@@ -187,6 +186,7 @@ internal static class DiagnosticCoverageAllowLists
         "OmitDoesNotSupportGuard",
         "OmittedFieldReadInState",
         "OmittedFieldSetInTargetState",
+        "OutOfRange",
         "PreEventGuardNotAllowed",
         "QualifierMismatch",
         "QuantifierPredicateNotBoolean",

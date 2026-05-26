@@ -435,10 +435,11 @@ public class TypesTests
     [Fact]
     public void MostTypes_ImpliedModifiers_AreEmpty()
     {
-        // Only the 4 identity types (Currency, UnitOfMeasure, Dimension, Timezone) carry Notempty
+        // The 4 identity types (Currency, UnitOfMeasure, Dimension, Timezone) carry Notempty;
+        // ExchangeRate carries Positive (structurally non-zero magnitude with implicit direction).
         var withImplied = Types.All.Where(m => m.ImpliedModifiers.Length > 0).ToList();
-        withImplied.Should().HaveCountLessThanOrEqualTo(4,
-            "only the identity types have implied modifiers");
+        withImplied.Should().HaveCountLessThanOrEqualTo(5,
+            "only identity types and ExchangeRate carry implied modifiers");
     }
 
     // ── ProofRequirements — accessor default ────────────────────────────────────

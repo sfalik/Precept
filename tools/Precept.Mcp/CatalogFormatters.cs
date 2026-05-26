@@ -505,6 +505,8 @@ internal static class CatalogFormatters
         if (normalized is null or "currencies")
         {
             AppendSection(sb, "Currencies");
+            sb.Append("_ISO 4217 data version: `").Append(CurrencyCatalog.DataVersion).AppendLine("`._");
+            sb.AppendLine();
             foreach (var currency in currencies)
             {
                 sb.Append("- **").Append(currency.AlphaCode).Append("**");

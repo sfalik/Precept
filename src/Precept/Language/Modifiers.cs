@@ -238,7 +238,7 @@ public static class Modifiers
             kind, Tokens.GetMeta(TokenKind.Maxplaces),
             "Maximum decimal places",
             ModifierCategory.Structural, BusinessMagnitudeTypes, HasValue: true,
-            HoverDescription: "The decimal or business-domain magnitude field (money, quantity, price, exchangerate) must have at most this many digits after the decimal point. For currency amounts, this overrides the currency's default minor-unit precision.",
+            HoverDescription: "The decimal or business-magnitude field (money, quantity, price, exchangerate) must have at most this many digits after the decimal point. For business-magnitude types, maxplaces is opt-in — `money in '<Cur>'` carries no implicit precision constraint.",
             DesugarsToRule: true),
 
         ModifierKind.Writable => new ValueModifierMeta(

@@ -280,7 +280,7 @@ Use a diagnostic code name such as `UndeclaredField` or a PRE number such as `PR
 
 Optional `scope` values:
 
-- `currencies`
+- `currencies` (output includes an ISO 4217 data-version stamp from `CurrencyCatalog.DataVersion` — surfaced so authors can confirm which revision of the standard the catalog was built from)
 - `units`
 - `prefixes`
 - `dimensions`

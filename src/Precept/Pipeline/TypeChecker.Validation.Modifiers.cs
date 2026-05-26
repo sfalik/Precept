@@ -490,24 +490,121 @@ internal static partial class TypeChecker
         return new ExtractedBoundValue(declaredMagnitude, normalizedMagnitude, qualifiers);
     }
 
-    private static bool TryExtractTypedConstantMagnitude(object? parsedValue, out decimal magnitude)
+    private static bool TryExtractTypedConstantMagnitude(object? parsedValue, out decimal magnitude) =>
+        TypedExpressionMagnitude.TryGetMagnitudeFromParsedValue(parsedValue, out magnitude);
+
+    /// <summary>
+    /// PRE0079 — OutOfRange: a field or event-arg default value violates a
+    /// structural numeric modifier declared or implied on the same declaration
+    /// ('nonnegative', 'positive', 'nonzero', 'min', 'max').
+    /// </summary>
+    private static void ValidateDefaultAgainstNumericModifiers(
+        TypedExpression resolvedDefault,
+        TypeKind targetType,
+        ImmutableArray<ModifierKind> modifiers,
+        ImmutableArray<ModifierKind> impliedModifiers,
+        decimal? normalizedDeclaredMin,
+        decimal? normalizedDeclaredMax,
+        string name,
+        SourceSpan span,
+        CheckContext ctx)
     {
-        if (parsedValue is decimal decimalValue)
+        if (!TypedExpressionMagnitude.TryGetStaticMagnitude(resolvedDefault, out var rawMagnitude))
+            return;
+
+        var comparableMagnitude = NormalizeMagnitudeForComparison(rawMagnitude, resolvedDefault, targetType);
+        var displayValue = resolvedDefault is TypedTypedConstant ttc
+            ? "'" + ttc.RawText + "'"
+            : rawMagnitude.ToString(CultureInfo.InvariantCulture);
+
+        foreach (var modKind in modifiers)
         {
-            magnitude = decimalValue;
-            return true;
+            if (TryReportNumericViolation(modKind, comparableMagnitude, normalizedDeclaredMin, normalizedDeclaredMax,
+                                          name, displayValue, span, ctx))
+                return;
         }
 
-        if (parsedValue is ITuple tuple
-            && tuple.Length > 0
-            && tuple[0] is decimal tupleMagnitude)
+        if (!impliedModifiers.IsDefaultOrEmpty)
         {
-            magnitude = tupleMagnitude;
-            return true;
+            foreach (var modKind in impliedModifiers)
+            {
+                if (TryReportNumericViolation(modKind, comparableMagnitude, normalizedDeclaredMin, normalizedDeclaredMax,
+                                              name, displayValue, span, ctx))
+                    return;
+            }
+        }
+    }
+
+    private static bool TryReportNumericViolation(
+        ModifierKind modKind,
+        decimal magnitude,
+        decimal? normalizedDeclaredMin,
+        decimal? normalizedDeclaredMax,
+        string name,
+        string displayValue,
+        SourceSpan span,
+        CheckContext ctx)
+    {
+        if (Modifiers.GetMeta(modKind) is not ValueModifierMeta meta || meta.ProofSatisfactions is null)
+            return false;
+
+        foreach (var satisfaction in meta.ProofSatisfactions)
+        {
+            if (satisfaction is not ProofSatisfaction.Numeric numeric) continue;
+            if (numeric.Projection is not SatisfactionProjection.SelfValue) continue;
+
+            decimal? bound = numeric.Bound switch
+            {
+                NumericBoundSource.Constant c => c.Value,
+                NumericBoundSource.DeclarationValue => modKind switch
+                {
+                    ModifierKind.Min => normalizedDeclaredMin,
+                    ModifierKind.Max => normalizedDeclaredMax,
+                    _ => null,
+                },
+                _ => null,
+            };
+            if (bound is null) continue;
+
+            var satisfied = numeric.Comparison switch
+            {
+                OperatorKind.GreaterThanOrEqual => magnitude >= bound.Value,
+                OperatorKind.GreaterThan        => magnitude >  bound.Value,
+                OperatorKind.LessThanOrEqual    => magnitude <= bound.Value,
+                OperatorKind.LessThan           => magnitude <  bound.Value,
+                OperatorKind.NotEquals          => magnitude != bound.Value,
+                OperatorKind.Equals             => magnitude == bound.Value,
+                _ => true,
+            };
+
+            if (!satisfied)
+            {
+                var modifierLabel = meta.Token.Text ?? modKind.ToString();
+                ctx.Diagnostics.Add(Diagnostics.Create(
+                    DiagnosticCode.OutOfRange,
+                    span, name, displayValue, modifierLabel));
+                return true;
+            }
         }
 
-        magnitude = default;
         return false;
+    }
+
+    private static decimal NormalizeMagnitudeForComparison(
+        decimal rawMagnitude,
+        TypedExpression resolved,
+        TypeKind targetType)
+    {
+        if (resolved is not TypedTypedConstant ttc) return rawMagnitude;
+
+        return ttc.ParsedValue switch
+        {
+            ValueTuple<decimal, UcumParsedUnit?> (_, var unit) when targetType == TypeKind.Quantity =>
+                TypedConstantNormalizer.NormalizeQuantity(rawMagnitude, unit),
+            ValueTuple<decimal, object?, UcumParsedUnit?> (_, _, var denominatorUnit) when targetType == TypeKind.Price =>
+                TypedConstantNormalizer.NormalizePrice(rawMagnitude, denominatorUnit),
+            _ => rawMagnitude,
+        };
     }
 
     private readonly record struct ExtractedBoundValue(

@@ -277,7 +277,7 @@ flowchart TB
     subgraph L3["③ Semantic / behavior"]
         Types["Types (32)"]
         Operators["Operators (21)"]
-        Operations["Operations (203)"]
+        Operations["Operations (201)"]
         Functions["Functions (23)"]
         Modifiers["Modifiers (29)"]
         Actions["Actions (15)"]
@@ -285,7 +285,7 @@ flowchart TB
     end
 
     subgraph L4["④ Failure modes"]
-        Diagnostics["Diagnostics (148)"]
+        Diagnostics["Diagnostics (150)"]
         Faults["Faults (15)"]
     end
 
@@ -501,7 +501,7 @@ classDiagram
 
 #### Operations — typed-legality hub
 
-`OperationMeta` is a discriminated union with **2 sealed subtypes**. 203 entries cover every legal `(operator, operand type(s)) → result type` combination in the language.
+`OperationMeta` is a discriminated union with **2 sealed subtypes**. 201 entries cover every legal `(operator, operand type(s)) → result type` combination in the language.
 
 ```mermaid
 classDiagram

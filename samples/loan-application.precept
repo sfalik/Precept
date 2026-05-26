@@ -16,7 +16,7 @@ precept LoanApplication
 # document verification, credit policy, and affordability checks.
 
 field ApplicantName as string notempty maxlength 200
-field RequestedAmount as money in 'USD' default '0.00 USD' positive
+field RequestedAmount as money in 'USD' default '0.00 USD' nonnegative
 field ApprovedAmount as money in 'USD' default '0.00 USD' nonnegative
 field CreditScore as integer default 300 min 300 max 850
 field AnnualIncome as money in 'USD' default '0.00 USD' nonnegative

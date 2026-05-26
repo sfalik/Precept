@@ -439,7 +439,7 @@ public class TypeCheckerCurrencyUnitTests
         TypeCheckerTestHelpers.CheckExpectingError("""
             precept Example
             field FxRate as exchangerate default '0 USD/EUR'
-            """, DiagnosticCode.InvalidModifierValue);
+            """, DiagnosticCode.OutOfRange);
     }
 
     [Fact]
@@ -448,6 +448,6 @@ public class TypeCheckerCurrencyUnitTests
         TypeCheckerTestHelpers.CheckExpectingError("""
             precept Example
             field FxRate as exchangerate default '-1.0 USD/EUR'
-            """, DiagnosticCode.InvalidModifierValue);
+            """, DiagnosticCode.OutOfRange);
     }
 }

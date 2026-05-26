@@ -689,6 +689,18 @@ internal static partial class TypeChecker
 
                     // PRE0067 — MaxPlacesExceeded: check decimal places against maxplaces
                     ValidateMaxPlaces(resolved, typedField, defaultMod.Value.Span, ctx);
+
+                    // PRE0079 — OutOfRange: default value vs. declared/implied numeric modifiers
+                    ValidateDefaultAgainstNumericModifiers(
+                        resolved,
+                        typedField.ResolvedType,
+                        typedField.Modifiers,
+                        typedField.ImpliedModifiers,
+                        typedField.NormalizedDeclaredMin,
+                        typedField.NormalizedDeclaredMax,
+                        typedField.Name,
+                        defaultMod.Value.Span,
+                        ctx);
                 }
                 ctx.Fields[i] = ctx.Fields[i] with { DefaultExpression = resolved };
                 ctx.FieldLookup[typedField.Name] = ctx.Fields[i];
@@ -862,6 +874,18 @@ internal static partial class TypeChecker
                     }
 
                     ValidateMaxPlaces(resolved, typedArg.Modifiers, declaredArg.ParsedModifiers, typedArg.Name, defaultMod.Value.Span, ctx);
+
+                    // PRE0079 — OutOfRange: default value vs. declared numeric modifiers (event args carry no implied modifiers)
+                    ValidateDefaultAgainstNumericModifiers(
+                        resolved,
+                        typedArg.ResolvedType,
+                        typedArg.Modifiers,
+                        ImmutableArray<ModifierKind>.Empty,
+                        typedArg.NormalizedDeclaredMin,
+                        typedArg.NormalizedDeclaredMax,
+                        typedArg.Name,
+                        defaultMod.Value.Span,
+                        ctx);
                 }
 
                 argsBuilder[argIdx] = typedArg with { DefaultExpression = resolved };
@@ -926,17 +950,16 @@ internal static partial class TypeChecker
         SourceSpan span,
         CheckContext ctx)
     {
-        if (resolved is not TypedLiteral { Value: decimal decValue }) return;
+        if (!modifiers.Contains(ModifierKind.Maxplaces)) return;
+        if (!TypedExpressionMagnitude.TryGetStaticMagnitude(resolved, out var magnitude)) return;
 
-        var maxplacesMod = modifiers.Contains(ModifierKind.Maxplaces)
-            ? parsedModifiers.FirstOrDefault(m => m.Kind == ModifierKind.Maxplaces)
-            : null;
+        var maxplacesMod = parsedModifiers.FirstOrDefault(m => m.Kind == ModifierKind.Maxplaces);
         if (maxplacesMod?.Value is not LiteralExpression { LiteralKind: TokenKind.NumberLiteral, Text: var maxText })
             return;
         if (!int.TryParse(maxText, System.Globalization.CultureInfo.InvariantCulture, out var maxPlaces) || maxPlaces < 0)
             return;
 
-        var decStr = decValue.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var decStr = magnitude.ToString(System.Globalization.CultureInfo.InvariantCulture);
         var dotIndex = decStr.IndexOf('.');
         var actualPlaces = dotIndex < 0 ? 0 : decStr.Length - dotIndex - 1;
 

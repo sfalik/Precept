@@ -209,88 +209,24 @@ public static partial class ProofEngine
 
     private static bool TryGetStaticNumericValue(TypedExpression expression, out decimal value)
     {
-        switch (expression)
+        if (!TypedExpressionMagnitude.TryGetStaticMagnitude(expression, out value))
+            return false;
+
+        // For Quantity/Price typed-constants, normalize to base unit so
+        // cross-precept subsumption compares unit-equivalent magnitudes.
+        if (expression is TypedTypedConstant ttc)
         {
-            case TypedLiteral literal when ToDecimal(literal.Value) is { } literalValue:
-                value = literalValue;
-                return true;
-
-            case TypedTypedConstant typedConstant when TryGetTypedConstantMagnitude(typedConstant.ParsedValue, out var typedConstantValue):
-                value = typedConstantValue;
-                return true;
-
-            case InterpolatedTypedConstant { StaticMagnitude: { } magnitude, StaticQualifier: var qualifier, Slots: var slots }:
+            value = ttc.ParsedValue switch
             {
-                var staticUnit = qualifier switch
-                {
-                    StaticUnitQualifier { Unit: var unit } => unit,
-                    StaticCurrencyAndUnitQualifier { Unit: var unit } => unit,
-                    _ => null,
-                };
-
-                if (staticUnit is null)
-                {
-                    if (slots.Any(slot => slot.SlotKind is InterpolationSlotKind.Unit
-                                          or InterpolationSlotKind.NumeratorUnit
-                                          or InterpolationSlotKind.DenominatorUnit))
-                    {
-                        if (magnitude == 0m)
-                        {
-                            value = 0m;
-                            return true;
-                        }
-
-                        value = default;
-                        return false;
-                    }
-
-                    value = magnitude;
-                    return true;
-                }
-
-                var factor = TypedConstantNormalizer.TryGetStaticScalingFactor(staticUnit);
-                if (!factor.HasValue)
-                {
-                    value = default;
-                    return false;
-                }
-
-                value = factor.Value * magnitude;
-                return true;
-            }
-
-            default:
-                value = default;
-                return false;
+                ValueTuple<decimal, UcumParsedUnit?> (var qm, var unit) when ttc.ResultType == TypeKind.Quantity =>
+                    TypedConstantNormalizer.NormalizeQuantity(qm, unit),
+                ValueTuple<decimal, object?, UcumParsedUnit?> (var pm, _, var denomUnit) when ttc.ResultType == TypeKind.Price =>
+                    TypedConstantNormalizer.NormalizePrice(pm, denomUnit),
+                _ => value,
+            };
         }
-    }
 
-    private static bool TryGetTypedConstantMagnitude(object? parsedValue, out decimal value)
-    {
-        switch (parsedValue)
-        {
-            case decimal direct:
-                value = direct;
-                return true;
-            case int integer:
-                value = integer;
-                return true;
-            case long whole:
-                value = whole;
-                return true;
-            case ValueTuple<decimal, object?> money:
-                value = money.Item1;
-                return true;
-            case ValueTuple<decimal, UcumParsedUnit?> quantity:
-                value = TypedConstantNormalizer.NormalizeQuantity(quantity.Item1, quantity.Item2);
-                return true;
-            case ValueTuple<decimal, object?, UcumParsedUnit?> price:
-                value = TypedConstantNormalizer.NormalizePrice(price.Item1, price.Item3);
-                return true;
-            default:
-                value = default;
-                return false;
-        }
+        return true;
     }
 
     private static ImmutableArray<InterpolatedTypedConstant> FindInterpolatedAssignments(

@@ -157,7 +157,7 @@ namespace Pipeline
         var source = @"
 namespace Precept.Language
 {
-    public enum DiagnosticCode { OutOfRange }
+    public enum DiagnosticCode { DivisionByZero }
 
     public static class Diagnostics
     {
@@ -173,7 +173,7 @@ namespace Pipeline
     {
         public void Check()
         {
-            Diagnostics.Create(DiagnosticCode.OutOfRange, null);
+            Diagnostics.Create(DiagnosticCode.DivisionByZero, null);
         }
     }
 }
@@ -181,7 +181,7 @@ namespace Pipeline
         var diagnostics = await AnalyzerTestHelper.AnalyzeAsync<Precept0027DiagnosticEmissionCoverage>(source);
         var stale = diagnostics.Where(d => d.Id == Precept0027DiagnosticEmissionCoverage.DiagnosticId_StaleAllowList).ToList();
         stale.Should().ContainSingle();
-        stale[0].GetMessage().Should().Contain("OutOfRange");
+        stale[0].GetMessage().Should().Contain("DivisionByZero");
     }
 
     // ════════════════════════════════════════════════════════════════════════════
@@ -195,7 +195,7 @@ namespace Pipeline
         var source = @"
 namespace Precept.Language
 {
-    public enum DiagnosticCode { OutOfRange }
+    public enum DiagnosticCode { DivisionByZero }
 
     public static class Diagnostics
     {
