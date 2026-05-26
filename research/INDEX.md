@@ -11,7 +11,7 @@ A single-page topic-to-file map across the full `research/` corpus. The sub-area
 
 If a topic has no research, that's the signal — surface a research-shaped gap to the owner before locking a design against unresearched comparable systems.
 
-**File status discipline.** Every research file declares a `status:` field in frontmatter (Phase 9 convention). Entries below are grouped by topic, not by status; check the file's frontmatter for current status (`Active` / `Cited` / `Promoted to: <link>` / `Active — horizon groundwork` / `Stale` / `Superseded` / `Archived`). The promote-or-cite audit at [`docs/Working/research-promote-or-cite-audit-2026-05-25.md`](../docs/Working/research-promote-or-cite-audit-2026-05-25.md) is the 2026-05-25 snapshot.
+**File status discipline.** Every research file declares a `status:` field in frontmatter (Phase 9 convention). Entries below are grouped by topic, not by status; check the file's frontmatter for current status (`Active` / `Cited` / `Promoted to: <link>` / `Active — horizon groundwork` / `Stale` / `Superseded` / `Archived`). The promote-or-cite audit at [`docs/Working/Archive/research-promote-or-cite-audit-2026-05-25.md`](../docs/Working/Archive/research-promote-or-cite-audit-2026-05-25.md) is the 2026-05-25 snapshot.
 
 ---
 
@@ -188,7 +188,7 @@ If a topic has no research, that's the signal — surface a research-shaped gap 
 
 ## Out of scope for this INDEX
 
-Brand and design-system research are filed under `research/brand/` and `research/design-system/` for historical reasons, but **per the `lifecycle-1-research` skill they belong in `design/brand/research/` and `design/system/research/`** respectively. The audit at [`docs/Working/research-promote-or-cite-audit-2026-05-25.md`](../docs/Working/research-promote-or-cite-audit-2026-05-25.md) flagged 16 files in these folders as systematically uncited; their relocation or archival is owner-judgment work outside Phase 10's scope. This INDEX deliberately doesn't list them.
+Brand and design-system research are filed under `research/brand/` and `research/design-system/` for historical reasons, but **per the `lifecycle-1-research` skill they belong in `design/brand/research/` and `design/system/research/`** respectively. The audit at [`docs/Working/Archive/research-promote-or-cite-audit-2026-05-25.md`](../docs/Working/Archive/research-promote-or-cite-audit-2026-05-25.md) flagged 16 files in these folders as systematically uncited; their relocation or archival is owner-judgment work outside Phase 10's scope. This INDEX deliberately doesn't list them.
 
 ---
 
