@@ -1,45 +1,53 @@
 ---
-status: Draft plan — 2026-05-25
+status: Draft plan — 2026-05-25 (extended with Phases 8-11 from research-system evaluation)
 sources:
   - docs/Working/doc-corpus-evaluation-opus.md
   - docs/Working/skills-rigor-evaluation-opus.md
-purpose: Execute the combined improvements surfaced by both Opus evaluations — restore corpus trust, scaffold AI-agent discovery, operationalize philosophy alignment, strengthen design and review rigor, reduce structural drift
+  - docs/Working/research-system-evaluation-opus.md
+purpose: Execute the combined improvements surfaced by three Opus evaluations — restore corpus trust, scaffold AI-agent discovery, operationalize philosophy alignment, strengthen design and review rigor, reduce structural drift, and close the rhetorical-vs-real gap in research/citation discipline
 ---
 
 # Doc Corpus + Skills Rigor Improvement Plan
 
 ## Sources
 
-This plan executes findings from two independent Opus evaluations:
+This plan executes findings from three independent Opus evaluations:
 
 - [`doc-corpus-evaluation-opus.md`](doc-corpus-evaluation-opus.md) — 18 findings on the doc corpus + skills system as an AI-agent knowledge architecture (referenced below as **DC-Fn**)
 - [`skills-rigor-evaluation-opus.md`](skills-rigor-evaluation-opus.md) — 15 findings on the design-lock skill and reviewer agent as process artifacts (referenced below as **SR-Fn**)
+- [`research-system-evaluation-opus.md`](research-system-evaluation-opus.md) — 15 findings on the research corpus + `lifecycle-1-research` skill + Stage 1→2 handoff (referenced below as **RS-Fn**)
 
-Total findings integrated: 33. Many overlap or reinforce each other; the phasing below combines them where they share an intervention.
+Total findings integrated: 48. Many overlap or reinforce each other; the phasing below combines them where they share an intervention.
 
 ## Phase summary
 
 | Phase | Goal | Findings addressed | Effort | Status |
 |---|---|---|---|---|
 | 0 | Foundational tooling — mechanical enforcement layer | DC-F3, DC-F4, SR-F1, SR-F11 | 1-2 days | **Deferred** — CI infrastructure not yet in place; revisit when CI exists |
-| 1 | Truth-up — restore corpus trust | DC-F1, DC-F2, DC-F3, DC-F4 | 1 day | Planned |
-| 2 | Discovery scaffolding — fresh-agent onboarding | DC-F9, DC-F10, DC-F13, DC-F18 | 2-3 days | Planned |
-| 3 | Philosophy operationalization — top-to-bottom alignment | DC-F7, DC-F8, SR-F2, SR-F4, SR-F8 | 2 days | Planned |
-| 4 | Decision and citation rigor — strengthen the per-decision discipline | SR-F3, SR-F6, SR-F7, SR-F9, SR-F10, SR-F15 | 2-3 days | Planned |
-| 5 | Process and orchestration — staging, independence, skill chain | SR-F5, SR-F12, SR-F13, SR-F14, DC-F12 | 2-3 days | Planned |
-| 6 | Structural cleanup — context cost and drift surface | DC-F5, DC-F6, DC-F15, DC-F16 | 2-3 days | Planned |
-| 7 | Polish — dedup and consolidation | DC-F14, DC-F17 | 1-2 days | Planned |
+| 1 | Truth-up — restore corpus trust | DC-F1, DC-F2, DC-F3, DC-F4 | 1 day | ✅ Complete (`5ee32337`) |
+| 2 | Discovery scaffolding — fresh-agent onboarding | DC-F9, DC-F10, DC-F13, DC-F18 | 2-3 days | ✅ Complete (`a231ce70`) |
+| 3 | Philosophy operationalization — top-to-bottom alignment | DC-F7, DC-F8, SR-F2, SR-F4, SR-F8 | 2 days | ✅ Complete (`d5c6532c`) |
+| 4 | Decision and citation rigor — strengthen the per-decision discipline | SR-F3, SR-F6, SR-F7, SR-F9, SR-F10, SR-F15 | 2-3 days | ✅ Complete (`18c41269`) |
+| 5 | Process and orchestration — staging, independence, skill chain | SR-F5, SR-F12, SR-F13, SR-F14, DC-F12 | 2-3 days | ✅ Complete (`0a3cf6aa`) |
+| 6 | Structural cleanup — context cost and drift surface | DC-F5, DC-F6, DC-F15, DC-F16 | 2-3 days | ✅ Complete (`744ef566` → `3a35e132`) |
+| 7 | Polish — dedup and consolidation | DC-F14, DC-F17 | 1-2 days | ✅ Complete (`c4f64ef9`) |
+| **8** | **Operationalize Phase 4 — close rhetorical-vs-real gap** | **RS-F1, RS-F2, RS-F3, RS-F9, RS-F11** | **2-3 days** | **Planned** |
+| **9** | **Strengthen `lifecycle-1-research` into a real Stage 1** | **RS-F2, RS-F3, RS-F8, RS-F12, RS-F13, RS-F14** | **2 days** | **Planned** |
+| **10** | **Promote-or-cite enforcement + corpus archival sweep** | **RS-F5, RS-F7, RS-F10** | **2-3 days** | **Planned** |
+| **11** | **Research-adequacy gate at design lock** | **RS-F6, RS-F15** | **1-2 days** | **Planned** |
 
-**Total estimate:** ~12-15 days focused work (Phase 0 deferred until CI exists).
-**Minimum viable improvement:** Phase 1 alone (1 day) closes the most damaging drift.
-**Highest-leverage subset:** Phases 1 + 3 (3-4 days) restores corpus trust *and* operationalizes the philosophy commitments that most distinguish Precept.
+**Total remaining estimate:** ~7-10 days focused work for Phases 8-11 (Phase 0 still deferred until CI exists; Phases 1-7 complete).
+**Minimum viable Phase 8+ improvement:** Phase 8 alone (2-3 days) closes the most damaging finding — that Phase 4's locked-design rules are universally unenforced in-tree.
+**Highest-leverage Phase 8+ subset (per RS eval):** Phases 8 + 10 (4-6 days) restore enforcement discipline *and* clear the shadow-policy research backlog.
 
 **Sequencing notes:**
-- Phase 0 deferred — early-days project; no CI process yet. Discipline is manual until CI lands; revisit Phase 0 when CI infrastructure exists. The SR-F1 / SR-F11 enforcement gap is acknowledged and accepted as a known limitation during this period.
-- Phase 3 combines doc-corpus and skills-rigor findings into one philosophy-alignment intervention — both evaluations converge on the same fix.
-- Phases 4, 5, 6, 7 are largely parallelizable after Phase 1.
-- Phase 6 (structural restructure) is highest risk; manual cross-reference audit required without lint.
-- Exit-criteria checks that reference `docs-lint` are performed manually for now; mark satisfied via grep/visual verification.
+- Phase 0 deferred — early-days project; no CI process yet. Discipline is manual until CI lands; revisit Phase 0 when CI infrastructure exists. The SR-F1 / SR-F11 / RS-F1 enforcement gap is acknowledged and accepted as a known limitation during this period.
+- Phase 3 combined doc-corpus and skills-rigor findings into one philosophy-alignment intervention — both evaluations converged on the same fix.
+- Phases 4, 5, 6, 7 were largely parallelizable after Phase 1 and shipped in order.
+- Phase 6 (structural restructure) was the highest-risk previous phase; mitigation via precept-reviewer pre-review surfaced two BLOCKERs before execution (§15 dual-canonical and §14 stale precept_language references) — both addressed.
+- **Phases 8-11 sequencing**: Phase 8 first (operationalize the rules) → Phase 9 in parallel with Phase 10 → Phase 11 last (depends on a clean corpus). Phase 8 is the keystone: until Phase 4's rules actually bind, every prior phase's "guard X refuses Y" claim is rhetorical (the failure mode RS-F1 names empirically).
+- **Phase 8 docs-lint constraint**: Phase 0 is still deferred (no CI), so Phase 8's docs-lint is a **local pre-commit hook + manual command**, not a CI gate. This is a partial measure — the long-term answer is Phase 0 + CI — but the local hook catches drift at commit time, which is most of the value. Authors who don't run the hook still lack the gate; mitigation is the reviewer agent's `§ 13 Source Verification` post-hoc check.
+- Exit-criteria checks that reference `docs-lint` are performed manually for now (Phase 1-7) or via local hook (Phase 8+); CI is the long-term forcing function.
 
 ---
 
@@ -423,17 +431,271 @@ The compiler-and-runtime-design.md pointer-hub conversion is the highest-risk ch
 
 ---
 
+## Phase 8: Operationalize Phase 4 — close the rhetorical-vs-real gap
+
+**Goal:** Make the citation and decision-discipline rules in `lifecycle-2-design` actually bind. Retrofit at least one in-tree locked design, ship the local docs-lint hook (without waiting on CI), and verify the discipline survives a real Stage 1→2 handoff.
+
+**Findings addressed:** **RS-F1** (Phase 4 rules unenforced on every locked design), **RS-F2** (lifecycle-1-research has no refusal gates — partial; full coverage in Phase 9), **RS-F3** (external URL discipline universally absent), **RS-F9** (`--from <research-doc>` undocumented/unused), **RS-F11** (bare comparable-systems claims).
+
+**Why Phase 8 is the keystone:** the empirical citation audit in the research-system evaluation found that `field-never-set-diagnostic.md` is `Locked 2026-05-25` with 6 decisions, every one missing every Phase 4 leg. The only docs that follow the lifecycle-2 frontmatter discipline are the meta-docs about the system (the three Opus evals + this plan), not designs the system produced. **Until Phase 4's rules actually bind, every prior phase's "guard X refuses Y" claim is rhetorical.** Phase 8 closes that gap.
+
+### Tasks
+
+1. **Retrofit `docs/Working/field-never-set-diagnostic.md` to Phase 4 standard.**
+   - Add `sources-consulted` frontmatter listing every source identifier cited inline.
+   - Classify each of the 6 decisions with `**Stakes**: low | medium | high | irreversible` (the keyword retirement of `writable` is `irreversible` per the skill's own table).
+   - Add `Sources consulted for this decision:` leg per decision, with verbatim excerpts for every external-language claim (Rust `mut`, TypeScript `readonly`, Kotlin `val`/`var`, SQL `GRANT UPDATE`). If excerpts can't be produced because the citations were always plausible-prose-not-citation, that's the finding — surface to owner.
+   - Add `## Falsifiers` section (external-author-visible language change with `irreversible` stakes).
+   - Add `Strongest counter-evidence:` leg on every high+ stakes decision (Decision 5 minimum).
+   - **Honest failure path:** if the retrofit reveals the comparable-systems grounding doesn't exist in the form Phase 4 requires, the design's `Locked` status comes off and the doc returns to `Externally-Grounded`; the design proceeds only after the gap is filled by Phase 9 / 10 / 11 work.
+
+2. **Ship local docs-lint (pre-commit hook + manual command).**
+   - Tool location: `tools/Precept.DocsLint/` (.NET analyzer or shell-script wrapper — author choice).
+   - Checks for `docs/Working/*.md` with `status: Locked` frontmatter:
+     - (a) `sources-consulted` frontmatter present and non-empty.
+     - (b) Every `### Decision N:` has a `**Stakes**:` line.
+     - (c) Every medium+ stakes decision has a `Sources consulted for this decision:` leg.
+     - (d) Every high+ stakes decision has a `Strongest counter-evidence:` leg, `Reversibility:` leg, `Blast radius:` leg.
+     - (e) Any irreversible decision has a matching `## Falsifiers` section in the same doc.
+     - (f) External URL citations carry an access date and verbatim excerpt.
+   - Wire as a pre-commit hook on changes touching `docs/Working/`. Document the command (`scripts/docs-lint` or `dotnet run --project tools/Precept.DocsLint`) in `docs/contributing/docs-lint.md`.
+   - **Without CI**: the hook catches drift at commit time; authors who bypass it (`--no-verify`) still ship past it. Mitigation: precept-reviewer's `§ 13 Source Verification` is the post-hoc gate.
+
+3. **Implement `--from <research-doc>` mechanically OR remove the claim.**
+   - **Option A (implement):** `/lifecycle-2-design --from research/path/to/file.md` ingests the research file's conclusions, pre-populates Decision legs with `grounded-by: research/path/to/file.md` in the design's frontmatter, and copies excerpts from the research file into per-decision `Sources consulted for this decision:` legs. Requires extending the skill's prompt structure to accept and parse the `--from` input.
+   - **Option B (remove):** Drop the `--from` claim from `lifecycle-2-design/SKILL.md § Composability`. Replace with explicit human-discipline obligation: "If a `research/` file exists for the topic, cite it in `sources-consulted` and copy verbatim excerpts into per-decision `Sources consulted for this decision:` legs."
+   - **Recommend Option B** for Phase 8 — the rhetorical claim is the present problem; making it operational requires more skill-engineering than this phase warrants. Revisit Option A in a later phase if the manual discipline proves insufficient.
+
+4. **Add lint heuristic for research-shaped designs missing research citations.**
+   - Mechanical pattern: if a design's prose mentions topic keywords (`temporal`, `currency`, `money`, `quantity`, `proof`, `qualifier`, `modifier`, `interpolation`, etc.) AND `research/` contains files in that topic's domain, the design must cite ≥1 of those files in `sources-consulted` OR carry an explicit `no-research-consulted:` declaration with justification.
+   - Implementation: simple keyword-to-folder map in `tools/Precept.DocsLint/`. Honest "no research consulted — pure-policy choice" override is acceptable but must appear in frontmatter.
+
+### Exit criteria
+
+- [ ] `docs/Working/field-never-set-diagnostic.md` carries the full Phase 4 leg structure (or is returned to `Externally-Grounded` if the grounding doesn't exist)
+- [ ] `tools/Precept.DocsLint/` exists; pre-commit hook installed; `docs/contributing/docs-lint.md` documents the contract
+- [ ] Local `docs-lint` refuses Locked designs missing Phase 4 structure
+- [ ] No locked design in `docs/Working/` fails the lint without an explicit allow-listed exception (with tracked-debt issue)
+- [ ] `lifecycle-2-design/SKILL.md` `--from` claim is either operational (Option A) or removed (Option B)
+- [ ] Lint flags research-shaped designs missing research citations
+
+### Doc-touch obligations
+
+- `docs/Working/field-never-set-diagnostic.md` — full retrofit
+- `tools/Precept.DocsLint/` — new tool
+- `docs/contributing/docs-lint.md` — new contract doc
+- `CONTRIBUTING.md` — add docs-lint to pre-commit / CI gate list (CI deferred; pre-commit ships)
+- `.claude/skills/lifecycle-2-design/SKILL.md` — clarify or remove `--from` claim; mention docs-lint as the new enforcement layer
+
+### Risk
+
+The retrofit may surface that `field-never-set-diagnostic.md` Decision 5 (keyword unification) wasn't grounded in cited Rust / TypeScript / Kotlin / SQL behavior — it was plausible-sounding prose. **Surfacing this is the point**; the corpus needs to confront whether existing designs hold up under Phase 4 scrutiny. Mitigation: if the retrofit reveals the grounding doesn't exist, that's a finding to surface to the owner, not a reason to skip the retrofit. The design may need to advance through Phase 9 / 10 / 11 work before re-Locking.
+
+---
+
+## Phase 9: Strengthen `lifecycle-1-research` into a real Stage 1
+
+**Goal:** Add refusal gates, required structural sections, and source-grading discipline to the research skill so it produces artifacts at the level the system claims they're produced at.
+
+**Findings addressed:** **RS-F2** (template not stage), **RS-F3** (citation discipline), **RS-F8** (missing Methodology / Threats to Validity sections), **RS-F12** (research-vs-advocacy distinction), **RS-F13** (source-grading absent), **RS-F14** (no Status field on research files).
+
+**Why Phase 9 is necessary:** The research-system evaluation found 2 imperative-gating instances in `lifecycle-1-research` vs 64 in `lifecycle-2-design`. The skill describes a methodology but has no rejection criteria. The best research files (currency survey, formal-spec comparators, parser-combinator) meet a high bar *because the author chose to* — nothing in the skill required it. Other files (xstate.md, polly.md, linq.md, temporal-type-strategy.md) cite a single URL or zero external sources. The variance is structural, not a quality problem the author can fix without skill changes.
+
+### Tasks
+
+1. **Add explicit numbered behavioral guards to `.claude/skills/lifecycle-1-research/SKILL.md`.** Parallel to lifecycle-2-design's 15 guards. Minimum set:
+   - **Guard 1: External sources required for external questions.** Refuse research that cites zero external sources on a question whose answer exists in the broader field. Explicit honest exit: `external-engagement-status: purely-internal — <one-line justification>` in frontmatter.
+   - **Guard 2: Verbatim excerpt per load-bearing claim.** Refuse claims about external systems without a verbatim excerpt and stable source identifier (DOI / RFC# / ISO# / vendor-doc URL with access date).
+   - **Guard 3: Methodology section required.** Refuse research without `## Methodology` naming what was searched, what was excluded, and why. Single-paragraph methodology is acceptable; absence is not.
+   - **Guard 4: Threats-to-validity section required.** Refuse research without `## Threats to Validity` (or "no threats identified — flag for review" as honest exit). Lists the strongest reasons this conclusion might be wrong.
+   - **Guard 5: Falsifiability for conclusions.** Research files that propose a conclusion (not just a survey) must include `## What would change this conclusion` section — 2-3 observations or evidence-shapes that would force re-investigation.
+
+2. **Add `Status:` taxonomy to research-file frontmatter.**
+   - Values: `Active` (informing current decisions), `Promoted` (decision adopted into spec/design — include link), `Cited` (referenced from another doc but not yet decision-adopting), `Stale` (predates major redesign), `Superseded by: <link>`, `Archived`.
+   - Document in skill body + research/README.md.
+   - Apply retroactively as opportunistic work — Phase 10's corpus sweep is the natural place to land the bulk retrofit.
+
+3. **Add source-grading guidance to the skill.**
+   - **Primary**: standards (RFC#, ISO#, W3C), peer-reviewed papers (DOI + venue + year), authoritative library docs with public versioning.
+   - **Secondary**: vendor documentation, community implementations, prominent blog posts by named authors.
+   - **Tertiary**: forum posts, knowledge claims supplemented when source is unfetchable.
+   - Designs with only tertiary sources on a load-bearing decision are CONCERNs in `precept-reviewer` review.
+   - The skill must require source-grade declaration per citation, OR each citation's nature is inferable from the identifier format (RFC# → Primary, vendor URL → Secondary, etc.).
+
+4. **Add external-citation discipline section to the skill.**
+   - Every external URL: full quoted excerpt verbatim, access date, stable identifier when standards/academic/RFC, preferred local mirror at `research/references/` for load-bearing sources.
+   - Mirror discipline: load-bearing external sources should be snapshotted to `research/references/<topic>/<source-name>.md` with the verbatim excerpt + metadata. Live URLs may rot; mirrors do not.
+
+5. **Update `precept-reviewer.md` to add a Stage 1 (research-doc) review path.**
+   - When review target is a `research/*.md` file, reviewer applies the Phase 9 guards (sources, methodology, threats, falsifiability, source-grading).
+   - Add to § 13 Source Verification: the reviewer must independently sample at least 3 external citations from the research file and verify excerpts.
+
+### Exit criteria
+
+- [ ] `lifecycle-1-research/SKILL.md` has explicit numbered behavioral guards (≥5)
+- [ ] Skill enforces Methodology, Threats to Validity, and What-would-change-this-conclusion sections for research that proposes conclusions
+- [ ] Skill carries source-grading taxonomy (Primary / Secondary / Tertiary)
+- [ ] Skill mandates external-citation discipline (verbatim excerpt, access date, stable identifier, mirror)
+- [ ] `Status:` field convention documented + ≥10 existing research files retrofitted opportunistically
+- [ ] `precept-reviewer.md` carries a Stage 1 (research-doc) review path
+
+### Doc-touch obligations
+
+- `.claude/skills/lifecycle-1-research/SKILL.md` — substantial expansion (behavioral guards, source-grading, citation discipline, required sections)
+- `.claude/agents/precept-reviewer.md` — research-doc review section
+- `research/README.md` — Status field convention; cross-link to skill changes
+- ~10 sampled research files — opportunistic Status-field retrofit (full corpus sweep in Phase 10)
+- `tools/Precept.DocsLint/` — extend to also lint research files (Methodology / Threats / Status presence)
+
+### Risk
+
+Adding refusal gates retroactively defines existing research as substandard. **Mitigation:** explicit grandfather rule — research files predating the cutoff date retain their current state; new gates apply to research produced after the cutoff. The retroactive opportunistic work in Phase 10 is upgrade, not validation-gate. The 6 high-quality research files identified in the eval (currency, formal-spec, parser-combinator, intellisense, domain-integrity, case-insensitive) already meet most of the new bar; their retrofit is incremental.
+
+---
+
+## Phase 10: Promote-or-cite enforcement + corpus archival sweep
+
+**Goal:** Make the promote-or-cite rule actually binding. Audit every `research/*.md` file for inbound citations from `docs/`. Promote, cite, or archive each. Correct sub-folder taxonomy errors. Add the cross-corpus topic index.
+
+**Findings addressed:** **RS-F5** (promote-or-cite empirically violated for 4 of 5 sampled files), **RS-F7** (sub-folder taxonomy unenforced; mis-filed research), **RS-F10** (no cross-corpus topic index).
+
+**Why Phase 10 is necessary:** The research-system eval found that of 5 sampled research files, 4 are sub-cited or shadow-policy by the skill's own definition (`parser-combinator-scalability.md`, `formal-spec-languages-comparators.md`, `security/security-survey.md`, `research/product/*.md`). `research/archive/` contains exactly one file across the entire corpus history — the rule the skill claims (research that didn't ship goes to archive) is empirically unenforced. The corpus contains substantive shadow policy.
+
+### Tasks
+
+1. **Inbound-citation audit across all `research/` files.**
+   - For every file, identify: (a) inbound citations from `docs/`, (b) inbound citations from another `research/` file, (c) inbound citations from a sample or test.
+   - Produce `research/audit-promote-or-cite-2026-MM-DD.md` listing audit results in a table: file path / inbound-citation count / inbound-citation sources / categorization.
+   - Three categorizations per file: `Promoted` (conclusion adopted into canonical doc — list canonical doc), `Cited` (referenced from another design/research/proposal), `Shadow` (no inbound citation; needs action).
+
+2. **For each Shadow file, choose one of three resolutions:**
+   - **Promote.** The conclusion is adopted into a canonical doc; the research file remains as evidence. Effort: tactical doc-update per file. Owner-judgment-required for which conclusion goes where.
+   - **Cite.** Add a cross-reference from an existing design/proposal/spec that uses the conclusion implicitly. Effort: one edit per file.
+   - **Archive.** Move to `research/archive/<topic>/` with a one-line note in frontmatter (`archived: <date> — <reason>`) explaining why it didn't ship. The skill mandates this for content that doesn't promote/cite.
+   - **Honest exit:** "deliberate horizon groundwork" — research the project intentionally produces before downstream decisions need it. If declared, the file carries `Status: Active — horizon groundwork` and is exempt from the promote-or-cite gate until a downstream decision either adopts or supersedes it.
+
+3. **Sub-folder taxonomy correction.** Per RS-F7:
+   - `parser-combinator-scalability.md` → `research/architecture/compiler/`
+   - `precept-language-mcp-audit.md`, `precept-language-tool-architecture.md` → `research/architecture/` (or new `research/tooling/`)
+   - `philosophy-refresh-assessment.md` → `research/philosophy/`
+   - `ucum-tier1-curation.md` → `research/language/references/`
+   - Use `git mv` to preserve history. Update inbound citations in `docs/` and other `research/` files in the same PR.
+
+4. **Add `research/INDEX.md` topic index.**
+   - Single-page topic-to-file map across the full corpus.
+   - Topics: currency precision, unit normalization, guard composition, timezone semantics, access modifiers, proof discharge, parser architecture, type system, state machines, etc.
+   - Per topic: short description + file list (with sub-folder paths).
+   - Anchored from `research/README.md § Start here`.
+   - Maintenance obligation: `/lifecycle-1-research` skill updates `research/INDEX.md` as the final step on every new research file.
+
+5. **Add `docs-lint` check for shadow research.**
+   - Every file in `research/` (except `research/archive/`) must have ≥1 inbound citation OR carry `Status: Active — horizon groundwork` in frontmatter.
+   - Files violating this after N days fail the lint with a tracked-debt allow-list.
+   - Lint runs against the current corpus on commit; new shadow files are caught immediately.
+
+### Exit criteria
+
+- [ ] Inbound-citation audit committed at `research/audit-promote-or-cite-2026-MM-DD.md`
+- [ ] Every `research/` file categorized as `Promoted` / `Cited` / `Horizon groundwork` / `Archived`
+- [ ] Mis-filed research relocated per the skill taxonomy (≥4 known relocations)
+- [ ] `research/INDEX.md` exists with cross-folder topic-to-file map; linked from `research/README.md`
+- [ ] `docs-lint` enforces inbound-citation discipline
+- [ ] `lifecycle-1-research` skill carries the obligation to update `research/INDEX.md` on every new file
+
+### Doc-touch obligations
+
+- `research/audit-promote-or-cite-2026-MM-DD.md` — new
+- `research/INDEX.md` — new
+- ≥4 research files — relocations via `git mv`
+- Inbound citations in `docs/` to relocated research files — updated
+- `research/README.md`, `research/language/README.md`, `research/architecture/compiler/README.md` — cross-link to INDEX
+- `.claude/skills/lifecycle-1-research/SKILL.md` — INDEX.md maintenance obligation + sub-folder discipline guards
+
+### Risk
+
+Bulk relocations break inbound links from `docs/`. **Mitigation:** `git mv` preserves history; `grep -rn "research/<old-path>"` and update every reference in the same PR. The audit is the riskier work because it may surface that the corpus contains more shadow-policy than the team expects — surface honestly to owner; the resolution per file is owner-judgment, not skill-automation.
+
+The "deliberate horizon groundwork" exit must be used sparingly. Every file flagged as horizon work is a research artifact that's structurally allowed to sit without adoption. Overuse re-creates the shadow-policy problem under a different label.
+
+---
+
+## Phase 11: Research-adequacy gate at design lock
+
+**Goal:** Close the gap where a `Locked irreversible` design can ship without verifiable prior-art research for the comparable-systems claims it makes. Add a research-adequacy check to the design skill's Locked-advancement criteria and a topic-to-comparator table to the reviewer agent.
+
+**Findings addressed:** **RS-F6** (no research-shaped gap detection), **RS-F15** (reviewer's Source Verification is post-hoc; doesn't catch missing-source claims).
+
+**Why Phase 11 depends on prior phases:** The gate Phase 11 adds — "design with irreversible decisions must cite a research file or carry an inline survey" — depends on (a) the citation discipline of Phase 8 actually binding, and (b) the research corpus being in a clean state (Phase 10) so the gate has trustworthy material to check against. Adding the gate before the corpus is clean would force designs to cite research that hasn't been categorized or quality-checked.
+
+### Tasks
+
+1. **Add a Locked-advancement criterion to `lifecycle-2-design/SKILL.md`.**
+   - For any design with at least one `Stakes: irreversible` decision, the design must either:
+     - (a) Cite a research file in `research/` that surveyed the relevant comparable systems with verbatim excerpts and meets Phase 9's Stage-1 quality bar, OR
+     - (b) Carry an inline survey leg per decision (`Inline survey:`) meeting the same discipline as a Stage-1 research artifact: per-comparator verbatim excerpt, access date, stable identifier.
+   - Honest exit: `comparable-systems-research-status: not-applicable — <one-line justification>` declaring no comparable-system claims are being made.
+
+2. **Add a "Mandatory comparator-checking by topic" table to `.claude/agents/precept-reviewer.md`** (parallel to the change-category table in § 13's mandatory-source-checking).
+
+   Topic → mandatory comparators (the reviewer always checks the design cites these or has explicit declarations):
+   - **Access modifiers** → Rust references, TypeScript references, Kotlin references, Java references
+   - **Temporal types** → Joda-Time / java.time / Python datetime / NodaTime / chrono / Pendulum references
+   - **Money/currency** → Joda-Money / JSR-354 / NodaMoney / Stripe / Adyen references
+   - **Constraint composition** → CEL / OPA / CUE / FluentValidation references
+   - **State machines** → xstate / Stateless.NET / SCXML references
+   - **Parser architecture** → Roslyn / ANTLR / Pratt / PEG (Ford 2004) / Superpower references
+   - **Proof systems** → Dafny / Liquid Haskell / SPARK Ada / CBMC / Frama-C references
+   - **Quantity / units** → UCUM / NIST SP 811 / Pint (Python) / units library (Haskell) references
+
+3. **Add `docs-lint` check for the research-adequacy gate.**
+   - For any `Locked` design with at least one `Stakes: irreversible` decision, lint verifies:
+     - (a) `sources-consulted` frontmatter includes ≥1 entry pointing to `research/` (the design cites Stage-1 work), OR
+     - (b) Every irreversible decision carries an `Inline survey:` leg listing the topic's mandatory comparators with excerpts, OR
+     - (c) `comparable-systems-research-status: not-applicable` is declared.
+   - Lint integrates with `research/INDEX.md` (Phase 10): the gate checks that cited research files exist at the paths claimed.
+
+4. **Document the gate in `lifecycle-2-design/SKILL.md § Staged advancement`.**
+   - Add a row to the stage-advancement criteria table: advancement from `Externally-Grounded` to `Locked` for designs with `irreversible` decisions requires research-adequacy verification.
+   - Cross-link to `precept-reviewer.md § Mandatory comparator-checking by topic`.
+
+### Exit criteria
+
+- [ ] `lifecycle-2-design/SKILL.md` carries the research-adequacy gate as an explicit Locked-advancement criterion
+- [ ] `precept-reviewer.md` carries the topic-to-comparator table
+- [ ] `docs-lint` enforces the gate
+- [ ] At least one in-tree design exercises the gate (likely `field-never-set-diagnostic.md` if its retrofit in Phase 8 surfaces the keyword-retirement comparable-systems gap)
+
+### Doc-touch obligations
+
+- `.claude/skills/lifecycle-2-design/SKILL.md` — research-adequacy gate; staged-advancement table update
+- `.claude/agents/precept-reviewer.md` — topic-to-comparator mandatory-checking table
+- `tools/Precept.DocsLint/` — gate check
+- `research/INDEX.md` — referenced from the gate
+
+### Risk
+
+The gate could over-fire on small designs that touch a topic but don't make load-bearing comparable-systems claims. **Mitigation:** the gate triggers only on `irreversible` stakes OR on explicit comparable-systems-claims-in-prose detection (heuristic: prose mentions named comparator systems like "Rust", "TypeScript", "Joda-Time" etc.). The honest exit (`comparable-systems-research-status: not-applicable`) is acceptable but must be declared and reviewer-checked.
+
+The topic-to-comparator table will become stale as Precept's scope evolves. **Mitigation:** the maintenance obligation is added to `/lifecycle-7-audit` (when that ships) — periodically review the table against the current scope and add/remove topics.
+
+---
+
 ## Open questions
 
 These do not block plan execution; settle during the relevant phase:
 
-1. **Phase 0 — grandfather strategy.** Hard-fail (retrofit existing locked docs) or allow-list with tracked debt? Recommend retrofit (eat the dog food).
-2. **Phase 2 — `agent-onboarding.md` as required reading?** Recommend no (optional discovery via docs/README.md); context-budget tradeoff for owner.
+1. **Phase 0 — grandfather strategy.** Hard-fail (retrofit existing locked docs) or allow-list with tracked debt? Recommend retrofit (eat the dog food). Phase 8 partially addresses this by retrofitting `field-never-set-diagnostic.md`.
+2. **Phase 2 — `agent-onboarding.md` as required reading?** Recommend no (optional discovery via docs/README.md); context-budget tradeoff for owner. (Resolved in Phase 2: optional discovery via docs/README.md.)
 3. **Phase 3 — principle list extraction format.** YAML block, dedicated section with stable anchor, or external file? Affects how the lint and the Philosophy Alignment matrix consume it.
 4. **Phase 4 — counter-evidence escalation.** "Locked-Novel" status with second-challenger requirement: who fills the second-challenger role in an AI-agent-driven project? Reviewer agent re-invoked with different framing, or separate agent class?
-5. **Phase 5 — staged advancement vs. existing locked designs.** Existing in-tree locked designs predate the staged model. Grandfather or re-stage? Recommend: existing designs stay Locked; new designs use the staged model.
-6. **Phase 6 — runtime-api.md status banner wording.** Public surface locked but operations throw NotImplementedException. Owner-judgment.
-7. **Phase 7 — anti-patterns.md vs catalog-driven-checklist.md boundary.** Plan recommends checklist for catalog-specific, anti-patterns.md for cross-layer. Verify at execution.
+5. **Phase 5 — staged advancement vs. existing locked designs.** Existing in-tree locked designs predate the staged model. Grandfather or re-stage? Recommend: existing designs stay Locked; new designs use the staged model. (Phase 8 retests this for `field-never-set-diagnostic.md` — may force re-staging.)
+6. **Phase 6 — runtime-api.md status banner wording.** Public surface locked but operations throw NotImplementedException. Owner-judgment. (Resolved in Phase 6: implementation-state field on each doc + Phase 2 banner.)
+7. **Phase 7 — anti-patterns.md vs catalog-driven-checklist.md boundary.** Plan recommends checklist for catalog-specific, anti-patterns.md for cross-layer. Verify at execution. (Resolved in Phase 7: anti-patterns.md is the cross-layer index; checklist is the catalog-specific operational gate.)
+8. **Phase 8 — `--from <research-doc>` Option A vs Option B.** Implement mechanically vs remove the claim? Recommend Option B for Phase 8 (remove); revisit Option A in a later phase if manual discipline proves insufficient.
+9. **Phase 8 — `field-never-set-diagnostic.md` honest-failure path.** If Phase 4 retrofit reveals the comparable-systems grounding doesn't exist in citation form, does the design return to `Externally-Grounded` (recommended) or stay `Locked` with tracked debt? Owner-judgment.
+10. **Phase 9 — research-skill grandfather rule cutoff date.** When do the new gates apply to new research? Recommend: gates apply to research produced after Phase 9 ships; pre-existing research is upgraded opportunistically in Phase 10.
+11. **Phase 10 — "deliberate horizon groundwork" exit overuse.** How sparingly should this exit be used to keep the promote-or-cite rule binding? Recommend: max N% of files at any time can carry `horizon groundwork` status; periodic audit catches drift.
+12. **Phase 11 — topic-to-comparator table staleness.** Who owns updating the table as Precept's scope evolves? Recommend: `/lifecycle-7-audit` (when shipped) takes the maintenance obligation.
 
 ## Dependencies
 
@@ -442,14 +704,22 @@ These do not block plan execution; settle during the relevant phase:
 
 ## Definition of done
 
-When all seven phases are complete:
+When Phases 1-7 are complete (✅ as of 2026-05-25):
 - Foundational docs agree on every observable fact (no count drift, no dangling refs, no out-of-taxonomy status fields)
 - A fresh AI agent navigates from `docs/philosophy.md` to substantive task via clearly signed paths, with glossary support and a coherent onboarding doc
 - The philosophy's most-distinctive commitments (approximation honesty, domain-expert primacy, Principles 7/10/11) are operationally referenced in every doc and skill that could threaten them
 - The design-lock skill demands formal semantics, principle-coverage matrix, audience and teachability content, falsifiers, counter-evidence, reversibility, blast radius, stakes-appropriate rigor
 - The reviewer agent has structural independence (re-statement preamble, mandatory source-checking, strongest-objection finding)
 - The lifecycle skill chain is complete (Stage 4 scaffolded; Stage 7 deferred per existing roadmap)
-- `docs-lint` mechanically gates future regressions across all the above
-- `compiler-and-runtime-design.md` is a pointer-hub; per-area docs are the canonical references; `catalog-system.md` is split into three navigable sub-docs
+- `compiler-and-runtime-design.md` is a pointer-hub; per-area docs are the canonical references; `catalog-system.md` inventory removed (catalogs in source + MCP tools are the canonical inventory)
+
+When Phases 8-11 are complete:
+- `docs-lint` (local pre-commit hook) mechanically gates Phase 4's locked-design discipline; CI gate remains deferred
+- At least one in-tree locked design carries the full Phase 4 leg structure as proof the rules bind
+- `lifecycle-1-research` is a real Stage 1 with refusal gates, required Methodology + Threats to Validity + What-would-change-this-conclusion sections, source-grading discipline, and Status field
+- Every research file is categorized (Promoted / Cited / Horizon groundwork / Archived); shadow policy is structurally caught
+- `research/INDEX.md` provides cross-corpus topic-to-file discoverability; sub-folder taxonomy is enforced
+- The research-adequacy gate at design lock prevents `irreversible` decisions from shipping without verifiable prior-art research
+- The reviewer agent carries a topic-to-comparator mandatory-checking table
 
 The bar moves from "below what the philosophy and skills claim" to "at the bar the philosophy and skills claim" — for the corpus, the skills, and the review process. The runtime implementation is not the subject of this plan.
