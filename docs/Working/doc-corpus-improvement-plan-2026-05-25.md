@@ -31,9 +31,9 @@ Total findings integrated: 48. Many overlap or reinforce each other; the phasing
 | 5 | Process and orchestration — staging, independence, skill chain | SR-F5, SR-F12, SR-F13, SR-F14, DC-F12 | 2-3 days | ✅ Complete (`0a3cf6aa`) |
 | 6 | Structural cleanup — context cost and drift surface | DC-F5, DC-F6, DC-F15, DC-F16 | 2-3 days | ✅ Complete (`744ef566` → `3a35e132`) |
 | 7 | Polish — dedup and consolidation | DC-F14, DC-F17 | 1-2 days | ✅ Complete (`c4f64ef9`) |
-| **8** | **Operationalize Phase 4 — close rhetorical-vs-real gap** (retrofit + skill text; no tooling) | **RS-F1, RS-F9** | **1-2 days** | **Planned** |
-| **9** | **Strengthen `lifecycle-1-research` into a real Stage 1** (skill text) | **RS-F2, RS-F3, RS-F8, RS-F12, RS-F13, RS-F14** | **2 days** | **Planned** |
-| **10** | **Promote-or-cite enforcement + corpus archival sweep** (audit + skill text; no tooling) | **RS-F5, RS-F7, RS-F10** | **2 days** | **Planned** |
+| 8 | Operationalize Phase 4 — close rhetorical-vs-real gap (retrofit + skill text; no tooling) | RS-F1, RS-F9 | 1-2 days | ✅ Complete (`2e62d006`) |
+| 9 | Strengthen `lifecycle-1-research` into a real Stage 1 (skill text) | RS-F2, RS-F3, RS-F8, RS-F12, RS-F13, RS-F14 | 2 days | ✅ Complete (`990293da`) |
+| 10 | Promote-or-cite enforcement + corpus archival sweep (audit + skill text; no tooling) | RS-F5, RS-F7, RS-F10 | 2 days | ✅ Complete (`59917e25`) |
 | **11** | **Research-adequacy gate at design lock** (skill text + reviewer table; no tooling) | **RS-F6, RS-F15** | **1 day** | **Planned** |
 
 **Total remaining estimate:** ~5-7 days focused work for Phases 8-11 (Phase 0 out of scope; Phases 1-7 complete). Smaller than originally proposed because all `docs-lint` tooling tasks are out of scope along with Phase 0.
