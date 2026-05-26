@@ -1621,7 +1621,7 @@ Modifiers are constraints on field/arg values. The type checker validates applic
 | `nonnegative` | `integer`, `decimal`, `number` | `string`, `boolean`, `choice`, collections, temporal, domain |
 | `positive` | `integer`, `decimal`, `number` | (same as above) |
 | `nonzero` | `integer`, `decimal`, `number` | (same as above) |
-| `notempty` | `string`, `set`, `queue`, `stack`, `log`, `log of T by P`, `bag`, `list`, `queue of T by P` | `integer`, `decimal`, `number`, `boolean`, `choice`, `lookup of K to V` |
+| `notempty` | `string`, `set`, `queue`, `stack`, `log`, `log of T by P`, `bag`, `list`, `queue of T by P`, `lookup of K to V` | `integer`, `decimal`, `number`, `boolean`, `choice` |
 | `min` / `max` | `integer`, `decimal`, `number` | `string`, `boolean`, collections |
 | `minlength` / `maxlength` | `string` | `number`, `integer`, `decimal`, `boolean`, collections |
 | `mincount` / `maxcount` | `set`, `queue`, `stack`, `log`, `log of T by P`, `bag`, `list`, `queue of T by P`, `lookup of K to V` | scalars |
@@ -1629,7 +1629,7 @@ Modifiers are constraints on field/arg values. The type checker validates applic
 | `ordered` | `choice` | all non-choice types |
 | `optional` | any field type | — (always valid) |
 
-> **`notempty` on collections:** On collection fields, `notempty` is equivalent to `mincount 1`. It statically discharges `.min`/`.max`/`.peek`/`.peekby`/`.first`/`.last`/`.at` access obligations — no per-access `.count > 0` guard is needed when the field is declared `notempty`. Not applicable to `lookup of K to V`, which has its own cardinality model.
+> **`notempty` on collections:** On collection fields, `notempty` is equivalent to `mincount 1`. It statically discharges `.min`/`.max`/`.peek`/`.peekby`/`.first`/`.last`/`.at` access obligations on the kinds that surface those accessors — no per-access `.count > 0` guard is needed when the field is declared `notempty`. On `lookup of K to V`, `notempty` asserts cardinality only (the kind does not surface element-returning accessors).
 
 > **`notempty` + `optional` are mutually exclusive:** A field or event argument cannot be both `optional` and `notempty`. `optional` means the value may be absent; `notempty` asserts the value has content. These constraints cannot both hold — the compiler emits `ConflictingModifiers` (C120) when both appear on the same declaration. To express "non-empty if present" semantics, use: `on Event ensure Arg is not set or Arg.length > 0 because "..."`. 
 
@@ -1659,7 +1659,7 @@ Modifiers are constraints on field/arg values. The type checker validates applic
 | `dequeue F (into G)? (by H)?` | `queue of T`, `queue of T by P` | — | If `into G`, `G` must be type `T`. If `by H` (priority queue), `H` must be type `P` — dequeues the entry whose key matches `H`. Requires emptiness proof (`UnguardedCollectionMutation`) (v3) |
 | `push F Expr` | `stack of T` | `T` | — |
 | `pop F (into G)?` | `stack of T` | — | If `into G`, `G` must be type `T`. Requires emptiness proof (`UnguardedCollectionMutation`) |
-| `clear F` | `set of T`, `queue of T`, `stack of T`, `bag of T`, `list of T`, `queue of T by P`; any `optional` field | — | On `optional` fields, resets the field to "not set" (see §1.2). Not valid on `log of T`, `log of T by P`, or `lookup of K to V` (v3) |
+| `clear F` | `set of T`, `queue of T`, `stack of T`, `bag of T`, `list of T`, `queue of T by P`, `lookup of K to V`; any `optional` field | — | On `optional` fields, resets the field to "not set" (see §1.2). On `lookup of K to V`, drops all key-value entries. Not valid on `log of T` or `log of T by P` (append-only chronicle). |
 | `append F Expr` | `log of T`, `list of T` | `T` | Appends to the end of the log or list (v3) |
 | `append F Expr by Expr` | `log of T by P` | `T`, then `P` | Explicit ordering key for log-by append (v3) |
 | `insert F Expr at N` | `list of T` | `T`, then `integer` | `N` is a zero-based index; inserts before element at position `N` (v3) |

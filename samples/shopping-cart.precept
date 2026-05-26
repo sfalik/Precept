@@ -170,15 +170,11 @@ from Cart on UpdateQuantity
     -> set TotalValue = ItemCount * 10.0
     -> no transition
 
-# Clear cart — remove all line items and gift messages; reset totals. The two
-# lookup fields (ItemQuantities, CartPromotions) cannot be cleared directly per
-# the v3 spec (F-LANG-COLL-13: clear is not valid on `lookup of K to V`). Their
-# entries become orphaned but harmless — LineItems is the canonical "what items
-# exist" tracker, and all read paths flow through a `LineItems contains` guard,
-# so stale lookup entries are invisible to event handlers. AddItem with the same
-# ItemId after ClearCart will overwrite via `put ItemQuantities ItemId = …`.
+# Clear cart — remove all items, promotions, and gift messages
 from Cart on ClearCart
     -> clear LineItems
+    -> clear ItemQuantities
+    -> clear CartPromotions
     -> clear GiftMessages
     -> set ItemCount = 0
     -> set TotalValue = 0.0
@@ -254,13 +250,12 @@ from Shipped on Deliver
     -> transition Delivered
 
 # Cancel — reachable before fulfillment. Shared cleanup across Cart, Checkout, Paid.
-# Note: ItemQuantities and CartPromotions are not cleared here per F-LANG-COLL-13
-# (clear is not valid on lookup in v3). Their entries are orphaned but harmless —
-# the Cancelled state is terminal so no event handler reads them.
 from Cart, Checkout, Paid on Cancel
     -> set CancelledAt = now()
     -> set OrderReason = Cancel.Reason
     -> clear LineItems
+    -> clear ItemQuantities
+    -> clear CartPromotions
     -> clear GiftMessages
     -> set ItemCount = 0
     -> set TotalValue = 0.0

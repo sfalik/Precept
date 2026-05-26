@@ -82,7 +82,7 @@ DirectionModifier := ascending | descending
 
 The inner type `T` must be a scalar type — any primitive type (`string`, `integer`, `decimal`, `number`, `boolean`, `choice`) or the special `~string` variant. Collections of collections are not supported.
 
-**Common surface:** All nine kinds share `.count`. `set`, `queue`, `stack`, `bag`, `log`, and `list` share `contains` for value membership. `lookup` uses `contains` for key membership; `queue of T by P` uses `contains` for value membership. `set`, `queue`, `stack`, `bag`, `log`, and `list` support `mincount`/`maxcount` constraints and list literal defaults (except `queue of T by P` and `lookup of K to V` — see per-type constraint notes). `clear` applies to `set`, `queue`, `stack`, `bag`, and `list` only — not log types (append-only) and not `lookup` (has per-key `remove`). Kind-specific operations are documented per section below.
+**Common surface:** All nine kinds share `.count`. `set`, `queue`, `stack`, `bag`, `log`, and `list` share `contains` for value membership. `lookup` uses `contains` for key membership; `queue of T by P` uses `contains` for value membership. `set`, `queue`, `stack`, `bag`, `log`, and `list` support `mincount`/`maxcount` constraints and list literal defaults (except `queue of T by P` and `lookup of K to V` — see per-type constraint notes). `clear` applies to `set`, `queue`, `stack`, `bag`, `list`, `queue of T by P`, and `lookup` — but not log types (append-only). Kind-specific operations are documented per section below.
 
 ---
 
@@ -753,7 +753,7 @@ For `lookup of K to V`, the analogous pattern is key-presence: `F contains K` in
 
 | Constraint | Applicable to | Meaning |
 |---|---|---|
-| `notempty` | `set`, `queue`, `stack`, `log`, `bag`, `list`, `queue of T by P` | Collection must contain at least one element. Statically discharges `.min`/`.max`/`.peek`/`.peekby`/`.first`/`.last` access safety. Equivalent to `mincount 1`. |
+| `notempty` | `set`, `queue`, `stack`, `log`, `bag`, `list`, `queue of T by P`, `lookup` | Collection must contain at least one element. Statically discharges `.min`/`.max`/`.peek`/`.peekby`/`.first`/`.last` access safety on the kinds that surface those accessors. Equivalent to `mincount 1`. |
 | `mincount N` | `set`, `queue`, `stack`, `log`, `bag`, `list`, `queue of T by P`, `lookup` | Collection must contain at least N elements |
 | `maxcount N` | `set`, `queue`, `stack`, `log`, `bag`, `list`, `queue of T by P`, `lookup` | Collection must contain at most N elements |
 | `optional` | any field type (including collections) | Field may be unset; requires `is set` guard before use |
@@ -899,7 +899,7 @@ This restriction exists because collections have no canonical string representat
 | `remove F at N` | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | — | index-bounds |
 | `put F K = V` | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | `K`, `V` | — |
 | `remove F K` (lookup) | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | `K` | — |
-| `clear F` | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ | — | — |
+| `clear F` | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | — | — |
 
 **Cross-kind errors:** Applying an action to the wrong collection kind emits `CollectionOperationOnScalar`. Applying a collection action to a scalar field emits `CollectionOperationOnScalar`. Applying a scalar action (`set =`) to a collection field emits `ScalarOperationOnCollection`.
 

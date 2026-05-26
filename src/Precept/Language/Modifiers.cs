@@ -49,7 +49,7 @@ public static class Modifiers
         new(TypeKind.String),
         new(TypeKind.Set), new(TypeKind.Queue), new(TypeKind.Stack),
         new(TypeKind.Log), new(TypeKind.LogBy), new(TypeKind.Bag),
-        new(TypeKind.List), new(TypeKind.QueueBy),
+        new(TypeKind.List), new(TypeKind.QueueBy), new(TypeKind.Lookup),
     ];
 
     private static readonly TypeTarget[] AnyType = []; // empty = applies to all types

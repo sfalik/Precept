@@ -139,10 +139,8 @@ public class ModifiersTests
             TypeKind.String,
             TypeKind.Set, TypeKind.Queue, TypeKind.Stack,
             TypeKind.Log, TypeKind.LogBy, TypeKind.Bag,
-            TypeKind.List, TypeKind.QueueBy,
-        ], "notempty applies to strings and all collections except lookup");
-        meta.ApplicableTo.Select(t => t.Kind).Should().NotContain(TypeKind.Lookup,
-            "lookup entries are defined at design time and cannot be empty at runtime");
+            TypeKind.List, TypeKind.QueueBy, TypeKind.Lookup,
+        ], "notempty applies to strings and all collection kinds");
     }
 
     [Theory]

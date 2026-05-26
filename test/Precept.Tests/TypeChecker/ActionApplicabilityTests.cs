@@ -105,6 +105,7 @@ public class ActionApplicabilityTests
     [InlineData("bag of string")]
     [InlineData("list of string")]
     [InlineData("queue of string by integer")]
+    [InlineData("lookup of string to integer")]
     [InlineData("string optional")]
     [InlineData("integer optional")]
     public void Clear_OnApplicableTarget_NoApplicabilityDiagnostic(string fieldType)
@@ -126,10 +127,11 @@ public class ActionApplicabilityTests
     }
 
     [Fact]
-    public void Clear_OnLookup_EmitsPRE0048()
+    public void Clear_OnLookup_CompilesClean()
     {
-        // Spec exclusion: docs/language/precept-language-spec.md:1662 — "Not valid on log of T, log of T by P, or lookup of K to V (v3)"
-        // Lookup has per-key remove instead. Author must remove keys individually.
+        // `clear MyLookup` drops all key-value entries — comparable to Java Map.clear(),
+        // C# IDictionary.Clear(), Python dict.clear(), Go clear(map). The spec previously
+        // forbade this with no idiomatic alternative; the lift restores catalog uniformity.
         var precept = """
             precept Widget
             field MyMap as lookup of string to integer
@@ -140,9 +142,30 @@ public class ActionApplicabilityTests
             """;
 
         var (_, diagnostics) = Check(precept);
-        diagnostics.Should().Contain(
-            d => d.Code == nameof(DiagnosticCode.ScalarOperationOnCollection),
-            because: "clear is not valid on lookup per the canonical spec (v3 exclusion)");
+        diagnostics.Should().NotContain(
+            d => d.Code == nameof(DiagnosticCode.CollectionOperationOnScalar)
+              || d.Code == nameof(DiagnosticCode.ScalarOperationOnCollection),
+            because: "clear is now valid on lookup");
+    }
+
+    [Theory]
+    [InlineData("lookup of string to integer")]
+    [InlineData("lookup of string to string")]
+    [InlineData("lookup of integer to integer")]
+    public void Notempty_OnLookup_CompilesClean(string fieldType)
+    {
+        // `notempty` on lookup is semantically equivalent to `mincount 1` — author chooses
+        // by style. All other collection kinds accept both forms; lookup matches the rest.
+        var precept = $$"""
+            precept Widget
+            field MyMap as {{fieldType}} notempty
+            state Open initial
+            """;
+
+        var (_, diagnostics) = Check(precept);
+        diagnostics.Should().NotContain(
+            d => d.Code == nameof(DiagnosticCode.InvalidModifierForType),
+            because: $"notempty applies to {fieldType}");
     }
 
     [Theory]

@@ -569,10 +569,10 @@ public class TypesTests
     }
 
     [Fact]
-    public void Lookup_NotemptyApplicable_False()
+    public void Lookup_NotemptyApplicable_True()
     {
-        Types.GetMeta(TypeKind.Lookup).NotemptyApplicable.Should().BeFalse(
-            "lookup uses key presence proof, not notempty");
+        Types.GetMeta(TypeKind.Lookup).NotemptyApplicable.Should().BeTrue(
+            "notempty on lookup asserts cardinality (synonymous with mincount 1)");
     }
 
     // ── Accessor shapes — new collection types ───────────────────────────────

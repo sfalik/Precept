@@ -27,19 +27,14 @@ surfaced for proper fixing.
 
 ## Active
 
-### F-LANG-COLL-13: `clear` is not valid on `lookup of K to V` per the v3 spec — language gap
+### F-LANG-COLL-13: `clear` and `notempty` lifted on `lookup of K to V` — **✅ Fixed by W-J (2026-05-26)**
 
-- **Discovered**: 2026-05-26 during Phase 4 W-A's `precept-reviewer` audit. The reviewer flagged a catalog widening (adding `Lookup` to `ClearApplicable`) that contradicted the canonical spec. Investigation surfaced that the v3 spec explicitly excludes `clear MyLookup` but offers no idiomatic alternative for "empty the entire lookup."
-- **Affected**: any precept that wants to empty a lookup field in one statement. The canonical spec excludes this in v3:
-  - `docs/language/collection-types.md:85` — *"`clear` applies to `set`, `queue`, `stack`, `bag`, and `list` only — not log types (append-only) and not `lookup` (has per-key `remove`)"*
-  - `docs/language/precept-language-spec.md:1662` — *"Not valid on `log of T`, `log of T by P`, or `lookup of K to V` (v3)"*
-- **Symptom**: `clear MyLookup` emits `PRE0048 ScalarOperationOnCollection` per W-A's enforcement (wired 2026-05-26). The spec rationale ("has per-key `remove`") assumed an iteration mechanism that doesn't exist in v3 — Precept lacks a key-iteration primitive, so `remove Lookup Key` can only target known keys. Authors who want "empty the lookup" have no v3 idiom.
-- **Affected samples**: `samples/shopping-cart.precept` ClearCart event (which used to call `clear ItemQuantities` and `clear CartPromotions`). Soft-clear workaround landed in W-B: the ClearCart event clears the controlling `LineItems` set and resets totals; the lookup entries become orphaned but harmless (all read paths flow through `LineItems contains` guards, so stale entries are invisible to event handlers). The sample carries an inline comment citing this entry.
-- **Workaround used**: soft-clear via the controlling set/list (when one exists). Generalizes only when authors maintain a parallel `set of K` membership tracker alongside the lookup — common pattern but doesn't scale to every shape.
-- **Root cause**: deliberate v3 design exclusion. The "per-key remove" rationale didn't account for missing iteration primitives.
-- **Fix complexity**: design-required — either (a) lift the exclusion (allow `clear MyLookup` with explicit "drop all keys" semantics) or (b) introduce a lookup-iteration primitive that lets authors express "for each key in lookup, remove it." Both are language-surface decisions requiring `/lifecycle-2-design`.
-- **Priority**: quality bar — affects the cart-reset idiom and any similar "empty this lookup" workflow. The soft-clear workaround is semantically incomplete (stale data orphaned but invisible).
-- **Target phase**: deferred pending `/lifecycle-2-design` pass; not assigned to Phase 4 or 5.
+- **Status**: ✅ **Fixed by W-J (2026-05-26)** after a `/lifecycle-2-design` pass surveyed comparator languages (Java `Map.clear`, C# `IDictionary.Clear`, Python `dict.clear`, Rust `HashMap::clear`, Swift `Dictionary.removeAll`, Kotlin `MutableMap.clear`, F# `Dictionary.Clear`, Go `clear(map)` added in 1.21 specifically to avoid forcing iteration). No surveyed language with per-key remove forbids the bulk operation; Precept's exclusion was anomalous. Bundled lift: `notempty` on lookup also lifted (was a parallel synonym restriction without independent rationale once `clear` lifted). Spec docs (`collection-types.md:85`, `:756`, `:902`, `precept-language-spec.md:1624`, `:1632`, `:1662`) updated. `Actions.cs ClearApplicable` adds `TypeKind.Lookup`; `Types.cs` Lookup TypeMeta drops the explicit `NotemptyApplicable: false` (default is `true`). Sample restore: `samples/shopping-cart.precept` ClearCart + Cancel events revert to canonical `clear LineItems / clear ItemQuantities / clear CartPromotions / clear GiftMessages`.
+- **Discovered**: 2026-05-26 during Phase 4 W-A's precept-reviewer audit.
+- **Affected**: any precept that wanted to empty a lookup field in one statement.
+- **Pre-fix symptom**: `clear MyLookup` emitted `PRE0048 ScalarOperationOnCollection`. `notempty MyLookup` emitted `InvalidModifierForType`.
+- **Workaround used (now removed)**: soft-clear via a paired controlling set/list (when one existed). Did not scale to every shape; semantically incomplete (stale data orphaned but invisible).
+- **Fix complexity**: XS-S — one TypeTarget entry, one default change, doc updates, sample restore, 4 new tests.
 
 ### BUG-013: `ParserIntegrationTests.TestSample_EventDeclaration_BindsInitialToCreateOnly` references missing `samples/Test.precept`
 

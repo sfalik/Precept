@@ -718,9 +718,7 @@ public static class Types
             TypeCategory.Collection,
             Accessors: LookupAccessors,
             DisplayName: "lookup",
-            HoverDescription: "A key-value map with unique keys. Use put and remove actions. Access values with 'F for K'. Supports .count accessor.",
-            UsageExample: "field CoverageLimits as lookup of string to decimal",
-            NotemptyApplicable: false
+            HoverDescription: "A key-value map with unique keys. Use put and remove actions. Access values with 'F for K'. Supports .count accessor."
         ),
 
         // ── Special ────────────────────────────────────────────────────

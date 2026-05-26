@@ -186,14 +186,14 @@ public class ActionsTests
     public void Clear_AppliesToCollectionsAndOptional()
     {
         var meta = Actions.GetMeta(ActionKind.Clear);
-        meta.ApplicableTo.Should().HaveCount(7);
+        meta.ApplicableTo.Should().HaveCount(8);
 
         var typeTargets = meta.ApplicableTo.OfType<TypeTarget>()
             .Where(t => t is not ModifiedTypeTarget)
             .Select(t => t.Kind)
             .ToList();
         typeTargets.Should().BeEquivalentTo(
-            [TypeKind.Set, TypeKind.Queue, TypeKind.Stack, TypeKind.Bag, TypeKind.List, TypeKind.QueueBy]);
+            [TypeKind.Set, TypeKind.Queue, TypeKind.Stack, TypeKind.Bag, TypeKind.List, TypeKind.QueueBy, TypeKind.Lookup]);
     }
 
     [Fact]

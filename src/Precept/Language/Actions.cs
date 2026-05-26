@@ -55,6 +55,7 @@ public static class Actions
         new(TypeKind.Bag),
         new(TypeKind.List),
         new(TypeKind.QueueBy),
+        new(TypeKind.Lookup),
         new ModifiedTypeTarget(null, [ModifierKind.Optional]),
     ];
 
