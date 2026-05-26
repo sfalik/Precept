@@ -287,7 +287,7 @@ public class DiagnosticsTests
     public static TheoryData<DiagnosticCode, string> UpdatedMessageTemplates => new()
     {
         { DiagnosticCode.FunctionArgConstraintViolation, "Argument {0} to '{1}' is not valid — {2}" },
-        { DiagnosticCode.CollectionOperationOnScalar, "'{0}' requires a collection, but '{2}' is a single value — change '{2}' to a set, list, or queue" },
+        { DiagnosticCode.CollectionOperationOnScalar, "'{0}' requires a collection, but '{1}' is a single value — change '{1}' to a set, list, or queue" },
         { DiagnosticCode.InvalidTypedConstantContent, "'{0}' is not a valid {1} — check the expected format for {1} values" },
         { DiagnosticCode.UnsatisfiableGuard, "Guard '{0}' on event '{1}' is unsatisfiable under the declared constraints{2} — this row can never fire" },
         { DiagnosticCode.DivisionByZero, "Division is unsafe: '{0}' can be zero{1}" },
@@ -407,6 +407,7 @@ public class DiagnosticsTests
         DiagnosticCode.KeyUniquenessGuard,
         DiagnosticCode.InvalidQuantifierTarget,
         DiagnosticCode.BindingShadowsField,
+        DiagnosticCode.RequiredTraitViolation,
         DiagnosticCode.MissingOrderingKey,
         DiagnosticCode.CollectionInnerTypeError,
         DiagnosticCode.QuantifierPredicateNotBoolean,

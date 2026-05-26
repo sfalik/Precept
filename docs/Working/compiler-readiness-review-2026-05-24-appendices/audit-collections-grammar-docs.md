@@ -109,7 +109,7 @@ Two docs read in full. Cross-checked against catalog (`TypeKind.cs`, `Types.cs`,
 ### F-LANG-COLL-01..02, F-LANG-COLL-12 — P3 informational [P3]
 - F-LANG-COLL-01: `lookup` `contains` confirms match.
 - F-LANG-COLL-02: `set of choice of T(...)` v1 limit enforced by parser; user-facing diagnostic could be more specific.
-- F-LANG-COLL-12: `Countof`/`Peekby` tokens defined but inert. Recommend remove from `TokenKind`/`Tokens.cs`.
+- F-LANG-COLL-12: **CLOSED AS AUDIT ERROR (2026-05-26, Phase 4 W-F).** Initial finding called `Countof` (137) / `Peekby` (138) "inert." Re-grep confirms both are live keyword tokens for `bag.countof(E)` (Types.cs:245 — `ElementParameterAccessor`) and `queue-of-T-by-P.peekby` (Types.cs:281 — `TypeAccessor`; TypeChecker.Expressions.Callables.cs dispatches on `accessor.Name == "peekby"`); full TokenMeta entries (Tokens.cs:413-415); MemberNameValid coverage (TokenMetaMemberNameTests.cs:13-14); parser tests (MemberAccessTests.cs:33-37, 76-80, 167-177); accessor-presence tests (TypesTests.cs:594-598, 602-607, 692-697); VS Code grammar (tmLanguage.json:117, 839); doc (collection-types.md:640-641). `.squad/decisions-archive.md` lock note: *"`countof` / `peekby` stay as member-name-legal compound accessors."* **No code change required.**
 
 ## § D. Implementation-Only Features
 

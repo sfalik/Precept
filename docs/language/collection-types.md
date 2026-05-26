@@ -452,7 +452,7 @@ The uniqueness check has **the same complexity as the append itself** — it pig
 | `add LogField Expr` | `CollectionOperationOnScalar` |
 | `clear LogField` | `CollectionOperationOnScalar` — not valid on an append-only log |
 | `set LogField = Expr` | `ScalarOperationOnCollection` |
-| `append LogField Expr` (missing `by`) | `MissingOrderingKey` — `log of T by P` requires a `by P` clause on every `append` |
+| `append LogField Expr` (missing `by`) | `MissingOrderingKey` (PRE0151) — reserved 2026-05-26; emission deferred (currently `ScalarOperationOnCollection` PRE0048 fires as a generic ApplicableTo mismatch) |
 | `append LogField Expr by P` where `Expr` type ≠ `T` | `TypeMismatch` |
 | `append LogField Expr by P` where `P` expression type ≠ declared ordering type | `TypeMismatch` |
 

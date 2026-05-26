@@ -289,7 +289,7 @@ public enum DiagnosticCode
     KeyUniquenessGuard              = 101,
     InvalidQuantifierTarget         = 102,
     BindingShadowsField             = 103,
-    MissingOrderingKey              = 104,
+    RequiredTraitViolation          = 104,
     CollectionInnerTypeError        = 105,
     QuantifierPredicateNotBoolean   = 106,
 
@@ -308,4 +308,13 @@ public enum DiagnosticCode
     /// § Diagnostic Stages > Tooling-side diagnostics for the contract.
     /// </summary>
     McpToolInternalError            = 149,
+
+    // ── Reserved for missing-`by` clause on append (Phase 4 W-F, F-LANG-COLL-11) ──
+    /// <summary>
+    /// Missing `by P` ordering key on an append to a `log of T by P` field.
+    /// Reserved 2026-05-26 in W-F's PRE0104 rename slice; emission not yet wired
+    /// (currently PRE0048 catches this as a generic ApplicableTo mismatch).
+    /// Specialization to a teachable message is deferred to a future W-F follow-up.
+    /// </summary>
+    MissingOrderingKey              = 151,
 }

@@ -111,6 +111,7 @@ internal static partial class TypeChecker
             case AssignAction assign:
             {
                 (fieldName, fieldType) = ResolveActionTarget(assign.Target, ctx);
+                ValidateActionApplicability(assign.Kind, fieldName, fieldType, assign.Target.Span, ctx);
                 TypedField? targetFieldMeta = null;
                 ImmutableArray<DeclaredQualifierMeta>? fieldQualifiers = null;
                 if (ctx.FieldLookup.TryGetValue(fieldName, out var resolvedTargetFieldMeta))
@@ -189,12 +190,20 @@ internal static partial class TypeChecker
             case CollectionValueAction colVal:
             {
                 (fieldName, fieldType) = ResolveActionTarget(colVal.Target, ctx);
+                ValidateActionApplicability(colVal.Kind, fieldName, fieldType, colVal.Target.Span, ctx);
+                // BUG-002: `remove F K` on a lookup expects the lookup's KEY type, not the element type.
+                // The action surface is `verb F E` for set/bag/list/lookup uniformly, but the meaning
+                // of `E` differs by target kind. Per spec § 1666 / collection-types.md:901:
+                // `remove F K (lookup)` expects K matching the lookup's key type. Type-driven dispatch
+                // happens here rather than in the catalog because the syntax is identical across kinds.
                 var valueExpectedType = ctx.FieldLookup.TryGetValue(fieldName, out var fieldMeta)
-                    ? fieldMeta.ElementType
+                    ? (colVal.Kind == ActionKind.Remove && fieldType == TypeKind.Lookup
+                        ? fieldMeta.KeyType
+                        : fieldMeta.ElementType)
                     : null;
                 var value = Resolve(colVal.Value, ctx, valueExpectedType);
 
-                // PRE0105 — CollectionInnerTypeError: element type mismatch
+                // PRE0105 — CollectionInnerTypeError: element/key type mismatch
                 if (value is not TypedErrorExpression
                     && valueExpectedType is not null
                     && valueExpectedType != TypeKind.Error
@@ -219,6 +228,7 @@ internal static partial class TypeChecker
             case CollectionIntoAction colInto:
             {
                 (fieldName, fieldType) = ResolveActionTarget(colInto.Target, ctx);
+                ValidateActionApplicability(colInto.Kind, fieldName, fieldType, colInto.Target.Span, ctx);
                 string? binding = null;
                 if (colInto.IntoTarget is IdentifierExpression intoId)
                     binding = intoId.Name;
@@ -232,6 +242,7 @@ internal static partial class TypeChecker
             case FieldOnlyAction fieldOnly:
             {
                 (fieldName, fieldType) = ResolveActionTarget(fieldOnly.Target, ctx);
+                ValidateActionApplicability(fieldOnly.Kind, fieldName, fieldType, fieldOnly.Target.Span, ctx);
                 return new TypedAction(
                     fieldOnly.Kind, fieldName, fieldType,
                     ProofRequirements: proofReqs.ToImmutableArray(),
@@ -241,6 +252,7 @@ internal static partial class TypeChecker
             case CollectionValueByAction colBy:
             {
                 (fieldName, fieldType) = ResolveActionTarget(colBy.Target, ctx);
+                ValidateActionApplicability(colBy.Kind, fieldName, fieldType, colBy.Target.Span, ctx);
                 var valueExpectedType = ctx.FieldLookup.TryGetValue(fieldName, out var fieldMeta)
                     ? fieldMeta.ElementType
                     : null;
@@ -264,6 +276,7 @@ internal static partial class TypeChecker
             case InsertAtAction insertAt:
             {
                 (fieldName, fieldType) = ResolveActionTarget(insertAt.Target, ctx);
+                ValidateActionApplicability(insertAt.Kind, fieldName, fieldType, insertAt.Target.Span, ctx);
                 var valueExpectedType = ctx.FieldLookup.TryGetValue(fieldName, out var fieldMeta)
                     ? fieldMeta.ElementType
                     : null;
@@ -284,6 +297,7 @@ internal static partial class TypeChecker
             case RemoveAtAction removeAt:
             {
                 (fieldName, fieldType) = ResolveActionTarget(removeAt.Target, ctx);
+                ValidateActionApplicability(removeAt.Kind, fieldName, fieldType, removeAt.Target.Span, ctx);
                 var index = Resolve(removeAt.Index, ctx, TypeKind.Integer);
                 // RemoveAt has an index but no value — use TypedInputAction with index as primary
                 return new TypedInputAction(
@@ -298,6 +312,7 @@ internal static partial class TypeChecker
             case PutKeyValueAction put:
             {
                 (fieldName, fieldType) = ResolveActionTarget(put.Target, ctx);
+                ValidateActionApplicability(put.Kind, fieldName, fieldType, put.Target.Span, ctx);
                 var valueExpectedType = ctx.FieldLookup.TryGetValue(fieldName, out var fieldMeta)
                     ? fieldMeta.ElementType
                     : null;
@@ -321,6 +336,7 @@ internal static partial class TypeChecker
             case CollectionIntoByAction colIntoBy:
             {
                 (fieldName, fieldType) = ResolveActionTarget(colIntoBy.Target, ctx);
+                ValidateActionApplicability(colIntoBy.Kind, fieldName, fieldType, colIntoBy.Target.Span, ctx);
                 string? binding = null;
                 if (colIntoBy.IntoTarget is IdentifierExpression intoId)
                     binding = intoId.Name;
@@ -375,6 +391,72 @@ internal static partial class TypeChecker
         // Non-identifier target — resolve as expression for error reporting
         var resolved = Resolve(target, ctx);
         return ("", resolved.ResultType);
+    }
+
+    /// <summary>
+    /// Enforces the catalog-declared <see cref="ActionMeta.ApplicableTo"/> contract for an action's
+    /// target. Emits PRE0047 (<see cref="DiagnosticCode.CollectionOperationOnScalar"/>) when the action
+    /// expects a collection but the target is scalar, or PRE0048
+    /// (<see cref="DiagnosticCode.ScalarOperationOnCollection"/>) when the target is a collection of
+    /// the wrong kind. Empty <c>ApplicableTo</c> (e.g., <c>set</c>) is treated as "caller validates" —
+    /// other checks (type-mismatch on the value, etc.) cover those cases.
+    /// </summary>
+    private static void ValidateActionApplicability(
+        ActionKind actionKind,
+        string fieldName,
+        TypeKind fieldType,
+        SourceSpan span,
+        CheckContext ctx)
+    {
+        if (fieldType == TypeKind.Error) return;
+        if (string.IsNullOrEmpty(fieldName)) return;
+
+        var meta = Actions.GetMeta(actionKind);
+        if (meta.ApplicableTo.Length == 0) return;
+
+        TypedField? field = ctx.FieldLookup.TryGetValue(fieldName, out var resolved) ? resolved : null;
+        if (MatchesAnyTarget(meta.ApplicableTo, fieldType, field)) return;
+
+        var actionVerb = meta.Token.Text ?? meta.Token.Kind.ToString();
+        if (Types.GetMeta(fieldType).Category == TypeCategory.Collection)
+        {
+            ctx.Diagnostics.Add(
+                Diagnostics.Create(DiagnosticCode.ScalarOperationOnCollection, span,
+                    actionVerb, fieldName));
+        }
+        else
+        {
+            ctx.Diagnostics.Add(
+                Diagnostics.Create(DiagnosticCode.CollectionOperationOnScalar, span,
+                    actionVerb, fieldName));
+        }
+    }
+
+    private static bool MatchesAnyTarget(TypeTarget[] targets, TypeKind fieldType, TypedField? field)
+    {
+        foreach (var target in targets)
+        {
+            if (target is ModifiedTypeTarget modified)
+            {
+                if (modified.Kind is not null && modified.Kind != fieldType) continue;
+                if (field is null) continue;
+                bool allPresent = true;
+                foreach (var required in modified.RequiredModifiers)
+                {
+                    if (!field.Modifiers.Contains(required) && !field.ImpliedModifiers.Contains(required))
+                    {
+                        allPresent = false;
+                        break;
+                    }
+                }
+                if (allPresent) return true;
+            }
+            else
+            {
+                if (target.Kind is null || target.Kind == fieldType) return true;
+            }
+        }
+        return false;
     }
 
     /// <summary>
@@ -877,7 +959,7 @@ internal static partial class TypeChecker
                 if ((elementMeta.Traits & accessor.RequiredTraits) != accessor.RequiredTraits)
                 {
                     ctx.Diagnostics.Add(
-                        Diagnostics.Create(DiagnosticCode.MissingOrderingKey, expr.Span,
+                        Diagnostics.Create(DiagnosticCode.RequiredTraitViolation, expr.Span,
                             expr.MemberName));
                     return new TypedErrorExpression(expr.Span);
                 }
@@ -966,7 +1048,7 @@ internal static partial class TypeChecker
                 if ((elementMeta.Traits & accessor.RequiredTraits) != accessor.RequiredTraits)
                 {
                     ctx.Diagnostics.Add(
-                        Diagnostics.Create(DiagnosticCode.MissingOrderingKey, expr.Span,
+                        Diagnostics.Create(DiagnosticCode.RequiredTraitViolation, expr.Span,
                             expr.MethodName));
                     return new TypedErrorExpression(expr.Span);
                 }

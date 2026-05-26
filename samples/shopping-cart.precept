@@ -141,7 +141,7 @@ from Cart on AddItem
 
 # Remove item — last item in cart, clear quantities and zero out totals
 from Cart on RemoveItem when LineItems contains RemoveItem.ItemId and ItemQuantities.count == 1
-    -> clear ItemQuantities
+    -> remove ItemQuantities RemoveItem.ItemId
     -> remove LineItems RemoveItem.ItemId
     -> set ItemCount = 0
     -> set TotalValue = 0.0
@@ -149,11 +149,10 @@ from Cart on RemoveItem when LineItems contains RemoveItem.ItemId and ItemQuanti
     -> set DiscountApplied = 0.0
     -> no transition
 
-# Remove item — multiple items remain. The lookup uses put to zero-out the
-# entry because BUG-002 prevents direct value removal from a lookup.
+# Remove item — multiple items remain.
 from Cart on RemoveItem when LineItems contains RemoveItem.ItemId
     -> set ItemCount = ItemCount - (ItemQuantities for RemoveItem.ItemId)
-    -> put ItemQuantities RemoveItem.ItemId = 0
+    -> remove ItemQuantities RemoveItem.ItemId
     -> remove LineItems RemoveItem.ItemId
     -> set TotalValue = ItemCount * 10.0
     -> no transition
@@ -171,11 +170,15 @@ from Cart on UpdateQuantity
     -> set TotalValue = ItemCount * 10.0
     -> no transition
 
-# Clear cart — remove all items, promotions, and gift messages
+# Clear cart — remove all line items and gift messages; reset totals. The two
+# lookup fields (ItemQuantities, CartPromotions) cannot be cleared directly per
+# the v3 spec (F-LANG-COLL-13: clear is not valid on `lookup of K to V`). Their
+# entries become orphaned but harmless — LineItems is the canonical "what items
+# exist" tracker, and all read paths flow through a `LineItems contains` guard,
+# so stale lookup entries are invisible to event handlers. AddItem with the same
+# ItemId after ClearCart will overwrite via `put ItemQuantities ItemId = …`.
 from Cart on ClearCart
     -> clear LineItems
-    -> clear ItemQuantities
-    -> clear CartPromotions
     -> clear GiftMessages
     -> set ItemCount = 0
     -> set TotalValue = 0.0
@@ -251,12 +254,13 @@ from Shipped on Deliver
     -> transition Delivered
 
 # Cancel — reachable before fulfillment. Shared cleanup across Cart, Checkout, Paid.
+# Note: ItemQuantities and CartPromotions are not cleared here per F-LANG-COLL-13
+# (clear is not valid on lookup in v3). Their entries are orphaned but harmless —
+# the Cancelled state is terminal so no event handler reads them.
 from Cart, Checkout, Paid on Cancel
     -> set CancelledAt = now()
     -> set OrderReason = Cancel.Reason
     -> clear LineItems
-    -> clear ItemQuantities
-    -> clear CartPromotions
     -> clear GiftMessages
     -> set ItemCount = 0
     -> set TotalValue = 0.0

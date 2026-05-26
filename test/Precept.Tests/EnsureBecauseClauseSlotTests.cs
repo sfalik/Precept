@@ -194,12 +194,15 @@ public class EnsureBecauseClauseSlotTests
     }
 
     [Fact]
-    public void StateEnsure_BecauseClauseSlot_IsOptional()
+    public void StateEnsure_BecauseClauseSlot_IsRequired()
     {
+        // F-LANG-SPEC-01: Principle 9 (precept-language-spec.md:107) — the `because` clause is
+        // syntactically required on every rule AND ensure. A prior implementation departure
+        // (commit 16f866a2, 2026-05-03) introduced an optional slot; reverted in Phase 4 W-F.
         var slots = Constructs.GetMeta(ConstructKind.StateEnsure).Slots;
         slots[3].Kind.Should().Be(ConstructSlotKind.BecauseClause);
-        slots[3].IsRequired.Should().BeFalse(
-            "StateEnsure allows ensures without a because clause — the slot is optional");
+        slots[3].IsRequired.Should().BeTrue(
+            "StateEnsure requires a because clause per Principle 9 — every ensure must carry a domain-readable rationale");
     }
 
     [Fact]
@@ -262,12 +265,15 @@ public class EnsureBecauseClauseSlotTests
     }
 
     [Fact]
-    public void EventEnsure_BecauseClauseSlot_IsOptional()
+    public void EventEnsure_BecauseClauseSlot_IsRequired()
     {
+        // F-LANG-SPEC-01: Principle 9 (precept-language-spec.md:107) — the `because` clause is
+        // syntactically required on every rule AND ensure. A prior implementation departure
+        // (commit 16f866a2, 2026-05-03) introduced an optional slot; reverted in Phase 4 W-F.
         var slots = Constructs.GetMeta(ConstructKind.EventEnsure).Slots;
         slots[3].Kind.Should().Be(ConstructSlotKind.BecauseClause);
-        slots[3].IsRequired.Should().BeFalse(
-            "EventEnsure allows ensures without a because clause — the slot is optional");
+        slots[3].IsRequired.Should().BeTrue(
+            "EventEnsure requires a because clause per Principle 9 — every ensure must carry a domain-readable rationale");
     }
 
     [Fact]
@@ -345,10 +351,11 @@ public class EnsureBecauseClauseSlotTests
     }
 
     [Fact]
-    public void Parser_StateEnsure_WithoutBecause_HasNoBecauseClauseSlot()
+    public void Parser_StateEnsure_WithoutBecause_ProducesParseError()
     {
-        // RED-P: Parser is a stub.
-        // Without a because clause, BecauseClause slot must be absent (optional slot is omitted).
+        // F-LANG-SPEC-01: Principle 9 (precept-language-spec.md:107) — the `because` clause is
+        // syntactically required on every rule AND ensure. State-ensure without because must
+        // produce a parse diagnostic. Slot is required, not optional (reverted in Phase 4 W-F).
         var src =
             "precept OrderFulfillment\n" +
             "field amount as number\n" +
@@ -360,15 +367,8 @@ public class EnsureBecauseClauseSlotTests
         var tokens = Lexer.Lex(src);
         var manifest = Precept.Pipeline.Parser.Parse(tokens);
 
-        manifest.Diagnostics.Should().BeEmpty("StateEnsure without because is valid DSL");
-        manifest.Constructs.Should().NotBeEmpty();
-
-        var stateEnsure = manifest.Constructs.Should().ContainSingle(
-            c => c.Meta.Kind == ConstructKind.StateEnsure).Subject;
-
-        stateEnsure.Slots.Should().NotContain(
-            s => s.Kind == ConstructSlotKind.BecauseClause,
-            "optional BecauseClause slot must be absent when no because clause is present");
+        manifest.Diagnostics.Should().NotBeEmpty(
+            "StateEnsure without because violates Principle 9 — every ensure must carry a rationale");
     }
 
     [Fact]
@@ -403,9 +403,9 @@ public class EnsureBecauseClauseSlotTests
     }
 
     [Fact]
-    public void Parser_EventEnsure_WithoutBecause_HasNoBecauseClauseSlot()
+    public void Parser_EventEnsure_WithoutBecause_ProducesParseError()
     {
-        // RED-P: Parser is a stub.
+        // F-LANG-SPEC-01: Principle 9 — the `because` clause is required on every event ensure.
         var src =
             "precept OrderFulfillment\n" +
             "field reviewer as string\n" +
@@ -417,14 +417,8 @@ public class EnsureBecauseClauseSlotTests
         var tokens = Lexer.Lex(src);
         var manifest = Precept.Pipeline.Parser.Parse(tokens);
 
-        manifest.Diagnostics.Should().BeEmpty("EventEnsure without because is valid DSL");
-
-        var eventEnsure = manifest.Constructs.Should().ContainSingle(
-            c => c.Meta.Kind == ConstructKind.EventEnsure).Subject;
-
-        eventEnsure.Slots.Should().NotContain(
-            s => s.Kind == ConstructSlotKind.BecauseClause,
-            "absent optional BecauseClause slot must not be materialized");
+        manifest.Diagnostics.Should().NotBeEmpty(
+            "EventEnsure without because violates Principle 9");
     }
 
     [Fact]
@@ -548,11 +542,11 @@ public class EnsureBecauseClauseSlotTests
     }
 
     [Fact]
-    public void Runtime_StateEnsure_WithoutBecause_DoesNotCrash_OnAbsentOptionalSlot()
+    public void Compile_StateEnsure_WithoutBecause_FailsCompilation()
     {
-        // RED-R: Runtime not yet implemented.
-        // Absent optional BecauseClause slot must not cause a NullReferenceException
-        // or other fault when the constraint fires.
+        // F-LANG-SPEC-01: Principle 9 — ensure-without-because is rejected at parse time,
+        // so the runtime is unreachable. The previous "runtime must not crash on absent slot"
+        // test is obsolete; the slot can never be absent in a successfully-compiled precept.
         var src =
             "precept OrderFulfillment\n" +
             "field amount as number default 0\n" +
@@ -562,18 +556,14 @@ public class EnsureBecauseClauseSlotTests
             "in Approved ensure amount > 0";
 
         var compilation = Compiler.Compile(src);
-        compilation.HasErrors.Should().BeFalse("StateEnsure without because is valid DSL");
-
-        var precept = Precept.Runtime.Precept.From(compilation);
-        var version = precept.Create(args: (JsonElement?)null);
-
-        version.Should().NotBeNull("runtime must handle absent optional BecauseClause without crashing");
+        compilation.HasErrors.Should().BeTrue(
+            "StateEnsure without because violates Principle 9 — must fail compilation");
     }
 
     [Fact]
-    public void Runtime_EventEnsure_WithoutBecause_DoesNotCrash_OnAbsentOptionalSlot()
+    public void Compile_EventEnsure_WithoutBecause_FailsCompilation()
     {
-        // RED-R: Runtime not yet implemented.
+        // F-LANG-SPEC-01: Principle 9 — see Compile_StateEnsure_WithoutBecause_FailsCompilation.
         var src =
             "precept OrderFulfillment\n" +
             "field reviewer as string default \"\"\n" +
@@ -583,11 +573,7 @@ public class EnsureBecauseClauseSlotTests
             "on Submit ensure Submit.reviewer != \"\"";
 
         var compilation = Compiler.Compile(src);
-        compilation.HasErrors.Should().BeFalse("EventEnsure without because is valid DSL");
-
-        var precept = Precept.Runtime.Precept.From(compilation);
-        var version = precept.Create(args: (JsonElement?)null);
-
-        version.Should().NotBeNull("runtime must handle absent optional BecauseClause without crashing");
+        compilation.HasErrors.Should().BeTrue(
+            "EventEnsure without because violates Principle 9 — must fail compilation");
     }
 }

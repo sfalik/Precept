@@ -324,7 +324,7 @@ public enum DiagnosticCode
     KeyUniquenessGuard              = 101,
     InvalidQuantifierTarget         = 102,
     BindingShadowsField             = 103,
-    MissingOrderingKey              = 104,
+    RequiredTraitViolation          = 104,
     CollectionInnerTypeError        = 105,
     QuantifierPredicateNotBoolean   = 106,
 

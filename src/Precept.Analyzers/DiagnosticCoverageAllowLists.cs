@@ -50,7 +50,8 @@ internal static class DiagnosticCoverageAllowLists
         // ConflictingAccessModes — wired (Slice 8)
         // RedundantAccessMode — wired (Slice 8)
         // ListLiteralOutsideDefault — wired (Slice 8)
-        "ScalarOperationOnCollection",        // D2: TypeMismatch fires instead (precision upgrade)
+        // ScalarOperationOnCollection — wired (Phase 4 W-A, F-LANG-COLL-08)
+        // CollectionOperationOnScalar — wired (Phase 4 W-A, F-LANG-COLL-08)
         // EventArgOutOfScope — wired (Slice 8)
         "InvalidInterpolationCoercion",       // D2: TypeMismatch fires instead (precision upgrade)
         // MaxPlacesExceeded — wired (Slice 8)
@@ -72,7 +73,7 @@ internal static class DiagnosticCoverageAllowLists
         "InvalidTypedConstantContent",
 
         // ── Pre-existing gaps (not in Slice 8 scope) ─────────────────────────────
-        "CollectionOperationOnScalar",        // no emission site wired
+        "MissingOrderingKey",                 // reserved 2026-05-26 (W-F COLL-11 rename); reserved for missing-`by` emission, not yet specialized
         "NonOrderableCollectionExtreme",      // no emission site wired
         "UnsatisfiableGuard",                 // no emission site wired
         "DivisionByZero",                     // no emission site wired
@@ -113,6 +114,8 @@ internal static class DiagnosticCoverageAllowLists
         "ChoiceRankConflict",
         "CircularComputedField",
         "CollectionInnerTypeError",
+        "CollectionOperationOnScalar",
+        "ScalarOperationOnCollection",
         "CompoundPeriodDenominator",
         "ComputedFieldNotWritable",
         "ComputedFieldWithDefault",
@@ -175,7 +178,7 @@ internal static class DiagnosticCoverageAllowLists
         "LengthBoundViolation",
         "ListLiteralOutsideDefault",
         "MaxPlacesExceeded",
-        "MissingOrderingKey",
+        "RequiredTraitViolation",
         "MultipleInitialEvents",
         "MultipleInitialStates",
         "MutuallyExclusiveQualifiers",

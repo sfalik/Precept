@@ -454,7 +454,7 @@ public static class Diagnostics
             RecoverySteps: ["Reorder the argument's choice values to match the order in the field's declaration"],
             ExampleBefore: "precept Example\nfield Status as choice of string(\"Active\", \"Done\")\nstate Draft initial\nstate Done terminal\nevent SetStatus(S as choice of string(\"Done\", \"Active\"))\nfrom Draft on SetStatus -> set Status = SetStatus.S -> transition Done",
             ExampleAfter: "precept Example\nfield Status as choice of string(\"Active\", \"Done\")\nstate Draft initial\nstate Done terminal\nevent SetStatus(S as choice of string(\"Active\", \"Done\"))\nfrom Draft on SetStatus -> set Status = SetStatus.S -> transition Done"),
-        DiagnosticCode.CollectionOperationOnScalar    => new(nameof(DiagnosticCode.CollectionOperationOnScalar),    DiagnosticStage.Type,  Severity.Error,   "'{0}' requires a collection, but '{2}' is a single value — change '{2}' to a set, list, or queue",                                  DiagnosticCategory.TypeSystem,
+        DiagnosticCode.CollectionOperationOnScalar    => new(nameof(DiagnosticCode.CollectionOperationOnScalar),    DiagnosticStage.Type,  Severity.Error,   "'{0}' requires a collection, but '{1}' is a single value — change '{1}' to a set, list, or queue",                                  DiagnosticCategory.TypeSystem,
             RelatedCodes: [DiagnosticCode.ScalarOperationOnCollection],
             FixHint: "Change the field type to a collection (set, queue, or stack) for collection operations",
             TriggerCondition: "A collection action such as add, remove, enqueue, or push is applied to a field that is a scalar type.",
@@ -1022,15 +1022,25 @@ public static class Diagnostics
             ExampleBefore: "precept Example\nfield Items as set of string\nfield Item as string optional\nrule any Item in Items (Item != \"\") because \"check\"",
             ExampleAfter: "precept Example\nfield Items as set of string\nfield Item as string optional\nrule any i in Items (i != \"\") because \"has non-empty items\""),
 
+        DiagnosticCode.RequiredTraitViolation => new(
+            nameof(DiagnosticCode.RequiredTraitViolation),
+            DiagnosticStage.Type, Severity.Error,
+            "Accessor '{0}' requires a trait the element type does not provide (e.g., .min/.max require Orderable)",
+            DiagnosticCategory.Structure,
+            TriggerCondition: "A collection accessor (.min/.max/.first/.last/etc.) is called on a collection whose element type lacks a required trait such as Orderable.",
+            RecoverySteps: ["Change the collection's element type to one that provides the required trait (e.g., use 'integer' or 'string' for orderable comparisons)", "Or use a different accessor that doesn't require the missing trait"],
+            ExampleBefore: "precept Example\nfield Flags as set of boolean\nfield FirstFlag as boolean optional <- Flags.min",
+            ExampleAfter: "precept Example\nfield Scores as set of integer\nfield LowestScore as integer optional <- Scores.min"),
+
         DiagnosticCode.MissingOrderingKey => new(
             nameof(DiagnosticCode.MissingOrderingKey),
             DiagnosticStage.Type, Severity.Error,
-            "'{0}' requires a 'by P' ordering key — use '{0} of T by P'",
+            "'{0}' on a 'log of T by P' field requires a 'by P' ordering key",
             DiagnosticCategory.Structure,
-            TriggerCondition: "An ordered collection type that requires a 'by' ordering key is declared without one.",
-            RecoverySteps: ["Add a 'by <type>' ordering key to the collection type declaration"],
-            ExampleBefore: "precept Example\nfield ClaimQueue as queue of string by",
-            ExampleAfter: "precept Example\nfield ClaimQueue as queue of string by integer"),
+            TriggerCondition: "An append action on a log-by field is written without a 'by P' ordering key clause.",
+            RecoverySteps: ["Add a 'by <key>' clause to the append: 'append F E by P'"],
+            ExampleBefore: "precept Example\nfield AuditLog as log of string by integer\nstate Draft initial\nstate Done terminal\nevent Log(Msg as string, Seq as integer)\nfrom Draft on Log -> append AuditLog Log.Msg -> transition Done",
+            ExampleAfter: "precept Example\nfield AuditLog as log of string by integer\nstate Draft initial\nstate Done terminal\nevent Log(Msg as string, Seq as integer)\nfrom Draft on Log -> append AuditLog Log.Msg by Log.Seq -> transition Done"),
 
         DiagnosticCode.CollectionInnerTypeError => new(
             nameof(DiagnosticCode.CollectionInnerTypeError),

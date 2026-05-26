@@ -288,9 +288,9 @@ public class ParserScopedConstructTests
     [InlineData("from Draft on Submit -> no transition")]
     [InlineData("from Draft on Submit -> reject \"Reason\"")]
     // StateEnsure with different leading tokens (complementary; in-variant covered by EnsureBecauseClauseSlotTests)
-    [InlineData("to Approved ensure amount > 0")]
-    [InlineData("from Draft ensure amount > 0")]
-    [InlineData("in Approved when IsOwner ensure amount > 0")]
+    [InlineData("to Approved ensure amount > 0 because \"required\"")]
+    [InlineData("from Draft ensure amount > 0 because \"required\"")]
+    [InlineData("in Approved when IsOwner ensure amount > 0 because \"required\"")]
     [InlineData("to Approved ensure amount > 0 because \"Approved amount must be positive\"")]
     [InlineData("from Draft ensure amount > 0 because \"Draft amount must be positive\"")]
     // AccessMode
@@ -304,8 +304,8 @@ public class ParserScopedConstructTests
     [InlineData("from Draft -> set amount = 0")]
     [InlineData("to Submitted when IsOwner -> set submittedAt = 1")]
     // EventEnsure (without because — with-because covered by EnsureBecauseClauseSlotTests)
-    [InlineData("on Submit ensure amount > 0")]
-    [InlineData("on Submit when IsOwner ensure amount > 0")]
+    [InlineData("on Submit ensure amount > 0 because \"required\"")]
+    [InlineData("on Submit when IsOwner ensure amount > 0 because \"required\"")]
     // EventHandler
     [InlineData("on UpdateName -> set name = newName")]
     public void ScopedConstruct_LexesWithoutErrors(string source)
@@ -493,9 +493,9 @@ public class ParserScopedConstructTests
     }
 
     [Theory]
-    [InlineData("in Approved when IsOwner ensure Balance > 0", ConstructKind.StateEnsure, 1)]
+    [InlineData("in Approved when IsOwner ensure Balance > 0 because \"Balance must be positive\"", ConstructKind.StateEnsure, 1)]
     [InlineData("to Submitted when IsOwner -> set Balance = Balance", ConstructKind.StateAction, 1)]
-    [InlineData("on Submit when IsOwner ensure Balance > 0", ConstructKind.EventEnsure, 1)]
+    [InlineData("on Submit when IsOwner ensure Balance > 0 because \"Balance must be positive\"", ConstructKind.EventEnsure, 1)]
     [InlineData("from Draft on Submit when IsOwner -> transition Submitted", ConstructKind.TransitionRow, 2)]
     [InlineData("in Draft when IsOwner modify Amount editable", ConstructKind.AccessMode, 1)]
     public void GuardedScopedConstruct_WithWhenClause_MaterializesGuardSlotAtExpectedIndex(
@@ -514,9 +514,9 @@ public class ParserScopedConstructTests
     }
 
     [Theory]
-    [InlineData("in Approved ensure Balance > 0", ConstructKind.StateEnsure)]
+    [InlineData("in Approved ensure Balance > 0 because \"Balance must be positive\"", ConstructKind.StateEnsure)]
     [InlineData("to Submitted -> set Balance = Balance", ConstructKind.StateAction)]
-    [InlineData("on Submit ensure Balance > 0", ConstructKind.EventEnsure)]
+    [InlineData("on Submit ensure Balance > 0 because \"Balance must be positive\"", ConstructKind.EventEnsure)]
     [InlineData("from Draft on Submit -> transition Submitted", ConstructKind.TransitionRow)]
     [InlineData("in Draft modify Amount editable", ConstructKind.AccessMode)]
     public void UnguardedScopedConstruct_WithoutWhenClause_DoesNotMaterializeGuardSlot(
@@ -551,7 +551,7 @@ public class ParserScopedConstructTests
     public void StateEnsure_WithToLeadingToken_ProducesCorrectKind()
     {
         // RED-P: 'to State ensure' must produce StateEnsure, not StateAction.
-        var tokens = Lexer.Lex("to Approved ensure amount > 0");
+        var tokens = Lexer.Lex("to Approved ensure amount > 0 because \"required\"");
         var manifest = Precept.Pipeline.Parser.Parse(tokens);
 
         manifest.Diagnostics.Should().BeEmpty(
@@ -565,7 +565,7 @@ public class ParserScopedConstructTests
     public void StateEnsure_WithFromLeadingToken_ProducesCorrectKind()
     {
         // RED-P: 'from State ensure' must produce StateEnsure, not TransitionRow.
-        var tokens = Lexer.Lex("from Draft ensure amount > 0");
+        var tokens = Lexer.Lex("from Draft ensure amount > 0 because \"required\"");
         var manifest = Precept.Pipeline.Parser.Parse(tokens);
 
         manifest.Diagnostics.Should().BeEmpty(
@@ -593,25 +593,26 @@ public class ParserScopedConstructTests
     }
 
     [Fact]
-    public void StateEnsure_WithFromLeadingToken_WithoutBecause_BecauseClauseSlot_IsAbsent()
+    public void StateEnsure_WithFromLeadingToken_WithBecause_BecauseClauseSlot_IsPresent()
     {
-        // RED-P: Optional BecauseClause must be absent for 'from' variant without because.
-        var tokens = Lexer.Lex("from Draft ensure amount > 0");
+        // F-LANG-SPEC-01 (Phase 4 W-F): `because` is required on every ensure per Principle 9.
+        // Prior test asserted optional-absent behavior; that path is now a parse error.
+        var tokens = Lexer.Lex("from Draft ensure amount > 0 because \"required\"");
         var manifest = Precept.Pipeline.Parser.Parse(tokens);
 
         var ensure = manifest.Constructs.SingleOrDefault(c => c.Meta.Kind == ConstructKind.StateEnsure);
         ensure.Should().NotBeNull();
 
-        ensure!.Slots.Should().NotContain(
+        ensure!.Slots.Should().Contain(
             s => s.Kind == ConstructSlotKind.BecauseClause,
-            "optional BecauseClause slot must be absent when no 'because' clause is present");
+            "BecauseClause slot must be present per Principle 9 — every ensure carries a domain-readable rationale");
     }
 
     [Fact]
     public void StateEnsure_HappyPath_StateTargetSlot_ContainsStateName()
     {
         // RED-P: StateTarget slot carries the scoping state name.
-        var tokens = Lexer.Lex("to Approved ensure amount > 0");
+        var tokens = Lexer.Lex("to Approved ensure amount > 0 because \"required\"");
         var manifest = Precept.Pipeline.Parser.Parse(tokens);
 
         var ensure = manifest.Constructs.SingleOrDefault(c => c.Meta.Kind == ConstructKind.StateEnsure);
@@ -627,7 +628,7 @@ public class ParserScopedConstructTests
     public void StateEnsure_HappyPath_EnsureClauseSlot_IsPresent()
     {
         // RED-P: EnsureClause is required on StateEnsure.
-        var tokens = Lexer.Lex("from Draft ensure amount > 0");
+        var tokens = Lexer.Lex("from Draft ensure amount > 0 because \"required\"");
         var manifest = Precept.Pipeline.Parser.Parse(tokens);
 
         var ensure = manifest.Constructs.SingleOrDefault(c => c.Meta.Kind == ConstructKind.StateEnsure);
@@ -642,7 +643,7 @@ public class ParserScopedConstructTests
     public void StateEnsure_WithoutGuard_SlotOrdering_StateTarget_Before_EnsureClause()
     {
         // RED-P: With the optional guard omitted, StateTarget must still precede EnsureClause.
-        var tokens = Lexer.Lex("to Approved ensure amount > 0");
+        var tokens = Lexer.Lex("to Approved ensure amount > 0 because \"required\"");
         var manifest = Precept.Pipeline.Parser.Parse(tokens);
 
         var ensure = manifest.Constructs.SingleOrDefault(c => c.Meta.Kind == ConstructKind.StateEnsure);
@@ -1078,7 +1079,7 @@ public class ParserScopedConstructTests
     public void EventEnsure_HappyPath_ProducesCorrectKind()
     {
         // RED-P: 'on Event ensure expr' must produce EventEnsure (not EventHandler).
-        var tokens = Lexer.Lex("on Submit ensure amount > 0");
+        var tokens = Lexer.Lex("on Submit ensure amount > 0 because \"required\"");
         var manifest = Precept.Pipeline.Parser.Parse(tokens);
 
         manifest.Diagnostics.Should().BeEmpty(
@@ -1092,7 +1093,7 @@ public class ParserScopedConstructTests
     public void EventEnsure_HappyPath_EventTargetSlot_ContainsEventName()
     {
         // RED-P
-        var tokens = Lexer.Lex("on Submit ensure amount > 0");
+        var tokens = Lexer.Lex("on Submit ensure amount > 0 because \"required\"");
         var manifest = Precept.Pipeline.Parser.Parse(tokens);
 
         var ensure = manifest.Constructs.SingleOrDefault(c => c.Meta.Kind == ConstructKind.EventEnsure);
@@ -1108,7 +1109,7 @@ public class ParserScopedConstructTests
     public void EventEnsure_HappyPath_EnsureClauseSlot_IsPresent()
     {
         // RED-P: EnsureClause is required on EventEnsure.
-        var tokens = Lexer.Lex("on Submit ensure amount > 0");
+        var tokens = Lexer.Lex("on Submit ensure amount > 0 because \"required\"");
         var manifest = Precept.Pipeline.Parser.Parse(tokens);
 
         var ensure = manifest.Constructs.SingleOrDefault(c => c.Meta.Kind == ConstructKind.EventEnsure);
@@ -1123,7 +1124,7 @@ public class ParserScopedConstructTests
     public void EventEnsure_WithoutGuard_SlotOrdering_EventTarget_Before_EnsureClause()
     {
         // RED-P: With the optional guard omitted, EventTarget must still precede EnsureClause.
-        var tokens = Lexer.Lex("on Submit ensure amount > 0");
+        var tokens = Lexer.Lex("on Submit ensure amount > 0 because \"required\"");
         var manifest = Precept.Pipeline.Parser.Parse(tokens);
 
         var ensure = manifest.Constructs.SingleOrDefault(c => c.Meta.Kind == ConstructKind.EventEnsure);
@@ -1140,7 +1141,7 @@ public class ParserScopedConstructTests
     public void EventEnsure_DoesNotContain_OutcomeSlot()
     {
         // RED-P: EventEnsure governs event preconditions; it has no transition outcome.
-        var tokens = Lexer.Lex("on Submit ensure amount > 0");
+        var tokens = Lexer.Lex("on Submit ensure amount > 0 because \"required\"");
         var manifest = Precept.Pipeline.Parser.Parse(tokens);
 
         var ensure = manifest.Constructs.SingleOrDefault(c => c.Meta.Kind == ConstructKind.EventEnsure);
@@ -1282,7 +1283,7 @@ public class ParserScopedConstructTests
     public void Disambiguation_From_WithEnsure_ProducesStateEnsure_NotTransitionRow()
     {
         // RED-P: peek(2) == 'ensure' → StateEnsure.
-        var tokens = Lexer.Lex("from Draft ensure amount > 0");
+        var tokens = Lexer.Lex("from Draft ensure amount > 0 because \"required\"");
         var manifest = Precept.Pipeline.Parser.Parse(tokens);
 
         manifest.Constructs.Should().ContainSingle(
@@ -1314,7 +1315,7 @@ public class ParserScopedConstructTests
     public void Disambiguation_In_WithEnsure_ProducesStateEnsure_NotAccessMode()
     {
         // RED-P: peek(2) == 'ensure' → StateEnsure.
-        var tokens = Lexer.Lex("in Approved ensure amount > 0");
+        var tokens = Lexer.Lex("in Approved ensure amount > 0 because \"required\"");
         var manifest = Precept.Pipeline.Parser.Parse(tokens);
 
         manifest.Constructs.Should().ContainSingle(
@@ -1361,7 +1362,7 @@ public class ParserScopedConstructTests
     public void Disambiguation_To_WithEnsure_ProducesStateEnsure_NotStateAction()
     {
         // RED-P: peek(2) == 'ensure' → StateEnsure.
-        var tokens = Lexer.Lex("to Approved ensure amount > 0");
+        var tokens = Lexer.Lex("to Approved ensure amount > 0 because \"required\"");
         var manifest = Precept.Pipeline.Parser.Parse(tokens);
 
         manifest.Constructs.Should().ContainSingle(
@@ -1408,7 +1409,7 @@ public class ParserScopedConstructTests
     public void Disambiguation_On_WithEnsure_ProducesEventEnsure_NotEventHandler()
     {
         // RED-P: peek(2) == 'ensure' → EventEnsure.
-        var tokens = Lexer.Lex("on Submit ensure amount > 0");
+        var tokens = Lexer.Lex("on Submit ensure amount > 0 because \"required\"");
         var manifest = Precept.Pipeline.Parser.Parse(tokens);
 
         manifest.Constructs.Should().ContainSingle(

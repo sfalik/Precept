@@ -32,7 +32,6 @@ public static class Constructs
     private static readonly ConstructSlot SlotEventTarget       = new(ConstructSlotKind.EventTarget,       Vocabulary: SlotVocabulary.EventNames);
     private static readonly ConstructSlot SlotEnsureClause      = new(ConstructSlotKind.EnsureClause,       TerminationTokens: [TokenKind.Because], Vocabulary: SlotVocabulary.Expression);
     private static readonly ConstructSlot SlotBecauseClause     = new(ConstructSlotKind.BecauseClause);
-    private static readonly ConstructSlot SlotOptBecauseClause  = new(ConstructSlotKind.BecauseClause,      IsRequired: false);
     private static readonly ConstructSlot SlotAccessModeKeyword = new(ConstructSlotKind.AccessModeKeyword, Vocabulary: SlotVocabulary.AccessModes);
     private static readonly ConstructSlot SlotFieldTarget       = new(ConstructSlotKind.FieldTarget,       IsList: true, ItemIntroducerToken: TokenKind.Comma, Vocabulary: SlotVocabulary.FieldNames);
     private static readonly ConstructSlot SlotRuleExpression    = new(ConstructSlotKind.RuleExpression,     TerminationTokens: [TokenKind.When, TokenKind.Because], Vocabulary: SlotVocabulary.Expression);
@@ -130,7 +129,7 @@ public static class Constructs
             "State-scoped constraint that must hold on entry, exit, or while in a state",
             "in Approved ensure amount > 0 because \"Approved amount must be positive\"",
             [ConstructKind.StateDeclaration],
-            [SlotStateTarget, SlotPreVerbGuardEnsure, SlotEnsureClause, SlotOptBecauseClause],
+            [SlotStateTarget, SlotPreVerbGuardEnsure, SlotEnsureClause, SlotBecauseClause],
             [new(TokenKind.In, [TokenKind.Ensure]), new(TokenKind.To, [TokenKind.Ensure]), new(TokenKind.From, [TokenKind.Ensure])],
             RoutingFamily.StateScoped),
 
@@ -171,7 +170,7 @@ public static class Constructs
             "Event-scoped constraint that must hold when an event fires",
             "on Submit ensure reviewer != \"\" because \"Reviewer required\"",
             [ConstructKind.EventDeclaration],
-            [SlotEventTarget, SlotPreVerbGuardEnsure, SlotEnsureClause, SlotOptBecauseClause],
+            [SlotEventTarget, SlotPreVerbGuardEnsure, SlotEnsureClause, SlotBecauseClause],
             [new(TokenKind.On, [TokenKind.Ensure])],
             RoutingFamily.EventScoped),
 

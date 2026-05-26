@@ -27,6 +27,20 @@ surfaced for proper fixing.
 
 ## Active
 
+### F-LANG-COLL-13: `clear` is not valid on `lookup of K to V` per the v3 spec — language gap
+
+- **Discovered**: 2026-05-26 during Phase 4 W-A's `precept-reviewer` audit. The reviewer flagged a catalog widening (adding `Lookup` to `ClearApplicable`) that contradicted the canonical spec. Investigation surfaced that the v3 spec explicitly excludes `clear MyLookup` but offers no idiomatic alternative for "empty the entire lookup."
+- **Affected**: any precept that wants to empty a lookup field in one statement. The canonical spec excludes this in v3:
+  - `docs/language/collection-types.md:85` — *"`clear` applies to `set`, `queue`, `stack`, `bag`, and `list` only — not log types (append-only) and not `lookup` (has per-key `remove`)"*
+  - `docs/language/precept-language-spec.md:1662` — *"Not valid on `log of T`, `log of T by P`, or `lookup of K to V` (v3)"*
+- **Symptom**: `clear MyLookup` emits `PRE0048 ScalarOperationOnCollection` per W-A's enforcement (wired 2026-05-26). The spec rationale ("has per-key `remove`") assumed an iteration mechanism that doesn't exist in v3 — Precept lacks a key-iteration primitive, so `remove Lookup Key` can only target known keys. Authors who want "empty the lookup" have no v3 idiom.
+- **Affected samples**: `samples/shopping-cart.precept` ClearCart event (which used to call `clear ItemQuantities` and `clear CartPromotions`). Soft-clear workaround landed in W-B: the ClearCart event clears the controlling `LineItems` set and resets totals; the lookup entries become orphaned but harmless (all read paths flow through `LineItems contains` guards, so stale entries are invisible to event handlers). The sample carries an inline comment citing this entry.
+- **Workaround used**: soft-clear via the controlling set/list (when one exists). Generalizes only when authors maintain a parallel `set of K` membership tracker alongside the lookup — common pattern but doesn't scale to every shape.
+- **Root cause**: deliberate v3 design exclusion. The "per-key remove" rationale didn't account for missing iteration primitives.
+- **Fix complexity**: design-required — either (a) lift the exclusion (allow `clear MyLookup` with explicit "drop all keys" semantics) or (b) introduce a lookup-iteration primitive that lets authors express "for each key in lookup, remove it." Both are language-surface decisions requiring `/lifecycle-2-design`.
+- **Priority**: quality bar — affects the cart-reset idiom and any similar "empty this lookup" workflow. The soft-clear workaround is semantically incomplete (stale data orphaned but invisible).
+- **Target phase**: deferred pending `/lifecycle-2-design` pass; not assigned to Phase 4 or 5.
+
 ### BUG-013: `ParserIntegrationTests.TestSample_EventDeclaration_BindsInitialToCreateOnly` references missing `samples/Test.precept`
 
 - **Discovered**: 2026-05-25 during Phase 2 Step 2.7 verification of the test suite
@@ -96,6 +110,7 @@ surfaced for proper fixing.
 
 ### BUG-002: `remove` on a lookup expects the value type instead of the key
 
+- **Status**: ✅ **Fixed by Phase 4 W-B (2026-05-26)** — `TypeChecker.Expressions.Callables.cs` `CollectionValueAction` arm now branches on target type: when target is Lookup and action is Remove, the expected operand type is the lookup's `KeyType` rather than `ElementType`. `remove Items "specific-key"` and `remove Items Drop.Key` now type-check correctly. Sample cleanup landed in the same commit: `bill-of-materials-management.precept` and `shopping-cart.precept` reverted from the `put F K = 0` workaround to direct `remove F K`. Tests in `test/Precept.Tests/TypeChecker/LookupRemoveTests.cs`.
 - **Discovered**: 2026-05-24 during authoring of `samples/bill-of-materials-management.precept`
 - **Affected**: any precept that wants to delete a key from a `lookup of K to V` field; observed in `samples/shopping-cart.precept` (worked around with `put Key = 0`) and `samples/bill-of-materials-management.precept` (same workaround)
 - **Symptom**: `PRE0105 CollectionInnerTypeError — Expected a integer value, but 'Components' holds elements of type string` when the user writes `remove Components RemoveComponent.PartNumber` where `Components` is `lookup of string to integer` and `PartNumber` is `string`. The type checker requires the `remove` argument to match the lookup's **value** type (integer here) rather than the **key** type. Two issues: (1) the only sensible deletion semantics on a lookup is key-removal, so the value-typed argument doesn't even map to a meaningful operation; (2) the diagnostic message confusingly reports the key type as the "element type" of the lookup, masking the real expectation.

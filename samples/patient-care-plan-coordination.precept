@@ -141,7 +141,7 @@ from Active on AddCareTeamMember when AddCareTeamMember.MemberType == "Coordinat
 
 from Active on UpdateProgress
     -> set GoalProgressPercent = UpdateProgress.ProgressPercent
-    -> add ProgressNotes UpdateProgress.Notes
+    -> append ProgressNotes UpdateProgress.Notes
     -> set LastProgressUpdate = now()
     -> no transition
 
@@ -161,18 +161,18 @@ from Active on DiscontinueCarePlan
 # InProgress — the plan is being executed; reviews capture clinical observations.
 from InProgress on UpdateProgress
     -> set GoalProgressPercent = UpdateProgress.ProgressPercent
-    -> add ProgressNotes UpdateProgress.Notes
+    -> append ProgressNotes UpdateProgress.Notes
     -> set LastProgressUpdate = now()
     -> no transition
 
 from InProgress on ReviewCarePlan
-    -> add ProgressNotes ReviewCarePlan.ClinicalNotes
+    -> append ProgressNotes ReviewCarePlan.ClinicalNotes
     -> set LastProgressUpdate = now()
     -> set LastModifiedAt = now()
     -> transition Active
 
 from InProgress on MarkAsCompleted
-    -> add ProgressNotes MarkAsCompleted.CompletionNotes
+    -> append ProgressNotes MarkAsCompleted.CompletionNotes
     -> set LastModifiedAt = now()
     -> set GoalStatus = "Completed"
     -> transition Completed
@@ -186,17 +186,17 @@ from InProgress on DiscontinueCarePlan
 from MilestoneReview on CompleteMilestone when CompleteMilestone.GoalAchieved
     -> set GoalProgressPercent = min(GoalProgressPercent + 25, 100)
     -> set GoalStatus = "Completed"
-    -> add ProgressNotes "Milestone achieved: " + CompleteMilestone.MilestoneOutcome
+    -> append ProgressNotes "Milestone achieved: " + CompleteMilestone.MilestoneOutcome
     -> set LastModifiedAt = now()
     -> transition Active
 from MilestoneReview on CompleteMilestone
     -> set GoalStatus = "Modified"
-    -> add ProgressNotes "Milestone not achieved: " + CompleteMilestone.MilestoneOutcome
+    -> append ProgressNotes "Milestone not achieved: " + CompleteMilestone.MilestoneOutcome
     -> set LastModifiedAt = now()
     -> no transition
 
 from MilestoneReview on ReviewCarePlan
-    -> add ProgressNotes ReviewCarePlan.ClinicalNotes
+    -> append ProgressNotes ReviewCarePlan.ClinicalNotes
     -> set LastProgressUpdate = now()
     -> set LastModifiedAt = now()
     -> transition Active

@@ -6,17 +6,17 @@ using static Precept.Tests.TypeChecker.TypeCheckerTestHelpers;
 namespace Precept.Tests;
 
 /// <summary>
-/// PRE0104 (MissingOrderingKey) — emitted when .min/.max is called on a
+/// PRE0104 (RequiredTraitViolation) — emitted when .min/.max is called on a
 /// collection whose element type lacks the Orderable trait.
 /// </summary>
 public class TypeCheckerCollectionSafetyTests
 {
-    // ── PRE0104: MissingOrderingKey ─────────────────────────────────────────
+    // ── PRE0104: RequiredTraitViolation ─────────────────────────────────────────
 
     [Theory]
     [InlineData("min")]
     [InlineData("max")]
-    public void SetOfString_MinMax_EmitsMissingOrderingKey(string accessor)
+    public void SetOfString_MinMax_EmitsRequiredTraitViolation(string accessor)
     {
         var (_, diagnostics) = Check($$"""
             precept Widget
@@ -24,7 +24,7 @@ public class TypeCheckerCollectionSafetyTests
             field Result as string optional <- Tags.{{accessor}}
             """);
 
-        diagnostics.Should().ContainSingle(d => d.Code == nameof(DiagnosticCode.MissingOrderingKey),
+        diagnostics.Should().ContainSingle(d => d.Code == nameof(DiagnosticCode.RequiredTraitViolation),
             because: $"string lacks Orderable trait, so .{accessor} should emit PRE0104");
     }
 
@@ -39,7 +39,7 @@ public class TypeCheckerCollectionSafetyTests
             field Result as integer optional <- Scores.{{accessor}}
             """);
 
-        diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.MissingOrderingKey),
+        diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.RequiredTraitViolation),
             because: $"integer has Orderable trait, so .{accessor} is structurally valid");
     }
 
@@ -54,14 +54,14 @@ public class TypeCheckerCollectionSafetyTests
             field Result as number optional <- Prices.{{accessor}}
             """);
 
-        diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.MissingOrderingKey),
+        diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.RequiredTraitViolation),
             because: $"decimal has Orderable trait, so .{accessor} is structurally valid");
     }
 
     [Theory]
     [InlineData("min")]
     [InlineData("max")]
-    public void SetOfBoolean_MinMax_EmitsMissingOrderingKey(string accessor)
+    public void SetOfBoolean_MinMax_EmitsRequiredTraitViolation(string accessor)
     {
         var (_, diagnostics) = Check($$"""
             precept Widget
@@ -69,7 +69,7 @@ public class TypeCheckerCollectionSafetyTests
             field Result as boolean optional <- Flags.{{accessor}}
             """);
 
-        diagnostics.Should().ContainSingle(d => d.Code == nameof(DiagnosticCode.MissingOrderingKey),
+        diagnostics.Should().ContainSingle(d => d.Code == nameof(DiagnosticCode.RequiredTraitViolation),
             because: $"boolean lacks Orderable trait, so .{accessor} should emit PRE0104");
     }
 
@@ -117,7 +117,7 @@ public class TypeCheckerCollectionSafetyTests
             state Open initial
             state Done
             event Submit(Value as integer)
-            from Open on Submit -> add Tags Submit.Value -> transition Done
+            from Open on Submit -> append Tags Submit.Value -> transition Done
             """;
 
         CheckExpectingError(precept, DiagnosticCode.CollectionInnerTypeError);
@@ -132,7 +132,7 @@ public class TypeCheckerCollectionSafetyTests
             state Open initial
             state Done
             event Submit(Value as string)
-            from Open on Submit -> add Tags Submit.Value -> transition Done
+            from Open on Submit -> append Tags Submit.Value -> transition Done
             """;
 
         CheckExpectingClean(precept);

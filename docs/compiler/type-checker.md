@@ -874,7 +874,7 @@ Every expression node type that won't be implemented in its slice has an explici
 | **Operations** | `FindCandidates`, `FindUnary`, `BinaryOperationMeta.QualifierMatch`, `.ProofRequirements` | Binary/unary expression resolution |
 | **Functions** | `ByName`, `FunctionOverload.Parameters`, `.ProofRequirements`, `.HasCIVariant` | Function call resolution, CI enforcement |
 | **Modifiers** | `ApplicableTo`, `MutuallyExclusiveWith`, `Subsumes` | Modifier validation |
-| **Actions** | `ApplicableTo`, `AllowedIn`, `ValueRequired`, `ActionSyntaxShape` | Action resolution and classification |
+| **Actions** | `ApplicableTo`, `AllowedIn`, `ValueRequired`, `ActionSyntaxShape` | Action resolution and classification. `ApplicableTo` enforced via `ValidateActionApplicability` in `TypeChecker.Expressions.Callables.cs` — emits `CollectionOperationOnScalar` (PRE0047) when the action expects a collection but the target is scalar, or `ScalarOperationOnCollection` (PRE0048) when the target is a collection of the wrong kind. |
 
 > **✅ Resolved in Source — ActionMeta.SyntaxShape:** `Action.cs` already carries a `SyntaxShape` property (`ActionSyntaxShape`). Update `catalog-system.md` to include it in the canonical `ActionMeta` shape and remove this as an open question.
 

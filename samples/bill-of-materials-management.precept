@@ -118,15 +118,10 @@ from Draft on UpdateComponentQuantity when ComponentPartNumbers contains UpdateC
 from Draft on UpdateComponentQuantity
     -> reject "Component {UpdateComponentQuantity.PartNumber} not in BOM — use AddComponent to add it"
 
-# Remove a component: drop membership from the set and zero the lookup entry.
-# BUG-002: `remove Components Key` does not type-check (the type checker expects
-# the lookup's value type, not the key type), so we zero-out the lookup entry
-# via `put Components Key = 0` instead. ComponentPartNumbers is the source of
-# truth for membership; the orphan zero-valued lookup entry is harmless because
-# every Components access flows through a `ComponentPartNumbers contains` guard.
+# Remove a component: drop membership from the set and the lookup entry.
 from Draft on RemoveComponent when ComponentPartNumbers contains RemoveComponent.PartNumber
     -> set TotalComponentUnits = TotalComponentUnits - (Components for RemoveComponent.PartNumber)
-    -> put Components RemoveComponent.PartNumber = 0
+    -> remove Components RemoveComponent.PartNumber
     -> remove ComponentPartNumbers RemoveComponent.PartNumber
     -> append ChangeLog RemoveComponent.PartNumber
     -> no transition
