@@ -101,6 +101,7 @@ If a topic has no research, that's the signal — surface a research-shaped gap 
 
 ## Modifiers, verdict modifiers
 
+- [`language/expressiveness/access-modifier-keyword-unification.md`](language/expressiveness/access-modifier-keyword-unification.md) — Cross-position access-modifier keyword precedent survey across 8 production languages (TypeScript, Kotlin, Rust, Swift, C#, Java, F#, Scala). Grounds F-LANG-GRAPH-04 Decision 5 keyword-unification precedent leg. **Cited** from `docs/Working/field-never-set-diagnostic.md`.
 - [`language/expressiveness/modifier-taxonomy-proposal.md`](language/expressiveness/modifier-taxonomy-proposal.md) — modifier taxonomy.
 - [`language/expressiveness/structural-lifecycle-modifiers.md`](language/expressiveness/structural-lifecycle-modifiers.md) — structural lifecycle modifiers.
 - [`language/expressiveness/milestone-modifier-feasibility.md`](language/expressiveness/milestone-modifier-feasibility.md) — milestone modifier feasibility.
