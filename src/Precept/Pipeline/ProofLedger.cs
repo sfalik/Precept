@@ -10,13 +10,13 @@ public sealed record ProofLedger(
     ImmutableArray<InitialStateSatisfiabilityResult> InitialStateResults,
     ImmutableArray<Diagnostic> Diagnostics,
     /// <summary>
-    /// W-C F-LANG-SPEC-12 — proof-engine-produced facts about reachability.
-    /// Currently carries <see cref="UnreachableRowFact"/> entries for
-    /// transition rows whose guards are unsatisfiable under field bounds.
-    /// Future consumers (LS hover, MCP `precept_proofs`) can read these
-    /// structured verdicts; the graph-level routing diagnostics are NOT
-    /// re-emitted from these facts (the proof engine emits its own
-    /// UnsatisfiableGuard diagnostics directly via the satisfiability scan).
+    /// Proof-engine-produced facts about reachability. Currently carries
+    /// <see cref="UnreachableRowFact"/> entries for transition rows whose
+    /// guards are unsatisfiable under field bounds. Future consumers (LS
+    /// hover, MCP `precept_proofs`) can read these structured verdicts; the
+    /// graph-level routing diagnostics are NOT re-emitted from these facts
+    /// (the proof engine emits its own UnsatisfiableGuard diagnostics
+    /// directly via the satisfiability scan).
     /// </summary>
     ImmutableArray<ProofForwardingFact> ProducedFacts
 )
@@ -67,7 +67,7 @@ public enum ProofStrategy
     IntervalContainment = 7,
     LengthContainment   = 8,
     CountContainment    = 9,
-    /// <summary>F-LANG-BIZ-05 — dimensional product of two quantity operands lands in the curated business-domain dimension set.</summary>
+    /// <summary>Dimensional product of two quantity operands lands in the curated business-domain dimension set.</summary>
     DimensionalProduct  = 10,
 }
 

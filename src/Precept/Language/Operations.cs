@@ -101,9 +101,10 @@ public static class Operations
             "Lookup value access"),
 
         // ── Scalar: integer ────────────────────────────────────────
-        // W-C BUG-006 — integer arithmetic gets IntervalTransfer functions so
-        // the proof engine can propagate field narrowings through `Counter + 1`
-        // and similar increment patterns.
+        // Integer arithmetic carries IntervalTransfer functions so the proof
+        // engine can propagate field narrowings through `Counter + 1` and
+        // similar increment patterns (without these the proof engine's
+        // IntervalOfNarrowed returns Unbounded at every integer binary op).
         OperationKind.IntegerPlusInteger => new BinaryOperationMeta(
             kind, OperatorKind.Plus, PInteger, PInteger, TypeKind.Integer,
             "Integer addition") { IntervalTransfer = AddTransfer },
@@ -478,7 +479,7 @@ public static class Operations
                     "Divisor must be non-zero"),
             ]),
 
-        // F-LANG-BIZ-01 — Money ÷ price → quantity. Inverse-of-inverse completion:
+        // Money ÷ price → quantity. Inverse-of-inverse completion:
         // `price × quantity → money` and `money / quantity → price` already exist;
         // `money / price → quantity` is the third leg. Currency axis must match
         // across operands (QualifierChainProofRequirement); the result inherits
@@ -588,14 +589,14 @@ public static class Operations
                     "Divisor must be non-zero"),
             ]),
 
-        // F-LANG-BIZ-05 — dimensional product check now active. The type
-        // checker's PRE0071 (CrossDimensionArithmetic) emission is scoped to
-        // additive operators (+/−) only (see TypeChecker.Expressions.cs);
-        // multiplication legitimately composes dimensions and flows through
-        // to the proof engine, which checks via DimensionalProductProofRequirement
-        // — the result dimension must land in the curated business-domain
-        // set (or be a cancelling pair that reduces to count). Products
-        // outside the curated set emit PRE0157.
+        // Dimensional product check via the proof engine: the type checker's
+        // PRE0071 (CrossDimensionArithmetic) emission is scoped to additive
+        // operators (+/−) only (see TypeChecker.Expressions.cs); multiplication
+        // legitimately composes dimensions and flows through to the proof
+        // engine, which checks via DimensionalProductProofRequirement — the
+        // result dimension must land in the curated business-domain set (or
+        // be a cancelling pair that reduces to count). Products outside the
+        // curated set emit PRE0157 IncompatibleDimensionalProduct.
         OperationKind.QuantityTimesQuantity => new BinaryOperationMeta(
             kind, OperatorKind.Times, PQuantity, PQuantity, TypeKind.Quantity,
             "Quantity × quantity → quantity (dimensional cancellation)",

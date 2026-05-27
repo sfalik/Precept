@@ -590,9 +590,11 @@ public static partial class Parser
                 }
                 else if (Modifiers.ByAccessToken.TryGetValue(modToken.Kind, out var accessMeta))
                 {
-                    // F-LANG-GRAPH-04 Decision 5: access modifiers (currently just
-                    // `editable`) are accepted at field-declaration position when
-                    // the catalog declares ApplicableDeclarationSites.FieldDeclaration.
+                    // Access modifiers (currently just `editable`) are accepted at
+                    // field-declaration position when the catalog declares
+                    // ApplicableDeclarationSites.FieldDeclaration. See
+                    // precept-language-spec.md § 2.2 — the unified `editable`
+                    // keyword stands at field-declaration and per-state-modify sites.
                     Advance();
                     lastSpan = modToken.Span;
                     modifiers.Add(new ParsedModifier(accessMeta.Kind, null, modToken.Span));
@@ -735,11 +737,11 @@ public static partial class Parser
                     var modifiers = ImmutableArray.CreateBuilder<ModifierKind>();
                     var parsedModifiers = ImmutableArray.CreateBuilder<ParsedModifier>();
 
-                    // F-LANG-GRAPH-04 Decision 5: `editable` at event-arg position
-                    // is structurally invalid (event args are always read-only in
-                    // the transition body). Consume the token and emit the
-                    // targeted EditableOnEventArg diagnostic instead of letting
-                    // the modifier loop fall through to a generic parse error.
+                    // `editable` at event-arg position is structurally invalid —
+                    // event args are always read-only in the transition body.
+                    // Consume the token and emit the targeted EditableOnEventArg
+                    // diagnostic instead of letting the modifier loop fall
+                    // through to a generic parse error.
                     while (FieldDeclarationAccessModifierTokens.Contains(Peek().Kind))
                     {
                         var accessTok = Advance();

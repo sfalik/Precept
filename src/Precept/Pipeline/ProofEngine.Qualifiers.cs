@@ -34,7 +34,7 @@ public static partial class ProofEngine
         return false;
     }
 
-    // ── Strategy: Dimensional Product Proof (F-LANG-BIZ-05) ───────────────────
+    // ── Strategy: Dimensional Product Proof ───────────────────────────────────
 
     /// <summary>
     /// Discharges <see cref="DimensionalProductProofRequirement"/>: the

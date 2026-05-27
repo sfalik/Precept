@@ -872,13 +872,12 @@ public static partial class ProofEngine
         decimal value,
         NumericProofRequirement requirement)
     {
-        // F-LANG-BIZ-08 — Discrete equality narrowing: when the guard pins
-        // the subject to a singleton value (`F == V_lit`), check whether
-        // V_lit satisfies the requirement's (comparison, threshold) pair
-        // directly. This closes the false-positive class where
-        // `when Severity == 1 ⇒ Severity > 0` was previously undischarged.
-        // Per Decision 5, the minimal sound surface is direct-equality only;
-        // disjunctive/range narrowing is deferred.
+        // Discrete equality narrowing: when the guard pins the subject to a
+        // singleton value (`F == V_lit`), check whether V_lit satisfies the
+        // requirement's (comparison, threshold) pair directly. Closes the
+        // false-positive class where `when Severity == 1 ⇒ Severity > 0`
+        // was previously undischarged. Minimal sound surface: direct-equality
+        // only; disjunctive/range narrowing is a separate extension.
         if (comparison == OperatorKind.Equals && ValueSatisfiesRequirement(value, requirement))
             return true;
 
@@ -900,9 +899,9 @@ public static partial class ProofEngine
     }
 
     /// <summary>
-    /// F-LANG-BIZ-08 — evaluates whether a singleton value satisfies a numeric
-    /// requirement's (comparison, threshold) pair. Used by the discrete-equality
-    /// narrowing path in <see cref="NumericConstraintSubsumes"/>.
+    /// Evaluates whether a singleton value satisfies a numeric requirement's
+    /// (comparison, threshold) pair. Used by the discrete-equality narrowing
+    /// path in <see cref="NumericConstraintSubsumes"/>.
     /// </summary>
     private static bool ValueSatisfiesRequirement(decimal value, NumericProofRequirement requirement) =>
         requirement.Comparison switch

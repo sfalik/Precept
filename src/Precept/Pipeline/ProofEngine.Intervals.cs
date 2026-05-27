@@ -395,9 +395,9 @@ public static partial class ProofEngine
             _ => null
         };
 
-        // BUG-006 — sibling reject-row composition: even without an explicit
-        // guard on this row, an earlier reject-row on the same (state, event)
-        // pair narrows the field values that can reach this row. Build the
+        // Sibling reject-row composition: even without an explicit guard on
+        // this row, an earlier reject-row on the same (state, event) pair
+        // narrows the field values that can reach this row. Build the
         // exclusion set from those sibling reject-rows.
         var siblingExclusions = obligation.Context is TransitionRowContext trc
             ? BuildSiblingRejectExclusions(trc.Row, semantics)
@@ -446,9 +446,9 @@ public static partial class ProofEngine
             }
         }
 
-        // BUG-006 — apply sibling reject-row exclusions. The sibling reject's
-        // guard NEGATION narrows the current row: this row reaches ONLY when
-        // the sibling's guard fails, so the negation of each leaf constraint
+        // Apply sibling reject-row exclusions. The sibling reject's guard
+        // NEGATION narrows the current row: this row reaches ONLY when the
+        // sibling's guard fails, so the negation of each leaf constraint
         // applies to the current row's per-field intervals. Half-open
         // arithmetic at the constraint level (e.g., negating `X >= 10` to
         // `X < 10`, narrowing X to `[_, 9]` for integer fields) is more
@@ -470,8 +470,8 @@ public static partial class ProofEngine
     }
 
     /// <summary>
-    /// BUG-006 — collects per-field intervals that earlier reject-rows on the
-    /// same (state, event) pair admit. The current row only fires when those
+    /// Collects per-field intervals that sibling reject-rows on the same
+    /// (state, event) pair admit. The current row only fires when those
     /// guards failed, so the admitted intervals are excluded from this row's
     /// reachable field values.
     /// </summary>
@@ -525,11 +525,17 @@ public static partial class ProofEngine
     }
 
     /// <summary>
-    /// BUG-006 — produce the negation of a constraint `field comparison value`
-    /// as an interval. Used to derive the narrowing the current row inherits
-    /// from a sibling reject-row above it. Integer-style half-open boundary
-    /// (e.g., negating `>= 10` to `<= 9`) — works for integer-valued fields,
-    /// approximate for decimal-valued ones.
+    /// Produce the negation of a constraint `field comparison value` as an
+    /// interval. Used to derive the narrowing the current row inherits from a
+    /// sibling reject-row above it. Integer-style half-open boundary (e.g.,
+    /// negating `>= 10` to `<= 9`).
+    ///
+    /// Conservative-for-decimal: decimal-valued fields are clipped to the
+    /// integer-style boundary, so e.g. a sibling rejecting `>= 10.0` narrows
+    /// the current row to `<= 9.0` rather than the precise `< 10.0`. The
+    /// resulting interval is a SUPERSET of the true admitted range, so the
+    /// proof engine under-claims discharges on decimal-heavy guards (a
+    /// missed discharge, never an unsoundness).
     /// </summary>
     private static NumericInterval? NegateConstraintToInterval(OperatorKind comparison, decimal value) =>
         comparison switch

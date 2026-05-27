@@ -157,10 +157,10 @@ internal static partial class TypeChecker
             }
         }
 
-        // F-LANG-GRAPH-04 Decision 5: validate access-modifier rules separately —
-        // they live in a different DU subtype (AccessModifierMeta) so the value-
-        // modifier loop above skips them. `editable` at field declaration is the
-        // unified replacement for the retired `writable` value modifier.
+        // Validate access-modifier rules separately — they live in a different
+        // DU subtype (AccessModifierMeta) so the value-modifier loop above
+        // skips them. `editable` at field declaration is the unified
+        // replacement for the retired `writable` value modifier.
         foreach (var mod in modifiers)
         {
             if (Modifiers.GetMeta(mod.Kind) is not AccessModifierMeta) continue;

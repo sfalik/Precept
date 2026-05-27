@@ -117,17 +117,20 @@ public sealed record DeadEndStateFact(
 ) : ProofForwardingFact;
 
 /// <summary>
-/// W-C F-LANG-SPEC-12 — a transition row is provably-unreachable because its
-/// guard is unsatisfiable under field bounds. Produced by the proof engine's
-/// satisfiability scan; consumed by graph-stage routing to sharpen dead-end
-/// detection when every outgoing row from a state on an event has a proven-
-/// unsatisfiable guard.
+/// A transition row is provably-unreachable because its guard is unsatisfiable
+/// under field bounds. Produced by the proof engine's satisfiability scan and
+/// surfaced via <see cref="ProofLedger.ProducedFacts"/> for structured
+/// consumers (LS hover, MCP precept_proofs).
+///
+/// Currently producer-only; no consumer reads it yet. The variant is reserved
+/// here so graph-stage routing — e.g. sharpening dead-end detection when every
+/// outgoing row from a state on an event has a proven-unsatisfiable guard —
+/// can wire up against the existing DU rather than a parallel fact channel.
 ///
 /// Producer/consumer note: this is the only <see cref="ProofForwardingFact"/>
 /// variant produced by the proof engine itself (the others come from the
-/// graph analyzer). Decision per the locked design: extend the existing DU
-/// rather than fork a separate <c>ProofEngineFact</c> DU — the consumption
-/// path already handles ProofForwardingFact subtypes uniformly.
+/// graph analyzer). The DU is extended rather than forked into a separate
+/// <c>ProofEngineFact</c> DU because consumption is uniform across subtypes.
 /// </summary>
 public sealed record UnreachableRowFact(
     string FromState,

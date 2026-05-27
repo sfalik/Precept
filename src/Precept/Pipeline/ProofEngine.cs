@@ -99,10 +99,13 @@ public static partial class ProofEngine
         // Incorporate forwarding facts before discharge
         IncorporateForwardingFacts(graph.ProofFacts, obligations, semantics);
 
-        // W-C — Satisfiability scan: flag unsatisfiable guards and
-        // contradictory rule pairs before the per-obligation discharge loop
-        // runs. Lateral pass that produces diagnostics directly (not via the
-        // obligation channel) per the locked design's Decision 1.
+        // Satisfiability scan: flag unsatisfiable guards and contradictory
+        // rule pairs before the per-obligation discharge loop runs. Lateral
+        // pass that produces diagnostics directly (not via the obligation
+        // channel) — satisfiability is whole-construct, not obligation-shaped,
+        // so the existing strategy dispatch (which is obligation-discharge-
+        // shaped) would be the wrong fit. See docs/compiler/proof-engine.md
+        // § Two-Pass Design (Pass 1.5).
         var producedFacts = new List<ProofForwardingFact>();
         ScanSatisfiability(semantics, diagnostics, producedFacts);
 

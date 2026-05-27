@@ -355,13 +355,19 @@ public enum DiagnosticCode
     // ── Type (collection ordering, qualifier precision) ──
     MissingOrderingKey                  = 151,
     MaxplacesCurrencyQualifierNotStatic = 152,
-    // 153/154/155 reserved for the proof-engine satisfiability-cluster workstream
+
+    // ── Proof (satisfiability scan) ──────────────────────
+    TautologicalGuard                   = 153,
+    VacuousRule                         = 154,
+    ContradictoryRule                   = 155,
 
     // ── Type (temporal constant comparison) ──────────────
     AlwaysFalsePeriodComparison         = 156,
-    // 157 reserved for the BIZ-operator-extensions workstream
 
-    // ── Graph (field-write-site analysis, F-LANG-GRAPH-04) ─
+    // ── Proof (business-domain dimensional product) ──────
+    IncompatibleDimensionalProduct      = 157,
+
+    // ── Graph (field-write-site analysis) ────────────────
     FieldNeverSet                       = 158,
 
     // ── NameBinder ───────────────────────────────────────
@@ -369,7 +375,7 @@ public enum DiagnosticCode
 }
 ```
 
-**154 active diagnostic codes** across the diagnostic stages (149 base + W-H currency precision 150–152 + W-E temporal 156 + W-B field-write-site 158; ordinals 153/154/155/157 are reserved for in-flight Phase 5 workstreams). `McpToolInternalError = 149` is a tooling-side code emitted by the MCP-tool wrapper, not the compile pipeline — see the note in § DiagnosticStage above.
+**158 active diagnostic codes** across the diagnostic stages. `McpToolInternalError = 149` is a tooling-side code emitted by the MCP-tool wrapper, not the compile pipeline — see the note in § DiagnosticStage above. PRE0150–PRE0152 cover currency-qualifier precision; PRE0153/PRE0154/PRE0155 are emitted by the proof engine's satisfiability scan (TautologicalGuard, VacuousRule, ContradictoryRule); PRE0156 catches always-false period literal comparisons; PRE0157 fires when `quantity × quantity` produces a dimension outside the curated business-domain set; PRE0158 fires when a field declaration has no discoverable write site.
 
 The enum **is** the complete set of diagnostic rules. It is a closed set — you cannot produce a diagnostic that is not a member. Adding a member without completing the catalog chain causes a build failure (see the FaultCode → DiagnosticCode Chain section below).
 

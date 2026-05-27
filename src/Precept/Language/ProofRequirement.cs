@@ -127,9 +127,9 @@ public sealed record ModifierRequirement(
 ) : ProofRequirement(ProofRequirementKind.Modifier, Description);
 
 /// <summary>
-/// F-LANG-BIZ-05 — Dimensional product proof: the multiplicative product of
-/// two quantity operands' unit dimension vectors must resolve to a known
-/// curated business-domain dimension (per <c>DimensionCatalog</c>). Used by
+/// Dimensional product proof: the multiplicative product of two quantity
+/// operands' unit dimension vectors must resolve to a known curated
+/// business-domain dimension (per <c>DimensionCatalog</c>). Used by
 /// <c>QuantityTimesQuantity</c> — `kg × m` (mass·length) is rejected because
 /// the product dimension is outside the curated set. Cancelling pairs (e.g.,
 /// `kg × (1/kg)` → dimensionless) satisfy because the count alias is part of
@@ -320,8 +320,8 @@ public abstract record ProofRequirementMeta(
             Language.DiagnosticCode.IndexBoundsGuard);
 
     /// <summary>
-    /// Dimensional product (F-LANG-BIZ-05) — operand dimension vectors multiply
-    /// to a curated business-domain dimension.
+    /// Dimensional product — operand dimension vectors multiply to a curated
+    /// business-domain dimension (per <see cref="DimensionCatalog"/>).
     /// </summary>
     public sealed record DimensionalProduct()
         : ProofRequirementMeta(ProofRequirementKind.DimensionalProduct,

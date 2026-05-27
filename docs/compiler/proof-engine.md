@@ -425,6 +425,20 @@ The proof engine operates in two sequential passes:
                                    │
                                    ▼
 ┌─────────────────────────────────────────────────────────────────────┐
+│  Pass 1.5: Satisfiability Scan (lateral)                             │
+│  • Walk TransitionRows for each row with a guard:                    │
+│    - If guard is unsatisfiable under field bounds → emit             │
+│      UnsatisfiableGuard (PRE0082) + produce UnreachableRowFact       │
+│    - Else if guard is tautological → emit TautologicalGuard (PRE0153)│
+│  • Walk Rules:                                                       │
+│    - If predicate is provably-true → emit VacuousRule (PRE0154)      │
+│    - For each rule pair, if interval intersection on a shared field  │
+│      is empty → emit ContradictoryRule (PRE0155)                     │
+│  • Runs between forwarding-fact incorporation and Pass 2 discharge.  │
+└─────────────────────────────────────────────────────────────────────┘
+                                   │
+                                   ▼
+┌─────────────────────────────────────────────────────────────────────┐
 │  Pass 2: Obligation Discharge                                        │
 │  • For each ProofObligation:                                         │
 │    - Try Strategy 1 (Literal) → if success, mark Proved              │
@@ -432,7 +446,8 @@ The proof engine operates in two sequential passes:
 │    - Try Strategy 3 (GuardInPath) → if success, mark Proved          │
 │    - Try Strategy 4 (FlowNarrowing) → if success, mark Proved        │
 │    - Try Strategy 5 (QualifierCompatibility) → if success, mark Proved │
-│    - Try Strategy 6 (CompositionalConstraint) → if success, mark Proved │
+│    - Try Strategy 6 (DimensionalProduct) → if success, mark Proved   │
+│    - Try Strategy 7 (CompositionalConstraint) → if success, mark Proved │
 │    - If all fail → mark Unresolved, emit diagnostic                  │
 │  • Build FaultSiteLinks for unresolved obligations                   │
 │  • Run constraint influence analysis                                 │
@@ -442,8 +457,17 @@ The proof engine operates in two sequential passes:
                                    ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │                            ProofLedger                               │
+│  (Diagnostics + Obligations + FaultSiteLinks + ProducedFacts)        │
 └─────────────────────────────────────────────────────────────────────┘
 ```
+
+**Satisfiability scan (Pass 1.5).** A lateral pass between forwarding-fact incorporation and per-obligation discharge that detects whole-construct verdicts the per-obligation strategies can't express: provably-empty guards, tautological guards, vacuous rule predicates, and contradictory rule pairs. Lives in `ProofEngine.Satisfiability.cs`. The verdict shape is whole-construct (no obligation site), so the scan emits diagnostics directly into the diagnostic stream rather than flowing through the obligation channel.
+
+The scan also produces `UnreachableRowFact` instances into `ProofLedger.ProducedFacts` for every transition row with a proven-unsatisfiable guard. This is the first `ProofForwardingFact` variant produced by the proof engine itself (the others — `ReachabilityFact`, `DominancePathFact`, `EventCoverageFact`, `TerminalCompletenessFact`, `DeadEndStateFact` — are produced by the graph analyzer). The DU is extended rather than forked because consumption is uniform.
+
+**Cross-row interval composition.** `BuildNarrowedIntervals` composes sibling reject-row guards into the current row's per-field narrowing. When a reject row on the same `(state, event)` pair carries a guard that admits an interval `I`, the current row implicitly satisfies `¬I` — `BuildNarrowedIntervals` intersects the current row's narrowing with `¬I` (computed via half-open negation: `>= V` ⇒ `<= V-1` for integer fields, conservative for decimal). This closes the canonical "increment to cap" repro shape: `from S on E when Counter >= MaxCount -> reject ...` followed by `from S on E -> set Counter = Counter + 1` is now provable.
+
+**DimensionalProduct (Strategy 6).** Discharges `DimensionalProductProofRequirement` on `quantity × quantity` operations. The strategy multiplies the operand dimension vectors (UCUM-derived) and asks `DimensionCatalog.TryGetAlias` whether the product matches a curated business-domain dimension. Cancelling pairs (e.g. `kg × (1/kg)` → `count`) succeed; products outside the curated set fail to discharge and emit `IncompatibleDimensionalProduct` (PRE0157).
 
 ### Obligation Generation Contract
 

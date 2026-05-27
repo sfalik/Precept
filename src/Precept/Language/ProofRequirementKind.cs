@@ -40,12 +40,12 @@ public enum ProofRequirementKind
     IndexBounds            = 11,
 
     /// <summary>
-    /// Dimensional product check (F-LANG-BIZ-05) — the multiplicative product of
-    /// two operand unit-dimension vectors must resolve to a known curated
-    /// business-domain dimension (length, mass, volume, area, temperature,
-    /// energy, pressure, force, speed, count). Used by
-    /// <c>QuantityTimesQuantity</c> to reject products outside the curated set
-    /// (e.g., <c>kg × m</c> is `mass·length`, not a business-domain dimension).
+    /// Dimensional product check — the multiplicative product of two operand
+    /// unit-dimension vectors must resolve to a known curated business-domain
+    /// dimension (length, mass, volume, area, temperature, energy, pressure,
+    /// force, speed, count). Used by <c>QuantityTimesQuantity</c> to reject
+    /// products outside the curated set (e.g., <c>kg × m</c> is `mass·length`,
+    /// not a business-domain dimension).
     /// </summary>
     DimensionalProduct     = 12,
 }

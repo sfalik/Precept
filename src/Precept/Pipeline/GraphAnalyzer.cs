@@ -42,8 +42,8 @@ public static partial class GraphAnalyzer
                     ImmutableArray<string>.Empty))
                 .ToImmutableArray();
 
-            // F-LANG-GRAPH-04 — stateless precepts may still declare fields, so
-            // FieldNeverSet must run here too.
+            // Stateless precepts may still declare fields, so the
+            // FieldNeverSet sub-pass runs here too.
             var statelessDiagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
             AnalyzeFieldWriteSites(semantics, statelessDiagnostics);
 
@@ -291,8 +291,8 @@ public static partial class GraphAnalyzer
         proofFacts.Add(terminalCompletenessFact);
         proofFacts.Add(deadEndStateFact);
 
-        // F-LANG-GRAPH-04 — field-write-site analysis (FieldNeverSet) runs after
-        // reachability / completeness / event coverage, before serialization.
+        // Field-write-site analysis (FieldNeverSet) runs after reachability /
+        // completeness / event coverage, before serialization.
         AnalyzeFieldWriteSites(semantics, diagnostics);
 
         return new StateGraph(

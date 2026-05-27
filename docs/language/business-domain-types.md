@@ -177,6 +177,10 @@ Per [`philosophy.md`](../philosophy.md) — "honesty about approximation": Prece
 
 **The qualifier system is load-bearing for approximation honesty.** `money in 'USD'`, `quantity in 'kg'`, `exchangerate in 'USD' to 'EUR'` — qualifiers travel with values through arithmetic, and operations that would silently coerce or lose them are rejected. See [`catalog-system.md § Qualifier Propagation`](catalog-system.md).
 
+**Compile-time dimensional reasoning is exact within the UCUM algebra and curated against the business-domain dimension set.** When `quantity × quantity` is checked at compile time, the proof engine multiplies the operand dimension vectors using UCUM's standard exponent algebra (length, mass, time, electric current, temperature, amount of substance, luminous intensity). The product is accepted only if it matches one of the curated business-domain aliases (length, mass, volume, area, temperature, energy, pressure, force, speed, count) or cancels to dimensionless. Products outside the curated set are rejected with `IncompatibleDimensionalProduct` (PRE0157), not silently typed as an unconstrained compound — the type system says "I don't recognize this product as a business dimension," rather than "this is a `quantity` of unclear shape." The dimension-vector arithmetic itself is exact (integer exponents); the curation is the design choice that maps physics-coherent products onto business-meaningful ones.
+
+**Cross-row interval composition is sound but conservative on decimal boundaries.** When a sibling reject-row narrows a field (e.g., `from S on E when Counter >= MaxCount -> reject ...`), the proof engine excludes the rejected interval from the next row's per-field narrowing using integer-style half-open arithmetic (`>= V` ⇒ `<= V-1`). For decimal-valued fields the narrowing is conservative — `decimal field >= 10.0` rejected is treated as `<= 9.0` rather than the precise `< 10.0` — which produces a SUPERSET of the truly admitted range. The proof engine under-claims discharges on decimal-heavy reject guards; it never silently accepts an unsound discharge.
+
 ---
 
 ## Motivation

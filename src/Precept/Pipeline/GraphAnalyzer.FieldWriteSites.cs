@@ -4,22 +4,22 @@ using Precept.Language;
 
 namespace Precept.Pipeline;
 
-// F-LANG-GRAPH-04 — FieldNeverSet analyzer.
+// FieldNeverSet analyzer.
 //
 // Whole-program write-site aggregation for every field declaration. A field
 // without a write site can only ever hold its declared default (or remain
 // unset for `optional`) — any rule, ensure, or consumer-side read sees a
 // constant value. This sub-pass walks the type-checked program and emits a
-// Warning per `docs/language/precept-language-spec.md § ... FieldNeverSet`.
+// Warning.
 //
-// Catalog-driven (Decision 6): `ActionMeta.WriteSemantics == EstablishesValue`
-// is the suppression criterion. `Clear` / `Remove` / `Pop` / `Dequeue` (all
-// classified `ClearsContents`) do NOT suppress — they don't establish a value.
+// Suppression is catalog-driven: `ActionMeta.WriteSemantics == EstablishesValue`
+// is the criterion. `Clear` / `Remove` / `Pop` / `Dequeue` (all classified
+// `ClearsContents`) do NOT suppress — they don't establish a value.
 //
-// Caller-side write capability (Decision 4): a field declared with `editable`
-// (ModifierKind.Write) at the field-declaration site OR via a per-state
-// `modify F editable` row grants the runtime API permission to write the
-// field. Both are write sites.
+// Caller-side write capability also suppresses: a field declared with
+// `editable` (ModifierKind.Write) at the field-declaration site OR via a
+// per-state `modify F editable` row grants the runtime API permission to
+// write the field; both are write sites.
 
 public static partial class GraphAnalyzer
 {
@@ -55,7 +55,7 @@ public static partial class GraphAnalyzer
             return true;
 
         // Field-level access modifier `editable` — grants caller-side write
-        // capability via the runtime API (Decision 4).
+        // capability via the runtime API.
         if (field.Modifiers.Contains(ModifierKind.Write))
             return true;
 
@@ -67,7 +67,8 @@ public static partial class GraphAnalyzer
             return true;
 
         // Transition-row action chains — establishes-value semantics suppresses;
-        // clears-contents does NOT (Decision 6 + acceptance criterion 4).
+        // clears-contents does NOT suppress (the action removes a value, it
+        // doesn't establish one).
         if (semantics.TransitionRows
             .OfType<TypedTransitionRowSuccess>()
             .Any(row => row.Actions.Any(action => IsEstablishingWriteTo(action, field.Name))))

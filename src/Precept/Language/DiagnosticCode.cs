@@ -328,28 +328,28 @@ public enum DiagnosticCode
     MaxplacesCurrencyQualifierNotStatic = 152,
 
     /// <summary>
-    /// PRE0153 — Tautological guard (F-LANG-SPEC-05). The guard expression is
-    /// provably always-true under the field's declared interval bounds and
-    /// implied modifiers. E.g. <c>field Counter nonnegative; when Counter &gt;= 0</c>
-    /// — the guard adds no constraint beyond the field's existing nonnegative
-    /// modifier. Emitted as a Warning by the proof engine's satisfiability scan.
+    /// PRE0153 — Tautological guard. The guard expression is provably always-true
+    /// under the field's declared interval bounds and implied modifiers. E.g.
+    /// <c>field Counter nonnegative; when Counter &gt;= 0</c> — the guard adds
+    /// no constraint beyond the field's existing nonnegative modifier. Emitted
+    /// as a Warning by the proof engine's satisfiability scan.
     /// </summary>
     TautologicalGuard = 153,
 
     /// <summary>
-    /// PRE0154 — Vacuous rule (F-LANG-SPEC-04). The rule predicate is
-    /// provably always-true under the fields' declared bounds (and the rule's
-    /// own `when` guard, if any), so the rule governs nothing. E.g.
-    /// <c>field X nonnegative; rule X &gt;= 0</c>. Emitted as a Warning.
+    /// PRE0154 — Vacuous rule. The rule predicate is provably always-true under
+    /// the fields' declared bounds (and the rule's own `when` guard, if any),
+    /// so the rule governs nothing. E.g. <c>field X nonnegative; rule X &gt;= 0</c>.
+    /// Emitted as a Warning.
     /// </summary>
     VacuousRule = 154,
 
     /// <summary>
-    /// PRE0155 — Contradictory rule pair (F-LANG-SPEC-03). Two rules whose
-    /// per-field constraints have empty intersection on at least one shared
-    /// field; e.g. <c>rule X &gt; 10</c> + <c>rule X &lt;= 5</c>. The conjunction
-    /// of the two rules governs the empty set. Emitted as a Warning on the
-    /// second rule with the first carried as the related-rule witness.
+    /// PRE0155 — Contradictory rule pair. Two rules whose per-field constraints
+    /// have empty intersection on at least one shared field; e.g.
+    /// <c>rule X &gt; 10</c> + <c>rule X &lt;= 5</c>. The conjunction of the
+    /// two rules governs the empty set. Emitted as a Warning on the second
+    /// rule with the first carried as the related-rule witness.
     /// </summary>
     ContradictoryRule = 155,
 
@@ -364,13 +364,13 @@ public enum DiagnosticCode
     AlwaysFalsePeriodComparison = 156,
 
     /// <summary>
-    /// PRE0157 — Incompatible dimensional product (F-LANG-BIZ-05). Emitted when
-    /// `quantity × quantity` produces a dimension vector that is not in the
-    /// curated business-domain set (length, mass, volume, area, temperature,
-    /// energy, pressure, force, speed, count). E.g. `kg × m` is `mass·length`
-    /// — a coherent physics compound but not a business-domain dimension.
-    /// Cancelling pairs (e.g., `kg × 1/kg`) resolve to the dimensionless count
-    /// alias and are accepted.
+    /// PRE0157 — Incompatible dimensional product. Emitted when `quantity × quantity`
+    /// produces a dimension vector that is not in the curated business-domain
+    /// set (length, mass, volume, area, temperature, energy, pressure, force,
+    /// speed, count). E.g. `kg × m` is `mass·length` — a coherent physics
+    /// compound but not a business-domain dimension. Cancelling pairs
+    /// (e.g., `kg × 1/kg`) resolve to the dimensionless count alias and are
+    /// accepted.
     /// </summary>
     IncompatibleDimensionalProduct = 157,
 
@@ -382,10 +382,8 @@ public enum DiagnosticCode
     /// computed `&lt;-` expression. Such a field can only ever hold its
     /// declared default (or remain unset for `optional`); any rule, ensure, or
     /// consumer-side read sees a constant value. Emitted as a Warning per
-    /// F-LANG-GRAPH-04 Decision 2 — the field is recoverable (wire it up, make
-    /// it computed, or delete it) so compilation continues. Ordinal 158 leaves
-    /// 153/154/155 reserved for the satisfiability-cluster workstream and 157
-    /// reserved for the BIZ-operator workstream.
+    /// Emitted as a Warning — the field is recoverable (wire it up, make it
+    /// computed, or delete it) so compilation continues.
     /// </summary>
     FieldNeverSet = 158,
 }

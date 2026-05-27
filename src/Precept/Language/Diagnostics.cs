@@ -769,9 +769,9 @@ public static class Diagnostics
             ExampleBefore: "precept Example\nfield Amount as number default 0\nstate Draft initial\nstate Done terminal\nevent Complete\nfrom Draft on Complete when Amount > 100 and Amount < 50 -> transition Done\nfrom Draft on Complete -> reject \"invalid\"",
             ExampleAfter: "precept Example\nfield Amount as number default 0\nstate Draft initial\nstate Done terminal\nevent Complete\nfrom Draft on Complete when Amount > 0 -> transition Done\nfrom Draft on Complete -> reject \"Amount must be positive\""),
 
-        // F-LANG-SPEC-05 — Tautological guard. The proof engine's satisfiability
-        // scan determined that the guard is always-true under the field's
-        // declared interval bounds and implied modifiers.
+        // Tautological guard. The proof engine's satisfiability scan determined
+        // that the guard is always-true under the field's declared interval
+        // bounds and implied modifiers.
         DiagnosticCode.TautologicalGuard              => new(nameof(DiagnosticCode.TautologicalGuard),              DiagnosticStage.Proof, Severity.Warning, "Guard '{0}' is always true under the declared constraints — it has no narrowing effect",                                                                  DiagnosticCategory.Proof,
             RelatedCodes: [DiagnosticCode.UnsatisfiableGuard, DiagnosticCode.VacuousRule, DiagnosticCode.ContradictoryRule],
             FixHint: "Remove the redundant guard, or refine it to narrow the field's value range.",
@@ -780,9 +780,9 @@ public static class Diagnostics
             ExampleBefore: "precept Example\nfield Counter as integer default 0 nonnegative\nstate Open initial\nstate Done terminal\nevent Advance\nfrom Open on Advance when Counter >= 0 -> transition Done",
             ExampleAfter: "precept Example\nfield Counter as integer default 0 nonnegative\nstate Open initial\nstate Done terminal\nevent Advance\nfrom Open on Advance -> transition Done"),
 
-        // F-LANG-SPEC-04 — Vacuous rule. The rule predicate is always-true under
-        // the fields' declared bounds (and the rule's own `when` guard, if any),
-        // so the rule governs nothing.
+        // Vacuous rule. The rule predicate is always-true under the fields'
+        // declared bounds (and the rule's own `when` guard, if any), so the
+        // rule governs nothing.
         DiagnosticCode.VacuousRule                    => new(nameof(DiagnosticCode.VacuousRule),                    DiagnosticStage.Proof, Severity.Warning, "Rule '{0}' is always true under the declared constraints — it governs nothing",                                                                          DiagnosticCategory.Proof,
             RelatedCodes: [DiagnosticCode.UnsatisfiableGuard, DiagnosticCode.TautologicalGuard, DiagnosticCode.ContradictoryRule],
             FixHint: "Remove the rule, or refine the predicate to actually constrain the field.",
@@ -791,8 +791,8 @@ public static class Diagnostics
             ExampleBefore: "precept Example\nfield Counter as integer default 0 nonnegative\nstate Open initial\nrule Counter >= 0 because \"Counter must be nonnegative\"",
             ExampleAfter: "precept Example\nfield Counter as integer default 0 nonnegative\nstate Open initial"),
 
-        // F-LANG-SPEC-03 — Contradictory rule pair. Two rules whose per-field
-        // constraints have empty intersection on at least one shared field.
+        // Contradictory rule pair. Two rules whose per-field constraints have
+        // empty intersection on at least one shared field.
         DiagnosticCode.ContradictoryRule              => new(nameof(DiagnosticCode.ContradictoryRule),              DiagnosticStage.Proof, Severity.Warning, "Rule '{0}' contradicts an earlier rule on field '{1}' — no valid configuration can satisfy both",                                                       DiagnosticCategory.Proof,
             RelatedCodes: [DiagnosticCode.UnsatisfiableGuard, DiagnosticCode.TautologicalGuard, DiagnosticCode.VacuousRule],
             FixHint: "Reconcile the two rules — combine them, drop one, or refine their predicates so they admit a common configuration.",

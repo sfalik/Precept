@@ -152,8 +152,8 @@ public static partial class ProofEngine
 
             case DimensionalProductProofRequirement:
             {
-                // F-LANG-BIZ-05 — surface the per-operand unit and the composed
-                // dimension name (or vector) so the diagnostic is teachable.
+                // Surface the per-operand unit and the composed dimension name
+                // (or vector) so the diagnostic is teachable.
                 string leftLabel = "?";
                 string rightLabel = "?";
                 string productLabel = "?";

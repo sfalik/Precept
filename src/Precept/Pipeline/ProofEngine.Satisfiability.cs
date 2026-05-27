@@ -5,32 +5,32 @@ using Precept.Language;
 
 namespace Precept.Pipeline;
 
-// W-C — Proof-engine satisfiability cluster.
+// Proof-engine satisfiability scan.
 //
 // Detects guards and rules whose conjunction with the fields' declared bounds
 // is empty (unsatisfiable / contradictory) — the dual of the per-obligation
 // discharge that the rest of the proof engine performs. Lives as a lateral
-// pass between `IncorporateForwardingFacts` and the discharge loop.
+// pass between `IncorporateForwardingFacts` and the discharge loop. See
+// docs/compiler/proof-engine.md § Two-Pass Design (Pass 1.5).
 //
-// Architectural placement per the locked design (Decision 1): the existing
-// strategy set in `ProofEngine.Strategies.cs` is obligation-discharge-shaped
-// (each strategy takes a ProofObligation and answers "did this discharge?").
-// Satisfiability is whole-construct ("does ANY data configuration satisfy
-// this guard?") with no obligation site — folding it into TryDischarge would
-// deform the dispatch shape. A dedicated lateral pass keeps the existing
-// strategies intact (the `precept-engine.md § 11 Decision 1` five-strategy
-// bound) and adds a clean second surface.
+// The existing strategy set in `ProofEngine.Strategies.cs` is obligation-
+// discharge-shaped (each strategy takes a ProofObligation and answers "did
+// this discharge?"). Satisfiability is whole-construct ("does ANY data
+// configuration satisfy this guard?") with no obligation site — folding it
+// into TryDischarge would deform the dispatch shape, so this scan emits
+// diagnostics directly rather than flowing through the obligation channel.
 
 public static partial class ProofEngine
 {
     /// <summary>
-    /// W-C — scans the precept for provably-unsatisfiable guards and
-    /// contradictory rule pairs, emitting `UnsatisfiableGuard` (PRE0082),
-    /// `TautologicalGuard` (PRE0153), `VacuousRule` (PRE0154), and
-    /// `ContradictoryRule` (PRE0155) directly into the diagnostic stream.
-    /// Soundness-over-completeness: every emission corresponds to a verdict
-    /// computed exactly under the existing `NumericInterval` algebra — no
-    /// solver, no heuristic, no "unknown" verdict.
+    /// Scans the precept for provably-unsatisfiable guards and contradictory
+    /// rule pairs, emitting `UnsatisfiableGuard` (PRE0082), `TautologicalGuard`
+    /// (PRE0153), `VacuousRule` (PRE0154), and `ContradictoryRule` (PRE0155)
+    /// directly into the diagnostic stream. Soundness-over-completeness
+    /// (per `precept-language-spec.md § 0.6 Proof philosophy`): every emission
+    /// corresponds to a verdict computed exactly under the existing
+    /// `NumericInterval` algebra — no solver, no heuristic, no "unknown"
+    /// verdict.
     /// </summary>
     private static void ScanSatisfiability(SemanticIndex semantics, List<Diagnostic> diagnostics, List<ProofForwardingFact> producedFacts)
     {
@@ -39,7 +39,7 @@ public static partial class ProofEngine
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    //  F-LANG-SPEC-05 / F-LANG-SPEC-04 — TautologicalGuard / VacuousRule
+    //  TautologicalGuard / VacuousRule
     //
     //  Shared mechanic: a predicate is provably-true iff every leaf constraint
     //  is provably-true under the field's bounded interval. We sidestep
@@ -113,7 +113,7 @@ public static partial class ProofEngine
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    //  F-LANG-SPEC-02 — UnsatisfiableGuard (PRE0082)
+    //  UnsatisfiableGuard (PRE0082)
     // ─────────────────────────────────────────────────────────────────────────
 
     private static void ScanTransitionRowGuards(SemanticIndex semantics, List<Diagnostic> diagnostics, List<ProofForwardingFact> producedFacts)
@@ -131,7 +131,7 @@ public static partial class ProofEngine
                     row.EventName,
                     string.Empty));
 
-                // F-LANG-SPEC-12 — produce a structured fact for downstream
+                // Produce a structured reachability fact for downstream
                 // consumers (LS hover, MCP precept_proofs). Wildcard FromState
                 // is represented as "*" for serialization stability.
                 producedFacts.Add(new UnreachableRowFact(
@@ -217,7 +217,7 @@ public static partial class ProofEngine
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    //  F-LANG-SPEC-03 — ContradictoryRule (PRE0155)
+    //  ContradictoryRule (PRE0155)
     // ─────────────────────────────────────────────────────────────────────────
 
     private static void ScanRules(SemanticIndex semantics, List<Diagnostic> diagnostics)
@@ -227,8 +227,8 @@ public static partial class ProofEngine
         {
             var rule = semantics.Rules[i];
 
-            // F-LANG-SPEC-04 — VacuousRule: rule predicate is provably-true
-            // under the fields' bounds (and the rule's own `when` guard, if any).
+            // VacuousRule: rule predicate is provably-true under the fields'
+            // bounds (and the rule's own `when` guard, if any).
             Dictionary<string, NumericInterval>? extraNarrowing = null;
             if (rule.Guard is not null)
             {

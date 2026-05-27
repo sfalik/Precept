@@ -21,10 +21,10 @@ public readonly struct NumericInterval
         new(decimal.MinValue, decimal.MaxValue, isUnbounded: true);
 
     /// <summary>
-    /// W-C — explicit empty interval. Distinct from <see cref="IsEmpty"/>
-    /// (which detects emptiness via <c>Max &lt; Min</c>) — this is the
-    /// canonical empty value the satisfiability scan returns for an
-    /// inhabited-set check that fails.
+    /// Explicit empty interval. Distinct from <see cref="IsEmpty"/> (which
+    /// detects emptiness via <c>Max &lt; Min</c>) — this is the canonical
+    /// empty value the satisfiability scan returns for an inhabited-set check
+    /// that fails.
     /// </summary>
     public static NumericInterval Empty { get; } = new(0m, -1m);
 
@@ -135,10 +135,10 @@ public readonly struct NumericInterval
     }
 
     /// <summary>
-    /// W-C — interval intersection. Used by the satisfiability scan to detect
+    /// Interval intersection. Used by the satisfiability scan to detect
     /// contradictory rule pairs: when two rules' per-field intervals intersect
-    /// to an empty interval, no valid configuration can satisfy both.
-    /// Returns <see cref="Empty"/> when the intervals are disjoint.
+    /// to an empty interval, no valid configuration can satisfy both. Returns
+    /// <see cref="Empty"/> when the intervals are disjoint.
     /// </summary>
     public NumericInterval Intersect(NumericInterval other)
     {
@@ -150,7 +150,7 @@ public readonly struct NumericInterval
     }
 
     /// <summary>
-    /// W-C — sound set difference (BUG-006 cross-row composition). When the
+    /// Sound set difference used by cross-row interval composition. When the
     /// difference would split this interval into two disjoint pieces
     /// (e.g. <c>[0,10] \ [3,5] = [0,3) ∪ (5,10]</c>), falls back to <c>this</c>
     /// unchanged — sound but less precise. The contiguous case

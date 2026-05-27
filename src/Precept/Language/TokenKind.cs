@@ -15,7 +15,8 @@ public enum TokenKind
     As          =   7,
     Default     =   8,
     Optional    =   9,
-    // Ordinal 10 retired (was Writable; unified with Editable per F-LANG-GRAPH-04).
+    // Ordinal 10 retired (was Writable; the unified `editable` keyword
+    // covers both field-declaration and per-state-modify positions).
     Because     =  11,
     Initial     =  12,
 
