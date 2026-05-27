@@ -115,3 +115,22 @@ public sealed record DeadEndStateFact(
     ImmutableArray<string> DeadEndStates,
     int DeadEndCount
 ) : ProofForwardingFact;
+
+/// <summary>
+/// W-C F-LANG-SPEC-12 — a transition row is provably-unreachable because its
+/// guard is unsatisfiable under field bounds. Produced by the proof engine's
+/// satisfiability scan; consumed by graph-stage routing to sharpen dead-end
+/// detection when every outgoing row from a state on an event has a proven-
+/// unsatisfiable guard.
+///
+/// Producer/consumer note: this is the only <see cref="ProofForwardingFact"/>
+/// variant produced by the proof engine itself (the others come from the
+/// graph analyzer). Decision per the locked design: extend the existing DU
+/// rather than fork a separate <c>ProofEngineFact</c> DU — the consumption
+/// path already handles ProofForwardingFact subtypes uniformly.
+/// </summary>
+public sealed record UnreachableRowFact(
+    string FromState,
+    string EventName,
+    SourceSpan RowSpan
+) : ProofForwardingFact;

@@ -32,9 +32,9 @@ public static partial class ProofEngine
     /// computed exactly under the existing `NumericInterval` algebra — no
     /// solver, no heuristic, no "unknown" verdict.
     /// </summary>
-    private static void ScanSatisfiability(SemanticIndex semantics, List<Diagnostic> diagnostics)
+    private static void ScanSatisfiability(SemanticIndex semantics, List<Diagnostic> diagnostics, List<ProofForwardingFact> producedFacts)
     {
-        ScanTransitionRowGuards(semantics, diagnostics);
+        ScanTransitionRowGuards(semantics, diagnostics, producedFacts);
         ScanRules(semantics, diagnostics);
     }
 
@@ -116,7 +116,7 @@ public static partial class ProofEngine
     //  F-LANG-SPEC-02 — UnsatisfiableGuard (PRE0082)
     // ─────────────────────────────────────────────────────────────────────────
 
-    private static void ScanTransitionRowGuards(SemanticIndex semantics, List<Diagnostic> diagnostics)
+    private static void ScanTransitionRowGuards(SemanticIndex semantics, List<Diagnostic> diagnostics, List<ProofForwardingFact> producedFacts)
     {
         foreach (var row in semantics.TransitionRows)
         {
@@ -130,6 +130,14 @@ public static partial class ProofEngine
                     FormatGuardText(row.Guard),
                     row.EventName,
                     string.Empty));
+
+                // F-LANG-SPEC-12 — produce a structured fact for downstream
+                // consumers (LS hover, MCP precept_proofs). Wildcard FromState
+                // is represented as "*" for serialization stability.
+                producedFacts.Add(new UnreachableRowFact(
+                    FromState: row.FromState ?? "*",
+                    EventName: row.EventName,
+                    RowSpan: row.RowSpan));
                 continue; // a guard can't be both unsatisfiable AND tautological
             }
 

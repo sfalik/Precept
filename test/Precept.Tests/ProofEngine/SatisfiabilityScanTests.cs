@@ -210,6 +210,26 @@ public class SatisfiabilityScanTests
     }
 
     [Fact]
+    public void UnsatisfiableGuard_AlsoProducesUnreachableRowFact()
+    {
+        // F-LANG-SPEC-12 — emitting UnsatisfiableGuard also produces an
+        // UnreachableRowFact in the proof ledger, surfacing the structured
+        // verdict for downstream consumers (LS hover, MCP precept_proofs).
+        var ledger = Prove("""
+            precept Repro
+            field X as integer default 0 editable
+            state Open initial
+            state Done terminal
+            event Submit
+            from Open on Submit when X > 100 and X < 50 -> transition Done
+            """);
+
+        ledger.ProducedFacts.OfType<UnreachableRowFact>().Should().ContainSingle(
+            f => f.EventName == "Submit" && f.FromState == "Open",
+            because: "the unsatisfiable guard produces a structured reachability verdict");
+    }
+
+    [Fact]
     public void TautologicalGuard_DoesNotEmit_OnUnboundedField()
     {
         // F-LANG-SPEC-05 scope-cut (soundness over completeness): when the

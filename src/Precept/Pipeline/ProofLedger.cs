@@ -8,8 +8,28 @@ public sealed record ProofLedger(
     ImmutableArray<FaultSiteLink> FaultSiteLinks,
     ImmutableArray<ConstraintInfluenceEntry> ConstraintInfluence,
     ImmutableArray<InitialStateSatisfiabilityResult> InitialStateResults,
-    ImmutableArray<Diagnostic> Diagnostics
-);
+    ImmutableArray<Diagnostic> Diagnostics,
+    /// <summary>
+    /// W-C F-LANG-SPEC-12 — proof-engine-produced facts about reachability.
+    /// Currently carries <see cref="UnreachableRowFact"/> entries for
+    /// transition rows whose guards are unsatisfiable under field bounds.
+    /// Future consumers (LS hover, MCP `precept_proofs`) can read these
+    /// structured verdicts; the graph-level routing diagnostics are NOT
+    /// re-emitted from these facts (the proof engine emits its own
+    /// UnsatisfiableGuard diagnostics directly via the satisfiability scan).
+    /// </summary>
+    ImmutableArray<ProofForwardingFact> ProducedFacts
+)
+{
+    public ProofLedger(
+        ImmutableArray<ProofObligation> obligations,
+        ImmutableArray<FaultSiteLink> faultSiteLinks,
+        ImmutableArray<ConstraintInfluenceEntry> constraintInfluence,
+        ImmutableArray<InitialStateSatisfiabilityResult> initialStateResults,
+        ImmutableArray<Diagnostic> diagnostics)
+        : this(obligations, faultSiteLinks, constraintInfluence, initialStateResults, diagnostics,
+               ImmutableArray<ProofForwardingFact>.Empty) { }
+}
 
 public sealed record ProofObligation(
     ProofRequirement Requirement,

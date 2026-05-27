@@ -103,7 +103,8 @@ public static partial class ProofEngine
         // contradictory rule pairs before the per-obligation discharge loop
         // runs. Lateral pass that produces diagnostics directly (not via the
         // obligation channel) per the locked design's Decision 1.
-        ScanSatisfiability(semantics, diagnostics);
+        var producedFacts = new List<ProofForwardingFact>();
+        ScanSatisfiability(semantics, diagnostics, producedFacts);
 
         var suppressDiagnostics = new bool[obligations.Count];
 
@@ -176,7 +177,8 @@ public static partial class ProofEngine
             faultSiteLinks.ToImmutableArray(),
             ProjectConstraintInfluence(semantics),
             initialStateResults,
-            diagnostics.ToImmutableArray());
+            diagnostics.ToImmutableArray(),
+            producedFacts.ToImmutableArray());
     }
 
     // ════════════════════════════════════════════════════════════════════════════
