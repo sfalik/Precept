@@ -630,9 +630,32 @@ public static partial class ProofEngine
             },
             _ => null
         };
-        if (guard is null) return false;
 
-        var branches = ExtractGuardBranches(guard);
+        // Event-ensure narrowing: when the obligation site is inside a transition row
+        // body, every event ensure anchored to the row's event provably holds before
+        // the row body runs — the event-ensure layer rejects the event when its
+        // condition is false. Contribute those ensure conditions as additional
+        // narrowing facts, AND-combined with the row's explicit guard.
+        var branches = guard is null
+            ? ImmutableArray.Create(ImmutableArray<GuardConstraint>.Empty)
+            : ExtractGuardBranches(guard);
+
+        if (obligation.Context is TransitionRowContext trc)
+        {
+            foreach (var ensure in semantics.Ensures)
+            {
+                if (ensure.AnchorEvent != trc.Row.EventName) continue;
+                // The ensure's Condition is the body assertion (e.g., `Amount is set`).
+                // Ensure's own Guard, if present, is handled separately when the
+                // ensure itself is being proven; it does NOT gate downstream narrowing
+                // because guarded ensures are conditional facts.
+                if (ensure.Guard is not null) continue;
+                var ensureBranches = ExtractGuardBranches(ensure.Condition);
+                branches = CombineAndBranches(branches, ensureBranches);
+            }
+        }
+
+        if (guard is null && branches.Length == 1 && branches[0].IsEmpty) return false;
 
         // Every OR branch must independently prove the obligation for it to discharge.
         foreach (var branchConstraints in branches)
@@ -667,6 +690,27 @@ public static partial class ProofEngine
         return branches.IsEmpty
             ? ImmutableArray.Create(ImmutableArray<GuardConstraint>.Empty)
             : branches;
+    }
+
+    /// <summary>
+    /// AND-combines two branch sets via cross-product, matching the AND-node logic
+    /// inside <see cref="ExtractGuardBranchesCore"/>. Used to fold additional narrowing
+    /// sources (e.g., event-ensure conditions) into a row's existing guard branches.
+    /// </summary>
+    private static ImmutableArray<ImmutableArray<GuardConstraint>> CombineAndBranches(
+        ImmutableArray<ImmutableArray<GuardConstraint>> left,
+        ImmutableArray<ImmutableArray<GuardConstraint>> right)
+    {
+        if (left.IsEmpty) return right;
+        if (right.IsEmpty) return left;
+        // If either side is the single "no constraints" branch, the other side passes through.
+        if (left.Length == 1 && left[0].IsEmpty) return right;
+        if (right.Length == 1 && right[0].IsEmpty) return left;
+        var cross = ImmutableArray.CreateBuilder<ImmutableArray<GuardConstraint>>(left.Length * right.Length);
+        foreach (var lb in left)
+            foreach (var rb in right)
+                cross.Add(lb.AddRange(rb));
+        return cross.ToImmutable();
     }
 
     private static ImmutableArray<ImmutableArray<GuardConstraint>> ExtractGuardBranchesCore(TypedExpression expr)
