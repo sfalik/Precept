@@ -285,7 +285,7 @@ flowchart TB
     end
 
     subgraph L4["④ Failure modes"]
-        Diagnostics["Diagnostics (150)"]
+        Diagnostics["Diagnostics (154)"]
         Faults["Faults (15)"]
     end
 
@@ -489,7 +489,7 @@ classDiagram
 
 | Subtype | Count | Representative members |
 |---------|------:|------------------------|
-| `ValueModifierMeta` | 15 | `optional`, `writable`, `nonnegative`, `positive`, `notempty`, `min`, `max`, `ordered` |
+| `ValueModifierMeta` | 14 | `optional`, `default`, `nonnegative`, `positive`, `notempty`, `min`, `max`, `ordered` (writable retired per F-LANG-GRAPH-04 — unified into the `editable` access modifier) |
 | `StateModifierMeta` | 7 | `initial` (state), `terminal`, `required`, `irreversible`, `success`, `warning`, `error` |
 | `EventModifierMeta` | 1 | `initial` (event) |
 | `AccessModifierMeta` | 3 | `editable` (Write), `readonly` (Read), `omit` (Omit) |

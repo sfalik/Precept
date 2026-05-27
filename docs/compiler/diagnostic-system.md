@@ -236,7 +236,7 @@ public enum DiagnosticCode
     ComputedFieldNotWritable           =  38,
     ComputedFieldWithDefault           =  39,
     CircularComputedField              =  40,
-    WritableOnEventArg                 =  41,
+    EditableOnEventArg                 =  41,
     ConflictingAccessModes             =  42,
     RedundantAccessMode                =  43,
     ListLiteralOutsideDefault          =  44,
@@ -352,12 +352,24 @@ public enum DiagnosticCode
     // ── Type (business-domain interpolation) ─────────────
     CurrencyMismatchInCurrencySlot  = 150,
 
+    // ── Type (collection ordering, qualifier precision) ──
+    MissingOrderingKey                  = 151,
+    MaxplacesCurrencyQualifierNotStatic = 152,
+    // 153/154/155 reserved for the proof-engine satisfiability-cluster workstream
+
+    // ── Type (temporal constant comparison) ──────────────
+    AlwaysFalsePeriodComparison         = 156,
+    // 157 reserved for the BIZ-operator-extensions workstream
+
+    // ── Graph (field-write-site analysis, F-LANG-GRAPH-04) ─
+    FieldNeverSet                       = 158,
+
     // ── NameBinder ───────────────────────────────────────
     UndeclaredArg                   = 107,
 }
 ```
 
-**150 total diagnostic codes** across the five diagnostic stages. (`McpToolInternalError = 149` is a tooling-side code emitted by the MCP-tool wrapper, not the compile pipeline — see the note in § DiagnosticStage above. `CurrencyMismatchInCurrencySlot = 150` fires when a currency-slot hole expression (`{field.currency}`) carries a currency that conflicts with the target field's declared qualifier.)
+**154 active diagnostic codes** across the diagnostic stages (149 base + W-H currency precision 150–152 + W-E temporal 156 + W-B field-write-site 158; ordinals 153/154/155/157 are reserved for in-flight Phase 5 workstreams). `McpToolInternalError = 149` is a tooling-side code emitted by the MCP-tool wrapper, not the compile pipeline — see the note in § DiagnosticStage above.
 
 The enum **is** the complete set of diagnostic rules. It is a closed set — you cannot produce a diagnostic that is not a member. Adding a member without completing the catalog chain causes a build failure (see the FaultCode → DiagnosticCode Chain section below).
 

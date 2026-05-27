@@ -23,6 +23,7 @@
   - [6.4 Structural Constraint Checks (Phase 3)](#64-structural-constraint-checks-phase-3)
   - [6.5 Event Coverage Analysis (Phase 3)](#65-event-coverage-analysis-phase-3)
   - [6.6 Proof Forwarding (Phase 4)](#66-proof-forwarding-phase-4)
+  - [6.7 Field-Write-Site Analysis (F-LANG-GRAPH-04)](#67-field-write-site-analysis-f-lang-graph-04)
 - [7. Dependencies and Integration Points](#7-dependencies-and-integration-points)
   - [Upstream Dependencies](#upstream-dependencies)
   - [Downstream Consumers](#downstream-consumers)
@@ -549,6 +550,21 @@ Package analysis results as typed facts for the proof engine:
 4. **TerminalCompletenessFact:** Whether all terminal states are reachable.
 
 5. **DeadEndStateFact:** Which reachable non-terminal states have no path to any terminal state.
+
+### 6.7 Field-Write-Site Analysis (F-LANG-GRAPH-04)
+
+After reachability and completeness, the graph stage walks every typed field and collects discoverable write sites. A field with no write site emits `FieldNeverSet` (Warning) — it can only ever hold its declared default or remain unset, so any rule, ensure, or consumer-side read sees a constant value.
+
+Write sites consulted (catalog-driven via `ActionMeta.WriteSemantics`):
+
+1. **Computed expression** (`field X as T <- expr`) — implicit value-establishing site.
+2. **Field-level `editable`** (`ModifierKind.Write` in field modifiers) — grants caller-side write capability via the runtime API.
+3. **Per-state `modify F editable`** (a `TypedAccessMode` with `Mode == ModifierKind.Write`) — grants caller-side write capability while the entity is in that state.
+4. **Transition-row actions** — any `TypedAction` whose `ActionMeta.WriteSemantics == EstablishesValue` targeting the field. `Clear`/`Remove`/`RemoveAt`/`Dequeue`/`DequeueBy`/`Pop` (classified `ClearsContents`) do NOT suppress — clearing or removing doesn't establish a value.
+5. **Construction event rows** (`TypedEventRowSuccess.Actions`) — same establishes-value rule.
+6. **State entry/exit hooks** (`TypedStateHook.Actions`) — same rule.
+
+Lives in `GraphAnalyzer.FieldWriteSites.cs` as a partial-class extension of `GraphAnalyzer` (matches the `Parser.Actions.cs`/`ProofEngine.Strategies.cs` convention). The analyzer runs in both the stateful and stateless paths of `Analyze` so stateless-precept field declarations get the same scrutiny.
 
 ---
 

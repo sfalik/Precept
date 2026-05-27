@@ -300,7 +300,7 @@ Every token the lexer can produce. Organized by category to match the `TokenKind
 | `As` | `as` | Type annotation (`field X as number`) |
 | `Default` | `default` | Default value modifier |
 | `Optional` | `optional` | Field optionality modifier (v2) |
-| `Writable` | `writable` | Field writable-baseline modifier — marks a non-computed field as directly editable by default across all states (v2) |
+| (retired) | (retired) | The `writable` field-level modifier was retired in favor of the unified `editable` access-mode adjective (F-LANG-GRAPH-04). The `Editable` token now stands at both field-declaration and per-state-modify positions. |
 | `Because` | `because` | Reason clause |
 | `Initial` | `initial` | Initial state marker |
 | `Ascending` | `ascending` | Sort direction modifier — ascending order for `queue of T by P` and `log of T by P` (v3) |
@@ -1026,21 +1026,23 @@ in StateTarget omit all                                              ← state-s
 
 **Two-layer access mode composition model:**
 
-- **Layer 1 — field-level baseline (`writable` modifier):** `writable` on a field declaration sets that field's baseline access mode to writable across all states. Fields without `writable` default to read-only.
+- **Layer 1 — field-level baseline (`editable` modifier):** `editable` on a field declaration sets that field's baseline access mode to writable across all states. Fields without `editable` default to read-only.
 - **Layer 2 — state-level override (`in <State> modify|omit`):** State-scoped declarations override the field's baseline for a specific (field, state) pair only. State-level always wins over the field-level baseline.
-- **Undeclared (field, state) pairs** use the field's baseline: read-only for fields without `writable`, editable for fields with `writable`.
+- **Undeclared (field, state) pairs** use the field's baseline: read-only for fields without `editable`, editable for fields with `editable`.
 
-Root-level access mode declarations are **not valid syntax** — use the `writable` modifier on the field declaration for field-level mutability. All access mode overrides are state-scoped.
+Root-level access mode declarations are **not valid syntax** — use the `editable` modifier on the field declaration for field-level mutability. All access mode overrides are state-scoped.
 
 State-scoped access modes (`in StateTarget`) use `modify` for constraint declarations and `omit` for structural exclusion. `StateTarget` may be a single state name, a comma-delimited list of state names, or `any`; comma-delimited state targets expand to one independent access-mode or omit declaration per named state. Guarded access modes read `in <StateTarget> when <Guard> modify <FieldTarget> readonly|editable`; the field target is either `all` or a comma-separated list of field names.
 
+The `editable` keyword is a single shared keyword at both positions (field declaration and per-state `modify F editable`). Per F-LANG-GRAPH-04, this is the cross-position-unified pattern used by 6 of 8 surveyed comparator languages (TypeScript `readonly`, Kotlin `val`/`var`, Swift `let`/`var`, C# `readonly`, Java `final`, Scala `val`/`var`); the prior split between `writable` (field declaration) and `editable` (per-state) was retired before external authors saw it.
+
 **Composition rules:**
-1. **Field baseline** — `writable` modifier on a field declaration sets the field's default to editable across all states.
-2. **D3 default** — fields without `writable` default to read-only for every (field, state) pair unless overridden by a state-scoped declaration.
+1. **Field baseline** — `editable` modifier on a field declaration sets the field's default to editable across all states.
+2. **D3 default** — fields without `editable` default to read-only for every (field, state) pair unless overridden by a state-scoped declaration.
 3. **State-level override always wins** — an explicit `in <State> modify|omit` declaration overrides the field's baseline for that (field, state) pair only.
 4a. **`readonly` and `editable` are the only guarded access modes** — guarded `editable` upgrades a read-only baseline to editable when the guard holds; guarded `readonly` downgrades a writable baseline to read-only when the guard holds; in both cases the field is always structurally present. `omit` cannot be guarded because conditional structural presence breaks static per-state field maps.
-4b. **Guarded `readonly` requires a `writable` baseline** — a guarded `readonly` on a field without `writable` is a compile error (`RedundantAccessMode`); both branches would otherwise resolve to read-only, making the guard vacuous.
-4c. **Unguarded declarations must change the effective mode** — `in <State> modify F editable` where `F` carries `writable` (editable is already the baseline) and `in <State> modify F readonly` where `F` lacks `writable` (read-only is the D3 default) are both compile errors (`RedundantAccessMode`). A declaration that resolves to the same mode the field already falls back to changes nothing — it is dead code. This mirrors the `RedundantModifier` pattern: declarations that have no effect are refused, not merely warned about. **`omit` is exempt** — it operates on structural presence rather than mutability and always changes the effective shape of the state, so it can never be redundant on the mutability axis. **`all` forms (`in <State> modify all readonly`) are also exempt** — a broadcast declaration's effective change depends on the current field population; applying redundancy checks to bulk forms would make valid declarations brittle as fields are added or removed.
+4b. **Guarded `readonly` requires an `editable` baseline** — a guarded `readonly` on a field without `editable` is a compile error (`RedundantAccessMode`); both branches would otherwise resolve to read-only, making the guard vacuous.
+4c. **Unguarded declarations must change the effective mode** — `in <State> modify F editable` where `F` carries `editable` (editable is already the baseline) and `in <State> modify F readonly` where `F` lacks `editable` (read-only is the D3 default) are both compile errors (`RedundantAccessMode`). A declaration that resolves to the same mode the field already falls back to changes nothing — it is dead code. This mirrors the `RedundantModifier` pattern: declarations that have no effect are refused, not merely warned about. **`omit` is exempt** — it operates on structural presence rather than mutability and always changes the effective shape of the state, so it can never be redundant on the mutability axis. **`all` forms (`in <State> modify all readonly`) are also exempt** — a broadcast declaration's effective change depends on the current field population; applying redundancy checks to bulk forms would make valid declarations brittle as fields are added or removed.
 5. **`omit` clears on state entry** — field value resets to default on any transition into an `omit` state (including self-transitions); does NOT apply to `no transition`.
 
    **D132 — RequiredFieldUnassignedOnEntry:** When a transition moves a required field (non-optional, no default value, not computed) from `omit` in the source state to non-omit in the target state, the transition action chain must include a `set` for that field. This is the structural dual of `InitialEventMissingAssignments` (D94) applied to state-crossing transitions.
@@ -1052,8 +1054,8 @@ State-scoped access modes (`in StateTarget`) use `modify` for constraint declara
 
    **D131 — OmittedFieldSetInTargetState:** A `set` (or any write) action that targets a field `omit` in the transition's target state is a compile error.
 7. **Conflicting modes** on the same (field, state) pair is a compile error.
-8. **`writable` on a computed field** is a compile error (`ComputedFieldNotWritable`).
-9. **`writable` on an event argument** is a compile error (`WritableOnEventArg`).
+8. **`editable` on a computed field** is a compile error (`ComputedFieldNotWritable`).
+9. **`editable` on an event argument** is a compile error (`EditableOnEventArg`).
 
 ### 2.3 Type References
 
@@ -1100,7 +1102,7 @@ Field modifiers appear after the type reference and before any computed expressi
 | Modifier | Syntax | Category |
 |----------|--------|----------|
 | `optional` | flag | Field is nullable; use `is set`/`is not set` for presence |
-| `writable` | flag | Field baseline is directly editable across all states (unless overridden per-state); invalid on computed fields and event args |
+| `editable` | flag (access modifier) | Field baseline is directly editable across all states (unless overridden per-state); invalid on computed fields and event args. Same keyword stands at the per-state `in <State> modify F editable` position. |
 | `ordered` | flag | Choice field supports ordinal comparison |
 | `nonnegative` | flag | Value ≥ 0 |
 | `positive` | flag | Value > 0 |
@@ -1618,7 +1620,7 @@ Modifiers are constraints on field/arg values. The type checker validates applic
 
 | Modifier | Applicable to | Error when applied to |
 |----------|---------------|----------------------|
-| `writable` | any non-computed field type (field declarations only) | computed fields (`ComputedFieldNotWritable`); event arguments (`WritableOnEventArg`) |
+| `editable` (access modifier) | any non-computed field type at field-declaration site AND per-state `modify F editable` site | computed fields (`ComputedFieldNotWritable`); event arguments (`EditableOnEventArg`) |
 | `nonnegative` | `integer`, `decimal`, `number` | `string`, `boolean`, `choice`, collections, temporal, domain |
 | `positive` | `integer`, `decimal`, `number` | (same as above) |
 | `nonzero` | `integer`, `decimal`, `number` | (same as above) |
