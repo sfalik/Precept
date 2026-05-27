@@ -169,6 +169,9 @@ public static class Actions
                     "Insert index must be within bounds [0, count]"),
             ],
             Parameters: [Types.PCollectionIndex],
+            // InputSlotRole defaults to Value (the input expression is the inserted value);
+            // the index lives on SecondaryExpression via ActionSecondaryRole.Index.
+            InputSlotRole: ActionSlotRole.Value,
             AllowedIn: AllActionContexts,
             HoverDescription: "Inserts an element at a zero-based index in a list field. Requires an index-bounds guard.",
             SnippetTemplate: "insert ${1:Field} ${2:value} at ${3:index}"),
@@ -187,6 +190,8 @@ public static class Actions
                     "Remove index must be within bounds [0, count)"),
             ],
             Parameters: [Types.PCollectionIndex],
+            // The input expression IS the index — RemoveAtIndex shape has no value slot.
+            InputSlotRole: ActionSlotRole.Index,
             AllowedIn: AllActionContexts,
             PrimaryActionKind: ActionKind.Remove,
             HoverDescription: "Removes the element at a zero-based index from a list field. Requires an index-bounds guard."),

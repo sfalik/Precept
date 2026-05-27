@@ -157,6 +157,34 @@ public class IndexBoundsTests
     }
 
     [Fact]
+    public void AtAccessor_WithDisjunctiveGuardOneBranchUnbounded_EmitsObligation()
+    {
+        // Per the design's acceptance criterion #5, both disjunctive branches must
+        // independently establish both bounds. Here the OR's right branch
+        // (`Pick.Force` is set) doesn't bound Pick.Index, so the obligation
+        // should remain Unresolved.
+        var ledger = Prove("""
+            precept Repro
+            field Items as list of string
+            field Picked as string default ""
+            field Force as boolean default false
+            state Open initial
+
+            event Pick(Index as integer)
+            from Open on Pick
+                when (Pick.Index >= 0 and Pick.Index < Items.count) or (Force == true)
+                -> set Picked = Items.at(Pick.Index)
+                -> no transition
+            """);
+
+        ledger.Obligations
+            .Where(o => o.Requirement is IndexBoundsProofRequirement)
+            .Where(o => o.Disposition == ProofDisposition.Unresolved)
+            .Should().NotBeEmpty(
+                because: "disjunctive guards must prove the obligation on EVERY branch; the Force==true branch doesn't bound Pick.Index");
+    }
+
+    [Fact]
     public void RemoveAt_WithAtOrBeforeGuard_DoesNotDischargeStrictMode()
     {
         // RemoveAt requires `<` (StrictlyBefore). `<=` is not sufficient since

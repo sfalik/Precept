@@ -360,9 +360,11 @@ public static partial class ProofEngine
         // discharge requires an explicit `N >= 0` guard constraint.
         bool lowerBoundTypeDerived = IsTypeDerivedNonnegative(indexExpr, semantics);
 
-        // No guard at all → discharge only when both bounds are type-derived.
+        // No guard at all → cannot discharge. The upper bound has no type-derived
+        // counterpart to `nonnegative` (a collection's max-index is dynamic), so a
+        // guard is always required even when the lower bound is type-derived.
         if (guard is null)
-            return lowerBoundTypeDerived && false;  // upper bound is never type-derived
+            return false;
 
         var branches = ExtractGuardBranches(guard);
         if (branches.Length == 0) return false;
@@ -395,10 +397,14 @@ public static partial class ProofEngine
 
     /// <summary>
     /// Walks the obligation's parent context (a TransitionRow / EventHandler / StateHook)
-    /// looking for an Insert or RemoveAt action targeting <paramref name="fieldName"/>;
-    /// returns the action's index TypedExpression (Insert's SecondaryExpression,
-    /// RemoveAt's InputExpression). Used by the action-site arm of
-    /// <see cref="TryIndexBoundsProof"/>.
+    /// looking for an action targeting <paramref name="fieldName"/> that carries an
+    /// <see cref="ActionSlotRole.Index"/> slot; returns the action's index TypedExpression.
+    /// Resolution is catalog-driven: the action's <see cref="TypedInputAction.SecondaryRole"/>
+    /// (for actions where the index lives on the secondary expression) and the catalog's
+    /// <see cref="ActionMeta.InputSlotRole"/> (for actions where the input expression IS
+    /// the index) both surface as <see cref="ActionSlotRole.Index"/>. No switching on
+    /// <see cref="ActionKind"/> — adding a new parameterized-index action just sets the
+    /// appropriate role in its catalog entry.
     /// </summary>
     private static TypedExpression? FindActionIndexInContext(ObligationContext context, string fieldName)
     {
@@ -415,11 +421,13 @@ public static partial class ProofEngine
         {
             if (action.FieldName != fieldName) continue;
             if (action is not TypedInputAction input) continue;
-            // Insert's index is SecondaryExpression with SecondaryRole = Index;
-            // RemoveAt's index is InputExpression (no secondary).
-            if (action.Kind == ActionKind.Insert && input.SecondaryRole == ActionSecondaryRole.Index)
+            // The index expression lives in whichever slot the catalog declares for the
+            // Index role. SecondaryRole is per-action-instance metadata; InputSlotRole
+            // is per-action-kind catalog metadata. Either path resolves to "this slot
+            // holds the index" without naming the ActionKind.
+            if (input.SecondaryRole == ActionSecondaryRole.Index)
                 return input.SecondaryExpression;
-            if (action.Kind == ActionKind.RemoveAt)
+            if (Actions.GetMeta(action.Kind).InputSlotRole == ActionSlotRole.Index)
                 return input.InputExpression;
         }
         return null;

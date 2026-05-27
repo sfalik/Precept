@@ -22,7 +22,8 @@ public sealed record ActionMeta(
     string?      SnippetTemplate  = null,
     ActionKind?  PrimaryActionKind = null,
     Func<TypedAction, SemanticIndex, ImmutableArray<ProofObligation>>? DynamicObligationGenerator = null,
-    ParameterMeta[]? Parameters = null)
+    ParameterMeta[]? Parameters = null,
+    ActionSlotRole? InputSlotRole = null)
 {
     /// <summary>Proof obligations the type checker must verify at call sites.</summary>
     public ProofRequirement[] ProofRequirements { get; } = ProofRequirements ?? [];
@@ -44,6 +45,15 @@ public sealed record ActionMeta(
     /// Empty for actions whose obligations only reference the receiver (SelfSubject).
     /// </summary>
     public ParameterMeta[] Parameters { get; } = Parameters ?? [];
+
+    /// <summary>
+    /// Catalog-declared role of the action's primary <c>InputExpression</c> slot —
+    /// e.g., <see cref="ActionSlotRole.Index"/> for <c>remove F at N</c> where the
+    /// input IS the index. Used by the proof engine to recover the index expression
+    /// without switching on <see cref="ActionKind"/> identity. Null for actions whose
+    /// input role is the default <see cref="ActionSlotRole.Value"/> shape.
+    /// </summary>
+    public ActionSlotRole? InputSlotRole { get; } = InputSlotRole;
 }
 
 /// <summary>

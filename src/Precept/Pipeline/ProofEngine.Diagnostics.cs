@@ -123,8 +123,9 @@ public static partial class ProofEngine
             {
                 // Two site shapes — accessor (.at(N)) and action (Insert/RemoveAt).
                 // For accessors, the field is access.Object; for actions, Site is the
-                // field directly. The index expression is the resolved subject (accessor)
-                // or recovered from the action context.
+                // field directly. In both cases, the index expression is recoverable —
+                // from access.Arguments for accessors, or by walking the parent context
+                // for actions (mirrors the discharge strategy's resolution).
                 string fieldName;
                 string indexLabel;
                 if (obligation.Site is TypedMemberAccess access)
@@ -137,7 +138,8 @@ public static partial class ProofEngine
                 else if (obligation.Site is TypedFieldRef fr2)
                 {
                     fieldName = fr2.FieldName;
-                    indexLabel = "<index>";
+                    var indexExpr = FindActionIndexInContext(obligation.Context, fr2.FieldName);
+                    indexLabel = indexExpr is null ? "<index>" : DescribeExpression(indexExpr);
                 }
                 else
                 {

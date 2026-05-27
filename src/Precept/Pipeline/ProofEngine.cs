@@ -444,7 +444,10 @@ public static partial class ProofEngine
                 TypedBinaryOp bin => ResolveParamInBinaryOp(param.Parameter, bin),
                 TypedFunctionCall call => ResolveParamInFunctionCall(param.Parameter, call),
                 TypedMemberAccess access => ResolveParamInMemberAccess(param.Parameter, access),
-                TypedFieldRef fieldRef => ResolveParamInActionOnField(param.Parameter, fieldRef),
+                // Action-site obligations (Insert/RemoveAt index bounds) do NOT resolve via
+                // this Subject path — the Site is a TypedFieldRef (the receiver), and the
+                // index expression is recovered through the obligation's parent context
+                // by FindActionIndexInContext in TryIndexBoundsProof.
                 _ => null
             },
             SelfSubject self => site switch
@@ -501,23 +504,6 @@ public static partial class ProofEngine
         return null;
     }
 
-    /// <summary>
-    /// Resolves a ParamSubject against an action's catalog-declared parameter list.
-    /// Action obligations carry the receiver field as their Site (via
-    /// <see cref="CreateActionProofSite"/>); the action's parameters (index, value,
-    /// key) come from the catalog-declared <see cref="ActionMeta.Parameters"/>,
-    /// mapped to the action's syntax-shape slots via <see cref="MapActionParamToExpression"/>.
-    /// </summary>
-    private static TypedExpression? ResolveParamInActionOnField(ParameterMeta param, TypedFieldRef site)
-    {
-        // The proof engine doesn't carry the original TypedAction on the obligation site,
-        // but the obligation's Context (TransitionRowContext / EventHandlerContext)
-        // holds the parent row. Walk the row's actions, find the one targeting this
-        // field, then map the ParameterMeta to its argument position.
-        // For now this is a no-op stub — the actual mapping is wired in
-        // BindActionParameterToObligation via the WalkActions site construction.
-        return null;
-    }
 
     private static string? GetFieldName(ProofSubject subject, TypedExpression site)
     {

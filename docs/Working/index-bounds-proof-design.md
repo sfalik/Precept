@@ -559,7 +559,7 @@ already-established one.
 
 - **Rationale**: When N is declared as `integer nonnegative` (field-level
   or arg-level), the type system already proves N >= 0. The existing
-  `DeclarationAttribute` strategy at `ProofEngine.Strategies.cs:92-103`
+  `DeclarationAttribute` strategy at `ProofEngine.Strategies.cs:137-148`
   walks effective modifiers and discharges `Numeric(>= 0)` from a
   `nonnegative` modifier. We reuse that strategy unchanged. When N is
   declared as `integer` (no modifier), the type system makes no
@@ -580,10 +580,10 @@ already-established one.
     `.at(-1)` when N is bare integer. Rejected — defeats the totality
     contract.
 - **Precedent**:
-  - `src/Precept/Pipeline/ProofEngine.Strategies.cs:92-103` —
+  - `src/Precept/Pipeline/ProofEngine.Strategies.cs:137-148` —
     *"`foreach (var modifier in attributeField.Modifiers.Concat(attributeField.ImpliedModifiers)) { var meta = Modifiers.GetMeta(modifier); if (meta is not ValueModifierMeta fmm) continue; foreach (var satisfaction in fmm.ProofSatisfactions) { if (SatisfactionCovers(satisfaction, obligation.Requirement)) return true; } }`"* — the established type-derived nonnegativity path.
 - **Sources consulted for this decision**:
-  - `src/Precept/Pipeline/ProofEngine.Strategies.cs:80-103` — *"Accessor-level nonnegative guarantee: collection count can never be negative … Walk declared + implied modifiers"*. The same pattern handles `field.count >= 0` (trivially nonnegative); we extend the same handling to `nonnegative`-declared args.
+  - `src/Precept/Pipeline/ProofEngine.Strategies.cs:125-148` — *"Accessor-level nonnegative guarantee: collection count can never be negative … Walk declared + implied modifiers"*. The same pattern handles `field.count >= 0` (trivially nonnegative); we extend the same handling to `nonnegative`-declared args.
   - `src/Precept/Language/Modifiers.cs` Nonnegative modifier meta — provides the `ValueModifierMeta.ProofSatisfactions` entry that this discharge consults.
 
 ### Decision 5: Reuse PRE0100 (IndexBoundsGuard) with refined message; reserve PRE0042 (UnguardedCollectionAccess) for non-empty failures
