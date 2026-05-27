@@ -24,7 +24,6 @@ field ReferenceRanges as string optional
 field CriticalFlags as set of string
 field VerifiedBy as string optional maxlength 200
 
-field RejectionReason as string optional
 field StatusReason as string optional
 
 # Rules

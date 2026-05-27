@@ -15,7 +15,7 @@ field TrialPlan as choice of string("Free", "Pro Starter", "Pro", "Enterprise") 
 
 # Pricing — money in 'USD' for exactness.
 field PlanMonthlyFee as money in 'USD' default '0.00 USD' nonnegative
-field MaximumDiscount as money in 'USD' default '100.00 USD' positive
+field MaximumDiscount as money in 'USD' default '100.00 USD' positive editable
 field ConversionDiscount as money in 'USD' default '0.00 USD' nonnegative
 
 # Conversion tracking
@@ -48,7 +48,7 @@ field TrialEndsAt as instant
 field ExtendedEndDate as instant optional
 field ConvertedAt as instant optional
 field OfferSentAt as instant optional
-field OfferExpiresAt as instant optional
+field OfferExpiresAt as instant optional editable
 
 # Domain rules — required fields when status is Converted.
 rule PlanMonthlyFee > '0.00 USD' when ConversionStatus == "Converted" because "A converted trial must have a positive monthly fee — a converted customer is paying"

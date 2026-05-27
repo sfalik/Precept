@@ -9,7 +9,7 @@ precept RestaurantWaitlist
 # identity is captured at creation. Parties flow through via JoinWaitlist events.
 
 # Currently-calling party — set when SeatNextParty dequeues, cleared on MarkSeated.
-field CurrentParty as string optional maxlength 200
+field CurrentParty as string optional maxlength 200 editable
 field LastCalledParty as string optional maxlength 200
 
 # Estimated wait — 10 minutes per party in the queue. Updated whenever the queue changes.

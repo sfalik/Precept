@@ -34,7 +34,7 @@ field EnrolledOn as date optional
 field TermStartDate as date optional
 field TermEndDate as date optional
 # BUG-003: `period default '<literal>'` crashes the MCP compiler — host supplies.
-field GracePeriod as period optional
+field GracePeriod as period optional editable
 
 # Dues and payment tracking — exact money, no approximation
 field DuesAmount as money in 'USD' optional

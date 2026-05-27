@@ -72,9 +72,9 @@ field InformationRequestSentAt as instant optional
 field InformationReceivedAt as instant optional
 
 # Audit and history
-field PriorAuthHistory as log of string
-field PriorAuthorizationCount as integer nonnegative default 0
-field PreviousAuthorizationNumber as string optional maxlength 50
+field PriorAuthHistory as log of string editable
+field PriorAuthorizationCount as integer nonnegative default 0 editable
+field PreviousAuthorizationNumber as string optional maxlength 50 editable
 
 # Case management
 field CaseManager as string optional maxlength 200

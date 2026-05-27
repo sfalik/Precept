@@ -16,7 +16,7 @@ field ApprovalNote as string optional
 
 # Repair workflow
 field RepairSteps as stack of string
-field LastReversedStep as string optional maxlength 200
+field LastReversedStep as string optional maxlength 200 editable
 field RepairComplete as boolean default false
 field ShippingLabelSent as boolean default false
 

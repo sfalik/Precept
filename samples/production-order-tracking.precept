@@ -38,7 +38,7 @@ rule YieldPercent <= 100 because "Yield percent cannot exceed 100% — produced 
 field BOMItems as lookup of string to integer
 
 # Material consumption tracking — actual materials drawn per batch.
-field MaterialConsumed as lookup of string to integer
+field MaterialConsumed as lookup of string to integer editable
 
 # Quality inspection
 field QualityStatus as choice of string("NotInspected", "Pass", "Fail", "Conditional") default "NotInspected"

@@ -20,7 +20,7 @@ namespace Precept.Pipeline;
 //
 // See: docs/language/catalog-system.md § GraphAnalyzer-catalog integration pattern
 
-public static class GraphAnalyzer
+public static partial class GraphAnalyzer
 {
     public static StateGraph Analyze(SemanticIndex semantics)
     {
@@ -42,6 +42,11 @@ public static class GraphAnalyzer
                     ImmutableArray<string>.Empty))
                 .ToImmutableArray();
 
+            // F-LANG-GRAPH-04 — stateless precepts may still declare fields, so
+            // FieldNeverSet must run here too.
+            var statelessDiagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
+            AnalyzeFieldWriteSites(semantics, statelessDiagnostics);
+
             return new StateGraph(
                 States: ImmutableArray<GraphState>.Empty,
                 Events: semantics.Events
@@ -56,7 +61,7 @@ public static class GraphAnalyzer
                 BackEdgeViolations: ImmutableArray<IrreversibleBackEdgeViolation>.Empty,
                 EventCoverage: statelessCoverage,
                 ProofFacts: [statelessTerminalFact, statelessDeadEndFact],
-                Diagnostics: ImmutableArray<Diagnostic>.Empty);
+                Diagnostics: statelessDiagnostics.ToImmutable());
         }
 
         var edges = BuildEdges(semantics);
@@ -285,6 +290,10 @@ public static class GraphAnalyzer
 
         proofFacts.Add(terminalCompletenessFact);
         proofFacts.Add(deadEndStateFact);
+
+        // F-LANG-GRAPH-04 — field-write-site analysis (FieldNeverSet) runs after
+        // reachability / completeness / event coverage, before serialization.
+        AnalyzeFieldWriteSites(semantics, diagnostics);
 
         return new StateGraph(
             States: graphStates,

@@ -27,21 +27,21 @@ field SatisfactionScore as integer default 50 nonnegative max 100
 
 # Risk tracking
 field RiskFactors as set of string
-field RiskLevel as choice of string("Low", "Medium", "High") default "Low"
+field RiskLevel as choice of string("Low", "Medium", "High") default "Low" editable
 field LastRiskAssessmentAt as instant optional
 
 # Engagement tracking
 field LastContactAt as instant optional
-field LastLoginDate as instant optional
-field DaysSinceLastLogin as integer default 0 nonnegative
-field LoginCountThisMonth as integer default 0 nonnegative
-field SupportTicketsOpen as integer default 0 nonnegative
+field LastLoginDate as instant optional editable
+field DaysSinceLastLogin as integer default 0 nonnegative editable
+field LoginCountThisMonth as integer default 0 nonnegative editable
+field SupportTicketsOpen as integer default 0 nonnegative editable
 
 # Success plan
 field SuccessPlan as string optional
-field KeyMetricsTracked as set of string
-field MilestonesCompleted as integer default 0 nonnegative
-field TotalMilestones as integer default 0 nonnegative
+field KeyMetricsTracked as set of string editable
+field MilestonesCompleted as integer default 0 nonnegative editable
+field TotalMilestones as integer default 0 nonnegative editable
 
 # Outreach history
 field OutreachHistory as log of string
@@ -51,8 +51,8 @@ field NextOutreachScheduled as instant optional
 
 # Account data
 field ContractValue as money in 'USD' positive
-field RenewalDate as instant optional
-field RenewalRisk as choice of string("Low", "Medium", "High") default "Low"
+field RenewalDate as instant optional editable
+field RenewalRisk as choice of string("Low", "Medium", "High") default "Low" editable
 field ChurnReason as string optional
 field CompletedAt as instant optional
 

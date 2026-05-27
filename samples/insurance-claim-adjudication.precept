@@ -58,7 +58,7 @@ field DenialReason as string optional
 field PaymentMethod as choice of string("Check", "Wire", "ACH", "DirectDeposit") optional
 
 # SLA tracking — handling-time bound for review.
-field ReviewSLA as duration default '30 days'
+field ReviewSLA as duration default '30 days' editable
 field TargetCompletion as instant optional
 
 # Rules — domain invariants

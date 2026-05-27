@@ -147,7 +147,7 @@ public class CompileToolTests
 
     private const string ValidSource = """
         precept LoanApplication
-        field Amount as number default 0
+        field Amount as number default 0 editable
         state Pending initial
         state Approved terminal
         event Approve

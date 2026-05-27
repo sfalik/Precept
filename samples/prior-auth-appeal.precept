@@ -56,7 +56,7 @@ field InformationReceivedAt as instant optional
 field DecisionDate as instant optional
 field AppealCompletedAt as instant optional
 field EffectiveDate as date optional
-field ExpirationDate as date optional
+field ExpirationDate as date optional editable
 field ServiceDate as date optional
 
 # Review process tracking

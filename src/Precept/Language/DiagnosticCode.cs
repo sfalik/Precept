@@ -336,4 +336,19 @@ public enum DiagnosticCode
     /// the comparison is legal but almost certainly not what the author intended.
     /// </summary>
     AlwaysFalsePeriodComparison = 156,
+
+    /// <summary>
+    /// PRE0158 — Field has no write site. The named field has no initial-event
+    /// assignment, no value-establishing action in any transition row, no
+    /// state-entry hook setting it, no caller-side write capability (no
+    /// field-level `editable`, no per-state `modify F editable`), and no
+    /// computed `&lt;-` expression. Such a field can only ever hold its
+    /// declared default (or remain unset for `optional`); any rule, ensure, or
+    /// consumer-side read sees a constant value. Emitted as a Warning per
+    /// F-LANG-GRAPH-04 Decision 2 — the field is recoverable (wire it up, make
+    /// it computed, or delete it) so compilation continues. Ordinal 158 leaves
+    /// 153/154/155 reserved for the satisfiability-cluster workstream and 157
+    /// reserved for the BIZ-operator workstream.
+    /// </summary>
+    FieldNeverSet = 158,
 }

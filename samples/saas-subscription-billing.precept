@@ -17,8 +17,8 @@ field BillingCycle as choice of string("Monthly", "Annual") default "Monthly"
 
 # Pricing — money in 'USD' for exactness.
 field Amount as money in 'USD' positive
-field DiscountPercent as decimal default 0 nonnegative max 100 maxplaces 2
-field DiscountEndDate as instant optional
+field DiscountPercent as decimal default 0 nonnegative max 100 maxplaces 2 editable
+field DiscountEndDate as instant optional editable
 
 # Billing period
 field CurrentPeriodStart as instant

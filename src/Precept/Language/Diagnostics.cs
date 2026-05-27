@@ -1062,6 +1062,23 @@ public static class Diagnostics
             ExampleBefore: "precept Example\nfield A as period default '1 month'\nfield B as period default '30 days'\nstate Open initial\nfield AlwaysFalse as boolean default false <- A == B",
             ExampleAfter: "precept Example\nfield A as duration default '30 days'\nfield B as duration default '30 days'\nstate Open initial\nfield AlwaysTrue as boolean default false <- A == B"),
 
+        DiagnosticCode.FieldNeverSet => new(
+            nameof(DiagnosticCode.FieldNeverSet),
+            DiagnosticStage.Graph, Severity.Warning,
+            "Field '{0}' has no write site — it can only hold its declared default or remain unset",
+            DiagnosticCategory.Structure,
+            FixHint: "Wire '{0}' into governance: add a value-establishing action in a transition row, mark it editable for caller-side writes, or make it computed with <-. If the field is genuinely unused, delete it.",
+            TriggerCondition: "The named field has no construction-event assignment, no value-establishing action (set/put/add/enqueue/push/append/insert), no state-entry hook setting it, no field-level or per-state `editable` access modifier, and no computed `<-` expression — the value can never change after declaration.",
+            RecoverySteps: [
+                "Add a `-> set {0} = <expr>` (or `put`/`add`/etc.) in a transition row that writes the field",
+                "Or declare `editable` on the field to grant caller-side write capability",
+                "Or rewrite as a computed field: `field {0} as <type> <- <expression>`",
+                "Or, if the field is unused, delete the declaration",
+            ],
+            ExampleBefore: "precept Example\nfield Priority as integer default 0\nstate Draft initial\nstate Done terminal\nevent Submit\nfrom Draft on Submit -> transition Done",
+            ExampleAfter: "precept Example\nfield Priority as integer default 0 editable\nstate Draft initial\nstate Done terminal\nevent Submit\nfrom Draft on Submit -> transition Done",
+            RelatedCodes: [DiagnosticCode.UnreachableState, DiagnosticCode.UnhandledEvent]),
+
         DiagnosticCode.CollectionInnerTypeError => new(
             nameof(DiagnosticCode.CollectionInnerTypeError),
             DiagnosticStage.Type, Severity.Error,

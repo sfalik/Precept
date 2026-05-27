@@ -36,7 +36,7 @@ field ExpirationDate as date optional
 # BUG-003: `period default '<literal>'` crashes the MCP compiler (unhandled
 # exception, no diagnostic emitted). Until that's fixed, this lease's grace
 # period stays optional and the host fills it in. See docs/Working/bugs.md.
-field GracePeriod as period optional
+field GracePeriod as period optional editable
 
 # Payments
 field MonthlyPayment as money in 'USD' optional

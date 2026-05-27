@@ -26,7 +26,7 @@ field OverallScore as decimal nonnegative max 100 maxplaces 2 <- (QualityScore +
 field DefectRecords as lookup of string to integer
 field TotalDefects as integer default 0 nonnegative
 field UnitsInspected as integer default 0 nonnegative
-field DefectRate as decimal default 0 nonnegative max 100 maxplaces 4
+field DefectRate as decimal default 0 nonnegative max 100 maxplaces 4 editable
 
 # Certifications — optional until established; expiry tracked.
 field Certification as choice of string("ISO9001", "IATF16949", "AS9100", "ISO14001", "ISO45001", "Other") optional
@@ -57,7 +57,7 @@ field ClosedAt as instant optional
 
 # Review notes, improvement plan, closure reason
 field ReviewNotes as string optional
-field ImprovementPlan as string optional
+field ImprovementPlan as string optional editable
 field ClosureReason as string optional
 
 # Rules — structural invariants the proof engine enforces.

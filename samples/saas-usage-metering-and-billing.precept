@@ -12,7 +12,7 @@ field CustomerName as string notempty maxlength 200
 field CustomerEmail as string notempty maxlength 200
 field MeterType as choice of string("ApiCalls", "Storage", "Compute", "Bandwidth", "Seats")
 field BillingCycle as choice of string("Monthly", "Quarterly", "Annual") default "Monthly"
-field BillingCycleNumber as integer default 1 positive
+field BillingCycleNumber as integer default 1 positive editable
 
 # Meter readings — per-meter usage and per-meter limit, keyed by meter name.
 field MeterReadings as lookup of string to integer
@@ -22,7 +22,7 @@ field MeterLimits as lookup of string to integer
 field BaseSubscriptionFee as money in 'USD' nonnegative
 field RatePerUnit as money in 'USD' default '0.00 USD' nonnegative
 field UsageCharge as money in 'USD' default '0.00 USD' nonnegative
-field OverageCharge as money in 'USD' default '0.00 USD' nonnegative
+field OverageCharge as money in 'USD' default '0.00 USD' nonnegative editable
 field CreditsApplied as money in 'USD' default '0.00 USD' nonnegative
 field AmountPaid as money in 'USD' default '0.00 USD' nonnegative
 
@@ -41,7 +41,7 @@ field DisputeAmount as money in 'USD' default '0.00 USD' nonnegative
 field ResolutionNotes as string optional
 
 # Alert thresholds
-field AlertThresholdPercent as integer default 80 nonnegative max 100
+field AlertThresholdPercent as integer default 80 nonnegative max 100 editable
 field AlertTriggered as boolean default false
 field AlertTriggeredAt as instant optional
 

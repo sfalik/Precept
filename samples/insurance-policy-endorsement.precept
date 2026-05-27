@@ -28,13 +28,13 @@ field ExpirationDate as date
 field CurrentPremium as money in 'USD' positive
 field NewPremium as money in 'USD' default '0.00 USD' nonnegative
 field PremiumAdjustment as money in 'USD' default '0.00 USD'
-field ProrationDays as integer default 0 nonnegative max 365
+field ProrationDays as integer default 0 nonnegative max 365 editable
 
 # Prior terms snapshot — captured at approval, before fields are overwritten.
 field PriorTerms as lookup of string to string
 
 # Coverage details — per-coverage limits keyed by coverage code.
-field CoverageLimits as lookup of string to integer
+field CoverageLimits as lookup of string to integer editable
 
 # Approval tracking
 field ApprovedBy as string optional maxlength 200
@@ -42,7 +42,7 @@ field ApprovalDate as instant optional
 
 # Reasons and notes
 field Reason as string optional
-field AdditionalNotes as string optional
+field AdditionalNotes as string optional editable
 field RejectionReason as string optional
 
 # Audit trail

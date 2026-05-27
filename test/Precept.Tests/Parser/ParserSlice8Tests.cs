@@ -65,7 +65,7 @@ public sealed class ParserSlice8Tests
     {
         var compilation = Compile("""
             precept Bug020
-            field Amount as number default 1
+            field Amount as number default 1 editable
             state Draft initial
             state Done terminal
             event Complete
@@ -99,7 +99,7 @@ public sealed class ParserSlice8Tests
     {
         var compilation = Compile("""
             precept Bug045
-            field History as log of string by integer ascending
+            field History as log of string by integer ascending editable
             state Draft initial
             state Done terminal
             event Close
@@ -115,7 +115,7 @@ public sealed class ParserSlice8Tests
     {
         var compilation = Compile("""
             precept Bug031
-            field Amount as number default 1
+            field Amount as number default 1 editable
             state Draft initial
             state Done terminal
             event Submit
@@ -155,7 +155,7 @@ public sealed class ParserSlice8Tests
         var compilation = Compile("""
             precept Bug030
             field Total as number <- Subtotal + 1
-            field Subtotal as number default 1
+            field Subtotal as number default 1 editable
             state Draft initial
             state Done terminal
             event Submit

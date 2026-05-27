@@ -14,7 +14,7 @@ field PatientId as string notempty maxlength 50
 field PatientName as string notempty maxlength 200
 field DateOfBirth as date
 field Gender as choice of string("Male", "Female", "Other", "Unknown")
-field SocialSecurityNumber as string optional maxlength 11  # SSN with hyphens (NNN-NN-NNNN)
+field SocialSecurityNumber as string optional maxlength 11 editable  # SSN with hyphens (NNN-NN-NNNN)
 
 # Contact.
 field StreetAddress as string notempty maxlength 200

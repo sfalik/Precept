@@ -34,7 +34,7 @@ field VehicleWeightLbs as integer optional positive max 80000
 field RegistrationTerm as period optional
 field PreviousExpirationDate as date optional
 field NewExpirationDate as date optional
-field NoticeIssueDate as date optional
+field NoticeIssueDate as date optional editable
 field PaymentDueDate as date optional
 
 # Fees — exact money, no approximation
@@ -42,8 +42,8 @@ field BaseRegistrationFee as money in 'USD' default '0.00 USD'
 field WeightSurcharge as money in 'USD' default '0.00 USD'
 field EmissionsFee as money in 'USD' default '0.00 USD'
 field PlatesFee as money in 'USD' default '0.00 USD'
-field LateFee as money in 'USD' default '0.00 USD'
-field BackedUpFees as money in 'USD' default '0.00 USD'
+field LateFee as money in 'USD' default '0.00 USD' editable
+field BackedUpFees as money in 'USD' default '0.00 USD' editable
 field TotalFeesDue as money in 'USD' <- BaseRegistrationFee + WeightSurcharge + EmissionsFee + PlatesFee + LateFee + BackedUpFees
 field AmountPaid as money in 'USD' default '0.00 USD'
 field OutstandingBalance as money in 'USD' <- TotalFeesDue - AmountPaid
@@ -61,7 +61,7 @@ field SafetyInspectionRequired as boolean default false
 field EmissionsPassed as boolean default false
 field SafetyInspectionPassed as boolean default false
 field InspectionStationId as string optional maxlength 50
-field LastInspectionDate as date optional
+field LastInspectionDate as date optional editable
 field InspectionFailureReason as string optional
 
 # Grace and suspension status — flipped by the host when calendar windows close.

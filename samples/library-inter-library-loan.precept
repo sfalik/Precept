@@ -57,7 +57,6 @@ field LoanedToPatronDate as date optional
 field DueDate as date optional
 field ReturnedByPatronDate as date optional
 field ReturnedToSourceDate as date optional
-field ClosedDate as date optional
 
 # Fees — exact money for any patron-borne charges
 field LoanFee as money in 'USD' default '0.00 USD'

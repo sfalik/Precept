@@ -78,7 +78,7 @@ public class CompileTool_BugReproTests
     {
         var result = CompileTool.Compile(
             "precept Repro\n" +
-            "field G as period default '1 year'\n" +
+            "field G as period default '1 year' editable\n" +
             "state Draft initial\n" +
             "state Done terminal\n" +
             "event E\n" +
@@ -108,7 +108,7 @@ public class CompileTool_BugReproTests
     {
         var result = CompileTool.Compile(
             "precept Repro\n" +
-            "field D as duration default '14 days'\n" +
+            "field D as duration default '14 days' editable\n" +
             "state Draft initial\n" +
             "state Done terminal\n" +
             "event E\n" +
@@ -144,7 +144,7 @@ public class CompileTool_BugReproTests
     {
         var result = CompileTool.Compile(
             "precept Repro\n" +
-            "field Tz as timezone default 'America/New_York'\n" +
+            "field Tz as timezone default 'America/New_York' editable\n" +
             "state Draft initial\n" +
             "state Done terminal\n" +
             "event E\n" +
@@ -159,7 +159,7 @@ public class CompileTool_BugReproTests
     {
         var result = CompileTool.Compile(
             "precept Repro\n" +
-            "field T as time default '09:00'\n" +
+            "field T as time default '09:00' editable\n" +
             "state Draft initial\n" +
             "state Done terminal\n" +
             "event E\n" +
@@ -177,7 +177,7 @@ public class CompileTool_BugReproTests
         // builds TypedQualifiedElement.
         var result = CompileTool.Compile(
             "precept Repro\n" +
-            "field F as lookup of string to money in 'USD'\n" +
+            "field F as lookup of string to money in 'USD' editable\n" +
             "state Draft initial terminal\n");
 
         result.Success.Should().BeTrue();
@@ -191,7 +191,7 @@ public class CompileTool_BugReproTests
         // both 'in <currency>' and 'of <dimension>' shapes.
         var result = CompileTool.Compile(
             "precept Repro\n" +
-            "field F as lookup of string to quantity of 'mass'\n" +
+            "field F as lookup of string to quantity of 'mass' editable\n" +
             "state Draft initial terminal\n");
 
         result.Success.Should().BeTrue();

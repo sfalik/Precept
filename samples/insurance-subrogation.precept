@@ -29,7 +29,7 @@ field RecoveryAmount as money in 'USD' positive
 field TotalRecovered as money in 'USD' default '0.00 USD' nonnegative
 field LegalCosts as money in 'USD' default '0.00 USD' nonnegative
 field NetRecovery as money in 'USD' default '0.00 USD'
-field RecoveryPercentage as decimal default 0 nonnegative max 100 maxplaces 2
+field RecoveryPercentage as decimal default 0 nonnegative max 100 maxplaces 2 editable
 
 # Legal status
 field LegalStatus as choice of string("NoLegal", "DemandLetter", "Litigation", "Arbitration", "Mediation", "SettlementConference") default "NoLegal"
@@ -57,8 +57,8 @@ field SettlementExecutedAt as instant optional
 field ClosedAt as instant optional
 
 # Notes and reasons
-field RecoveryNotes as string optional
-field LitigationReason as string optional
+field RecoveryNotes as string optional editable
+field LitigationReason as string optional editable
 field ClosureReason as string optional
 
 # Rules — domain invariants

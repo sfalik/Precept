@@ -37,8 +37,8 @@ public sealed class Track2PhaseAToolchainRegressionTests
         var compilation = Compile("""
             precept Bug026Regression
             field Name as string editable default ""
-            field Amount as number default 0
-            field Notes as string optional
+            field Amount as number default 0 editable
+            field Notes as string optional editable
             state Active initial
             state Closed terminal
             in Closed modify all readonly
@@ -58,8 +58,8 @@ public sealed class Track2PhaseAToolchainRegressionTests
         var compilation = Compile("""
             precept Bug037Regression
             field Name as string default "" editable
-            field Amount as number default 0
-            field Notes as string optional
+            field Amount as number default 0 editable
+            field Notes as string optional editable
             state Draft initial
             state Closed terminal
             in Draft omit all
@@ -102,8 +102,8 @@ public sealed class Track2PhaseAToolchainRegressionTests
     {
         var compilation = Compile($$"""
             precept DualUseRuleRegression
-            field Left as number default 0
-            field Right as number default 0
+            field Left as number default 0 editable
+            field Right as number default 0 editable
             rule {{functionName}}(Left, Right) >= 0 because "msg"
             """);
 
@@ -120,8 +120,8 @@ public sealed class Track2PhaseAToolchainRegressionTests
     {
         var compilation = Compile($$"""
             precept DualUseGuardRegression
-            field Left as number default 0
-            field Right as number default 0
+            field Left as number default 0 editable
+            field Right as number default 0 editable
             state Draft initial
             state Done terminal
             event Advance

@@ -26,7 +26,7 @@ field AdmissionSource as choice of string("EmergencyDepartment", "DirectAdmit", 
 # ICU > StepDown > MedSurg > Observation.
 field LevelOfCare as choice of string("Observation", "MedSurg", "StepDown", "ICU") ordered
 field AuthorizedDays as integer positive default 1
-field LengthOfStayDays as integer nonnegative default 0
+field LengthOfStayDays as integer nonnegative default 0 editable
 
 # Review cycle.
 field NextReviewDue as date optional

@@ -55,7 +55,7 @@ public sealed class ActionSecondaryDispatchRegressionTests
         // with only the non-empty proof from the notempty modifier.
         var compilation = Compiler.Compile("""
             precept RemoveAtRegression
-            field Steps as list of string notempty
+            field Steps as list of string notempty editable
             state Active initial
             state Done terminal
             event RemoveStep(Index as integer)
@@ -78,8 +78,8 @@ public sealed class ActionSecondaryDispatchRegressionTests
         // `when N >= 0 and N <= F.count`. Position is integer-typed here.
         var compilation = Compiler.Compile("""
             precept TaskQueue
-            field Steps as list of string
-            field Position as integer default 0 nonnegative
+            field Steps as list of string editable
+            field Position as integer default 0 nonnegative editable
             state Active initial
             state Done terminal
             event Add(NewStep as string, Position as integer)
@@ -101,8 +101,8 @@ public sealed class ActionSecondaryDispatchRegressionTests
         // Same bounds-guard requirement as the plain-list variant.
         var compilation = Compiler.Compile("""
             precept TaskQueue
-            field Steps as list of string notempty
-            field Position as integer default 0 nonnegative
+            field Steps as list of string notempty editable
+            field Position as integer default 0 nonnegative editable
             state Active initial
             state Done terminal
             event Add(NewStep as string, Position as integer)

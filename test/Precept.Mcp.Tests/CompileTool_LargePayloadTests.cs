@@ -52,7 +52,7 @@ public class CompileTool_LargePayloadTests
         sb.AppendLine("precept LargePayload");
         for (var i = 0; i < fieldCount; i++)
         {
-            sb.Append("field F").Append(i).Append(" as integer default ").Append(i).AppendLine(" nonnegative");
+            sb.Append("field F").Append(i).Append(" as integer default ").Append(i).AppendLine(" nonnegative editable");
         }
         sb.AppendLine("state Draft initial");
         sb.AppendLine("state Done terminal");

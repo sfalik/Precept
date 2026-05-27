@@ -14,8 +14,8 @@ field CustomerId as string notempty maxlength 50
 field ProductName as string notempty maxlength 200
 
 # License configuration — established at purchase.
-field LicenseType as choice of string("Perpetual", "Subscription", "Trial", "Named", "Concurrent") default "Subscription"
-field LicenseCategory as choice of string("FullAccess", "LimitedAccess", "Readonly", "Developer") default "FullAccess"
+field LicenseType as choice of string("Perpetual", "Subscription", "Trial", "Named", "Concurrent") default "Subscription" editable
+field LicenseCategory as choice of string("FullAccess", "LimitedAccess", "Readonly", "Developer") default "FullAccess" editable
 field BillingCycle as choice of string("Monthly", "Annual") default "Annual"
 
 # Pool capacity and utilization — totals carry the integrity invariants.
@@ -31,7 +31,7 @@ field LicensesAvailable as integer default 0 nonnegative
 # Dropped `max 100`; runtime rule below.
 field UtilizationPercentage as integer default 0 nonnegative
 rule UtilizationPercentage <= 100 because "Utilization is a 0-100 ratio — values above 100 indicate a calculation error"
-field MaxUtilizationThreshold as integer default 90 nonnegative max 100
+field MaxUtilizationThreshold as integer default 90 nonnegative max 100 editable
 field PeakUsageCount as integer default 0 nonnegative
 field PeakUsageDate as instant optional
 

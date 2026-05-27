@@ -14,15 +14,15 @@ precept InsuranceUnderwriting
 field ApplicationNumber as string notempty maxlength 50
 field ApplicantName as string notempty maxlength 200
 field ApplicantDateOfBirth as date
-field ApplicantGender as string optional maxlength 20
-field Occupation as string optional maxlength 200
-field AnnualIncome as money in 'USD' default '0.00 USD' nonnegative
+field ApplicantGender as string optional maxlength 20 editable
+field Occupation as string optional maxlength 200 editable
+field AnnualIncome as money in 'USD' default '0.00 USD' nonnegative editable
 
 # Policy request
 field PolicyType as choice of string("Life", "Health", "Disability", "Annuity", "LongTermCare")
 field CoverageAmount as money in 'USD' positive
 field PolicyTerm as integer nonnegative max 100
-field PremiumRating as choice of string("Standard", "Preferred", "PreferredPlus", "SuperPreferred", "TableRating") default "Standard"
+field PremiumRating as choice of string("Standard", "Preferred", "PreferredPlus", "SuperPreferred", "TableRating") default "Standard" editable
 
 # Risk assessment — factors accumulated and scored.
 field RiskFactors as lookup of string to decimal
@@ -40,16 +40,16 @@ field RatingMultiplier as decimal default 1 nonnegative max 5 maxplaces 4
 field HasMedicalExam as boolean default false
 field MedicalExamDate as date optional
 field ExamResult as string optional
-field PrescribedMedications as string optional
-field FamilyHistory as string optional
-field TobaccoUse as choice of string("Never", "Former", "Current") optional
-field TobaccoYearsQuit as integer optional nonnegative max 100
+field PrescribedMedications as string optional editable
+field FamilyHistory as string optional editable
+field TobaccoUse as choice of string("Never", "Former", "Current") optional editable
+field TobaccoYearsQuit as integer optional nonnegative max 100 editable
 
 # Risk modifiers
-field HazardousHobbies as boolean default false
-field HazardousOccupation as boolean default false
-field TravelToHighRiskCountries as boolean default false
-field AviationActivity as boolean default false
+field HazardousHobbies as boolean default false editable
+field HazardousOccupation as boolean default false editable
+field TravelToHighRiskCountries as boolean default false editable
+field AviationActivity as boolean default false editable
 
 # Notes
 field UnderwriterNotes as string optional

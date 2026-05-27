@@ -28,13 +28,13 @@ field CareCoordinators as set of string
 # Goals and progress
 field CarePlanGoals as set of string
 field GoalStartDate as date
-field GoalEndDate as date optional
+field GoalEndDate as date optional editable
 field GoalStatus as choice of string("Active", "Completed", "OnHold", "Modified") ordered default "Active"
 field GoalProgressPercent as integer nonnegative default 0 max 100
 
 field ProgressNotes as log of string
 field LastProgressUpdate as instant optional
-field NextScheduledReview as date optional
+field NextScheduledReview as date optional editable
 # BUG-008: duration default crashes the compiler. Review-frequency scheduling
 # lives in the host until the bug is fixed; the precept governs progress
 # tracking only.

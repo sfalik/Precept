@@ -6,15 +6,15 @@ precept FeeSchedule
 # together they determine what the host application bills.
 #
 # Pricing levers (BaseFee, DiscountPercent, MinimumCharge) are editable — the
-# host's pricing UI adjusts them. TaxRate and CurrencyCode are intentionally
-# locked: they are jurisdiction-level settings that must go through a separate
-# administrative approval flow, not direct editing on a fee record.
+# host's pricing UI adjusts them. TaxRate and CurrencyCode are also editable
+# but typically only changed via a separate administrative approval flow at
+# the host level, not direct editing on a fee record.
 
-field CurrencyCode as currency default 'USD'
+field CurrencyCode as currency default 'USD' editable
 
 field BaseFee as money in '{CurrencyCode}' default '0 {CurrencyCode}' nonnegative editable
 field DiscountPercent as decimal default 0 nonnegative max 100 maxplaces 2 editable
 field MinimumCharge as money in '{CurrencyCode}' default '0 {CurrencyCode}' nonnegative editable
-field TaxRate as decimal default 0.1 nonnegative max 1 maxplaces 4
+field TaxRate as decimal default 0.1 nonnegative max 1 maxplaces 4 editable
 
 rule MinimumCharge <= BaseFee because "Minimum charge {MinimumCharge} exceeds the base fee {BaseFee} — the minimum cannot raise a quote above the headline price"

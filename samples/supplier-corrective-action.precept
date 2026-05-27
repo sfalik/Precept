@@ -18,9 +18,9 @@ field DueDate as date
 field IssueCategory as choice of string("Defect", "Delivery", "Documentation", "Process", "QualitySystem", "Other")
 field Severity as choice of string("Minor", "Major", "Critical")
 field ProblemDescription as string notempty
-field QuantityAffected as integer default 0 nonnegative
-field DateOfOccurrence as date optional
-field DetectionDate as date optional
+field QuantityAffected as integer default 0 nonnegative editable
+field DateOfOccurrence as date optional editable
+field DetectionDate as date optional editable
 
 # 8D — team and containment.
 field TeamMembers as lookup of string to string

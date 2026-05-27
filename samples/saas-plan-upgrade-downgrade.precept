@@ -27,27 +27,27 @@ field CompletedAt as instant optional
 # Pricing and proration — money in 'USD' for exactness.
 field CurrentMonthlyFee as money in 'USD' positive
 field NewMonthlyFee as money in 'USD' default '0.00 USD' nonnegative
-field ProrationAmount as money in 'USD' default '0.00 USD' nonnegative
+field ProrationAmount as money in 'USD' default '0.00 USD' nonnegative editable
 field ProrationCredit as money in 'USD' default '0.00 USD' nonnegative
-field TotalDue as money in 'USD' default '0.00 USD' nonnegative
-field DaysInPeriod as integer default 30 positive max 31
+field TotalDue as money in 'USD' default '0.00 USD' nonnegative editable
+field DaysInPeriod as integer default 30 positive max 31 editable
 field RemainingDays as integer default 0 nonnegative max 31
-field BillingCycleStart as instant optional
+field BillingCycleStart as instant optional editable
 
 # Usage limits — per-metric limit lookups for current and target plan.
-field CurrentLimits as lookup of string to integer
-field TargetLimits as lookup of string to integer
+field CurrentLimits as lookup of string to integer editable
+field TargetLimits as lookup of string to integer editable
 
 # Feature access — per-feature boolean lookups for current and pending.
-field FeatureAccess as lookup of string to boolean
-field PendingFeatureAccess as lookup of string to boolean
+field FeatureAccess as lookup of string to boolean editable
+field PendingFeatureAccess as lookup of string to boolean editable
 
 # Rejection
 field RejectionReason as string optional
 
 # Audit trail
 field ChangeLog as log of string
-field ChangeRequestNumber as integer default 1 positive
+field ChangeRequestNumber as integer default 1 positive editable
 
 # States — review → processing → activation lifecycle.
 state Requested initial

@@ -5,16 +5,17 @@ precept PaymentMethod
 # cardholder-controlled flags (nickname, default selection). The card data
 # itself is immutable once stored — re-storing requires creating a new record.
 #
-# Editability is deliberately minimal: the verified payment instrument fields
-# (LastFour, ExpiryMonth, ExpiryYear, CardholderName, CardBrand) are locked at
-# storage. Only IsDefault and Nickname can be updated after the card is saved,
-# because those are display-layer preferences, not authorization data.
+# The verified payment instrument fields (LastFour, ExpiryMonth, ExpiryYear,
+# CardholderName, CardBrand) are caller-supplied at storage. IsDefault and
+# Nickname are display-layer preferences the cardholder can change after the
+# card is saved; the host application is responsible for refusing edits to
+# the instrument fields after the card-on-file is verified.
 
-field CardholderName as string optional maxlength 200
-field LastFour as string optional maxlength 4
-field CardBrand as choice of string("Visa","Mastercard","Amex","Discover","JCB","UnionPay","Other") default "Other"
-field ExpiryMonth as integer default 1 min 1 max 12
-field ExpiryYear as integer default 2025 min 2025 max 2099
+field CardholderName as string optional maxlength 200 editable
+field LastFour as string optional maxlength 4 editable
+field CardBrand as choice of string("Visa","Mastercard","Amex","Discover","JCB","UnionPay","Other") default "Other" editable
+field ExpiryMonth as integer default 1 min 1 max 12 editable
+field ExpiryYear as integer default 2025 min 2025 max 2099 editable
 
 field IsDefault as boolean default false editable
 field Nickname as string optional maxlength 50 editable
