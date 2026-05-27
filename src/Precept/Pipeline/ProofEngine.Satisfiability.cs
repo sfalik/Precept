@@ -39,6 +39,80 @@ public static partial class ProofEngine
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    //  F-LANG-SPEC-05 / F-LANG-SPEC-04 — TautologicalGuard / VacuousRule
+    //
+    //  Shared mechanic: a predicate is provably-true iff every leaf constraint
+    //  is provably-true under the field's bounded interval. We sidestep
+    //  expression negation (which would require synthesizing inverted
+    //  TypedBinaryOp nodes) by checking each leaf directly against the field's
+    //  interval: e.g. `field > V` is provably-true iff `min(field) > V`.
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// True iff every leaf constraint of the predicate is provably-true under
+    /// the field's declared bounds. Returns false for OR-disjunctive predicates
+    /// (every branch must independently be tautological for the disjunction to
+    /// be tautological — we conservatively decline on disjunctions).
+    /// </summary>
+    private static bool IsPredicateProvablyTrue(
+        TypedExpression predicate,
+        SemanticIndex semantics,
+        Dictionary<string, NumericInterval>? extraNarrowing = null)
+    {
+        var branches = ExtractGuardBranches(predicate);
+        if (branches.IsEmpty) return false;
+
+        foreach (var branchConstraints in branches)
+        {
+            if (branchConstraints.IsEmpty) return false; // empty branch: nothing proven
+            foreach (var gc in branchConstraints)
+            {
+                if (gc.IsPresenceCheck) return false; // out of scope for this check
+                if (gc.Value is not { } value) return false;
+                if (!IsConstraintProvablyTrue(gc.Field, gc.Comparison, value, semantics, extraNarrowing))
+                    return false;
+            }
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// True iff the constraint `field comparison value` holds for every value
+    /// in the field's bounded interval (optionally further narrowed by
+    /// <paramref name="extraNarrowing"/> — used for the rule's own `when`
+    /// guard when checking VacuousRule).
+    /// </summary>
+    private static bool IsConstraintProvablyTrue(
+        string fieldName,
+        OperatorKind comparison,
+        decimal value,
+        SemanticIndex semantics,
+        Dictionary<string, NumericInterval>? extraNarrowing)
+    {
+        var interval = ExtractFieldInterval(fieldName, semantics);
+        if (extraNarrowing is not null && extraNarrowing.TryGetValue(fieldName, out var extra))
+            interval = interval.IsUnbounded
+                ? extra
+                : interval.Intersect(extra);
+
+        // An unbounded interval cannot guarantee any non-trivial constraint
+        // (soundness over completeness — § 0.6 #1).
+        if (interval.IsUnbounded) return false;
+        if (interval.IsEmpty) return false;
+
+        return comparison switch
+        {
+            OperatorKind.GreaterThan        => interval.Min >  value,
+            OperatorKind.GreaterThanOrEqual => interval.Min >= value,
+            OperatorKind.LessThan           => interval.Max <  value,
+            OperatorKind.LessThanOrEqual    => interval.Max <= value,
+            OperatorKind.Equals             => interval.Min == value && interval.Max == value,
+            OperatorKind.NotEquals          => value < interval.Min || value > interval.Max,
+            _ => false,
+        };
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     //  F-LANG-SPEC-02 — UnsatisfiableGuard (PRE0082)
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -47,14 +121,25 @@ public static partial class ProofEngine
         foreach (var row in semantics.TransitionRows)
         {
             if (row.Guard is null) continue;
-            if (!IsGuardUnsatisfiableUnderFieldBounds(row.Guard, semantics)) continue;
 
-            diagnostics.Add(Diagnostics.Create(
-                DiagnosticCode.UnsatisfiableGuard,
-                row.Guard.Span,
-                FormatGuardText(row.Guard),
-                row.EventName,
-                string.Empty));
+            if (IsGuardUnsatisfiableUnderFieldBounds(row.Guard, semantics))
+            {
+                diagnostics.Add(Diagnostics.Create(
+                    DiagnosticCode.UnsatisfiableGuard,
+                    row.Guard.Span,
+                    FormatGuardText(row.Guard),
+                    row.EventName,
+                    string.Empty));
+                continue; // a guard can't be both unsatisfiable AND tautological
+            }
+
+            if (IsPredicateProvablyTrue(row.Guard, semantics))
+            {
+                diagnostics.Add(Diagnostics.Create(
+                    DiagnosticCode.TautologicalGuard,
+                    row.Guard.Span,
+                    FormatGuardText(row.Guard)));
+            }
         }
     }
 
@@ -133,6 +218,32 @@ public static partial class ProofEngine
         for (int i = 0; i < semantics.Rules.Length; i++)
         {
             var rule = semantics.Rules[i];
+
+            // F-LANG-SPEC-04 — VacuousRule: rule predicate is provably-true
+            // under the fields' bounds (and the rule's own `when` guard, if any).
+            Dictionary<string, NumericInterval>? extraNarrowing = null;
+            if (rule.Guard is not null)
+            {
+                extraNarrowing = new Dictionary<string, NumericInterval>(System.StringComparer.Ordinal);
+                foreach (var gc in ExtractGuardConstraints(rule.Guard))
+                {
+                    if (gc.IsPresenceCheck) continue;
+                    if (gc.Value is not { } v) continue;
+                    var current = extraNarrowing.TryGetValue(gc.Field, out var existing)
+                        ? existing
+                        : new NumericInterval(decimal.MinValue, decimal.MaxValue);
+                    extraNarrowing[gc.Field] = NarrowByConstraint(current, gc.Comparison, v);
+                }
+            }
+
+            if (IsPredicateProvablyTrue(rule.Condition, semantics, extraNarrowing))
+            {
+                diagnostics.Add(Diagnostics.Create(
+                    DiagnosticCode.VacuousRule,
+                    rule.Condition.Span,
+                    FormatGuardText(rule.Condition)));
+            }
+
             var perField = SummariseRuleConstraints(rule.Condition);
             ruleConstraints.Add(new RuleConstraintSummary(i, rule, perField));
         }

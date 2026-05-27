@@ -54,8 +54,6 @@ internal static class DiagnosticCoverageAllowLists
         "SqrtOfNegative",                     // no emission site wired
         "ChoiceElementTypeMismatch",          // no emission site wired
         "ChoiceMissingElementType",           // no emission site wired
-        "TautologicalGuard",                  // F-LANG-SPEC-05 — guard-negation logic deferred (separate slice)
-        "VacuousRule",                        // F-LANG-SPEC-04 — guard-negation logic deferred (separate slice)
 
         // ── MCP tooling backstop ─────────────────────────────────────────────────
         // McpToolInternalError fires only from the McpToolSafeInvoke wrapper in
@@ -209,7 +207,9 @@ internal static class DiagnosticCoverageAllowLists
         "FieldNeverSet",
         "IncompatibleDimensionalProduct",
         "ContradictoryRule",
+        "TautologicalGuard",
         "UnsatisfiableGuard",
+        "VacuousRule",
         "ZeroConstructionRows",
 
         // ── MCP tooling backstop ─────────────────────────────────────────────────

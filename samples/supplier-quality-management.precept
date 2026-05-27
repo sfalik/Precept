@@ -60,8 +60,8 @@ field ReviewNotes as string optional
 field ImprovementPlan as string optional editable
 field ClosureReason as string optional
 
-# Rules — structural invariants the proof engine enforces.
-rule DefectRate <= 100 because "Defect rate {DefectRate}% cannot exceed 100% — a rate above 100% would mean more defects than units inspected"
+# Structural invariants for DefectRate are enforced via its declarators
+# (`nonnegative max 100`); no separate rule is needed.
 
 # States
 state Registered initial

@@ -141,4 +141,90 @@ public class SatisfiabilityScanTests
         ledger.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.ContradictoryRule),
             because: "A and B are independent fields");
     }
+
+    [Fact]
+    public void TautologicalGuard_EmitsPRE0153_OnRedundantBound()
+    {
+        // F-LANG-SPEC-05 — `field X min 5 max 100; when X >= 5` adds no
+        // constraint beyond the field's existing modifier.
+        var ledger = Prove("""
+            precept Repro
+            field X as integer default 7 min 5 max 100 editable
+            state Open initial
+            state Done terminal
+            event Advance
+            from Open on Advance when X >= 5 -> transition Done
+            """);
+
+        ledger.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.TautologicalGuard),
+            because: "X >= 5 is always true under the min-5 field bound");
+    }
+
+    [Fact]
+    public void TautologicalGuard_DoesNotEmit_WhenGuardActuallyNarrows()
+    {
+        // Soundness baseline: `X > 50` does narrow X within [5, 100], so
+        // the guard is not tautological.
+        var ledger = Prove("""
+            precept Repro
+            field X as integer default 7 min 5 max 100 editable
+            state Open initial
+            state Done terminal
+            event Advance
+            from Open on Advance when X > 50 -> transition Done
+            """);
+
+        ledger.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.TautologicalGuard),
+            because: "X > 50 actually narrows X from [5, 100] to (50, 100]");
+    }
+
+    [Fact]
+    public void VacuousRule_EmitsPRE0154_OnAlwaysTruePredicate()
+    {
+        // F-LANG-SPEC-04 — `field X min 5; rule X >= 5` is always true.
+        var ledger = Prove("""
+            precept Repro
+            field X as integer default 7 min 5 max 100 editable
+            rule X >= 5 because "X must be at least 5"
+            state Open initial
+            """);
+
+        ledger.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.VacuousRule),
+            because: "the rule predicate is already guaranteed by the field's min 5 modifier");
+    }
+
+    [Fact]
+    public void VacuousRule_DoesNotEmit_OnConstrainingPredicate()
+    {
+        // Soundness baseline: a rule that actually narrows the field
+        // beyond its modifiers does not emit.
+        var ledger = Prove("""
+            precept Repro
+            field X as integer default 7 min 5 max 100 editable
+            rule X > 50 because "X must exceed 50"
+            state Open initial
+            """);
+
+        ledger.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.VacuousRule),
+            because: "the rule predicate X > 50 is not implied by min 5");
+    }
+
+    [Fact]
+    public void TautologicalGuard_DoesNotEmit_OnUnboundedField()
+    {
+        // F-LANG-SPEC-05 scope-cut (soundness over completeness): when the
+        // field has no declared bounds, every comparison is "cannot decide,"
+        // not "tautological."
+        var ledger = Prove("""
+            precept Repro
+            field X as integer default 0 editable
+            state Open initial
+            state Done terminal
+            event Advance
+            from Open on Advance when X >= 0 -> transition Done
+            """);
+
+        ledger.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.TautologicalGuard),
+            because: "without declared bounds, X >= 0 is not provably-true");
+    }
 }
