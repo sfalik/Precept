@@ -2503,9 +2503,9 @@ internal sealed class CompletionHandler : ICompletionHandler
 
     private static IEnumerable<ModifierMeta> GetModifiers(ModifierDomain domain) => domain switch
     {
-        // F-LANG-GRAPH-04 Decision 5: field-position modifiers are value modifiers
-        // plus any access modifier whose catalog ApplicableDeclarationSites includes
-        // FieldDeclaration (currently just `editable`).
+        // Field-position modifiers are value modifiers plus any access modifier
+        // whose catalog ApplicableDeclarationSites includes FieldDeclaration
+        // (currently just `editable`).
         ModifierDomain.Field => Modifiers.All
             .OfType<ValueModifierMeta>()
             .Cast<ModifierMeta>()
