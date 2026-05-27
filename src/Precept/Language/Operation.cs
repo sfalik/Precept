@@ -47,6 +47,14 @@ public enum ResultQualifierPolicy
     /// Used by <c>PriceDivideQuantity</c>.
     /// </summary>
     CompoundDimensionElevation,
+
+    /// <summary>
+    /// Result quantity inherits the price's denominator unit. Used by
+    /// <c>MoneyDividePrice</c> (F-LANG-BIZ-01): `money in 'USD' ÷ price in 'USD/each' → quantity in 'each'`.
+    /// The dimensional cancellation is currency↔currency; the result's unit is
+    /// the price's denominator unit.
+    /// </summary>
+    InheritPriceDenominatorUnit,
 }
 
 /// <summary>

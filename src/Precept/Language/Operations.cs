@@ -475,6 +475,24 @@ public static class Operations
                     "Divisor must be non-zero"),
             ]),
 
+        // F-LANG-BIZ-01 — Money ÷ price → quantity. Inverse-of-inverse completion:
+        // `price × quantity → money` and `money / quantity → price` already exist;
+        // `money / price → quantity` is the third leg. Currency axis must match
+        // across operands (QualifierChainProofRequirement); the result inherits
+        // the price's denominator unit (e.g. 'USD'/`USD/each` → 'each').
+        OperationKind.MoneyDividePrice => new BinaryOperationMeta(
+            kind, OperatorKind.Divide, PMoney, PPrice, TypeKind.Quantity,
+            "Money ÷ price → quantity (dimensional cancellation: currency cancels, denominator unit becomes result unit)",
+            ResultQualifierPolicy: ResultQualifierPolicy.InheritPriceDenominatorUnit,
+            ProofRequirements:
+            [
+                new QualifierChainProofRequirement(new ParamSubject(PMoney), QualifierAxis.Currency,
+                    new ParamSubject(PPrice), QualifierAxis.Currency,
+                    "Money currency must match price numerator currency"),
+                new NumericProofRequirement(new ParamSubject(PPrice), OperatorKind.NotEquals, 0m,
+                    "Divisor must be non-zero"),
+            ]),
+
         OperationKind.MoneyDividePeriod => new BinaryOperationMeta(
             kind, OperatorKind.Divide, PMoney, PPeriod, TypeKind.Price,
             "Money ÷ period → price (time-based price derivation)",

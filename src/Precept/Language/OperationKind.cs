@@ -105,6 +105,12 @@ public enum OperationKind
     MoneyDivideQuantity                      =  71,
     MoneyDividePeriod                        =  72,
     MoneyDivideDuration                      =  73,
+    /// <summary>
+    /// F-LANG-BIZ-01 — Money ÷ price → quantity. Inverse of <c>PriceTimesQuantity</c>:
+    /// <c>'100 USD' / '5 USD/each' → '20 each'</c>. Currency axis matches across operands;
+    /// result inherits the price's denominator unit. Requires divisor-non-zero proof.
+    /// </summary>
+    MoneyDividePrice                         = 204,
 
     // ── Business: quantity ──────────────────────────────────────────
     QuantityPlusQuantity                     =  74,
