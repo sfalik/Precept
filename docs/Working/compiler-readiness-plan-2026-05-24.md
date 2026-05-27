@@ -18,7 +18,7 @@
 | 1 | Doc foundation truthful + lifecycle skills + 16 Archive promotions | ~55 | 8 (✅ all settled 2026-05-24) | XL (~5-7 days) | ✅ **Complete 2026-05-24** (all 6 workstreams shipped; verification report at [`lifecycle-review-phase-1-2026-05-24.md`](lifecycle-review-phase-1-2026-05-24.md)) |
 | 2 | Green baseline + no crashes + Operations.Resolve + MCP-crash family | **12+** | 2 | **L (~4-5 days)** | ✅ **Complete 2026-05-25** (all 7 steps shipped: 2.1–2.7; MCP wrapper backstop + temporal-literal verified clean + LS URI-case fix + Operations.Resolve + generic SyntaxReference test; 6107/6108 Precept.Tests pass with the 1 failure as new BUG-013; 411/411 LS tests pass; 67/67 Mcp tests pass; 291/291 analyzer tests pass) |
 | 3 | Type system completeness | ~13 (F-LANG-BIZ-02 dropped → doc-only retire D10 + Frank's case-9 absorbed) | 4 (✅ all settled 2026-05-25, incl. F-LANG-BIZ-02 Position 3 post-research) | **M (~4-6 days)** | ✅ **Complete 2026-05-26** (catalog shape shipped 2026-05-25; runtime enforcement shipped 2026-05-26 in followup commit after `precept-reviewer` philosophy-first re-review surfaced three closures had landed catalog metadata without runtime enforcement — F-LANG-BIZ-06 ExchangeRate Positive, F-LANG-TEMP-03 Duration/Period nonnegative, F-LANG-BIZ-02 Position 3 maxplaces opt-in. Single architectural fix: magnitude-projection helper + `ValidateDefaultAgainstNumericModifiers` + `OutOfRange` (PRE0079) promoted from deferred. 6175/6176 Precept.Tests pass (1 pre-existing BUG-013); 23 new falsifier tests; F-LANG-BIZ-11 filed for Phase 4+ (boundary-precision; renumbered from BIZ-09 due to ID collision).) |
-| 4 | Collection completeness + BUG-002 | **~16** | 2 | L | Stub — TBD |
+| 4 | Collection completeness + BUG-002 + F-LANG-BIZ-10 | **~16** | 7 (D1-D7 — all settled) | **L+ (~2.5-3 weeks)** | ✅ **Complete 2026-05-26** (all 10 workstreams W-A through W-J shipped across ~42 commits across 2 sessions; 6281/6282 Precept.Tests pass — only pre-existing BUG-013; 411/411 LS, 67/67 MCP, 291/291 analyzer; 8 precept-reviewer rounds caught real BLOCKERs each time; 3 locked design docs via `/lifecycle-2-design` — W-G choice-inner, W-E index-bounds, W-H currency.minorUnit; bugs.md flipped BUG-002, BUG-005, BUG-012, F-LANG-COLL-13 to Fixed; W-H canonical sample `insurance-claim-adjudication.precept` uses `maxplaces currency.minorUnit`. Final phase-close audit (`1e865ac1`) swept 2 stale BUG-002 sample workarounds, 8 transient finding-ID refs, and shipped W-H sample uplift.) |
 | 5 | Proof engine satisfiability + BUG-004 + BUG-006 + BUG-012 + FieldNeverSet/unification | **~14** | 2 | XL | Partial — F-LANG-GRAPH-04 planned, rest stubbed |
 | 6 | `units` block + composite basis | 2 | 0 | L | Stub — TBD |
 | 7 | API surface solidity (typed descriptors) | ~6 | 1 | M-L | Stub — TBD |
@@ -35,17 +35,17 @@
 | Bug | Status | Phase | Rationale |
 |---|---|---|---|
 | BUG-001 | ✅ Fixed | (earlier) | Proof engine narrowing — shipped pre-plan |
-| BUG-002 | Active | 4 | Lookup `remove` key dispatch — collection completeness |
+| BUG-002 | ✅ Fixed | 4 (W-B) | Lookup `remove` key dispatch — collection completeness |
 | BUG-003 | ✅ Fixed | 2 | Period typed-constant default crash |
 | BUG-004 | Active | 5 | Proof engine event-ensure body narrowing — same family as BUG-001 |
-| BUG-005 | Active (symptom-fixed) | 2 symptom + 4 root | Qualified inner types in lookup — full support is F-LANG-COLL-06 |
+| BUG-005 | ✅ Fixed | 2 symptom + 4 root (W-C) | Qualified inner types in lookup — full support shipped via F-LANG-COLL-06 |
 | BUG-006 | Active | 5 | Proof engine guard + field-`max` interval composition |
 | BUG-007 | ✅ Fixed | 2 | `precept_domains` MCP crash |
 | BUG-008 | ✅ Fixed | 2 | Duration typed-constant default crash |
 | BUG-009 | ✅ Fixed | 2 | MCP payload-size — in-process verified clean; wire-level wrapper backstop |
-| BUG-010 | ✅ Fixed (crash) / open (type-inference) | 2 crash + 4 type-inference | `now() + '<duration>'` — structured diagnostic; full inference fix Phase 4 |
+| BUG-010 | ✅ Fixed (crash) / open (type-inference) | 2 crash + 4 type-inference | `now() + '<duration>'` — structured diagnostic; full inference fix Phase 4+ |
 | BUG-011 | ✅ Fixed | 2 | Timezone / time typed-constant default crash |
-| BUG-012 | Active | 5 | Ordered-choice + literal proof gap — same proof-engine-strategy family as BUG-004 / BUG-006 |
+| BUG-012 | ✅ Fixed | 4 (W-G; pulled forward from Phase 5) | Ordered-choice + literal proof gap — typed-literal inference in `TryDeclarationAttributeProof` lifts modifier from binary-op sibling |
 | BUG-013 | Active (parallel-session owned) | n/a | `samples/Test.precept` missing; the test references a sample the parallel session didn't carry forward. **Parallel-session triage**: either re-add the fixture or rewrite the test inline. Not assigned to a numbered phase because the test-side fix is trivial and the sample-side ownership lives outside this plan. |
 
 ---
@@ -138,7 +138,7 @@ All three Phase-3-gating decisions are settled. Each carries the four-leg ration
 
 ### Still open — gating Phase 4+
 
-- F-LANG-SPEC-01 (`because` on ensures): enforce or amend Principle 9? Gates Phase 2 or 3 implementation work — currently unaddressed in the active plan; flagging for Phase 4 triage.
+- ~~F-LANG-SPEC-01~~ — ✅ shipped in Phase 4 W-F as AI-slop cleanup (Principle 9 is locked spec text; the optional slot was a Copilot-co-authored departure that no author ever exercised). Detail: D5 in Phase 4 § Decisions captured.
 - **F-LANG-BIZ-11** *(new finding, filed 2026-05-25 from F-LANG-BIZ-02 Position 3 spinoff; originally filed as F-LANG-BIZ-09 but renumbered 2026-05-26 due to ID collision with the Phase 6 entity-scoped `units` block work)*: **Boundary-precision enforcement for money values at persistence + `transition apply` + external integration**. Under Position 3, `money in 'USD'` no longer carries an implicit `maxplaces 2` at the type system; the prevention guarantee for currency-derived precision must therefore relocate to the wire/persistence boundary. Stripe/Square/Adyen all enforce per-currency minor-unit precision at the API boundary (per the survey `research/architecture/compiler/currency-precision-coupling-survey.md`); Precept should provide a structural mechanism that enforces precision rules at boundaries where money values cross between Precept-governed and external state. **Scope**: design pass needed to define the boundary surface (`transition apply`? persistence layer? both?), the API for declaring per-field boundary-precision rules, and the diagnostic surface for boundary violations. **Cross-link**: research artifact's Open Question #1. **Target phase**: 4 or 5, owner picks during triage; non-blocking for either phase's existing scope.
 - 5 additional research follow-ups from the currency-precision survey's Open Questions section (opt-in syntax discoverability beyond samples; multi-currency arithmetic safety verification; hyperinflationary / non-ISO drift policy; Temenos T24 / core-banking comparator gap; crypto / non-fiat assets) — owner triages individually if/when each becomes blocking.
 - 15 additional decisions listed in `compiler-readiness-review-2026-05-24.md` § 6 (cited per-phase as work approaches).
@@ -674,32 +674,67 @@ Planning artifact: `/home/sfalik/.claude/plans/refactored-yawning-fern.md` (heav
 
 ---
 
-# Phase 4: Collection completeness
+# Phase 4: Collection completeness + BUG-002 + F-LANG-BIZ-10 — ✅ Complete 2026-05-26
 
-**Goal**: Every documented capability of the 9 collection types works as specified. The catalog's action-applicability metadata is actually enforced. Two-field quantifier bindings for ordered collections work. Qualified inner types parse. The grammar doc's vocabulary matches code.
+**Goal**: Every documented capability of the 9 collection types works as specified. The catalog's action-applicability metadata is actually enforced. Two-field quantifier bindings for ordered collections work. Qualified inner types parse. The grammar doc's vocabulary matches code. Plus: BUG-002 (lookup-remove key dispatch) and F-LANG-BIZ-10 (currency-derived `maxplaces`).
 
-**Findings in scope** (~16, expanded after bugs.md integration):
-- F-LANG-COLL-04 (.at(N) index-bounds proof obligation)
-- F-LANG-COLL-05 (log-by append uniqueness proof obligation)
-- F-LANG-COLL-06 (qualified inner types `set of money in 'USD'`, `set of quantity of 'length'`, etc.) — **root-cause fix for BUG-005 symptom** (Phase 2 ships clean diagnostic; Phase 4 actually supports the construct)
-- F-LANG-COLL-07 (queue of T by P two-field quantifier binding `.value`/`.by`)
-- F-LANG-COLL-08 (action `ApplicableTo` enforcement — emit PRE0047/0048)
-- F-LANG-COLL-09 (insert/remove-at index-bounds proof obligations)
-- F-LANG-COLL-11 (MissingOrderingKey rename + allocation)
-- F-LANG-COLL-02 (choice-in-collection-inner targeted diagnostic)
-- F-LANG-COLL-03 (ordered-choice trait propagation verification)
-- F-LANG-COLL-12 (Countof/Peekby inert tokens — remove or wire per decision)
-- F-LANG-GRAM-01 (vestigial `ConstructionRow` enum value — delete or document)
-- F-LANG-GRAM-02 (rename `ConstructionRowReject` → `EventRowReject`)
-- F-LANG-CAT-08 partial (`ProofRequirementKind` rewrite — the doc side; this phase ships new proof requirement code that the rewrite reflects)
-- **BUG-002** — `remove` on lookup expects value type instead of key. Fix: extend action catalog with key-removal shape for lookups, OR change `remove` dispatch on lookup to expect key type. Quality bar; worth fixing before lookup becomes more visible in tutorials. Workaround in samples uses `put k = 0` (orphan zero-valued entries).
+**Status**: ✅ Complete 2026-05-26. All 10 workstreams (W-A through W-J) shipped across ~42 commits across 2 sessions. 6281/6282 Precept.Tests (only pre-existing BUG-013); 411/411 LS, 67/67 MCP, 291/291 analyzer. 8 precept-reviewer rounds caught real BLOCKERs each time. 3 locked design docs went through `/lifecycle-2-design`.
 
-**Decisions required**:
-- F-LANG-COLL-11: rename PRE0104 to `RequiredTraitViolation` and allocate fresh code for missing-`by`, OR route missing-`by` through the new `CollectionOperationOnScalar` enforcement (Wave 4 from F-LANG-COLL-08)?
-- F-LANG-COLL-12: wire `Countof`/`Peekby` as keywords or remove from `TokenKind.cs`/`Tokens.cs`?
+**Findings closed** (16 + bundled bugs):
+- F-LANG-COLL-02 (choice inner in collections) — shipped W-G as feature (was scoped as targeted diagnostic; promoted)
+- F-LANG-COLL-03 (ordered-choice trait propagation) — shipped W-G; W-G remediation added D-3 Option A (`TypedMemberAccess.ChoiceMetadata` slot) per reviewer
+- F-LANG-COLL-04 (.at(N) index-bounds proof obligation) — shipped W-E via `IndexBoundsProofRequirement(StrictlyBefore)`
+- F-LANG-COLL-05 (log-by append uniqueness) — shipped W-E early via existing `KeyPresenceProofRequirement(RequireAbsence)`
+- F-LANG-COLL-06 (qualified inner types) — shipped W-C; root-cause fix for BUG-005; new `TypedElementType` DU
+- F-LANG-COLL-07 (queue-by/log-by quantifier `.value`/`.by`) — shipped W-D
+- F-LANG-COLL-08 (action ApplicableTo enforcement) — shipped W-A; PRE0047/PRE0048 emission wired
+- F-LANG-COLL-09 (insert/remove-at index-bounds) — shipped W-E; `IndexBoundsMode.AtOrBefore` for insert
+- F-LANG-COLL-10 (`notempty` on lookup) — shipped W-F (doc-only) then lifted as feature in W-J
+- F-LANG-COLL-11 (MissingOrderingKey rename) — shipped W-F: PRE0104 renamed to `RequiredTraitViolation`; new PRE0151 reserved for missing-`by`
+- F-LANG-COLL-12 (Countof/Peekby tokens) — **closed as audit error** in W-F: tokens are live keyword tokens (Types.cs:245,281); no code change
+- F-LANG-COLL-13 (clear + notempty lift on lookup) — shipped W-J after `/lifecycle-2-design` survey of comparator languages (Java/C#/Python/Rust/Swift/Kotlin/F#/Go all allow bulk clear)
+- F-LANG-GRAM-01/02/03/04/05 + InitialEvent rename — shipped W-I after `/lifecycle-2-design` taxonomy reorganization
+- F-LANG-CAT-08 (ProofRequirementKind catalog completeness) — shipped W-E: catalog count now 11 (IndexBounds = 11)
+- F-LANG-SPEC-01 (mandatory `because`) — shipped W-F as cleanup (folded in mid-phase; was originally framed as "enforce or amend Principle 9" but investigation showed Principle 9 is locked spec text and the optional slot was an AI-co-authored departure)
+- F-LANG-BIZ-10 (currency-derived `maxplaces currency.minorUnit`) — shipped W-H after `/lifecycle-2-design` + two precept-reviewer rounds; F-UP-BIZ-10-B (`UseInModifierValueContext` catalog flag) landed early per reviewer
+- **BUG-002** — shipped W-B: new `RemoveByKey` ActionSyntaxShape; lookup-remove dispatches on key type
+- **BUG-005** — fully closed by W-C's F-LANG-COLL-06 ship (was symptom-fixed in Phase 2)
+- **BUG-012** — pulled forward from Phase 5 into W-G: typed-literal inference in `TryDeclarationAttributeProof` lifts modifier from binary-op sibling
 
-**Status**: Stub — detailed execution plan TBD pending Phase 3 completion and the 2 listed decisions.
-**Estimated effort**: L (~1-1.5 weeks — F-LANG-COLL-06 is itself multi-day; F-LANG-COLL-08 needs a regression matrix test; F-LANG-COLL-07 needs new binding-shape infrastructure).
+**Decisions captured** (D1-D7, all settled):
+- **D1** — Bundle collection proof obligations (COLL-04/05/09) into Phase 4 alongside the features. **Settled**: bundle (the obligations are the safety story for the features).
+- **D2** — F-LANG-COLL-11 PRE0104 rename. **Settled**: rename + fresh code (PRE0151 reserved for missing-`by`).
+- **D3** — F-LANG-COLL-12. **Settled**: closed as audit error; no code change.
+- **D4** — F-LANG-BIZ-10 inclusion in Phase 4 W-H. **Settled**: include, gated on `/lifecycle-2-design` + precept-reviewer pass.
+- **D5** — F-LANG-SPEC-01 (`because` on ensures). **Settled**: remove the optional slot (AI-slop cleanup; Principle 9 is locked spec text).
+- **D6** — Catalog-strict `Add` (no widening to Log/List). **Settled**: catalog-strict; sample/test cleanup migrated to `append` verb.
+- **D7** — Revert Lookup from `ClearApplicable` (W-A initial patch was a spec violation). **Settled**: revert; W-J then lifts via proper `/lifecycle-2-design` pass.
+
+**Designs locked via `/lifecycle-2-design`**:
+- `docs/Working/choice-inner-and-ordered-propagation-design.md` (W-G — F-LANG-COLL-02/03 + BUG-012)
+- `docs/Working/index-bounds-proof-design.md` (W-E — F-LANG-COLL-04/09; pulls forward W-E's structural reshape that emerged mid-phase)
+- `docs/Working/f-lang-biz-10-currency-derived-maxplaces.md` (W-H — currency-derived `maxplaces`)
+- `docs/Working/clear-on-lookup-design.md` (W-J)
+- `docs/Working/construct-kind-taxonomy-design.md` (W-I)
+
+**Workstream commits** (in execution order):
+- `392b9a89` — W-C (qualified inner types, root-cause for BUG-005)
+- `cbd4564c` — W-J (clear + notempty lift on lookup)
+- `54954e4d` — W-I (ConstructKind taxonomy)
+- `6ce7d584` — W-D (queue-by quantifier binding)
+- `844b10b4` — W-G (choice inner + ordered + BUG-012); `11b020a9` — W-G remediation (D-1 reshape + D-3 Option A + grammar sync)
+- W-A + W-B + W-F (action applicability + BUG-002 + hygiene — earlier session)
+- `44739a8b` — W-E F-LANG-COLL-05 + IndexBounds scaffolding
+- `d91ac091` — W-E design lock (after `/lifecycle-2-design` proper pass replaced an earlier ungrounded draft)
+- `12c670ac` — W-E slice 1 (Arguments slot on TypedMemberAccess); `c34359b1` — W-E slices 2-6 (catalog parameters, guard extension, discharge strategy, catalog wiring, diagnostic refinement); `a91ed96c` — W-E remediation (catalog-driven action dispatch)
+- `b5107e09` — W-H design remediation (verbatim citations + meta-pattern falsifier + early catalog-flag landing); `df5c4cff` — W-H implementation
+- `1e865ac1` — Phase 4 close-out audit remediation (BUG-002 sample sweep + transient ref scrub + W-H sample uplift)
+
+**Effort**: 2.5-3 weeks actual (was originally estimated L ~1-1.5 weeks; grew to L+ when proof obligations bundled, then to ~2.5-3w when W-H added + 8 reviewer rounds added remediation passes).
+
+**Calibration for Phase 5** (from the phase-close audit):
+- BUG repros that name "field-vs-literal" vs "field-vs-field" as separate symptoms ARE separate fixes from the start. W-G's BUG-012 fix had to ship the literal-side strategy alongside the F-LANG-COLL-03 accessor work; treating them as one decision held.
+- precept-reviewer + `/lifecycle-2-design` cadence works. 8 rounds caught real BLOCKERs each time; treating it as overhead rather than discipline would have produced shippable-looking work that failed close-out audit.
 
 ---
 
@@ -719,7 +754,7 @@ Planning artifact: `/home/sfalik/.claude/plans/refactored-yawning-fern.md` (heav
 - F-LANG-TEMP-04 (always-false period literal comparison — small constant-folding analyzer)
 - **BUG-004** — Proof engine ignores event ensures for transition-row body narrowing. Fix: extend guard-extraction switch in `ProofEngine.Strategies.cs` so event ensures on the row's event contribute their `is set` predicates to body narrowing. Mirrors the BUG-001 fix shape. Trivial-to-small.
 - **BUG-006** — Proof engine doesn't combine guard narrowing with field-level `max` for arithmetic interval inference. Fix: extend the interval-narrowing strategy to compose guard-derived field bounds with field-modifier-derived bounds across rows. Design-required; same architectural family as the new dead-guard / contradictory-rule machinery.
-- **BUG-012** — Ordinal comparison between an ordered-choice field and a choice-literal (`Severity <= 2`, `Tier <= "Medium"`) cannot be proved; the `Both choice operands must be declared ordered` obligation falls through to Unresolved when one operand is a literal. Fix: either (a) lift the `Ordered` modifier from the contextual choice-set type when one operand is a literal and the other a typed ordered-choice field, or (b) add a typed-literal strategy that infers the modifier from the operand's expected type. Small-to-medium; self-contained to the proof engine; no language surface change. Same architectural family as BUG-004 / BUG-006 (proof-engine strategy extension).
+- ~~**BUG-012**~~ — **pulled forward into Phase 4 W-G** (2026-05-26). Shipped as typed-literal inference in `TryDeclarationAttributeProof`'s Modifier arm: when the obligation's subject resolves to a literal/typed-constant operand of a binary op, lift the modifier from the contextual sibling operand. `Severity <= 2` and `Tier <= "Low"` now prove cleanly; unordered choices still emit PRE0112; field-vs-field path unchanged. Sample restore: `samples/it-helpdesk-ticket.precept` reverted from equality-cascade to canonical ordinal form. Tests in `test/Precept.Tests/ProofEngine/OrderedChoiceLiteralTests.cs` (7).
 - **F-LANG-GRAPH-04 (FieldNeverSet + access-modifier unification)** — fully planned 2026-05-25. Design: [`field-never-set-diagnostic.md`](field-never-set-diagnostic.md) v2. See § F-LANG-GRAPH-04 execution slices below.
 
 **Decisions required**:
