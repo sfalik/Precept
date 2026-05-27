@@ -50,11 +50,12 @@ internal static class DiagnosticCoverageAllowLists
         // ── Pre-existing gaps ───────────────────────────────────────────────────
         "MissingOrderingKey",                 // reserved for missing-`by` clause emission; not yet specialized (currently ScalarOperationOnCollection catches it as a generic applicability mismatch)
         "NonOrderableCollectionExtreme",      // no emission site wired
-        "UnsatisfiableGuard",                 // no emission site wired
         "DivisionByZero",                     // no emission site wired
         "SqrtOfNegative",                     // no emission site wired
         "ChoiceElementTypeMismatch",          // no emission site wired
         "ChoiceMissingElementType",           // no emission site wired
+        "TautologicalGuard",                  // F-LANG-SPEC-05 — guard-negation logic deferred (separate slice)
+        "VacuousRule",                        // F-LANG-SPEC-04 — guard-negation logic deferred (separate slice)
 
         // ── MCP tooling backstop ─────────────────────────────────────────────────
         // McpToolInternalError fires only from the McpToolSafeInvoke wrapper in
@@ -207,6 +208,8 @@ internal static class DiagnosticCoverageAllowLists
         "EditableOnEventArg",
         "FieldNeverSet",
         "IncompatibleDimensionalProduct",
+        "ContradictoryRule",
+        "UnsatisfiableGuard",
         "ZeroConstructionRows",
 
         // ── MCP tooling backstop ─────────────────────────────────────────────────

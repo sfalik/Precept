@@ -328,6 +328,32 @@ public enum DiagnosticCode
     MaxplacesCurrencyQualifierNotStatic = 152,
 
     /// <summary>
+    /// PRE0153 — Tautological guard (F-LANG-SPEC-05). The guard expression is
+    /// provably always-true under the field's declared interval bounds and
+    /// implied modifiers. E.g. <c>field Counter nonnegative; when Counter &gt;= 0</c>
+    /// — the guard adds no constraint beyond the field's existing nonnegative
+    /// modifier. Emitted as a Warning by the proof engine's satisfiability scan.
+    /// </summary>
+    TautologicalGuard = 153,
+
+    /// <summary>
+    /// PRE0154 — Vacuous rule (F-LANG-SPEC-04). The rule predicate is
+    /// provably always-true under the fields' declared bounds (and the rule's
+    /// own `when` guard, if any), so the rule governs nothing. E.g.
+    /// <c>field X nonnegative; rule X &gt;= 0</c>. Emitted as a Warning.
+    /// </summary>
+    VacuousRule = 154,
+
+    /// <summary>
+    /// PRE0155 — Contradictory rule pair (F-LANG-SPEC-03). Two rules whose
+    /// per-field constraints have empty intersection on at least one shared
+    /// field; e.g. <c>rule X &gt; 10</c> + <c>rule X &lt;= 5</c>. The conjunction
+    /// of the two rules governs the empty set. Emitted as a Warning on the
+    /// second rule with the first carried as the related-rule witness.
+    /// </summary>
+    ContradictoryRule = 155,
+
+    /// <summary>
     /// PRE0156 — Always-false period literal comparison. When both operands of a
     /// period `==` are constant expressions with non-overlapping components
     /// (e.g., `'1 month' == '30 days'`), the comparison is statically false.

@@ -20,6 +20,14 @@ public readonly struct NumericInterval
     public static NumericInterval Unbounded { get; } =
         new(decimal.MinValue, decimal.MaxValue, isUnbounded: true);
 
+    /// <summary>
+    /// W-C — explicit empty interval. Distinct from <see cref="IsEmpty"/>
+    /// (which detects emptiness via <c>Max &lt; Min</c>) — this is the
+    /// canonical empty value the satisfiability scan returns for an
+    /// inhabited-set check that fails.
+    /// </summary>
+    public static NumericInterval Empty { get; } = new(0m, -1m);
+
     public static NumericInterval Point(decimal v) => new(v, v);
 
     // Sentinel-safe helpers: decimal.MinValue / decimal.MaxValue represent ±∞.
@@ -124,6 +132,57 @@ public readonly struct NumericInterval
     {
         if (IsUnbounded || other.IsUnbounded) return Unbounded;
         return new(Math.Min(Min, other.Min), Math.Max(Max, other.Max));
+    }
+
+    /// <summary>
+    /// W-C — interval intersection. Used by the satisfiability scan to detect
+    /// contradictory rule pairs: when two rules' per-field intervals intersect
+    /// to an empty interval, no valid configuration can satisfy both.
+    /// Returns <see cref="Empty"/> when the intervals are disjoint.
+    /// </summary>
+    public NumericInterval Intersect(NumericInterval other)
+    {
+        if (IsUnbounded) return other;
+        if (other.IsUnbounded) return this;
+        var lo = Math.Max(Min, other.Min);
+        var hi = Math.Min(Max, other.Max);
+        return hi < lo ? Empty : new(lo, hi);
+    }
+
+    /// <summary>
+    /// W-C — sound set difference (BUG-006 cross-row composition). When the
+    /// difference would split this interval into two disjoint pieces
+    /// (e.g. <c>[0,10] \ [3,5] = [0,3) ∪ (5,10]</c>), falls back to <c>this</c>
+    /// unchanged — sound but less precise. The contiguous case
+    /// (e.g. <c>[0,10] \ [5,∞) = [0,5)</c>) is the common one for reject-row
+    /// guards on the upper end and produces a single tightened interval.
+    /// </summary>
+    public NumericInterval Difference(NumericInterval other)
+    {
+        if (IsEmpty || other.IsEmpty) return this;
+        if (other.IsUnbounded) return Empty;
+        if (IsUnbounded) return this; // can't precisely difference an unbounded interval
+
+        // other entirely outside this: difference is unchanged
+        if (other.Max < Min || other.Min > Max) return this;
+
+        // other entirely contains this: difference is empty
+        if (other.Min <= Min && other.Max >= Max) return Empty;
+
+        // other clips off the right end: difference is [Min, other.Min)
+        // (we approximate the open boundary by leaving the bound inclusive —
+        // the scan uses interval *emptiness* as the verdict, so the off-by-one
+        // on closed/open is conservative)
+        if (other.Min > Min && other.Max >= Max)
+            return new(Min, Math.Min(Max, other.Min));
+
+        // other clips off the left end: difference is (other.Max, Max]
+        if (other.Max < Max && other.Min <= Min)
+            return new(Math.Max(Min, other.Max), Max);
+
+        // other is in the middle — non-contiguous difference. Fall back
+        // to the original interval (sound, less precise).
+        return this;
     }
 
     public override string ToString() =>
