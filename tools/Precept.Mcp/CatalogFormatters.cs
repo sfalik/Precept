@@ -902,6 +902,7 @@ internal static class CatalogFormatters
             IntervalContainmentProofRequirement interval => $"{RenderProofSubject(interval.Subject)} fits within {interval.TargetField} bounds — {interval.Description}",
             LengthContainmentProofRequirement length => $"{RenderProofSubject(length.Subject)} length fits {length.TargetField} bounds — {length.Description}",
             CountContainmentProofRequirement count => $"{RenderProofSubject(count.Subject)} count fits {count.TargetField} bounds — {count.Description}",
+            DimensionalProductProofRequirement dimProduct => $"{RenderCompatibleSubjects(dimProduct.LeftSubject, dimProduct.RightSubject)} product is a curated business-domain dimension — {dimProduct.Description}",
             _ => throw new ArgumentOutOfRangeException(nameof(proofRequirement), proofRequirement, null),
         };
 

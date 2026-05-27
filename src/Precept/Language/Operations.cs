@@ -588,18 +588,24 @@ public static class Operations
                     "Divisor must be non-zero"),
             ]),
 
-        // F-LANG-BIZ-05 scaffolding shipped (DimensionalProductProofRequirement
-        // + PRE0157 + ProofEngine.TryDimensionalProductProof). The catalog
-        // attachment to QuantityTimesQuantity is deferred: the current type
-        // checker eagerly emits PRE0071 (CrossDimensionArithmetic) for any
-        // quantity × quantity with cross-dimensional operands, suppressing
-        // the proof-engine path. Switching the catalog requirement on requires
-        // a separate type-checker-rebalancing slice that migrates existing
-        // PRE0071-on-multiply tests to PRE0157. Tracked as a follow-up.
+        // F-LANG-BIZ-05 — dimensional product check now active. The type
+        // checker's PRE0071 (CrossDimensionArithmetic) emission is scoped to
+        // additive operators (+/−) only (see TypeChecker.Expressions.cs);
+        // multiplication legitimately composes dimensions and flows through
+        // to the proof engine, which checks via DimensionalProductProofRequirement
+        // — the result dimension must land in the curated business-domain
+        // set (or be a cancelling pair that reduces to count). Products
+        // outside the curated set emit PRE0157.
         OperationKind.QuantityTimesQuantity => new BinaryOperationMeta(
             kind, OperatorKind.Times, PQuantity, PQuantity, TypeKind.Quantity,
             "Quantity × quantity → quantity (dimensional cancellation)",
-            ResultQualifierPolicy: ResultQualifierPolicy.CompoundUnitCancellation),
+            ResultQualifierPolicy: ResultQualifierPolicy.CompoundUnitCancellation,
+            ProofRequirements:
+            [
+                new DimensionalProductProofRequirement(
+                    new ParamSubject(PQuantity), new ParamSubject(PQuantity),
+                    "Product dimension must be in the curated business-domain set or cancel to a known dimension"),
+            ]),
 
         OperationKind.QuantityTimesPeriod => new BinaryOperationMeta(
             kind, OperatorKind.Times, PQuantity, PPeriod, TypeKind.Quantity,

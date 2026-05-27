@@ -1193,9 +1193,17 @@ internal static partial class TypeChecker
             }
         }
 
-        // PRE0071: Cross-dimension arithmetic — Quantity + Quantity with different dimensions
+        // PRE0071: Cross-dimension arithmetic — Quantity + Quantity with different dimensions.
+        // F-LANG-BIZ-05 (Decision 3): scoped to ADDITIVE / comparison / membership
+        // operators only. Multiplication and division legitimately compose
+        // dimensions — the proof engine's DimensionalProductProofRequirement
+        // catches multiplicative products outside the curated business-domain
+        // set via PRE0157.
+        bool opComposesDimensions = opMeta.Kind == OperatorKind.Times
+            || opMeta.Kind == OperatorKind.Divide;
         if (qualifierLeft.ResultType == TypeKind.Quantity && qualifierRight.ResultType == TypeKind.Quantity
-            && enforcePairwiseQualifierChecks)
+            && enforcePairwiseQualifierChecks
+            && !opComposesDimensions)
         {
             var leftDim = GetDimensionFromQualifiers(leftQualifiers.Value);
             var rightDim = GetDimensionFromQualifiers(rightQualifiers.Value);

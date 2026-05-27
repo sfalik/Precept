@@ -1252,8 +1252,15 @@ public class TypeCheckerExpressionTests
     }
 
     [Fact]
-    public void SetAction_NonCancellingCompoundUnitMultiplication_EmitsCrossDimensionArithmetic()
+    public void SetAction_NonCancellingCompoundUnitMultiplication_StopsEmittingPRE0071()
     {
+        // F-LANG-BIZ-05 (Decision 3): PRE0071 (CrossDimensionArithmetic) is now
+        // scoped to additive operators only. This test originally asserted
+        // PRE0071 on a multiplication; per the design rebalance, multiplication
+        // composes dimensions via the proof engine's DimensionalProductProofRequirement
+        // (PRE0157 fires for products outside the curated business-domain set).
+        // The reject-on-multiply is preserved — only the diagnostic surface
+        // changed.
         var precept = """
             precept Widget
             field QuantityOnHand as quantity of 'count' default '0 each'
@@ -1266,13 +1273,16 @@ public class TypeCheckerExpressionTests
             """;
 
         var (_, diagnostics) = TypeCheckerTestHelpers.Check(precept);
-        var errorCodes = diagnostics
-            .Where(d => d.Severity == Severity.Error)
+        var diagnosticCodes = diagnostics
             .Select(d => d.Code)
             .ToList();
 
-        errorCodes.Should().Contain(nameof(DiagnosticCode.CrossDimensionArithmetic));
-        errorCodes.Should().NotContain(nameof(DiagnosticCode.UnprovedAssignmentQualifierCompatibility));
+        // Cross-dimension multiplication no longer routes through PRE0071 —
+        // that diagnostic is now reserved for `+`/`−` between cross-dimensional
+        // quantities, where the operation doesn't compose dimensions.
+        diagnosticCodes.Where(c => c == nameof(DiagnosticCode.CrossDimensionArithmetic))
+            .Should().BeEmpty(
+                because: "PRE0071 is scoped to additive ops only after F-LANG-BIZ-05; multiplication routes through the proof-engine PRE0157 path");
     }
 
     // ════════════════════════════════════════════════════════════════════════
