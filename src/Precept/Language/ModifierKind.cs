@@ -36,8 +36,7 @@ public enum ModifierKind
     Maxcount    = 13,
     /// <summary>Value: maximum decimal places.</summary>
     Maxplaces   = 14,
-    /// <summary>Flag: field is directly editable (write baseline); defaults to read-only without this modifier.</summary>
-    Writable    = 15,
+    // Ordinal 15 retired (was Writable; unified into ModifierKind.Write per F-LANG-GRAPH-04).
 
     // ── State modifiers (7) — StateModifierMeta ─────────────────────────────────
 

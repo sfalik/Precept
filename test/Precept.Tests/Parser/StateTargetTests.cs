@@ -218,7 +218,7 @@ public class StateTargetTests
     {
         var compilation = Compiler.Compile("""
             precept WildcardFromAny
-            field Flag as boolean default false writable
+            field Flag as boolean default false editable
             state Draft initial
             state Done terminal
             event Toggle
@@ -234,7 +234,7 @@ public class StateTargetTests
     {
         var compilation = Compiler.Compile("""
             precept BroadcastModify
-            field Name as string writable
+            field Name as string editable
             field Amount as number
             state Draft initial
             state Closed terminal
@@ -252,7 +252,7 @@ public class StateTargetTests
     {
         var compilation = Compiler.Compile("""
             precept BroadcastOmit
-            field Name as string optional writable
+            field Name as string optional editable
             field Amount as number optional
             state Draft initial
             state Closed terminal

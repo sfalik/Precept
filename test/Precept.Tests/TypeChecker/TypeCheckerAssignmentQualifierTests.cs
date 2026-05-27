@@ -228,7 +228,7 @@ public class TypeCheckerAssignmentQualifierTests
         // When target is 'in kg', qualifiers match — no PRE0134.
         var precept = """
             precept Widget
-            field Qty as quantity in 'kg' default '0 kg' writable
+            field Qty as quantity in 'kg' default '0 kg' editable
             state Open initial
             state Closed
             event Update(n as decimal)
@@ -246,7 +246,7 @@ public class TypeCheckerAssignmentQualifierTests
         // '{n} g' has StaticQualifier = StaticUnitQualifier(g), target is 'in kg' → PRE0134.
         var precept = """
             precept Widget
-            field Qty as quantity in 'kg' default '0 kg' writable
+            field Qty as quantity in 'kg' default '0 kg' editable
             state Open initial
             state Closed
             event Update(n as decimal)
@@ -264,7 +264,7 @@ public class TypeCheckerAssignmentQualifierTests
         // '{n} USD' has StaticQualifier = StaticCurrencyQualifier(USD), target is 'in USD' → clean.
         var precept = """
             precept Widget
-            field Total as money in 'USD' default '0.00 USD' writable
+            field Total as money in 'USD' default '0.00 USD' editable
             state Open initial
             state Closed
             event Update(n as decimal)
@@ -282,7 +282,7 @@ public class TypeCheckerAssignmentQualifierTests
         // '{n} EUR' has StaticQualifier = StaticCurrencyQualifier(EUR), target is 'in USD' → PRE0134.
         var precept = """
             precept Widget
-            field Total as money in 'USD' default '0.00 USD' writable
+            field Total as money in 'USD' default '0.00 USD' editable
             state Open initial
             state Closed
             event Update(n as decimal)
@@ -303,7 +303,7 @@ public class TypeCheckerAssignmentQualifierTests
         // for the StaticCurrencyAndUnitQualifier subtype with a two-axis mismatch.
         var precept = """
             precept Widget
-            field Cost as price in 'USD' of 'kg' default '0 USD/kg' writable
+            field Cost as price in 'USD' of 'kg' default '0 USD/kg' editable
             state Open initial
             state Closed
             event Update(n as decimal)
@@ -324,7 +324,7 @@ public class TypeCheckerAssignmentQualifierTests
     {
         const string precept = """
             precept Widget
-            field Cost as price in 'each' default '1 USD/each' writable
+            field Cost as price in 'each' default '1 USD/each' editable
             state A initial
             state B terminal
             event go initial
@@ -347,7 +347,7 @@ public class TypeCheckerAssignmentQualifierTests
     {
         const string precept = """
             precept Widget
-            field Cost as price in 'each' default '1 USD/each' writable
+            field Cost as price in 'each' default '1 USD/each' editable
             state A initial
             state B terminal
             event go initial
@@ -364,7 +364,7 @@ public class TypeCheckerAssignmentQualifierTests
     {
         const string precept = """
             precept Widget
-            field Cost as price in 'USD' of 'mass' default '1 USD/kg' writable
+            field Cost as price in 'USD' of 'mass' default '1 USD/kg' editable
             state A initial
             state B terminal
             event go initial
@@ -414,7 +414,7 @@ public class TypeCheckerAssignmentQualifierTests
         const string precept = """
             precept InterpolatedMismatch
             field test3 as quantity in 'box' default '1 box'
-            field test5 as price in 'each' default '1 USD/each' writable
+            field test5 as price in 'each' default '1 USD/each' editable
             state Active initial
             state Done terminal
             event Update initial
@@ -432,7 +432,7 @@ public class TypeCheckerAssignmentQualifierTests
         const string precept = """
             precept InterpolatedMatch
             field test3 as quantity in 'each' default '1 each'
-            field test5 as price in 'each' default '1 USD/each' writable
+            field test5 as price in 'each' default '1 USD/each' editable
             state Active initial
             state Done terminal
             event Update initial
@@ -450,7 +450,7 @@ public class TypeCheckerAssignmentQualifierTests
         const string precept = """
             precept InterpolatedCurrencyMismatch
             field test3 as quantity in 'kg' default '1 kg'
-            field test5 as price in 'USD' of 'mass' default '1 USD/kg' writable
+            field test5 as price in 'USD' of 'mass' default '1 USD/kg' editable
             state Active initial
             state Done terminal
             event Update initial
@@ -849,7 +849,7 @@ public class TypeCheckerAssignmentQualifierTests
     public void DurationBareAssignment_UsesImpliedTemporalDimensionResolver_AndCompilesClean()
     {
         var precept = CreateSetAssignmentPrecept(
-            targetDeclaration: "field target as duration default '24 hours' writable",
+            targetDeclaration: "field target as duration default '24 hours' editable",
             assignment: "source",
             "field source as duration default '72 hours'");
 
@@ -907,7 +907,7 @@ public class TypeCheckerAssignmentQualifierTests
     public void MoneyMinFunctionCallMatchingCurrency_PreservesResultQualifier_AndCompilesClean()
     {
         var precept = CreateSetAssignmentPrecept(
-            targetDeclaration: "field target as money in 'USD' default '1 USD' writable",
+            targetDeclaration: "field target as money in 'USD' default '1 USD' editable",
             assignment: "min(left, right)",
             "field left as money in 'USD' default '2 USD'",
             "field right as money in 'USD' default '1 USD'");
@@ -940,7 +940,7 @@ public class TypeCheckerAssignmentQualifierTests
     public void QuantityMaxFunctionCallMatchingUnit_PreservesResultQualifier_AndCompilesClean()
     {
         var precept = CreateSetAssignmentPrecept(
-            targetDeclaration: "field target as quantity in 'kg' default '1 kg' writable",
+            targetDeclaration: "field target as quantity in 'kg' default '1 kg' editable",
             assignment: "max(left, right)",
             "field left as quantity in 'kg' default '2 kg'",
             "field right as quantity in 'kg' default '1 kg'");
@@ -973,7 +973,7 @@ public class TypeCheckerAssignmentQualifierTests
     public void MoneyRoundFunctionCallMatchingCurrency_PreservesResultQualifier_AndCompilesClean()
     {
         var precept = CreateSetAssignmentPrecept(
-            targetDeclaration: "field target as money in 'USD' default '1 USD' writable",
+            targetDeclaration: "field target as money in 'USD' default '1 USD' editable",
             assignment: "round(source, 2)",
             "field source as money in 'USD' default '1.25 USD'");
 

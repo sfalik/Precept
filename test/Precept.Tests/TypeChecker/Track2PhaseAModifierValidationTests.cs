@@ -55,16 +55,20 @@ public class Track2PhaseAModifierValidationTests
     }
 
     [Fact]
-    public void WritableOnEventArg_RejectedByParserWithExpectedToken()
+    public void EditableOnEventArg_EmitsTargetedDiagnostic()
     {
+        // F-LANG-GRAPH-04 Decision 5: with the unified `editable` keyword the
+        // parser consumes the token at event-arg position and emits the targeted
+        // EditableOnEventArg diagnostic (rather than letting a generic
+        // ExpectedToken fall through).
         var precept = """
             precept Widget
             field Name as string
             state Draft initial
-            event Update(NewName as string writable)
+            event Update(NewName as string editable)
             from Draft on Update -> set Name = Update.NewName -> no transition
             """;
 
-        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.ExpectedToken);
+        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.EditableOnEventArg);
     }
 }

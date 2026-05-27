@@ -187,7 +187,7 @@ public class ProofEngineTypedArgQualifierTests
     {
         var ledger = Prove("""
             precept Widget
-            field Total as money in 'USD' default '0.00 USD' writable
+            field Total as money in 'USD' default '0.00 USD' editable
             state Draft initial
             event Receive(UnitCost as price in 'USD' of 'mass', Qty as quantity of 'mass')
             from Draft on Receive -> set Total = Receive.UnitCost * Receive.Qty -> no transition
@@ -206,7 +206,7 @@ public class ProofEngineTypedArgQualifierTests
     {
         var compilation = Compiler.Compile("""
             precept Widget
-            field Total as money in 'USD' default '0.00 USD' writable
+            field Total as money in 'USD' default '0.00 USD' editable
             state Draft initial
             event Receive(UnitCost as price in 'USD' of 'mass', Qty as quantity of 'length')
             from Draft on Receive -> set Total = Receive.UnitCost * Receive.Qty -> no transition
@@ -268,7 +268,7 @@ public class ProofEngineTypedArgQualifierTests
         var compilation = Compiler.Compile("""
             precept Widget
             field Min as decimal default '0'
-            field Qty as quantity in 'kg' default '0 kg' writable
+            field Qty as quantity in 'kg' default '0 kg' editable
             rule Qty > '{Min} kg' because "positive"
             """);
 
@@ -284,7 +284,7 @@ public class ProofEngineTypedArgQualifierTests
         var compilation = Compiler.Compile("""
             precept Widget
             field MinAmount as decimal default '0'
-            field Balance as money in 'USD' default '0.00 USD' writable
+            field Balance as money in 'USD' default '0.00 USD' editable
             rule Balance > '{MinAmount} USD' because "positive"
             """);
 

@@ -15,7 +15,7 @@ public enum TokenKind
     As          =   7,
     Default     =   8,
     Optional    =   9,
-    Writable    =  10,
+    // Ordinal 10 retired (was Writable; unified with Editable per F-LANG-GRAPH-04).
     Because     =  11,
     Initial     =  12,
 

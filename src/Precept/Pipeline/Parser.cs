@@ -21,6 +21,15 @@ public static partial class Parser
     private static readonly FrozenSet<TokenKind> ValueModifierTokens =
         Modifiers.ByValueToken.Keys.ToFrozenSet();
 
+    // Catalog-derived: access-modifier tokens whose ApplicableDeclarationSites
+    // includes FieldDeclaration. Currently just `editable` (the unified access
+    // modifier covering field-declaration and per-state modify positions).
+    private static readonly FrozenSet<TokenKind> FieldDeclarationAccessModifierTokens =
+        Modifiers.ByAccessToken
+            .Where(kv => kv.Value.ApplicableDeclarationSites.HasFlag(AccessModifierDeclarationSite.FieldDeclaration))
+            .Select(kv => kv.Key)
+            .ToFrozenSet();
+
     private static readonly FrozenSet<TokenKind> ExpressionStartTokens =
         ExpressionForms.All
             .Where(form => !form.IsLeftDenotation)
@@ -529,7 +538,8 @@ public static partial class Parser
             var startSpan = Peek().Span;
             var lastSpan = startSpan;
 
-            while (ValueModifierTokens.Contains(Peek().Kind))
+            while (ValueModifierTokens.Contains(Peek().Kind)
+                || FieldDeclarationAccessModifierTokens.Contains(Peek().Kind))
             {
                 var modToken = Peek();
                 if (Modifiers.ByValueToken.TryGetValue(modToken.Kind, out var modMeta))
@@ -567,6 +577,7 @@ public static partial class Parser
                         {
                             valueExpr = ParseExpression(0, () =>
                                 ValueModifierTokens.Contains(Peek().Kind)
+                                || FieldDeclarationAccessModifierTokens.Contains(Peek().Kind)
                                 || IsAtConstructBoundary());
                             lastSpan = valueExpr.Span;
                         }
@@ -576,6 +587,15 @@ public static partial class Parser
                         modMeta.Kind,
                         valueExpr,
                         valueExpr is null ? modToken.Span : SourceSpan.Covering(modToken.Span, valueExpr.Span)));
+                }
+                else if (Modifiers.ByAccessToken.TryGetValue(modToken.Kind, out var accessMeta))
+                {
+                    // F-LANG-GRAPH-04 Decision 5: access modifiers (currently just
+                    // `editable`) are accepted at field-declaration position when
+                    // the catalog declares ApplicableDeclarationSites.FieldDeclaration.
+                    Advance();
+                    lastSpan = modToken.Span;
+                    modifiers.Add(new ParsedModifier(accessMeta.Kind, null, modToken.Span));
                 }
                 else
                 {
@@ -714,6 +734,19 @@ public static partial class Parser
 
                     var modifiers = ImmutableArray.CreateBuilder<ModifierKind>();
                     var parsedModifiers = ImmutableArray.CreateBuilder<ParsedModifier>();
+
+                    // F-LANG-GRAPH-04 Decision 5: `editable` at event-arg position
+                    // is structurally invalid (event args are always read-only in
+                    // the transition body). Consume the token and emit the
+                    // targeted EditableOnEventArg diagnostic instead of letting
+                    // the modifier loop fall through to a generic parse error.
+                    while (FieldDeclarationAccessModifierTokens.Contains(Peek().Kind))
+                    {
+                        var accessTok = Advance();
+                        _diagnostics.Add(DiagnosticsCatalog.Create(
+                            DiagnosticCode.EditableOnEventArg, accessTok.Span, nameToken.Text));
+                    }
+
                     while (Modifiers.ByValueToken.TryGetValue(Peek().Kind, out var modMeta)
                            && modMeta.ApplicableDeclarationSites.HasFlag(argSite))
                     {

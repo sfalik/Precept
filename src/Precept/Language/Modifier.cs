@@ -137,7 +137,7 @@ public abstract record ModifierMeta(
     public ModifierKind[] MutuallyExclusiveWith { get; } = MutuallyExclusiveWith ?? [];
 }
 
-/// <summary>Value modifiers (15 members: optional, ordered, nonnegative, …, writable).</summary>
+/// <summary>Value modifiers (14 members: optional, ordered, nonnegative, …, maxplaces).</summary>
 public sealed record ValueModifierMeta(
     ModifierKind Kind,
     TokenMeta Token,

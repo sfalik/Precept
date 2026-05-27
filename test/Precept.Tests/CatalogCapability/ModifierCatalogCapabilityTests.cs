@@ -9,12 +9,12 @@ public sealed class ModifierCatalogCapabilityTests
 {
     [Fact]
     public void ValueModifierMeta_UsesCanonicalTypeName()
-        => ValueModifierTestAccess.RuntimeTypeName(ModifierKind.Writable)
+        => ValueModifierTestAccess.RuntimeTypeName(ModifierKind.Default)
             .Should().Be("ValueModifierMeta");
 
     [Fact]
     public void ValueModifierMeta_NoLongerExposesApplicableToEventArgs()
-        => ValueModifierTestAccess.GetMeta(ModifierKind.Writable).RuntimeInstance.GetType()
+        => ValueModifierTestAccess.GetMeta(ModifierKind.Default).RuntimeInstance.GetType()
             .GetProperty("ApplicableToEventArgs")
             .Should().BeNull();
 
@@ -56,14 +56,6 @@ public sealed class ModifierCatalogCapabilityTests
         => CatalogCapabilityReflection.GetInstanceValue(
                 Modifiers.GetMeta(ModifierKind.Mincount), "BoundCounterpart")
             .Should().Be(ModifierKind.Maxcount);
-
-    [Fact]
-    public void Writable_ExcludesEventArgumentDeclarations()
-    {
-        var meta = ValueModifierTestAccess.GetMeta(ModifierKind.Writable);
-        ValueModifierTestAccess.HasDeclarationSiteFlag(meta, "FieldDeclaration").Should().BeTrue();
-        ValueModifierTestAccess.HasAnyDeclarationSiteFlag(meta, "EventArgument", "EventArgDeclaration").Should().BeFalse();
-    }
 
     [Fact]
     public void Default_IncludesEventArgumentDeclarations()

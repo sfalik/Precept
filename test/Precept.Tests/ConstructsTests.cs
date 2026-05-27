@@ -577,11 +577,14 @@ public class ConstructsTests
     }
 
     [Fact]
-    public void LeadingTokens_DoesNotContainRetiredTokens()
+    public void LeadingTokens_DoesNotContainAccessModeAdjectives()
     {
-        // Write was retired from access mode context in B4
-        Constructs.LeadingTokens.Should().NotContain(TokenKind.Writable,
-            "Writable is not a leading token for any construct");
+        // Access mode adjectives (editable, readonly) appear AFTER a `modify` head
+        // or AFTER a field declaration's type; they never lead a construct.
+        Constructs.LeadingTokens.Should().NotContain(TokenKind.Editable,
+            "Editable appears AFTER `modify` or after a field declaration's type — never as a construct leader");
+        Constructs.LeadingTokens.Should().NotContain(TokenKind.Readonly,
+            "Readonly appears AFTER `modify` — never as a construct leader");
     }
 
     [Theory]

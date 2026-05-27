@@ -2232,7 +2232,7 @@ internal static class RichHoverFactory
             .Where(access => access.Mode == ModifierKind.Write)
             .ToImmutableArray();
         ImmutableArray<string> writableStates;
-        if (writeAccesses.IsEmpty && field.Modifiers.Contains(ModifierKind.Writable))
+        if (writeAccesses.IsEmpty && field.Modifiers.Contains(ModifierKind.Write))
         {
             writableStates = states
                 .Where(state => !omittedStates.Contains(state))
@@ -2277,7 +2277,7 @@ internal static class RichHoverFactory
         }
 
         return compilation.Semantics.Fields
-            .Where(field => field.Modifiers.Contains(ModifierKind.Writable)
+            .Where(field => field.Modifiers.Contains(ModifierKind.Write)
                 && !omittedFields.Contains(field.Name))
             .Select(field => field.Name)
             .ToImmutableArray();

@@ -131,8 +131,8 @@ public static class QuickstartCatalog
             """
             precept FeeSchedule
 
-            field BaseFee as decimal default 0 nonnegative maxplaces 2 writable
-            field DiscountPercent as decimal default 0 nonnegative max 100 maxplaces 2 writable
+            field BaseFee as decimal default 0 nonnegative maxplaces 2 editable
+            field DiscountPercent as decimal default 0 nonnegative max 100 maxplaces 2 editable
             field TaxRate as decimal default 0.1 nonnegative maxplaces 4
             """),
 

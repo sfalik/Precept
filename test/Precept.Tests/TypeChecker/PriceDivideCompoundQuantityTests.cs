@@ -91,7 +91,7 @@ public class PriceDivideCompoundQuantityTests
         var (_, diagnostics) = TypeCheckerTestHelpers.Check("""
             precept Widget
             field ListPrice as price in 'USD' of 'mass'
-            field ConvFactor as quantity in 'each/kg' default '1 each/kg' writable
+            field ConvFactor as quantity in 'each/kg' default '1 each/kg' editable
             field CostPerUnit as price in 'USD' of 'count'
             state Open initial
             state Closed
@@ -115,7 +115,7 @@ public class PriceDivideCompoundQuantityTests
         var (_, diagnostics) = TypeCheckerTestHelpers.Check("""
             precept Widget
             field ListPrice as price in 'USD' of 'mass'
-            field ConvFactor as quantity in 'each/kg' default '1 each/kg' writable
+            field ConvFactor as quantity in 'each/kg' default '1 each/kg' editable
             field CostPerUnit as price in 'EUR' of 'count'
             state Open initial
             state Closed

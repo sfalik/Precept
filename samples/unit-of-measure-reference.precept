@@ -25,27 +25,27 @@ precept UnitOfMeasureReference
 # IsBaseUnit marks the canonical unit of its dimension (the one with factor 1).
 
 # Identity
-field Code as string optional maxlength 32 writable
-field DisplayName as string optional maxlength 100 writable
-field Symbol as string optional maxlength 16 writable
+field Code as string optional maxlength 32 editable
+field DisplayName as string optional maxlength 100 editable
+field Symbol as string optional maxlength 16 editable
 
 # Dimension classification — what the unit measures.
-field Dimension as choice of string("Length","Mass","Time","ElectricCurrent","Temperature","Substance","Luminosity","Count","Area","Volume","Speed","Acceleration","Force","Energy","Power","Pressure","Frequency","Angle") default "Count" writable
+field Dimension as choice of string("Length","Mass","Time","ElectricCurrent","Temperature","Substance","Luminosity","Count","Area","Volume","Speed","Acceleration","Force","Energy","Power","Pressure","Frequency","Angle") default "Count" editable
 
 # BaseUnitCode references the canonical unit of the dimension. For SI Mass
 # that's 'g' (gram); for SI Length that's 'm' (metre). When IsBaseUnit is true
 # BaseUnitCode and Code refer to the same unit.
-field BaseUnitCode as string optional maxlength 32 writable
+field BaseUnitCode as string optional maxlength 32 editable
 
 # ConversionFactor — how many of the base unit equal one of this unit.
-field ConversionFactor as decimal default 1 positive maxplaces 12 writable
+field ConversionFactor as decimal default 1 positive maxplaces 12 editable
 
-field IsBaseUnit as boolean default false writable
+field IsBaseUnit as boolean default false editable
 
 # UcumExpression is the formal UCUM syntax for this unit (e.g. 'kg', 'm/s2').
 # The runtime accepts UCUM-compatible expressions directly in quantity types;
 # this field exists so a host UI can render the canonical UCUM string.
-field UcumExpression as string optional maxlength 64 writable
+field UcumExpression as string optional maxlength 64 editable
 
 # System classifies which measurement system this unit belongs to.
 #   SI            — International System of Units (kg, m, s, ...)
@@ -54,10 +54,10 @@ field UcumExpression as string optional maxlength 64 writable
 #   CGS           — centimetre-gram-second (cm, g, dyne, erg, ...)
 #   UCUM          — UCUM-only convention (e.g. unified codes)
 #   Custom        — application-defined (case, pallet, batch)
-field System as choice of string("SI","USCustomary","Imperial","CGS","UCUM","Custom") default "UCUM" writable
+field System as choice of string("SI","USCustomary","Imperial","CGS","UCUM","Custom") default "UCUM" editable
 
-field Active as boolean default true writable
-field Notes as string optional writable
+field Active as boolean default true editable
+field Notes as string optional editable
 
 rule ConversionFactor == 1 when IsBaseUnit because "A base unit must have a conversion factor of exactly 1 — the base unit is the reference point of its dimension and converts to itself"
 rule ConversionFactor != 1 when IsBaseUnit == false because "A non-base unit must have a conversion factor different from 1 — a factor of 1 would make it indistinguishable from the base unit of the same dimension"

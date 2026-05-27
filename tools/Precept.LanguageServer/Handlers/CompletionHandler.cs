@@ -2503,7 +2503,15 @@ internal sealed class CompletionHandler : ICompletionHandler
 
     private static IEnumerable<ModifierMeta> GetModifiers(ModifierDomain domain) => domain switch
     {
-        ModifierDomain.Field => Modifiers.All.OfType<ValueModifierMeta>(),
+        // F-LANG-GRAPH-04 Decision 5: field-position modifiers are value modifiers
+        // plus any access modifier whose catalog ApplicableDeclarationSites includes
+        // FieldDeclaration (currently just `editable`).
+        ModifierDomain.Field => Modifiers.All
+            .OfType<ValueModifierMeta>()
+            .Cast<ModifierMeta>()
+            .Concat(Modifiers.All
+                .OfType<AccessModifierMeta>()
+                .Where(m => m.ApplicableDeclarationSites.HasFlag(AccessModifierDeclarationSite.FieldDeclaration))),
         ModifierDomain.State => Modifiers.All.OfType<StateModifierMeta>(),
         ModifierDomain.Event => Modifiers.All.OfType<EventModifierMeta>(),
         ModifierDomain.Access => Modifiers.All.OfType<AccessModifierMeta>(),
@@ -2526,11 +2534,23 @@ internal sealed class CompletionHandler : ICompletionHandler
                 .Where(meta => !alreadyApplied.Contains(meta.Token.Kind));
         }
 
-        return modifiers
+        // Value modifiers apply per their ApplicableDeclarationSites and ApplicableTo;
+        // access modifiers (currently just `editable`) carry a separate site enum and
+        // apply to any field type.
+        var valueMatches = modifiers
             .OfType<ValueModifierMeta>()
             .Where(meta => meta.ApplicableDeclarationSites.HasFlag(declarationSite))
             .Where(meta => meta.ApplicableTo.Length == 0 || IsTypeApplicable(meta.ApplicableTo, resolvedType, appliedModifiers))
             .Where(meta => !alreadyApplied.Contains(meta.Token.Kind));
+
+        var accessMatches = declarationSite == ValueModifierDeclarationSite.FieldDeclaration
+            ? modifiers
+                .OfType<AccessModifierMeta>()
+                .Where(meta => meta.ApplicableDeclarationSites.HasFlag(AccessModifierDeclarationSite.FieldDeclaration))
+                .Where(meta => !alreadyApplied.Contains(meta.Token.Kind))
+            : Enumerable.Empty<AccessModifierMeta>();
+
+        return valueMatches.Cast<ModifierMeta>().Concat(accessMatches);
     }
 
     /// <summary>

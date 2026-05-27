@@ -8,8 +8,8 @@ namespace Precept.Tests.TypeChecker;
 /// <summary>
 /// Modifier Validation.
 /// Covers type-applicability (catalog-driven), duplicate detection, mutual exclusivity,
-/// subsumption redundancy, implied-modifier redundancy, writable-on-event-arg,
-/// and computed-field-not-writable diagnostics.
+/// subsumption redundancy, implied-modifier redundancy, editable-on-event-arg,
+/// and computed-field-not-editable diagnostics.
 /// </summary>
 public class TypeCheckerModifierTests
 {
@@ -58,7 +58,7 @@ public class TypeCheckerModifierTests
     {
         var precept = """
             precept Widget
-            field Name as string writable
+            field Name as string editable
             state Open initial
             """;
 
@@ -409,7 +409,7 @@ public class TypeCheckerModifierTests
             field Status as string
             state Open initial
             state Closed
-            event Close(Reason as string writable)
+            event Close(Reason as string editable)
             from Open on Close -> set Status = "done" -> Closed
             """;
 
@@ -421,8 +421,8 @@ public class TypeCheckerModifierTests
     {
         var precept = """
             precept Widget
-            field Price as number writable
-            field Tax as number writable <- Price
+            field Price as number editable
+            field Tax as number editable <- Price
             """;
 
         TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.ComputedFieldNotWritable);
@@ -433,7 +433,7 @@ public class TypeCheckerModifierTests
     {
         var precept = """
             precept Widget
-            field Price as number writable
+            field Price as number editable
             field Tax as number <- Price
             """;
 
@@ -662,7 +662,7 @@ public class TypeCheckerModifierTests
     {
         var precept = """
             precept Widget
-            field Name as string writable default "x"
+            field Name as string editable default "x"
             state Open initial
             state Done
             in Done modify Name readonly
@@ -682,7 +682,7 @@ public class TypeCheckerModifierTests
     {
         var precept = """
             precept Widget
-            field Name as string writable default "x"
+            field Name as string editable default "x"
             state Open initial
             in Open modify Name editable
             """;
@@ -695,7 +695,7 @@ public class TypeCheckerModifierTests
     {
         var precept = """
             precept Widget
-            field Name as string writable default "x"
+            field Name as string editable default "x"
             state Open initial
             state Done
             in Done modify Name readonly

@@ -41,9 +41,9 @@ public class ProofEngineInitialEventTests
         // Guard D != 0 must discharge the divisor-nonzero obligation via GuardInPath.
         var (_, ledger) = ProveAllowingDiagnostics("""
             precept Widget
-            field X as number default 0 writable
-            field Y as integer default 1 writable
-            field D as number default 1 writable
+            field X as number default 0 editable
+            field Y as integer default 1 editable
+            field D as number default 1 editable
             state Draft initial terminal
             event Create initial
             on Create when D != 0 -> set X = Y / D
@@ -78,8 +78,8 @@ public class ProofEngineInitialEventTests
         // and focus solely on proof engine interval-narrowing behavior.
         var (_, ledger) = ProveAllowingDiagnostics("""
             precept Widget
-            field Amount as integer min 1 max 200 writable
-            field Result as integer min 1 max 100 writable
+            field Amount as integer min 1 max 200 editable
+            field Result as integer min 1 max 100 editable
             state Draft initial terminal
             event Create initial
             on Create when Amount >= 10 and Amount <= 100 -> set Result = Amount
@@ -112,9 +112,9 @@ public class ProofEngineInitialEventTests
     {
         var (_, ledger) = ProveAllowingDiagnostics("""
             precept Widget
-            field X as number default 0 writable
-            field Y as integer default 1 writable
-            field D as number default 1 writable
+            field X as number default 0 editable
+            field Y as integer default 1 editable
+            field D as number default 1 editable
             state Draft initial terminal
             event Create initial
             on Create -> set X = Y / D
@@ -146,9 +146,9 @@ public class ProofEngineInitialEventTests
         // but spelled as a construction row instead.
         var (_, ledger) = ProveAllowingDiagnostics("""
             precept Widget
-            field X as number default 0 writable
-            field Y as integer default 1 writable
-            field D as number default 1 writable
+            field X as number default 0 editable
+            field Y as integer default 1 editable
+            field D as number default 1 editable
             state Draft initial terminal
             event Create initial
             on Create when D != 0 -> set X = Y / D

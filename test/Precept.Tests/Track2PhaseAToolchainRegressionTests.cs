@@ -36,7 +36,7 @@ public sealed class Track2PhaseAToolchainRegressionTests
     {
         var compilation = Compile("""
             precept Bug026Regression
-            field Name as string writable default ""
+            field Name as string editable default ""
             field Amount as number default 0
             field Notes as string optional
             state Active initial
@@ -57,7 +57,7 @@ public sealed class Track2PhaseAToolchainRegressionTests
     {
         var compilation = Compile("""
             precept Bug037Regression
-            field Name as string default "" writable
+            field Name as string default "" editable
             field Amount as number default 0
             field Notes as string optional
             state Draft initial
@@ -141,8 +141,8 @@ public sealed class Track2PhaseAToolchainRegressionTests
     {
         var compilation = Compile($$"""
             precept DualUseActionRegression
-            field Left as number default 0 writable
-            field Right as number default 0 writable
+            field Left as number default 0 editable
+            field Right as number default 0 editable
             field Result as number default 0
             state Draft initial
             state Done terminal

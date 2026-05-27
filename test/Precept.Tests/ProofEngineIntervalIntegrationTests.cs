@@ -930,7 +930,7 @@ from Inactive on Activate
         // price of 'mass' × quantity of 'length' → dimension mismatch → S5 fires.
         var source = """
             precept QualCheck
-            field Total as money in 'USD' default '0.00 USD' writable
+            field Total as money in 'USD' default '0.00 USD' editable
             state Draft initial
             event Receive(UnitCost as price in 'USD' of 'mass', Qty as quantity of 'length')
             from Draft on Receive -> set Total = Receive.UnitCost * Receive.Qty -> no transition

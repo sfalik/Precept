@@ -158,9 +158,9 @@ public class ProofEngineTests
         {
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
+                field D as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Y / D -> no transition
@@ -178,9 +178,9 @@ public class ProofEngineTests
             // Stateless precept uses event handler (no states/transition rows)
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
+                field D as number default 1 editable
                 event Submit
                 on Submit -> set X = Y / D
                 """);
@@ -209,8 +209,8 @@ public class ProofEngineTests
         {
             var ledger = Prove("""
                 precept Widget
-                field Y as number default 1 writable
-                field D as number nonzero default 1 writable
+                field Y as number default 1 editable
+                field D as number nonzero default 1 editable
                 field X as number <- Y / D
                 """);
 
@@ -233,7 +233,7 @@ public class ProofEngineTests
             // `set X = 42` has no proof requirements (no division, no sqrt)
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
+                field X as number default 0 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = 42 -> no transition
@@ -251,9 +251,9 @@ public class ProofEngineTests
             // Precept with division in a transition row and in a rule → both contexts created
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
-                field D as number nonzero default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
+                field D as number nonzero default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Y / D -> no transition
@@ -270,9 +270,9 @@ public class ProofEngineTests
             // State hook (on-entry) with division action → StateHookContext
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
-                field D as number nonzero default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
+                field D as number nonzero default 1 editable
                 state Draft initial
                 to Draft -> set X = Y / D
                 """);
@@ -286,9 +286,9 @@ public class ProofEngineTests
         {
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
+                field D as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Y / D -> no transition
@@ -313,8 +313,8 @@ public class ProofEngineTests
             // Divisor is literal 2 → subject resolves to literal → literal proof succeeds
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Y / 2 -> no transition
@@ -334,9 +334,9 @@ public class ProofEngineTests
             // Divisor is a field (not a literal) → literal proof cannot apply
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
+                field D as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Y / D -> no transition
@@ -355,7 +355,7 @@ public class ProofEngineTests
             // sqrt(4) — argument is literal 4 → subject resolves in function call → proved
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
+                field X as number default 0 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = sqrt(4) -> no transition
@@ -376,9 +376,9 @@ public class ProofEngineTests
             // Y is integer so IntegerDivideNumber is used — correctly identifies D (number) as divisor.
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as integer default 1 writable
-                field D as number nonzero default 1 writable
+                field X as number default 0 editable
+                field Y as integer default 1 editable
+                field D as number nonzero default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Y / D -> no transition
@@ -399,9 +399,9 @@ public class ProofEngineTests
             // Y is integer so IntegerDivideNumber is used — correctly identifies D (number) as divisor.
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as integer default 1 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field Y as integer default 1 editable
+                field D as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit when D != 0 -> set X = Y / D -> no transition
@@ -427,8 +427,8 @@ public class ProofEngineTests
         {
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Y / 2 -> no transition
@@ -447,8 +447,8 @@ public class ProofEngineTests
             // Dividing by literal 0 → fails the != 0 check → Unresolved
             var (_, ledger) = ProveAllowingDiagnostics("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Y / 0 -> no transition
@@ -467,7 +467,7 @@ public class ProofEngineTests
             // sqrt(4) — 4 >= 0 → proved by literal
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
+                field X as number default 0 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = sqrt(4) -> no transition
@@ -486,7 +486,7 @@ public class ProofEngineTests
             // sqrt(-1) — -1 >= 0 is false → Unresolved
             var (_, ledger) = ProveAllowingDiagnostics("""
                 precept Widget
-                field X as number default 0 writable
+                field X as number default 0 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = sqrt(-1) -> no transition
@@ -505,9 +505,9 @@ public class ProofEngineTests
             // Field divisor → subject is not a literal → strategy 1 skips
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
-                field D as number nonzero default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
+                field D as number nonzero default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Y / D -> no transition
@@ -527,8 +527,8 @@ public class ProofEngineTests
             // Addition has no proof requirements → no Strategy 1 obligations
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Y + 1 -> no transition
@@ -550,9 +550,9 @@ public class ProofEngineTests
             // Y is integer so IntegerDivideNumber correctly identifies D (number) as divisor subject.
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as integer default 1 writable
-                field D as number nonzero default 1 writable
+                field X as number default 0 editable
+                field Y as integer default 1 editable
+                field D as number nonzero default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Y / D -> no transition
@@ -572,9 +572,9 @@ public class ProofEngineTests
             // Y is integer so IntegerDivideNumber correctly identifies D (number) as divisor subject.
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as integer default 1 writable
-                field D as number positive default 1 writable
+                field X as number default 0 editable
+                field Y as integer default 1 editable
+                field D as number positive default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Y / D -> no transition
@@ -593,9 +593,9 @@ public class ProofEngineTests
             // nonnegative (>= 0) does NOT subsume != 0: zero is allowed
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
-                field D as number nonnegative default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
+                field D as number nonnegative default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Y / D -> no transition
@@ -615,8 +615,8 @@ public class ProofEngineTests
             // nonnegative modifier satisfies >= 0 requirement for sqrt
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number nonnegative default 1 writable
+                field X as number default 0 editable
+                field Y as number nonnegative default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = sqrt(Y) -> no transition
@@ -635,8 +635,8 @@ public class ProofEngineTests
             // positive (> 0) subsumes >= 0
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number positive default 1 writable
+                field X as number default 0 editable
+                field Y as number positive default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = sqrt(Y) -> no transition
@@ -655,9 +655,9 @@ public class ProofEngineTests
             // No modifier on divisor → Strategy 2 cannot prove it
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
+                field D as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Y / D -> no transition
@@ -675,9 +675,9 @@ public class ProofEngineTests
         {
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
-                field D as number nonzero default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
+                field D as number nonzero default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Y / D -> no transition
@@ -738,9 +738,9 @@ public class ProofEngineTests
             // Y is integer so IntegerDivideNumber correctly identifies D (number) as divisor subject.
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as integer default 1 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field Y as integer default 1 editable
+                field D as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit when D != 0 -> set X = Y / D -> no transition
@@ -760,9 +760,9 @@ public class ProofEngineTests
             // Y is integer so IntegerDivideNumber correctly identifies D (number) as divisor subject.
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as integer default 1 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field Y as integer default 1 editable
+                field D as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit when D > 0 -> set X = Y / D -> no transition
@@ -782,9 +782,9 @@ public class ProofEngineTests
             // Y is integer so IntegerDivideNumber correctly identifies D (number) as divisor subject.
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as integer default 1 writable
-                field D as number default 0 writable
+                field X as number default 0 editable
+                field Y as integer default 1 editable
+                field D as number default 0 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit when D < 0 -> set X = Y / D -> no transition
@@ -803,9 +803,9 @@ public class ProofEngineTests
             // `D > 0 or D < 0` means D is nonzero in every branch, so the divisor obligation discharges.
             var (_, ledger) = ProveAllowingDiagnostics("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as integer default 1 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field Y as integer default 1 editable
+                field D as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit when D > 0 or D < 0 -> set X = Y / D -> no transition
@@ -833,9 +833,9 @@ public class ProofEngineTests
             // Y is integer so IntegerDivideNumber correctly identifies D (number) as divisor subject.
             var (_, ledger) = ProveAllowingDiagnostics("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as integer default 1 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field Y as integer default 1 editable
+                field D as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit when D != 0 and Y > 0 -> set X = Y / D -> no transition
@@ -856,9 +856,9 @@ public class ProofEngineTests
             // Y is integer so IntegerDivideNumber correctly identifies D (number) as divisor subject.
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as integer default 1 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field Y as integer default 1 editable
+                field D as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit when not (D == 0) -> set X = Y / D -> no transition
@@ -878,9 +878,9 @@ public class ProofEngineTests
             // Y is integer so IntegerDivideNumber correctly identifies D (number) as divisor subject.
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as integer default 1 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field Y as integer default 1 editable
+                field D as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit when 0 < D -> set X = Y / D -> no transition
@@ -899,9 +899,9 @@ public class ProofEngineTests
             // No guard → strategy 3 skips → obligation stays unresolved
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
+                field D as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Y / D -> no transition
@@ -919,9 +919,9 @@ public class ProofEngineTests
             // Event handlers have no guards — strategy 3 cannot apply
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
-                field D as number nonzero default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
+                field D as number nonzero default 1 editable
                 event Submit
                 on Submit -> set X = Y / D
                 """);
@@ -1010,7 +1010,7 @@ public class ProofEngineTests
         {
             var ledger = Prove("""
                 precept Widget
-                field Head as string default "" writable
+                field Head as string default "" editable
                 field Items as queue of string
                 state Draft initial
                 event Assign
@@ -1031,7 +1031,7 @@ public class ProofEngineTests
         {
             var ledger = Prove("""
                 precept Widget
-                field Lowest as number default 0 writable
+                field Lowest as number default 0 editable
                 field RequestedFloors as set of number
                 state Draft initial
                 event Submit
@@ -1164,9 +1164,9 @@ public class ProofEngineTests
             // The obligation is therefore Unresolved.
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field A as number positive default 2 writable
-                field B as number nonnegative default 1 writable
+                field X as number default 0 editable
+                field A as number positive default 2 editable
+                field B as number nonnegative default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit when A > B -> set X = sqrt(A - B) -> no transition
@@ -1193,10 +1193,10 @@ public class ProofEngineTests
             // Y is integer so IntegerDivideNumber correctly identifies A-B (number) as divisor subject.
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as integer default 1 writable
-                field A as number positive default 2 writable
-                field B as number nonnegative default 1 writable
+                field X as number default 0 editable
+                field Y as integer default 1 editable
+                field A as number positive default 2 editable
+                field B as number nonnegative default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit when A > B -> set X = Y / (A - B) -> no transition
@@ -1223,9 +1223,9 @@ public class ProofEngineTests
             // The obligation is therefore Unresolved.
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field A as number nonnegative default 1 writable
-                field B as number nonnegative default 0 writable
+                field X as number default 0 editable
+                field A as number nonnegative default 1 editable
+                field B as number nonnegative default 0 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit when A >= B -> set X = sqrt(A - B) -> no transition
@@ -1248,10 +1248,10 @@ public class ProofEngineTests
             // A >= B allows A == B, so A - B could be 0; flow narrowing cannot prove != 0
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number positive default 1 writable
-                field A as number nonnegative default 1 writable
-                field B as number nonnegative default 0 writable
+                field X as number default 0 editable
+                field Y as number positive default 1 editable
+                field A as number nonnegative default 1 editable
+                field B as number nonnegative default 0 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit when A >= B -> set X = Y / (A - B) -> no transition
@@ -1272,9 +1272,9 @@ public class ProofEngineTests
             // Y is integer so IntegerDivideNumber correctly identifies A (number) as divisor subject.
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as integer default 1 writable
-                field A as number default 1 writable
+                field X as number default 0 editable
+                field Y as integer default 1 editable
+                field A as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit when A > 0 -> set X = Y / A -> no transition
@@ -1295,10 +1295,10 @@ public class ProofEngineTests
             // Strategy 4 applies to subtraction only; Y / A with guard A > B is not covered
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number positive default 1 writable
-                field A as number positive default 2 writable
-                field B as number nonnegative default 1 writable
+                field X as number default 0 editable
+                field Y as number positive default 1 editable
+                field A as number positive default 2 editable
+                field B as number nonnegative default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit when A > B -> set X = Y / A -> no transition
@@ -1319,9 +1319,9 @@ public class ProofEngineTests
             // No guard → no field-to-field constraints → strategy 4 returns false
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field A as number positive default 2 writable
-                field B as number nonnegative default 1 writable
+                field X as number default 0 editable
+                field A as number positive default 2 editable
+                field B as number nonnegative default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = sqrt(A - B) -> no transition
@@ -1452,9 +1452,9 @@ public class ProofEngineTests
             // NumericProofRequirement → strategy 5 is never applied
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
-                field D as number nonzero default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
+                field D as number nonzero default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Y / D -> no transition
@@ -1525,8 +1525,8 @@ public class ProofEngineTests
             // Site (the BinaryOp) contains error → proof obligation suppressed
             var (_, ledger) = ProveAllowingDiagnostics("""
                 precept Widget
-                field X as number default 0 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field D as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Phantom / D -> no transition
@@ -1543,8 +1543,8 @@ public class ProofEngineTests
             // Undefined field in divisor position → error expression in the site
             var (_, ledger) = ProveAllowingDiagnostics("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Y / Undefined -> no transition
@@ -1561,7 +1561,7 @@ public class ProofEngineTests
             // sqrt(Undefined) → error arg → site contains error → suppressed
             var (_, ledger) = ProveAllowingDiagnostics("""
                 precept Widget
-                field X as number default 0 writable
+                field X as number default 0 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = sqrt(Undefined) -> no transition
@@ -1578,9 +1578,9 @@ public class ProofEngineTests
             // All fields defined; unguarded division → DivisionByZero emitted
             var (_, ledger) = ProveAllowingDiagnostics("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
+                field D as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Y / D -> no transition
@@ -1597,8 +1597,8 @@ public class ProofEngineTests
             // Error-tainted obligation → no FaultSiteLink produced
             var (_, ledger) = ProveAllowingDiagnostics("""
                 precept Widget
-                field X as number default 0 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field D as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Phantom / D -> no transition
@@ -1620,9 +1620,9 @@ public class ProofEngineTests
         {
             var (_, ledger) = ProveAllowingDiagnostics("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
+                field D as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Y / D -> no transition
@@ -1638,8 +1638,8 @@ public class ProofEngineTests
         {
             var (_, ledger) = ProveAllowingDiagnostics("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 0 writable
+                field X as number default 0 editable
+                field Y as number default 0 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = sqrt(Y) -> no transition
@@ -1655,9 +1655,9 @@ public class ProofEngineTests
         {
             var (_, ledger) = ProveAllowingDiagnostics("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
+                field D as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Y / D -> no transition
@@ -1677,9 +1677,9 @@ public class ProofEngineTests
         {
             var (_, ledger) = ProveAllowingDiagnostics("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
+                field D as number default 1 editable
                 event Submit
                 on Submit -> set X = Y / D
                 """);
@@ -1697,9 +1697,9 @@ public class ProofEngineTests
         {
             var (_, ledger) = ProveAllowingDiagnostics("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
+                field D as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Y / D -> no transition
@@ -1716,8 +1716,8 @@ public class ProofEngineTests
             // Literal divisor 2 → proved → no fault site link
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Y / 2 -> no transition
@@ -1732,8 +1732,8 @@ public class ProofEngineTests
         {
             var (_, ledger) = ProveAllowingDiagnostics("""
                 precept Widget
-                field X as number default 0 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field D as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Phantom / D -> no transition
@@ -1749,8 +1749,8 @@ public class ProofEngineTests
             // Y / 2 proved by literal → no DivisionByZero
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Y / 2 -> no transition
@@ -2159,9 +2159,9 @@ public class ProofEngineTests
             // Archived is unreachable → ProofEngine suppresses obligations from it
             var source = """
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
+                field D as number default 1 editable
                 state Draft initial
                 state Archived
                 event Submit
@@ -2189,9 +2189,9 @@ public class ProofEngineTests
         {
             var source = """
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
+                field D as number default 1 editable
                 state Draft initial
                 state Archived
                 event Submit
@@ -2221,9 +2221,9 @@ public class ProofEngineTests
             // Draft is reachable → obligations preserved (not vacuously proved)
             var source = """
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
+                field D as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Y / D -> no transition
@@ -2263,9 +2263,9 @@ public class ProofEngineTests
             // Stalled is a dead-end state; Stalled → Stalled transition is suppressed
             var source = """
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
+                field D as number default 1 editable
                 state Draft initial
                 state Stalled
                 state Approved terminal
@@ -2297,9 +2297,9 @@ public class ProofEngineTests
             // Transition INTO dead-end state from initial — obligations preserved
             var source = """
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
+                field D as number default 1 editable
                 state Draft initial
                 state Stalled
                 state Approved terminal
@@ -2337,9 +2337,9 @@ public class ProofEngineTests
         {
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
+                field D as number default 1 editable
                 event Submit
                 on Submit -> set X = Y / D
                 """);
@@ -2357,9 +2357,9 @@ public class ProofEngineTests
             // Y is integer so IntegerDivideNumber correctly identifies D (number) as divisor subject.
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as integer default 1 writable
-                field D as number nonzero default 1 writable
+                field X as number default 0 editable
+                field Y as integer default 1 editable
+                field D as number nonzero default 1 editable
                 event Submit
                 on Submit -> set X = Y / D
                 """);
@@ -2377,9 +2377,9 @@ public class ProofEngineTests
             // Event handlers have no guards → strategies 3 and 4 must not fire
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
-                field D as number nonzero default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
+                field D as number nonzero default 1 editable
                 event Submit
                 on Submit -> set X = Y / D
                 """);
@@ -2414,7 +2414,7 @@ public class ProofEngineTests
         {
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
+                field X as number default 0 editable
                 event Submit
                 on Submit -> set X = 1
                 """);
@@ -2429,9 +2429,9 @@ public class ProofEngineTests
             // Y is integer so IntegerDivideNumber correctly identifies D (number) as divisor subject.
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as integer default 1 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field Y as integer default 1 editable
+                field D as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit when D != 0 -> set X = Y / D -> no transition
@@ -2447,9 +2447,9 @@ public class ProofEngineTests
         {
             var (_, ledger) = ProveAllowingDiagnostics("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
+                field D as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Y / D -> no transition
@@ -2464,9 +2464,9 @@ public class ProofEngineTests
         {
             var (_, ledger) = ProveAllowingDiagnostics("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
+                field D as number default 1 editable
                 state Draft initial
                 in Draft ensure X >= 0 because "X must be nonneg"
                 event Submit
@@ -2495,8 +2495,8 @@ public class ProofEngineTests
             // Y / 2 → literal proof → all obligations proved → empty FaultSiteLinks
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Y / 2 -> no transition
@@ -2512,10 +2512,10 @@ public class ProofEngineTests
             // Y is integer so IntegerDivideNumber correctly identifies D1/D2 (number) as divisor subjects.
             var (_, ledger) = ProveAllowingDiagnostics("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as integer default 1 writable
-                field D1 as number nonzero default 1 writable
-                field D2 as number default 1 writable
+                field X as number default 0 editable
+                field Y as integer default 1 editable
+                field D1 as number nonzero default 1 editable
+                field D2 as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Y / D1 -> no transition
@@ -2540,9 +2540,9 @@ public class ProofEngineTests
             // Y is integer so IntegerDivideNumber correctly identifies D (number) as divisor subject.
             var compilation = Compiler.Compile("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as integer default 1 writable
-                field D as number nonzero default 1 writable
+                field X as number default 0 editable
+                field Y as integer default 1 editable
+                field D as number nonzero default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Y / D -> no transition
@@ -2560,9 +2560,9 @@ public class ProofEngineTests
         {
             var compilation = Compiler.Compile("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
+                field D as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Y / D -> no transition
@@ -2580,8 +2580,8 @@ public class ProofEngineTests
             // Multiplication has no proof requirements → no obligations
             var ledger = Prove("""
                 precept ComputedTaxNet
-                field Subtotal as number default 120 positive writable
-                field TaxRate as number default 0.08 min 0 max 0.99 writable
+                field Subtotal as number default 120 positive editable
+                field TaxRate as number default 0.08 min 0 max 0.99 editable
                 field Tax as number nonnegative <- Subtotal * TaxRate
                 field Net as number positive <- Subtotal - Tax
                 """);
@@ -2610,9 +2610,9 @@ public class ProofEngineTests
             // cf. CollectObligations_EventHandlerWithDivision_CreatesEventHandlerContext
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
+                field D as number default 1 editable
                 event Submit
                 on Submit -> set X = Y / D
                 """);
@@ -2639,8 +2639,8 @@ public class ProofEngineTests
             // cf. CollectObligations_ComputedFieldWithDivision_CreatesFieldExpressionContext
             var ledger = Prove("""
                 precept Widget
-                field Y as number default 1 writable
-                field D as number nonzero default 1 writable
+                field Y as number default 1 editable
+                field D as number nonzero default 1 editable
                 field X as number <- Y / D
                 """);
 
@@ -2653,7 +2653,7 @@ public class ProofEngineTests
             // cf. CollectObligations_LiteralAssignment_ProducesNoObligations
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
+                field X as number default 0 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = 42 -> no transition
@@ -2672,9 +2672,9 @@ public class ProofEngineTests
             // cf. ObligationContext_TransitionRow_HoldsEventAndState
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
+                field D as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Y / D -> no transition
@@ -2693,9 +2693,9 @@ public class ProofEngineTests
             // The obligation is created; no strategy can prove it for a binary-expression argument.
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field A as number positive default 2 writable
-                field B as number nonnegative default 1 writable
+                field X as number default 0 editable
+                field A as number positive default 2 editable
+                field B as number nonnegative default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = sqrt(A - B) -> no transition
@@ -2713,9 +2713,9 @@ public class ProofEngineTests
             // Y is integer so IntegerDivideNumber correctly identifies D (number) as divisor.
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as integer default 1 writable
-                field D as number nonzero default 1 writable
+                field X as number default 0 editable
+                field Y as integer default 1 editable
+                field D as number nonzero default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Y / D -> no transition
@@ -2734,8 +2734,8 @@ public class ProofEngineTests
             // sqrt(Y): Y is the argument param subject. Nonnegative modifier → strategy 2 proves it.
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number nonnegative default 1 writable
+                field X as number default 0 editable
+                field Y as number nonnegative default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = sqrt(Y) -> no transition
@@ -2754,7 +2754,7 @@ public class ProofEngineTests
             // sqrt(Y) in a computed field: Y is resolved as the subject for the >= 0 requirement.
             var ledger = Prove("""
                 precept Widget
-                field Y as number nonnegative default 1 writable
+                field Y as number nonnegative default 1 editable
                 field X as number <- sqrt(Y)
                 """);
 
@@ -2773,9 +2773,9 @@ public class ProofEngineTests
             // Nonzero modifier on D → strategy 2 proves the obligation.
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as integer default 1 writable
-                field D as number nonzero default 1 writable
+                field X as number default 0 editable
+                field Y as integer default 1 editable
+                field D as number nonzero default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Y / D -> no transition
@@ -2792,8 +2792,8 @@ public class ProofEngineTests
             // Addition has no risky sub-expression → no subjects resolved → no obligations.
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Y + 1 -> no transition
@@ -2810,9 +2810,9 @@ public class ProofEngineTests
             // Observable: D's modifier lookup succeeds → obligation proved by DeclarationAttribute.
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as integer default 1 writable
-                field D as number nonzero default 1 writable
+                field X as number default 0 editable
+                field Y as integer default 1 editable
+                field D as number nonzero default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Y / D -> no transition
@@ -2831,9 +2831,9 @@ public class ProofEngineTests
             // Observable: strategy 3 proves the obligation via the resolved field name.
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as integer default 1 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field Y as integer default 1 editable
+                field D as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit when D != 0 -> set X = Y / D -> no transition
@@ -2852,10 +2852,10 @@ public class ProofEngineTests
             // Observable: strategies 2 and 3 cannot use the subject → obligation unresolved.
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number positive default 1 writable
-                field A as number positive default 2 writable
-                field B as number nonnegative default 1 writable
+                field X as number default 0 editable
+                field Y as number positive default 1 editable
+                field A as number positive default 2 editable
+                field B as number nonnegative default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit when A > B -> set X = Y / (A - B) -> no transition
@@ -2877,8 +2877,8 @@ public class ProofEngineTests
             // Literal divisor 2 → strategy 1 proves it; no other strategy fires.
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Y / 2 -> no transition
@@ -2913,9 +2913,9 @@ public class ProofEngineTests
             // Field with positive modifier satisfies the != 0 requirement (ordered/positive → proved).
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as integer default 1 writable
-                field D as number positive default 1 writable
+                field X as number default 0 editable
+                field Y as integer default 1 editable
+                field D as number positive default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Y / D -> no transition
@@ -2934,9 +2934,9 @@ public class ProofEngineTests
             // Field with no modifier cannot discharge the != 0 requirement.
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
+                field D as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Y / D -> no transition
@@ -3019,9 +3019,9 @@ public class ProofEngineTests
             // Y is integer so IntegerDivideNumber correctly identifies D as divisor subject.
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as integer default 1 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field Y as integer default 1 editable
+                field D as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit when D > 0 -> set X = Y / D -> no transition
@@ -3042,9 +3042,9 @@ public class ProofEngineTests
             // Y is integer so IntegerDivideNumber correctly identifies D as divisor.
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as integer default 1 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field Y as integer default 1 editable
+                field D as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit when D > 0 -> set X = Y / D -> no transition
@@ -3064,9 +3064,9 @@ public class ProofEngineTests
             // via the guard-in-path strategy — the same mechanism used for is-set guards.
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as integer default 1 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field Y as integer default 1 editable
+                field D as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit when D != 0 -> set X = Y / D -> no transition
@@ -3086,9 +3086,9 @@ public class ProofEngineTests
             // not (D == 0) → inverted comparison D != 0 → proves divisor != 0.
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as integer default 1 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field Y as integer default 1 editable
+                field D as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit when not (D == 0) -> set X = Y / D -> no transition
@@ -3108,9 +3108,9 @@ public class ProofEngineTests
             // 0 < D → literal on left → op inverted → D > 0 → subsumes D != 0.
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as integer default 1 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field Y as integer default 1 editable
+                field D as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit when 0 < D -> set X = Y / D -> no transition
@@ -3132,9 +3132,9 @@ public class ProofEngineTests
             // sqrt(A-B) with A > B guard; site is TypedFunctionCall → strategy 4 cannot fire.
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field A as number positive default 2 writable
-                field B as number nonnegative default 1 writable
+                field X as number default 0 editable
+                field A as number positive default 2 editable
+                field B as number nonnegative default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit when A > B -> set X = sqrt(A - B) -> no transition
@@ -3158,10 +3158,10 @@ public class ProofEngineTests
             // Y / (A-B) with A > B guard; divisor is binary expression → no strategy handles it.
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as integer default 1 writable
-                field A as number positive default 2 writable
-                field B as number nonnegative default 1 writable
+                field X as number default 0 editable
+                field Y as integer default 1 editable
+                field A as number positive default 2 editable
+                field B as number nonnegative default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit when A > B -> set X = Y / (A - B) -> no transition
@@ -3185,9 +3185,9 @@ public class ProofEngineTests
             // A >= B and sqrt(A-B); site is TypedFunctionCall → strategy 4 cannot fire.
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field A as number nonnegative default 1 writable
-                field B as number nonnegative default 0 writable
+                field X as number default 0 editable
+                field A as number nonnegative default 1 editable
+                field B as number nonnegative default 0 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit when A >= B -> set X = sqrt(A - B) -> no transition
@@ -3207,9 +3207,9 @@ public class ProofEngineTests
             // B > A (i.e. A < B): A - B would be negative; strategy 4 cannot prove A - B > 0.
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field A as number nonnegative default 1 writable
-                field B as number positive default 2 writable
+                field X as number default 0 editable
+                field A as number nonnegative default 1 editable
+                field B as number positive default 2 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit when B > A -> set X = sqrt(A - B) -> no transition
@@ -3230,10 +3230,10 @@ public class ProofEngineTests
             // Division Y / A with A > B guard: strategy 4 applies to subtraction, not division.
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number positive default 1 writable
-                field A as number positive default 2 writable
-                field B as number nonnegative default 1 writable
+                field X as number default 0 editable
+                field Y as number positive default 1 editable
+                field A as number positive default 2 editable
+                field B as number nonnegative default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit when A > B -> set X = Y / A -> no transition
@@ -3254,9 +3254,9 @@ public class ProofEngineTests
             // `when A > 0` is field vs literal → strategy 3, not strategy 4.
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as integer default 1 writable
-                field A as number default 1 writable
+                field X as number default 0 editable
+                field Y as integer default 1 editable
+                field A as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit when A > 0 -> set X = Y / A -> no transition
@@ -3362,8 +3362,8 @@ public class ProofEngineTests
             // cf. ErrorTainted_UndefinedDivisor_SuppressesDivisionByZeroDiagnostic
             var (_, ledger) = ProveAllowingDiagnostics("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Y / Undefined -> no transition
@@ -3380,8 +3380,8 @@ public class ProofEngineTests
             // cf. ErrorTainted_UndefinedDividend_SuppressesDivisionByZeroDiagnostic
             var (_, ledger) = ProveAllowingDiagnostics("""
                 precept Widget
-                field X as number default 0 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field D as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Phantom / D -> no transition
@@ -3398,7 +3398,7 @@ public class ProofEngineTests
             // cf. ErrorTainted_UndefinedSqrtArg_SuppressesSqrtOfNegativeDiagnostic
             var (_, ledger) = ProveAllowingDiagnostics("""
                 precept Widget
-                field X as number default 0 writable
+                field X as number default 0 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = sqrt(Undefined) -> no transition
@@ -3441,9 +3441,9 @@ public class ProofEngineTests
             // cf. Diagnostic_ContextDescription_TransitionRow_ContainsEventName
             var (_, ledger) = ProveAllowingDiagnostics("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
+                field D as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Y / D -> no transition
@@ -3463,9 +3463,9 @@ public class ProofEngineTests
             // cf. Diagnostic_ContextDescription_EventHandler_ContainsEventName
             var (_, ledger) = ProveAllowingDiagnostics("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
+                field D as number default 1 editable
                 event Submit
                 on Submit -> set X = Y / D
                 """);
@@ -3611,9 +3611,9 @@ public class ProofEngineTests
             // cf. ForwardingFacts_UnreachableState_ObligationsVacuouslyProved
             var source = """
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
+                field D as number default 1 editable
                 state Draft initial
                 state Archived
                 event Submit
@@ -3642,9 +3642,9 @@ public class ProofEngineTests
             // cf. ForwardingFacts_DeadEndToDeadEnd_ObligationsSuppressed
             var source = """
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
+                field D as number default 1 editable
                 state Draft initial
                 state Stalled
                 state Approved terminal
@@ -3676,9 +3676,9 @@ public class ProofEngineTests
             // cf. ForwardingFacts_DeadEndIncomingTransition_ObligationsPreserved
             var source = """
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
+                field D as number default 1 editable
                 state Draft initial
                 state Stalled
                 state Approved terminal
@@ -3709,9 +3709,9 @@ public class ProofEngineTests
             // cf. ForwardingFacts_ReachableState_ObligationsNotSuppressed
             var source = """
                 precept Widget
-                field X as number default 0 writable
-                field Y as number default 1 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field Y as number default 1 editable
+                field D as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Y / D -> no transition
@@ -3738,10 +3738,10 @@ public class ProofEngineTests
             // A >= B allows A == B so A - B could be 0; flow narrowing cannot prove != 0.
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number positive default 1 writable
-                field A as number nonnegative default 1 writable
-                field B as number nonnegative default 0 writable
+                field X as number default 0 editable
+                field Y as number positive default 1 editable
+                field A as number nonnegative default 1 editable
+                field B as number nonnegative default 0 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit when A >= B -> set X = Y / (A - B) -> no transition
@@ -3764,10 +3764,10 @@ public class ProofEngineTests
             // Y is integer so IntegerDivideNumber correctly identifies D1/D2 as divisor subjects.
             var (_, ledger) = ProveAllowingDiagnostics("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as integer default 1 writable
-                field D1 as number nonzero default 1 writable
-                field D2 as number default 1 writable
+                field X as number default 0 editable
+                field Y as integer default 1 editable
+                field D1 as number nonzero default 1 editable
+                field D2 as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = Y / D1 -> no transition
@@ -3800,9 +3800,9 @@ public class ProofEngineTests
         {
             var ledger = Prove("""
                 precept Widget
-                field F1 as money in 'USD' default '0.00 USD' writable
-                field F2 as money in 'USD' default '0.00 USD' writable
-                field Result as money in 'USD' default '0.00 USD' writable
+                field F1 as money in 'USD' default '0.00 USD' editable
+                field F2 as money in 'USD' default '0.00 USD' editable
+                field Result as money in 'USD' default '0.00 USD' editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set Result = F1 + F2 -> no transition
@@ -3818,9 +3818,9 @@ public class ProofEngineTests
         {
             var ledger = Prove("""
                 precept Widget
-                field F1 as money in 'USD' default '0.00 USD' writable
-                field F2 as money in 'EUR' default '0.00 EUR' writable
-                field Result as money default '0.00 USD' writable
+                field F1 as money in 'USD' default '0.00 USD' editable
+                field F2 as money in 'EUR' default '0.00 EUR' editable
+                field Result as money default '0.00 USD' editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set Result = F1 + F2 -> no transition
@@ -3839,9 +3839,9 @@ public class ProofEngineTests
         {
             var ledger = Prove("""
                 precept Widget
-                field F1 as money in 'USD' default '0.00 USD' writable
-                field F2 as money in 'EUR' default '0.00 EUR' writable
-                field Result as money default '0.00 USD' writable
+                field F1 as money in 'USD' default '0.00 USD' editable
+                field F2 as money in 'EUR' default '0.00 EUR' editable
+                field Result as money default '0.00 USD' editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set Result = F1 + F2 -> no transition
@@ -3900,8 +3900,8 @@ public class ProofEngineTests
         {
             var ledger = Prove("""
                 precept Widget
-                field F1 as money in 'USD' default '0.00 USD' writable
-                field F2 as money in 'USD' default '0.00 USD' writable
+                field F1 as money in 'USD' default '0.00 USD' editable
+                field F2 as money in 'USD' default '0.00 USD' editable
                 state Draft initial
                 event Submit
                 from Draft on Submit when F1 <= F2 -> no transition
@@ -3917,9 +3917,9 @@ public class ProofEngineTests
         {
             var ledger = Prove("""
                 precept Widget
-                field F1 as money default '0.00 USD' writable
-                field F2 as money default '0.00 USD' writable
-                field Result as money default '0.00 USD' writable
+                field F1 as money default '0.00 USD' editable
+                field F2 as money default '0.00 USD' editable
+                field Result as money default '0.00 USD' editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set Result = F1 + F2 -> no transition
@@ -3936,9 +3936,9 @@ public class ProofEngineTests
         {
             var ledger = Prove("""
                 precept Widget
-                field F1 as quantity in 'kg' default '0 kg' writable
-                field F2 as quantity in 'kg' default '0 kg' writable
-                field Result as quantity in 'kg' default '0 kg' writable
+                field F1 as quantity in 'kg' default '0 kg' editable
+                field F2 as quantity in 'kg' default '0 kg' editable
+                field Result as quantity in 'kg' default '0 kg' editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set Result = F1 + F2 -> no transition
@@ -3957,9 +3957,9 @@ public class ProofEngineTests
         {
             var ledger = Prove("""
                 precept Widget
-                field Rate as exchangerate in 'USD' to 'EUR' writable
-                field Amt as money in 'USD' default '0.00 USD' writable
-                field Result as money default '0.00 USD' writable
+                field Rate as exchangerate in 'USD' to 'EUR' editable
+                field Amt as money in 'USD' default '0.00 USD' editable
+                field Result as money default '0.00 USD' editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set Result = Rate * Amt -> no transition
@@ -3976,9 +3976,9 @@ public class ProofEngineTests
         {
             var (_, ledger) = ProveAllowingDiagnostics("""
                 precept Widget
-                field Rate as exchangerate in 'USD' to 'EUR' writable
-                field Amt as money in 'GBP' default '0.00 GBP' writable
-                field Result as money in 'EUR' default '0.00 EUR' writable
+                field Rate as exchangerate in 'USD' to 'EUR' editable
+                field Amt as money in 'GBP' default '0.00 GBP' editable
+                field Result as money in 'EUR' default '0.00 EUR' editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set Result = Rate * Amt -> no transition
@@ -3995,9 +3995,9 @@ public class ProofEngineTests
         {
             var (_, ledger) = ProveAllowingDiagnostics("""
                 precept Widget
-                field Rate as exchangerate in 'USD' to 'EUR' writable
-                field Amt as money in 'EUR' default '0.00 EUR' writable
-                field Result as money in 'EUR' default '0.00 EUR' writable
+                field Rate as exchangerate in 'USD' to 'EUR' editable
+                field Amt as money in 'EUR' default '0.00 EUR' editable
+                field Result as money in 'EUR' default '0.00 EUR' editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set Result = Rate * Amt -> no transition
@@ -4014,9 +4014,9 @@ public class ProofEngineTests
         {
             var ledger = Prove("""
                 precept Widget
-                field P as price in 'USD' of 'mass' writable
-                field Q as quantity of 'mass' writable
-                field Result as money default '0.00 USD' writable
+                field P as price in 'USD' of 'mass' editable
+                field Q as quantity of 'mass' editable
+                field Result as money default '0.00 USD' editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set Result = P * Q -> no transition
@@ -4032,9 +4032,9 @@ public class ProofEngineTests
         {
             var (_, ledger) = ProveAllowingDiagnostics("""
                 precept Widget
-                field P as price in 'USD' of 'mass' writable
-                field Q as quantity of 'length' writable
-                field Result as money default '0.00 USD' writable
+                field P as price in 'USD' of 'mass' editable
+                field Q as quantity of 'length' editable
+                field Result as money default '0.00 USD' editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set Result = P * Q -> no transition
@@ -4051,9 +4051,9 @@ public class ProofEngineTests
         {
             var ledger = Prove("""
                 precept Widget
-                field Rate as exchangerate writable
-                field Amt as money default '0.00 USD' writable
-                field Result as money default '0.00 USD' writable
+                field Rate as exchangerate editable
+                field Amt as money default '0.00 USD' editable
+                field Result as money default '0.00 USD' editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set Result = Rate * Amt -> no transition
@@ -4070,9 +4070,9 @@ public class ProofEngineTests
         {
             var ledger = Prove("""
                 precept Widget
-                field P as price writable
-                field Q as quantity default '0 kg' writable
-                field Result as money default '0.00 USD' writable
+                field P as price editable
+                field Q as quantity default '0 kg' editable
+                field Result as money default '0.00 USD' editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set Result = P * Q -> no transition
@@ -4089,9 +4089,9 @@ public class ProofEngineTests
         {
             var ledger = Prove("""
                 precept Widget
-                field F1 as quantity in 'kg' default '0 kg' writable
-                field F2 as quantity in 'kg' default '0 kg' writable
-                field Result as quantity in 'kg' default '0 kg' writable
+                field F1 as quantity in 'kg' default '0 kg' editable
+                field F2 as quantity in 'kg' default '0 kg' editable
+                field Result as quantity in 'kg' default '0 kg' editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set Result = F1 + F2 -> no transition
@@ -4110,9 +4110,9 @@ public class ProofEngineTests
         {
             var ledger = Prove("""
                 precept Widget
-                field F1 as quantity of 'mass' writable
-                field F2 as quantity of 'mass' writable
-                field Result as quantity of 'mass' writable
+                field F1 as quantity of 'mass' editable
+                field F2 as quantity of 'mass' editable
+                field Result as quantity of 'mass' editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set Result = F1 + F2 -> no transition
@@ -4129,9 +4129,9 @@ public class ProofEngineTests
         {
             var ledger = Prove("""
                 precept Widget
-                field Q1 as quantity of 'mass' writable
-                field Q2 as quantity of 'mass' writable
-                field Result as quantity default '0 kg' writable
+                field Q1 as quantity of 'mass' editable
+                field Q2 as quantity of 'mass' editable
+                field Result as quantity default '0 kg' editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set Result = Q1 + Q2 -> no transition
@@ -4150,9 +4150,9 @@ public class ProofEngineTests
         {
             var ledger = Prove("""
                 precept Widget
-                field Q1 as quantity of 'mass' writable
-                field Q2 as quantity of 'length' writable
-                field Result as quantity default '0 kg' writable
+                field Q1 as quantity of 'mass' editable
+                field Q2 as quantity of 'length' editable
+                field Result as quantity default '0 kg' editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set Result = Q1 + Q2 -> no transition
@@ -4206,9 +4206,9 @@ public class ProofEngineTests
             // prove: Balance is nonzero (for Ratio = Total / Balance) → Proved via S6
             var ledger = Prove("""
                 precept Wallet
-                field Total as money in 'USD' default '100 USD' writable
-                field Balance as money in 'USD' default '1 USD' writable
-                field Ratio as decimal default 1 writable
+                field Total as money in 'USD' default '100 USD' editable
+                field Balance as money in 'USD' default '1 USD' editable
+                field Ratio as decimal default 1 editable
                 state Active initial
                 event Pay(Amount as number nonzero, Code as currency)
                 from Active on Pay -> set Balance = '{Amount} {Code}' -> set Ratio = Total / Balance -> no transition
@@ -4229,9 +4229,9 @@ public class ProofEngineTests
             // Two transitions both set Balance from '{Amount} {Code}' where Amount is nonzero
             var ledger = Prove("""
                 precept Wallet
-                field Total as money in 'USD' default '100 USD' writable
-                field Balance as money in 'USD' default '1 USD' writable
-                field Ratio as decimal default 1 writable
+                field Total as money in 'USD' default '100 USD' editable
+                field Balance as money in 'USD' default '1 USD' editable
+                field Ratio as decimal default 1 editable
                 state Active initial
                 state Review
                 event Pay(Amount as number nonzero, Code as currency)
@@ -4255,10 +4255,10 @@ public class ProofEngineTests
             // One transition: Amount nonzero, another: Amount2 has no modifier → Unresolved
             var ledger = Prove("""
                 precept Wallet
-                field Total as money in 'USD' default '100 USD' writable
-                field Balance as money in 'USD' default '1 USD' writable
-                field Amount2 as number default 1 writable
-                field Ratio as decimal default 1 writable
+                field Total as money in 'USD' default '100 USD' editable
+                field Balance as money in 'USD' default '1 USD' editable
+                field Amount2 as number default 1 editable
+                field Ratio as decimal default 1 editable
                 state Active initial
                 state Review
                 event Pay(Amount as number nonzero, Code as currency)
@@ -4282,9 +4282,9 @@ public class ProofEngineTests
             // set Balance = Total in another transition → strategy declines
             var ledger = Prove("""
                 precept Wallet
-                field Total as money in 'USD' default '100 USD' writable
-                field Balance as money in 'USD' default '1 USD' writable
-                field Ratio as decimal default 1 writable
+                field Total as money in 'USD' default '100 USD' editable
+                field Balance as money in 'USD' default '1 USD' editable
+                field Ratio as decimal default 1 editable
                 state Active initial
                 state Review
                 event Pay(Amount as number nonzero, Code as currency)
@@ -4307,10 +4307,10 @@ public class ProofEngineTests
             // field m as money nonzero; set Balance = '{m}' (whole-value hole) → Proved
             var ledger = Prove("""
                 precept Wallet
-                field Total as money in 'USD' default '100 USD' writable
-                field Balance as money in 'USD' default '1 USD' writable
-                field m as money in 'USD' nonzero default '1 USD' writable
-                field Ratio as decimal default 1 writable
+                field Total as money in 'USD' default '100 USD' editable
+                field Balance as money in 'USD' default '1 USD' editable
+                field m as money in 'USD' nonzero default '1 USD' editable
+                field Ratio as decimal default 1 editable
                 state Active initial
                 event Go
                 from Active on Go -> set Balance = '{m}' -> set Ratio = Total / Balance -> no transition
@@ -4331,10 +4331,10 @@ public class ProofEngineTests
             // field m as money (no modifier); set Balance = '{m}' → S6 can't prove
             var ledger = Prove("""
                 precept Wallet
-                field Total as money in 'USD' default '100 USD' writable
-                field Balance as money in 'USD' default '1 USD' writable
-                field m as money in 'USD' default '1 USD' writable
-                field Ratio as decimal default 1 writable
+                field Total as money in 'USD' default '100 USD' editable
+                field Balance as money in 'USD' default '1 USD' editable
+                field m as money in 'USD' default '1 USD' editable
+                field Ratio as decimal default 1 editable
                 state Active initial
                 event Go
                 from Active on Go -> set Balance = '{m}' -> set Ratio = Total / Balance -> no transition
@@ -4354,9 +4354,9 @@ public class ProofEngineTests
             // Amount as number positive → positive subsumes nonzero via SatisfactionCovers → Proved
             var ledger = Prove("""
                 precept Wallet
-                field Total as money in 'USD' default '100 USD' writable
-                field Balance as money in 'USD' default '1 USD' writable
-                field Ratio as decimal default 1 writable
+                field Total as money in 'USD' default '100 USD' editable
+                field Balance as money in 'USD' default '1 USD' editable
+                field Ratio as decimal default 1 editable
                 state Active initial
                 event Pay(Amount as number positive, Code as currency)
                 from Active on Pay -> set Balance = '{Amount} {Code}' -> set Ratio = Total / Balance -> no transition
@@ -4377,9 +4377,9 @@ public class ProofEngineTests
             // Amount as number nonnegative → nonneg does NOT subsume nonzero → Unresolved
             var ledger = Prove("""
                 precept Wallet
-                field Total as money in 'USD' default '100 USD' writable
-                field Balance as money in 'USD' default '1 USD' writable
-                field Ratio as decimal default 1 writable
+                field Total as money in 'USD' default '100 USD' editable
+                field Balance as money in 'USD' default '1 USD' editable
+                field Ratio as decimal default 1 editable
                 state Active initial
                 event Pay(Amount as number nonnegative, Code as currency)
                 from Active on Pay -> set Balance = '{Amount} {Code}' -> set Ratio = Total / Balance -> no transition
@@ -4399,8 +4399,8 @@ public class ProofEngineTests
             // Presence obligation → strategy declines (only handles numeric)
             var ledger = Prove("""
                 precept Wallet
-                field Balance as money in 'USD' default '1 USD' writable
-                field Desc as string optional writable
+                field Balance as money in 'USD' default '1 USD' editable
+                field Desc as string optional editable
                 state Active initial
                 event Pay(Amount as number nonzero, Code as currency)
                 from Active on Pay -> set Balance = '{Amount} {Code}' -> no transition
@@ -4422,9 +4422,9 @@ public class ProofEngineTests
             // Event arg as number nonzero used as magnitude slot → proved via arg's modifier
             var ledger = Prove("""
                 precept Wallet
-                field Total as money in 'USD' default '100 USD' writable
-                field Balance as money in 'USD' default '1 USD' writable
-                field Ratio as decimal default 1 writable
+                field Total as money in 'USD' default '100 USD' editable
+                field Balance as money in 'USD' default '1 USD' editable
+                field Ratio as decimal default 1 editable
                 state Active initial
                 event Pay(Amount as number nonzero, Code as currency)
                 from Active on Pay -> set Balance = '{Amount} {Code}' -> set Ratio = Total / Balance -> no transition
@@ -4444,9 +4444,9 @@ public class ProofEngineTests
         {
             var ledger = Prove("""
                 precept InventoryMath
-                field OnHand as number default 0 writable
-                field StockingUnitsPerPurchaseUnit as number default 1 writable
-                field Average as number default 0 writable
+                field OnHand as number default 0 editable
+                field StockingUnitsPerPurchaseUnit as number default 1 editable
+                field Average as number default 0 editable
                 state Active initial
                 rule OnHand >= 0 because "On hand cannot go negative"
                 rule StockingUnitsPerPurchaseUnit > 0 because "Conversion ratio must be positive"
@@ -4547,9 +4547,9 @@ public class ProofEngineTests
         {
             var compilation = Compiler.Compile("""
                 precept Widget
-                field P as price in 'USD' of 'mass' default '5 USD/kg' writable
-                field Q as quantity of 'mass' default '2 kg' writable
-                field M as money in 'USD' default '0.00 USD' writable
+                field P as price in 'USD' of 'mass' default '5 USD/kg' editable
+                field Q as quantity of 'mass' default '2 kg' editable
+                field M as money in 'USD' default '0.00 USD' editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set M = P * Q -> no transition
@@ -4564,10 +4564,10 @@ public class ProofEngineTests
         {
             var compilation = Compiler.Compile("""
                 precept Widget
-                field Qty as quantity in 'each' default '2 each' writable
-                field Conv as quantity in 'kg/each' default '3 kg/each' writable
-                field P as price in 'USD' of 'mass' default '5 USD/kg' writable
-                field M as money in 'USD' default '0.00 USD' writable
+                field Qty as quantity in 'each' default '2 each' editable
+                field Conv as quantity in 'kg/each' default '3 kg/each' editable
+                field P as price in 'USD' of 'mass' default '5 USD/kg' editable
+                field M as money in 'USD' default '0.00 USD' editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set M = Qty * Conv * P -> no transition
@@ -4582,9 +4582,9 @@ public class ProofEngineTests
         {
             var compilation = Compiler.Compile("""
                 precept Widget
-                field Qty as quantity in 'each' default '2 each' writable
-                field Conv as quantity in 'kg/each' default '3 kg/each' writable
-                field Result as quantity in 'kg' default '0 kg' writable
+                field Qty as quantity in 'each' default '2 each' editable
+                field Conv as quantity in 'kg/each' default '3 kg/each' editable
+                field Result as quantity in 'kg' default '0 kg' editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set Result = Qty * Conv -> no transition
@@ -4599,9 +4599,9 @@ public class ProofEngineTests
         {
             var compilation = Compiler.Compile("""
                 precept Widget
-                field Qty as quantity in 'each' default '2 each' writable
-                field Conv as quantity in 'kg/each' default '3 kg/each' writable
-                field Result as quantity in 'kg' default '0 kg' writable
+                field Qty as quantity in 'each' default '2 each' editable
+                field Conv as quantity in 'kg/each' default '3 kg/each' editable
+                field Result as quantity in 'kg' default '0 kg' editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set Result = Conv * Qty -> no transition
@@ -4616,9 +4616,9 @@ public class ProofEngineTests
         {
             var compilation = Compiler.Compile("""
                 precept Widget
-                field Qty as quantity in 'case' default '2 case' writable
-                field Conv as quantity of 'each/case' default '12 each/case' writable
-                field Result as quantity in 'each' default '0 each' writable
+                field Qty as quantity in 'case' default '2 case' editable
+                field Conv as quantity of 'each/case' default '12 each/case' editable
+                field Result as quantity in 'each' default '0 each' editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set Result = Qty * Conv -> no transition
@@ -4716,7 +4716,7 @@ public class ProofEngineTests
         {
             var compilation = Compiler.Compile("""
                 precept Widget
-                field Balance as money in 'USD' default '0.00 USD' writable
+                field Balance as money in 'USD' default '0.00 USD' editable
                 state Draft initial
                 event Submit
                 on Submit ensure Balance > '0.00 USD' because "Balance must be positive"
@@ -4732,7 +4732,7 @@ public class ProofEngineTests
         {
             var compilation = Compiler.Compile("""
                 precept Widget
-                field Weight as quantity in 'kg' default '0 kg' writable
+                field Weight as quantity in 'kg' default '0 kg' editable
                 state Draft initial
                 event Submit
                 on Submit ensure Weight > '0 kg' because "Weight must be positive"
@@ -4748,7 +4748,7 @@ public class ProofEngineTests
         {
             var compilation = Compiler.Compile("""
                 precept Widget
-                field P as price in 'USD' of 'mass' default '1 USD/kg' writable
+                field P as price in 'USD' of 'mass' default '1 USD/kg' editable
                 state Draft initial
                 event Submit
                 on Submit ensure P > '0 USD/kg' because "Price must be positive"
@@ -4764,7 +4764,7 @@ public class ProofEngineTests
         {
             var compilation = Compiler.Compile("""
                 precept Widget
-                field Balance as money in 'USD' default '0.00 USD' writable
+                field Balance as money in 'USD' default '0.00 USD' editable
                 state Draft initial
                 event Submit
                 on Submit ensure Balance > '0.00 EUR' because "Balance must be positive"
@@ -4867,8 +4867,8 @@ public class ProofEngineTests
             // The resulting DeclaredQualifierMeta.Currency must have SourceFieldName == "CatalogCurrency".
             var (index, _) = TypeCheckerTestHelpers.Check("""
                 precept Widget
-                field CatalogCurrency as currency default 'USD' writable
-                field Balance as money in '{CatalogCurrency}' default '0.00 USD' writable
+                field CatalogCurrency as currency default 'USD' editable
+                field Balance as money in '{CatalogCurrency}' default '0.00 USD' editable
                 state Draft initial
                 """);
 
@@ -4890,8 +4890,8 @@ public class ProofEngineTests
             // SourceFieldName must be "StockingUnit" (root of the member-access expression).
             var (index, _) = TypeCheckerTestHelpers.Check("""
                 precept Widget
-                field StockingUnit as unitofmeasure default 'kg' writable
-                field Weight as quantity in '{StockingUnit}' default '0 kg' writable
+                field StockingUnit as unitofmeasure default 'kg' editable
+                field Weight as quantity in '{StockingUnit}' default '0 kg' editable
                 state Draft initial
                 """);
 
@@ -4934,9 +4934,9 @@ public class ProofEngineTests
         {
             var compilation = Compiler.Compile("""
                 precept Widget
-                field Rate as exchangerate in 'USD' to 'EUR' default '1.1 USD/EUR' writable
-                field Amount as money in 'USD' default '0.00 USD' writable
-                field Converted as money in 'EUR' default '0.00 EUR' writable
+                field Rate as exchangerate in 'USD' to 'EUR' default '1.1 USD/EUR' editable
+                field Amount as money in 'USD' default '0.00 USD' editable
+                field Converted as money in 'EUR' default '0.00 EUR' editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set Converted = Rate * Amount -> no transition
@@ -4953,7 +4953,7 @@ public class ProofEngineTests
                 precept Widget
                 field CatalogCurrency as currency default 'USD'
                 field SupplierCurrency as currency default 'EUR'
-                field TotalInventoryCost as money in '{CatalogCurrency}' default '0.00 {CatalogCurrency}' writable
+                field TotalInventoryCost as money in '{CatalogCurrency}' default '0.00 {CatalogCurrency}' editable
                 state Draft initial
                 event ReceiveShipment(
                     Amt as money in '{SupplierCurrency}' default '1.00 {SupplierCurrency}',
@@ -4972,9 +4972,9 @@ public class ProofEngineTests
         {
             var compilation = Compiler.Compile("""
                 precept Widget
-                field Rate as exchangerate in 'GBP' to 'EUR' default '1.2 GBP/EUR' writable
-                field Amount as money in 'USD' default '0.00 USD' writable
-                field Converted as money in 'EUR' default '0.00 EUR' writable
+                field Rate as exchangerate in 'GBP' to 'EUR' default '1.2 GBP/EUR' editable
+                field Amount as money in 'USD' default '0.00 USD' editable
+                field Converted as money in 'EUR' default '0.00 EUR' editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set Converted = Rate * Amount -> no transition
@@ -4992,9 +4992,9 @@ public class ProofEngineTests
             // (the ToCurrency), so assigning to EUR succeeds.
             var compilation = Compiler.Compile("""
                 precept Widget
-                field Rate as exchangerate in 'USD' to 'EUR' default '1.1 USD/EUR' writable
-                field Amount as money in 'USD' default '0.00 USD' writable
-                field Converted as money in 'EUR' default '0.00 EUR' writable
+                field Rate as exchangerate in 'USD' to 'EUR' default '1.1 USD/EUR' editable
+                field Amount as money in 'USD' default '0.00 USD' editable
+                field Converted as money in 'EUR' default '0.00 EUR' editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set Converted = Rate * Amount -> no transition
@@ -5019,9 +5019,9 @@ public class ProofEngineTests
             // D > 0 or D < 0 → both branches independently prove D != 0
             var (_, ledger) = ProveAllowingDiagnostics("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as integer default 1 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field Y as integer default 1 editable
+                field D as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit when D > 0 or D < 0 -> set X = Y / D -> no transition
@@ -5043,10 +5043,10 @@ public class ProofEngineTests
             // D > 0 or E > 0 — branch 2 (E > 0) does NOT prove D != 0; obligation stays unresolved
             var (_, ledger) = ProveAllowingDiagnostics("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as integer default 1 writable
-                field D as number default 1 writable
-                field E as number default 1 writable
+                field X as number default 0 editable
+                field Y as integer default 1 editable
+                field D as number default 1 editable
+                field E as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit when D > 0 or E > 0 -> set X = Y / D -> no transition
@@ -5070,9 +5070,9 @@ public class ProofEngineTests
             // D > 0 or D < 0 or D != 0 — all three branches prove D != 0
             var (_, ledger) = ProveAllowingDiagnostics("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as integer default 1 writable
-                field D as number default 1 writable
+                field X as number default 0 editable
+                field Y as integer default 1 editable
+                field D as number default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit when D > 0 or D < 0 or D != 0 -> set X = Y / D -> no transition
@@ -5188,8 +5188,8 @@ public class ProofEngineTests
             // be treated as an unconditional numeric fact by TryGetNumericEnsureFact.
             var (index, _) = TypeCheckerTestHelpers.Check("""
                 precept Widget
-                field D as number default 1 writable
-                field result as number default 0 writable
+                field D as number default 1 editable
+                field result as number default 0 editable
                 state Draft initial
                 in Draft when D > 0 ensure result >= 0 because "result is nonneg when D is positive"
                 """);
@@ -5213,7 +5213,7 @@ public class ProofEngineTests
             // `ensure D >= 0` with no `when` clause → Guard must be null → unconditional fact
             var index = TypeCheckerTestHelpers.CheckExpectingClean("""
                 precept Widget
-                field D as number default 0 writable
+                field D as number default 0 editable
                 state Draft initial
                 in Draft ensure D >= 0 because "D stays nonnegative"
                 """);
@@ -5228,8 +5228,8 @@ public class ProofEngineTests
             // Unconditional ensure through full pipeline must not throw
             var index = TypeCheckerTestHelpers.CheckExpectingClean("""
                 precept Widget
-                field D as number nonzero default 1 writable
-                field X as number default 0 writable
+                field D as number nonzero default 1 editable
+                field X as number default 0 editable
                 state Draft initial
                 event Submit
                 in Draft ensure D != 0 because "D is always nonzero"
@@ -5247,8 +5247,8 @@ public class ProofEngineTests
             // Transition row with no guard → TryGuardInPathProof exits early, no null dereference
             var ledger = Prove("""
                 precept Widget
-                field X as number default 0 writable
-                field Y as number nonzero default 1 writable
+                field X as number default 0 editable
+                field Y as number nonzero default 1 editable
                 state Draft initial
                 event Submit
                 from Draft on Submit -> set X = 1 / Y -> no transition

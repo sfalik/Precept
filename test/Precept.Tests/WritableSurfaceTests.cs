@@ -9,17 +9,19 @@ using Xunit.Abstractions;
 namespace Precept.Tests;
 
 /// <summary>
-/// Compile-surface tests for the <c>writable</c> modifier feature.
-/// Documents exact behavior given that Parser and TypeChecker are NotImplementedException stubs.
+/// Compile-surface tests for the unified access-modifier vocabulary —
+/// field-declaration `editable`, per-state `modify F editable | readonly | omit`.
 /// </summary>
 public class WritableSurfaceTests(ITestOutputHelper output)
 {
-    // ── Case 1: field Amount as money writable ──────────────────────────────
+    // ── Case 1: field Amount as money editable ──────────────────────────────
 
     [Fact]
-    public void Case1_WritableModifier_LexesCorrectly()
+    public void Case1_EditableFieldModifier_LexesCorrectly()
     {
-        var src = "precept TestWritable\nfield Amount as money writable";
+        // F-LANG-GRAPH-04 Decision 5: the unified `editable` keyword stands in
+        // for the retired `writable` value modifier at the field-declaration site.
+        var src = "precept TestEditable\nfield Amount as money editable";
         var stream = Lexer.Lex(src);
 
         stream.Diagnostics.Should().BeEmpty();
@@ -34,19 +36,19 @@ public class WritableSurfaceTests(ITestOutputHelper output)
             TokenKind.Identifier,
             TokenKind.As,
             TokenKind.MoneyType,
-            TokenKind.Writable,
+            TokenKind.Editable,
             TokenKind.EndOfSource);
     }
 
     [Fact]
-    public void Case1_WritableModifier_CompileThrowsNotImplemented()
+    public void Case1_EditableFieldModifier_CompileSucceeds()
     {
-        var src = "precept TestWritable\nfield Amount as money writable";
+        var src = "precept TestEditable\nfield Amount as money editable";
         var act = () => Compiler.Compile(src);
-        act.Should().NotThrow("pipeline stages are stubbed and should not throw");
+        act.Should().NotThrow();
     }
 
-    // ── Case 2: field Amount as money (no writable) ─────────────────────────
+    // ── Case 2: field Amount as money (no editable) ─────────────────────────
 
     [Fact]
     public void Case2_ReadOnlyField_LexesCorrectly()
@@ -67,18 +69,17 @@ public class WritableSurfaceTests(ITestOutputHelper output)
             TokenKind.As,
             TokenKind.MoneyType,
             TokenKind.EndOfSource);
-        kinds.Should().NotContain(TokenKind.Writable);
     }
 
     [Fact]
-    public void Case2_ReadOnlyField_CompileThrowsNotImplemented()
+    public void Case2_ReadOnlyField_CompileSucceeds()
     {
         var src = "precept TestReadOnly\nfield Amount as money";
         var act = () => Compiler.Compile(src);
-        act.Should().NotThrow("pipeline stages are stubbed and should not throw");
+        act.Should().NotThrow();
     }
 
-    // ── Case 3: in Draft modify Amount editable (new access mode vocab B4) ───
+    // ── Case 3: in Draft modify Amount editable (per-state access vocab) ─────
 
     [Fact]
     public void Case3_ModifyEditable_LexesCorrectly()
@@ -101,7 +102,7 @@ public class WritableSurfaceTests(ITestOutputHelper output)
     }
 
     [Fact]
-    public void Case3_ModifyEditable_CompileThrowsNotImplemented()
+    public void Case3_ModifyEditable_CompileSucceeds()
     {
         var src =
             "precept TestModify\n" +
@@ -111,7 +112,7 @@ public class WritableSurfaceTests(ITestOutputHelper output)
             "from Draft on Approve -> transition Approved\n" +
             "event Approve";
         var act = () => Compiler.Compile(src);
-        act.Should().NotThrow("pipeline stages are stubbed and should not throw");
+        act.Should().NotThrow();
     }
 
     // ── Case 4: in Draft modify Amount readonly (read-only access mode) ──────
@@ -133,16 +134,13 @@ public class WritableSurfaceTests(ITestOutputHelper output)
         var kinds = stream.Tokens.Select(t => t.Kind).ToArray();
         output.WriteLine("Tokens: " + string.Join(", ", kinds));
 
-        // Key tokens: In, Identifier(Draft), Modify, Identifier(Amount), Readonly
         kinds.Should().Contain(TokenKind.In);
         kinds.Should().Contain(TokenKind.Modify);
         kinds.Should().Contain(TokenKind.Readonly);
-        // No Writable modifier token — this is the access-mode modify, not field-level writable
-        kinds.Should().NotContain(TokenKind.Writable);
     }
 
     [Fact]
-    public void Case4_InStateModifyReadonly_CompileThrowsNotImplemented()
+    public void Case4_InStateModifyReadonly_CompileSucceeds()
     {
         var src =
             "precept TestStateful\n" +
@@ -153,7 +151,7 @@ public class WritableSurfaceTests(ITestOutputHelper output)
             "event Approve";
 
         var act = () => Compiler.Compile(src);
-        act.Should().NotThrow("pipeline stages are stubbed and should not throw");
+        act.Should().NotThrow();
     }
 
     // ── Case 5: in Draft omit Amount (structural exclusion) ──────────────────
@@ -161,7 +159,6 @@ public class WritableSurfaceTests(ITestOutputHelper output)
     [Fact]
     public void Case5_InStateOmit_LexesCorrectly()
     {
-        // write at root level was old eliminated syntax. Now testing omit — structural exclusion.
         var src =
             "precept TestOmit\n" +
             "field Amount as money\n" +
@@ -171,19 +168,17 @@ public class WritableSurfaceTests(ITestOutputHelper output)
             "event Approve";
 
         var stream = Lexer.Lex(src);
-        // Lexer is context-free — it does not reject semantically invalid forms; Parser would.
         stream.Diagnostics.Should().BeEmpty();
 
         var kinds = stream.Tokens.Select(t => t.Kind).ToArray();
         output.WriteLine("Tokens: " + string.Join(", ", kinds));
 
-        // in Draft omit Amount → In, Identifier, Omit, Identifier
         kinds.Should().Contain(TokenKind.In);
         kinds.Should().Contain(TokenKind.Omit);
     }
 
     [Fact]
-    public void Case5_InStateOmit_CompileThrowsNotImplemented()
+    public void Case5_InStateOmit_CompileSucceeds()
     {
         var src =
             "precept TestOmit\n" +
@@ -194,6 +189,6 @@ public class WritableSurfaceTests(ITestOutputHelper output)
             "event Approve";
 
         var act = () => Compiler.Compile(src);
-        act.Should().NotThrow("pipeline stages are stubbed and should not throw");
+        act.Should().NotThrow();
     }
 }

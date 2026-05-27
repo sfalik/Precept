@@ -12,7 +12,7 @@ public class Track2PhaseAProofEngineTests
     {
         var precept = """
             precept Widget
-            field X as number default 0 writable
+            field X as number default 0 editable
             rule sqrt(abs(X)) >= 0 because "abs makes the value nonnegative"
             """;
 

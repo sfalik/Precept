@@ -31,9 +31,9 @@ public class ProofEngineTemporalChainTests
     {
         var ledger = Prove($"""
             precept Widget
-            field P as price in 'USD' of '{priceDimension}' writable
-            field T as period of '{periodDimension}' writable
-            field Result as money writable
+            field P as price in 'USD' of '{priceDimension}' editable
+            field T as period of '{periodDimension}' editable
+            field Result as money editable
             state Draft initial
             event Submit
             from Draft on Submit -> set Result = P * T -> no transition
@@ -51,9 +51,9 @@ public class ProofEngineTemporalChainTests
     {
         var ledger = Prove($"""
             precept Widget
-            field P as price in 'USD' of '{priceDimension}' writable
-            field T as period of '{periodDimension}' writable
-            field Result as money writable
+            field P as price in 'USD' of '{priceDimension}' editable
+            field T as period of '{periodDimension}' editable
+            field Result as money editable
             state Draft initial
             event Submit
             from Draft on Submit -> set Result = P * T -> no transition
@@ -68,9 +68,9 @@ public class ProofEngineTemporalChainTests
     {
         var ledger = Prove("""
             precept Widget
-            field P as price in 'USD' of 'time' writable
-            field D as duration writable
-            field Result as money writable
+            field P as price in 'USD' of 'time' editable
+            field D as duration editable
+            field Result as money editable
             state Draft initial
             event Submit
             from Draft on Submit -> set Result = P * D -> no transition
@@ -87,9 +87,9 @@ public class ProofEngineTemporalChainTests
     {
         var ledger = Prove($"""
             precept Widget
-            field P as price in 'USD' of '{priceDimension}' writable
-            field D as duration writable
-            field Result as money writable
+            field P as price in 'USD' of '{priceDimension}' editable
+            field D as duration editable
+            field Result as money editable
             state Draft initial
             event Submit
             from Draft on Submit -> set Result = P * D -> no transition
@@ -104,9 +104,9 @@ public class ProofEngineTemporalChainTests
     {
         var ledger = Prove("""
             precept Widget
-            field P as price writable
-            field T as period writable
-            field Result as money writable
+            field P as price editable
+            field T as period editable
+            field Result as money editable
             state Draft initial
             event Submit
             from Draft on Submit -> set Result = P * T -> no transition
@@ -121,9 +121,9 @@ public class ProofEngineTemporalChainTests
     {
         var ledger = Prove("""
             precept Widget
-            field P as price writable
-            field D as duration writable
-            field Result as money writable
+            field P as price editable
+            field D as duration editable
+            field Result as money editable
             state Draft initial
             event Submit
             from Draft on Submit -> set Result = P * D -> no transition
@@ -138,9 +138,9 @@ public class ProofEngineTemporalChainTests
     {
         var ledger = Prove("""
             precept Widget
-            field P as price in 'USD' of 'mass' writable
-            field Scale as decimal default 2.0 writable
-            field Result as price in 'USD' of 'mass' writable
+            field P as price in 'USD' of 'mass' editable
+            field Scale as decimal default 2.0 editable
+            field Result as price in 'USD' of 'mass' editable
             state Draft initial
             event Submit
             from Draft on Submit -> set Result = P * Scale -> no transition
@@ -155,9 +155,9 @@ public class ProofEngineTemporalChainTests
     {
         var ledger = Prove("""
             precept Widget
-            field P1 as price in 'USD' of 'mass' writable
-            field P2 as price in 'USD' of 'mass' writable
-            field Result as price in 'USD' of 'mass' writable
+            field P1 as price in 'USD' of 'mass' editable
+            field P2 as price in 'USD' of 'mass' editable
+            field Result as price in 'USD' of 'mass' editable
             state Draft initial
             event Submit
             from Draft on Submit -> set Result = P1 + P2 -> no transition
@@ -174,9 +174,9 @@ public class ProofEngineTemporalChainTests
     {
         var ledger = Prove("""
             precept Widget
-            field P1 as price in 'USD' of 'mass' writable
-            field P2 as price in 'USD' of 'mass' writable
-            field Result as price in 'USD' of 'mass' writable
+            field P1 as price in 'USD' of 'mass' editable
+            field P2 as price in 'USD' of 'mass' editable
+            field Result as price in 'USD' of 'mass' editable
             state Draft initial
             event Submit
             from Draft on Submit -> set Result = P1 + P2 -> no transition

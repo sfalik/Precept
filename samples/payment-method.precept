@@ -16,7 +16,7 @@ field CardBrand as choice of string("Visa","Mastercard","Amex","Discover","JCB",
 field ExpiryMonth as integer default 1 min 1 max 12
 field ExpiryYear as integer default 2025 min 2025 max 2099
 
-field IsDefault as boolean default false writable
-field Nickname as string optional maxlength 50 writable
+field IsDefault as boolean default false editable
+field Nickname as string optional maxlength 50 editable
 
 rule LastFour.length == 4 when LastFour is set because "LastFour {LastFour} must be exactly four digits — the field stores the last four characters of the PAN as a display string"

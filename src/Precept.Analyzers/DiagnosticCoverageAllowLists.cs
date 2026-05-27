@@ -204,7 +204,7 @@ internal static class DiagnosticCoverageAllowLists
         "UninitializedCrossFieldReadInInitialAssignment",
         "UninitializedFieldReadInInitialAssignment",
         "MaterializedFieldSelfReference",
-        "WritableOnEventArg",
+        "EditableOnEventArg",
         "ZeroConstructionRows",
 
         // ── MCP tooling backstop ─────────────────────────────────────────────────

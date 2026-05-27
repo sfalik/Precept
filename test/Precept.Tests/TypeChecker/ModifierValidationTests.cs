@@ -13,7 +13,7 @@ public class ModifierValidationTests
     {
         var index = TypeCheckerTestHelpers.CheckExpectingClean("""
             precept Example
-            field Priority as choice of string("Low", "Medium", "High") default "Low" writable
+            field Priority as choice of string("Low", "Medium", "High") default "Low" editable
             state Open initial
             state Done terminal
             event Escalate

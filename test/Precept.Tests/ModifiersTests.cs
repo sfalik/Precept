@@ -42,14 +42,15 @@ public class ModifiersTests
     [Fact]
     public void Total_Count()
     {
-        // 15 field + 7 state + 1 event + 3 access + 3 anchor = 29
-        Modifiers.All.Should().HaveCount(29);
+        // 14 field + 7 state + 1 event + 3 access + 3 anchor = 28
+        // (Writable retired; access-modifier `editable` is the unified replacement.)
+        Modifiers.All.Should().HaveCount(28);
     }
 
     [Fact]
     public void ValueModifier_Count()
     {
-        ValueModifierTestAccess.All().Should().HaveCount(15);
+        ValueModifierTestAccess.All().Should().HaveCount(14);
     }
 
     [Fact]
@@ -190,28 +191,9 @@ public class ModifiersTests
         meta.ApplicableTo.Should().BeEmpty("empty = applies to all types");
     }
 
-    [Fact]
-    public void Writable_AppliesToAnyType()
-    {
-        var meta = ValueModifierTestAccess.GetMeta(ModifierKind.Writable);
-        meta.ApplicableTo.Should().BeEmpty("empty = applies to all types; computed-field restriction is enforced by the type checker, not the modifier catalog");
-    }
-
-    [Fact]
-    public void Writable_IsStructuralFlag()
-    {
-        var meta = ValueModifierTestAccess.GetMeta(ModifierKind.Writable);
-        meta.Category.Should().Be(ModifierCategory.Structural);
-        meta.HasValue.Should().BeFalse("writable is a bare flag");
-    }
-
-    [Fact]
-    public void Writable_TokenTextIsWritable()
-    {
-        var meta = ValueModifierTestAccess.GetMeta(ModifierKind.Writable);
-        meta.Token.Text.Should().Be("writable");
-        meta.Token.Kind.Should().Be(TokenKind.Writable);
-    }
+    // F-LANG-GRAPH-04 Decision 5: writable/Writable have been retired in favor of
+    // editable/ModifierKind.Write (an AccessModifierMeta). Catalog-property tests
+    // for the unified access modifier live in Track2PhaseAModifierCatalogTests.
 
     [Fact]
     public void Positive_HasProofSatisfaction_Numeric_GreaterThan_Zero()
@@ -286,7 +268,6 @@ public class ModifiersTests
     [InlineData(ModifierKind.Optional)]
     [InlineData(ModifierKind.Ordered)]
     [InlineData(ModifierKind.Default)]
-    [InlineData(ModifierKind.Writable)]
     [InlineData(ModifierKind.Maxplaces)]
     public void ModifiersWithoutProofSatisfactions_HaveEmptyArray(ModifierKind kind)
     {
@@ -328,7 +309,6 @@ public class ModifiersTests
     [InlineData(ModifierKind.Positive)]
     [InlineData(ModifierKind.Nonzero)]
     [InlineData(ModifierKind.Notempty)]
-    [InlineData(ModifierKind.Writable)]
     public void FlagModifiers_HasValueIsFalse(ModifierKind kind)
     {
         var meta = ValueModifierTestAccess.GetMeta(kind);
@@ -512,9 +492,10 @@ public class ModifiersTests
     [Fact]
     public void Category_StructuralCount()
     {
-        // 15 field + 4 structural state + 1 event + 3 access + 3 anchor = 26
+        // 14 field + 4 structural state + 1 event + 3 access + 3 anchor = 25
+        // (Writable retired per F-LANG-GRAPH-04.)
         Modifiers.All.Count(m => m.Category == ModifierCategory.Structural)
-            .Should().Be(26);
+            .Should().Be(25);
     }
 
     [Fact]

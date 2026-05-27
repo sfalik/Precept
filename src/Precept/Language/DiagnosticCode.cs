@@ -90,7 +90,7 @@ public enum DiagnosticCode
     ComputedFieldNotWritable           =  38,
     ComputedFieldWithDefault           =  39,
     CircularComputedField              =  40,
-    WritableOnEventArg                 =  41,
+    EditableOnEventArg                 =  41,
     ConflictingAccessModes             =  42,
     RedundantAccessMode                =  43,
     ListLiteralOutsideDefault          =  44,

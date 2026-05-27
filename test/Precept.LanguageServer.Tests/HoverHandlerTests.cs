@@ -352,7 +352,7 @@ state Draft initial
     {
         const string source = """
             precept MutabilityHover
-            field Price as money in 'USD' writable
+            field Price as money in 'USD' editable
             state Draft initial
             state Hidden terminal
             event Hide
@@ -422,7 +422,7 @@ state Draft initial
     {
         const string source = """
             precept MutabilityHover
-            field Price as money in 'USD' writable
+            field Price as money in 'USD' editable
             state Draft initial
             state Hidden terminal
             event Hide
@@ -434,7 +434,7 @@ state Draft initial
 
         markup.Should().Contain("🔁 In: `Hide` · Out: none");
         markup.Should().Contain("✏️ 0 fields (unconditional) · 🧭 terminal ✓ · ⚡ 0 ensures (0 ⚠️)");
-        markup.Should().NotContain("`Price`", because: "omitted fields are structurally absent, not writable");
+        markup.Should().NotContain("`Price`", because: "omitted fields are structurally absent, not editable");
     }
 
     [Fact]
@@ -442,7 +442,7 @@ state Draft initial
     {
         const string source = """
             precept OmitAllMutabilityHover
-            field Price as money in 'USD' writable
+            field Price as money in 'USD' editable
             state Draft initial
             state Archived terminal
             event Archive
@@ -461,8 +461,8 @@ state Draft initial
     {
         const string source = """
             precept OmitAllMutabilityHover
-            field Price as money in 'USD' writable
-            field Qty as integer writable
+            field Price as money in 'USD' editable
+            field Qty as integer editable
             state Draft initial
             state Archived terminal
             event Archive

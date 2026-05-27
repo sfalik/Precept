@@ -12,7 +12,6 @@ public sealed class ModifierCatalogTests
     [
         ModifierKind.Optional,
         ModifierKind.Default,
-        ModifierKind.Writable,
     ];
 
     public static TheoryData<ModifierKind, ModifierMeta> AllModifiers => CatalogTestReflection.AllModifiers();

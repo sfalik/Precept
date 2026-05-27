@@ -214,8 +214,8 @@ public static class SyntaxReference
             """
             precept FeeSchedule
 
-            field BaseFee as decimal default 0 nonnegative maxplaces 2 writable
-            field DiscountPercent as decimal default 0 nonnegative max 100 maxplaces 2 writable
+            field BaseFee as decimal default 0 nonnegative maxplaces 2 editable
+            field DiscountPercent as decimal default 0 nonnegative max 100 maxplaces 2 editable
             field TaxRate as decimal default 0.1 nonnegative maxplaces 4
             """),
 
@@ -609,7 +609,7 @@ public static class SyntaxReference
 
         new(
             "State-scoped editing window",
-            "Declare a window of mutability for specific fields only while the entity is in a given state. 'in State modify Fields editable' is lifecycle-aware: the editing window closes the moment the state changes. An optional 'when Condition' narrows the window further to a runtime guard within the state. Distinct from 'writable', which is a stateless per-field flag with no lifecycle awareness.",
+            "Declare a window of mutability for specific fields only while the entity is in a given state. 'in State modify Fields editable' is lifecycle-aware: the editing window closes the moment the state changes. An optional 'when Condition' narrows the window further to a runtime guard within the state. Distinct from declaring a field 'editable' at its declaration site (lifecycle-agnostic baseline), which grants caller-side write capability without any state-scoped narrowing.",
             """
             # All five fields are editable while in Draft; window closes on Submit.
             in Draft modify ApplicantName, MonthlyIncome, RequestedRent, CreditScore, HouseholdSize editable

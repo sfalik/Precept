@@ -91,8 +91,8 @@ public class OperatorTypingTests
     {
         var index = TypeCheckerTestHelpers.CheckExpectingClean("""
             precept Example
-            field A as boolean default false writable
-            field B as boolean default false writable
+            field A as boolean default false editable
+            field B as boolean default false editable
             field Both as boolean <- A and B
             """);
 
@@ -108,8 +108,8 @@ public class OperatorTypingTests
     {
         var index = TypeCheckerTestHelpers.CheckExpectingClean("""
             precept Example
-            field A as boolean default false writable
-            field B as boolean default false writable
+            field A as boolean default false editable
+            field B as boolean default false editable
             field Either as boolean <- A or B
             """);
 
@@ -141,8 +141,8 @@ public class OperatorTypingTests
     {
         var index = TypeCheckerTestHelpers.CheckExpectingClean("""
             precept Example
-            field X as integer default 0 writable
-            field Y as integer default 0 writable
+            field X as integer default 0 editable
+            field Y as integer default 0 editable
             field Flag as boolean <- X + 1 > Y
             """);
 

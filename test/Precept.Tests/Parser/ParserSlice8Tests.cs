@@ -16,7 +16,7 @@ public sealed class ParserSlice8Tests
     {
         var compilation = Compile("""
             precept Bug004
-            field Total as number writable default 0
+            field Total as number editable default 0
             state Draft initial
             state Done terminal
             event Submit(amount as number default 1)
@@ -32,8 +32,8 @@ public sealed class ParserSlice8Tests
     {
         var compilation = Compile("""
             precept Bug005
-            field FirstName as string writable default ""
-            field LastName as string writable default ""
+            field FirstName as string editable default ""
+            field LastName as string editable default ""
             state Draft initial
             state Done terminal
             in Done modify FirstName, LastName readonly
@@ -82,7 +82,7 @@ public sealed class ParserSlice8Tests
     {
         var compilation = Compile("""
             precept Bug044
-            field Amount as number writable default 1
+            field Amount as number editable default 1
             state Draft initial
             state Done terminal
             event Submit
@@ -137,7 +137,7 @@ public sealed class ParserSlice8Tests
     {
         var compilation = Compile("""
             precept Bug019
-            field OpenedOn as date writable default '2026-01-01'
+            field OpenedOn as date editable default '2026-01-01'
             state Draft initial
             state Done terminal
             event Submit

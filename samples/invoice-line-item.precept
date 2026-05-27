@@ -2,7 +2,7 @@ precept InvoiceLineItem
 
 # A stateless precept governing a single invoice line — unit price, quantity,
 # discount, tax — together with the derived totals every billing system needs
-# downstream. Source fields are writable (the host's invoice editor sets them);
+# downstream. Source fields are editable (the host's invoice editor sets them);
 # computed fields cannot be assigned and update atomically when their inputs
 # change. There is no lifecycle: a line either is or isn't a valid line.
 #
@@ -11,14 +11,14 @@ precept InvoiceLineItem
 # maxplaces 2) are what make the computed totals provably non-negative — no
 # separate runtime rules required.
 
-field CurrencyCode as currency default 'USD' writable
+field CurrencyCode as currency default 'USD' editable
 
 # Source fields — directly edited by the host's line-editor UI.
-field Description as string optional writable
-field UnitPrice as money in '{CurrencyCode}' default '0 {CurrencyCode}' nonnegative writable
-field Quantity as integer default 1 positive writable
-field DiscountPercent as decimal default 0 nonnegative max 100 maxplaces 2 writable
-field TaxRate as decimal default 0.08 nonnegative max 1 maxplaces 4 writable
+field Description as string optional editable
+field UnitPrice as money in '{CurrencyCode}' default '0 {CurrencyCode}' nonnegative editable
+field Quantity as integer default 1 positive editable
+field DiscountPercent as decimal default 0 nonnegative max 100 maxplaces 2 editable
+field TaxRate as decimal default 0.08 nonnegative max 1 maxplaces 4 editable
 
 # Computed fields — derived from source values at every read. Cannot be
 # assigned; the formula is the single source of truth.

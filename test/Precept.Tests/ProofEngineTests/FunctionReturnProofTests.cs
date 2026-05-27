@@ -12,7 +12,7 @@ public sealed class FunctionReturnProofTests
     {
         var compilation = Compile("""
             precept FunctionReturnProof
-            field Value as number default 0 writable
+            field Value as number default 0 editable
             field Result as number default 0 nonnegative
             state Open initial
             state Done terminal

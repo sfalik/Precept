@@ -632,14 +632,16 @@ public class TypeCheckerSymbolTests
     {
         var precept = """
             precept Widget
-            field Name as string writable
+            field Name as string editable
             state Open initial
             """;
 
         var index = TypeCheckerTestHelpers.CheckExpectingClean(precept);
         var field = index.Fields.Single(f => f.Name == "Name");
 
-        field.Modifiers.Should().Contain(ModifierKind.Writable);
+        // F-LANG-GRAPH-04 Decision 5: `editable` at the field-declaration site
+        // maps to ModifierKind.Write (the unified access modifier).
+        field.Modifiers.Should().Contain(ModifierKind.Write);
         field.IsWritable.Should().BeTrue();
     }
 

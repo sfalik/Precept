@@ -145,24 +145,32 @@ internal static partial class TypeChecker
                         meta.Token.Text, typeName));
             }
 
-            // Writable on event arg
+            // Declaration-site applicability for value modifiers.
             var declarationSite = isEventArg
                 ? ValueModifierDeclarationSite.EventArgDeclaration
                 : ValueModifierDeclarationSite.FieldDeclaration;
             if (!valueMeta.ApplicableDeclarationSites.HasFlag(declarationSite))
             {
-                if (isEventArg && kind == ModifierKind.Writable)
-                {
-                    ctx.Diagnostics.Add(
-                        Diagnostics.Create(DiagnosticCode.WritableOnEventArg, modifierSpan, declarationName));
-                }
+                // No value modifier today reaches this branch with an emit — the
+                // retired `writable` modifier used to. Defensive guard left for
+                // future declaration-site-restricted value modifiers.
             }
+        }
 
-            // Writable on computed field
-            if (kind == ModifierKind.Writable && isComputed)
+        // F-LANG-GRAPH-04 Decision 5: validate access-modifier rules separately —
+        // they live in a different DU subtype (AccessModifierMeta) so the value-
+        // modifier loop above skips them. `editable` at field declaration is the
+        // unified replacement for the retired `writable` value modifier.
+        foreach (var mod in modifiers)
+        {
+            if (Modifiers.GetMeta(mod.Kind) is not AccessModifierMeta) continue;
+
+            // `editable` on a computed field is a contradiction — computed fields
+            // are derived, not directly written.
+            if (mod.Kind == ModifierKind.Write && isComputed)
             {
                 ctx.Diagnostics.Add(
-                    Diagnostics.Create(DiagnosticCode.ComputedFieldNotWritable, modifierSpan, declarationName));
+                    Diagnostics.Create(DiagnosticCode.ComputedFieldNotWritable, mod.Span, declarationName));
             }
         }
 

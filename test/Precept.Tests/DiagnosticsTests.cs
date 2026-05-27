@@ -149,9 +149,9 @@ public class DiagnosticsTests
     }
 
     [Fact]
-    public void WritableOnEventArg_HasErrorSeverity()
+    public void EditableOnEventArg_HasErrorSeverity()
     {
-        Diagnostics.GetMeta(DiagnosticCode.WritableOnEventArg).Severity.Should().Be(Severity.Error);
+        Diagnostics.GetMeta(DiagnosticCode.EditableOnEventArg).Severity.Should().Be(Severity.Error);
     }
 
     [Fact]
@@ -365,7 +365,7 @@ public class DiagnosticsTests
         DiagnosticCode.ComputedFieldNotWritable,
         DiagnosticCode.ComputedFieldWithDefault,
         DiagnosticCode.CircularComputedField,
-        DiagnosticCode.WritableOnEventArg,
+        DiagnosticCode.EditableOnEventArg,
         DiagnosticCode.ConflictingAccessModes,
         DiagnosticCode.ListLiteralOutsideDefault,
         DiagnosticCode.DuplicateChoiceValue,

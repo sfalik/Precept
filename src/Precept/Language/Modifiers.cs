@@ -241,11 +241,9 @@ public static class Modifiers
             HoverDescription: "The decimal or business-magnitude field (money, quantity, price, exchangerate) must have at most this many digits after the decimal point. For business-magnitude types, maxplaces is opt-in — `money in '<Cur>'` carries no implicit precision constraint.",
             DesugarsToRule: true),
 
-        ModifierKind.Writable => new ValueModifierMeta(
-            kind, Tokens.GetMeta(TokenKind.Writable),
-            "Field is directly editable; read-only by default without this modifier",
-            ModifierCategory.Structural, AnyType, ApplicableDeclarationSites: ValueModifierDeclarationSite.FieldDeclaration,
-            HoverDescription: "The field is directly editable. Without this modifier, the field is read-only by default. Use 'in State modify Field editable/readonly' to override per state."),
+        // F-LANG-GRAPH-04 Decision 5: ModifierKind.Writable is retired. The
+        // unified `editable` keyword is the AccessModifierMeta `Write` member
+        // below, valid at field-declaration AND state-access-row positions.
 
         // ── State modifiers ─────────────────────────────────────────────────────
         ModifierKind.InitialState => new StateModifierMeta(

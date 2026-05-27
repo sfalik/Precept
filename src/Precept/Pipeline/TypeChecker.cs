@@ -502,7 +502,9 @@ internal static partial class TypeChecker
                 : null;
 
             bool isOptional = modifiers.Contains(ModifierKind.Optional);
-            bool isWritable = modifiers.Contains(ModifierKind.Writable);
+            // F-LANG-GRAPH-04 Decision 5: the unified `editable` keyword is now
+            // ModifierKind.Write (an AccessModifierMeta), retiring ModifierKind.Writable.
+            bool isWritable = modifiers.Contains(ModifierKind.Write);
 
             var typedField = new TypedField(
                 Name: declared.Name,

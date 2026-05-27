@@ -75,8 +75,8 @@ public sealed class ForwardReferenceTests
         var compilation = Compile("""
             precept MultiForward
             field Total as number <- Price * Quantity
-            field Price as number default 0 writable
-            field Quantity as integer default 1 writable
+            field Price as number default 0 editable
+            field Quantity as integer default 1 editable
             """);
 
         compilation.HasErrors.Should().BeFalse(

@@ -254,17 +254,23 @@ public class CompletionHandlerTests
             field Enabled as boolean ¦
             """, " ");
         var labels = completions.Items.Select(item => item.Label).ToArray();
-        var expected = Precept.Language.Modifiers.All
+        var valueModifiers = Precept.Language.Modifiers.All
             .OfType<Precept.Language.ValueModifierMeta>()
             .Where(meta => meta.ApplicableDeclarationSites.HasFlag(Precept.Language.ValueModifierDeclarationSite.FieldDeclaration))
             .Where(meta =>
                 meta.ApplicableTo.Length == 0
                 || meta.ApplicableTo.Any(target => target.Kind is null or Precept.Language.TypeKind.Boolean))
-            .Select(meta => meta.Token.Text!)
-            .ToArray();
+            .Select(meta => meta.Token.Text!);
+        // F-LANG-GRAPH-04 Decision 5: access modifiers (editable) are also offered
+        // at field-declaration position via the unified catalog.
+        var accessModifiers = Precept.Language.Modifiers.All
+            .OfType<Precept.Language.AccessModifierMeta>()
+            .Where(meta => meta.ApplicableDeclarationSites.HasFlag(Precept.Language.AccessModifierDeclarationSite.FieldDeclaration))
+            .Select(meta => meta.Token.Text!);
+        var expected = valueModifiers.Concat(accessModifiers).ToArray();
 
         completions.IsIncomplete.Should().BeFalse();
-        expected.Should().BeEquivalentTo(["default", "optional", "writable"]);
+        expected.Should().BeEquivalentTo(["default", "optional", "editable"]);
         labels.Should().BeEquivalentTo(expected.Concat(["<- "]));
         labels.Should().NotContain(["max", "maxplaces", "min", "nonnegative", "nonzero", "positive"]);
     }

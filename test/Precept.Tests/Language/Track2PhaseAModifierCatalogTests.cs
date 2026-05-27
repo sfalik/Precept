@@ -8,16 +8,7 @@ public class Track2PhaseAModifierCatalogTests
 {
     [Fact]
     public void ValueModifierMeta_UsesCanonicalTypeName()
-        => ValueModifierTestAccess.RuntimeTypeName(ModifierKind.Writable).Should().Be("ValueModifierMeta");
-
-    [Fact]
-    public void Writable_DeclarationSiteApplicability_ExcludesEventArguments()
-    {
-        var meta = ValueModifierTestAccess.GetMeta(ModifierKind.Writable);
-
-        ValueModifierTestAccess.HasDeclarationSiteFlag(meta, "FieldDeclaration").Should().BeTrue();
-        ValueModifierTestAccess.HasAnyDeclarationSiteFlag(meta, "EventArgument", "EventArgDeclaration").Should().BeFalse();
-    }
+        => ValueModifierTestAccess.RuntimeTypeName(ModifierKind.Default).Should().Be("ValueModifierMeta");
 
     [Fact]
     public void Default_DeclarationSiteApplicability_IncludesEventArguments()

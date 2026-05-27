@@ -10,34 +10,34 @@ precept ProductCatalog
 # reference a product by SKU and assume its data is valid at every read.
 # This precept's job is to ensure the data ever stored on a product is valid.
 #
-# All fields are writable — the host application's catalog management UI is
+# All fields are editable — the host application's catalog management UI is
 # responsible for editing them. Identity fields (Sku, Name) are optional in
 # storage but the host should refuse to publish a product without them set.
 
 # Identity
-field Sku as string optional maxlength 50 writable
-field Name as string optional maxlength 200 writable
-field Description as string optional writable
+field Sku as string optional maxlength 50 editable
+field Name as string optional maxlength 200 editable
+field Description as string optional editable
 
 # Classification
-field Category as choice of string("Electronics","Clothing","HomeGoods","Grocery","HealthBeauty","SportsOutdoors","Toys","Books","Other") default "Other" writable
-field Brand as string optional maxlength 100 writable
+field Category as choice of string("Electronics","Clothing","HomeGoods","Grocery","HealthBeauty","SportsOutdoors","Toys","Books","Other") default "Other" editable
+field Brand as string optional maxlength 100 editable
 
 # Pricing — list price is in the catalog currency.
-field CatalogCurrency as currency default 'USD' writable
-field ListPrice as money in 'USD' default '0.00 USD' nonnegative writable
-field CostBasis as money in 'USD' optional writable
+field CatalogCurrency as currency default 'USD' editable
+field ListPrice as money in 'USD' default '0.00 USD' nonnegative editable
+field CostBasis as money in 'USD' optional editable
 
 # Physical attributes — weight in kilograms, dimensions in centimetres.
-field Weight as quantity in 'kg' default '0 kg' nonnegative writable
-field Length as quantity in 'cm' default '0 cm' nonnegative writable
-field Width as quantity in 'cm' default '0 cm' nonnegative writable
-field Height as quantity in 'cm' default '0 cm' nonnegative writable
+field Weight as quantity in 'kg' default '0 kg' nonnegative editable
+field Length as quantity in 'cm' default '0 cm' nonnegative editable
+field Width as quantity in 'cm' default '0 cm' nonnegative editable
+field Height as quantity in 'cm' default '0 cm' nonnegative editable
 
 # Availability flags
-field Active as boolean default true writable
-field Discontinued as boolean default false writable
-field RequiresShipping as boolean default true writable
+field Active as boolean default true editable
+field Discontinued as boolean default false editable
+field RequiresShipping as boolean default true editable
 
 rule CostBasis <= ListPrice when CostBasis is set because "Cost basis {CostBasis} cannot exceed the list price {ListPrice} — a product cannot be sold at a structural loss"
 rule Active == false or Discontinued == false because "An entry cannot be both Active and Discontinued — these are mutually exclusive lifecycle flags"

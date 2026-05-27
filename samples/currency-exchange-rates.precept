@@ -14,22 +14,22 @@ precept CurrencyExchangeRates
 # Currency codes are ISO 4217 identifiers. The `currency` domain type accepts
 # any registered ISO 4217 code — USD, EUR, GBP, JPY, CHF, CAD, AUD, etc.
 
-field BaseCurrency as currency default 'USD' writable
-field QuoteCurrency as currency default 'EUR' writable
+field BaseCurrency as currency default 'USD' editable
+field QuoteCurrency as currency default 'EUR' editable
 
 # Rate carries dynamic from/to qualifiers — the runtime enforces that whatever
 # rate value the host application assigns has its qualifier currencies match
 # BaseCurrency and QuoteCurrency. Optional because a record may be created
 # before the first quote is posted.
-field Rate as exchangerate in '{BaseCurrency}' to '{QuoteCurrency}' optional maxplaces 8 writable
+field Rate as exchangerate in '{BaseCurrency}' to '{QuoteCurrency}' optional maxplaces 8 editable
 
-field EffectiveAt as instant optional writable
-field ExpiresAt as instant optional writable
+field EffectiveAt as instant optional editable
+field ExpiresAt as instant optional editable
 
 # Source identifies the publishing authority. Central banks publish official
 # reference rates; market data providers (Reuters, Bloomberg) publish realtime
 # tradable quotes; Internal is for rates derived inside the host application.
-field Source as choice of string("ECB","FederalReserve","BankOfEngland","BankOfJapan","BankOfCanada","ReserveBankAustralia","SwissNationalBank","Reuters","Bloomberg","Internal") default "Internal" writable
+field Source as choice of string("ECB","FederalReserve","BankOfEngland","BankOfJapan","BankOfCanada","ReserveBankAustralia","SwissNationalBank","Reuters","Bloomberg","Internal") default "Internal" editable
 
 # RateType distinguishes the convention this quote represents.
 #   Spot    — settlement T+2 (the standard FX quote)
@@ -37,9 +37,9 @@ field Source as choice of string("ECB","FederalReserve","BankOfEngland","BankOfJ
 #   Mid     — midpoint between bid and ask
 #   Bid     — what the market maker will pay for the base currency
 #   Ask     — what the market maker will sell the base currency for
-field RateType as choice of string("Spot","Forward","Mid","Bid","Ask") default "Spot" writable
+field RateType as choice of string("Spot","Forward","Mid","Bid","Ask") default "Spot" editable
 
-field Notes as string optional writable
+field Notes as string optional editable
 
 rule ExpiresAt > EffectiveAt when EffectiveAt is set and ExpiresAt is set because "Expiry {ExpiresAt} must come after the effective time {EffectiveAt} — an exchange-rate quote with a zero or negative validity window is malformed"
 rule BaseCurrency != QuoteCurrency because "Base and quote currencies must differ — converting a currency to itself is not a meaningful exchange rate"

@@ -765,8 +765,8 @@ public class TypeCheckerAssemblyTests
         // `when D > 0 or D < 0 ensure result >= 0` — TypedEnsure.Guard must be non-null
         var (index, _) = TypeCheckerTestHelpers.Check("""
             precept Widget
-            field D as number default 1 writable
-            field result as number default 0 writable
+            field D as number default 1 editable
+            field result as number default 0 editable
             state Draft initial
             in Draft when D > 0 or D < 0 ensure result >= 0 because "result is nonneg when D is nonzero"
             """);
@@ -782,8 +782,8 @@ public class TypeCheckerAssemblyTests
         // `when D > 0 ensure result >= 0` on event ensure → Guard preserved
         var (index, _) = TypeCheckerTestHelpers.Check("""
             precept Widget
-            field D as number default 1 writable
-            field result as number default 0 writable
+            field D as number default 1 editable
+            field result as number default 0 editable
             state Draft initial
             event Submit
             on Submit when D > 0 ensure result >= 0 because "result nonneg when D positive"
@@ -801,8 +801,8 @@ public class TypeCheckerAssemblyTests
         // Guard must become TypedErrorExpression
         var (index, diagnostics) = TypeCheckerTestHelpers.Check("""
             precept Widget
-            field D as number default 1 writable
-            field result as number default 0 writable
+            field D as number default 1 editable
+            field result as number default 0 editable
             state Draft initial
             in Draft when D ensure result >= 0 because "invalid guard"
             """);
