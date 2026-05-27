@@ -917,7 +917,7 @@ internal static partial class TypeChecker
                             ctx);
                     }
 
-                    ValidateMaxPlaces(resolved, typedArg.Modifiers, declaredArg.ParsedModifiers, typedArg.Name, defaultMod.Value.Span, ctx);
+                    ValidateMaxPlaces(resolved, typedArg.Modifiers, declaredArg.ParsedModifiers, typedArg.DeclaredQualifiers, typedArg.Name, defaultMod.Value.Span, ctx);
 
                     // PRE0079 — OutOfRange: default value vs. declared numeric modifiers (event args carry no implied modifiers)
                     ValidateDefaultAgainstNumericModifiers(
@@ -979,6 +979,7 @@ internal static partial class TypeChecker
             field.Modifiers,
             field.Syntax.GetSlot<ModifierListSlot>(ConstructSlotKind.ModifierList)?.Modifiers
                 ?? ImmutableArray<ParsedModifier>.Empty,
+            field.DeclaredQualifiers,
             field.Name,
             span,
             ctx);
@@ -990,6 +991,7 @@ internal static partial class TypeChecker
         TypedExpression resolved,
         ImmutableArray<ModifierKind> modifiers,
         ImmutableArray<ParsedModifier> parsedModifiers,
+        ImmutableArray<DeclaredQualifierMeta> declaredQualifiers,
         string name,
         SourceSpan span,
         CheckContext ctx)
@@ -998,9 +1000,8 @@ internal static partial class TypeChecker
         if (!TypedExpressionMagnitude.TryGetStaticMagnitude(resolved, out var magnitude)) return;
 
         var maxplacesMod = parsedModifiers.FirstOrDefault(m => m.Kind == ModifierKind.Maxplaces);
-        if (maxplacesMod?.Value is not LiteralExpression { LiteralKind: TokenKind.NumberLiteral, Text: var maxText })
-            return;
-        if (!int.TryParse(maxText, System.Globalization.CultureInfo.InvariantCulture, out var maxPlaces) || maxPlaces < 0)
+        if (maxplacesMod is null) return;
+        if (!TryResolveMaxplacesValue(maxplacesMod.Value, declaredQualifiers, out var maxPlaces))
             return;
 
         var decStr = magnitude.ToString(System.Globalization.CultureInfo.InvariantCulture);

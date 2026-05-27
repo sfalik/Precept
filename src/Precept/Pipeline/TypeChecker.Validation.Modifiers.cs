@@ -168,7 +168,7 @@ internal static partial class TypeChecker
 
         ValidateBoundQualifierRequirements(modifiers, resolvedType, declaredQualifiers, ctx);
         ValidateModifierBounds(modifiers, resolvedType, declaredQualifiers, span, ctx);
-        ValidateModifierValues(modifiers, ctx);
+        ValidateModifierValues(modifiers, resolvedType, declaredQualifiers, ctx);
         ValidateBoundQualifierCompatibility(modifiers, resolvedType, declaredQualifiers, ctx);
     }
 
@@ -616,7 +616,11 @@ internal static partial class TypeChecker
     /// PRE0035 — InvalidModifierValue: validate that modifiers with values carry valid values.
     /// For example, 'maxplaces' must be a non-negative integer.
     /// </summary>
-    private static void ValidateModifierValues(ImmutableArray<ParsedModifier> modifiers, CheckContext ctx)
+    private static void ValidateModifierValues(
+        ImmutableArray<ParsedModifier> modifiers,
+        TypeKind resolvedType,
+        ImmutableArray<DeclaredQualifierMeta> declaredQualifiers,
+        CheckContext ctx)
     {
         foreach (var modifier in modifiers)
         {
@@ -626,7 +630,9 @@ internal static partial class TypeChecker
             {
                 case ModifierKind.Maxplaces:
                 {
-                    // maxplaces must be a non-negative integer
+                    // maxplaces accepts: (a) a non-negative integer literal, OR
+                    // (b) a contextual `currency.minorUnit` accessor when the field
+                    //     carries a static currency qualifier (F-LANG-BIZ-10).
                     if (modifier.Value is LiteralExpression lit && lit.LiteralKind == TokenKind.NumberLiteral)
                     {
                         if (lit.Text.Contains('.') ||
@@ -640,6 +646,15 @@ internal static partial class TypeChecker
                     {
                         ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.InvalidModifierValue,
                             modifier.Span, "maxplaces", "a non-negative integer"));
+                    }
+                    else if (TryRecognizeContextualCurrencyAccessor(modifier.Value, out var accessorName))
+                    {
+                        ValidateMaxplacesCurrencyAccessor(modifier, accessorName, resolvedType, declaredQualifiers, ctx);
+                    }
+                    else
+                    {
+                        ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.InvalidModifierValue,
+                            modifier.Span, "maxplaces", "a non-negative integer or 'currency.minorUnit'"));
                     }
                     break;
                 }
@@ -687,6 +702,118 @@ internal static partial class TypeChecker
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Recognizes the contextual `<receiver>.<member>` shape used in modifier-value
+    /// position (F-LANG-BIZ-10). For `currency.minorUnit`, returns true with
+    /// <paramref name="accessorName"/> = "minorUnit". Receiver must be a bare
+    /// identifier "currency"; the broader `UseInModifierValueContext` whitelist
+    /// (Decision 5) is enforced by <see cref="ValidateMaxplacesCurrencyAccessor"/>.
+    /// </summary>
+    private static bool TryRecognizeContextualCurrencyAccessor(ParsedExpression? value, out string accessorName)
+    {
+        accessorName = string.Empty;
+        if (value is MemberAccessExpression { Target: IdentifierExpression { Name: "currency" }, MemberName: var name })
+        {
+            accessorName = name;
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Validates the contextual `maxplaces currency.&lt;accessor&gt;` form per F-LANG-BIZ-10:
+    /// (a) field must carry a currency qualifier (DeclaredQualifierMeta.Currency);
+    /// (b) qualifier must be a static literal — not interpolated from another field;
+    /// (c) accessor must be on the modifier-value-context whitelist (via the catalog's
+    ///     `UseInModifierValueContext` flag on FixedReturnAccessor).
+    /// </summary>
+    private static void ValidateMaxplacesCurrencyAccessor(
+        ParsedModifier modifier,
+        string accessorName,
+        TypeKind resolvedType,
+        ImmutableArray<DeclaredQualifierMeta> declaredQualifiers,
+        CheckContext ctx)
+    {
+        // (a) Field must carry a currency qualifier. Money/Price/ExchangeRate are
+        // the qualifier-bearing types that produce a DeclaredQualifierMeta.Currency
+        // via the type checker's qualifier-extraction path.
+        var currencyQualifier = declaredQualifiers.OfType<DeclaredQualifierMeta.Currency>().FirstOrDefault();
+        if (currencyQualifier is null)
+        {
+            ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.InvalidModifierValue,
+                modifier.Span, "maxplaces",
+                $"'currency.{accessorName}' on a field without a currency qualifier"));
+            return;
+        }
+
+        // (b) Currency qualifier must be a static literal — SourceFieldName=null means
+        // the qualifier was a literal token ('USD'), not an interpolated field reference.
+        if (currencyQualifier.SourceFieldName is not null)
+        {
+            ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.MaxplacesCurrencyQualifierNotStatic,
+                modifier.Span, "maxplaces"));
+            return;
+        }
+
+        // (c) Accessor must be on the modifier-value-context whitelist. The Currency
+        // type-meta's accessor inventory carries `UseInModifierValueContext: true` only
+        // on `minorUnit`; other accessors (numericCode, name, symbol) parse cleanly
+        // but are not whitelisted in this position.
+        var currencyMeta = Types.GetMeta(TypeKind.Currency);
+        var accessor = currencyMeta.Accessors
+            .OfType<FixedReturnAccessor>()
+            .FirstOrDefault(a => a.Name == accessorName);
+        if (accessor is null || !accessor.UseInModifierValueContext)
+        {
+            ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.InvalidModifierValue,
+                modifier.Span, "maxplaces",
+                $"'currency.{accessorName}' — only `currency.minorUnit` is recognized here (currency.minorUnit returns the ISO 4217 minor-unit count for the field's currency)"));
+            return;
+        }
+
+        // All three gates pass — the form is structurally valid. The actual catalog
+        // resolution (turning currency.minorUnit into the integer count for the
+        // declared currency code) is performed by downstream consumers via
+        // `TryResolveMaxplacesValue`.
+    }
+
+    /// <summary>
+    /// Resolves a `maxplaces` modifier value to its integer count, accepting both the
+    /// literal-integer form and the contextual `currency.minorUnit` form (F-LANG-BIZ-10).
+    /// Returns false if the value shape isn't recognized or the contextual form's
+    /// currency qualifier can't be resolved. Callers should already have called
+    /// <see cref="ValidateModifierValues"/> to surface diagnostics; this helper is the
+    /// resolution step downstream of validation.
+    /// </summary>
+    internal static bool TryResolveMaxplacesValue(
+        ParsedExpression? value,
+        ImmutableArray<DeclaredQualifierMeta> declaredQualifiers,
+        out int maxplaces)
+    {
+        if (value is LiteralExpression { LiteralKind: TokenKind.NumberLiteral, Text: var litText }
+            && int.TryParse(litText, CultureInfo.InvariantCulture, out maxplaces)
+            && maxplaces >= 0)
+        {
+            return true;
+        }
+
+        if (TryRecognizeContextualCurrencyAccessor(value, out var accessorName)
+            && accessorName == "minorUnit")
+        {
+            var currencyQualifier = declaredQualifiers.OfType<DeclaredQualifierMeta.Currency>().FirstOrDefault();
+            if (currencyQualifier is not null
+                && currencyQualifier.SourceFieldName is null
+                && CurrencyCatalog.TryGet(currencyQualifier.CurrencyCode, out var entry))
+            {
+                maxplaces = entry.MinorUnit;
+                return true;
+            }
+        }
+
+        maxplaces = -1;
+        return false;
     }
 
     /// <summary>

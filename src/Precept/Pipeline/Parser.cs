@@ -538,10 +538,32 @@ public static partial class Parser
                     lastSpan = modToken.Span;
                     ParsedExpression? valueExpr = null;
 
-                    // Valued modifiers parse an expression for their value
+                    // Valued modifiers parse an expression for their value.
+                    // Special case: `maxplaces currency.<member>` (F-LANG-BIZ-10) —
+                    // `currency` is a reserved type keyword that's not in
+                    // ExpressionStartTokens, but the modifier-value position is
+                    // exactly where the contextual-identifier pattern applies. Recognize
+                    // it here as a MemberAccessExpression with a synthetic
+                    // IdentifierExpression("currency") receiver.
                     if (modMeta.HasValue)
                     {
-                        if (ExpressionStartTokens.Contains(Peek().Kind))
+                        if (Peek().Kind == TokenKind.CurrencyType
+                            && Peek(1).Kind == TokenKind.Dot
+                            && Peek(2).Kind == TokenKind.Identifier)
+                        {
+                            var currencyTok = Advance();         // 'currency'
+                            Advance();                            // '.'
+                            var memberAdv = Advance();            // member name
+                            var receiver = new IdentifierExpression("currency", currencyTok.Span);
+                            valueExpr = new MemberAccessExpression(
+                                receiver,
+                                TokenKind.Identifier,
+                                memberAdv.Text,
+                                memberAdv.Span,
+                                SourceSpan.Covering(currencyTok.Span, memberAdv.Span));
+                            lastSpan = valueExpr.Span;
+                        }
+                        else if (ExpressionStartTokens.Contains(Peek().Kind))
                         {
                             valueExpr = ParseExpression(0, () =>
                                 ValueModifierTokens.Contains(Peek().Kind)

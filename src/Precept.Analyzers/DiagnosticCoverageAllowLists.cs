@@ -153,6 +153,7 @@ internal static class DiagnosticCoverageAllowLists
         "LengthBoundViolation",
         "ListLiteralOutsideDefault",
         "MaxPlacesExceeded",
+        "MaxplacesCurrencyQualifierNotStatic",
         "RequiredTraitViolation",
         "MultipleInitialEvents",
         "MultipleInitialStates",

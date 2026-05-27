@@ -1042,6 +1042,16 @@ public static class Diagnostics
             ExampleBefore: "precept Example\nfield AuditLog as log of string by integer\nstate Draft initial\nstate Done terminal\nevent Log(Msg as string, Seq as integer)\nfrom Draft on Log -> append AuditLog Log.Msg -> transition Done",
             ExampleAfter: "precept Example\nfield AuditLog as log of string by integer\nstate Draft initial\nstate Done terminal\nevent Log(Msg as string, Seq as integer)\nfrom Draft on Log -> append AuditLog Log.Msg by Log.Seq -> transition Done"),
 
+        DiagnosticCode.MaxplacesCurrencyQualifierNotStatic => new(
+            nameof(DiagnosticCode.MaxplacesCurrencyQualifierNotStatic),
+            DiagnosticStage.Type, Severity.Error,
+            "'maxplaces currency.minorUnit' requires the field's currency qualifier to be a static literal — '{0}' has a dynamic/interpolated currency",
+            DiagnosticCategory.Structure,
+            TriggerCondition: "A money field uses 'maxplaces currency.minorUnit' but the field's 'in '<Cur>'' qualifier is interpolated from another value, so the minor-unit count cannot be resolved at compile time.",
+            RecoverySteps: ["Pin the currency to a static literal (e.g., 'in \\'USD\\'') and the form resolves at compile time", "Or use the literal-integer form 'maxplaces 2' if the precision is genuinely fixed independent of currency"],
+            ExampleBefore: "precept Example\nfield Code as string default \"USD\"\nfield Amount as money in '{Code}' maxplaces currency.minorUnit\nstate Open initial",
+            ExampleAfter: "precept Example\nfield Amount as money in 'USD' maxplaces currency.minorUnit\nstate Open initial"),
+
         DiagnosticCode.CollectionInnerTypeError => new(
             nameof(DiagnosticCode.CollectionInnerTypeError),
             DiagnosticStage.Type, Severity.Error,
