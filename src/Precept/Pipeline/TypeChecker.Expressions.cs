@@ -585,7 +585,52 @@ internal static partial class TypeChecker
         // B2 enforcement: qualifier compatibility check (PRE0070–0074)
         ValidateQualifierCompatibility(resolved, opMeta, span, ctx);
 
+        // Always-false period-literal comparison (per `temporal-type-system.md` § Period
+        // equality semantics). When both operands of `==` / `!=` on `period` are static
+        // literal periods with disjoint non-zero components, the comparison is statically
+        // knowable; emit a Warning so the author can switch to `duration` (for absolute
+        // time) or rewrite the comparison.
+        ValidateAlwaysFalsePeriodComparison(resolved, span, ctx);
+
         return resolved;
+    }
+
+    /// <summary>
+    /// Warns when both operands of a period `==` / `!=` are static literal periods whose
+    /// non-zero components are disjoint, making the comparison statically knowable.
+    /// </summary>
+    private static void ValidateAlwaysFalsePeriodComparison(TypedBinaryOp resolved, SourceSpan span, CheckContext ctx)
+    {
+        if (resolved.ResolvedOp is not (OperationKind.PeriodEqualsPeriod or OperationKind.PeriodNotEqualsPeriod))
+            return;
+        if (resolved.Left is not TypedTypedConstant { ParsedValue: NodaTime.Period left } leftTc) return;
+        if (resolved.Right is not TypedTypedConstant { ParsedValue: NodaTime.Period right } rightTc) return;
+        if (left.Equals(right)) return;  // structurally equal — not always-false
+        if (HasOverlappingNonZeroComponents(left, right)) return;  // could differ for a different reason
+
+        var alwaysValue = resolved.ResolvedOp == OperationKind.PeriodEqualsPeriod ? "false" : "true";
+        ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.AlwaysFalsePeriodComparison, span,
+            alwaysValue, leftTc.RawText, rightTc.RawText));
+    }
+
+    /// <summary>
+    /// True when two NodaTime Periods share at least one component with non-zero values
+    /// on both sides — meaning the comparison's outcome depends on those shared components'
+    /// magnitudes, not just on the parts-shape. Disjoint non-zero components mean the periods
+    /// can never be structurally equal regardless of magnitude.
+    /// </summary>
+    private static bool HasOverlappingNonZeroComponents(NodaTime.Period a, NodaTime.Period b)
+    {
+        return (a.Years != 0 && b.Years != 0)
+            || (a.Months != 0 && b.Months != 0)
+            || (a.Weeks != 0 && b.Weeks != 0)
+            || (a.Days != 0 && b.Days != 0)
+            || (a.Hours != 0 && b.Hours != 0)
+            || (a.Minutes != 0 && b.Minutes != 0)
+            || (a.Seconds != 0 && b.Seconds != 0)
+            || (a.Milliseconds != 0 && b.Milliseconds != 0)
+            || (a.Ticks != 0 && b.Ticks != 0)
+            || (a.Nanoseconds != 0 && b.Nanoseconds != 0);
     }
 
     private static TypedBinaryOp CreateSyntheticBinaryOp(

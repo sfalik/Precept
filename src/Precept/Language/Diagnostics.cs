@@ -1052,6 +1052,16 @@ public static class Diagnostics
             ExampleBefore: "precept Example\nfield Code as string default \"USD\"\nfield Amount as money in '{Code}' maxplaces currency.minorUnit\nstate Open initial",
             ExampleAfter: "precept Example\nfield Amount as money in 'USD' maxplaces currency.minorUnit\nstate Open initial"),
 
+        DiagnosticCode.AlwaysFalsePeriodComparison => new(
+            nameof(DiagnosticCode.AlwaysFalsePeriodComparison),
+            DiagnosticStage.Type, Severity.Warning,
+            "This is always {0} — '{1}' and '{2}' use different parts. Period equality compares each part (years, months, days) separately.",
+            DiagnosticCategory.Safety,
+            TriggerCondition: "Both operands of a period == (or !=) are constant literal periods whose non-zero components are disjoint, so the comparison is statically knowable.",
+            RecoverySteps: ["Use a duration if you mean absolute time (e.g., '30 days' as a duration is exact)", "Or rewrite the comparison to test the specific part you care about (e.g., 'Period.days' if available)"],
+            ExampleBefore: "precept Example\nfield A as period default '1 month'\nfield B as period default '30 days'\nstate Open initial\nfield AlwaysFalse as boolean default false <- A == B",
+            ExampleAfter: "precept Example\nfield A as duration default '30 days'\nfield B as duration default '30 days'\nstate Open initial\nfield AlwaysTrue as boolean default false <- A == B"),
+
         DiagnosticCode.CollectionInnerTypeError => new(
             nameof(DiagnosticCode.CollectionInnerTypeError),
             DiagnosticStage.Type, Severity.Error,

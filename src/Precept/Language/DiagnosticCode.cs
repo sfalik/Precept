@@ -326,4 +326,14 @@ public enum DiagnosticCode
     /// compile time.
     /// </summary>
     MaxplacesCurrencyQualifierNotStatic = 152,
+
+    /// <summary>
+    /// PRE0156 — Always-false period literal comparison. When both operands of a
+    /// period `==` are constant expressions with non-overlapping components
+    /// (e.g., `'1 month' == '30 days'`), the comparison is statically false.
+    /// Period equality compares each part (years, months, days, etc.) separately;
+    /// disjoint components can never be structurally equal. Emitted as a Warning —
+    /// the comparison is legal but almost certainly not what the author intended.
+    /// </summary>
+    AlwaysFalsePeriodComparison = 156,
 }
