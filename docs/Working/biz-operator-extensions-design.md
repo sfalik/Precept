@@ -1,5 +1,5 @@
 ---
-status: Locked 2026-05-26
+status: Locked 2026-05-26 — refreshed 2026-05-26 (precept-reviewer remediation: PRE0152 renumbered to PRE0157 to avoid collision with W-H's already-shipped MaxplacesCurrencyQualifierNotStatic; § 0.4 property 7 mis-citation corrected to § 0.6 Proof philosophy + § 0.4 trailing paragraph attributing absence of widening to property 1; PRE0071 reuse vs new-code question addressed in Decision 3; Cancelling(u1, u2) defined via UCUM DimensionVector algebra; CUE excerpt replaced with verbatim "greatest lower bound" from /docs/references/spec/)
 phase-target: Phase 5 (proof engine extensions and business-domain operator completeness)
 comparable-systems-research-status: partial — inline survey per decision; each high-stakes decision carries verbatim excerpts from at least one external system with access date
 sources-consulted:
@@ -37,7 +37,7 @@ When done, three things work that are currently rejected or silently wrong:
   - One new catalog entry: `OperationKind.MoneyDividePrice → Quantity` with a `QualifierChainProofRequirement` linking the money's currency to the price's currency and a `ResultQualifierPolicy` that propagates the price's denominator unit to the result.
   - A new `QualifierChainProofRequirement` arm on `OperationKind.QuantityTimesQuantity` asserting that the two quantities' dimensions compose to a known dimension under the existing UCUM-derived `DimensionVector` algebra (or, where the product is dimensionally meaningless in the curated business-domain set, the operation is rejected with a teachable diagnostic).
   - A new proof-engine strategy `TryDiscreteEqualityNarrowingProof` that consumes `$eq:F:V` markers from guard scopes and discharges numeric obligations whose subject is `F` against the singleton interval `[V, V]`. The strategy reuses the existing guard-decomposition pipeline; the marker shape mirrors the qualifier `$eq:` markers documented in business-domain-types.md § Discrete Equality Narrowing but for choice-domain fields.
-  - One new diagnostic code: `PRE0152 IncompatibleDimensionalProduct` — emitted when `quantity * quantity` has operand dimensions that compose to a dimension outside the curated registry AND no downstream context narrows the result.
+  - One new diagnostic code: `PRE0157 IncompatibleDimensionalProduct` — emitted when `quantity * quantity` has operand dimensions that compose to a dimension outside the curated registry AND no downstream context narrows the result.
 - **Out of scope**:
   - Full multi-term compound-unit algebra (Level C in business-domain-types.md). The curated business-domain dimension set (length, mass, volume, area, temperature, energy, pressure, count) is what the proof requirement validates against; physics-grade dimensional analysis remains permanently out of scope per business-domain-types.md.
   - Narrowing on `F in (list)` guard forms (D5 below resolves this).
@@ -85,8 +85,8 @@ JSR-354's `MonetaryAmount` carries `divide(Number)` and `multiply(Number)` but d
 
 For (b), CUE's value disjunction narrowing and Liquid Haskell's refinement narrowing on equality are the canonical comparators:
 
-> "When two struct values are unified, the result is the most general value that is an instance of both."
-> — CUE Language Specification, "Unification", accessed 2026-05-26 (https://cuelang.org/docs/references/spec/#unification)
+> "The _unification_ of values `a` and `b` is defined as the greatest lower bound of `a` and `b`."
+> — CUE Language Specification, "Unification", accessed 2026-05-26 (https://cuelang.org/docs/references/spec/) — verbatim
 
 CUE's lattice-based evaluation treats equality narrowing as unification at compile time: `severity: 1 | 2 | 3 | 4 | 5` unified with `severity: 1` yields `severity: 1`, and downstream constraints see the singleton. Precept's divergence: Precept's narrowing is scoped to a guard (`when Severity == 1`), not unified globally on the field. The scope is the row body / rule body where the guard is in scope, not the field's full lifetime. This matches Liquid Haskell's refinement-narrowing on case-scrutinee equality:
 
@@ -128,7 +128,7 @@ rule RefundCap > 0 when Severity == 1
 **Error message.** A domain expert writes `set Density = WeightKg * DistanceM` on fields `WeightKg as quantity in 'kg'` and `DistanceM as quantity in 'm'`:
 
 ```
-PRE0152: 'kg' × 'm' produces dimension 'mass·length', which is not in the
+PRE0157: 'kg' × 'm' produces dimension 'mass·length', which is not in the
 business-domain dimension set. Multiplying these two quantities does not yield
 a meaningful business value — density is mass per volume (kg/L), not mass times
 distance. If you meant area, multiply two length quantities; if you meant
@@ -167,7 +167,7 @@ Premises: `c1 = c2` (currency axes match — discharged as a `QualifierChainProo
                     Γ ⊢ e1 * e2 : quantity(u1·u2, d_result)
 ```
 
-Where `⊕` is dimension-vector addition (UCUM-derived) and `Cancelling(u1, u2)` is the set of unit pairs where one unit's UCUM dimension is the inverse of the other's (the existing `CompoundUnitCancellation` case). If `d_result` falls outside both sets, the operation emits `PRE0152 IncompatibleDimensionalProduct` — this is the strengthened static check.
+Where `⊕` is dimension-vector addition (UCUM-derived) and `Cancelling(u1, u2)` is the set of unit pairs where one unit's UCUM dimension is the inverse of the other's (the existing `CompoundUnitCancellation` case). If `d_result` falls outside both sets, the operation emits `PRE0157 IncompatibleDimensionalProduct` — this is the strengthened static check.
 
 **Proof obligation for F-LANG-BIZ-08 (new `TryDiscreteEqualityNarrowingProof` strategy).**
 
@@ -206,9 +206,9 @@ This is the correct layering because catalog metadata is the source of truth for
   - Parser: None — no new tokens, keywords, or surface syntax.
   - Type checker: F-LANG-BIZ-01 adds a typing-rule arm via the catalog entry (Operations.cs index entry); F-LANG-BIZ-05 strengthens the type-check via the new ProofRequirement arm; F-LANG-BIZ-08 adds no typing-rule changes (proof-only).
   - Evaluator: F-LANG-BIZ-01 needs evaluator dispatch for the new `MoneyDividePrice` operation kind — `Amount / (Amount2 / Unit) = (Amount / Amount2)` as a `decimal`, then wrap in `Quantity(result, Unit)`. F-LANG-BIZ-05 and F-LANG-BIZ-08 are proof-time only.
-  - Diagnostics: F-LANG-BIZ-05 adds `PRE0152 IncompatibleDimensionalProduct`; the other two reuse existing codes (`PRE0070`-family for qualifier mismatches, the existing safety-obligation codes for F-LANG-BIZ-08's discharge path).
+  - Diagnostics: F-LANG-BIZ-05 adds `PRE0157 IncompatibleDimensionalProduct`; the other two reuse existing codes (`PRE0070`-family for qualifier mismatches, the existing safety-obligation codes for F-LANG-BIZ-08's discharge path).
 - Tooling (syntax highlighting, completions, hover, semantic tokens): None for F-LANG-BIZ-01/05 beyond automatic catalog-derivation. F-LANG-BIZ-08's narrowing IS visible on hover via existing proof-attribution machinery (the new `$eq:` markers surface in the same hover surface as the existing qualifier `$eq:` markers).
-- MCP (vocabulary, DTOs, tool output): F-LANG-BIZ-01 adds one operator entry to the catalog-derived MCP vocabulary (auto-derived from `Operations.All`). F-LANG-BIZ-05 adds `PRE0152` to the diagnostic registry exposed via `precept_diagnostic`. F-LANG-BIZ-08 surfaces in `precept_proofs` output via existing proof-attribution.
+- MCP (vocabulary, DTOs, tool output): F-LANG-BIZ-01 adds one operator entry to the catalog-derived MCP vocabulary (auto-derived from `Operations.All`). F-LANG-BIZ-05 adds `PRE0157` to the diagnostic registry exposed via `precept_diagnostic`. F-LANG-BIZ-08 surfaces in `precept_proofs` output via existing proof-attribution.
 
 **Breaking changes.** None. F-LANG-BIZ-01 is purely additive (a previously-rejected expression now type-checks). F-LANG-BIZ-05 changes a `quantity * quantity` accept-then-erase-dimension into accept-with-dimension-or-reject; this could in principle reject previously-accepted programs, but per the grounding read the current acceptance is "accepted then dimension erased" — there are no in-tree samples that rely on dimension-erased quantity products (verified by grep on `samples/`; the only `quantity * quantity` usage is compound × cancellation via Level B, which is covered explicitly by the new `CuratedBusinessDimensions ∪ Cancelling(u1, u2)` rule). F-LANG-BIZ-08 is additive (a previously-undischarged obligation now discharges).
 
@@ -221,12 +221,12 @@ The architectural problem F-LANG-BIZ-08 most directly faces — "extending inter
 
 What Precept takes: scope-bounded narrowing of a discrete-domain field to a singleton when an equality guard pins it. The narrowing flows into proof obligations within the scope and does not leak out.
 
-What Precept deliberately diverges from: Liquid Haskell discharges obligations via SMT (Z3); Precept discharges via syntactic guard-decomposition. The SMT route would violate Precept's determinism principle (Principle 3 — no non-deterministic solvers per `precept-language-spec.md § 0.1`) and would conflict with the "no widening" property explicitly called out in `precept-language-spec.md § 0.4 property 7`. Precept's narrower mechanism handles the case that actually appears in business-domain precepts (equality guards on choice fields) without paying the SMT cost.
+What Precept deliberately diverges from: Liquid Haskell discharges obligations via SMT (Z3); Precept discharges via syntactic guard-decomposition. The SMT route would violate Precept's determinism principle (Principle 3 per `precept-language-spec.md § 0.1`) and the "no opaque solvers" commitment in `precept-language-spec.md § 0.6 Proof philosophy`. The absence of fixpoint/widening machinery — itself a consequence of property 1 (no loops) per the trailing paragraph of `precept-language-spec.md § 0.4` — keeps the discharge linear over guard branches rather than iterative. Precept's narrower mechanism handles the case that actually appears in business-domain precepts (equality guards on choice fields) without paying the SMT cost.
 
 For F-LANG-BIZ-05's curated dimensional algebra, the architectural precedent for "accept some compound dimensions, reject others" is CUE's lattice:
 
-> "CUE's value system is based on lattices. Each value is in a partial order with all other values, where any two values have a unique least upper bound (their unification) and a unique greatest lower bound."
-> — CUE Language Specification, "Lattice", accessed 2026-05-26 (https://cuelang.org/docs/references/spec/#lattice)
+> "The _unification_ of values `a` and `b` is defined as the greatest lower bound of `a` and `b`."
+> — CUE Language Specification, "Values" § Unification, accessed 2026-05-26 (https://cuelang.org/docs/references/spec/) — verbatim. CUE's full lattice framing (each value is in a partial order; unification yields the greatest lower bound; values whose unification falls below `_|_` (bottom) are rejected) is the structural precedent — Precept's curated-business-domain rejection mirrors the "reject below bottom" semantics; dimension vectors outside the curated set are "below" the language's accepted domain.
 
 CUE's lattice rejects values whose unification falls below `_|_` (bottom). Precept's curated-business-domain rejection is structurally similar: dimension vectors that fall outside the curated set are "below" the language's accepted domain. The architectural choice mirrors CUE's: define the lattice (curated set), reject anything not in it. The divergence is that CUE's lattice is open (users define their own constraints) whereas Precept's curated set is closed by design (per `business-domain-types.md § UCUM dimension categories`).
 
@@ -270,16 +270,16 @@ CUE's lattice rejects values whose unification falls below `_|_` (bottom). Prece
       SemanticIndex semantics)
   ```
   Consumes the same `guard` extraction pipeline as `TryGuardInPathProof` and `TryFlowNarrowingProof`. For each branch, looks for `F == V_lit` leaves where `F` is the obligation subject and the literal value `V_lit` satisfies the obligation's numeric comparison against threshold. Hooked into the strategy-chain in `ProofEngine.cs`.
-- **`ProofEngine.Diagnostics.cs`** — new diagnostic-emitting path for `PRE0152 IncompatibleDimensionalProduct` consumed by the new `DimensionalProductProofRequirement`.
+- **`ProofEngine.Diagnostics.cs`** — new diagnostic-emitting path for `PRE0157 IncompatibleDimensionalProduct` consumed by the new `DimensionalProductProofRequirement`.
 
 ### Diagnostic catalog
 
-- New code `PRE0152 IncompatibleDimensionalProduct` registered in `DiagnosticCode` enum and the diagnostic catalog with the wording shown in § Audience and Teachability.
+- New code `PRE0157 IncompatibleDimensionalProduct` registered in `DiagnosticCode` enum and the diagnostic catalog with the wording shown in § Audience and Teachability.
 
 ### Tests
 
 - `test/Precept.Tests/Operations/MoneyDividePriceTests.cs` — positive (currency match, nonzero divisor), negative (currency mismatch), negative (zero divisor).
-- `test/Precept.Tests/Operations/QuantityProductDimensionTests.cs` — positive (mass × volume → density-like cancellation case, count × decimal scaling), negative (kg × m → PRE0152).
+- `test/Precept.Tests/Operations/QuantityProductDimensionTests.cs` — positive (mass × volume → density-like cancellation case, count × decimal scaling), negative (kg × m → PRE0157).
 - `test/Precept.Tests/ProofEngine/DiscreteEqualityNarrowingTests.cs` — choice equality narrowing for safety obligations; F-LANG-BIZ-08 repro from the IT helpdesk sample.
 
 ### Samples
@@ -340,8 +340,10 @@ CUE's lattice rejects values whose unification falls below `_|_` (bottom). Prece
   - `CLAUDE.md § Catalog System (Non-Negotiable)` — "Never switch on `*Kind` enum identity to dispatch per-member behavior."
   - CUE Language Specification, "Lattice", accessed 2026-05-26 — "any two values have a unique least upper bound (their unification) and a unique greatest lower bound" (https://cuelang.org/docs/references/spec/#lattice)
 - **Strongest counter-evidence**: F# units of measure proves that an open dimensional algebra is workable in a typed language. If F# can do it, Precept could too — why curate? Response: F#'s audience is general programming (physicists, scientists, financial quants). Precept's audience is domain experts modeling business entities (`docs/philosophy.md § Who authors a precept`). The curated business set names dimensions the author already thinks in (mass, volume, energy); products outside that set (kg·m, kg²) are signals of intent mismatch in business contexts, not legitimate physics. The curation is value-add for the audience, not a limitation.
-- **Reversibility**: Hard. Once `PRE0152` ships and authors learn to refactor their precepts to avoid it, relaxing the requirement later would change the language's acceptance set in a way that affects existing code only positively (more programs accepted) but would also change the diagnostic surface (PRE0152 disappears, replaced by silent acceptance).
-- **Blast radius**: 1 catalog entry modification (Operations.cs), 1 new proof-requirement subtype, 1 new diagnostic code (PRE0152), 1 doc update (business-domain-types.md § Compound Types and Dimensional Cancellation), proof-engine test additions.
+- **Reversibility**: Hard. Once `PRE0157` ships and authors learn to refactor their precepts to avoid it, relaxing the requirement later would change the language's acceptance set in a way that affects existing code only positively (more programs accepted) but would also change the diagnostic surface (PRE0157 disappears, replaced by silent acceptance).
+- **Blast radius**: 1 catalog entry modification (Operations.cs), 1 new proof-requirement subtype, 1 new diagnostic code (PRE0157), 1 doc update (business-domain-types.md § Compound Types and Dimensional Cancellation), proof-engine test additions.
+- **Why a new code, not PRE0071 reuse (per reviewer remediation 2026-05-26)**: PRE0071 `CrossDimensionArithmetic` already fires for `+`/`−` between operands of different physical dimensions (e.g., `kg + m`). It checks operand-level dimensional incoherence at addition-shaped operations, where the operation does NOT compose dimensions. The new PRE0157 fires for `*` (multiplication-shaped), where the operation DOES compose dimensions — and the result lands outside the curated business-domain set. Different semantics, different recovery shape: PRE0071's fix is "use one type or the other"; PRE0157's fix is "refactor to a known compound, or accept the value belongs outside Precept's domain." Reuse would require widening PRE0071's contract and changing its message template, which downstream tooling/MCP consumers depend on. A separate code keeps PRE0071's existing semantics intact. (Acknowledges asymmetry with `QuantityDivideQuantityCrossDimension` at Operations.cs:542, which today accepts cross-dimension `quantity / quantity → compound quantity` without emitting any incompatibility diagnostic — this design intentionally leaves division loose because reciprocal-dimension cancellation is the most common useful shape; division-emits is a separate future decision tracked alongside F-LANG-BIZ-11 boundary-precision work.)
+- **`Cancelling(u1, u2)` definition (per reviewer remediation 2026-05-26)**: A pair of UCUM-derived `DimensionVector`s `v1, v2` cancels iff `v1 + v2` (element-wise vector addition) produces a vector whose non-zero components are entirely within the curated business-domain dimension set (length, mass, volume, area, temperature, energy, pressure, count, time-magnitude). Implementation: the existing `DimensionVector` algebra in `src/Precept/Language/Ucum/UcumAtom.cs` provides the per-dimension exponent vectors; the new `DimensionalProductProofRequirement` computes `v1 + v2` and inspects each non-zero element against the catalog of curated dimension names. The "common cancelling case" (e.g., `mass × (1/mass) → 1`) reduces to the zero-vector, which trivially satisfies the curated-set check.
 
 ### Decision 4 — F-LANG-BIZ-08: extend interval narrowing to discrete domains via a new strategy that reuses existing infrastructure
 
@@ -352,7 +354,7 @@ CUE's lattice rejects values whose unification falls below `_|_` (bottom). Prece
 - **Alternatives considered**:
   - **Build new `DiscreteIntervalNarrowing` infrastructure.** Rejected — the existing `$eq:` markers already work for the qualifier axis with the same mechanics; the only thing missing is consumption of those markers in the safety-obligation discharge path for choice-domain values. Building parallel infrastructure would be duplication.
   - **Use the existing numeric-interval narrowing (`ProofEngine.Intervals.cs`) and treat choice values as numeric points.** Considered carefully. For `choice of integer(1,2,3,4,5)`, this would work — narrow Severity to `[1,1]` and use the existing interval-discharge path. But for `choice of string("Low","Medium","High")`, the values aren't numeric and the interval machinery doesn't apply. A uniform mechanism that works across both integer-choice and string-choice domains is needed; `$eq:` is the right shape because it doesn't require a numeric line. Reject the interval-only approach.
-  - **Discharge via SMT.** Rejected — violates Principle 3 (Determinism) and Principle 0.4-property-7 (No widening). Section `precept-language-spec.md § 0.6 Proof philosophy` explicitly states "no non-deterministic solvers."
+  - **Discharge via SMT.** Rejected — violates Principle 3 (Determinism) and § 0.6 Proof philosophy's no-opaque-solvers commitment. The absence of widening (consequence of § 0.4 property 1 — no loops — per the section's trailing paragraph) further argues against an iterative fixpoint solver.
 - **Precedent**:
   - Liquid Haskell case-scrutinee narrowing (cited above): "When we match against a constructor, we get to assume that the scrutinee equals that constructor in the corresponding branch."
   - CUE value disjunction narrowing (cited above): unification narrows a disjunctive value to the specific value matched.
@@ -386,11 +388,11 @@ CUE's lattice rejects values whose unification falls below `_|_` (bottom). Prece
 
 ## Falsifiers
 
-External-author-visible changes ship in F-LANG-BIZ-01 (new operator), F-LANG-BIZ-05 (new diagnostic PRE0152), and F-LANG-BIZ-08 (changed discharge surface — programs that previously emitted obligation diagnostics now compile). Falsifiers:
+External-author-visible changes ship in F-LANG-BIZ-01 (new operator), F-LANG-BIZ-05 (new diagnostic PRE0157), and F-LANG-BIZ-08 (changed discharge surface — programs that previously emitted obligation diagnostics now compile). Falsifiers:
 
-1. **If three or more samples in `samples/` need PRE0152 workarounds (explicit-cast or refactor) after F-LANG-BIZ-05 ships**, the curated business-domain dimension set is too narrow and should expand (review the post-v1 watchlist in `business-domain-types.md § UCUM dimension categories`: `'power'`, `'flow-rate'`, `'concentration'`).
+1. **If three or more samples in `samples/` need PRE0157 workarounds (explicit-cast or refactor) after F-LANG-BIZ-05 ships**, the curated business-domain dimension set is too narrow and should expand (review the post-v1 watchlist in `business-domain-types.md § UCUM dimension categories`: `'power'`, `'flow-rate'`, `'concentration'`).
 2. **If `precept_compile` p99 latency exceeds 50ms on the median sample after F-LANG-BIZ-08 ships**, the discrete-equality narrowing strategy is too expensive and should be made opt-in or restricted to specific guard shapes.
-3. **If a single domain expert in a usability test cannot articulate the PRE0152 diagnostic's recovery path within 2 minutes**, the wording is too compiler-internal and should be revised to use more domain vocabulary.
+3. **If a single domain expert in a usability test cannot articulate the PRE0157 diagnostic's recovery path within 2 minutes**, the wording is too compiler-internal and should be revised to use more domain vocabulary.
 4. **If the `MoneyDividePrice` entry produces more than one MCP-vocabulary disambiguation question per quarter** (authors confused about which combination to use), the operator surface around price arithmetic is too dense and price/money operators should be reorganised in the canonical doc.
 5. **If any choice-domain field type other than `choice of integer(...)` and `choice of string(...)` requires special-casing in the discrete-equality narrowing strategy**, the strategy's assumption of "any choice-domain value can serve as an equality narrowing target" was wrong and the surface should narrow to integer-choice only initially.
 
@@ -400,9 +402,9 @@ A vertical slice is complete when ALL of the following hold:
 
 1. `set TotalUnits = TotalCost / UnitPrice` on `field TotalCost as money in 'USD'` and `field UnitPrice as price in 'USD/each'` compiles cleanly and produces `quantity in 'each'`. `precept_compile` returns no diagnostics. (F-LANG-BIZ-01 positive test.)
 2. `set TotalUnits = TotalCost / UnitPrice` where `UnitPrice` is `price in 'EUR/each'` emits a currency-mismatch diagnostic from the `QualifierChainProofRequirement`. (F-LANG-BIZ-01 negative test.)
-3. `quantity in 'kg' * quantity in 'L'` where the context expects nothing specific compiles cleanly only if mass·volume is in the curated set OR cancels; otherwise emits PRE0152. (F-LANG-BIZ-05 positive and negative tests.)
+3. `quantity in 'kg' * quantity in 'L'` where the context expects nothing specific compiles cleanly only if mass·volume is in the curated set OR cancels; otherwise emits PRE0157. (F-LANG-BIZ-05 positive and negative tests.)
 4. The IT helpdesk sample's `when Severity == 1` row body can include an action whose safety depends on `Severity = 1` and the safety obligation discharges without an explicit `nonzero`/`positive` modifier. (F-LANG-BIZ-08 positive test via `samples/it-helpdesk-ticket.precept` regression.)
-5. The MCP `precept_operations` tool surfaces the new `MoneyDividePrice` entry; `precept_diagnostic` surfaces `PRE0152` with the audience-fit message; `precept_proofs` attributes the discharge of F-LANG-BIZ-08 obligations to the guard that established the narrowing. (Tooling integration test.)
+5. The MCP `precept_operations` tool surfaces the new `MoneyDividePrice` entry; `precept_diagnostic` surfaces `PRE0157` with the audience-fit message; `precept_proofs` attributes the discharge of F-LANG-BIZ-08 obligations to the guard that established the narrowing. (Tooling integration test.)
 6. `docs/language/business-domain-types.md § Operators table on money` includes the new `money / price` row; `docs/language/business-domain-types.md § Compound Types and Dimensional Cancellation` includes the curated-dimension-product rule; `docs/language/business-domain-types.md § Discrete Equality Narrowing` extends to choice-domain values. (Doc-update enumeration verified.)
 7. The catalog-driven grammar generator emits the same `tmLanguage.json` output as before for token/keyword surface (no surface syntax change). (Catalog discipline verified.)
 
@@ -419,7 +421,7 @@ Per `CLAUDE.md` § Documentation Sync routing table:
 |---|---|
 | New operator in catalog → new row in operators table for `money` and for `price` | `docs/language/business-domain-types.md § money operators`, `§ price operators` |
 | Strengthened proof requirement on `quantity * quantity` + new diagnostic | `docs/language/business-domain-types.md § Compound Types and Dimensional Cancellation` |
-| New diagnostic code `PRE0152 IncompatibleDimensionalProduct` | `docs/compiler/diagnostic-system.md` |
+| New diagnostic code `PRE0157 IncompatibleDimensionalProduct` | `docs/compiler/diagnostic-system.md` |
 | Extended discrete-equality narrowing to choice-domain values | `docs/language/business-domain-types.md § Discrete Equality Narrowing § Mechanism` (new bullet for choice-domain marker shape) |
 | New proof strategy in the proof engine | `docs/compiler/proof-engine.md § Strategies` |
 | Catalog inventory updated for new `OperationKind.MoneyDividePrice` + new `ResultQualifierPolicy.InheritPriceDenominatorUnit` + new `ProofRequirement.DimensionalProductProofRequirement` | `docs/language/catalog-system.md § Operations`, `§ ProofRequirements` |
