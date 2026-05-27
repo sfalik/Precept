@@ -149,6 +149,27 @@ public static partial class ProofEngine
                 return Diagnostics.Create(DiagnosticCode.IndexBoundsGuard, obligation.Site.Span,
                     fieldName, indexLabel);
             }
+
+            case DimensionalProductProofRequirement:
+            {
+                // F-LANG-BIZ-05 — surface the per-operand unit and the composed
+                // dimension name (or vector) so the diagnostic is teachable.
+                string leftLabel = "?";
+                string rightLabel = "?";
+                string productLabel = "?";
+                if (obligation.Site is TypedBinaryOp dimBin)
+                {
+                    leftLabel = DescribeQualifiedExpression(dimBin.Left, QualifierAxis.Unit, semantics).QualifierValue;
+                    if (string.IsNullOrWhiteSpace(leftLabel) || leftLabel == "?")
+                        leftLabel = DescribeQualifiedExpression(dimBin.Left, QualifierAxis.Dimension, semantics).QualifierValue;
+                    rightLabel = DescribeQualifiedExpression(dimBin.Right, QualifierAxis.Unit, semantics).QualifierValue;
+                    if (string.IsNullOrWhiteSpace(rightLabel) || rightLabel == "?")
+                        rightLabel = DescribeQualifiedExpression(dimBin.Right, QualifierAxis.Dimension, semantics).QualifierValue;
+                    productLabel = $"{leftLabel}·{rightLabel}";
+                }
+                return Diagnostics.Create(DiagnosticCode.IncompatibleDimensionalProduct, obligation.Site.Span,
+                    leftLabel, rightLabel, productLabel);
+            }
         }
 
         throw new InvalidOperationException($"Unexpected proof requirement type '{obligation.Requirement.GetType().FullName}'.");

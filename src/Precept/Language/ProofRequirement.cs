@@ -127,6 +127,21 @@ public sealed record ModifierRequirement(
 ) : ProofRequirement(ProofRequirementKind.Modifier, Description);
 
 /// <summary>
+/// F-LANG-BIZ-05 — Dimensional product proof: the multiplicative product of
+/// two quantity operands' unit dimension vectors must resolve to a known
+/// curated business-domain dimension (per <c>DimensionCatalog</c>). Used by
+/// <c>QuantityTimesQuantity</c> — `kg × m` (mass·length) is rejected because
+/// the product dimension is outside the curated set. Cancelling pairs (e.g.,
+/// `kg × (1/kg)` → dimensionless) satisfy because the count alias is part of
+/// the curated set.
+/// </summary>
+public sealed record DimensionalProductProofRequirement(
+    ProofSubject  LeftSubject,
+    ProofSubject  RightSubject,
+    string        Description
+) : ProofRequirement(ProofRequirementKind.DimensionalProduct, Description);
+
+/// <summary>
 /// Interval containment proof: the computed value interval of an expression
 /// assigned to a decimal/number field must fit within the field's declared
 /// bounds (if any). Used to prevent compile-time-provable numeric overflow
@@ -303,6 +318,15 @@ public abstract record ProofRequirementMeta(
         : ProofRequirementMeta(ProofRequirementKind.IndexBounds,
             "Index bounds — parameter (index N) must satisfy 0 <= N < F.count (or <= F.count for inserts)",
             Language.DiagnosticCode.IndexBoundsGuard);
+
+    /// <summary>
+    /// Dimensional product (F-LANG-BIZ-05) — operand dimension vectors multiply
+    /// to a curated business-domain dimension.
+    /// </summary>
+    public sealed record DimensionalProduct()
+        : ProofRequirementMeta(ProofRequirementKind.DimensionalProduct,
+            "Dimensional product — operand quantities' dimensions must compose to a known business-domain dimension",
+            Language.DiagnosticCode.IncompatibleDimensionalProduct);
 }
 
 // ProofSatisfaction DU — positive carrier fact that can satisfy a ProofRequirement

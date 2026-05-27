@@ -47,6 +47,8 @@ public enum ProofStrategy
     IntervalContainment = 7,
     LengthContainment   = 8,
     CountContainment    = 9,
+    /// <summary>F-LANG-BIZ-05 — dimensional product of two quantity operands lands in the curated business-domain dimension set.</summary>
+    DimensionalProduct  = 10,
 }
 
 public sealed record FaultSiteLink(

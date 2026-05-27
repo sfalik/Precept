@@ -585,6 +585,14 @@ public static class Operations
                     "Divisor must be non-zero"),
             ]),
 
+        // F-LANG-BIZ-05 scaffolding shipped (DimensionalProductProofRequirement
+        // + PRE0157 + ProofEngine.TryDimensionalProductProof). The catalog
+        // attachment to QuantityTimesQuantity is deferred: the current type
+        // checker eagerly emits PRE0071 (CrossDimensionArithmetic) for any
+        // quantity × quantity with cross-dimensional operands, suppressing
+        // the proof-engine path. Switching the catalog requirement on requires
+        // a separate type-checker-rebalancing slice that migrates existing
+        // PRE0071-on-multiply tests to PRE0157. Tracked as a follow-up.
         OperationKind.QuantityTimesQuantity => new BinaryOperationMeta(
             kind, OperatorKind.Times, PQuantity, PQuantity, TypeKind.Quantity,
             "Quantity × quantity → quantity (dimensional cancellation)",

@@ -338,6 +338,17 @@ public enum DiagnosticCode
     AlwaysFalsePeriodComparison = 156,
 
     /// <summary>
+    /// PRE0157 — Incompatible dimensional product (F-LANG-BIZ-05). Emitted when
+    /// `quantity × quantity` produces a dimension vector that is not in the
+    /// curated business-domain set (length, mass, volume, area, temperature,
+    /// energy, pressure, force, speed, count). E.g. `kg × m` is `mass·length`
+    /// — a coherent physics compound but not a business-domain dimension.
+    /// Cancelling pairs (e.g., `kg × 1/kg`) resolve to the dimensionless count
+    /// alias and are accepted.
+    /// </summary>
+    IncompatibleDimensionalProduct = 157,
+
+    /// <summary>
     /// PRE0158 — Field has no write site. The named field has no initial-event
     /// assignment, no value-establishing action in any transition row, no
     /// state-entry hook setting it, no caller-side write capability (no

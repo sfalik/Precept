@@ -34,6 +34,65 @@ public static partial class ProofEngine
         return false;
     }
 
+    // ── Strategy: Dimensional Product Proof (F-LANG-BIZ-05) ───────────────────
+
+    /// <summary>
+    /// Discharges <see cref="DimensionalProductProofRequirement"/>: the
+    /// multiplicative product of the two operand quantities' unit dimension
+    /// vectors must resolve to a known curated business-domain dimension
+    /// (per <see cref="DimensionCatalog"/>). The dimensionless count alias
+    /// covers cancelling pairs (e.g., `kg × (1/kg)` → `count`).
+    /// </summary>
+    private static bool TryDimensionalProductProof(ProofObligation obligation, SemanticIndex semantics)
+    {
+        if (obligation.Requirement is not DimensionalProductProofRequirement)
+            return false;
+        if (obligation.Site is not TypedBinaryOp binOp)
+            return false;
+
+        if (!TryResolveDimensionVector(binOp.Left, semantics, out var leftVector))
+            return false;
+        if (!TryResolveDimensionVector(binOp.Right, semantics, out var rightVector))
+            return false;
+
+        var productVector = leftVector.Multiply(rightVector);
+        return DimensionCatalog.TryGetAlias(productVector, out _);
+    }
+
+    private static bool TryResolveDimensionVector(TypedExpression expr, SemanticIndex semantics, out DimensionVector vector)
+    {
+        var qualifier = ResolveQualifierFromExpression(expr, QualifierAxis.Unit, semantics)
+                     ?? ResolveQualifierFromExpression(expr, QualifierAxis.Dimension, semantics);
+        if (qualifier is null)
+        {
+            vector = default;
+            return false;
+        }
+
+        var qualifierText = ExtractComparableValue(qualifier);
+        if (string.IsNullOrWhiteSpace(qualifierText))
+        {
+            vector = default;
+            return false;
+        }
+
+        if (string.Equals(qualifierText, "count", StringComparison.OrdinalIgnoreCase))
+        {
+            vector = DimensionVector.None;
+            return true;
+        }
+
+        var parsed = UcumParser.Parse(qualifierText);
+        if (parsed.IsValid && parsed.Unit is not null)
+        {
+            vector = parsed.Unit.Vector;
+            return true;
+        }
+
+        vector = default;
+        return false;
+    }
+
     /// <summary>
     /// Compares two qualifier values across potentially different axes by extracting
     /// their comparable string values.

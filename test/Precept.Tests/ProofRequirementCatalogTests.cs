@@ -41,8 +41,8 @@ public class ProofRequirementCatalogTests
     [Fact]
     public void Total_Count()
     {
-        // IndexBounds = 11 brings the total catalog count to 11.
-        ProofRequirements.All.Should().HaveCount(11);
+        // F-LANG-BIZ-05 adds DimensionalProduct = 12, bringing the catalog to 12.
+        ProofRequirements.All.Should().HaveCount(12);
     }
 
     // ── DU subtype correctness ──────────────────────────────────────────────────
@@ -102,10 +102,12 @@ public class ProofRequirementCatalogTests
     [Fact]
     public void FiveKinds_AreSingleSubject()
     {
-        // IndexBounds brings the single-subject kind total to 9.
+        // DimensionalProduct is dual-subject (left and right operand of the
+        // multiplicative op), so the single-subject group stays at 9.
         var singleSubject = ProofRequirements.All
             .Where(m => m is not ProofRequirementMeta.QualifierCompatibility
-                        and not ProofRequirementMeta.QualifierChain)
+                        and not ProofRequirementMeta.QualifierChain
+                        and not ProofRequirementMeta.DimensionalProduct)
             .ToList();
         singleSubject.Should().HaveCount(9);
     }
@@ -207,12 +209,13 @@ public class ProofRequirementCatalogTests
     [Fact]
     public void SingleSubjectKinds_NowIncludesIntervalContainment()
     {
-        // Single-subject kinds total 9:
+        // Single-subject kinds total 9 (DimensionalProduct is dual-subject):
         // Numeric, Presence, Dimension, Modifier, IntervalContainment, LengthContainment,
         // CountContainment, KeyPresence, IndexBounds.
         var singleSubject = ProofRequirements.All
             .Where(m => m is not ProofRequirementMeta.QualifierCompatibility
-                        and not ProofRequirementMeta.QualifierChain)
+                        and not ProofRequirementMeta.QualifierChain
+                        and not ProofRequirementMeta.DimensionalProduct)
             .ToList();
         singleSubject.Should().HaveCount(9,
             "IndexBounds joins the existing single-subject kinds");

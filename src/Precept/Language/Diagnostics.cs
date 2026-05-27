@@ -1062,6 +1062,21 @@ public static class Diagnostics
             ExampleBefore: "precept Example\nfield A as period default '1 month'\nfield B as period default '30 days'\nstate Open initial\nfield AlwaysFalse as boolean default false <- A == B",
             ExampleAfter: "precept Example\nfield A as duration default '30 days'\nfield B as duration default '30 days'\nstate Open initial\nfield AlwaysTrue as boolean default false <- A == B"),
 
+        DiagnosticCode.IncompatibleDimensionalProduct => new(
+            nameof(DiagnosticCode.IncompatibleDimensionalProduct),
+            DiagnosticStage.Proof, Severity.Error,
+            "'{0}' × '{1}' produces dimension '{2}', which is not in the business-domain dimension set",
+            DiagnosticCategory.TypeSystem,
+            FixHint: "Multiplying these two quantities does not yield a meaningful business value. Adjust the operand types or use a domain-typed compound (e.g., 'quantity in kg/L' for density).",
+            TriggerCondition: "`quantity * quantity` has operand dimensions that compose to a dimension outside the curated business-domain set (length, mass, volume, area, temperature, energy, pressure, force, speed, count).",
+            RecoverySteps: [
+                "Verify the operand quantities are dimensionally what you intend",
+                "If you meant density, multiply mass by a 1/volume — not mass by length",
+                "If the product is dimensionally meaningful in physics but not in business, the operation belongs outside Precept's curated dimensional algebra",
+            ],
+            ExampleBefore: "precept Example\nfield WeightKg as quantity in 'kg'\nfield DistanceM as quantity in 'm'\nfield Density as quantity in 'kg/L' <- WeightKg * DistanceM\nstate Open initial",
+            ExampleAfter: "precept Example\nfield WeightKg as quantity in 'kg' editable\nfield VolumeL as quantity in 'L' editable\nfield Density as quantity in 'kg/L' <- WeightKg / VolumeL\nstate Open initial"),
+
         DiagnosticCode.FieldNeverSet => new(
             nameof(DiagnosticCode.FieldNeverSet),
             DiagnosticStage.Graph, Severity.Warning,

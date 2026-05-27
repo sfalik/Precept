@@ -206,6 +206,7 @@ internal static class DiagnosticCoverageAllowLists
         "MaterializedFieldSelfReference",
         "EditableOnEventArg",
         "FieldNeverSet",
+        "IncompatibleDimensionalProduct",
         "ZeroConstructionRows",
 
         // ── MCP tooling backstop ─────────────────────────────────────────────────
