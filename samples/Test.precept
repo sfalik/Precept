@@ -1,0 +1,17 @@
+precept Test
+
+# Minimal fixture for parser integration tests. The single-line event
+# declaration `event create initial, start, stop, reset` exercises the
+# parser's comma-separated event-entry list with one entry carrying the
+# `initial` modifier — see test/Precept.Tests/Parser/ParserIntegrationTests.cs
+# TestSample_EventDeclaration_BindsInitialToCreateOnly.
+
+event create initial, start, stop, reset
+state Idle initial
+state Running
+state Stopped terminal
+
+from Idle on create -> transition Running
+from Running on start -> no transition
+from Running on stop -> transition Stopped
+from Running on reset -> transition Idle
