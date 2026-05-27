@@ -18,13 +18,14 @@ field IncidentLocation as string optional maxlength 500
 field ClaimType as choice of string("Property", "Liability", "Auto", "WorkersComp", "Medical")
 
 # Financial amounts — money in 'USD' for exactness.
-# maxplaces 2 opts into ISO 4217 minor-unit precision enforcement (USD = 2 decimal places).
+# maxplaces currency.minorUnit derives the decimal-place count from the field's
+# own currency qualifier; for USD that resolves to 2 (ISO 4217 minor-unit count).
 # Omit maxplaces on intermediate or ratio fields where higher precision is intentional.
-field LossAmount as money in 'USD' maxplaces 2 positive
-field Deductible as money in 'USD' maxplaces 2 nonnegative
-field Reserves as money in 'USD' maxplaces 2 default '0.00 USD' nonnegative
-field PaymentAmount as money in 'USD' maxplaces 2 default '0.00 USD' nonnegative
-field SubrogationRecovery as money in 'USD' maxplaces 2 default '0.00 USD' nonnegative
+field LossAmount as money in 'USD' maxplaces currency.minorUnit positive
+field Deductible as money in 'USD' maxplaces currency.minorUnit nonnegative
+field Reserves as money in 'USD' maxplaces currency.minorUnit default '0.00 USD' nonnegative
+field PaymentAmount as money in 'USD' maxplaces currency.minorUnit default '0.00 USD' nonnegative
+field SubrogationRecovery as money in 'USD' maxplaces currency.minorUnit default '0.00 USD' nonnegative
 
 # Coverage details — per-coverage limits keyed by coverage code.
 # Note: lookup values use decimal because lookup of money in 'X' is not

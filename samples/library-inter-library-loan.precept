@@ -200,11 +200,9 @@ from Draft on AddCandidateSource
     -> append LoanLog AddCandidateSource.LibraryCode
     -> no transition
 
-# BUG-002 workaround: zero the lookup entry rather than `remove`; the set is
-# the membership source of truth.
 from Draft on RemoveCandidateSource when CandidateSourceLibraries contains RemoveCandidateSource.LibraryCode
     -> set CandidateCount = CandidateCount - 1
-    -> put SourceLibraryNotes RemoveCandidateSource.LibraryCode = ""
+    -> remove SourceLibraryNotes RemoveCandidateSource.LibraryCode
     -> remove CandidateSourceLibraries RemoveCandidateSource.LibraryCode
     -> append LoanLog RemoveCandidateSource.LibraryCode
     -> no transition

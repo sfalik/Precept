@@ -83,7 +83,7 @@ public sealed record TypedFunctionCall(
 /// (ordered bit, etc.) when the accessor returns the element type of an ordered-choice
 /// collection — needed so accessor chains, list-literal accessors, and conditional
 /// receivers can discharge ordered-choice proof requirements without walking back
-/// through arbitrary expression trees (see F-LANG-COLL-03 design D-3 Option A).
+/// through arbitrary expression trees.
 /// <see cref="Arguments"/> preserves resolved method-call arguments (empty for bare
 /// member access). Required so proof obligations on parameterized accessors
 /// (e.g., <c>.at(N)</c> index bounds) can resolve their <c>ParamSubject</c> via

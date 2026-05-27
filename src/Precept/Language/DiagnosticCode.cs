@@ -323,7 +323,7 @@ public enum DiagnosticCode
     /// statically-known currency qualifier on the field. The field's currency
     /// must be a literal (`in 'USD'`), not an interpolated/dynamic value, so
     /// the type checker can resolve the minor-unit count from the catalog at
-    /// compile time. F-LANG-BIZ-10 (Phase 4 W-H).
+    /// compile time.
     /// </summary>
     MaxplacesCurrencyQualifierNotStatic = 152,
 }

@@ -539,12 +539,12 @@ public static partial class Parser
                     ParsedExpression? valueExpr = null;
 
                     // Valued modifiers parse an expression for their value.
-                    // Special case: `maxplaces currency.<member>` (F-LANG-BIZ-10) —
-                    // `currency` is a reserved type keyword that's not in
-                    // ExpressionStartTokens, but the modifier-value position is
-                    // exactly where the contextual-identifier pattern applies. Recognize
-                    // it here as a MemberAccessExpression with a synthetic
-                    // IdentifierExpression("currency") receiver.
+                    // Special case: `maxplaces currency.<member>` — `currency` is a
+                    // reserved type keyword that's not in ExpressionStartTokens, but
+                    // the modifier-value position is exactly where the contextual-
+                    // identifier pattern applies. Recognize it here as a
+                    // MemberAccessExpression with a synthetic IdentifierExpression("currency")
+                    // receiver.
                     if (modMeta.HasValue)
                     {
                         if (Peek().Kind == TokenKind.CurrencyType

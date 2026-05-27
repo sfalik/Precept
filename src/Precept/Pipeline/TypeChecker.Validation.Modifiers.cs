@@ -632,7 +632,7 @@ internal static partial class TypeChecker
                 {
                     // maxplaces accepts: (a) a non-negative integer literal, OR
                     // (b) a contextual `currency.minorUnit` accessor when the field
-                    //     carries a static currency qualifier (F-LANG-BIZ-10).
+                    //     carries a static currency qualifier.
                     if (modifier.Value is LiteralExpression lit && lit.LiteralKind == TokenKind.NumberLiteral)
                     {
                         if (lit.Text.Contains('.') ||
@@ -706,10 +706,10 @@ internal static partial class TypeChecker
 
     /// <summary>
     /// Recognizes the contextual `<receiver>.<member>` shape used in modifier-value
-    /// position (F-LANG-BIZ-10). For `currency.minorUnit`, returns true with
+    /// position. For `currency.minorUnit`, returns true with
     /// <paramref name="accessorName"/> = "minorUnit". Receiver must be a bare
     /// identifier "currency"; the broader `UseInModifierValueContext` whitelist
-    /// (Decision 5) is enforced by <see cref="ValidateMaxplacesCurrencyAccessor"/>.
+    /// on <see cref="FixedReturnAccessor"/> gates which member names are accepted.
     /// </summary>
     private static bool TryRecognizeContextualCurrencyAccessor(ParsedExpression? value, out string accessorName)
     {
@@ -723,7 +723,7 @@ internal static partial class TypeChecker
     }
 
     /// <summary>
-    /// Validates the contextual `maxplaces currency.&lt;accessor&gt;` form per F-LANG-BIZ-10:
+    /// Validates the contextual `maxplaces currency.&lt;accessor&gt;` form:
     /// (a) field must carry a currency qualifier (DeclaredQualifierMeta.Currency);
     /// (b) qualifier must be a static literal — not interpolated from another field;
     /// (c) accessor must be on the modifier-value-context whitelist (via the catalog's
@@ -781,7 +781,7 @@ internal static partial class TypeChecker
 
     /// <summary>
     /// Resolves a `maxplaces` modifier value to its integer count, accepting both the
-    /// literal-integer form and the contextual `currency.minorUnit` form (F-LANG-BIZ-10).
+    /// literal-integer form and the contextual `currency.minorUnit` form.
     /// Returns false if the value shape isn't recognized or the contextual form's
     /// currency qualifier can't be resolved. Callers should already have called
     /// <see cref="ValidateModifierValues"/> to surface diagnostics; this helper is the

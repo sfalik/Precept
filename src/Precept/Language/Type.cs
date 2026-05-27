@@ -118,9 +118,9 @@ public record TypeAccessor(
 /// the accessor returns the qualifier value on the named axis. <see cref="ReturnNonnegative"/>
 /// marks accessors whose numeric result is structurally guaranteed to be ≥ 0.
 /// <see cref="UseInModifierValueContext"/> opts the accessor into the contextual
-/// recognition surface in modifier-value position (F-LANG-BIZ-10 / `currency.minorUnit`);
-/// when false (the default), the accessor is invalid in modifier-value position
-/// even if its return type matches the modifier's value contract.
+/// recognition surface in modifier-value position (e.g., `currency.minorUnit` in
+/// `maxplaces`); when false (the default), the accessor is invalid in modifier-value
+/// position even if its return type matches the modifier's value contract.
 /// </summary>
 public sealed record FixedReturnAccessor(
     string        Name,

@@ -123,16 +123,11 @@ from Draft on AddCourse
     -> append RegistrationLog AddCourse.CourseNumber
     -> no transition
 
-# Drop a course: drop membership from the set and zero the lookup entry.
-# BUG-002: `remove CourseCredits Key` does not type-check (the type checker expects
-# the lookup's value type, not the key type), so we zero-out the lookup entry via
-# `put CourseCredits Key = 0` instead. CourseNumbers is the source of truth for
-# membership; the orphan zero-valued lookup entry is harmless because every
-# CourseCredits access flows through a `CourseNumbers contains` guard.
+# Drop a course: remove the lookup entry and the set membership.
 from Draft on DropCourse when CourseNumbers contains DropCourse.CourseNumber
     -> set TotalCreditHours = TotalCreditHours - (CourseCredits for DropCourse.CourseNumber)
     -> set CourseCount = CourseCount - 1
-    -> put CourseCredits DropCourse.CourseNumber = 0
+    -> remove CourseCredits DropCourse.CourseNumber
     -> remove CourseNumbers DropCourse.CourseNumber
     -> append RegistrationLog DropCourse.CourseNumber
     -> no transition
