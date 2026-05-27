@@ -37,4 +37,30 @@ public class Track2PhaseAModifierCatalogTests
     [InlineData(ModifierKind.Maxcount, ModifierKind.Mincount)]
     public void BoundCounterpart_MatchesExpectedPair(ModifierKind kind, ModifierKind counterpart)
         => ValueModifierTestAccess.GetMeta(kind).BoundCounterpart.Should().Be(counterpart);
+
+    [Fact]
+    public void WriteAccess_ApplicableAtFieldDeclarationAndStateAccessRow()
+    {
+        // F-LANG-GRAPH-04 Decision 5: the unified `editable` keyword (ModifierKind.Write)
+        // must be applicable at BOTH the field-declaration site and per-state modify rows.
+        var meta = (AccessModifierMeta)Modifiers.GetMeta(ModifierKind.Write);
+        meta.ApplicableDeclarationSites.Should().HaveFlag(AccessModifierDeclarationSite.FieldDeclaration);
+        meta.ApplicableDeclarationSites.Should().HaveFlag(AccessModifierDeclarationSite.StateAccessRow);
+    }
+
+    [Fact]
+    public void ReadAccess_ApplicableAtStateAccessRowOnly()
+    {
+        // F-LANG-GRAPH-04 Decision 5: readonly remains a per-state declaration
+        // (field-level read-only is expressed by *omitting* `editable`, not by writing `readonly`).
+        var meta = (AccessModifierMeta)Modifiers.GetMeta(ModifierKind.Read);
+        meta.ApplicableDeclarationSites.Should().Be(AccessModifierDeclarationSite.StateAccessRow);
+    }
+
+    [Fact]
+    public void OmitAccess_ApplicableAtStateAccessRowOnly()
+    {
+        var meta = (AccessModifierMeta)Modifiers.GetMeta(ModifierKind.Omit);
+        meta.ApplicableDeclarationSites.Should().Be(AccessModifierDeclarationSite.StateAccessRow);
+    }
 }

@@ -295,8 +295,10 @@ public static class Modifiers
         // ── Access modifiers ────────────────────────────────────────────────────
         ModifierKind.Write => new AccessModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Editable),
-            "Field is present and writable",
+            "Field is present and writable — accepted at field declaration AND per-state modify rows",
             ModifierCategory.Structural, IsPresent: true, IsWritable: true,
+            ApplicableDeclarationSites: AccessModifierDeclarationSite.FieldDeclaration
+                                     | AccessModifierDeclarationSite.StateAccessRow,
             MutuallyExclusiveWith: [ModifierKind.Read, ModifierKind.Omit]),
 
         ModifierKind.Read => new AccessModifierMeta(

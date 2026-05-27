@@ -60,6 +60,22 @@ public enum ValueModifierDeclarationSite
     EventArgDeclaration = 1 << 1,
 }
 
+/// <summary>
+/// Declaration sites where an access modifier may appear. Mirrors
+/// <see cref="ValueModifierDeclarationSite"/> for the access-modifier domain.
+/// The <c>FieldDeclaration</c> site exists so the unified <c>editable</c>
+/// keyword (<see cref="ModifierKind.Write"/>) can stand in for the retired
+/// <c>writable</c> value modifier; <c>StateAccessRow</c> is the per-state
+/// <c>in &lt;State&gt; modify &lt;Field&gt; editable</c> position.
+/// </summary>
+[global::System.Flags]
+public enum AccessModifierDeclarationSite
+{
+    None             = 0,
+    FieldDeclaration = 1 << 0,
+    StateAccessRow   = 1 << 1,
+}
+
 // ════════════════════════════════════════════════════════════════════════════════
 //  TypeTarget — shared supporting type for applicability declarations
 // ════════════════════════════════════════════════════════════════════════════════
@@ -177,6 +193,8 @@ public sealed record AccessModifierMeta(
     ModifierCategory Category,
     bool IsPresent = true,
     bool IsWritable = true,
+    AccessModifierDeclarationSite ApplicableDeclarationSites =
+        AccessModifierDeclarationSite.StateAccessRow,
     bool DesugarsToRule = false,
     ModifierKind[]? MutuallyExclusiveWith = null)
     : ModifierMeta(Kind, Token, Description, Category, DesugarsToRule, MutuallyExclusiveWith);

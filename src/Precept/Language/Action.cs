@@ -14,6 +14,7 @@ public sealed record ActionMeta(
     string       Description,
     TypeTarget[] ApplicableTo,
     ActionSyntaxShape SyntaxShape,
+    ActionWriteSemantics WriteSemantics,
     bool         ValueRequired = false,
     ProofRequirement[]? ProofRequirements = null,
     ConstructKind[]?    AllowedIn         = null,
