@@ -302,7 +302,7 @@ public abstract record ProofRequirementMeta(
     public sealed record IndexBounds()
         : ProofRequirementMeta(ProofRequirementKind.IndexBounds,
             "Index bounds — parameter (index N) must satisfy 0 <= N < F.count (or <= F.count for inserts)",
-            Language.DiagnosticCode.UnguardedCollectionAccess);
+            Language.DiagnosticCode.IndexBoundsGuard);
 }
 
 // ProofSatisfaction DU — positive carrier fact that can satisfy a ProofRequirement

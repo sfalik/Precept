@@ -313,6 +313,267 @@ public static partial class ProofEngine
     // ── Strategy 3: Guard-in-Path Proof ───────────────────────────────────────
 
     /// <summary>
+    /// Discharges an <see cref="IndexBoundsProofRequirement"/> by walking the
+    /// row/handler/hook guard branches for both lower-bound (<c>N &gt;= 0</c>) and
+    /// upper-bound (<c>N &lt; F.count</c> or <c>N &lt;= F.count</c> per
+    /// <see cref="IndexBoundsMode"/>) facts. Each disjunctive branch must
+    /// independently establish both bounds.
+    /// </summary>
+    private static bool TryIndexBoundsProof(
+        IndexBoundsProofRequirement req,
+        ProofObligation obligation,
+        SemanticIndex semantics)
+    {
+        // Two site shapes:
+        //  (a) Accessor case (.at(N)): Site = TypedMemberAccess; receiver field = Site.Object;
+        //      index expression = ResolveSubject(ParamSubject(IndexParam), Site) = Site.Arguments[0].
+        //  (b) Action case (Insert/RemoveAt): Site = TypedFieldRef (receiver field); the index
+        //      expression is captured from the parent action via the obligation's Context.
+        TypedExpression? indexExpr;
+        string? receiverField;
+        if (obligation.Site is TypedMemberAccess accessSite)
+        {
+            indexExpr = ResolveSubject(req.Subject, accessSite);
+            receiverField = (accessSite.Object as TypedFieldRef)?.FieldName;
+        }
+        else if (obligation.Site is TypedFieldRef fieldSite)
+        {
+            receiverField = fieldSite.FieldName;
+            indexExpr = FindActionIndexInContext(obligation.Context, fieldSite.FieldName);
+        }
+        else
+        {
+            return false;
+        }
+        if (indexExpr is null || receiverField is null) return false;
+
+        var guard = obligation.Context switch
+        {
+            TransitionRowContext t => t.Row.Guard,
+            StateHookContext s => s.Hook.Guard,
+            EventHandlerContext h => h.Handler.Guard,
+            _ => null,
+        };
+
+        // Type-derived lower bound: if the index expression resolves to a field/arg
+        // declared `nonnegative`, the lower bound discharges silently. Otherwise the
+        // discharge requires an explicit `N >= 0` guard constraint.
+        bool lowerBoundTypeDerived = IsTypeDerivedNonnegative(indexExpr, semantics);
+
+        // No guard at all → discharge only when both bounds are type-derived.
+        if (guard is null)
+            return lowerBoundTypeDerived && false;  // upper bound is never type-derived
+
+        var branches = ExtractGuardBranches(guard);
+        if (branches.Length == 0) return false;
+
+        foreach (var numericBranch in branches)
+        {
+            bool lowerBoundOk = lowerBoundTypeDerived
+                || BranchEstablishesLowerBound(numericBranch, indexExpr);
+            if (!lowerBoundOk) return false;
+        }
+
+        // Upper bound walk (separate from lower-bound branches because the
+        // upper-bound constraint shape isn't representable as a GuardConstraint).
+        var upperBounds = ExtractParamUpperBoundsByBranch(guard);
+        if (upperBounds.Length != branches.Length)
+        {
+            // Shouldn't happen — both walkers use the same branching structure.
+            // Conservative reject.
+            return false;
+        }
+
+        for (int i = 0; i < upperBounds.Length; i++)
+        {
+            if (!BranchEstablishesUpperBound(upperBounds[i], indexExpr, receiverField, req.Mode, req.UpperBoundAccessor.Name))
+                return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Walks the obligation's parent context (a TransitionRow / EventHandler / StateHook)
+    /// looking for an Insert or RemoveAt action targeting <paramref name="fieldName"/>;
+    /// returns the action's index TypedExpression (Insert's SecondaryExpression,
+    /// RemoveAt's InputExpression). Used by the action-site arm of
+    /// <see cref="TryIndexBoundsProof"/>.
+    /// </summary>
+    private static TypedExpression? FindActionIndexInContext(ObligationContext context, string fieldName)
+    {
+        var actions = context switch
+        {
+            TransitionRowContext t => (t.Row is TypedTransitionRowSuccess s) ? s.Actions : default,
+            StateHookContext s => s.Hook.Actions,
+            EventHandlerContext h => (h.Handler is TypedEventRowSuccess es) ? es.Actions : default,
+            _ => default,
+        };
+        if (actions.IsDefaultOrEmpty) return null;
+
+        foreach (var action in actions)
+        {
+            if (action.FieldName != fieldName) continue;
+            if (action is not TypedInputAction input) continue;
+            // Insert's index is SecondaryExpression with SecondaryRole = Index;
+            // RemoveAt's index is InputExpression (no secondary).
+            if (action.Kind == ActionKind.Insert && input.SecondaryRole == ActionSecondaryRole.Index)
+                return input.SecondaryExpression;
+            if (action.Kind == ActionKind.RemoveAt)
+                return input.InputExpression;
+        }
+        return null;
+    }
+
+    private static bool IsTypeDerivedNonnegative(TypedExpression expr, SemanticIndex semantics)
+    {
+        if (expr is TypedFieldRef fr
+            && semantics.FieldsByName.TryGetValue(fr.FieldName, out var field))
+        {
+            return field.Modifiers.Contains(ModifierKind.Nonnegative)
+                || field.ImpliedModifiers.Contains(ModifierKind.Nonnegative);
+        }
+
+        if (expr is TypedArgRef ar
+            && semantics.EventsByName.TryGetValue(ar.EventName, out var evt))
+        {
+            var arg = evt.Args.FirstOrDefault(a => a.Name == ar.ArgName);
+            if (arg is not null)
+                return arg.Modifiers.Contains(ModifierKind.Nonnegative);
+        }
+
+        return false;
+    }
+
+    private static bool BranchEstablishesLowerBound(
+        ImmutableArray<GuardConstraint> branch, TypedExpression indexExpr)
+    {
+        var indexName = indexExpr switch
+        {
+            TypedFieldRef fr => fr.FieldName,
+            TypedArgRef ar => ar.ArgName,
+            TypedMemberAccess { Object: TypedFieldRef ofr } => ofr.FieldName,
+            TypedMemberAccess { Object: TypedArgRef oar } => oar.ArgName,
+            _ => null,
+        };
+        if (indexName is null) return false;
+
+        foreach (var c in branch)
+        {
+            if (c.Field == indexName && c.Value is { } v && v >= 0
+                && c.Comparison is OperatorKind.GreaterThanOrEqual or OperatorKind.GreaterThan)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static ImmutableArray<ImmutableArray<ParamUpperBoundConstraint>> ExtractParamUpperBoundsByBranch(
+        TypedExpression guard)
+    {
+        var branches = ExtractParamUpperBoundsByBranchCore(guard);
+        return branches.IsEmpty
+            ? ImmutableArray.Create(ImmutableArray<ParamUpperBoundConstraint>.Empty)
+            : branches;
+    }
+
+    private static ImmutableArray<ImmutableArray<ParamUpperBoundConstraint>> ExtractParamUpperBoundsByBranchCore(
+        TypedExpression expr)
+    {
+        if (expr is TypedBinaryOp bin)
+        {
+            var op = Operations.GetMeta(bin.ResolvedOp).Op;
+
+            if (op == OperatorKind.Or)
+            {
+                var left = ExtractParamUpperBoundsByBranchCore(bin.Left);
+                var right = ExtractParamUpperBoundsByBranchCore(bin.Right);
+                return left.AddRange(right);
+            }
+
+            if (op == OperatorKind.And)
+            {
+                var left = ExtractParamUpperBoundsByBranchCore(bin.Left);
+                var right = ExtractParamUpperBoundsByBranchCore(bin.Right);
+                if (left.IsEmpty) return right;
+                if (right.IsEmpty) return left;
+                var cross = ImmutableArray.CreateBuilder<ImmutableArray<ParamUpperBoundConstraint>>(left.Length * right.Length);
+                foreach (var lb in left)
+                    foreach (var rb in right)
+                        cross.Add(lb.AddRange(rb));
+                return cross.ToImmutable();
+            }
+        }
+
+        var leaf = ImmutableArray.CreateBuilder<ParamUpperBoundConstraint>();
+        ExtractParamUpperBoundLeaf(expr, leaf);
+        return ImmutableArray.Create(leaf.ToImmutable());
+    }
+
+    private static void ExtractParamUpperBoundLeaf(
+        TypedExpression expr, ImmutableArray<ParamUpperBoundConstraint>.Builder builder)
+    {
+        if (expr is not TypedBinaryOp bin) return;
+        var op = Operations.GetMeta(bin.ResolvedOp).Op;
+        if (op is not (OperatorKind.LessThan or OperatorKind.LessThanOrEqual
+            or OperatorKind.GreaterThan or OperatorKind.GreaterThanOrEqual))
+            return;
+
+        // <index_expr> <op> <field>.<accessor>
+        if (bin.Right is TypedMemberAccess { Object: TypedFieldRef rf, ResolvedAccessor: var ra })
+        {
+            builder.Add(new ParamUpperBoundConstraint(bin.Left, op, rf.FieldName, ra.Name));
+            return;
+        }
+        // <field>.<accessor> <op> <index_expr>  →  invert
+        if (bin.Left is TypedMemberAccess { Object: TypedFieldRef lf, ResolvedAccessor: var la })
+        {
+            builder.Add(new ParamUpperBoundConstraint(bin.Right, InvertOp(op), lf.FieldName, la.Name));
+        }
+    }
+
+    private static bool BranchEstablishesUpperBound(
+        ImmutableArray<ParamUpperBoundConstraint> branch,
+        TypedExpression indexExpr,
+        string receiverField,
+        IndexBoundsMode mode,
+        string upperBoundAccessor)
+    {
+        foreach (var c in branch)
+        {
+            if (c.CollectionField != receiverField) continue;
+            if (c.AccessorName != upperBoundAccessor) continue;
+            if (!TypedExpressionShapeEqual(c.IndexExpression, indexExpr)) continue;
+
+            var ok = mode switch
+            {
+                IndexBoundsMode.StrictlyBefore => c.Comparison == OperatorKind.LessThan,
+                IndexBoundsMode.AtOrBefore => c.Comparison is OperatorKind.LessThan or OperatorKind.LessThanOrEqual,
+                _ => false,
+            };
+            if (ok) return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Structural equality on TypedExpression shapes — ignores Span (which differs
+    /// between the guard occurrence and the obligation-site occurrence even when
+    /// the expressions are semantically the same identifier reference).
+    /// </summary>
+    private static bool TypedExpressionShapeEqual(TypedExpression a, TypedExpression b) => (a, b) switch
+    {
+        (TypedFieldRef af, TypedFieldRef bf) => af.FieldName == bf.FieldName,
+        (TypedArgRef ar, TypedArgRef br) => ar.EventName == br.EventName && ar.ArgName == br.ArgName,
+        (TypedMemberAccess ama, TypedMemberAccess bma) =>
+            ama.ResolvedAccessor.Name == bma.ResolvedAccessor.Name
+            && TypedExpressionShapeEqual(ama.Object, bma.Object),
+        (TypedLiteral al, TypedLiteral bl) => Equals(al.Value, bl.Value) && al.ResultType == bl.ResultType,
+        _ => false,
+    };
+
+    /// <summary>
     /// Discharges a <see cref="KeyPresenceProofRequirement"/> by matching the row/handler
     /// guard against a <c>F contains X</c> (or <c>not (F contains X)</c> when
     /// <c>RequireAbsence</c>) check. The field name is recovered from the obligation
@@ -493,6 +754,21 @@ public static partial class ProofEngine
                     var litValue = ToDecimal(maLit.Value);
                     if (litValue is not null)
                         builder.Add(new GuardConstraint(maField.FieldName, compOp, litValue, false));
+                }
+                // arg op literal — events expose args as TypedArgRef. Used by IndexBounds
+                // lower-bound discharge (`when Pick.Index >= 0`).
+                else if (bin.Left is TypedArgRef leftArg && bin.Right is TypedLiteral rightArgLit)
+                {
+                    var litValue = ToDecimal(rightArgLit.Value);
+                    if (litValue is not null)
+                        builder.Add(new GuardConstraint(leftArg.ArgName, compOp, litValue, false));
+                }
+                // literal op arg → invert
+                else if (bin.Left is TypedLiteral leftArgLit && bin.Right is TypedArgRef rightArg)
+                {
+                    var litValue = ToDecimal(leftArgLit.Value);
+                    if (litValue is not null)
+                        builder.Add(new GuardConstraint(rightArg.ArgName, InvertOp(compOp), litValue, false));
                 }
                 break;
             }

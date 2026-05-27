@@ -84,7 +84,10 @@ public class TypeCheckerCollectionSafetyTests
             field First as string optional <- Steps.at(0)
             """);
 
-        compilation.Diagnostics.Should().ContainSingle(
+        // Per Phase 4 W-E (F-LANG-COLL-04), .at(0) emits two PRE0100s — one for
+        // the non-empty obligation, one for the index bounds obligation. Both use
+        // the IndexBoundsGuard code.
+        compilation.Diagnostics.Should().Contain(
             d => d.Code == nameof(DiagnosticCode.IndexBoundsGuard),
             because: ".at() index access without bounds proof should emit PRE0100");
     }

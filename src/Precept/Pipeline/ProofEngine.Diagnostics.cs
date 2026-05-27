@@ -121,10 +121,31 @@ public static partial class ProofEngine
 
             case IndexBoundsProofRequirement indexReq:
             {
-                var fieldName = obligation.Site is TypedFieldRef fr2 ? fr2.FieldName : "?";
-                return Diagnostics.Create(DiagnosticCode.UnguardedCollectionAccess, obligation.Site.Span,
-                    fieldName,
-                    contextClause);
+                // Two site shapes — accessor (.at(N)) and action (Insert/RemoveAt).
+                // For accessors, the field is access.Object; for actions, Site is the
+                // field directly. The index expression is the resolved subject (accessor)
+                // or recovered from the action context.
+                string fieldName;
+                string indexLabel;
+                if (obligation.Site is TypedMemberAccess access)
+                {
+                    fieldName = DescribeExpression(access.Object);
+                    indexLabel = access.Arguments.IsDefaultOrEmpty
+                        ? "<index>"
+                        : DescribeExpression(access.Arguments[0]);
+                }
+                else if (obligation.Site is TypedFieldRef fr2)
+                {
+                    fieldName = fr2.FieldName;
+                    indexLabel = "<index>";
+                }
+                else
+                {
+                    fieldName = "?";
+                    indexLabel = "<index>";
+                }
+                return Diagnostics.Create(DiagnosticCode.IndexBoundsGuard, obligation.Site.Span,
+                    fieldName, indexLabel);
             }
         }
 

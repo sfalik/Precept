@@ -83,8 +83,12 @@ public sealed class Track2PhaseAToolchainRegressionTests
             field ThirdStep as string optional <- Steps.at(2)
             """);
 
-        compilation.Diagnostics.Should().ContainSingle(d => d.Code == nameof(DiagnosticCode.IndexBoundsGuard),
-            because: "index access without a bounds proof should use the index-bounds diagnostic (PRE0100)");
+        // Per Phase 4 W-E (F-LANG-COLL-04), .at(N) emits up to two PRE0100s:
+        // one for the non-empty (count > 0) obligation, one for the index bounds
+        // obligation. Both surface as IndexBoundsGuard since the diagnostic is
+        // unified for .at(N) sites.
+        compilation.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.IndexBoundsGuard),
+            because: "index access without a bounds proof emits the index-bounds diagnostic (PRE0100)");
         compilation.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.DivisionByZero),
             because: "Steps.at(2) is collection access, not arithmetic division (PRE0083)");
         compilation.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.ExpectedToken),

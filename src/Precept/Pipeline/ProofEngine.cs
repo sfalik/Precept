@@ -41,6 +41,20 @@ public static partial class ProofEngine
         OperatorKind Comparison,
         string RightField);
 
+    /// <summary>
+    /// Guard constraint of shape <c>&lt;paramExpr&gt; &lt;op&gt; &lt;collectionField&gt;.&lt;accessor&gt;</c>
+    /// — used by <see cref="IndexBoundsProofRequirement"/> discharge to match
+    /// author-written `when N &lt; F.count` guards. <see cref="IndexExpression"/>
+    /// is the TypedExpression that resolves to the parameter (arg-ref, field-ref,
+    /// member-access, or literal). The discharge strategy walks for a matching
+    /// shape relative to the obligation's resolved index expression.
+    /// </summary>
+    private record ParamUpperBoundConstraint(
+        TypedExpression IndexExpression,
+        OperatorKind Comparison,
+        string CollectionField,
+        string AccessorName);
+
     [Flags]
     private enum NumericSignSet
     {
@@ -430,6 +444,7 @@ public static partial class ProofEngine
                 TypedBinaryOp bin => ResolveParamInBinaryOp(param.Parameter, bin),
                 TypedFunctionCall call => ResolveParamInFunctionCall(param.Parameter, call),
                 TypedMemberAccess access => ResolveParamInMemberAccess(param.Parameter, access),
+                TypedFieldRef fieldRef => ResolveParamInActionOnField(param.Parameter, fieldRef),
                 _ => null
             },
             SelfSubject self => site switch
@@ -473,7 +488,34 @@ public static partial class ProofEngine
 
     private static TypedExpression? ResolveParamInMemberAccess(ParameterMeta param, TypedMemberAccess access)
     {
-        // Member access proof requirements use SelfSubject, not ParamSubject
+        // Match the ParameterMeta against the accessor's declared parameter list.
+        // Used by IndexBoundsProofRequirement on `.at(N)` and similar parameterized
+        // accessors. Bare (zero-parameter) accessors leave Parameters empty.
+        var parameters = access.ResolvedAccessor.Parameters;
+        if (parameters.Length == 0 || access.Arguments.IsDefaultOrEmpty) return null;
+        for (int i = 0; i < parameters.Length; i++)
+        {
+            if (ReferenceEquals(param, parameters[i]))
+                return i < access.Arguments.Length ? access.Arguments[i] : null;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Resolves a ParamSubject against an action's catalog-declared parameter list.
+    /// Action obligations carry the receiver field as their Site (via
+    /// <see cref="CreateActionProofSite"/>); the action's parameters (index, value,
+    /// key) come from the catalog-declared <see cref="ActionMeta.Parameters"/>,
+    /// mapped to the action's syntax-shape slots via <see cref="MapActionParamToExpression"/>.
+    /// </summary>
+    private static TypedExpression? ResolveParamInActionOnField(ParameterMeta param, TypedFieldRef site)
+    {
+        // The proof engine doesn't carry the original TypedAction on the obligation site,
+        // but the obligation's Context (TransitionRowContext / EventHandlerContext)
+        // holds the parent row. Walk the row's actions, find the one targeting this
+        // field, then map the ParameterMeta to its argument position.
+        // For now this is a no-op stub — the actual mapping is wired in
+        // BindActionParameterToObligation via the WalkActions site construction.
         return null;
     }
 
@@ -621,6 +663,15 @@ public static partial class ProofEngine
         if (obligation.Requirement is KeyPresenceProofRequirement keyReq)
         {
             if (TryKeyPresenceProof(keyReq, obligation, semantics))
+                return (ProofDisposition.Proved, ProofStrategy.GuardInPath);
+        }
+
+        // Index bounds: parameterised-index access/mutation (.at(N), insert at N,
+        // remove at N) requires `0 <= N < F.count` (or `<= F.count` for inserts).
+        // Discharged via guard branches that establish both lower and upper bounds.
+        if (obligation.Requirement is IndexBoundsProofRequirement indexReq)
+        {
+            if (TryIndexBoundsProof(indexReq, obligation, semantics))
                 return (ProofDisposition.Proved, ProofStrategy.GuardInPath);
         }
 

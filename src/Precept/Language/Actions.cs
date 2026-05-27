@@ -164,9 +164,11 @@ public static class Actions
             ActionSyntaxShape.InsertAt, ValueRequired: true,
             ProofRequirements:
             [
-                new NumericProofRequirement(new SelfSubject(Types.CollectionCountAccessor), OperatorKind.GreaterThanOrEqual, 0m,
-                    "Index must be within bounds (0 to count)"),
+                new IndexBoundsProofRequirement(new ParamSubject(Types.PCollectionIndex),
+                    IndexBoundsMode.AtOrBefore, Types.CollectionCountAccessor,
+                    "Insert index must be within bounds [0, count]"),
             ],
+            Parameters: [Types.PCollectionIndex],
             AllowedIn: AllActionContexts,
             HoverDescription: "Inserts an element at a zero-based index in a list field. Requires an index-bounds guard.",
             SnippetTemplate: "insert ${1:Field} ${2:value} at ${3:index}"),
@@ -179,8 +181,12 @@ public static class Actions
             ProofRequirements:
             [
                 new NumericProofRequirement(new SelfSubject(Types.CollectionCountAccessor), OperatorKind.GreaterThan, 0m,
-                    "Index must be within bounds"),
+                    "List must be non-empty"),
+                new IndexBoundsProofRequirement(new ParamSubject(Types.PCollectionIndex),
+                    IndexBoundsMode.StrictlyBefore, Types.CollectionCountAccessor,
+                    "Remove index must be within bounds [0, count)"),
             ],
+            Parameters: [Types.PCollectionIndex],
             AllowedIn: AllActionContexts,
             PrimaryActionKind: ActionKind.Remove,
             HoverDescription: "Removes the element at a zero-based index from a list field. Requires an index-bounds guard."),

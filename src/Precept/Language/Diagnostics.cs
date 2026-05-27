@@ -983,13 +983,13 @@ public static class Diagnostics
         DiagnosticCode.IndexBoundsGuard => new(
             nameof(DiagnosticCode.IndexBoundsGuard),
             DiagnosticStage.Type, Severity.Error,
-            "'{0}' access at index '{1}' is not bounds-checked — add a 'when {0}.count > {1}' guard",
+            "'{0}' access at index '{1}' is not bounds-checked — add `when {1} >= 0 and {1} < {0}.count` to prove the index is in range",
             DiagnosticCategory.Safety,
             PreventsFault: FaultCode.CollectionEmptyOnAccess,
             TriggerCondition: "A collection index-based access is performed without first verifying that the index is within the collection's bounds.",
-            RecoverySteps: ["Add 'when Collection.count > N' before the index-based access"],
-            ExampleBefore: "precept Example\nfield Items as list of string\nfield First as string optional\nstate Draft initial\nstate Done terminal\nevent Peek\nfrom Draft on Peek -> set First = Items.at(0) -> no transition",
-            ExampleAfter: "precept Example\nfield Items as list of string\nfield First as string optional\nstate Draft initial\nstate Done terminal\nevent Peek\nfrom Draft on Peek when Items.count > 0 -> set First = Items.at(0) -> no transition\nfrom Draft on Peek -> no transition"),
+            RecoverySteps: ["Add 'when N >= 0 and N < Collection.count' (or declare N as `integer nonnegative` plus 'when N < Collection.count')"],
+            ExampleBefore: "precept Example\nfield Items as list of string\nfield First as string optional\nstate Draft initial\nstate Done terminal\nevent Peek(Index as integer)\nfrom Draft on Peek -> set First = Items.at(Peek.Index) -> no transition",
+            ExampleAfter: "precept Example\nfield Items as list of string\nfield First as string optional\nstate Draft initial\nstate Done terminal\nevent Peek(Index as integer)\nfrom Draft on Peek when Peek.Index >= 0 and Peek.Index < Items.count -> set First = Items.at(Peek.Index) -> no transition\nfrom Draft on Peek -> no transition"),
 
         DiagnosticCode.KeyUniquenessGuard => new(
             nameof(DiagnosticCode.KeyUniquenessGuard),

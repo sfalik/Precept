@@ -84,17 +84,32 @@ public sealed record QualifierShape(
 /// <summary>
 /// A member accessor on a type. Base record = inner-type return (e.g., collection
 /// <c>.peek</c>, <c>.min</c>, <c>.max</c> return the collection's element type).
+/// <see cref="Parameters"/> exposes the accessor's call parameters as <see cref="ParameterMeta"/>
+/// instances so proof obligations can reference them via <see cref="ParamSubject"/> —
+/// e.g., <c>.at(N)</c> binds <c>IndexBoundsProofRequirement(ParamSubject(IndexParam))</c>
+/// to the actual index expression at discharge time. Plural shape symmetric with
+/// <c>ActionMeta.Parameters</c>; chosen now to avoid migration when the first
+/// multi-arg accessor (<c>.range(start, end)</c>, etc.) lands.
 /// </summary>
 public record TypeAccessor(
     string    Name,
     string    Description,
     TypeKind? ParameterType  = null,
     TypeTrait RequiredTraits = TypeTrait.None,
-    ProofRequirement[]? ProofRequirements = null
+    ProofRequirement[]? ProofRequirements = null,
+    ParameterMeta[]? Parameters = null
 )
 {
     /// <summary>Proof obligations the type checker must verify at call sites.</summary>
     public ProofRequirement[] ProofRequirements { get; } = ProofRequirements ?? [];
+
+    /// <summary>
+    /// Catalog-declared parameters for this accessor (empty for nullary accessors
+    /// like <c>.count</c>, <c>.first</c>). Used by the proof engine's
+    /// <c>ResolveParamInMemberAccess</c> to map <see cref="ParamSubject"/> to a
+    /// concrete <c>TypedMemberAccess.Arguments</c> slot.
+    /// </summary>
+    public ParameterMeta[] Parameters { get; } = Parameters ?? [];
 }
 
 /// <summary>

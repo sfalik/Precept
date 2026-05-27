@@ -50,6 +50,9 @@ public sealed class ActionSecondaryDispatchRegressionTests
     [Fact]
     public void RemoveAt_Form_CompilesCleanly()
     {
+        // Per Phase 4 W-E (F-LANG-COLL-09), remove-at-N requires an explicit
+        // bounds guard `when N >= 0 and N < F.count`. Prior to W-E this passed
+        // with only the non-empty proof from the notempty modifier.
         var compilation = Compiler.Compile("""
             precept RemoveAtRegression
             field Steps as list of string notempty
@@ -57,7 +60,10 @@ public sealed class ActionSecondaryDispatchRegressionTests
             state Done terminal
             event RemoveStep(Index as integer)
             event Finish
-            from Active on RemoveStep -> remove Steps at RemoveStep.Index -> no transition
+            from Active on RemoveStep
+                when RemoveStep.Index >= 0 and RemoveStep.Index < Steps.count
+                -> remove Steps at RemoveStep.Index
+                -> no transition
             from Active on Finish -> transition Done
             """);
 
@@ -68,15 +74,18 @@ public sealed class ActionSecondaryDispatchRegressionTests
     [Fact]
     public void Insert_PlainListField_NoModifiers_CompilesClean()
     {
+        // Per Phase 4 W-E (F-LANG-COLL-09), insert-at-N requires bounds
+        // `when N >= 0 and N <= F.count`. Position is integer-typed here.
         var compilation = Compiler.Compile("""
             precept TaskQueue
             field Steps as list of string
-            field Position as number default 0 nonnegative
+            field Position as integer default 0 nonnegative
             state Active initial
             state Done terminal
-            event Add(NewStep as string, Position as number)
+            event Add(NewStep as string, Position as integer)
             event Finish
             from Active on Add
+                when Add.Position >= 0 and Add.Position <= Steps.count
                 -> insert Steps Add.NewStep at Add.Position
                 -> no transition
             from Active on Finish -> transition Done
@@ -89,15 +98,17 @@ public sealed class ActionSecondaryDispatchRegressionTests
     [Fact]
     public void Insert_WithNotemptyField_CompilesClean()
     {
+        // Same bounds-guard requirement as the plain-list variant.
         var compilation = Compiler.Compile("""
             precept TaskQueue
             field Steps as list of string notempty
-            field Position as number default 0 nonnegative
+            field Position as integer default 0 nonnegative
             state Active initial
             state Done terminal
-            event Add(NewStep as string, Position as number)
+            event Add(NewStep as string, Position as integer)
             event Finish
             from Active on Add
+                when Add.Position >= 0 and Add.Position <= Steps.count
                 -> insert Steps Add.NewStep at Add.Position
                 -> no transition
             from Active on Finish -> transition Done

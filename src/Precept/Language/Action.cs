@@ -21,20 +21,29 @@ public sealed record ActionMeta(
     string?      UsageExample     = null,
     string?      SnippetTemplate  = null,
     ActionKind?  PrimaryActionKind = null,
-    Func<TypedAction, SemanticIndex, ImmutableArray<ProofObligation>>? DynamicObligationGenerator = null)
+    Func<TypedAction, SemanticIndex, ImmutableArray<ProofObligation>>? DynamicObligationGenerator = null,
+    ParameterMeta[]? Parameters = null)
 {
     /// <summary>Proof obligations the type checker must verify at call sites.</summary>
     public ProofRequirement[] ProofRequirements { get; } = ProofRequirements ?? [];
 
     /// <summary>Construct kinds where this action may appear.</summary>
     public ConstructKind[] AllowedIn { get; } = AllowedIn ?? [];
-    
+
     /// <summary>
     /// Optional delegate to generate dynamic proof obligations based on runtime context.
     /// Used for obligations that depend on field properties (e.g., interval containment depends on field bounds).
     /// Returns an empty array if no dynamic obligations apply.
     /// </summary>
     public Func<TypedAction, SemanticIndex, ImmutableArray<ProofObligation>>? DynamicObligationGenerator { get; } = DynamicObligationGenerator;
+
+    /// <summary>
+    /// Catalog-declared parameters for this action, positional with the action's
+    /// syntax-shape slots. Used by the proof engine's <c>ResolveParamInAction</c>
+    /// to map <see cref="ParamSubject"/> to a concrete <c>TypedAction</c> operand.
+    /// Empty for actions whose obligations only reference the receiver (SelfSubject).
+    /// </summary>
+    public ParameterMeta[] Parameters { get; } = Parameters ?? [];
 }
 
 /// <summary>

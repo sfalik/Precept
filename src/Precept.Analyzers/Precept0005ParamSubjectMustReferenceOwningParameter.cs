@@ -97,7 +97,8 @@ public sealed class PRECEPT0005ParamSubjectMustReferenceOwningParameter : Diagno
         while (current != null)
         {
             if (current is IObjectCreationOperation creation &&
-                creation.Type?.Name is "BinaryOperationMeta" or "UnaryOperationMeta" or "FunctionOverload")
+                creation.Type?.Name is "BinaryOperationMeta" or "UnaryOperationMeta" or "FunctionOverload"
+                    or "TypeAccessor" or "ActionMeta")
             {
                 return creation;
             }

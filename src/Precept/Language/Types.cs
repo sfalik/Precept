@@ -150,6 +150,14 @@ public static class Types
     internal static readonly FixedReturnAccessor CollectionCountAccessor =
         new("count", TypeKind.Integer, "Number of elements", ReturnNonnegative: true);
 
+    /// <summary>
+    /// Shared ParameterMeta for the integer index parameter on parameterised-index
+    /// accessors (<c>.at(N)</c>) and actions (<c>insert at N</c>, <c>remove at N</c>).
+    /// Used by <see cref="IndexBoundsProofRequirement"/> as the <see cref="ParamSubject"/>
+    /// reference — ref-equality resolves it to the actual TypedExpression at discharge time.
+    /// </summary>
+    internal static readonly ParameterMeta PCollectionIndex = new(TypeKind.Integer, "index");
+
     private static readonly TypeAccessor[] SetAccessors =
     [
         CollectionCountAccessor,
@@ -211,8 +219,12 @@ public static class Types
             ProofRequirements:
             [
                 new NumericProofRequirement(new SelfSubject(CollectionCountAccessor), OperatorKind.GreaterThan, 0m,
-                    "Index must be within bounds"),
-            ]),
+                    "Log must be non-empty"),
+                new IndexBoundsProofRequirement(new ParamSubject(PCollectionIndex),
+                    IndexBoundsMode.StrictlyBefore, CollectionCountAccessor,
+                    "Index must be within bounds [0, count)"),
+            ],
+            Parameters: [PCollectionIndex]),
     ];
 
     private static readonly TypeAccessor[] LogByAccessors =
@@ -235,8 +247,12 @@ public static class Types
             ProofRequirements:
             [
                 new NumericProofRequirement(new SelfSubject(CollectionCountAccessor), OperatorKind.GreaterThan, 0m,
-                    "Index must be within bounds"),
-            ]),
+                    "Log must be non-empty"),
+                new IndexBoundsProofRequirement(new ParamSubject(PCollectionIndex),
+                    IndexBoundsMode.StrictlyBefore, CollectionCountAccessor,
+                    "Index must be within bounds [0, count)"),
+            ],
+            Parameters: [PCollectionIndex]),
         // Quantifier-binding two-axis projection: in `each entry in MyLogBy (...)`,
         // `entry.value` is the element (T) and `entry.by` is the ordering key (P).
         // Type-driven dispatch in ResolveMemberAccess routes these to the binding's
@@ -273,8 +289,12 @@ public static class Types
             ProofRequirements:
             [
                 new NumericProofRequirement(new SelfSubject(CollectionCountAccessor), OperatorKind.GreaterThan, 0m,
-                    "Index must be within bounds"),
-            ]),
+                    "List must be non-empty"),
+                new IndexBoundsProofRequirement(new ParamSubject(PCollectionIndex),
+                    IndexBoundsMode.StrictlyBefore, CollectionCountAccessor,
+                    "Index must be within bounds [0, count)"),
+            ],
+            Parameters: [PCollectionIndex]),
     ];
 
     private static readonly TypeAccessor[] QueueByAccessors =

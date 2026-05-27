@@ -130,7 +130,10 @@ public class MemberAccessTests
     [Fact]
     public void Compiler_ListAtAccessor_CompilesCleanly()
     {
-        // BUG-039: 'list.at(N)' rejected — 'at' ambiguity
+        // BUG-039: 'list.at(N)' rejected — 'at' ambiguity.
+        // Updated per Phase 4 W-E (F-LANG-COLL-04): .at(N) now requires an explicit
+        // bounds guard. The original test verified the 'at' keyword parsed cleanly
+        // even on a notempty-typed list; the bounds guard ships alongside.
         var compilation = Compiler.Compile("""
             precept ListAt
             field Steps as list of string notempty
@@ -139,12 +142,13 @@ public class MemberAccessTests
             state Done terminal
             event ReadStep(Index as integer)
             from Active on ReadStep
+                when ReadStep.Index >= 0 and ReadStep.Index < Steps.count
                 -> set LastStep = Steps.at(ReadStep.Index)
                 -> transition Done
             """);
 
         compilation.HasErrors.Should().BeFalse(
-            because: "Steps.at(N) uses the 'at' keyword as a member name — it must parse and type-check cleanly");
+            because: "Steps.at(N) uses the 'at' keyword as a member name — must parse, type-check, and discharge bounds via the explicit guard");
     }
 
     [Fact]
