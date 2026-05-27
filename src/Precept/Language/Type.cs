@@ -117,6 +117,10 @@ public record TypeAccessor(
 /// <c>.currency → currency</c>). <see cref="ReturnsQualifier"/> indicates
 /// the accessor returns the qualifier value on the named axis. <see cref="ReturnNonnegative"/>
 /// marks accessors whose numeric result is structurally guaranteed to be ≥ 0.
+/// <see cref="UseInModifierValueContext"/> opts the accessor into the contextual
+/// recognition surface in modifier-value position (F-LANG-BIZ-10 / `currency.minorUnit`);
+/// when false (the default), the accessor is invalid in modifier-value position
+/// even if its return type matches the modifier's value contract.
 /// </summary>
 public sealed record FixedReturnAccessor(
     string        Name,
@@ -126,7 +130,8 @@ public sealed record FixedReturnAccessor(
     TypeKind?     ParameterType    = null,
     TypeTrait     RequiredTraits   = TypeTrait.None,
     ProofRequirement[]? ProofRequirements = null,
-    QualifierAxis ReturnsQualifier = QualifierAxis.None
+    QualifierAxis ReturnsQualifier = QualifierAxis.None,
+    bool          UseInModifierValueContext = false
 ) : TypeAccessor(Name, Description, ParameterType, RequiredTraits, ProofRequirements);
 
 /// <summary>

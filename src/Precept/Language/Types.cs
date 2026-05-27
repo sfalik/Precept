@@ -566,7 +566,8 @@ public static class Types
             Accessors:
             [
                 new FixedReturnAccessor("name",        TypeKind.String,  "Currency display name"),
-                new FixedReturnAccessor("minorUnit",   TypeKind.Integer, "Minor-unit decimal places (e.g., 2 for USD)"),
+                new FixedReturnAccessor("minorUnit",   TypeKind.Integer, "Minor-unit decimal places (e.g., 2 for USD)",
+                    UseInModifierValueContext: true),
                 new FixedReturnAccessor("numericCode", TypeKind.Integer, "ISO 4217 numeric code"),
                 new FixedReturnAccessor("symbol",      TypeKind.String,  "Currency symbol (e.g., '$')"),
             ],

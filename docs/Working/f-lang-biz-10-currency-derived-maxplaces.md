@@ -1,5 +1,5 @@
 ---
-status: Locked 2026-05-25 — refreshed 2026-05-26 (W-H precept-reviewer remediation: added Philosophy Alignment / Language Design Grounding / Architecture Grounding / Audience and Teachability / Semantic Rules sections; tracked follow-ups F-UP-BIZ-10-A through -C; corrected `:519-548` line-range to `:627-645`). Verbatim citation excerpts in § Language Design Grounding remain to be pulled before final lock.
+status: Locked 2026-05-25 — refreshed 2026-05-26 (W-H precept-reviewer remediation pass 2: added Falsifier 6 (meta-pattern), pulled verbatim excerpts for C# Keywords + nameof citations, engaged Haskell/GHC research file as direct comparator, strengthened Option D dismissal (3-leg rationale), landed F-UP-BIZ-10-B (`UseInModifierValueContext` flag on `FixedReturnAccessor`) early as catalog-drift mitigation, propagated `:627-645` line-range across body/frontmatter).
 phase-target: Phase 4 (compiler-readiness plan) — fold into business-domain follow-ups; not a Phase 3 commit
 authored: 2026-05-25
 author: Claude (/lifecycle-2-design — F-LANG-BIZ-10)
@@ -20,6 +20,7 @@ sources-consulted:
   - `docs/language/business-domain-types.md:521` — current author-form `money in 'USD' maxplaces 2`
   - `docs/Working/compiler-readiness-plan-2026-05-24.md § Phase 3 — Resolved` — F-LANG-BIZ-02 Position 3 four-leg rationale
   - `research/architecture/compiler/currency-precision-coupling-survey.md` — external precedent on currency-precision coupling (Joda-Money / JSR-354 / NodaMoney / Stripe / Square / Adyen)
+  - `research/architecture/compiler/context-sensitive-literal-typing-survey.md:8-46` — Haskell/GHC bidirectional numeric-literal typing (the directly-relevant category for Decision 2's context-sensitive identifier resolution)
   - `docs/philosophy.md § Compile-time structural checking` — language commitment to compile-time enforcement
   - `CLAUDE.md § Catalog System` — catalog-first principle for language-surface extensions
   - Java Bean Validation 3.0 (Jakarta Validation) — `@DecimalMax`/`@DecimalMin` accept string-form constants; no annotation-cross-reference mechanism
@@ -82,6 +83,7 @@ No principle is regressed. Two principles (#4 catalog-driven semantics, #7 compi
 
 The closest comparators across mainstream languages:
 
+- **Haskell / GHC bidirectional numeric-literal typing** — `research/architecture/compiler/context-sensitive-literal-typing-survey.md:8-46` surveys exactly the category Decision 2 takes a position on: AST nodes whose meaning is determined by surrounding context, not by intrinsic shape. GHC's `42 ≡ fromInteger 42` desugars literals into a polymorphic `Num a => a` constraint; the type checker narrows `a` from usage-site context (type annotations, function-argument types, partner operands). The architectural takeaway: bidirectional/contextual resolution is well-established in production type systems, and the proof witnesses are inspectable (constraint sets, defaulting rules). Precept's `currency.minorUnit` mirrors the *shape* of context-sensitive resolution while diverging on the substance — GHC's context narrows a type variable; Precept's narrows a sibling annotation's value into the modifier-value position. The architectural seam (catalog + type checker) maps cleanly. **Not transferable in detail** (Haskell's instances are open; Precept's catalog is closed), but the discipline of "context-sensitive resolution with inspectable rules" is the directly-relevant precedent.
 - **C# contextual keywords** (`var`, `value`, `nameof`, `dynamic`) — keywords that acquire meaning only in specific syntactic positions, without being reserved globally. Microsoft Learn ("C# Keywords"): contextual keywords are not reserved words; they have meaning only in defined contexts. `currency.minorUnit` mirrors this: `currency` is not a reserved identifier; it acquires meaning only in modifier-value position on a money field.
 - **Roslyn `nameof(x)` recognition** — the C# parser sees `nameof` as an identifier; the binder identifies the pattern via context. Reference: `roslyn/src/Compilers/CSharp/Portable/Binder/Binder_Expressions.cs` (the `IsNameofOperator` check). Decision 4 mirrors this — parser is unchanged; type-checker recognizes the pattern.
 - **F# anonymous record accessors** — type-provider context drives accessor resolution based on the surrounding declaration; the accessor expression itself is grammar-uniform.
@@ -94,7 +96,7 @@ The closest comparators across mainstream languages:
 - **JSR-354 (java.money)** — `MonetaryAmount.getCurrency().getDefaultFractionDigits()`. Same shape as Joda-Money.
 - **Stripe / Square / Adyen** — enforce minor-unit precision at the wire boundary (request/response validation), not in the application type system. Aligns with the F-LANG-BIZ-02 Position 3 stance that precision enforcement relocates to boundaries.
 
-> **Verbatim excerpts pending owner ratification.** Microsoft Learn / Jakarta Validation citations above are summarized. Before locking, pull verbatim excerpts (per the § 9a Citation Discipline requirement for irreversible decisions). The C# Keywords reference and Roslyn's `Binder_Expressions.cs` snippet are the load-bearing ones. Pull from Microsoft Learn and the dotnet/roslyn source mirror.
+> **Citation discipline note (resolved 2026-05-26)**: Verbatim excerpts have been pulled from Microsoft Learn for the load-bearing C# Keywords and `nameof` citations — see Decision 2's `Sources consulted` leg. The Roslyn-source citation is downgraded to architectural-pattern reference (the exact binder-stage method name varied across the live source tree and a single canonical line excerpt could not be fetched); the Microsoft Learn `nameof` page documents the compile-time-evaluation semantic that the pattern relies on. The Jakarta Validation citation is honestly framed as survey-grade — the *absence* of an annotation-cross-reference mechanism in the spec is the relevant signal, not a single quotable line.
 
 **Strongest external precedent for the chosen syntax**: C# contextual keywords. Strongest external precedent against: SQL's `INFORMATION_SCHEMA.CHARACTER_SETS.CHARACTER_SET_NAME` style (cross-reference by name → Option A — `'USD'.minorUnit`). Decision 2's tradeoff narrative addresses this.
 
@@ -253,7 +255,10 @@ This choice keeps the grammar invariant: the parser does not need to know about 
     2. Re-stating the currency code is the literal-integer form's flaw (the author has to keep two strings in sync — `'USD'` and `2`), just with a different second string.
     3. Option A would naturally generalize to "any typed-constant accessor in modifier-value position," which is a much larger language change than this design wants to commit to.
   - **Option C — bare sentinel `maxplaces native` or `maxplaces auto`**: Opaque to a reader. Doesn't extend to a future world where someone wants the analogous derivation on `unit.dimension` for quantity. Rejected.
-  - **Option D — leading-dot accessor `maxplaces .minorUnit`** (Swift-style implicit-member): More concise; reads as "the type's member." Rejected because the antecedent is ambiguous to a reader — *whose* `.minorUnit`? — and Precept has no other contextual-member shorthand to anchor the reader's intuition. The `currency.` prefix makes the antecedent legible at the cost of one extra word.
+  - **Option D — leading-dot accessor `maxplaces .minorUnit`** (Swift-style implicit-member): More concise; reads as "the type's member." Rejected on three grounds:
+    1. **No anchoring precedent in Precept's existing surface**. Swift's `.member` syntax works because Swift authors are conditioned to "the contextual type" through years of language exposure (`UIColor.red` shorthand, enum-case dot-access). Precept has *zero* existing surface that primes a reader for "leading dot = contextual type-member." Introducing the shorthand here without that anchoring forces the reader to guess at the antecedent on first contact.
+    2. **Precept's audience is the domain expert, not the developer** (`docs/language/precept-language-spec.md § 0.7`). A financial-services analyst reading `maxplaces .minorUnit` has no Swift-by-osmosis fallback; the `currency.` prefix names the antecedent in domain-vocabulary terms (the field's currency annotation) rather than requiring the reader to infer it from positional convention.
+    3. **The token-saving is real but small** — one word saved per use site against a permanent affordance cost. The design rejects the tradeoff in favor of the named antecedent. Confirmed against the Falsifier 6 (added in remediation): if usability testing falsifies the named-antecedent affordance claim, both `currency.minorUnit` and any future `.minorUnit` form are retracted together, not migrated to.
   - **Option E — verbose `maxplaces self.currency.minorUnit`**: Adds `self` for nothing. Rejected.
 - **Precedent**:
   - C# contextual keywords (`var`, `value`, `nameof`, `dynamic`) — context-sensitive identifiers that are not reserved globally but acquire meaning in specific syntactic positions. `currency` in modifier-value position on a money field is analogous: it is not a reserved word; it acquires meaning only inside this specific context.
@@ -273,8 +278,13 @@ This choice keeps the grammar invariant: the parser does not need to know about 
 - **Sources consulted for this decision**:
   - `src/Precept/Language/Modifiers.cs:237-242` — *`ModifierKind.Maxplaces => new ValueModifierMeta(kind, Tokens.GetMeta(TokenKind.Maxplaces), "Maximum decimal places", ModifierCategory.Structural, BusinessMagnitudeTypes, HasValue: true, …)`*
   - `src/Precept/Pipeline/Parser.cs:540-549` — *"Valued modifiers parse an expression for their value … `valueExpr = ParseExpression(0, …)`"* — confirms parser is permissive; type-checker gates.
-  - C# language spec (Microsoft Learn, accessed 2026-05-25) — contextual keywords list including `var`, `value`, `nameof`, `dynamic`: *"A contextual keyword is used to provide a specific meaning in the code, but it is not a reserved word in C#."* (Excerpt from Microsoft's "C# Keywords" reference page.)
-  - Java Bean Validation 3.0 (Jakarta Validation) constraint annotations — `@DecimalMax`, `@DecimalMin`, `@Digits` — accept string-form value constants but offer no annotation-cross-reference pattern. (Survey of Jakarta Validation 3.0 API spec; no analogous mechanism present.)
+  - **Microsoft Learn — "C# Keywords and contextual keywords"** (https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/, accessed 2026-05-26):
+    - *"Contextual keywords have special meaning only in a limited program context and can be used as identifiers outside that context. Generally, as new keywords are added to the C# language, they're added as contextual keywords to avoid breaking programs written in earlier versions."*
+    - *"A contextual keyword provides a specific meaning in the code, but it isn't a reserved word in C#. Some contextual keywords, such as `partial` and `where`, have special meanings in two or more contexts."*
+    - This is the direct precedent for Decision 2 — `currency` in modifier-value position acquires meaning only in that context; it remains a usable identifier (field name, arg name) outside.
+  - **Microsoft Learn — "The nameof expression"** (https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/operators/nameof, accessed 2026-05-26): *"A `nameof` expression produces the name of a variable, type, or member as the string constant. A `nameof` expression is evaluated at compile time and has no effect at run time."* — confirms the type-checker-recognizes-not-parser-reserves precedent that Decision 4 invokes.
+  - **Roslyn `nameof` recognition** (https://github.com/dotnet/roslyn — `src/Compilers/CSharp/Portable/Binder/` directory; binder-stage recognition rather than parser-stage). **Citation status**: web access did not return a single canonical method excerpt; the recognition is documented in Microsoft Learn (above) as compile-time-evaluated. Cited as architectural pattern (binder/type-checker recognizes contextual identifier; parser stays grammar-only), not as a verbatim source snippet.
+  - **Java Bean Validation 3.0 (Jakarta Validation)** constraint annotations — `@DecimalMax`, `@DecimalMin`, `@Digits` — accept string-form value constants. Cited from the Jakarta Validation 3.0 spec API surface; no equivalent of "derive constraint value from another annotation on the same declaration" surfaced in API review. **Citation status**: survey-grade citation — no single line excerpt; the *absence* of the pattern in the API spec is the relevant signal.
 
 ### Decision 3: Only valid when the `in '<Cur>'` qualifier is a static literal
 
@@ -307,7 +317,7 @@ This choice keeps the grammar invariant: the parser does not need to know about 
 - **Tradeoff accepted**: A future reader of the parser cannot tell from grammar alone that `currency.minorUnit` has special meaning. The type checker's `Maxplaces` arm is the only place where the meaning is encoded. Mitigation: this design documents the contextual recognition explicitly in `docs/compiler/type-checker.md`.
 - **Sources consulted for this decision**:
   - `src/Precept/Pipeline/Parser.cs:526-569` — `ParseModifierList` uses `ParseExpression` without modifier-kind-specific dispatch; confirms the parser is layered correctly today.
-  - `src/Precept/Pipeline/TypeChecker.Validation.Modifiers.cs:519-548` — *"`/// PRE0035 — InvalidModifierValue: validate that modifiers with values carry valid values. For example, 'maxplaces' must be a non-negative integer.`"* — the type checker is the existing gate for value-shape validation; extending the gate is the natural seam.
+  - `src/Precept/Pipeline/TypeChecker.Validation.Modifiers.cs:627-645` — *"`/// PRE0035 — InvalidModifierValue: validate that modifiers with values carry valid values. For example, 'maxplaces' must be a non-negative integer.`"* — the type checker is the existing gate for value-shape validation; extending the gate is the natural seam.
   - Roslyn — `nameof` recognition pattern (Microsoft .NET source: `src/Compilers/CSharp/Portable/Binder/Binder_Expressions.cs` — accessed 2026-05-25 via Microsoft .NET source browser); confirms the type-checker-recognizes-not-parser-recognizes precedent.
   - `CLAUDE.md § Catalog System` — *"Never switch on `*Kind` enum identity to dispatch per-member behavior."* — the recognition lives in the `Maxplaces` arm of an existing kind-switch, which is the violation pattern to watch for. **Mitigation**: the kind-switch is already present and accepted for modifier-value validation; this design adds one arm to an existing switch rather than introducing a new kind-switch. If the modifier-value validation surface grows further, the whole switch should move to catalog-driven metadata on `ValueModifierMeta` (a `ValueShapeMeta` or similar) — explicitly out of scope here.
 
@@ -317,8 +327,8 @@ This choice keeps the grammar invariant: the parser does not need to know about 
 - **Rationale**: Of the four Currency accessors, only `.minorUnit` returns an integer that satisfies `Maxplaces`'s value contract (a non-negative integer). `.numericCode` also returns an integer but represents the ISO 4217 numeric code (e.g., 840 for USD) — using it as a decimal-places count is nonsensical. `.name` and `.symbol` return strings — type-incoherent for `maxplaces`. The recognition is type-driven: the contextual accessor must resolve to a non-negative integer matching `Maxplaces`'s declared value contract.
 - **Alternatives considered**:
   - **Accept any `currency.<accessor>` whose return type matches the modifier's value type**: would automatically include `.numericCode`. Rejected because `.numericCode` *type-checks* (it's an integer) but is semantically wrong for precision.
-  - **Reject by accessor-name whitelist hardcoded to `minorUnit`**: simpler. Chosen for this initial design.
-  - **Add a `UseInModifierValueContext: bool` flag to `FixedReturnAccessor` and gate on it**: catalog-driven, generalizes naturally. Deferred — the catalog metadata extension is a larger change; for one accessor it's overkill. Filed as a follow-up if/when a second contextual accessor lands.
+  - **Reject by accessor-name whitelist hardcoded to `minorUnit`**: simpler but creates a catalog-drift hazard — if a future engineer adds `currency.fractionDigits` or renames `minorUnit`, the hardcoded string-match would silently mis-route. Rejected for that reason.
+  - **Add a `UseInModifierValueContext: bool` flag to `FixedReturnAccessor` and gate on it**: catalog-driven, generalizes naturally. **Chosen.** The flag is set to `true` only on `.minorUnit` in this design's scope; future accessors can opt in by setting the flag without touching the type-checker arm. This honors the catalog-first principle (CLAUDE.md non-negotiable) at the cost of one bool on the accessor record.
 - **Precedent**: SQL `CHECK` constraint expressions accept arbitrary boolean-returning expressions but in practice every dialect ships a small whitelist of allowed functions in `CHECK` context (the rest are flagged as non-deterministic). Same shape: type-allows-many, design-allows-one.
 - **Tradeoff accepted**: A future Currency accessor that returns an integer (e.g., a hypothetical `.iso4217Year`) would need its own whitelist entry. The catalog won't auto-include it.
 - **Strongest counter-evidence**: An author with strong familiarity with `.numericCode` (e.g., a financial-systems integrator who already uses 840-for-USD in their domain) may reasonably try `currency.numericCode` as a precision source under the misapprehension that "minor unit" and "numeric code" are interchangeable currency-catalog data. The rejection diagnostic must explain *why* the form is rejected ("only `currency.minorUnit` is recognized in modifier-value position because `Maxplaces` is a precision constraint and the ISO 4217 numeric code is not a precision value") — not just *that* it's rejected. **Mitigation**: the test case `CurrencyDerived_RejectedOnNonMinorUnitAccessors` in the acceptance criteria verifies the diagnostic text contains the explanation.
@@ -338,7 +348,7 @@ This choice keeps the grammar invariant: the parser does not need to know about 
 - **Precedent**: All other compile-time-derived modifier values (none today; this is the first) would naturally land at the same stage. Existing literal-integer validation already happens in `ValidateModifierValues`.
 - **Tradeoff accepted**: None identified. The type checker is the obvious home.
 - **Sources consulted for this decision**:
-  - `src/Precept/Pipeline/TypeChecker.Validation.Modifiers.cs:519-548` — current validation home.
+  - `src/Precept/Pipeline/TypeChecker.Validation.Modifiers.cs:627-645` — current validation home.
 
 ## Acceptance criteria
 
@@ -394,6 +404,8 @@ This design ships **one irreversible decision** (Decision 2 — the `currency.mi
 4. **A directly-comparable system surfaces in the literature after the design ships**. The Decision 2 precedent claim ("no directly comparable annotation-cross-reference precedent") is partial — a surfaced precedent could either ratify or contradict the chosen syntax. If contradicting, the decision narrative loses one of its supports. Action: update the design doc; consider whether the contradicting precedent argues for a syntax change before authors lock in.
 5. **The `.minorUnit` accessor returns a value that doesn't fit `Maxplaces`'s contract for some currency**. ISO 4217 lists currencies with `MinorUnit` values from 0 to 4 (and "N.A." for some entries — handled in `CurrencyCatalog` parsing); all are non-negative integers, satisfying `Maxplaces`. If a future ISO 4217 revision changes the schema, the assumption breaks. Action: gate the catalog lookup; emit `InvalidModifierValue` if the resolved value violates `Maxplaces`'s contract.
 
+6. **Domain experts misread `currency.minorUnit` as referring to a lexical-scope identifier**. The deeper irreversibility of Decision 2 isn't the specific token `currency.minorUnit` — it's the introduction of a **contextual-identifier pattern** in modifier-value position. If two or more authors in usability testing read `currency.minorUnit` and predict it refers to an identifier in lexical scope (a field named `currency`, an event named `currency`) rather than a sibling annotation, the contextual-identifier *category* has the wrong reading affordance and the design must retract the pattern itself, not just the token. Action: deprecate the syntax form and move toward Option A (`'USD'.minorUnit` — typed-constant member access, no contextual binding) or Option C (bare sentinel keyword like `maxplaces currency-aware`, no member-access shape at all). This is the falsifier for the meta-decision; Falsifier 1 only covers adoption of the *token*.
+
 ## Follow-ups
 
 Tracked obligations surfaced by Decisions 4 and 5. These do not block W-H execution but must be carried forward as named, owned items.
@@ -411,15 +423,11 @@ Tracked obligations surfaced by Decisions 4 and 5. These do not block W-H execut
 
 **Owner**: language compiler team. Filed against the compiler-readiness plan's "follow-ups" or Phase 7 (API surface solidity).
 
-### F-UP-BIZ-10-B: catalog-driven whitelist for contextual accessors in modifier-value position
+### F-UP-BIZ-10-B: catalog-driven whitelist for contextual accessors in modifier-value position — ✅ landed early in W-H
 
-**Trigger**: same as F-UP-BIZ-10-A — when a second contextual accessor lands, or when authors request additional Currency accessors in `maxplaces` position.
+**Status**: Closed at design lock (2026-05-26). After the precept-reviewer audit flagged the hardcoded-string-match approach as a catalog-drift hazard (a future `currency.numericCode` accessor would silently mis-route), this follow-up was pulled into W-H. The `UseInModifierValueContext: bool` flag is now on `FixedReturnAccessor` (`src/Precept/Language/Type.cs`), set to `true` only on `currency.minorUnit` (`src/Precept/Language/Types.cs`). The `Maxplaces` type-checker arm consults the flag rather than string-matching `"minorUnit"`.
 
-**Rationale**: Decision 5 hardcoded the recognition to `currency.minorUnit` only. The longer-term shape is a `bool UseInModifierValueContext` flag on `FixedReturnAccessor` (or analogous metadata on the accessor catalog). The whitelist becomes catalog-driven; new accessors can be opted in without touching the type-checker arm.
-
-**Scope at trigger time**: add the flag to `FixedReturnAccessor` (and any analogous accessor subtype); migrate the hardcoded `minorUnit` recognition to consult the flag.
-
-**Owner**: language compiler team. Same phase target as F-UP-BIZ-10-A.
+**Migration if widened**: any future accessor opting into modifier-value context simply sets `UseInModifierValueContext: true` on its catalog entry. No type-checker change required. Other modifiers wanting analogous contextual-accessor support extend the type-checker arm via the same flag (or a more general `ValueShapeMeta` per F-UP-BIZ-10-A).
 
 ### F-UP-BIZ-10-C: extension to `price`, `exchangerate` (F-LANG-BIZ-12)
 
