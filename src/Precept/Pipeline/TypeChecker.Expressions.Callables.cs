@@ -1136,7 +1136,8 @@ internal static partial class TypeChecker
             accessor,
             accessor.ProofRequirements.ToImmutableArray(),
             expr.Span,
-            ResolveAccessorChoiceMetadata(accessor, receiver, ctx));
+            ResolveAccessorChoiceMetadata(accessor, receiver, ctx),
+            resolvedArgs);
     }
 
     /// <summary>

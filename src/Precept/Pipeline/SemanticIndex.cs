@@ -84,6 +84,11 @@ public sealed record TypedFunctionCall(
 /// collection — needed so accessor chains, list-literal accessors, and conditional
 /// receivers can discharge ordered-choice proof requirements without walking back
 /// through arbitrary expression trees (see F-LANG-COLL-03 design D-3 Option A).
+/// <see cref="Arguments"/> preserves resolved method-call arguments (empty for bare
+/// member access). Required so proof obligations on parameterized accessors
+/// (e.g., <c>.at(N)</c> index bounds) can resolve their <c>ParamSubject</c> via
+/// the standard <c>ResolveParamInMemberAccess</c> path. Default empty preserves
+/// existing zero-arg accessor call sites unchanged.
 /// </summary>
 public sealed record TypedMemberAccess(
     TypeKind ResultType,
@@ -91,7 +96,8 @@ public sealed record TypedMemberAccess(
     TypeAccessor ResolvedAccessor,
     ImmutableArray<ProofRequirement> ProofRequirements,
     SourceSpan Span,
-    TypedChoiceElement? ChoiceMetadata = null
+    TypedChoiceElement? ChoiceMetadata = null,
+    ImmutableArray<TypedExpression> Arguments = default
 ) : TypedExpression(ResultType, Span);
 
 /// <summary>

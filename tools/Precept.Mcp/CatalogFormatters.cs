@@ -897,6 +897,11 @@ internal static class CatalogFormatters
             QualifierCompatibilityProofRequirement qualifierCompatibility => $"{RenderCompatibleSubjects(qualifierCompatibility.LeftSubject, qualifierCompatibility.RightSubject)} share {qualifierCompatibility.Axis.ToString().ToLowerInvariant()} qualifiers — {qualifierCompatibility.Description}",
             QualifierChainProofRequirement chain => $"{RenderCompatibleSubjects(chain.LeftSubject, chain.RightSubject)} chain {chain.LeftAxis.ToString().ToLowerInvariant()}↔{chain.RightAxis.ToString().ToLowerInvariant()} — {chain.Description}",
             ModifierRequirement modifier => $"{RenderProofSubject(modifier.Subject)} declares {RenderModifier(modifier.Required)} — {modifier.Description}",
+            KeyPresenceProofRequirement keyPresence => $"{RenderProofSubject(keyPresence.Subject)} {(keyPresence.RequireAbsence ? "does NOT contain" : "contains")} key — {keyPresence.Description}",
+            IndexBoundsProofRequirement indexBounds => $"{RenderProofSubject(indexBounds.Subject)} {(indexBounds.Mode == IndexBoundsMode.AtOrBefore ? "≤" : "<")} self.{indexBounds.UpperBoundAccessor.Name} — {indexBounds.Description}",
+            IntervalContainmentProofRequirement interval => $"{RenderProofSubject(interval.Subject)} fits within {interval.TargetField} bounds — {interval.Description}",
+            LengthContainmentProofRequirement length => $"{RenderProofSubject(length.Subject)} length fits {length.TargetField} bounds — {length.Description}",
+            CountContainmentProofRequirement count => $"{RenderProofSubject(count.Subject)} count fits {count.TargetField} bounds — {count.Description}",
             _ => throw new ArgumentOutOfRangeException(nameof(proofRequirement), proofRequirement, null),
         };
 
