@@ -394,49 +394,152 @@ public static partial class ProofEngine
             EventHandlerContext h => h.Handler.Guard,
             _ => null
         };
-        if (guard is null) return null;
 
-        var branches = ExtractGuardBranches(guard);
-        if (branches.IsEmpty) return null;
+        // BUG-006 — sibling reject-row composition: even without an explicit
+        // guard on this row, an earlier reject-row on the same (state, event)
+        // pair narrows the field values that can reach this row. Build the
+        // exclusion set from those sibling reject-rows.
+        var siblingExclusions = obligation.Context is TransitionRowContext trc
+            ? BuildSiblingRejectExclusions(trc.Row, semantics)
+            : null;
 
-        // Use the first branch only — single-branch guards.
+        if (guard is null && siblingExclusions is null) return null;
+
         var builder = ImmutableDictionary.CreateBuilder<string, NumericInterval>(StringComparer.Ordinal);
 
-        foreach (var branch in branches)
+        if (guard is not null)
         {
-            var branchNarrowings = new Dictionary<string, NumericInterval>(StringComparer.Ordinal);
-
-            foreach (var gc in branch)
+            var branches = ExtractGuardBranches(guard);
+            foreach (var branch in branches)
             {
-                if (gc.IsPresenceCheck || gc.Value is null) continue;
+                var branchNarrowings = new Dictionary<string, NumericInterval>(StringComparer.Ordinal);
 
-                var baseInterval = ExtractFieldInterval(gc.Field, semantics);
-                if (!branchNarrowings.TryGetValue(gc.Field, out var current))
-                    current = baseInterval.IsUnbounded
-                        ? new NumericInterval(decimal.MinValue, decimal.MaxValue)
-                        : baseInterval;
-
-                var value = gc.Value.Value;
-                current = gc.Comparison switch
+                foreach (var gc in branch)
                 {
-                    OperatorKind.GreaterThanOrEqual => new NumericInterval(Math.Max(current.Min, value), current.Max),
-                    OperatorKind.GreaterThan => new NumericInterval(Math.Max(current.Min, value), current.Max),
-                    OperatorKind.LessThanOrEqual => new NumericInterval(current.Min, Math.Min(current.Max, value)),
-                    OperatorKind.LessThan => new NumericInterval(current.Min, Math.Min(current.Max, value)),
-                    _ => current
-                };
-                branchNarrowings[gc.Field] = current;
-            }
+                    if (gc.IsPresenceCheck || gc.Value is null) continue;
 
-            foreach (var (field, interval) in branchNarrowings)
+                    var baseInterval = ExtractFieldInterval(gc.Field, semantics);
+                    if (!branchNarrowings.TryGetValue(gc.Field, out var current))
+                        current = baseInterval.IsUnbounded
+                            ? new NumericInterval(decimal.MinValue, decimal.MaxValue)
+                            : baseInterval;
+
+                    var value = gc.Value.Value;
+                    current = gc.Comparison switch
+                    {
+                        OperatorKind.GreaterThanOrEqual => new NumericInterval(Math.Max(current.Min, value), current.Max),
+                        OperatorKind.GreaterThan => new NumericInterval(Math.Max(current.Min, value), current.Max),
+                        OperatorKind.LessThanOrEqual => new NumericInterval(current.Min, Math.Min(current.Max, value)),
+                        OperatorKind.LessThan => new NumericInterval(current.Min, Math.Min(current.Max, value)),
+                        _ => current
+                    };
+                    branchNarrowings[gc.Field] = current;
+                }
+
+                foreach (var (field, interval) in branchNarrowings)
+                {
+                    if (builder.TryGetValue(field, out var existing))
+                        builder[field] = existing.Union(interval);
+                    else
+                        builder[field] = interval;
+                }
+            }
+        }
+
+        // BUG-006 — apply sibling reject-row exclusions. The sibling reject's
+        // guard NEGATION narrows the current row: this row reaches ONLY when
+        // the sibling's guard fails, so the negation of each leaf constraint
+        // applies to the current row's per-field intervals. Half-open
+        // arithmetic at the constraint level (e.g., negating `X >= 10` to
+        // `X < 10`, narrowing X to `[_, 9]` for integer fields) is more
+        // precise than closed-interval set difference.
+        if (siblingExclusions is not null)
+        {
+            foreach (var (field, negatedRange) in siblingExclusions)
             {
-                if (builder.TryGetValue(field, out var existing))
-                    builder[field] = existing.Union(interval);
-                else
-                    builder[field] = interval;
+                var baseInterval = builder.TryGetValue(field, out var existing)
+                    ? existing
+                    : ExtractFieldInterval(field, semantics);
+                if (baseInterval.IsUnbounded)
+                    baseInterval = new NumericInterval(decimal.MinValue, decimal.MaxValue);
+                builder[field] = baseInterval.Intersect(negatedRange);
             }
         }
 
         return builder.Count > 0 ? builder.ToImmutable() : null;
     }
+
+    /// <summary>
+    /// BUG-006 — collects per-field intervals that earlier reject-rows on the
+    /// same (state, event) pair admit. The current row only fires when those
+    /// guards failed, so the admitted intervals are excluded from this row's
+    /// reachable field values.
+    /// </summary>
+    private static Dictionary<string, NumericInterval>? BuildSiblingRejectExclusions(
+        TypedTransitionRow currentRow,
+        SemanticIndex semantics)
+    {
+        // The current row is only a candidate for sibling-reject narrowing if
+        // it's a TypedTransitionRowSuccess — reject rows themselves don't
+        // benefit from this narrowing.
+        if (currentRow is not TypedTransitionRowSuccess) return null;
+
+        Dictionary<string, NumericInterval>? result = null;
+
+        // Walk every reject row on the same (state, event). Reject rows that
+        // would match-first under their guard narrow the field-value space
+        // the current row implicitly inhabits.
+        foreach (var sibling in semantics.TransitionRows)
+        {
+            if (ReferenceEquals(sibling, currentRow)) continue;
+            if (sibling is not TypedTransitionRowReject) continue;
+            if (sibling.Guard is null) continue; // unguarded reject already covered the event
+            if (!string.Equals(sibling.EventName, currentRow.EventName, StringComparison.Ordinal)) continue;
+            // FromState must match (null in either means broadcast).
+            if (sibling.FromState is not null && currentRow.FromState is not null
+                && !string.Equals(sibling.FromState, currentRow.FromState, StringComparison.Ordinal))
+                continue;
+
+            var siblingBranches = ExtractGuardBranches(sibling.Guard);
+            if (siblingBranches.Length != 1) continue; // multi-branch reject guards skipped (sound under-approximation)
+            var branch = siblingBranches[0];
+            foreach (var gc in branch)
+            {
+                if (gc.IsPresenceCheck || gc.Value is null) continue;
+
+                // Negate the reject's leaf constraint: this row reaches only
+                // when the sibling's guard fails. Integer-style half-open
+                // arithmetic at the boundary (e.g., negating `X >= 10` ⇒
+                // `X < 10` ⇒ narrow to `[_, 9]`).
+                var negatedRange = NegateConstraintToInterval(gc.Comparison, gc.Value.Value);
+                if (negatedRange is null) continue;
+
+                result ??= new Dictionary<string, NumericInterval>(StringComparer.Ordinal);
+                result[gc.Field] = result.TryGetValue(gc.Field, out var existing)
+                    ? existing.Intersect(negatedRange.Value)
+                    : negatedRange.Value;
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// BUG-006 — produce the negation of a constraint `field comparison value`
+    /// as an interval. Used to derive the narrowing the current row inherits
+    /// from a sibling reject-row above it. Integer-style half-open boundary
+    /// (e.g., negating `>= 10` to `<= 9`) — works for integer-valued fields,
+    /// approximate for decimal-valued ones.
+    /// </summary>
+    private static NumericInterval? NegateConstraintToInterval(OperatorKind comparison, decimal value) =>
+        comparison switch
+        {
+            OperatorKind.GreaterThanOrEqual => new NumericInterval(decimal.MinValue, value - 1m),    // ¬(X ≥ V) ⇒ X ≤ V - 1
+            OperatorKind.GreaterThan        => new NumericInterval(decimal.MinValue, value),         // ¬(X > V)  ⇒ X ≤ V
+            OperatorKind.LessThanOrEqual    => new NumericInterval(value + 1m, decimal.MaxValue),    // ¬(X ≤ V) ⇒ X ≥ V + 1
+            OperatorKind.LessThan           => new NumericInterval(value,       decimal.MaxValue),   // ¬(X < V)  ⇒ X ≥ V
+            OperatorKind.Equals             => null,    // X ≠ V isn't representable as a single closed interval
+            OperatorKind.NotEquals          => NumericInterval.Point(value),    // ¬(X ≠ V) ⇒ X = V
+            _ => null,
+        };
 }

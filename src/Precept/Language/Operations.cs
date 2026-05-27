@@ -101,17 +101,20 @@ public static class Operations
             "Lookup value access"),
 
         // ── Scalar: integer ────────────────────────────────────────
+        // W-C BUG-006 — integer arithmetic gets IntervalTransfer functions so
+        // the proof engine can propagate field narrowings through `Counter + 1`
+        // and similar increment patterns.
         OperationKind.IntegerPlusInteger => new BinaryOperationMeta(
             kind, OperatorKind.Plus, PInteger, PInteger, TypeKind.Integer,
-            "Integer addition"),
+            "Integer addition") { IntervalTransfer = AddTransfer },
 
         OperationKind.IntegerMinusInteger => new BinaryOperationMeta(
             kind, OperatorKind.Minus, PInteger, PInteger, TypeKind.Integer,
-            "Integer subtraction"),
+            "Integer subtraction") { IntervalTransfer = SubtractTransfer },
 
         OperationKind.IntegerTimesInteger => new BinaryOperationMeta(
             kind, OperatorKind.Times, PInteger, PInteger, TypeKind.Integer,
-            "Integer multiplication"),
+            "Integer multiplication") { IntervalTransfer = MultiplyTransfer },
 
         OperationKind.IntegerDivideInteger => new BinaryOperationMeta(
             kind, OperatorKind.Divide, PInteger, PInteger, TypeKind.Integer,
