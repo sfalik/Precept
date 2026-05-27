@@ -872,6 +872,16 @@ public static partial class ProofEngine
         decimal value,
         NumericProofRequirement requirement)
     {
+        // F-LANG-BIZ-08 — Discrete equality narrowing: when the guard pins
+        // the subject to a singleton value (`F == V_lit`), check whether
+        // V_lit satisfies the requirement's (comparison, threshold) pair
+        // directly. This closes the false-positive class where
+        // `when Severity == 1 ⇒ Severity > 0` was previously undischarged.
+        // Per Decision 5, the minimal sound surface is direct-equality only;
+        // disjunctive/range narrowing is deferred.
+        if (comparison == OperatorKind.Equals && ValueSatisfiesRequirement(value, requirement))
+            return true;
+
         return (comparison, requirement.Comparison) switch
         {
             (OperatorKind.GreaterThan, OperatorKind.NotEquals)
@@ -888,6 +898,23 @@ public static partial class ProofEngine
             _ => false,
         };
     }
+
+    /// <summary>
+    /// F-LANG-BIZ-08 — evaluates whether a singleton value satisfies a numeric
+    /// requirement's (comparison, threshold) pair. Used by the discrete-equality
+    /// narrowing path in <see cref="NumericConstraintSubsumes"/>.
+    /// </summary>
+    private static bool ValueSatisfiesRequirement(decimal value, NumericProofRequirement requirement) =>
+        requirement.Comparison switch
+        {
+            OperatorKind.GreaterThan        => value >  requirement.Threshold,
+            OperatorKind.GreaterThanOrEqual => value >= requirement.Threshold,
+            OperatorKind.LessThan           => value <  requirement.Threshold,
+            OperatorKind.LessThanOrEqual    => value <= requirement.Threshold,
+            OperatorKind.Equals             => value == requirement.Threshold,
+            OperatorKind.NotEquals          => value != requirement.Threshold,
+            _ => false,
+        };
 
     private static OperatorKind InvertOp(OperatorKind op) => op switch
     {
