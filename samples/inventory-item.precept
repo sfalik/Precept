@@ -133,10 +133,10 @@ event Delist(Reason as string optional)
 event Relist
 
 # ── Transitions ───────────────────────────────────────────────────────────────
-# Sku presence is guaranteed by the Listed state ensure but the proof engine
-# cannot narrow on it across the transition body (BUG-004 family — event-ensure
-# narrowing is in place but state-ensure narrowing across a transition body is
-# not). Guard explicitly.
+# Sku presence is guaranteed by the Listed state ensure, but the proof engine
+# does not currently narrow state-ensure facts across a transition body. (Event-
+# ensure narrowing is in place; state-ensure narrowing across transitions is a
+# separate, still-open limitation.) Guard explicitly until that gap closes.
 from Unlisted on Publish when Sku is set
     -> set ListPrice = Publish.InitialListPrice
     -> set Description = if Publish.Desc is set then Publish.Desc else Sku

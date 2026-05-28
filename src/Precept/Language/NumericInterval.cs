@@ -21,10 +21,10 @@ public readonly struct NumericInterval
         new(decimal.MinValue, decimal.MaxValue, isUnbounded: true);
 
     /// <summary>
-    /// Explicit empty interval. Distinct from <see cref="IsEmpty"/> (which
-    /// detects emptiness via <c>Max &lt; Min</c>) — this is the canonical
-    /// empty value the satisfiability scan returns for an inhabited-set check
-    /// that fails.
+    /// Explicit empty interval, used as the return value from <see cref="Intersect"/>
+    /// when the two operands have no overlap. Distinct from <see cref="IsEmpty"/>,
+    /// which detects emptiness structurally via <c>Max &lt; Min</c> regardless of
+    /// whether the value was produced by <see cref="Empty"/> or by Intersect itself.
     /// </summary>
     public static NumericInterval Empty { get; } = new(0m, -1m);
 

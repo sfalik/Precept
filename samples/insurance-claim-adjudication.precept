@@ -27,9 +27,10 @@ field Reserves as money in 'USD' maxplaces currency.minorUnit default '0.00 USD'
 field PaymentAmount as money in 'USD' maxplaces currency.minorUnit default '0.00 USD' nonnegative
 field SubrogationRecovery as money in 'USD' maxplaces currency.minorUnit default '0.00 USD' nonnegative
 
-# Coverage details — per-coverage limits keyed by coverage code.
-# Note: lookup values use decimal because lookup of money in 'X' is not
-# currently supported (BUG-005); currency is tracked at the entity level.
+# Coverage details — per-coverage limits keyed by coverage code. Currency is
+# tracked at the entity level (PaymentAmount, SubrogationRecovery); the per-
+# coverage limit values are plain decimals carrying the same currency by
+# convention.
 field CoverageDetails as lookup of string to decimal
 
 # Subrogation tracking — whether a third party may be at fault and recoverable.

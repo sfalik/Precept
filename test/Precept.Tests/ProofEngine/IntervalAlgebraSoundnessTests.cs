@@ -119,4 +119,83 @@ public class IntervalAlgebraSoundnessTests
             because: "X is decimal-typed; the sibling reject narrows X to [0, 10] (closed superset), " +
                      "and X * 1.1 reaches 11 which overflows Result max 10");
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  Slice 6: source-order and wildcard-row sibling-reject soundness
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void SiblingRejectBelowSuccessRow_DoesNotNarrow()
+    {
+        // First-match dispatch (spec § 5.2): when the success row is declared
+        // BEFORE the reject row, the reject never intercepts at runtime — it's
+        // dead in source order. Applying its negation as a narrowing on the
+        // earlier success row would be unsound. The engine must recognise the
+        // success row precedes the reject and refuse to apply the narrowing,
+        // exposing the real overflow.
+        var ledger = Prove("""
+            precept Repro
+            field X as integer default 0 nonnegative max 10 editable
+            state Open initial
+            state Done terminal
+            event Inc
+            from Open on Inc -> set X = X + 1 -> no transition
+            from Open on Inc when X >= 10 -> reject "cap (never reaches because success above)"
+            event Finish
+            from Open on Finish -> transition Done
+            """);
+
+        ledger.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.NumericOverflow),
+            because: "the reject is declared below the success row, so it never intercepts at runtime; " +
+                     "the proof engine must not borrow its negation as narrowing on the success row");
+    }
+
+    [Fact]
+    public void SiblingRejectOnSpecificState_DoesNotNarrowWildcardSuccess()
+    {
+        // The reject row is anchored to state A; the success row is a wildcard
+        // (`from on Bump`) that fires in every other state too. Applying the
+        // sibling's narrowing across the wildcard's full reach is unsound —
+        // the wildcard can fire in state B where the sibling never intercepts.
+        var ledger = Prove("""
+            precept Repro
+            field Counter as integer default 0 nonnegative max 10 editable
+            state A initial
+            state B
+            state Done terminal
+            event Bump
+            from A on Bump when Counter >= 10 -> reject "cap at A"
+            from on Bump -> set Counter = Counter + 1 -> no transition
+            event Move
+            from A on Move -> transition B
+            event Stop
+            from on Stop -> transition Done
+            """);
+
+        ledger.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.NumericOverflow),
+            because: "the wildcard success row fires in state B where the A-specific reject doesn't intercept; " +
+                     "Counter can reach 10 there and Counter + 1 overflows max 10");
+    }
+
+    [Fact]
+    public void RulePair_DisjointNumericGuards_DoesNotEmitContradictoryRule()
+    {
+        // Two rules with mutually-exclusive numeric `when` guards constrain X
+        // to disjoint ranges on disjoint configuration spaces. The guard on Y
+        // (Y > 0 vs Y < 0) makes the rules apply to non-overlapping
+        // configurations — no concrete entity triggers both predicates, so
+        // PRE0155 ContradictoryRule must NOT fire.
+        var ledger = Prove("""
+            precept Repro
+            field X as integer default 0 editable
+            field Y as integer default 0 editable
+            rule X > 100 when Y > 0 because "X must exceed 100 when Y is positive"
+            rule X < 50 when Y < 0 because "X must be below 50 when Y is negative"
+            state Open initial
+            """);
+
+        ledger.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.ContradictoryRule),
+            because: "the numeric guards on Y are mutually exclusive (Y > 0 vs Y < 0); the rules " +
+                     "apply to disjoint configurations and don't conflict");
+    }
 }

@@ -145,16 +145,6 @@ internal static partial class TypeChecker
                         meta.Token.Text, typeName));
             }
 
-            // Declaration-site applicability for value modifiers.
-            var declarationSite = isEventArg
-                ? ValueModifierDeclarationSite.EventArgDeclaration
-                : ValueModifierDeclarationSite.FieldDeclaration;
-            if (!valueMeta.ApplicableDeclarationSites.HasFlag(declarationSite))
-            {
-                // No value modifier today reaches this branch with an emit — the
-                // retired `writable` modifier used to. Defensive guard left for
-                // future declaration-site-restricted value modifiers.
-            }
         }
 
         // Validate access-modifier rules separately — they live in a different

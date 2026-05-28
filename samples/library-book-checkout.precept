@@ -22,9 +22,10 @@ field CheckoutDay as integer default 0 nonnegative
 field DueDay as integer default 0 nonnegative
 
 # Renewal cap is enforced by the guard `RenewalCount < 2` on the renewal row
-# plus the runtime rule below. A field-level `max 2` modifier would express the
-# bound structurally, but the proof engine cannot combine guard narrowing with
-# field-level max for the `Counter + 1` interval check (BUG-006).
+# plus the runtime rule below. A field-level `max 2` modifier could express
+# the bound structurally; the runtime rule is kept here as the authoritative
+# enforcement (the rule fires regardless of dispatch path and survives any
+# future restructuring of the renewal flow).
 field RenewalCount as integer default 0 nonnegative
 rule RenewalCount <= 2 because "RenewalCount {RenewalCount} exceeds the per-loan renewal cap of 2 — additional extensions require staff override, not patron self-service"
 

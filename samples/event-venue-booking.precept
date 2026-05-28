@@ -181,9 +181,7 @@ on CancelWithPartialRefund ensure CancelWithPartialRefund.Forfeit >= '0.00 USD' 
 # Inquiry intake — booker submits the initial request. The inquiry timestamp
 # is recorded; the host is expected to set InquiryDate during Draft enrichment
 # (it's not required by the event ensures, but Inquiry's state ensure on
-# InquiredAt + EventDate together establishes the picture). BUG-004 prevents
-# the row from defaulting InquiryDate from EventDate inline because the
-# `on SubmitInquiry ensure EventDate is set` doesn't narrow the row body.
+# InquiredAt + EventDate together establishes the picture).
 from Draft on SubmitInquiry
     -> set InquiredAt = now()
     -> append BookingLog "Inquiry submitted"

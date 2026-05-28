@@ -1,5 +1,5 @@
 ---
-status: Locked 2026-05-27
+status: Promoted 2026-05-28 — implemented in commit `11599944`. Decision A (`UnsatisfiableRule` PRE0159 pre-pass in `ScanRules` + `ComposeRulePredicateWithFieldBounds` helper) and Decision B (reachability-gated `FieldNeverSet` — `HashSet<string> reachableStates` threaded into `HasAnyWriteSite` / `AnalyzeFieldWriteSites`) shipped. Canonical content lives in `docs/compiler/proof-engine.md § Pass 1.5 — Satisfiability Scan`, `docs/compiler/graph-analyzer.md § 6.7 Field-Write-Site Analysis`, `docs/compiler/diagnostic-system.md § PRE0159`, `docs/language/catalog-system.md § Diagnostics count`. This archive retains the inline comparator survey (Z3 unsat-core, Roslyn IDE0051, GNATprove per-check attribution) for future audit reference.
 phase-target: post-phase-5-review-remediation
 comparable-systems-research-status: partial — inline-survey legs on each decision carry verbatim excerpts from external comparators (SMT solver `unsat-core` attribution mechanics; Roslyn unused-member analysis dead-code-detection precedent). No standalone Stage-1 research file exists for "diagnostic attribution in interval-arithmetic proof scans" or "reachability-aware dead-store detection"; both gaps surfaced inline rather than promoted to `research/`.
 sources-consulted:

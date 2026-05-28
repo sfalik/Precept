@@ -204,13 +204,14 @@ from Draft, Scheduled on AddParticipant
     -> append MeetingLog "Added {AddParticipant.Email} ({AddParticipant.Tz})"
     -> no transition
 
-# Note: lookup deletion is unsupported (BUG-002). The ParticipantEmails set
-# is the canonical membership record; the lookup entry stays as a tombstone
-# until the meeting record is itself archived. Reads should always filter
-# through ParticipantEmails. The `contains` guard below uses CI semantics
-# from `set of ~string`, so a caller who invited "Alice@…" can remove the
-# entry by typing "ALICE@…" without the system claiming they were never on
-# the meeting.
+# Design note: lookup entries are NOT removed when a participant is dropped —
+# the ParticipantEmails set is the canonical membership record and the lookup
+# entry stays as a tombstone until the meeting record is itself archived. This
+# keeps audit-log reads stable (timezone-by-email lookups for past invitees
+# resolve cleanly). Reads should always filter through ParticipantEmails. The
+# `contains` guard below uses CI semantics from `set of ~string`, so a caller
+# who invited "Alice@…" can remove the entry by typing "ALICE@…" without the
+# system claiming they were never on the meeting.
 from Draft, Scheduled on RemoveParticipant when not (ParticipantEmails contains RemoveParticipant.Email)
     -> reject "Participant {RemoveParticipant.Email} is not on this meeting"
 from Draft, Scheduled on RemoveParticipant

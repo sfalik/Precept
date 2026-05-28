@@ -176,21 +176,11 @@ public static partial class ProofEngine
         SemanticIndex semantics)
     {
         var byField = new Dictionary<string, NumericInterval>(System.StringComparer.Ordinal);
-
-        foreach (var gc in branchConstraints)
+        FoldConstraintsInto(byField, branchConstraints, field => ExtractFieldInterval(field, semantics), semantics);
+        foreach (var (_, interval) in byField)
         {
-            if (gc.IsPresenceCheck) continue;
-            if (gc.Value is not { } value) continue;
-
-            var current = byField.TryGetValue(gc.Field, out var existing)
-                ? existing
-                : ExtractFieldInterval(gc.Field, semantics);
-
-            var clipped = NarrowByConstraint(current, gc.Comparison, value, GetFieldType(gc.Field, semantics));
-            if (clipped.IsEmpty) return true;
-            byField[gc.Field] = clipped;
+            if (interval.IsEmpty) return true;
         }
-
         return false;
     }
 
@@ -240,6 +230,42 @@ public static partial class ProofEngine
             ? field.ResolvedType
             : TypeKind.Decimal;
 
+    /// <summary>
+    /// Fold a set of guard-leaf constraints into a per-field <see cref="NumericInterval"/>
+    /// dictionary by intersecting each leaf via <see cref="NarrowByConstraint"/>. The
+    /// <paramref name="seedFn"/> picks the starting interval for each field — different
+    /// call sites use different seed policies (field-declared bounds for self-unsat
+    /// detection vs. <c>[MinValue, MaxValue]</c> for pair-wise comparison). Skips
+    /// presence-checks and non-numeric leaves. Mutates the supplied dictionary so
+    /// callers can chain folds (e.g., guard then predicate) without re-seeding.
+    /// </summary>
+    private static void FoldConstraintsInto(
+        Dictionary<string, NumericInterval> result,
+        IEnumerable<GuardConstraint> constraints,
+        Func<string, NumericInterval> seedFn,
+        SemanticIndex semantics)
+    {
+        foreach (var gc in constraints)
+        {
+            if (gc.IsPresenceCheck) continue;
+            if (gc.Value is not { } v) continue;
+
+            if (!result.TryGetValue(gc.Field, out var current))
+                current = seedFn(gc.Field);
+
+            result[gc.Field] = NarrowByConstraint(current, gc.Comparison, v, GetFieldType(gc.Field, semantics));
+        }
+    }
+
+    private static NumericInterval BoundedFieldInterval(string fieldName, SemanticIndex semantics)
+    {
+        var i = ExtractFieldInterval(fieldName, semantics);
+        return i.IsUnbounded ? new NumericInterval(decimal.MinValue, decimal.MaxValue) : i;
+    }
+
+    private static NumericInterval MinMaxInterval(string _) =>
+        new NumericInterval(decimal.MinValue, decimal.MaxValue);
+
     // ─────────────────────────────────────────────────────────────────────────
     //  ContradictoryRule (PRE0155)
     // ─────────────────────────────────────────────────────────────────────────
@@ -282,15 +308,7 @@ public static partial class ProofEngine
             if (rule.Guard is not null)
             {
                 extraNarrowing = new Dictionary<string, NumericInterval>(System.StringComparer.Ordinal);
-                foreach (var gc in ExtractGuardConstraints(rule.Guard))
-                {
-                    if (gc.IsPresenceCheck) continue;
-                    if (gc.Value is not { } v) continue;
-                    var current = extraNarrowing.TryGetValue(gc.Field, out var existing)
-                        ? existing
-                        : new NumericInterval(decimal.MinValue, decimal.MaxValue);
-                    extraNarrowing[gc.Field] = NarrowByConstraint(current, gc.Comparison, v, GetFieldType(gc.Field, semantics));
-                }
+                FoldConstraintsInto(extraNarrowing, ExtractGuardConstraints(rule.Guard), MinMaxInterval, semantics);
             }
 
             if (IsPredicateProvablyTrue(rule.Condition, semantics, extraNarrowing))
@@ -311,6 +329,19 @@ public static partial class ProofEngine
             for (int k = 0; k < j; k++)
             {
                 var prior = ruleConstraints[k];
+
+                // Guard mutual-exclusion pre-check: if both rules have `when`
+                // guards whose numeric constraints carve out disjoint
+                // configuration spaces on some shared field, the rules apply
+                // to disjoint sets of configurations — no contradiction is
+                // possible because no concrete configuration triggers both.
+                // (String-equality and presence-check guards are not folded;
+                // the GuardConstraint representation is numeric-only. Pairs
+                // disambiguated only by string/presence guards remain a
+                // documented over-approximation — known limitation.)
+                if (AreGuardsMutuallyExclusive(current.Rule, prior.Rule, semantics))
+                    continue;
+
                 foreach (var (field, currentInterval) in current.PerField)
                 {
                     if (!prior.PerField.TryGetValue(field, out var priorInterval)) continue;
@@ -335,10 +366,37 @@ public static partial class ProofEngine
     }
 
     /// <summary>
-    /// Maps a rule's predicate expression to a per-field interval the rule
-    /// imposes. Returns empty when the predicate has OR-disjunction (per the
-    /// design's scope-cut — only AND-conjoined-leaf shapes are handled).
+    /// Two rules' `when` guards are mutually exclusive iff both have non-null
+    /// guards AND the conjunction of their guards is unsatisfiable on at least
+    /// one shared field. Numeric constraints only — string-equality and
+    /// presence checks are not folded (GuardConstraint.Value is decimal?).
     /// </summary>
+    private static bool AreGuardsMutuallyExclusive(TypedRule current, TypedRule prior, SemanticIndex semantics)
+    {
+        if (current.Guard is null || prior.Guard is null) return false;
+
+        var currentGuard = SummariseGuardConstraints(current.Guard, semantics);
+        var priorGuard = SummariseGuardConstraints(prior.Guard, semantics);
+        if (currentGuard.Count == 0 || priorGuard.Count == 0) return false;
+
+        foreach (var (field, currentInterval) in currentGuard)
+        {
+            if (!priorGuard.TryGetValue(field, out var priorInterval)) continue;
+            if (currentInterval.Intersect(priorInterval).IsEmpty)
+                return true;
+        }
+        return false;
+    }
+
+    private static Dictionary<string, NumericInterval> SummariseGuardConstraints(
+        TypedExpression guard,
+        SemanticIndex semantics)
+    {
+        var result = new Dictionary<string, NumericInterval>(System.StringComparer.Ordinal);
+        FoldConstraintsInto(result, ExtractGuardConstraints(guard), MinMaxInterval, semantics);
+        return result;
+    }
+
     /// <summary>
     /// Compose a rule's predicate with its field-declared bounds AND its own
     /// `when` guard (if any) to detect self-unsatisfiability. Differs from
@@ -356,56 +414,30 @@ public static partial class ProofEngine
         TypedRule rule,
         SemanticIndex semantics)
     {
+        // Seed each newly-seen field from the field's declared interval — that's
+        // the distinguishing seed for self-unsat detection (vs. pair-wise
+        // comparison which seeds from MinValue/MaxValue, see BoundedFieldInterval
+        // / MinMaxInterval helpers and FoldConstraintsInto).
         var result = new Dictionary<string, NumericInterval>(System.StringComparer.Ordinal);
-
-        void Fold(TypedExpression expr)
-        {
-            foreach (var gc in ExtractGuardConstraints(expr))
-            {
-                if (gc.IsPresenceCheck) continue;
-                if (gc.Value is not { } v) continue;
-
-                if (!result.TryGetValue(gc.Field, out var current))
-                {
-                    // Seed from the field's declared interval. This is the
-                    // distinguishing seed for self-unsat detection (the pair-sweep
-                    // helper SummariseRuleConstraints seeds from MinValue/MaxValue).
-                    current = ExtractFieldInterval(gc.Field, semantics);
-                    if (current.IsUnbounded)
-                        current = new NumericInterval(decimal.MinValue, decimal.MaxValue);
-                }
-                result[gc.Field] = NarrowByConstraint(current, gc.Comparison, v, GetFieldType(gc.Field, semantics));
-            }
-        }
-
         if (rule.Guard is not null)
-            Fold(rule.Guard);
-        Fold(rule.Condition);
-
+            FoldConstraintsInto(result, ExtractGuardConstraints(rule.Guard), field => BoundedFieldInterval(field, semantics), semantics);
+        FoldConstraintsInto(result, ExtractGuardConstraints(rule.Condition), field => BoundedFieldInterval(field, semantics), semantics);
         return result;
     }
 
+    /// <summary>
+    /// Maps a rule's predicate expression to a per-field interval the rule
+    /// imposes. Seeds from a fresh MinValue/MaxValue interval — correct for
+    /// pair-wise comparison (used by the PRE0155 ContradictoryRule sweep),
+    /// but blind to field bounds. For self-unsatisfiability detection use
+    /// <see cref="ComposeRulePredicateWithFieldBounds"/> instead.
+    /// </summary>
     private static Dictionary<string, NumericInterval> SummariseRuleConstraints(
         TypedExpression predicate,
         SemanticIndex semantics)
     {
         var result = new Dictionary<string, NumericInterval>(System.StringComparer.Ordinal);
-        var constraints = ExtractGuardConstraints(predicate);
-        foreach (var gc in constraints)
-        {
-            if (gc.IsPresenceCheck) continue;
-            if (gc.Value is not { } value) continue;
-
-            var current = result.TryGetValue(gc.Field, out var existing)
-                ? existing
-                : NumericInterval.Unbounded;
-
-            // Use a non-sentinel base when intersecting (Unbounded ∩ X always = X).
-            if (current.IsUnbounded)
-                current = new NumericInterval(decimal.MinValue, decimal.MaxValue);
-
-            result[gc.Field] = NarrowByConstraint(current, gc.Comparison, value, GetFieldType(gc.Field, semantics));
-        }
+        FoldConstraintsInto(result, ExtractGuardConstraints(predicate), MinMaxInterval, semantics);
         return result;
     }
 

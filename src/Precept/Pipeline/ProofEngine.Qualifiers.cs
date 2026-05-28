@@ -795,7 +795,6 @@ public static partial class ProofEngine
         return ResolveQualifierFromExpression(priceOperand, axis, semantics);
     }
 
-    /// <summary>Look up a field's qualifier on a specific axis (with standard fallbacks).</summary>
     /// <summary>
     /// Resolves a qualifier on the element-type of a collection field. Used for lookup-access
     /// (and future element-returning accessors on qualified-inner-type collections).
@@ -817,6 +816,7 @@ public static partial class ProofEngine
         return null;
     }
 
+    /// <summary>Look up a field's qualifier on a specific axis (with standard fallbacks: Unit → Dimension; Dimension → TemporalDimension; then CompoundPrice projection).</summary>
     private static DeclaredQualifierMeta? ResolveFieldQualifier(
         string fieldName, QualifierAxis axis, SemanticIndex semantics)
     {

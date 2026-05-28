@@ -18,11 +18,8 @@ field CurrentDowntimeReason as choice of string("MachineFailure", "Maintenance",
 field LastDowntimeStart as instant optional
 field LastDowntimeEnd as instant optional
 
-# Cumulative downtime totals across the shift. Optional rather than
-# defaulted because the duration-typed default crashes the compiler
-# (BUG-008); the host can carry the zero baseline outside the precept,
-# or initialize on the first downtime completion.
-field TotalDowntimeToday as duration optional
+# Cumulative downtime totals across the shift.
+field TotalDowntimeToday as duration default '0 hours'
 
 # Production results — cumulative across the shift.
 field ProducedQuantity as integer default 0 nonnegative
@@ -122,15 +119,9 @@ from Active on ReportDowntime
 # event arg keeps the precept side fully deterministic.
 from Active on CompleteDowntime when CurrentDowntimeReason is not set
     -> reject "No active downtime to complete"
-from Active on CompleteDowntime when TotalDowntimeToday is set
-    -> set LastDowntimeEnd = now()
-    -> set TotalDowntimeToday = TotalDowntimeToday + CompleteDowntime.IncidentDuration
-    -> clear CurrentDowntimeReason
-    -> append DowntimeLog "Downtime completed: {CompleteDowntime.IncidentDuration}"
-    -> no transition
 from Active on CompleteDowntime
     -> set LastDowntimeEnd = now()
-    -> set TotalDowntimeToday = CompleteDowntime.IncidentDuration
+    -> set TotalDowntimeToday = TotalDowntimeToday + CompleteDowntime.IncidentDuration
     -> clear CurrentDowntimeReason
     -> append DowntimeLog "Downtime completed: {CompleteDowntime.IncidentDuration}"
     -> no transition

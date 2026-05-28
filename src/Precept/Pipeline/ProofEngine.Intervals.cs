@@ -427,15 +427,11 @@ public static partial class ProofEngine
                             ? new NumericInterval(decimal.MinValue, decimal.MaxValue)
                             : baseInterval;
 
-                    var value = gc.Value.Value;
-                    current = gc.Comparison switch
-                    {
-                        OperatorKind.GreaterThanOrEqual => new NumericInterval(Math.Max(current.Min, value), current.Max),
-                        OperatorKind.GreaterThan => new NumericInterval(Math.Max(current.Min, value), current.Max),
-                        OperatorKind.LessThanOrEqual => new NumericInterval(current.Min, Math.Min(current.Max, value)),
-                        OperatorKind.LessThan => new NumericInterval(current.Min, Math.Min(current.Max, value)),
-                        _ => current
-                    };
+                    // Defer to NarrowByConstraint for type-aware integer-vs-decimal
+                    // dispatch on strict comparisons (sentinel-safe; see
+                    // ProofEngine.Satisfiability.cs:NarrowByConstraint). Previously
+                    // this site inlined a coarser switch that treated `>` like `>=`.
+                    current = NarrowByConstraint(current, gc.Comparison, gc.Value.Value, GetFieldType(gc.Field, semantics));
                     branchNarrowings[gc.Field] = current;
                     unionFields.Add(gc.Field);
                 }
@@ -522,7 +518,24 @@ public static partial class ProofEngine
             if (sibling is not TypedTransitionRowReject) continue;
             if (sibling.Guard is null) continue; // unguarded reject already covered the event
             if (!string.Equals(sibling.EventName, currentRow.EventName, StringComparison.Ordinal)) continue;
-            // FromState must match (null in either means broadcast).
+
+            // First-match discipline: transition rows dispatch in declaration order
+            // (precept-language-spec.md § 5.2). A reject row positioned BELOW the
+            // current success row never intercepts at runtime — its negation can't
+            // narrow the success row's reachable field-value space.
+            if (sibling.RowSpan.Offset >= currentRow.RowSpan.Offset) continue;
+
+            // FromState compatibility check. Four cases to consider:
+            //   sibling=X, current=X        — same specific state; sibling intercepts.
+            //   sibling=X, current=Y        — different specific states; sibling can't intercept.
+            //   sibling=null, current=X     — sibling is wildcard; intercepts every state including X.
+            //   sibling=null, current=null  — both wildcards; sibling intercepts everywhere current fires.
+            //   sibling=X, current=null     — sibling specific, current wildcard.
+            //                                  The wildcard fires on states the sibling DOES NOT cover,
+            //                                  so we can't soundly apply the sibling's narrowing across
+            //                                  the wildcard's full reach. Skip.
+            if (sibling.FromState is not null && currentRow.FromState is null)
+                continue;
             if (sibling.FromState is not null && currentRow.FromState is not null
                 && !string.Equals(sibling.FromState, currentRow.FromState, StringComparison.Ordinal))
                 continue;

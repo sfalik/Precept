@@ -382,9 +382,9 @@ public enum DiagnosticCode
     /// field-level `editable`, no per-state `modify F editable`), and no
     /// computed `&lt;-` expression. Such a field can only ever hold its
     /// declared default (or remain unset for `optional`); any rule, ensure, or
-    /// consumer-side read sees a constant value. Emitted as a Warning per
-    /// Emitted as a Warning — the field is recoverable (wire it up, make it
-    /// computed, or delete it) so compilation continues.
+    /// consumer-side read sees a constant value. Emitted as a Warning — the
+    /// field is recoverable (wire it up, make it computed, or delete it) so
+    /// compilation continues.
     /// </summary>
     FieldNeverSet = 158,
 

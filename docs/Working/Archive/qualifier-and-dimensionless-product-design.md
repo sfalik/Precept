@@ -1,5 +1,5 @@
 ---
-status: Locked 2026-05-27
+status: Promoted 2026-05-28 — implemented in commit `11599944`. Decision A (`PriceDenominatorInherited` `QualifierBinding` subtype + 5 consumer-arm wiring) and Decision B (PRE0137 lift from `!opComposesDimensions` gate) shipped. Canonical content lives in `docs/compiler/type-checker.md § QualifierBinding DU`, `docs/compiler/proof-engine.md § Strategy 6 — Dimensional Product Proof`, `docs/language/business-domain-types.md § 397` (counting-unit non-interchangeability rule extended to `× ÷`), `docs/compiler/diagnostic-system.md § PRE0137`. This archive retains the four-leg rationale and the comparator survey for future audit reference.
 phase-target: post-phase-5-review-remediation
 comparable-systems-research-status: strong
 sources-consulted:
