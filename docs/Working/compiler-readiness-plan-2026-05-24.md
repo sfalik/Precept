@@ -21,7 +21,7 @@
 | 4 | Collection completeness + BUG-002 + F-LANG-BIZ-10 | **~16** | 7 (D1-D7 — all settled) | **L+ (~2.5-3 weeks)** | ✅ **Complete 2026-05-26** (all 10 workstreams W-A through W-J shipped across ~42 commits across 2 sessions; 6281/6282 Precept.Tests pass — only pre-existing BUG-013; 411/411 LS, 67/67 MCP, 291/291 analyzer; 8 precept-reviewer rounds caught real BLOCKERs each time; 3 locked design docs via `/lifecycle-2-design` — W-G choice-inner, W-E index-bounds, W-H currency.minorUnit; bugs.md flipped BUG-002, BUG-005, BUG-012, F-LANG-COLL-13 to Fixed; W-H canonical sample `insurance-claim-adjudication.precept` uses `maxplaces currency.minorUnit`. Final phase-close audit (`1e865ac1`) swept 2 stale BUG-002 sample workarounds, 8 transient finding-ID refs, and shipped W-H sample uplift.) |
 | 5 | Proof engine satisfiability + BUG-004 + BUG-006 + FieldNeverSet/unification + BIZ operator extensions | **14** | 2 | XL (~3 sessions) | ✅ **Complete 2026-05-27** (all 6 workstreams W-A through W-F shipped across 20 commits; 7136/7136 tests pass across all 4 projects; 2 precept-reviewer rounds + remediations; 3 locked designs via `/lifecycle-2-design` — W-B FieldNeverSet, W-C satisfiability cluster, W-D BIZ operator extensions. **Workstream summary**: W-A BUG-004 event-ensure narrowing (`034a5976`); W-B F-LANG-GRAPH-04 FieldNeverSet + writable→editable unification — 8 slices, 4 commits, 27 sample fixes (`0d61f792` `12d7c422` `0feb135a` `2ac416b5`); W-C satisfiability cluster — SPEC-02 UnsatisfiableGuard wire-up + SPEC-03 ContradictoryRule + SPEC-04 VacuousRule + SPEC-05 TautologicalGuard + SPEC-12 UnreachableRowFact + BUG-006 cross-row interval composition (`a6c35e36` `ffb7288b` `c16be77b` `42cee783`); W-D BIZ operator extensions — BIZ-01 `money / price → quantity` + BIZ-05 `DimensionalProductProofRequirement` + PRE0157 + BIZ-08 discrete equality narrowing (`5d945711` `e71e09d2` `08fae0ef` `fdf33095`); W-E F-LANG-TEMP-04 always-false period comparison (`27dfe325`); W-F BUG-013 sample fixture restore (`766637c0`). Phase-close audit (`34d11e61` + `ed1f4193`) addressed 1 BLOCKER + 5 CONCERNs + 2 NITs from the reviewer punch list; pre-existing proof-engine.md strategy-chain doc gap closed in (`6a35369c`). 6 new diagnostic codes (PRE0153–PRE0158); 1 new ProofRequirementKind (DimensionalProduct); 1 new ProofForwardingFact variant (UnreachableRowFact); 1 new ResultQualifierPolicy (InheritPriceDenominatorUnit); 1 new ActionMeta property (WriteSemantics); 1 new ProofStrategy (DimensionalProduct); 1 retired ModifierKind (Writable) + TokenKind; NumericInterval gains Empty/Intersect/Difference; Integer arithmetic ops gain IntervalTransfer functions. Five §0.6 obligations move from Specification-only to Implemented.) |
 | Phase 5 post-review remediation | 15 code-review findings + 3 surfaced soundness defects + cleanup | 22 | 2 (Slice 2 qualifier + dimensionless-product; Slice 4 satisfiability-attribution + reachability) | M (~1 session) | ✅ **Complete 2026-05-28** (commit `11599944` + sample-restore `332f76ac` + post-regression Slices 6–7 still local). Extra-high-effort `/code-review` on the Phase 5 spike branch surfaced 15 findings; remediated across Slice 1 (1a/1b/1c/1d direct bug fixes), Slice 3 (`PriceDenominatorInherited` `QualifierBinding` subtype wired across 5 consumer sites + PRE0137 lift from `!opComposesDimensions` gate), and Slice 5 (PRE0159 `UnsatisfiableRule` pre-pass + reachability-gated `FieldNeverSet`). Two locked designs via `/lifecycle-2-design`, now archived in `docs/Working/Archive/`. Three precept-reviewer audits cleared with remediations. A regression `/code-review` pass against the cumulative diff confirmed 0 of 15 originals survived and surfaced 3 NEW soundness defects (`BuildSiblingRejectExclusions` source-order + wildcard-row gate; `ScanRules` pair-sweep ignoring `when` guards) — fixed in Slice 6 with the guard mutual-exclusion pre-check and the source-order/wildcard checks. Slice 7 collapsed four duplicate fold-constraint sites onto a shared `FoldConstraintsInto` helper, removed dead code, cleaned doc-comment drift, downgraded `bugs.md` BUG-006 scope notes (literal-comparison sibling rejects only), and swept 6 stale narrative `# BUG-NNN` refs in samples. **7167/7167 tests pass** (was 7136 at Phase 5 close; +31 net new tests across the remediation slices). Two designs archived; `bugs.md` updated. |
-| 6 | `units` block + composite period basis (partial close) | 1 closed + 1 open | 1 (F-LANG-BIZ-07 build-or-drop, still owner-pending) | TBD | 🟡 **In progress** — F-LANG-BIZ-09 closed 2026-05-28 as already-answered by `business-domain-types.md § D6` (`unitofmeasure § Registry scopes` table synced to match the actual surface — compound-unit `quantity` fields per `samples/inventory-item.precept` pattern). F-LANG-BIZ-07 (composite period basis `&` separator) **still owner-pending** — the original Wave-0 "build OR drop" decision was never made; needs discussion. Previous 2026-05-28 design-pass artifacts (locked design doc + entity-scoped-units research + composite-period-basis research) deleted as tainted — they overrode § D6 without owner consultation and were structurally bundled with the F-LANG-BIZ-09 bad design. Workstream tracker (W-A through W-F from the bad design) deleted. |
+| 6 | composite period basis (F-LANG-BIZ-07) | 1 (F-LANG-BIZ-09 closed) | 2 (D6.1 sample? D6.2 runtime-lowering deferral — both resolved in the plan) | M (~2.5–3.5d) | 🟡 **Active — design locked, build planned 2026-05-28.** F-LANG-BIZ-09 closed as already-answered by `business-domain-types.md § D6`. F-LANG-BIZ-07 design locked: D4 amended `&`→`+` (commit `03dfc4da`, grounded by two internal surveys); 4 workstreams W-A–W-D detailed below. Runtime `Period.Between` lowering deferred to the runtime phase (compile-time surface only this phase). |
 | 7 | API surface solidity (typed descriptors) | ~6 | 1 | M-L | Stub — TBD |
 | 8 | Diagnostic completeness | ~7 | 3 | M | Stub — TBD |
 | 9 | Polish + cleanup + `/lifecycle-7-audit` skill | ~20 | 4 | M | Stub — TBD |
@@ -902,6 +902,129 @@ Exit: all 12 design acceptance criteria pass; PR mergeable.
 
 ---
 
+# Phase 6: composite period basis (F-LANG-BIZ-07)
+
+**Status**: Active — design locked, build planned 2026-05-28.
+
+**Goal**: A `period` field or event arg can declare a composite basis with `+`-separated components (`period in 'hours + minutes'`), the type checker validates and canonicalizes it, the `.basis`/`.dimension` accessors return the composite/derived values, and composite bases correctly do *not* cancel single-unit time denominators — all at compile time.
+
+**Companion docs**:
+- `docs/language/business-domain-types.md` § D4 + § Period basis (the locked amendment, commit `03dfc4da`) — the design.
+- `research/language/expressiveness/period-basis-separator-survey.md` — grounds the `+` separator.
+- `research/language/expressiveness/literal-whitespace-consistency-survey.md` — grounds lenient-whitespace + spaced-canonical.
+
+**Findings in scope** (1): F-LANG-BIZ-07 (composite period basis). F-LANG-BIZ-09 already closed (§ D6) — this completes Phase 6.
+
+## Decisions captured (locked in the D4 amendment, 2026-05-28)
+
+- **Separator**: `+` (not `&`) — matches the value-literal combiner; one operator for temporal composition.
+- **Whitespace**: lenient input (`'hours+minutes'` ≡ `'hours + minutes'`); canonical form is **spaced**.
+- **Canonicalization**: coarse-to-fine component order (years→months→weeks→days→hours→minutes→seconds); any input order accepted, silently normalized.
+- **Open-period `.basis`**: returns the runtime decomposition basis with zero-valued components omitted.
+- **D14 composite extension**: a value is accepted iff its non-zero component set ⊆ the declared basis.
+- **Composite legality by source operation**: every atom must be legal for the operation; illegal atoms emit `QualifierMismatch` per atom.
+- **`of` rejects composite syntax** (dimension-class atoms only).
+- **Interpolated composite bases deferred** (literal-only at first ship).
+- **Three malformed-basis diagnostics reserved**: duplicate / unknown / empty component.
+
+## Open decisions
+
+- **D6.1 — Sample exercising composite basis?** No current sample uses composite basis. **Options**: (a) ship the feature with scenario-test coverage only, no sample; (b) add a sample (e.g., a billing/SLA precept using `period in 'years + months'`). **Recommended**: (a) — the feature is fully exercised by scenario tests; sample-corpus churn is owned by the parallel sample-authoring session per prior phases. A sample can follow as a clean add. **Lands**: W-D kickoff.
+- **D6.2 — Runtime `Period.Between` lowering**: out of scope this phase. **Decided**: the runtime evaluator is still stub (no `Period.Between` call exists in `src/`); composite-basis runtime lowering lands with the runtime phase (Phase 10+). This phase delivers the compile-time surface only — parsing, validation, canonicalization, accessors, cancellation discipline. Noted here so it is not silently dropped.
+
+## Workstream blocks
+
+| WS | Goal | Effort | Depends on |
+|---|---|---|---|
+| W-A | Composite representation + parse/validate/canonicalize + 3 diagnostics | M (~1–1.5d) | — |
+| W-B | `.basis` / `.dimension` accessor resolution for composite | S (~½d) | W-A |
+| W-C | Composite-aware cancellation + legal-basis-by-operation enforcement | M (~1d) | W-A |
+| W-D | Scenario-test matrix + doc-status verification | S (~½d) | W-B, W-C |
+
+**Total**: ~2.5–3.5 days serial; ~2–3 if W-B and W-C parallelize after W-A.
+
+### Workstream W-A — Composite representation, parse, validate, canonicalize
+
+**Goal**: `MapTemporalUnitQualifier` accepts and canonicalizes composite bases; malformed bases emit the three new diagnostics.
+
+**Steps**:
+1. Extend `DeclaredQualifierMeta.TemporalUnit` (`src/Precept/Language/DeclaredQualifierMeta.cs:75`) to carry an ordered component set (e.g., `ImmutableArray<string> Components` + the existing `UnitName` retained as the canonical joined string for back-compat with single-basis consumers, or `UnitName` becomes the canonical composite string). Single-component stays a one-element set.
+2. Rewrite `MapTemporalUnitQualifier` (`src/Precept/Pipeline/TypeChecker.cs:393`): split the value on `+` with whitespace trimming per component; for each component call `TemporalUnits.TryGet`; detect duplicate (PRE0160), unknown atom (PRE0161), empty segment (PRE0162); canonicalize to coarse-to-fine order; compute combined `PeriodDimension` (date-only → Date, time-only → Time, mixed → Datetime).
+3. Add `DuplicateCompositeBasisComponent`, `UnknownCompositeBasisComponent`, `EmptyCompositeBasisComponent` to `DiagnosticCode.cs` (next free: PRE0160–0162); add factory entries to `Diagnostics.cs` with `FixHint`/`TriggerCondition`/`RecoverySteps`/`ExampleBefore`/`ExampleAfter`; wire emission at the `MapTemporalUnitQualifier` sites; register in `DiagnosticCoverageAllowLists.cs` only if any path lacks an emission site (expectation: all three emit, so no allow-list entry).
+4. Confirm the parser passes the raw quoted qualifier string unmodified (expected: yes — single-basis already passes `"months"` whole; no `Parser.Types.cs` change anticipated). If the parser pre-tokenizes on `+`, that's a discovered gap — handle in this WS.
+
+**Exit criteria**:
+- `precept_compile` on `period in 'hours + minutes'`, `'hours+minutes'`, `'minutes + hours'` (non-canonical) all succeed; `.basis` resolves to canonical `'hours + minutes'`.
+- `period in 'hours + hours'` emits PRE0160; `period in 'years + fortnights'` emits PRE0161; `period in 'years +'` emits PRE0162.
+- `dotnet test` green; `Precept0027DiagnosticEmissionCoverage` analyzer clean (no missing-emission or stale-allow-list warnings for the 3 new codes).
+
+**Doc-update obligations**: `docs/compiler/diagnostic-system.md` (3 new codes); `docs/language/catalog-system.md` (diagnostic count bump); `docs/compiler/type-checker.md` if the `DeclaredQualifierMeta.TemporalUnit` shape change is documented there.
+
+### Workstream W-B — Accessor resolution
+
+**Goal**: `.basis` returns the canonical spaced composite string; `.dimension` returns `'datetime'` for date+time-spanning composites.
+
+**Steps**:
+1. `.basis` accessor (`src/Precept/Language/Types.cs:480`, `FixedReturnAccessor("basis", …)`): ensure the resolved value is the canonical composite string. The proof-marker mapping (`src/Precept/Pipeline/ProofEngine.Qualifiers.cs:198,244` — `TemporalUnit { UnitName: var value } => value`) must surface the canonical composite spelling for `$eq:X.basis:…` markers.
+2. `.dimension` accessor (`Types.cs:481`): return `Datetime` when the composite spans both date and time atoms (uses the combined `PeriodDimension` computed in W-A).
+
+**Exit criteria**:
+- `when X.basis == 'hours + minutes'` narrows correctly (proof marker matches canonical).
+- `.dimension` on `period in 'days + hours'` returns `'datetime'`; on `period in 'years + months'` returns `'date'`.
+- `dotnet test` green.
+
+**Doc-update obligations**: none beyond the already-amended `business-domain-types.md` accessor rows (verify they match implementation).
+
+### Workstream W-C — Composite-aware cancellation + legal-basis enforcement
+
+**Goal**: composite bases do not cancel single-unit denominators (D15), and illegal atoms / non-subset assignments emit `QualifierMismatch`.
+
+**Steps**:
+1. Single-basis-assuming consumers must treat composite as "not single-basis": `src/Precept/Pipeline/TypeChecker.Expressions.cs:1322–1339` (period cancellation against price denominators) — a composite period must not cancel `price in 'USD/hours'`; emit/retain `CompoundPeriodDenominator`. Audit `ProofEngine.cs:602`, `ProofEngine.Qualifiers.cs:198/244`, `ProofEngine.Strategies.cs:236` for `UnitName` single-atom assumptions.
+2. Legal-basis-by-source-operation (Gap 4): a composite atom illegal for the source operation (e.g., `hours` on `date - date`) emits `QualifierMismatch` per illegal atom.
+3. D14 composite subset (Gap 3): assignment whose non-zero component set ⊄ declared basis emits `QualifierMismatch`.
+
+**Exit criteria**:
+- `period in 'hours + minutes' * price in 'USD/hours'` emits `CompoundPeriodDenominator`.
+- `date - date as period in 'days + hours'` emits `QualifierMismatch` for `hours`.
+- Assigning a Days-bearing value to `period in 'years + months'` emits `QualifierMismatch`.
+- `dotnet test` green.
+
+**Doc-update obligations**: verify `business-domain-types.md` § D15 cancellation + § Composite legality + D14 composite extension match implementation (already amended; confirm no drift).
+
+### Workstream W-D — Scenario tests + doc-status verification
+
+**Goal**: the matrix is covered by scenario tests and the docs match shipped behavior.
+
+**Steps**:
+1. Scenario tests (`test/Precept.Tests/`, new `CompositePeriodBasisTests.cs`): canonicalization (order-independence, spaced canonical), lenient whitespace, PRE0160/0161/0162 emission, D14 subset accept/reject, legal-basis-by-operation, cancellation-blocked, `.basis`/`.dimension` returns.
+2. Resolve D6.1 (sample or not). If sample: add + `precept_compile` clean.
+3. Verify no doc drift: `business-domain-types.md` composite sections describe shipped behavior; flip any status notes.
+
+**Exit criteria**:
+- New test file covers every row of the decision matrix; `dotnet test` green at the new higher count.
+- `precept_compile` on a composite example (and the sample if added) is clean.
+- `grep` confirms no `&`-as-basis-separator remains in samples or docs.
+
+**Doc-update obligations**: `docs/language/business-domain-types.md` (status confirmation); readiness-plan Phase 6 row → ✅ Complete; this Phase 6 section → status Complete with commit refs.
+
+## Discovered during planning
+
+The D4 amendment is an in-place spec edit (not a `/lifecycle-2-design` doc with `sources-consulted` frontmatter), so the code surface was mapped during this planning pass rather than enumerated at design time. Files the build will touch, none a design oversight:
+- `src/Precept/Language/DeclaredQualifierMeta.cs` — `TemporalUnit` shape extension
+- `src/Precept/Pipeline/TypeChecker.cs` — `MapTemporalUnitQualifier`
+- `src/Precept/Language/DiagnosticCode.cs`, `Diagnostics.cs` — 3 new codes + factories
+- `src/Precept.Analyzers/DiagnosticCoverageAllowLists.cs` — only if an emission gap exists
+- `src/Precept/Language/Types.cs` — `.basis`/`.dimension` accessors
+- `src/Precept/Pipeline/ProofEngine.Qualifiers.cs`, `ProofEngine.cs`, `ProofEngine.Strategies.cs` — single-atom-assumption audit
+- `src/Precept/Pipeline/TypeChecker.Expressions.cs` — period/price cancellation
+- `test/Precept.Tests/CompositePeriodBasisTests.cs` — new
+
+## Definition of done
+
+Phase 6 is complete when: every WS exit criterion holds; `dotnet test` green; the diagnostic-coverage analyzer is clean; `precept_compile` accepts the canonicalization/whitespace matrix and rejects the malformed/illegal cases with the right codes; `business-domain-types.md` composite sections describe shipped behavior with no drift; the Phase 6 row flips to ✅. Runtime `Period.Between` lowering is explicitly deferred to the runtime phase (D6.2) and is not a Phase 6 exit condition.
+
+---
 
 # Phase 7: API surface solidity (typed descriptors + analyzer extensions)
 
