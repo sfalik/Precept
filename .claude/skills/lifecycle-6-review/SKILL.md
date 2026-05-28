@@ -30,8 +30,12 @@ Stage 6 of the engineering lifecycle. Holistic completion verification for a sin
 The skill verifies the work item was processed through all 5 earlier stages:
 
 1. **Stage 1 — Research**
-   - Was research done? Check for `research/<area>/` docs cited in the design.
-   - If no research found: emit ⚠️ "no research cited — intentional?" — owner judges (some work is small enough to skip research; some isn't)
+   - Was research done? Check for `research/<area>/` docs cited in the design or plan row.
+   - **Three honest exits** — exactly one applies per work item:
+     - **(a) Research-cited**: design or plan row cites at least one file in `research/` with an excerpt or section reference. ✅
+     - **(b) Research-not-applicable**: design or plan row declares `research-status: not-applicable — <one-line reason>` (e.g., "direct bug fix against `proof-engine.md § N`; no comparator question," "mechanical sample-corpus restore; no design surface"). ✅ The declaration is the honest "I checked, this doesn't apply here" answer — accepted at face value when the work is genuinely mechanical (bug fixes, test-fixture restores, doc-only sweeps, refactors with no behavior change).
+     - **(c) Research-missing**: neither (a) nor (b) is present, but the work item involves design surface (new language construct, new diagnostic, new pipeline stage, new public API). ⚠️ "no research cited — intentional?" — owner judges.
+   - The skill refuses to upgrade (c) to ✅ without either a research citation or an explicit not-applicable declaration. Marking a work item not-applicable retroactively is fine; silently ignoring missing research is not.
 
 2. **Stage 2 — Design**
    - Design doc exists in `docs/Working/` or `docs/Working/Archive/`
@@ -47,6 +51,8 @@ The skill verifies the work item was processed through all 5 earlier stages:
    - Decisions surfaced as gates (not buried in execution steps)
    - Doc-touch obligations per phase enumerated
    - 🔴 if any phase the work item touches lacks exit criteria
+   - **Exit-criteria format is not prescribed.** Discrete checklists (`- [x] foo`) and narrative phase-row prose both satisfy the gate, provided the prose contains all four elements: **(i) completion marker** (✅/❌ or `Complete YYYY-MM-DD`), **(ii) test-suite outcome** (counts or "test suite green"), **(iii) commit references** (per workstream or rolled-up), **(iv) workstream enumeration** with per-workstream one-line outcome. A narrative row missing any of these four elements drops to ⚠️ (the missing element is named in the report).
+   - Decisions surfaced as gates means: where the phase requires a decision before execution can proceed (e.g., locked design doc, choice between option A/B), the decision is named and its resolution location cited. Buried decisions ("we'll figure out X during execution") drop to 🔴 — execution-time invention isn't a planned decision.
 
 4. **Stage 4 — Execute**
    - Code shipped (commit refs in design or plan)
@@ -108,8 +114,13 @@ Distinct from:
 |---|---|
 | Design doc has no acceptance criteria | 🔴 — Stage 2 incomplete; remediate before signing off |
 | Plan doesn't enumerate doc-touch | 🔴 — Stage 3 incomplete |
+| Phase row uses narrative prose instead of a bulleted checklist | ✅ if the prose contains (i) completion marker, (ii) test-suite outcome, (iii) commit refs, (iv) workstream enumeration with per-workstream one-line outcome — format is not prescribed |
+| Phase row narrative is missing one of the four elements above | ⚠️ — name the missing element ("no test-suite outcome stated" / "no commit refs cited") |
+| Phase has no exit criteria in any form | 🔴 — Stage 3 incomplete |
 | Canonical doc not updated per plan's doc-touch list | 🔴 — Stage 5 incomplete; run `/lifecycle-5-promote` for the gap |
 | Tests exist but acceptance criterion has no test ref | ⚠️ — surface judgment question |
-| No research cited for a small bug fix | ⚠️ — likely OK; ask owner |
+| No research cited for a small bug fix, AND no `research-status: not-applicable` declaration | ⚠️ — likely OK; ask owner OR add a one-line `research-status: not-applicable — <reason>` to the design / plan row to convert to ✅ |
+| `research-status: not-applicable — <reason>` declared on a bug fix, refactor, doc sweep, or test-fixture restore | ✅ — honest exit accepted at face value |
+| `research-status: not-applicable` declared on work that introduces design surface (new construct, diagnostic, pipeline stage) | ⚠️ — challenge: the declaration looks dishonest given the surface. Ask owner whether research truly doesn't apply or whether it was skipped |
 | `--strict` mode + ⚠️ present | Treat as 🔴 |
 | User invokes `--accept-debt "reason"` | Record in debt log; downgrade 🔴 to ✅* |

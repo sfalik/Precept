@@ -201,34 +201,37 @@ Each decision is self-classified by stakes; the required-leg set scales with sta
 
 | Stakes | Definition | Examples |
 |---|---|---|
+| **exploratory** | Decision is included for discussion / future resolution; author is not ready to lock. Skips the per-stakes leg requirements but must declare what's keeping it open. Cannot survive into `Locked` status — must resolve or be removed before the doc locks. | Three-way syntax bake-off awaiting prototype data; placement question depending on Phase N work; tradeoff awaiting usability test |
 | **low** | Recoverable choice; reversal touches <5 docs/samples; no public-surface lock-in | Severity choice on a new diagnostic, RecoverySteps wording, NIT-level naming |
 | **medium** | Choice that affects more than one consumer but is reversible with bounded effort | New modifier semantics, new accessor, new diagnostic code |
 | **high** | Touches public-surface contracts (catalog member names, diagnostic codes, MCP vocabulary, keyword choices); reversal is costly | New keyword, new construct, new type, new operator, public API addition |
 | **irreversible** | Once shipped to external authors, reversal is effectively infinite cost | Keyword retirement, public-API breaking change, semantic change to existing operator, catalog enum renumbering |
 
-State the stakes explicitly: `**Stakes**: low | medium | high | irreversible`. The reviewer flags missing or implausible stakes classification.
+State the stakes explicitly: `**Stakes**: exploratory | low | medium | high | irreversible`. The reviewer flags missing or implausible stakes classification. **Exploratory is a draft-mode marker** — it lets authors sketch decisions they don't yet know enough to lock, without forcing premature four-leg work. A design can carry mixed exploratory + locked decisions in `Draft` / `Semantics-Stated` / `Externally-Grounded` status; lock-time refuses any exploratory decisions remaining.
 
 ### Required legs by stakes
 
-| Leg | low | medium | high | irreversible |
-|---|---|---|---|---|
-| Rationale | ✓ | ✓ | ✓ | ✓ |
-| Tradeoff accepted | ✓ | ✓ | ✓ | ✓ |
-| Alternatives considered | — | ✓ | ✓ | ✓ |
-| Precedent | — | ✓ | ✓ | ✓ |
-| Sources consulted (with excerpt) | — | ✓ | ✓ | ✓ |
-| Counter-evidence | — | — | ✓ | ✓ |
-| Reversibility | — | — | ✓ | ✓ |
-| Blast radius | — | — | ✓ | ✓ |
-| Falsifiers (in companion section) | — | — | — | ✓ |
-| 24-hour cooling-off before Locked | — | — | — | ✓ |
+| Leg | exploratory | low | medium | high | irreversible |
+|---|---|---|---|---|---|
+| Rationale | — | ✓ | ✓ | ✓ | ✓ |
+| Tradeoff accepted | — | ✓ | ✓ | ✓ | ✓ |
+| Alternatives considered | — | — | ✓ | ✓ | ✓ |
+| Precedent | — | — | ✓ | ✓ | ✓ |
+| Sources consulted (with excerpt) | — | — | ✓ | ✓ | ✓ |
+| Counter-evidence | — | — | — | ✓ | ✓ |
+| Reversibility | — | — | — | ✓ | ✓ |
+| Blast radius | — | — | — | ✓ | ✓ |
+| Falsifiers (in companion section) | — | — | — | — | ✓ |
+| 24-hour cooling-off before Locked | — | — | — | — | ✓ |
+| Exploratory-because + Working-hypothesis + Decision-needed-before | ✓ | — | — | — | — |
+| Survives into Locked status | ✗ | ✓ | ✓ | ✓ | ✓ |
 
 ### Decision template
 
 ```markdown
 ### Decision N: <one-line decision>
 
-**Stakes**: <low | medium | high | irreversible>
+**Stakes**: <exploratory | low | medium | high | irreversible>
 
 - **Rationale**: why this choice
 - **Tradeoff accepted**: the known downside being taken on
@@ -254,6 +257,26 @@ State the stakes explicitly: `**Stakes**: low | medium | high | irreversible`. T
   consumers affected.
   [required for high+]
 ```
+
+### Decision template — exploratory variant
+
+```markdown
+### Decision N: <one-line decision — TBD>
+
+**Stakes**: exploratory
+
+- **Exploratory because**: <what's keeping this open — depends on Phase N
+  prototype data, waiting on usability test, blocked on owner judgment, etc.>
+- **Working hypothesis**: <current leaning, NOT committed; may flip on new
+  information>
+- **Decision needed before**: <the latest point this must resolve — Phase N
+  exit, before construct ships, before tests reference it>
+- **Open questions**: <enumerated unknowns that would let this decision lock>
+```
+
+The exploratory variant skips Rationale, Tradeoff, Alternatives, Precedent, Sources, Counter-evidence, Reversibility, Blast-radius. The author is honestly saying "I don't know enough yet." When information arrives, the decision is re-classified to `low | medium | high | irreversible` and the appropriate legs are filled.
+
+**Cannot survive into Locked status.** A design moving to `Locked YYYY-MM-DD` must either (a) resolve every exploratory decision into a full-leg one, or (b) remove the exploratory decision from the doc entirely. Lock-time refuses any `Stakes: exploratory` decisions still present.
 
 ### Honest-answer exits
 
@@ -339,17 +362,18 @@ ladder through all four.
 | **Draft** | Decision text written; stakes classified per decision. May skip directly to Locked for designs where every decision is `Stakes: low` and no language-surface change. |
 | **Semantics-Stated** | + Semantic Rules section present (if affected by guard 4) + Decision text + per-decision Rationale and Tradeoff |
 | **Externally-Grounded** | + Language Design Grounding (if affected by guard 2) + Architecture Grounding with external precedent (if affected by guard 5) + per-decision Sources consulted (with excerpts) + per-decision Counter-evidence (for high+ stakes) |
-| **Locked YYYY-MM-DD** | + Philosophy Alignment matrix filled + Audience and Teachability (if language surface) + Acceptance criteria + Doc-update enumeration + Falsifiers (if external-author-visible) + Reversibility / Blast radius legs (for high+ stakes) + No open questions + **Research-adequacy verified (if any `Stakes: irreversible` decision)** |
+| **Locked YYYY-MM-DD** | + Philosophy Alignment matrix filled + Audience and Teachability (if language surface) + Acceptance criteria + Doc-update enumeration + Falsifiers (if external-author-visible) + Reversibility / Blast radius legs (for high+ stakes) + No open questions + **No `Stakes: exploratory` decisions remaining** + **Research-adequacy verified (if any `Stakes: irreversible` decision)** |
 
 Cooling-off requirement: a design with any `Stakes: irreversible` decision must hold `status: Externally-Grounded` for at least 24 hours before advancing to `Locked`. The cooling-off is structural — it forces a second-pass review of the design after time away.
 
 ### Research-adequacy gate (irreversible decisions)
 
-Designs with at least one `Stakes: irreversible` decision must clear a research-adequacy check before advancing to `Locked`. The gate has three honest exits, exactly one of which must apply:
+Designs with at least one `Stakes: irreversible` decision must clear a research-adequacy check before advancing to `Locked`. The gate has four honest exits, exactly one of which must apply:
 
 - **(a) Research-cited**: the design cites a research file in `research/` that surveyed the relevant comparable systems with verbatim excerpts and meets `/lifecycle-1-research` Stage-1 quality. The cited file must appear in `sources-consulted` and in at least one per-decision `Sources consulted for this decision:` leg. Frontmatter declares `comparable-systems-research-status: strong`.
 - **(b) Inline-survey**: per-decision comparable-systems survey is carried inline — for each external system named in the decision's prose, the leg supplies a verbatim excerpt, an access date, and a stable identifier (file path, RFC#, DOI, paper title + venue + year, or live URL with mirror). The inline survey meets the same discipline as a Stage-1 research artifact; the cumulative legs across decisions cover every comparator named. Frontmatter declares `comparable-systems-research-status: partial`.
 - **(c) Not-applicable**: the design genuinely makes no comparable-systems claims. The frontmatter declares `comparable-systems-research-status: not-applicable — <one-line justification>` (e.g., "purely Precept-internal placement decision; no language-surface or architectural-precedent claim"). Reviewer treats this exit as a CONCERN if the design's prose nonetheless names external systems.
+- **(d) Novel-verified**: the author looked for comparators, found none that apply to the decision's problem, and is locking the decision as honestly novel. The frontmatter declares `comparable-systems-research-status: novel-verified`. The design must include a `## Novel-verified declaration` section listing (1) **the obvious comparators checked** — at minimum 3, drawn from the reviewer's `Mandatory comparator-checking by topic` table for the relevant surface; (2) **a one-line "doesn't apply because <reason>" for each**; (3) **a one-paragraph defense of why the novelty is warranted** given the gap. The exit is for designs that are genuinely first-of-their-kind, not for designs where the author didn't want to do the survey. Reviewer treats this exit as a CONCERN if (a) any comparator on the reviewer's topic table is missing from the checked-list without justification, or (b) the design's prose nonetheless names a system that DOES solve the decision's problem and the doesn't-apply line is unconvincing.
 
 The gate is enforced by skill-text obligation + reviewer-agent invocation (see `.claude/agents/precept-reviewer.md § Mandatory comparator-checking by topic`). Without docs-lint (Phase 0 deferred), authors who skip the reviewer can ship past the gate; the discipline is author-side + reviewer-side, not build-time.
 
@@ -371,7 +395,7 @@ The skill enforces:
 
 5. **Pipeline/API/catalog changes require Architecture Grounding.** If the design touches catalog structure, pipeline stage boundaries, public API contracts, or cross-component interfaces: all sub-sections must be present. Precept-internal placement: layer placement + cross-component propagation (no blanks; explicit "None" required per category) + breaking changes. External architectural precedent: at least one comparator's solution cited with excerpt for non-trivial architectural changes. "No precedent — novel architectural choice" is acceptable but requires explicit acknowledgment.
 
-6. **Every decision carries stakes-appropriate legs.** Each decision declares `Stakes: low | medium | high | irreversible`. Required legs scale with stakes (see § Decisions § Required legs by stakes). High-stakes decisions require Counter-evidence, Reversibility, and Blast-radius legs. Irreversible decisions additionally require a `## Falsifiers` section and a 24-hour cooling-off period before advancing to `Locked`. Missing stakes classification or skipped legs are refused.
+6. **Every decision carries stakes-appropriate legs.** Each decision declares `Stakes: exploratory | low | medium | high | irreversible`. Required legs scale with stakes (see § Decisions § Required legs by stakes). High-stakes decisions require Counter-evidence, Reversibility, and Blast-radius legs. Irreversible decisions additionally require a `## Falsifiers` section and a 24-hour cooling-off period before advancing to `Locked`. **Exploratory decisions** skip the per-stakes leg requirements but must declare Exploratory-because + Working-hypothesis + Decision-needed-before; they cannot survive into `Locked` status (the doc either resolves or removes them before locking). Missing stakes classification or skipped legs are refused.
 
 7. **External-author-visible changes require Falsifiers.** If the design locks behavior visible to external authors (language surface, error messages, diagnostic codes, MCP vocabulary, public-API shape), a `## Falsifiers` section is required with 2-5 specific observations that would force redesign post-ship. Missing Falsifiers on an external-author-visible change is refused.
 
@@ -394,7 +418,7 @@ The skill enforces:
 
 15. **Operational dimensions required when triggered.** If the design touches source-text ingestion (lexer/parser/MCP input), a Security prompt must be addressed. If it touches runtime evaluation or diagnostic surface, an Observability prompt must be addressed. If it depends on an external standard (NodaTime, ICU, UCUM, ISO 4217, TZDB), an Evolvability prompt must be addressed. Skipping a triggered prompt without explicit "N/A — <reason>" is refused.
 
-16. **Research-adequacy gate for irreversible decisions.** A design with any `Stakes: irreversible` decision cannot advance to `Locked` until research-adequacy is verified (see § Staged advancement § Research-adequacy gate). The author must declare exactly one of: `comparable-systems-research-status: strong` (cites a Stage-1 research file in `research/`), `partial` (inline survey per decision meets Stage-1 discipline), or `not-applicable` (with one-line justification). Missing `comparable-systems-research-status` frontmatter on an irreversible-decision design is refused. The gate is cross-checked against the reviewer's `Mandatory comparator-checking by topic` table; topics named in decision prose that lack the expected comparator citations are flagged as a CONCERN.
+16. **Research-adequacy gate for irreversible decisions.** A design with any `Stakes: irreversible` decision cannot advance to `Locked` until research-adequacy is verified (see § Staged advancement § Research-adequacy gate). The author must declare exactly one of: `comparable-systems-research-status: strong` (cites a Stage-1 research file in `research/`), `partial` (inline survey per decision meets Stage-1 discipline), `not-applicable` (with one-line justification), or `novel-verified` (with a `## Novel-verified declaration` section listing the obvious comparators checked, a doesn't-apply line for each, and a one-paragraph defense of the novelty). Missing `comparable-systems-research-status` frontmatter on an irreversible-decision design is refused. The gate is cross-checked against the reviewer's `Mandatory comparator-checking by topic` table; topics named in decision prose that lack the expected comparator citations are flagged as a CONCERN; topics absent from the checked-list under `novel-verified` are likewise flagged.
 
 ## Composability
 
@@ -407,6 +431,8 @@ The skill enforces:
 - Leave acceptance criteria as prose ("the feature works")
 - Skip doc-update enumeration ("I'll figure it out later")
 - Mark "Locked" with `(?)` markers or `TBD` placeholders in decision rationale
+- Mark "Locked" with `Stakes: exploratory` decisions still present (exploratory is a draft-mode marker — resolve or remove before locking)
+- Use `Stakes: exploratory` as a way to skip the four-leg for a decision the author IS confident about (the exit is for genuine uncertainty, not for skipping homework)
 - Cite a source without an excerpt ("Consulted: `Modifiers.cs`" — bare; no proof of reading). The excerpt is the forcing function. Bare-path citations are refused.
 - Make claims about external state with no `Sources consulted` ("The catalog already has 8 of these" — no citation). The skill refuses to lock when prose references external state but the citation leg is empty.
 - Write `## Philosophy Alignment` as a single sentence ("this design is consistent with Precept's philosophy") — requires addressing each commitment specifically
@@ -432,5 +458,9 @@ The skill enforces:
 | Language Design Grounding cites only Precept-internal docs | Refuse; require engagement with broader field (comparable systems or PLT) |
 | Pipeline/API/catalog change with no Architecture Grounding | Refuse; require layer placement + propagation + breaking change assessment |
 | Architecture Grounding propagation category left blank | Refuse; require explicit "None" or impact description per category |
-| Irreversible decision with no `comparable-systems-research-status` frontmatter | Refuse; require one of `strong` / `partial` / `not-applicable — <justification>` |
-| Decision prose names external systems but no comparator citations | Refuse; require either Stage-1 research citation or inline survey legs |
+| Irreversible decision with no `comparable-systems-research-status` frontmatter | Refuse; require one of `strong` / `partial` / `not-applicable — <justification>` / `novel-verified` |
+| Decision prose names external systems but no comparator citations | Refuse; require either Stage-1 research citation, inline survey legs, or `novel-verified` declaration with the named systems addressed in the doesn't-apply lines |
+| Author claims "novel" but did no comparator check | Offer `novel-verified` exit: pick the obvious 3-5 comparators for this surface (from reviewer's topic table), write a one-line doesn't-apply for each, defend the novelty in a paragraph |
+| Author wants to sketch a decision but isn't ready to commit four-leg | Offer `Stakes: exploratory`: decision lives in the doc with Exploratory-because + Working-hypothesis + Decision-needed-before legs; resolves to a real stakes value (or drops out) before lock |
+| Author marks a decision exploratory to skip four-leg | Refuse — exploratory is for genuine uncertainty, not for offloading work. If the author knows the rationale, the four-leg is fast to write |
+| Design ready to Lock but exploratory decisions still present | Refuse Lock until each exploratory is either resolved into a `low | medium | high | irreversible` decision with appropriate legs, or removed from the doc |
