@@ -32,7 +32,7 @@
   - [Catalog-Driven Obligation Instantiation](#catalog-driven-obligation-instantiation)
   - [ProofRequirement Catalog DU](#proofrequirement-catalog-du)
 - [7. Component Mechanics](#7-component-mechanics)
-  - [Six Proof Strategies](#six-proof-strategies)
+  - [Proof Strategies](#proof-strategies)
   - [Subject Resolution Utilities](#subject-resolution-utilities)
   - [ProofSatisfaction DU](#proofsatisfaction-du)
   - [Carrier Types](#carrier-types)
@@ -58,7 +58,7 @@
   - [Determinism](#determinism)
   - [Catalog Correspondence](#catalog-correspondence)
 - [11. Design Rationale and Decisions](#11-design-rationale-and-decisions)
-  - [Decision 1: Five-Strategy Bounded Set vs. SMT Solver](#decision-1-five-strategy-bounded-set-vs-smt-solver)
+  - [Decision 1: Bounded Strategy Set vs. SMT Solver](#decision-1-bounded-strategy-set-vs-smt-solver)
   - [Decision 2: ProofLedger Does NOT Cross Compile-Runtime Boundary](#decision-2-proofledger-does-not-cross-compile-runtime-boundary)
   - [Decision 3: Obligations Stamped by Type Checker, Not Identified by Proof Engine](#decision-3-obligations-stamped-by-type-checker-not-identified-by-proof-engine)
   - [Decision 4: Constraint Influence as Proof Engine Output](#decision-4-constraint-influence-as-proof-engine-output)
@@ -440,18 +440,24 @@ The proof engine operates in two sequential passes:
                                    ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │  Pass 2: Obligation Discharge                                        │
-│  • For each ProofObligation:                                         │
-│    - Try Strategy 1 (Literal) → if success, mark Proved              │
-│    - Try Strategy 2 (DeclarationAttribute) → if success, mark Proved │
-│    - Try Strategy 3 (GuardInPath) → if success, mark Proved          │
-│    - Try Strategy 4 (FlowNarrowing) → if success, mark Proved        │
-│    - Try Strategy 5 (QualifierCompatibility) → if success, mark Proved │
-│    - Try Strategy 6 (DimensionalProduct) → if success, mark Proved   │
-│    - Try Strategy 7 (CompositionalConstraint) → if success, mark Proved │
-│    - If all fail → mark Unresolved, emit diagnostic                  │
-│  • Build FaultSiteLinks for unresolved obligations                   │
-│  • Run constraint influence analysis                                 │
-│  • Run initial-state satisfiability check                            │
+│  • For each ProofObligation, try strategies in order; first to       │
+│    succeed marks the obligation Proved:                              │
+│    1. Literal                  — value literal at the site            │
+│    2. DeclarationAttribute     — field modifier (e.g., `nonnegative`) │
+│    3. GuardInPath              — `when …` clause in the path's guard  │
+│    4. FlowNarrowing            — set-then-read interval flow          │
+│    5. QualifierCompatibility   — currency/unit/dimension match        │
+│    6. DimensionalProduct       — quantity × quantity in curated set   │
+│    7. CompositionalConstraint  — multi-field constraint composition   │
+│    8. IntervalContainment      — narrowed interval fits target bounds │
+│    9. LengthContainment        — string literal length fits min/max   │
+│   10. CountContainment         — collection size fits min/max         │
+│   (requirement-dispatched: KeyPresence and IndexBounds use            │
+│    guard-derived bounds, both reported under ProofStrategy.GuardInPath)│
+│  • If all fail → mark Unresolved, emit diagnostic.                   │
+│  • Build FaultSiteLinks for unresolved obligations.                  │
+│  • Run constraint influence analysis.                                │
+│  • Run initial-state satisfiability check.                           │
 └─────────────────────────────────────────────────────────────────────┘
                                    │
                                    ▼
@@ -563,14 +569,14 @@ public sealed record IntervalContainmentProofRequirement(
     decimal?     AuthoredMax,   // raw authored magnitude (for diagnostic display only)
     string       Description
 ) : ProofRequirement(ProofRequirementKind.IntervalContainment, Description);
-// Discharged by Strategy 7 (IntervalContainment). For quantity and price fields,
+// Discharged by Strategy 8 (IntervalContainment). For quantity and price fields,
 // DeclaredMin/DeclaredMax carry UCUM-normalized base-unit magnitudes computed by
 // the TypeChecker at extraction time. AuthoredMin/AuthoredMax preserve the raw
 // values as written by the author (e.g. 5 for `min '5 kg'`) and are used only
 // for diagnostic display. For non-quantity fields the two pairs are identical.
 ```
 
-> **Normalization boundary.** For `quantity` and `price` fields, the TypeChecker normalizes `min`/`max` modifier magnitudes to UCUM base units at field-typing time, storing the results as `NormalizedDeclaredMin`/`NormalizedDeclaredMax` on `TypedField` and `TypedArg`. The obligation collectors (`ProofEngine.Analysis.cs`, `Actions.cs`) then construct `IntervalContainmentProofRequirement` by calling `GetFieldBounds()`, which reads these pre-normalized values. Downstream consumers — Strategy 7, `TypedFieldRef` interval extraction, and the MCP `precept_compile` tool — read the pre-normalized `DeclaredMin`/`DeclaredMax` values. Raw authored magnitudes are preserved on `TypedField.DeclaredMin/Max` and `IntervalContainmentProofRequirement.AuthoredMin/Max` for diagnostic display only. Explicit counting-unit mismatches (e.g. `each` vs `box`) are not normalized — they must match qualifiers or use a separate runtime conversion field.
+> **Normalization boundary.** For `quantity` and `price` fields, the TypeChecker normalizes `min`/`max` modifier magnitudes to UCUM base units at field-typing time, storing the results as `NormalizedDeclaredMin`/`NormalizedDeclaredMax` on `TypedField` and `TypedArg`. The obligation collectors (`ProofEngine.Analysis.cs`, `Actions.cs`) then construct `IntervalContainmentProofRequirement` by calling `GetFieldBounds()`, which reads these pre-normalized values. Downstream consumers — Strategy 8 (IntervalContainment), `TypedFieldRef` interval extraction, and the MCP `precept_compile` tool — read the pre-normalized `DeclaredMin`/`DeclaredMax` values. Raw authored magnitudes are preserved on `TypedField.DeclaredMin/Max` and `IntervalContainmentProofRequirement.AuthoredMin/Max` for diagnostic display only. Explicit counting-unit mismatches (e.g. `each` vs `box`) are not normalized — they must match qualifiers or use a separate runtime conversion field.
 
 #### ProofSubject
 
@@ -590,9 +596,9 @@ public sealed record SelfSubject(TypeAccessor? Accessor = null) : ProofSubject;
 
 ## 7. Component Mechanics
 
-### Six Proof Strategies
+### Proof Strategies
 
-Each strategy is a simple predicate function — not a solver. The first strategy that succeeds marks the obligation as `Proved`. Strategies are tried in order (1 → 2 → 3 → 4 → 5 → 6).
+Each strategy is a simple predicate function — not a solver. The first strategy that succeeds marks the obligation as `Proved`. The seven catalog-driven strategies (1–7) run unconditionally on every obligation; three further requirement-dispatched strategies (8–10) run only when the obligation carries a matching requirement subtype (`IntervalContainmentProofRequirement`, `LengthContainmentProofRequirement`, `CountContainmentProofRequirement`). Two more requirement-dispatched paths (KeyPresence, IndexBounds) reuse the `ProofStrategy.GuardInPath` reporting tag because they discharge via guard-derived bounds — they are dispatched on requirement subtype but credit the guard-in-path mechanic.
 
 ### Subject Resolution Utilities
 
@@ -1394,7 +1400,23 @@ bool TryQualifierCompatibilityProof(ProofObligation obligation, SemanticIndex se
 
 **Reference:** The exact dispatch, fallback chains, currency-axis translation, and comparison tables are documented in **Qualifier Resolution Reference** below.
 
-#### Strategy 6: Compositional Constraint Proof
+#### Strategy 6: Dimensional Product Proof
+
+**When it applies:** An obligation of kind `DimensionalProductProofRequirement` on a `quantity × quantity` site (currently produced by the `QuantityTimesQuantity` operator).
+
+**How it works:** Resolves each operand's unit qualifier (falling back to dimension), parses via UCUM into a `DimensionVector`, multiplies the two vectors (element-wise exponent addition), and asks `DimensionCatalog.TryGetAlias(product, ...)` whether the result matches a curated business-domain dimension (length, mass, volume, area, temperature, energy, pressure, force, speed, count).
+
+```csharp
+// Discharged by Strategy 6 (Dimensional Product Proof).
+// Lives in ProofEngine.Qualifiers.cs:TryDimensionalProductProof.
+//
+// product = leftVector.Multiply(rightVector);
+// return DimensionCatalog.TryGetAlias(product, out _);
+```
+
+Cancelling pairs (e.g. `kg × (1/kg)` → `count`) resolve to `DimensionVector.None` and succeed via the dimensionless `count` alias. Products outside the curated set (e.g. `kg × m` ⇒ `mass·length`) fail to discharge and the obligation emits `IncompatibleDimensionalProduct` (PRE0157). The dimension-vector arithmetic itself is exact integer-exponent algebra; the curation is the design choice that maps physics-coherent products onto business-meaningful ones — see `docs/language/business-domain-types.md § Approximation Stance`.
+
+#### Strategy 7: Compositional Constraint Proof
 
 **When it applies:** An obligation on a field's numeric range can be proven by compositional sign inference across all assignments to that field combined with the modifiers on the assigned values.
 
@@ -1601,14 +1623,33 @@ bool SignSetSatisfiesRequirement(NumericSignSet signSet, NumericProofRequirement
 }
 ```
 
-> **Intentional scope:** Strategy 6 combines three proof techniques:
+> **Intentional scope:** Strategy 7 combines three proof techniques:
 >
 > 1. **Interpolated assignment analysis** — if a field is ALWAYS assigned from interpolated typed constants with modifiers on the slot sources, those modifiers can discharge numeric obligations on the field.
 > 2. **Compositional sign inference** — arithmetic operations propagate sign information through operands, allowing proof by combining modifier facts and literal signs.
 > 3. **Trusted constraint facts** — numeric comparisons in unresolved rules and ensures provide context-scoped facts that refine sign sets during inference.
 >
-> Strategy 6 is the LAST strategy tried — after Strategies 1–5 have all failed. It is more expensive than per-site strategies (searches across all assignments) and more speculative (relies on patterns of modifiers and assignments). This ordering ensures that simpler, more direct proofs (literals, declarations, guards) are preferred over compositional reasoning.
+> Strategy 7 is the LAST general-purpose catalog-driven strategy tried — after Strategies 1–6 have all failed. It is more expensive than per-site strategies (searches across all assignments) and more speculative (relies on patterns of modifiers and assignments). This ordering ensures that simpler, more direct proofs (literals, declarations, guards) are preferred over compositional reasoning. Strategies 8–10 below are requirement-dispatched — they run only when the obligation's `Requirement` is the matching subtype.
 
+#### Strategy 8: Interval Containment Proof (narrowed)
+
+**When it applies:** An obligation of kind `IntervalContainmentProofRequirement` — produced by every value-establishing action on a field whose declared `min` / `max` modifier bounds (or business-domain qualifier bounds) form a closed interval.
+
+**How it works:** `BuildNarrowedIntervals` (in `ProofEngine.Intervals.cs`) produces a per-field narrowing dictionary by walking the obligation's guard branches and applying sibling reject-row negations (the "cross-row composition" path documented in § 2-Pass Design). `IntervalOfNarrowed` then evaluates the assignment's value expression under that narrowing — propagating through `IntervalTransfer` functions on integer / decimal / number arithmetic — to compute a result interval. If the result interval fits within the target field's `[DeclaredMin, DeclaredMax]` bounds, the obligation discharges; otherwise `NumericOverflow` (PRE0078) emits with the computed interval surfaced in the diagnostic.
+
+The strategy is exact under decimal arithmetic. The conservative-on-decimal half-open negation in the cross-row sibling path (`NegateConstraintToInterval`) can under-claim on decimal-valued fields but never silently accepts an unsound discharge — see the doc-comment at `NegateConstraintToInterval` for the SUPERSET-of-true-admitted-range argument.
+
+#### Strategy 9: Length Containment Proof
+
+**When it applies:** An obligation of kind `LengthContainmentProofRequirement` — produced when a string literal is assigned to a field declared with `minlength` / `maxlength` modifiers.
+
+**How it works:** A direct character-count check on the literal's value against the field's declared bounds. Literal-only by design: a field-to-field string assignment cannot establish length statically (the source field's value is dynamic), so the strategy returns `false` on non-literal sites and the obligation flows to `LengthBoundViolation` (PRE0135) only when the literal length actually exceeds the declared bound. Lives in `ProofEngine.Intervals.cs:TryLengthContainmentProof`.
+
+#### Strategy 10: Count Containment Proof
+
+**When it applies:** An obligation of kind `CountContainmentProofRequirement` — produced when a collection field declares `mincount` / `maxcount` bounds.
+
+**How it works:** Currently always-unresolved by design: in v1, `set` on a collection is rejected by the type checker (collections only mutate via `add` / `remove` / `enqueue` / etc., not whole-value assignment), so no value-establishing site that could prove a count fits exists. The strategy is present in the catalog so that future operations producing whole-collection values flow through a uniform discharge path. The unresolved state surfaces as `CountBoundViolation` (PRE0136) when emission is wired (currently in the Gate 1 allow-list — see `DiagnosticCoverageAllowLists.cs`).
 
 ### Qualifier Resolution Reference
 
@@ -2276,15 +2317,15 @@ static bool ContainsErrorExpression(TypedExpression expr) => expr switch
 
 ## 11. Design Rationale and Decisions
 
-### Decision 1: Five-Strategy Bounded Set vs. SMT Solver
+### Decision 1: Bounded Strategy Set vs. SMT Solver
 
-**Decision:** The proof engine uses exactly five proof strategies — no general SMT solver.
+**Decision:** The proof engine uses a bounded set of proof strategies — no general SMT solver. The set has grown by one strategy at a time as the language surface has expanded (currently seven catalog-driven strategies plus three requirement-dispatched ones); each addition has gone through `/lifecycle-2-design` review against this same rationale.
 
 **Rationale:**
 - **Predictability:** Every proof attempt completes in bounded, deterministic time. No solver timeouts, no "unknown" results, no resource exhaustion.
 - **Auditability:** Each strategy is a simple predicate function (~10–30 lines). Authors can understand exactly why an obligation was proved or not.
 - **Zero external dependencies:** No Z3, no CVC5, no SAT solver. The proof engine is self-contained within the Precept runtime.
-- **Coverage sufficiency:** The DSL expression language is intentionally constrained. Precept does not support arbitrary arithmetic, unbounded loops, or recursive definitions. The six strategies cover the realistic obligation space, including qualifier compatibility as a dedicated bounded case.
+- **Coverage sufficiency:** The DSL expression language is intentionally constrained. Precept does not support arbitrary arithmetic, unbounded loops, or recursive definitions. The strategies cover the realistic obligation space — including qualifier compatibility and dimensional product as dedicated bounded cases.
 
 **Trade-off accepted:** The proof engine cannot discharge complex cross-field value relationships or inductive properties. This is acceptable because:
 1. Such relationships are rare in business state machines
