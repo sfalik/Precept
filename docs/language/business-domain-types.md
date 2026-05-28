@@ -740,7 +740,7 @@ field SelectedUnit as unitofmeasure optional
 |---|---|---|---|
 | **Language-level** | NodaTime | `days`, `hours`, `months` | Compile-time — closed set |
 | **Standard registry** | ISO 4217, UCUM (full grammar + tiered discovery) | `USD`, `EUR`, `kg`, `lbs` | Compile-time — Tier 1/2 atoms plus grammar-valid derived expressions |
-| **Entity-scoped** | `units` block in precept definition | `each`, `case`, `six-pack` | Compile-time within the precept |
+| **Entity-scoped** | Field declarations carrying `unitofmeasure` values (e.g., `field StockingUnit as unitofmeasure default 'each'`) and compound-unit `quantity` fields for conversion factors (e.g., `field StockingUnitsPerPurchaseUnit as quantity in '{StockingUnit}/{PurchaseUnit}'`) — see § D6 and `samples/inventory-item.precept` | `each`, `case`, `six-pack` | Compile-time within the precept |
 
 **Constraints:** `optional`, `default '...'`.
 
@@ -1745,7 +1745,7 @@ For business-domain types, comparison operators carry domain preconditions. **Cr
 
 **Opt-in strict mode:** `maxplaces` is available on all four magnitude types (`money`, `quantity`, `price`, `exchangerate`). Authors who want Joda-Money-style strictness for a money field declare it explicitly. See `samples/insurance-claim-adjudication.precept` for a canonical example using `money in 'USD' maxplaces 2`.
 
-**Boundary enforcement (future):** Precision enforcement at persistence, `transition apply`, and external integration boundaries is filed as a separate finding (F-LANG-BIZ-09) targeting Phase 4+.
+**Boundary enforcement (future):** Precision enforcement at persistence, `transition apply`, and external integration boundaries is filed as a separate finding (F-LANG-BIZ-11) targeting Phase 4+.
 
 ### D11. Cross-currency `money` arithmetic requires explicit `exchangerate`
 

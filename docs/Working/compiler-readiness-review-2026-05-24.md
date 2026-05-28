@@ -725,8 +725,8 @@ Each of these is "spec promises X / implementation doesn't deliver X" — owner 
 - F-LANG-TEMP-01/02 (`'3 days'`/`'2 weeks'` in instant context): context-aware parser or revise spec
 - F-LANG-TEMP-08 (`zoneddatetime ± period`): remove catalog op or remove doc rejection
 - F-LANG-TEMP-05 (mixed temporal quantities): relax parser or revise doc
-- F-LANG-BIZ-07 (composite period basis `&` separator): build or drop from doc
-- F-LANG-BIZ-09 (`units` block): build construct or drop from doc
+- F-LANG-BIZ-07 (composite period basis `&` separator): build or drop from doc *(still owner-pending — needs discussion before Phase 6 fully closes)*
+- F-LANG-BIZ-09 (`units` block): **DECIDED 2026-05-28** — close as already-answered by `business-domain-types.md § D6`. The locked spec already rejects a dedicated `units { }` block ("complex language feature for what amounts to multiplication") and provides the canonical pattern: entity-scoped unit identifiers live in `unitofmeasure` fields, conversion factors live in compound-unit `quantity` fields (`quantity in 'each/case'`). The pattern works in practice — `samples/inventory-item.precept` uses interpolated qualifiers (`quantity in '{StockingUnit}/{PurchaseUnit}'`) for runtime-configurable unit configurations, with dimensional cancellation verified at compile time. `unitofmeasure § Registry scopes` table synced to match. A potential verbosity-friction gap (interpolation syntax density; numerator-vs-denominator discipline) is noted for future revisit if it surfaces as real pain.
 
 Without these decisions, Waves 1-3 will stall. Recommend a 1-hour synchronous review of the appendix files with the owner.
 
