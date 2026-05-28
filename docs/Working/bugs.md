@@ -27,141 +27,71 @@ surfaced for proper fixing.
 
 ## Active
 
-### F-LANG-COLL-13: `clear` and `notempty` lifted on `lookup of K to V` — **✅ Fixed by W-J (2026-05-26)**
+*(empty — all known bugs and gap-findings have been fixed and promoted to § Fixed.)*
 
-- **Status**: ✅ **Fixed by W-J (2026-05-26)** after a `/lifecycle-2-design` pass surveyed comparator languages (Java `Map.clear`, C# `IDictionary.Clear`, Python `dict.clear`, Rust `HashMap::clear`, Swift `Dictionary.removeAll`, Kotlin `MutableMap.clear`, F# `Dictionary.Clear`, Go `clear(map)` added in 1.21 specifically to avoid forcing iteration). No surveyed language with per-key remove forbids the bulk operation; Precept's exclusion was anomalous. Bundled lift: `notempty` on lookup also lifted (was a parallel synonym restriction without independent rationale once `clear` lifted). Spec docs (`collection-types.md:85`, `:756`, `:902`, `precept-language-spec.md:1624`, `:1632`, `:1662`) updated. `Actions.cs ClearApplicable` adds `TypeKind.Lookup`; `Types.cs` Lookup TypeMeta drops the explicit `NotemptyApplicable: false` (default is `true`). Sample restore: `samples/shopping-cart.precept` ClearCart + Cancel events revert to canonical `clear LineItems / clear ItemQuantities / clear CartPromotions / clear GiftMessages`.
-- **Discovered**: 2026-05-26 during Phase 4 W-A's precept-reviewer audit.
-- **Affected**: any precept that wanted to empty a lookup field in one statement.
-- **Pre-fix symptom**: `clear MyLookup` emitted `PRE0048 ScalarOperationOnCollection`. `notempty MyLookup` emitted `InvalidModifierForType`.
-- **Workaround used (now removed)**: soft-clear via a paired controlling set/list (when one existed). Did not scale to every shape; semantically incomplete (stale data orphaned but invisible).
-- **Fix complexity**: XS-S — one TypeTarget entry, one default change, doc updates, sample restore, 4 new tests.
+## Fixed
 
-### BUG-013: `ParserIntegrationTests.TestSample_EventDeclaration_BindsInitialToCreateOnly` references missing `samples/Test.precept`
+### F-LANG-BIZ-08: Discrete equality narrowing for `choice of` fields
 
-- **Discovered**: 2026-05-25 during Phase 2 Step 2.7 verification of the test suite
-- **Affected**: `test/Precept.Tests/Parser/ParserIntegrationTests.cs:179` reads `Path.Combine(SamplesRoot, "Test.precept")` and parses it; `samples/Test.precept` does not exist in the repo, so `ParseFile` throws `FileNotFoundException`. Single sample-side test failure surfaced by `dotnet test`.
-- **Symptom**: `System.IO.FileNotFoundException : Could not find file '/home/sfalik/source/repos/Precept/samples/Test.precept'.` at the test's `ParseFile(path)` call. The 1 failing test out of 6108 in `Precept.Tests` after Phase 2.
-- **Root cause** (suspected): the test was authored when `Test.precept` existed (parallel sample-authoring sessions historically added/removed a scratch `Test.precept` fixture); the file was removed without updating the test. Either the test should embed its expected source inline (no filesystem dependency), or the sample file should be re-added under a stable name.
-- **Workaround used**: none — the test simply fails. Out of Phase 2 scope per the plan ("Sample-side failures, if any remain, are routed to bugs.md").
-- **Fix complexity**: trivial — either rewrite the test with inline `precept ...` source, or re-add `samples/Test.precept` with the minimal multi-event-with-`initial` shape the test asserts (`event create, start, stop, reset` with `create initial`).
-- **Priority**: quality bar — exactly 1 test failure noise in an otherwise green baseline. Quick to clear.
-
-### BUG-012: Ordinal comparison between an ordered-choice field and a choice-literal cannot be proved — **✅ Fixed by Phase 4 W-G (2026-05-26)**
-
-- **Status**: ✅ **Fixed by Phase 4 W-G (2026-05-26).** The proof engine's `TryDeclarationAttributeProof` ModifierRequirement arm now lifts a literal-side modifier from the sibling operand when the obligation site is a binary op (`ProofEngine.Strategies.cs`). When `Severity <= 2` emits `ModifierRequirement(PChoice, Ordered)` resolved against the literal `2`, the engine consults the sibling `Severity` operand and discharges from its declared `ordered` choice. The fix is symmetric: `Tier <= "Low"` discharges identically. Field-vs-field comparisons continue to discharge via the original DeclarationAttribute path. Unordered choice fields with literal comparisons still emit `PRE0112` (no order to inherit). Sample restore: `samples/it-helpdesk-ticket.precept` reverts the equality-cascade Priority computation to the canonical ordinal form (`if Severity <= 1 and Urgency <= 1 then "Critical" / else if Severity <= 2 or Urgency <= 2 then "High" / else if Severity <= 4 and Urgency <= 4 then "Medium" / else "Low"`). Tests in `test/Precept.Tests/ProofEngine/OrderedChoiceLiteralTests.cs` (4 new).
-- **Discovered**: 2026-05-25 during refactor of `samples/it-helpdesk-ticket.precept` to give Severity, Urgency, and Priority an idiomatic ordered-choice shape.
-- **Affected**: any precept that uses `<`, `<=`, `>`, or `>=` between an `ordered` `choice of …` field and a bare literal from the same choice set. Both flavors reproduce: `choice of integer(...)` (e.g. `Severity <= 2`) and `choice of string(...)` (e.g. `Tier <= "Medium"`). Field-vs-field comparisons of two same-set ordered choice fields prove cleanly via `DeclarationAttribute`.
-- **Symptom**: `precept_compile` emits `PRE0112` UnprovedModifierRequirement: `Cannot prove that '<literal>' satisfies the required modifier 'Ordered' (used in the computed expression for field '<F>')`. The proof obligation `Both choice operands must be declared ordered` lists as `Unresolved`. The proof engine appears to require both operands to carry the `Ordered` modifier directly on their declaration; a literal that lexically belongs to a same-set ordered choice declaration is not lifted to "ordered" by virtue of the field on the other side of the operator.
-- **Minimal repro**:
-  ```precept
-  precept Repro
-  field Severity as choice of integer(1, 2, 3, 4, 5) ordered default 3
-  field IsCritical as boolean <- Severity <= 2
-  ```
-  Equivalent string-set repro:
-  ```precept
-  precept Repro
-  field Tier as choice of string("Low", "Medium", "High") ordered default "Low"
-  field IsLow as boolean <- Tier <= "Low"
-  ```
-  Field-vs-field (proves clean — shows the gap is literal-side, not the operator):
-  ```precept
-  precept Repro
-  field Severity as choice of integer(1, 2, 3, 4, 5) ordered default 3
-  field Threshold as choice of integer(1, 2, 3, 4, 5) ordered default 1
-  field R as boolean <- Severity <= Threshold
-  ```
-- **Root cause** (suspected): the proof obligation `Both choice operands must be declared ordered` (defined on `ChoiceLessThanChoice` etc. in the operations catalog) is resolved by `DeclarationAttribute` strategy only — it walks operand declarations looking for the `ordered` modifier. A choice literal has no field declaration to inspect, so the obligation falls through to `Unresolved` and reports against the literal text. The fix is either to (a) lift the `Ordered` modifier from the contextual choice-set type when one operand is a literal and the other a typed ordered-choice field, or (b) add a typed-literal strategy that infers the modifier from the operand's expected type.
-- **Workaround used**: in `samples/it-helpdesk-ticket.precept`, the Priority computed field was rewritten as an equality-based cascade (`Severity == 1 or Severity == 2 or …`) instead of the more natural ordinal form (`Severity <= 2 or …`). The original mapping shape (`if Severity <= 1 and Urgency <= 1 then …`) is recorded in the file header docstring; equivalence to the cascade form is verified by case analysis. No BUG-012 inline citation was added because the cascade is correct as written — but it is more verbose than the ordinal form would be.
-- **Post-fix cleanup**: in `samples/it-helpdesk-ticket.precept`, replace the equality-based cascade with the ordinal form documented in the original refactor brief — `if Severity <= 1 and Urgency <= 1 then "Critical" / else if Severity <= 2 or Urgency <= 2 then "High" / else if Severity <= 4 and Urgency <= 4 then "Medium" / else "Low"`. Update the field-level comment to drop the reference to this bug entry.
-- **Fix complexity**: small to medium — extends one proof strategy or adds a new typed-literal strategy. Self-contained to the proof engine; no language surface change.
-- **Priority**: quality bar — the workaround is correct but verbose, and the limitation forecloses the natural idiom for tier/rank fields where ordinal comparisons against thresholds are the obvious shape. Documented in `docs/language/primitive-types.md` § Type Operator Surface Summary that the `choice` row supports ordinal comparison; consumers will reach for it.
+- **Status**: ✅ **Fixed by Phase 5 W-D BIZ-08 (2026-05-27, commit `08fae0ef`).** Extended `NumericConstraintSubsumes` in `ProofEngine.Strategies.cs` to recognize `F == V_lit` equality guards: when the guard pins a field to a singleton value, the singleton is checked directly against the obligation's (comparison, threshold) pair via a new `ValueSatisfiesRequirement` helper. Reuses the existing guard-decomposition pipeline (branch-walking discipline preserved — every OR branch must independently discharge). Minimal sound surface per the locked design: direct `F == literal` only; disjunctive equality and field-to-field equality are deferred as separate extensions. Tests in `test/Precept.Tests/ProofEngine/DiscreteEqualityNarrowingTests.cs` (4 new, including soundness negatives for `Severity == 0 ⇒ 1 / Severity` and field-scope checks).
+- **Discovered**: 2026-05-25 during Phase 3 Step 3.3f verification
+- **Affected**: any precept rule or guard that uses `choice == "literal"` and expects the proof engine to narrow the choice field to that value in the branch body
+- **Original symptom**: `when Priority == "High"` did not narrow `Priority` to `"High"` inside the branch. Strategy 3 (GuardInPath) and Strategy 4 (FlowNarrowing) were numeric-only — no `BuildNarrowedDiscreteValues` analog. The equality operator resolved cleanly, but no narrowing strategy consumed the result.
+- **Workaround used**: none needed for shipped samples — choice equality worked as a boolean condition; just didn't enable further proof narrowing.
+- **Fix complexity**: ended up small — extending the existing subsumption switch with one equality arm + one value-satisfies helper. The "design-required" estimate proved too pessimistic: the reuse path through `GuardConstraint` made a new mechanism unnecessary.
 
 ### BUG-006: Proof engine doesn't combine guard narrowing with field-level `max` for arithmetic interval inference
 
+- **Status**: ✅ **Fixed by Phase 5 W-C (2026-05-27, commit `c16be77b`).** `BuildNarrowedIntervals` in `ProofEngine.Intervals.cs` now composes sibling reject-row guards into the current row's per-field narrowing. New `BuildSiblingRejectExclusions` helper walks every reject row on the same `(state, event)` pair; for each leaf constraint, `NegateConstraintToInterval` produces the negated interval (integer-style half-open: `>= V` ⇒ `<= V-1`; conservative-on-decimal noted in the doc-comment). Required collateral: integer arithmetic ops (`IntegerPlusInteger`, `IntegerMinusInteger`, `IntegerTimesInteger`) now carry `IntervalTransfer` functions so the narrowed interval propagates through `Counter + 1`. Tests in `test/Precept.Tests/ProofEngine/CrossRowIntervalCompositionTests.cs` (3 new, including the verbatim repro). Sample-restore pending: `samples/library-inter-library-loan.precept` can now reintroduce `max 5` on `RenewalCount`.
 - **Discovered**: 2026-05-24 during authoring of `samples/library-inter-library-loan.precept`
 - **Affected**: any precept doing `set Counter = Counter + 1` in a row body where a sibling row above rejects when `Counter >= MaxField`, and `MaxField` carries a field-level `max N` modifier
-- **Symptom**: `PRE0078 UnprovedOverflow` (or similar interval-containment failure) on `Counter + 1` even though the guard row above structurally rejects the case where `Counter >= MaxField` AND `MaxField` is bounded by `max N`. The proof engine narrows on each separately but does not combine them transitively.
-- **Root cause** (suspected): same architectural class as BUG-001 / BUG-004 — the proof engine's interval-narrowing strategy doesn't compose guard-derived field bounds with field-modifier-derived bounds across rows in a transition table. Probably fixable by extending the same narrowing infrastructure that handles presence to handle numeric intervals.
-- **Workaround used**: in `samples/library-inter-library-loan.precept`, dropped the field-level `max 5` on `RenewalCount` and rely on a runtime `rule RenewalCount <= MaxRenewals` invariant. Cited inline with a `# BUG-006:` comment.
-- **Post-fix cleanup**: restore `max 5` on `RenewalCount` in `samples/library-inter-library-loan.precept` (or whatever the structural bound should be); decide whether to keep the runtime `rule RenewalCount <= MaxRenewals` (defense-in-depth) or drop it (the field bound + reject row are now provably sufficient). **Scope-check**: sweep `grep -rn "# BUG-006" samples/` to find every cite site. Remove `# BUG-006` comments.
-- **Fix complexity**: design-required — the narrowing combination is a real interval-inference extension, not a trivial switch.
-- **Priority**: quality bar — workaround is a small downgrade (runtime check vs compile-time guarantee) but doesn't block samples.
-- **Repro**: a precept with `field Counter as integer default 0 nonnegative` and `field MaxCount as integer max 5`, plus rows `from S on Inc when Counter >= MaxCount -> reject "..."` then `from S on Inc -> set Counter = Counter + 1 -> no transition`. The unguarded second row fails proof on `Counter + 1` containment.
+- **Original symptom**: `PRE0078 UnprovedOverflow` on `Counter + 1` even though the guard row above structurally rejected the case where `Counter >= MaxField` AND `MaxField` was bounded by `max N`. The proof engine narrowed on each separately but did not combine them transitively.
+- **Workaround used**: in `samples/library-inter-library-loan.precept`, dropped the field-level `max 5` on `RenewalCount` and relied on a runtime `rule RenewalCount <= MaxRenewals` invariant. Cited inline with a `# BUG-006:` comment.
+- **Post-fix cleanup pending**: restore `max 5` on `RenewalCount` in `samples/library-inter-library-loan.precept`. **Scope-check**: sweep `grep -rn "# BUG-006" samples/` to find every cite site. Remove `# BUG-006` comments.
 
-### BUG-005: `lookup of K to money in '<Currency>'` — **✅ Fixed by Phase 4 W-C (2026-05-26)**
+### BUG-004: Proof engine ignores event ensures for transition-row body narrowing
 
-- **Status**: ✅ **Fully fixed by Phase 4 W-C (2026-05-26, F-LANG-COLL-06).** Qualified inner types in collections (`set of money in 'USD'`, `lookup of K to money in 'USD'`, `bag of quantity of 'mass'`, etc.) parse, type-check, and propagate qualifier metadata through to the proof engine. New `TypedElementType` DU in `SemanticIndex.cs` (variants: `TypedScalarElement`, `TypedChoiceElement` for W-G, `TypedQualifiedElement` with declared-qualifier metadata). Parser extended at `Parser.Types.cs ParseInnerTypeReference` to route inner types through `TryParseQualifiers`. Proof engine extended at `ProofEngine.Qualifiers.cs ResolveQualifierFromExpression` to inherit lookup-access result qualifiers from the lookup's element-type metadata. Sample restore: `event-venue-booking.precept` reverted from event-arg-carried-fee workaround back to canonical `set of string AddOnServices + lookup of string to money in 'USD' AddOnFees` paired pattern. Tests in `test/Precept.Tests/Parser/QualifiedInnerTypeTests.cs` (13 new). Phase 2's symptom-fix code (single PRE0105 emission) deleted; replaced by real feature support.
+- **Status**: ✅ **Fixed by Phase 5 W-A (2026-05-27, commit `034a5976`).** Extended the guard-extraction switch in `ProofEngine.Strategies.cs:TryGuardInPathProof` so event ensures on the row's event contribute their predicates to the row body's narrowing context. AND-combined with the row's own explicit guard via the new `CombineAndBranches` helper. Mirrors BUG-001's fix shape. Tests in `test/Precept.Tests/ProofEngine/EventEnsureNarrowingTests.cs` (4 new). Sample-restore pending: `samples/equipment-lease-agreement.precept` can drop the redundant `when MonthlyPayment is set` guard.
+- **Discovered**: 2026-05-24 during authoring of `samples/equipment-lease-agreement.precept`
+- **Affected**: any precept whose transition row body reads an optional field that an `on Event ensure Field is set` declaration has already proven present.
+- **Original symptom**: `PRE0116 UnprovedPresenceRequirement` on `MonthlyPayment` (after `on Quote ensure MonthlyPayment is set`) even though the event ensure structurally rejects the event before the row body runs if the field is absent. Same shape as BUG-001 (rule/ensure `when` guard body narrowing) but for event ensures narrowing transition-row bodies.
+- **Workaround used**: equipment-lease-agreement sample added a redundant `when MonthlyPayment is set` guard to the row with a `# BUG-004:` comment.
+- **Post-fix cleanup pending**: remove the redundant `when X is set` guard from every row carrying a `# BUG-004` cite. **Scope-check**: sweep `grep -rn "# BUG-004" samples/`.
+
+### BUG-013: `ParserIntegrationTests.TestSample_EventDeclaration_BindsInitialToCreateOnly` references missing `samples/Test.precept`
+
+- **Status**: ✅ **Fixed by Phase 5 W-F (2026-05-27, commit `766637c0`).** `samples/Test.precept` restored with the minimal multi-event-with-`initial` shape the test asserts: `event create initial`, `event start`, `event stop`, `event reset`, three states (Idle/Running/Stopped), four transition rows. Test now passes.
+- **Discovered**: 2026-05-25 during Phase 2 Step 2.7 verification of the test suite
+- **Affected**: `test/Precept.Tests/Parser/ParserIntegrationTests.cs:179` read `Path.Combine(SamplesRoot, "Test.precept")` and parsed it; `samples/Test.precept` did not exist in the repo, so `ParseFile` threw `FileNotFoundException`.
+- **Original symptom**: `System.IO.FileNotFoundException : Could not find file '/home/sfalik/source/repos/Precept/samples/Test.precept'.` at the test's `ParseFile(path)` call.
+
+### F-LANG-COLL-13: `clear` and `notempty` lifted on `lookup of K to V`
+
+- **Status**: ✅ **Fixed by Phase 4 W-J (2026-05-26)** after a `/lifecycle-2-design` pass surveyed comparator languages (Java `Map.clear`, C# `IDictionary.Clear`, Python `dict.clear`, Rust `HashMap::clear`, Swift `Dictionary.removeAll`, Kotlin `MutableMap.clear`, F# `Dictionary.Clear`, Go `clear(map)` added in 1.21 specifically to avoid forcing iteration). No surveyed language with per-key remove forbids the bulk operation; Precept's exclusion was anomalous. Bundled lift: `notempty` on lookup also lifted (was a parallel synonym restriction without independent rationale once `clear` lifted). Spec docs (`collection-types.md:85`, `:756`, `:902`, `precept-language-spec.md:1624`, `:1632`, `:1662`) updated. `Actions.cs ClearApplicable` adds `TypeKind.Lookup`; `Types.cs` Lookup TypeMeta drops the explicit `NotemptyApplicable: false` (default is `true`). Sample restore: `samples/shopping-cart.precept` ClearCart + Cancel events revert to canonical `clear LineItems / clear ItemQuantities / clear CartPromotions / clear GiftMessages`.
+- **Discovered**: 2026-05-26 during Phase 4 W-A's precept-reviewer audit.
+- **Affected**: any precept that wanted to empty a lookup field in one statement.
+- **Pre-fix symptom**: `clear MyLookup` emitted `PRE0048 ScalarOperationOnCollection`. `notempty MyLookup` emitted `InvalidModifierForType`.
+
+### BUG-012: Ordinal comparison between an ordered-choice field and a choice-literal cannot be proved
+
+- **Status**: ✅ **Fixed by Phase 4 W-G (2026-05-26).** The proof engine's `TryDeclarationAttributeProof` ModifierRequirement arm now lifts a literal-side modifier from the sibling operand when the obligation site is a binary op (`ProofEngine.Strategies.cs`). When `Severity <= 2` emits `ModifierRequirement(PChoice, Ordered)` resolved against the literal `2`, the engine consults the sibling `Severity` operand and discharges from its declared `ordered` choice. The fix is symmetric: `Tier <= "Low"` discharges identically. Field-vs-field comparisons continue to discharge via the original DeclarationAttribute path. Unordered choice fields with literal comparisons still emit `PRE0112` (no order to inherit). Sample restore: `samples/it-helpdesk-ticket.precept` reverts the equality-cascade Priority computation to the canonical ordinal form (`if Severity <= 1 and Urgency <= 1 then "Critical" / else if Severity <= 2 or Urgency <= 2 then "High" / else if Severity <= 4 and Urgency <= 4 then "Medium" / else "Low"`). Tests in `test/Precept.Tests/ProofEngine/OrderedChoiceLiteralTests.cs` (4 new).
+- **Discovered**: 2026-05-25 during refactor of `samples/it-helpdesk-ticket.precept` to give Severity, Urgency, and Priority an idiomatic ordered-choice shape.
+- **Affected**: any precept that used `<`, `<=`, `>`, or `>=` between an `ordered` `choice of …` field and a bare literal from the same choice set.
+- **Pre-fix symptom**: `precept_compile` emitted `PRE0112` UnprovedModifierRequirement on the literal operand. Field-vs-field comparisons of two same-set ordered choice fields proved cleanly via `DeclarationAttribute`.
+
+### BUG-005: `lookup of K to money in '<Currency>'` and other qualified inner types
+
+- **Status**: ✅ **Fully fixed by Phase 4 W-C (2026-05-26, F-LANG-COLL-06).** Qualified inner types in collections (`set of money in 'USD'`, `lookup of K to money in 'USD'`, `bag of quantity of 'mass'`, etc.) parse, type-check, and propagate qualifier metadata through to the proof engine. New `TypedElementType` DU in `SemanticIndex.cs` (variants: `TypedScalarElement`, `TypedChoiceElement` for W-G, `TypedQualifiedElement` with declared-qualifier metadata). Parser extended at `Parser.Types.cs ParseInnerTypeReference` to route inner types through `TryParseQualifiers`. Proof engine extended at `ProofEngine.Qualifiers.cs ResolveQualifierFromExpression` to inherit lookup-access result qualifiers from the lookup's element-type metadata. Sample restore: `event-venue-booking.precept` reverted from event-arg-carried-fee workaround back to canonical `set of string AddOnServices + lookup of string to money in 'USD' AddOnFees` paired pattern. Tests in `test/Precept.Tests/Parser/QualifiedInnerTypeTests.cs` (13 new).
 - **Discovered**: 2026-05-24 during authoring of `samples/event-venue-booking.precept`
 - **Affected**: any precept declaring a lookup with a qualified-money value type; bisected to specifically the `in '<Currency>'` qualifier on the value side
-- **Original symptom** (before Phase 2): `precept_compile` returned "An error occurred invoking 'precept_compile'." with no PRE-code and no diagnostic. Bisected:
-  - `lookup of string to money` — compiles clean (unqualified money is fine)
-  - `lookup of string to money in 'USD'` — crashed (now emits clean PRE0105)
-  - `lookup of string to quantity of 'mass'` — emits a clean PRE0105 (was already covered)
-- **Root cause** (now understood): qualified inner types are unsupported in lookup value position. Phase 2 added the symmetric currency-qualifier rejection; Phase 4 will add full support (F-LANG-COLL-06).
-- **Workaround used**: in `samples/event-venue-booking.precept`, dropped the `lookup of K to money in 'USD'` for per-service fees; per-add-on services live only in `AddOnServices` (a `set of string`); `AddOnTotal` accumulates the running total. The `RemoveService` event carries `Fee as money in 'USD'` as an arg so the row can decrement `AddOnTotal` directly without reading per-service fees back out of a lookup. The sample retains the lookup-with-membership *pattern shape* on `AddOnServices` (set membership guards every action) but skips the per-key value table because of this restriction. Cited inline with `# BUG-005:` comment.
-- **Post-fix cleanup**: restore `field AddOnFees as lookup of string to money in 'USD'` in `samples/event-venue-booking.precept`; drop the `Fee as money in 'USD'` arg from `RemoveService`; have the row read the fee back from `AddOnFees` instead. Remove `# BUG-005` comment.
-- **Fix complexity**: small-to-medium — Phase 4 work; extend the qualified-inner-type plumbing through the type checker, proof engine, and runtime evaluator.
-- **Priority**: quality bar — workaround is awkward (event-arg fee instead of authoritative lookup) but unblocks samples.
+- **Original symptom** (before Phase 2): `precept_compile` returned "An error occurred invoking 'precept_compile'." with no PRE-code and no diagnostic. Phase 2 added a symmetric currency-qualifier rejection (clean PRE0105); Phase 4 added full support.
 
 ### BUG-002: `remove` on a lookup expects the value type instead of the key
 
 - **Status**: ✅ **Fixed by Phase 4 W-B (2026-05-26)** — `TypeChecker.Expressions.Callables.cs` `CollectionValueAction` arm now branches on target type: when target is Lookup and action is Remove, the expected operand type is the lookup's `KeyType` rather than `ElementType`. `remove Items "specific-key"` and `remove Items Drop.Key` now type-check correctly. Sample cleanup landed in the same commit: `bill-of-materials-management.precept` and `shopping-cart.precept` reverted from the `put F K = 0` workaround to direct `remove F K`. Tests in `test/Precept.Tests/TypeChecker/LookupRemoveTests.cs`.
 - **Discovered**: 2026-05-24 during authoring of `samples/bill-of-materials-management.precept`
-- **Affected**: any precept that wants to delete a key from a `lookup of K to V` field; observed in `samples/shopping-cart.precept` (worked around with `put Key = 0`) and `samples/bill-of-materials-management.precept` (same workaround)
-- **Symptom**: `PRE0105 CollectionInnerTypeError — Expected a integer value, but 'Components' holds elements of type string` when the user writes `remove Components RemoveComponent.PartNumber` where `Components` is `lookup of string to integer` and `PartNumber` is `string`. The type checker requires the `remove` argument to match the lookup's **value** type (integer here) rather than the **key** type. Two issues: (1) the only sensible deletion semantics on a lookup is key-removal, so the value-typed argument doesn't even map to a meaningful operation; (2) the diagnostic message confusingly reports the key type as the "element type" of the lookup, masking the real expectation.
-- **Root cause** (suspected): the `Remove` action's `CollectionValue` syntax dispatches the same element-type check it uses for set/list/bag. Lookup needs its own `RemoveByKey` shape (mirroring `Put`'s key/value pair) or a dedicated `removekey` action.
-- **Workaround used**: shopping-cart sample uses `put CartPromotions Key = 0.0` to zero-out the entry rather than delete; documents the workaround inline. BOM sample applies the same idiom: pairs the lookup with a `set of string` of part numbers as the source of membership truth, then `put Components PartNumber = 0` to zero out and `remove ComponentPartNumbers PartNumber` to drop membership. Comment cites BUG-002.
-- **Post-fix cleanup**: in `samples/shopping-cart.precept` and `samples/bill-of-materials-management.precept`, replace each `put Lookup Key = 0` (or `= 0.0`, or `= ""`) workaround with `remove Lookup Key`; drop the parallel `set of K` field (e.g. `ComponentPartNumbers`) where it was added purely as a membership tracker for the workaround. **Scope-check**: sweep `grep -rn "# BUG-002" samples/` to find every cite site before declaring the cleanup done. Remove `# BUG-002` comments.
-- **Fix complexity**: small — extend the action catalog with a key-removal shape for lookups, or change `remove` dispatch on lookup to expect the key type
-- **Priority**: quality bar — the workaround is awkward (orphan zero-valued entries) but doesn't block samples from compiling. Worth fixing before lookup becomes more visible in tutorials.
-- **Repro**:
-  ```precept
-  precept Repro
-  field Items as lookup of string to integer
-  state Draft initial
-  state Done terminal
-  event Drop(Key as string notempty)
-  from Draft on Drop -> remove Items Drop.Key -> no transition
-  event Finish
-  from Draft on Finish -> transition Done
-  ```
-  Yields `PRE0105 Expected a integer value, but 'Items' holds elements of type string`.
-
-### BUG-004: Proof engine ignores event ensures for transition-row body narrowing
-
-- **Discovered**: 2026-05-24 during authoring of `samples/equipment-lease-agreement.precept`
-- **Affected**: any precept whose transition row body reads an optional field that an `on Event ensure Field is set` declaration has already proven present. Observed on the `from Draft on Quote` row reading `MonthlyPayment` after `on Quote ensure MonthlyPayment is set`.
-- **Symptom**: `PRE0116 UnprovedPresenceRequirement — Cannot prove that 'MonthlyPayment' is present (used on event 'Quote' from state 'Draft') — guard with 'when MonthlyPayment is set', initialize it earlier, or make it required` even though the event ensure structurally rejects the event before the row body runs if the field is absent. This is the same shape as BUG-001 (which fixed body narrowing for rule/ensure `when` guards) but for event ensures narrowing transition-row bodies.
-- **Root cause** (suspected): `ProofEngine.Strategies.cs` Strategy 3 / 4 enumerate guard sources for narrowing — the rule/ensure narrowing was added in BUG-001's fix, but event ensures are still not consulted as a narrowing source when evaluating transition-row body expressions for the same event.
-- **Workaround used**: equipment-lease-agreement sample adds a redundant `when MonthlyPayment is set` guard to the row (line 135 area), with a comment citing BUG-004. The row remains the only Quote transition from Draft, so the guard does not shadow anything.
-- **Post-fix cleanup**: remove the redundant `when X is set` guard from every row carrying a `# BUG-004` cite — start with `samples/equipment-lease-agreement.precept`. **Scope-check**: sweep `grep -rn "# BUG-004" samples/` to find every cite site. After deletion, sweep more broadly for the *pattern* (`when X is set` guards on rows whose event has a matching `on Event ensure X is set`) — those become removable noise once the fix lands, even if they weren't cited.
-- **Fix complexity**: trivial-to-small — extend the guard-extraction switch in `ProofEngine.Strategies.cs` so event ensures on the row's event contribute their `is set` predicates to the row body's narrowing context. Mirrors the BUG-001 fix shape.
-- **Priority**: quality bar — workaround is mechanical (one extra guard per affected row), but it adds noise to every Free-Construction row that reads an event-ensure-guaranteed field. Worth fixing because Free-Construction is becoming the canonical pattern.
-- **Repro**:
-  ```precept
-  precept Repro
-  field Amount as money in 'USD' optional
-  state Draft initial
-  state Done terminal
-  event Submit
-  on Submit ensure Amount is set because "Required"
-  from Draft on Submit -> set Amount = Amount + '1.00 USD' -> transition Done
-  ```
-  Yields PRE0116 on the right-hand `Amount` read even though `on Submit ensure Amount is set` provably establishes presence before the row body runs.
-
-### F-LANG-BIZ-08: Discrete equality narrowing for `choice of` fields is not implemented
-
-- **Discovered**: 2026-05-25 during Phase 3 Step 3.3f verification
-- **Affected**: any precept rule or guard that uses `choice == "literal"` and expects the proof engine to narrow the choice field to that value in the branch body
-- **Symptom**: `when Priority == "High"` does not narrow `Priority` to `"High"` inside the branch. The proof engine's narrowing strategies (Strategy 3 GuardInPath, Strategy 4 FlowNarrowing in `ProofEngine.Strategies.cs`) are numeric-only — no `BuildNarrowedDiscreteValues` analog exists for choice literals. The equality operator (`ChoiceEqualsChoice → Boolean`) resolves cleanly, but no narrowing strategy consumes the result.
-- **Root cause**: `ProofEngine.Strategies.cs` narrowing infrastructure handles numeric interval narrowing via `BuildNarrowedIntervals`. There is no corresponding mechanism to recognize `when X == "literal"` for a choice field and narrow `X`'s set of possible values to `{"literal"}` in the guard-true branch.
-- **Workaround used**: none needed for current samples — choice equality guards work as boolean conditions, they just don't enable further proof narrowing (e.g., proving that a subsequent use of the same field satisfies a constraint).
-- **Fix complexity**: design-required — requires (a) a new proof strategy that recognizes `choiceField == literal` guards and narrows the field's discrete value set, and (b) a discrete-value interval representation (analogous to `BuildNarrowedIntervals` for scalar types). Non-trivial proof-engine extension.
-- **Priority**: quality bar — narrowing for choice fields improves proof-engine completeness and reduces false-positive `UnprovedModifierRequirement` diagnostics in complex guard chains.
-- **Target phase**: Phase 5 (proof engine satisfiability)
-
-## Fixed
+- **Affected**: any precept that wants to delete a key from a `lookup of K to V` field
+- **Pre-fix symptom**: `PRE0105 CollectionInnerTypeError — Expected a integer value, but 'Components' holds elements of type string` when the user wrote `remove Components RemoveComponent.PartNumber` where `Components` is `lookup of string to integer`. The type checker required the `remove` argument to match the lookup's value type rather than the key type.
 
 ### BUG-011: `timezone` and `time` fields with typed-constant default crash the compiler
 
