@@ -32,6 +32,8 @@ If a topic has no research, that's the signal — surface a research-shaped gap 
 - [`language/expressiveness/nodatime-exception-surface-audit.md`](language/expressiveness/nodatime-exception-surface-audit.md) — NodaTime exception inventory.
 - [`language/expressiveness/sample-temporal-pattern-catalog.md`](language/expressiveness/sample-temporal-pattern-catalog.md) — 91 temporal markers across 15 samples.
 - [`language/expressiveness/native-date-time-literals.md`](language/expressiveness/native-date-time-literals.md) — literal syntax precedent.
+- [`language/expressiveness/period-basis-separator-survey.md`](language/expressiveness/period-basis-separator-survey.md) — type-level composite period-basis separator (`&` vs `+`); internal-record + NodaTime check grounding the F-LANG-BIZ-07 / D4 amendment question.
+- [`language/expressiveness/literal-whitespace-consistency-survey.md`](language/expressiveness/literal-whitespace-consistency-survey.md) — whitespace handling across every single-quoted `'...'` typed-constant / qualifier surface (money/quantity/price/exchangerate/period/UCUM/date-time); grounds the composite period-basis `+` spacing rule (lenient input + compact canonical). Extends the period-basis-separator survey.
 - [`language/references/nodatime-type-model.md`](language/references/nodatime-type-model.md) — NodaTime type model reference.
 - [`architecture/compiler/temporal-type-hierarchy-survey.md`](architecture/compiler/temporal-type-hierarchy-survey.md) — multi-library temporal hierarchy comparison.
 

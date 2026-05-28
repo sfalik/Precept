@@ -77,7 +77,7 @@
   - [D1. `money` as a distinct type — not `decimal` + `choice`](#d1-money-as-a-distinct-type--not-decimal--choice)
   - [D2. Result-type refinement — algebra produces named types, not generic `quantity`](#d2-result-type-refinement--algebra-produces-named-types-not-generic-quantity)
   - [D3. `in` on `period` is unit-selection, not exactness constraint — Noda-faithful](#d3-in-on-period-is-unit-selection-not-exactness-constraint--noda-faithful)
-  - [D4. `&` for period basis composition, `/` exclusively for ratios](#d4--for-period-basis-composition--exclusively-for-ratios)
+  - [D4. `+` for period basis composition, `/` exclusively for ratios](#d4--for-period-basis-composition--exclusively-for-ratios)
   - [D5. UCUM as the standard registry for physical units](#d5-ucum-as-the-standard-registry-for-physical-units)
   - [D6. Entity-scoped conversion factors are typed compound quantities, not bare integers](#d6-entity-scoped-conversion-factors-are-typed-compound-quantities-not-bare-integers)
   - [D7. `of` for category constraint — unified across `quantity` and `period`](#d7-of-for-category-constraint--unified-across-quantity-and-period)
@@ -399,6 +399,8 @@ Time units (`s`, `min`, `h`, `d`) are excluded from the `quantity` category syst
 #### Period temporal dimensions
 
 `period of 'date'` and `period of 'time'` replace the temporal design's `dateonly` and `timeonly` constraint suffixes with the same general `of` mechanism. The `of` value is a `dimension` from the temporal partition — the same type used for UCUM dimensions on `quantity`, unified under a single partitioned registry. The proof semantics are identical — the compiler uses the dimension to verify that `time ± period` and `date ± period` are safe.
+
+`of` accepts only the three dimension-class atoms (`'date'`, `'time'`, `'datetime'`); composite syntax (`+` separator) is not valid on `of` — it constrains the dimension category, not the decomposition basis. `period of 'date + time'` emits `QualifierMismatch`; use `period of 'datetime'`.
 
 | Temporal dimension | Admitted components | Replaces | NodaTime safety guarantee |
 |---|---|---|---|
@@ -1220,8 +1222,8 @@ Discrete equality narrowing plugs into the existing guard-narrowing pipeline fro
 | `money` | `.amount` | `decimal` | Magnitude (the numeric part) |
 | `quantity` | `.unit` | `unitofmeasure` | Specific UCUM unit |
 | `quantity` | `.dimension` | `dimension` | UCUM dimension category |
-| `period` | `.basis` | `string` | Canonical basis name from the field's `in` constraint (e.g., `'hours'`, `'hours&minutes'`). For open periods, returns the runtime decomposition basis. NodaTime lowering: computed from which `PeriodUnits` flags are non-zero in the `Period` value |
-| `period` | `.dimension` | `dimension` | Temporal dimension: `'date'`, `'time'`, or `'datetime'`. Date bases: `years`, `months`, `weeks`, `days`. Time bases: `hours`, `minutes`, `seconds`, `milliseconds`, `nanoseconds`, `ticks`. Multi-basis periods spanning both date and time components (e.g., `'days&hours'`) return `'datetime'`. NodaTime lowering: computed from `HasDateComponent` / `HasTimeComponent` boolean properties |
+| `period` | `.basis` | `string` | Canonical basis name from the field's `in` constraint (e.g., `'hours'`, `'hours + minutes'`), always in canonical coarse-to-fine order with spaced `+`. For open periods (no `in` constraint), returns the runtime decomposition basis — the canonical string of every component with a non-zero value at access time; zero-valued components are omitted (a `Period(Years: 2, Months: 0, Days: 5)` value returns `'years + days'`). NodaTime lowering: computed from which `PeriodUnits` flags are non-zero in the `Period` value |
+| `period` | `.dimension` | `dimension` | Temporal dimension: `'date'`, `'time'`, or `'datetime'`. Date bases: `years`, `months`, `weeks`, `days`. Time bases: `hours`, `minutes`, `seconds`, `milliseconds`, `nanoseconds`, `ticks`. Multi-basis periods spanning both date and time components (e.g., `'days + hours'`) return `'datetime'`. NodaTime lowering: computed from `HasDateComponent` / `HasTimeComponent` boolean properties |
 | `price` | `.currency` | `currency` | Numerator currency |
 | `price` | `.unit` | `unitofmeasure` | Denominator unit |
 | `price` | `.dimension` | `dimension` | Denominator unit dimension category |
@@ -1302,17 +1304,35 @@ For `period`, the `in` syntax is a **unit-selection instruction**, not an exactn
 | `'minutes'` | `Minutes` |
 | `'seconds'` | `Seconds` |
 
-**Composite basis** uses `&` as separator (D4):
+**Composite basis** uses `+` as separator (D4):
 
 | Precept basis | NodaTime flags |
 |---|---|
-| `'years&months'` | `Years \| Months` |
-| `'years&months&days'` | `Years \| Months \| Days` |
-| `'hours&minutes'` | `Hours \| Minutes` |
-| `'hours&minutes&seconds'` | `Hours \| Minutes \| Seconds` |
-| `'days&hours&minutes'` | `Days \| Hours \| Minutes` |
+| `'years + months'` | `Years \| Months` |
+| `'years + months + days'` | `Years \| Months \| Days` |
+| `'hours + minutes'` | `Hours \| Minutes` |
+| `'hours + minutes + seconds'` | `Hours \| Minutes \| Seconds` |
+| `'days + hours + minutes'` | `Days \| Hours \| Minutes` |
 
-`&` means "and" (basis composition). `/` is reserved exclusively for ratio expressions.
+`+` means "and" (basis composition) — the same combiner used in period value literals (`'1 year + 6 months'`, D17 in the temporal design). `/` is reserved exclusively for ratio expressions.
+
+**Whitespace.** Spacing around `+` is lenient on input and follows the language-wide treatment of `+`: the expression lexer consumes whitespace silently (`5+3` and `5 + 3` tokenize identically), and the value-literal combiner already accepts `'1 year + 6 months'`, `'1 year+6 months'`, and `'1 year +6 months'` (`TemporalQuantityParser` trims entries). Composite basis matches: `'hours+minutes'` and `'hours + minutes'` are accepted equivalently. The **canonical form is spaced** — `.basis`, hover, MCP output, and proof markers render the spaced form (`'hours + minutes'`), consistent with the value-literal `+` combiner, which also canonicalizes spaced. (The ratio operator `/` remains compact — `'USD/kg'` — because `/` is a distinct operator with its own convention.)
+
+**Canonicalization.** Composite basis components have a canonical coarse-to-fine order: `years → months → weeks → days → hours → minutes → seconds`. Authors may write components in any order — `period in 'months + years'` is the same type as `period in 'years + months'` (NodaTime `PeriodUnits` is a flag union; order does not affect semantics). Non-canonical order is accepted without diagnostic; canonicalization is a silent normalization, not a warning. The canonical form (coarse-to-fine order, single space around each `+`) is what downstream consumers see:
+
+- **`.basis` accessor** returns the canonical-order spaced string.
+- **Type equality** (qualifier-compatibility checks) compares canonical forms — `period in 'minutes + hours'` and `period in 'hours+minutes'` are the same type.
+- **Proof markers** use the canonical spelling — `$eq:X.basis:hours + minutes` regardless of declared order or input spacing.
+
+**Interpolation.** Composite basis strings must be literal at this time. Interpolated composite bases (`period in '{X}+{Y}'`) are not supported. Single-component interpolated bases (`period in '{X}'`) continue to work via the existing qualifier-value path — interpolated composites would defer component-validity to runtime, which the static-checking discipline (Principle 10) resists; the restriction can relax later if a concrete use case demands it.
+
+**Malformed-basis diagnostics.** Three diagnostics are reserved for composite-basis well-formedness, distinct from `QualifierMismatch` (which reports a *recognized* atom that is illegal for the field's type or source operation per § Composite legality and the D14 composite extension):
+
+- **Duplicate component** — the list names the same atom twice (`'hours + minutes + hours'`). The components are individually valid but the list is not a set.
+- **Unknown component** — the list contains a token that is not a known period basis atom (`'years + fortnights'`).
+- **Empty component** — a leading, trailing, or doubled separator leaves a missing segment (`'years +'`, `'+ months'`, `'years + + days'`).
+
+(Diagnostic-code assignment and emission wiring land with the implementation.)
 
 ### Legal basis by source operation
 
@@ -1331,6 +1351,8 @@ NodaTime enforces which period units are valid for each local-type subtraction. 
 | `time - time` as `period in 'days'` | `LocalTime.Between` rejects date units |
 | `date - date` as `period in 'hours'` | `LocalDate.Between` rejects time units |
 
+**Composite legality.** A composite basis is legal for a source operation iff *every* component atom is in that operation's legal-component set. `date - date` accepts any composite drawn from `{Years, Months, Weeks, Days}`; `time - time` from `{Hours, Minutes, Seconds}`; `datetime - datetime` from the full set. An illegal atom in a composite emits `QualifierMismatch` naming the violating component; multiple illegal atoms emit one diagnostic per atom. Example: `date - date as period in 'days + hours'` emits `QualifierMismatch` for the `hours` component (a time atom on a date-only subtraction).
+
 ### Default NodaTime basis (no `in` specified)
 
 | Operation | Default basis |
@@ -1344,9 +1366,9 @@ NodaTime enforces which period units are valid for each local-type subtraction. 
 | Precept expression | NodaTime lowering |
 |---|---|
 | `date - date` as `period in 'months'` | `Period.Between(start, end, PeriodUnits.Months)` |
-| `date - date` as `period in 'weeks&days'` | `Period.Between(start, end, PeriodUnits.Weeks \| PeriodUnits.Days)` |
-| `time - time` as `period in 'hours&minutes'` | `Period.Between(start, end, PeriodUnits.Hours \| PeriodUnits.Minutes)` |
-| `datetime - datetime` as `period in 'days&hours&minutes'` | `Period.Between(start, end, PeriodUnits.Days \| PeriodUnits.Hours \| PeriodUnits.Minutes)` |
+| `date - date` as `period in 'weeks + days'` | `Period.Between(start, end, PeriodUnits.Weeks \| PeriodUnits.Days)` |
+| `time - time` as `period in 'hours + minutes'` | `Period.Between(start, end, PeriodUnits.Hours \| PeriodUnits.Minutes)` |
+| `datetime - datetime` as `period in 'days + hours + minutes'` | `Period.Between(start, end, PeriodUnits.Days \| PeriodUnits.Hours \| PeriodUnits.Minutes)` |
 
 The result is whatever NodaTime returns for the requested basis. Precept does not add additional exactness rejection or round-trip validation beyond what NodaTime itself provides.
 
@@ -1679,12 +1701,13 @@ For business-domain types, comparison operators carry domain preconditions. **Cr
 - **Precedent:** NodaTime's `Period.Between(start, end, PeriodUnits)` overload.
 - **Tradeoff accepted:** `period in 'months'` on a non-month-boundary date difference will silently truncate toward start, per NodaTime behavior.
 
-### D4. `&` for period basis composition, `/` exclusively for ratios
+### D4. `+` for period basis composition, `/` exclusively for ratios
 
-- **What:** `period in 'hours&minutes'` means Hours AND Minutes. `price in 'USD/kg'` means USD PER kg. `/` has one meaning everywhere: division/ratio.
-- **Why:** `&` eliminates the overloaded `/` problem. Every `/` inside a quoted expression means "per."
-- **Alternatives rejected:** (A) `/` for both — context-dependent disambiguation needed. (B) `+` for basis composition — confusing because `+` already means addition.
-- **Tradeoff accepted:** None significant.
+- **What:** `period in 'hours + minutes'` means Hours AND Minutes. `price in 'USD/kg'` means USD PER kg. `/` has one meaning everywhere: division/ratio. `+` inside a quoted temporal expression means "combine these components" — the same role it plays in period value literals (`'1 year + 6 months'`). Spacing around `+` is lenient on input (`'hours+minutes'` and `'hours + minutes'` are equivalent); the canonical form is spaced.
+- **Why:** `+` is already the temporal-component combiner in value literals (temporal design D17, locked 2026-04-15: `'1 year + 6 months'` maps to `Period` component union, not arithmetic). Using the same operator for type-level basis composition gives the author one combiner to learn for temporal components, in both value and basis position. `&` would be the only place that operator appears anywhere in the language. The basis position is lexically unambiguous — `'hours+minutes'` carries no magnitudes, so it cannot be read as a value (you cannot add bare unit identifiers); the surrounding `in`/`of`/`default` keyword distinguishes basis position from value position.
+- **Alternatives rejected:** (A) `/` for both — context-dependent disambiguation needed; `/` would mean both "ratio" and "and." (B) `&` for basis composition — the original lock (2026-04-18) chose `&` three days after the value-literal `+` combiner (2026-04-15) by the same author, on the stated grounds that "`+` already means addition." That rationale describes `+`'s arithmetic role but does not survive the value-literal lock, where `+` is *already* the non-arithmetic component combiner inside the same `'...'` delimiter on the same `period` type. The `&` choice was a missed alignment, not a load-bearing distinction — confirmed by `research/language/expressiveness/period-basis-separator-survey.md` (NodaTime has no textual unit-selection separator; no other Precept type-level qualifier uses a list separator; no archived design or commit revisited the choice). Amended to `+` 2026-05-28.
+- **Precedent:** Temporal design D17 (`'1 year + 6 months'` value-literal combiner). `research/language/expressiveness/period-basis-separator-survey.md` — survey of NodaTime, Joda-Time, and the internal record.
+- **Tradeoff accepted:** `+` requires the reader to confirm no arithmetic is intended in basis position — a momentary check that `&` would resolve instantly by visual distinctiveness. Accepted because basis position carries no magnitudes (the check always resolves to "no arithmetic possible here") and the consistency win — one temporal combiner across value and basis — outweighs the orphan-operator cost of `&`.
 
 ### D5. UCUM as the standard registry for physical units
 
@@ -1729,7 +1752,7 @@ For business-domain types, comparison operators carry domain preconditions. **Cr
   | `money` | `.currency` | `when X.currency == 'USD'` | `$eq:X.currency:USD` |
   | `quantity` | `.unit` | `when X.unit == 'kg'` | `$eq:X.unit:kg` |
   | `quantity` | `.dimension` | `when X.dimension == 'length'` | `$eq:X.dimension:length` |
-  | `period` | `.basis` | `when X.basis == 'hours&minutes'` | `$eq:X.basis:hours&minutes` |
+  | `period` | `.basis` | `when X.basis == 'hours + minutes'` | `$eq:X.basis:hours + minutes` |
   | `period` | `.dimension` | `when X.dimension == 'date'` | `$eq:X.dimension:date` |
   | `price` | `.currency`, `.unit`, `.dimension` | `when X.currency == 'USD'` | `$eq:X.currency:USD` |
   | `exchangerate` | `.from`, `.to` | `when X.from == 'USD'` | `$eq:X.from:USD` |
@@ -1790,6 +1813,8 @@ For business-domain types, comparison operators carry domain preconditions. **Cr
 
 **Reconciliation with D3:** D3 and D14 govern different phases of the same `in` keyword. D3 governs the **decomposition basis** — which NodaTime `PeriodUnits` overload `Period.Between()` uses. D14 governs the **assignment constraint** — what values the field accepts. Both apply simultaneously: a `period in 'months'` field uses the months decomposition basis (D3) AND rejects assignments containing non-months components (D14).
 
+**Composite extension.** For composite-basis constraints, D14 generalizes: a value is accepted iff its non-zero component set is a subset of the declared basis. `period in 'years + months'` rejects an assignment with a non-zero `Days` component (`QualifierMismatch`) because `{Days}` ⊄ `{Years, Months}`. Zero-valued components are ignored — a `Period(Years: 2, Months: 0, Days: 0)` value is accepted against `period in 'years + months'` because its non-zero set `{Years}` ⊆ `{Years, Months}`.
+
 **Enforcement mechanism:** The `QualifierMismatch` diagnostic enforces `in` constraints at compile time using the proven-violation-only policy (same principle as the proof engine's interval diagnostics which apply to numeric range violations). Three enforcement tiers:
 
 1. **Literals with statically-known content:** `set CostUsd = '100 EUR'` where `CostUsd` is `money in 'USD'` — the compiler resolves the literal's currency to EUR, proves it violates the USD constraint, and emits `QualifierMismatch` as a compile-time error. Same for `set MonthsField = '30 days'` against `period in 'months'`.
@@ -1814,9 +1839,9 @@ For business-domain types, comparison operators carry domain preconditions. **Cr
 - **Operators enabled:**
   - Period path: `price × period → money`, `money ÷ period → price`, `quantity(compound) × period → quantity`, `quantity ÷ period → quantity(compound)` — cancels any time denominator.
   - Duration path: `price × duration → money`, `money ÷ duration → price`, `quantity(compound) × duration → quantity`, `quantity ÷ duration → quantity(compound)` — cancels `hours`/`minutes`/`seconds` only.
-- **Period single-basis cancellation rule:** A `period` cancels a single-unit time denominator **only when the period has a single matching basis**. `period in 'hours'` cancels `price in 'USD/hours'`. `period in 'hours&minutes'` does **not** cancel `price in 'USD/hours'` — it is a compile error. NodaTime stores period components separately (`.Hours`, `.Minutes`, `.Seconds`) with no native `TotalHours` conversion. Converting a multi-basis period to a single unit would require Precept-invented arithmetic that NodaTime deliberately refuses. The author must decompose first: extract the hours component or use a single-basis period. `CompoundPeriodDenominator` enforces this — a compound period assignment to a single-unit denominator context is a proven constraint violation.
+- **Period single-basis cancellation rule:** A `period` cancels a single-unit time denominator **only when the period has a single matching basis**. `period in 'hours'` cancels `price in 'USD/hours'`. `period in 'hours + minutes'` does **not** cancel `price in 'USD/hours'` — it is a compile error. NodaTime stores period components separately (`.Hours`, `.Minutes`, `.Seconds`) with no native `TotalHours` conversion. Converting a multi-basis period to a single unit would require Precept-invented arithmetic that NodaTime deliberately refuses. The author must decompose first: extract the hours component or use a single-basis period. `CompoundPeriodDenominator` enforces this — a compound period assignment to a single-unit denominator context is a proven constraint violation.
 - **Duration is exempt from this restriction.** `Duration` is a single scalar (nanoseconds internally) — `duration.ToInt64Nanoseconds()` always yields an exact conversion to any time unit. There is no multi-basis ambiguity. `duration` cancels any fixed-length time denominator (`hours`/`minutes`/`seconds`) regardless of how the duration was constructed.
-- **Date-component denominators remain period-only.** `days`, `weeks`, `months`, `years` denominators cancel only with `period`, and follow the same single-basis rule: `period in 'months'` cancels `price in 'USD/months'`, but `period in 'months&days'` does not — because NodaTime cannot convert "2 months + 15 days" into a pure months count without a reference date.
+- **Date-component denominators remain period-only.** `days`, `weeks`, `months`, `years` denominators cancel only with `period`, and follow the same single-basis rule: `period in 'months'` cancels `price in 'USD/months'`, but `period in 'months + days'` does not — because NodaTime cannot convert "2 months + 15 days" into a pure months count without a reference date.
 - **Alternatives rejected:** (A) UCUM time units — requires translation table. (B) Time spans as `quantity` — dead end #6. (C) No cancellation — makes `HourlyRate * HoursWorked` impossible. (D) `period`-only — blocks `instant - instant → duration` from compound arithmetic. (E) Compiler warning on dual paths — second-guessing the author's deliberate type choice.
 - **Precedent:** NodaTime separates `Duration` (fixed elapsed) from `Period` (calendar distance). The temporal proposal preserves this. The boundary is faithful to NodaTime's model.
 - **Tradeoff accepted:** UCUM time units not valid in denominators. Minor vocabulary restriction for zero-translation cancellation.
@@ -1949,7 +1974,7 @@ This proposal extends mechanisms established by the temporal proposal (Issue #10
 
 - Recognize `in '<unit-expression>'` and `of '<dimension-category>'` after type keywords in field declarations.
 - Enforce mutual exclusivity: `in` and `of` on the same field declaration is a parse error.
-- Parse unit expressions inside `'...'` — distinguish period basis (atoms separated by `&`), currency codes (3 uppercase letters), UCUM unit names, and compound price/rate expressions (containing `/` between a currency and a unit).
+- Parse unit expressions inside `'...'` — distinguish period basis (atoms separated by `+`), currency codes (3 uppercase letters), UCUM unit names, and compound price/rate expressions (containing `/` between a currency and a unit).
 - Parse category names inside `of '...'` — validate against the known UCUM dimension vocabulary for `quantity`, and the fixed set `'date'`/`'time'` for `period`.
 - **Typed-constant content remains opaque through the parser phase.** The parser preserves the literal text and span only. The type checker performs context-directed parsing and validation so diagnostics still attach to the literal span, but type identity is never pre-classified in the parser.
 
@@ -2041,7 +2066,7 @@ This document covers the design of the seven new business-domain types, the peri
 | `CrossDimensionArithmetic` | `'5 kg' + '3 mi'` (mass ≠ length) |
 | `DenominatorUnitMismatch` | `price in 'USD/kg' * quantity in 'mi'` |
 | `DurationDenominatorMismatch` | `price in 'USD/days' * duration` (variable-length denominator) |
-| `CompoundPeriodDenominator` | `period in 'hours&minutes' * price in 'USD/hours'` |
+| `CompoundPeriodDenominator` | `period in 'hours + minutes' * price in 'USD/hours'` |
 | `MutuallyExclusiveQualifiers` | `field X as quantity in 'kg' of 'mass'` (only `price` supports both) |
 | `InvalidUnitString` | `set SelectedUnit = 'kg/m'` for an atomic-unit field |
 | `InvalidCurrencyCode` | `'USDX'` as a currency literal or `currency` field value |
