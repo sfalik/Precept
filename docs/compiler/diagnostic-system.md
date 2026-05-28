@@ -362,7 +362,7 @@ public enum DiagnosticCode
     ContradictoryRule                   = 155,
 
     // ── Type (temporal constant comparison) ──────────────
-    AlwaysFalsePeriodComparison         = 156,
+    DegeneratePeriodComparison          = 156,
 
     // ── Proof (business-domain dimensional product) ──────
     IncompatibleDimensionalProduct      = 157,
@@ -370,12 +370,15 @@ public enum DiagnosticCode
     // ── Graph (field-write-site analysis) ────────────────
     FieldNeverSet                       = 158,
 
+    // ── Proof (rule self-impossibility) ──────────────────
+    UnsatisfiableRule                   = 159,
+
     // ── NameBinder ───────────────────────────────────────
     UndeclaredArg                   = 107,
 }
 ```
 
-**158 active diagnostic codes** across the diagnostic stages. `McpToolInternalError = 149` is a tooling-side code emitted by the MCP-tool wrapper, not the compile pipeline — see the note in § DiagnosticStage above. PRE0150–PRE0152 cover currency-qualifier precision; PRE0153/PRE0154/PRE0155 are emitted by the proof engine's satisfiability scan (TautologicalGuard, VacuousRule, ContradictoryRule); PRE0156 catches always-false period literal comparisons; PRE0157 fires when `quantity × quantity` produces a dimension outside the curated business-domain set; PRE0158 fires when a field declaration has no discoverable write site.
+**159 active diagnostic codes** across the diagnostic stages. `McpToolInternalError = 149` is a tooling-side code emitted by the MCP-tool wrapper, not the compile pipeline — see the note in § DiagnosticStage above. PRE0150–PRE0152 cover currency-qualifier precision; PRE0153/PRE0154/PRE0155 are emitted by the proof engine's satisfiability scan (TautologicalGuard, VacuousRule, ContradictoryRule); PRE0156 catches degenerate period literal comparisons; PRE0157 fires when `quantity × quantity` produces a dimension outside the curated business-domain set; PRE0158 fires when a field declaration has no discoverable write site; PRE0159 fires when a single rule's predicate is unsatisfiable under its field-declared bounds (distinct from PRE0155 which requires a pair-wise contradiction).
 
 The enum **is** the complete set of diagnostic rules. It is a closed set — you cannot produce a diagnostic that is not a member. Adding a member without completing the catalog chain causes a build failure (see the FaultCode → DiagnosticCode Chain section below).
 

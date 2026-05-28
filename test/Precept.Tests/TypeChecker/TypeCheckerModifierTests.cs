@@ -733,4 +733,5 @@ public class TypeCheckerModifierTests
 
         TypeCheckerTestHelpers.CheckExpectingClean(precept);
     }
+
 }

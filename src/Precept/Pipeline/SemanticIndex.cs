@@ -261,6 +261,14 @@ public sealed record CurrencyConversionRequired : QualifierBinding;
 /// </summary>
 public sealed record CompoundDimensionElevationRequired : QualifierBinding;
 
+/// <summary>
+/// Result quantity inherits the unit (and dimension) from the price operand's denominator.
+/// Used for <c>MoneyDividePrice</c>: <c>money in 'USD' ÷ price in 'USD/each'</c> produces
+/// <c>quantity in 'each'</c> — the currency axis cancels via <see cref="QualifierChainProofRequirement"/>,
+/// and the result's unit/dimension axes are inherited from the price's denominator unit.
+/// </summary>
+public sealed record PriceDenominatorInherited : QualifierBinding;
+
 // ════════════════════════════════════════════════════════════════════════════
 //  ActionSecondaryRole enum (D5)
 // ════════════════════════════════════════════════════════════════════════════

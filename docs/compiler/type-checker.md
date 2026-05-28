@@ -393,12 +393,28 @@ public sealed record TypedArg(
 public abstract record QualifierBinding;
 public sealed record InheritedQualifier(string FieldName) : QualifierBinding;
 public sealed record SameQualifierRequired : QualifierBinding;
+public sealed record CompoundUnitCancellationRequired : QualifierBinding;
+public sealed record QualifiedOperandInherited : QualifierBinding;
+public sealed record CurrencyConversionRequired : QualifierBinding;
+public sealed record CompoundDimensionElevationRequired : QualifierBinding;
+public sealed record PriceDenominatorInherited : QualifierBinding;
 ```
 
-- `InheritedQualifier` — result inherits qualifier identity from the named field
-- `SameQualifierRequired` — both operands must have the same qualifier; result inherits
+- `InheritedQualifier` — result inherits qualifier identity from the named field.
+- `SameQualifierRequired` — both operands must carry the same qualifier; the result inherits it.
+- `CompoundUnitCancellationRequired` — a quantity product cancels a compound-unit denominator and inherits the numerator unit (e.g., `quantity in 'kg' × quantity in '1/kg' → quantity of 'count'`).
+- `QualifiedOperandInherited` — result inherits qualifiers from the qualifier-bearing operand in a scalar operation; the non-qualifier-bearing operand (e.g., `decimal`) is transparent to qualifier flow.
+- `CurrencyConversionRequired` — result currency is the `ToCurrency` of the exchangerate operand. Used for `ExchangeRateTimesMoney`.
+- `CompoundDimensionElevationRequired` — `price ÷ compound-quantity` requires that the price's denominator dimension match the compound-quantity's denominator dimension; the result carries the compound-quantity's numerator unit.
+- `PriceDenominatorInherited` — `money in 'C' ÷ price in 'C/U'` produces `quantity in 'U'`. Currency cancels via `QualifierChainProofRequirement`; the result's unit/dimension axes inherit from the price's denominator (the `U` component of the `CompoundPrice` qualifier).
+
+Consumer surfaces (every site that switches on `QualifierBinding` subtype): `MapQualifierBinding` (this file, ~line 980), `ShouldSkipPairwiseQualifierChecks` (this file, ~line 1139), `ResolveBinaryQualifierAxis` (`TypeChecker.Expressions.AssignmentQualifiers.cs`, ~line 343), two `ResolveQualifierFromExpression` forms (`ProofEngine.Qualifiers.cs`, ~lines 332 and 469), and `RichHoverFactory.cs` hover dispatch (~line 1002).
 
 Qualifier propagation is a type-checker concern for structural validation only. The actual qualifier *value* (`"USD"`, `"kg"`) is a runtime concern — the checker can't know it at compile time. The checker validates qualifier *compatibility* when `FindCandidates` returns multiple entries disambiguated by `QualifierMatch`. The **ProofEngine** handles deeper obligations (e.g., "prove these two money values have the same currency").
+
+##### Cross-counting-unit operation (PRE0137) — operator-family-uniform
+
+The type checker enforces counting-unit non-interchangeability across the full qualifier-equivalence operator family — addition, subtraction, comparison, same-match function calls, **and multiplication / division** — when both operands carry `DimensionVector.None` with differing explicit unit codes. The check lives outside the `!opComposesDimensions` gate at `TypeChecker.Expressions.cs:1207-1241`, because `each × box` and `each + box` violate the same rule (`business-domain-types.md:397` — counting units share the `count` dimension but are not universally convertible). The cross-dimension check (PRE0071) stays gated to additive operators only, since multiplication legitimately composes dimensions.
 
 #### Normalized Declarations
 

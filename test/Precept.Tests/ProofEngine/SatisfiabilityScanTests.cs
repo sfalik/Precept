@@ -247,4 +247,96 @@ public class SatisfiabilityScanTests
         ledger.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.TautologicalGuard),
             because: "without declared bounds, X >= 0 is not provably-true");
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  UnsatisfiableRule (PRE0159) — pre-pass that fires before ContradictoryRule
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void UnsatisfiableRule_EmitsPRE0159_OnSelfImpossibleRule()
+    {
+        // The rule `X >= 10` is impossible because X is declared `max 4`. The
+        // intersection of [0, 4] (from field bounds) and [10, ∞) (from the rule)
+        // is empty AND non-Unbounded, satisfying the soundness gate.
+        var ledger = Prove("""
+            precept LoanRenewalCap
+            field RenewalCount as integer default 0 nonnegative max 4 editable
+            rule RenewalCount >= 10 because "Renewal cannot exceed cap"
+            state Open initial
+            """);
+
+        ledger.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.UnsatisfiableRule),
+            because: "RenewalCount has declared bounds [0, 4]; the rule requires >= 10, which is impossible");
+    }
+
+    [Fact]
+    public void UnsatisfiableRule_AttributesToOffender_NotInnocentPartner()
+    {
+        // The attribution-fix test: when one rule is self-unsat and another is fine,
+        // PRE0159 fires on the offender; ContradictoryRule does NOT fire on the partner.
+        var ledger = Prove("""
+            precept LoanRenewalCap
+            field RenewalCount as integer default 0 nonnegative max 4 editable
+            rule RenewalCount >= 10 because "Offender — impossible"
+            rule RenewalCount <= 50 because "Innocent — trivially satisfiable"
+            state Open initial
+            """);
+
+        ledger.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.UnsatisfiableRule),
+            because: "the first rule is self-unsat and should be attributed correctly");
+        ledger.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.ContradictoryRule),
+            because: "the second rule is excluded from the pair sweep because the first is self-unsat");
+    }
+
+    [Fact]
+    public void ContradictoryRule_StillFiresOnGenuinePairConflict()
+    {
+        // Regression guard: when both rules are individually satisfiable but
+        // their conjunction is empty, PRE0155 still fires (PRE0159 does NOT).
+        var ledger = Prove("""
+            precept Repro
+            field X as integer default 7 editable
+            rule X > 10 because "X must exceed 10"
+            rule X <= 5 because "X must be at most 5"
+            state Open initial
+            """);
+
+        ledger.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.ContradictoryRule),
+            because: "both rules are individually satisfiable on an unbounded integer; the pair has empty intersection");
+        ledger.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnsatisfiableRule),
+            because: "neither rule is self-unsatisfiable in isolation — X is unbounded, so each rule admits values");
+    }
+
+    [Fact]
+    public void UnsatisfiableRule_DoesNotFire_OnUnboundedField()
+    {
+        // Soundness-over-completeness gate: a rule that would intersect with an
+        // unbounded field to [100, ∞) is NOT empty, so PRE0159 does NOT fire.
+        var ledger = Prove("""
+            precept Repro
+            field X as integer default 0 editable
+            rule X >= 100 because "X must reach the threshold"
+            state Open initial
+            """);
+
+        ledger.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnsatisfiableRule),
+            because: "X has no declared max, so the rule X >= 100 is satisfiable for large enough X");
+    }
+
+    [Fact]
+    public void UnsatisfiableRule_ComposesWithWhenGuard()
+    {
+        // The rule's own `when` guard is folded into the per-field interval
+        // before the predicate. `when X <= 5` narrows X to [0, 5]; then
+        // `X >= 10` (predicate) intersects to empty → PRE0159 fires.
+        var ledger = Prove("""
+            precept Repro
+            field X as integer default 0 nonnegative max 100 editable
+            rule X >= 10 when X <= 5 because "Conjunction is impossible"
+            state Open initial
+            """);
+
+        ledger.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.UnsatisfiableRule),
+            because: "the rule's `when` guard composes with its predicate; the conjunction X <= 5 AND X >= 10 is empty");
+    }
 }

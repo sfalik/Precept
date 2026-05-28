@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using Precept.Language;
@@ -43,9 +44,12 @@ public static partial class GraphAnalyzer
                 .ToImmutableArray();
 
             // Stateless precepts may still declare fields, so the
-            // FieldNeverSet sub-pass runs here too.
+            // FieldNeverSet sub-pass runs here too. With no states there's no
+            // per-state reachability set; construction-row writes, computed
+            // fields, and field-level `editable` are the only write sites that
+            // can fire, and the sub-pass admits all three unconditionally.
             var statelessDiagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
-            AnalyzeFieldWriteSites(semantics, statelessDiagnostics);
+            AnalyzeFieldWriteSites(semantics, new HashSet<string>(System.StringComparer.Ordinal), statelessDiagnostics);
 
             return new StateGraph(
                 States: ImmutableArray<GraphState>.Empty,
@@ -292,8 +296,10 @@ public static partial class GraphAnalyzer
         proofFacts.Add(deadEndStateFact);
 
         // Field-write-site analysis (FieldNeverSet) runs after reachability /
-        // completeness / event coverage, before serialization.
-        AnalyzeFieldWriteSites(semantics, diagnostics);
+        // completeness / event coverage, before serialization. The reachable
+        // state set is threaded in so per-state writes (access modes,
+        // transition rows, state hooks) on unreachable states are excluded.
+        AnalyzeFieldWriteSites(semantics, reachability.Reachable, diagnostics);
 
         return new StateGraph(
             States: graphStates,

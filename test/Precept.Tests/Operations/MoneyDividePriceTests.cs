@@ -89,4 +89,73 @@ public class MoneyDividePriceTests
         diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.TypeMismatch),
             because: "money ÷ price now type-checks to quantity via the new MoneyDividePrice operation");
     }
+
+    [Fact]
+    public void MoneyDividePrice_ResultInheritsPriceDenominatorUnit_NoQualifierMismatch()
+    {
+        // Decision A wiring: PriceDenominatorInherited subtype + assignment-side
+        // resolver should derive the result's Unit-axis qualifier from the price's
+        // denominator unit ('each' from 'USD/each'), so the target field's declared
+        // 'quantity in 'each'' qualifier matches and no QualifierMismatch fires.
+        // Uses the canonical compound-price syntax `price in 'USD/each'`.
+        var (_, diagnostics) = Check("""
+            precept Reorder
+            field Budget as money in 'USD' default '0 USD' editable
+            field UnitCost as price in 'USD/each' default '1 USD/each' editable
+            field UnitsToBuy as quantity in 'each' default '0 each' <- Budget / UnitCost
+            state Open initial
+            """);
+
+        diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.QualifierMismatch),
+            because: "result quantity inherits 'each' from the price's denominator unit, matching the target's qualifier");
+        diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnprovedQualifierCompatibility),
+            because: "PriceDenominatorInherited resolver provides the unit-axis qualifier for proof discharge");
+        diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnprovedAssignmentQualifierCompatibility),
+            because: "the assignment-side resolver returns Resolved (not Unknown) for the Unit/Dimension axes");
+    }
+
+    [Fact]
+    public void MoneyDividePrice_TransitiveInheritance_PriceSideWrappedInBinaryOp()
+    {
+        // Transitive resolution: the price operand itself is a binary op
+        // (`UnitCost + Markup`). The resolver must walk into that nested op to
+        // find the CompoundPrice qualifier on the leaf field references.
+        // Exercises ResolveQualifierFromExpression's recursive descent through
+        // a SameQualifierRequired binding to reach the price.
+        var (_, diagnostics) = Check("""
+            precept Reorder
+            field Budget as money in 'USD' default '0 USD' editable
+            field UnitCost as price in 'USD/each' default '1 USD/each' editable
+            field Markup as price in 'USD/each' default '0 USD/each' editable
+            field UnitsToBuy as quantity in 'each' default '0 each' <- Budget / (UnitCost + Markup)
+            state Open initial
+            """);
+
+        diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.QualifierMismatch),
+            because: "transitive resolution: outer / projects denominator from the inner (UnitCost + Markup) price sum");
+        diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnprovedAssignmentQualifierCompatibility),
+            because: "the resolver must walk into the nested binary op on the price side and still find the denominator");
+    }
+
+    [Fact]
+    public void MoneyDividePrice_MoneySideWrappedInBinaryOp_ResolutionStillCorrect()
+    {
+        // The money operand wrapped in a binary op: (Budget - Spent) / UnitCost.
+        // Tests that the operand-side identification `binary.Left.ResultType ==
+        // TypeKind.Price ? binary.Left : binary.Right` correctly picks the price
+        // operand even when the money side is itself a TypedBinaryOp.
+        var (_, diagnostics) = Check("""
+            precept Reorder
+            field Budget as money in 'USD' default '0 USD' editable
+            field Spent as money in 'USD' default '0 USD' editable
+            field UnitCost as price in 'USD/each' default '1 USD/each' editable
+            field Remaining as quantity in 'each' default '0 each' <- (Budget - Spent) / UnitCost
+            state Open initial
+            """);
+
+        diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.QualifierMismatch),
+            because: "wrapping the money side does not change the price-side denominator inheritance");
+        diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnprovedAssignmentQualifierCompatibility),
+            because: "operand-side identification correctly picks the Price operand when Money is nested");
+    }
 }

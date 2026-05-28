@@ -585,31 +585,32 @@ internal static partial class TypeChecker
         // B2 enforcement: qualifier compatibility check (PRE0070–0074)
         ValidateQualifierCompatibility(resolved, opMeta, span, ctx);
 
-        // Always-false period-literal comparison (per `temporal-type-system.md` § Period
+        // Degenerate period-literal comparison (per `temporal-type-system.md` § Period
         // equality semantics). When both operands of `==` / `!=` on `period` are static
         // literal periods with disjoint non-zero components, the comparison is statically
-        // knowable; emit a Warning so the author can switch to `duration` (for absolute
-        // time) or rewrite the comparison.
-        ValidateAlwaysFalsePeriodComparison(resolved, span, ctx);
+        // knowable — `==` is always-false, `!=` is always-true. Emit a Warning so the
+        // author can switch to `duration` (for absolute time) or rewrite the comparison.
+        ValidateDegeneratePeriodComparison(resolved, span, ctx);
 
         return resolved;
     }
 
     /// <summary>
     /// Warns when both operands of a period `==` / `!=` are static literal periods whose
-    /// non-zero components are disjoint, making the comparison statically knowable.
+    /// non-zero components are disjoint, making the comparison statically knowable —
+    /// `==` always returns false, `!=` always returns true.
     /// </summary>
-    private static void ValidateAlwaysFalsePeriodComparison(TypedBinaryOp resolved, SourceSpan span, CheckContext ctx)
+    private static void ValidateDegeneratePeriodComparison(TypedBinaryOp resolved, SourceSpan span, CheckContext ctx)
     {
         if (resolved.ResolvedOp is not (OperationKind.PeriodEqualsPeriod or OperationKind.PeriodNotEqualsPeriod))
             return;
         if (resolved.Left is not TypedTypedConstant { ParsedValue: NodaTime.Period left } leftTc) return;
         if (resolved.Right is not TypedTypedConstant { ParsedValue: NodaTime.Period right } rightTc) return;
-        if (left.Equals(right)) return;  // structurally equal — not always-false
+        if (left.Equals(right)) return;  // structurally equal — comparison is not degenerate
         if (HasOverlappingNonZeroComponents(left, right)) return;  // could differ for a different reason
 
         var alwaysValue = resolved.ResolvedOp == OperationKind.PeriodEqualsPeriod ? "false" : "true";
-        ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.AlwaysFalsePeriodComparison, span,
+        ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.DegeneratePeriodComparison, span,
             alwaysValue, leftTc.RawText, rightTc.RawText));
     }
 
@@ -990,6 +991,9 @@ internal static partial class TypeChecker
         if (meta.ResultQualifierPolicy == ResultQualifierPolicy.CompoundDimensionElevation)
             return new CompoundDimensionElevationRequired();
 
+        if (meta.ResultQualifierPolicy == ResultQualifierPolicy.InheritPriceDenominatorUnit)
+            return new PriceDenominatorInherited();
+
         return meta.Match switch
         {
             QualifierMatch.Same      => new SameQualifierRequired(),
@@ -1136,6 +1140,11 @@ internal static partial class TypeChecker
     {
         CompoundUnitCancellationRequired => ResolveCompoundCancellationAxis(op, QualifierAxis.Dimension).Kind == QualifierResolutionKind.Resolved,
         CompoundDimensionElevationRequired => ResolveCompoundElevationAxis(op, QualifierAxis.Dimension).Kind == QualifierResolutionKind.Resolved,
+        // MoneyDividePrice operands are Money / Price (different types) and never
+        // match the Money + Money or Quantity + Quantity gates downstream, so the
+        // skip choice is functionally moot — we choose `true` defensively.
+        // Currency-axis sameness is verified by QualifierChainProofRequirement.
+        PriceDenominatorInherited => true,
         _ => false,
     };
 
@@ -1203,6 +1212,11 @@ internal static partial class TypeChecker
         // QuantityDivideQuantityCrossDimension).
         bool opComposesDimensions = opMeta.Kind == OperatorKind.Times
             || opMeta.Kind == OperatorKind.Divide;
+
+        // Cross-dimension arithmetic (PRE0071) — gated to additive/comparison ops.
+        // Multiplication and division legitimately compose dimensions; their
+        // dimensional-product check lives in the proof engine via
+        // DimensionalProductProofRequirement (PRE0157).
         if (qualifierLeft.ResultType == TypeKind.Quantity && qualifierRight.ResultType == TypeKind.Quantity
             && enforcePairwiseQualifierChecks
             && !opComposesDimensions)
@@ -1218,7 +1232,24 @@ internal static partial class TypeChecker
                         GetOperandName(qualifierRight), rightDim));
                 return;
             }
+        }
 
+        // Cross-counting-unit operation (PRE0137) — fires for + - × ÷ uniformly.
+        // Counting units (each, box, case, ...) share the `count` dimension but
+        // are NOT universally convertible — see business-domain-types.md § UCUM
+        // dimension categories. When both operands are dimensionless quantities
+        // with different explicit unit names, refuse the operation regardless of
+        // operator family.
+        //
+        // Interpolated qualifiers (e.g. `quantity in '{Field1}/{Field2}'`) are
+        // implicitly safe here: TryGetQualifierDimensionVector returns false on
+        // any qualifier whose unit code or dimension name contains '{' (UCUM
+        // parse fails on the braced string AND DimensionCatalog lookup misses),
+        // so the outer guard short-circuits and the unit-name discrimination
+        // never runs against an interpolated unit code.
+        if (qualifierLeft.ResultType == TypeKind.Quantity && qualifierRight.ResultType == TypeKind.Quantity
+            && enforcePairwiseQualifierChecks)
+        {
             if (TryGetQualifierDimensionVector(leftQualifiers.Value, out var leftVector)
                 && TryGetQualifierDimensionVector(rightQualifiers.Value, out var rightVector)
                 && leftVector.Equals(DimensionVector.None)

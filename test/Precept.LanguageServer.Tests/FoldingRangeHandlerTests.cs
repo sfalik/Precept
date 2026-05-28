@@ -84,7 +84,8 @@ public class FoldingRangeHandlerTests
                 ImmutableArray<FaultSiteLink>.Empty,
                 ImmutableArray<ConstraintInfluenceEntry>.Empty,
                 ImmutableArray<InitialStateSatisfiabilityResult>.Empty,
-                ImmutableArray<Precept.Language.Diagnostic>.Empty),
+                ImmutableArray<Precept.Language.Diagnostic>.Empty,
+                ImmutableArray<ProofForwardingFact>.Empty),
             ImmutableArray<Precept.Language.Diagnostic>.Empty,
             false);
     }

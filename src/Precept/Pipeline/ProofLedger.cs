@@ -19,17 +19,7 @@ public sealed record ProofLedger(
     /// directly via the satisfiability scan).
     /// </summary>
     ImmutableArray<ProofForwardingFact> ProducedFacts
-)
-{
-    public ProofLedger(
-        ImmutableArray<ProofObligation> obligations,
-        ImmutableArray<FaultSiteLink> faultSiteLinks,
-        ImmutableArray<ConstraintInfluenceEntry> constraintInfluence,
-        ImmutableArray<InitialStateSatisfiabilityResult> initialStateResults,
-        ImmutableArray<Diagnostic> diagnostics)
-        : this(obligations, faultSiteLinks, constraintInfluence, initialStateResults, diagnostics,
-               ImmutableArray<ProofForwardingFact>.Empty) { }
-}
+);
 
 public sealed record ProofObligation(
     ProofRequirement Requirement,

@@ -430,10 +430,15 @@ The proof engine operates in two sequential passes:
 │    - If guard is unsatisfiable under field bounds → emit             │
 │      UnsatisfiableGuard (PRE0082) + produce UnreachableRowFact       │
 │    - Else if guard is tautological → emit TautologicalGuard (PRE0153)│
-│  • Walk Rules:                                                       │
-│    - If predicate is provably-true → emit VacuousRule (PRE0154)      │
-│    - For each rule pair, if interval intersection on a shared field  │
-│      is empty → emit ContradictoryRule (PRE0155)                     │
+│  • Walk Rules (PRE0159 pre-pass + PRE0154 + PRE0155 pair sweep):     │
+│    - Compose each rule's predicate with its field-declared bounds    │
+│      and its own `when` guard. If any field's interval is empty →    │
+│      emit UnsatisfiableRule (PRE0159); exclude the rule from the     │
+│      pair sweep.                                                     │
+│    - For non-self-unsat rules: if predicate is provably-true →       │
+│      emit VacuousRule (PRE0154).                                     │
+│    - For each non-self-unsat rule pair, if interval intersection on  │
+│      a shared field is empty → emit ContradictoryRule (PRE0155).     │
 │  • Runs between forwarding-fact incorporation and Pass 2 discharge.  │
 └─────────────────────────────────────────────────────────────────────┘
                                    │
@@ -467,11 +472,17 @@ The proof engine operates in two sequential passes:
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-**Satisfiability scan (Pass 1.5).** A lateral pass between forwarding-fact incorporation and per-obligation discharge that detects whole-construct verdicts the per-obligation strategies can't express: provably-empty guards, tautological guards, vacuous rule predicates, and contradictory rule pairs. Lives in `ProofEngine.Satisfiability.cs`. The verdict shape is whole-construct (no obligation site), so the scan emits diagnostics directly into the diagnostic stream rather than flowing through the obligation channel.
+**Satisfiability scan (Pass 1.5).** A lateral pass between forwarding-fact incorporation and per-obligation discharge that detects whole-construct verdicts the per-obligation strategies can't express: provably-empty guards, tautological guards, vacuous rule predicates, self-unsatisfiable rules, and contradictory rule pairs. Lives in `ProofEngine.Satisfiability.cs`. The verdict shape is whole-construct (no obligation site), so the scan emits diagnostics directly into the diagnostic stream rather than flowing through the obligation channel.
+
+Rule-level scans run in two phases. First, `UnsatisfiableRule (PRE0159)` classification: each rule's predicate is composed with the field-declared bounds and the rule's own `when` guard via the `ComposeRulePredicateWithFieldBounds` helper; if any field's resulting interval is empty (and non-Unbounded — the soundness gate), the rule is impossible on its own and PRE0159 fires. Self-unsat rules are excluded from subsequent passes. Second, the existing `VacuousRule (PRE0154)` provably-true check and `ContradictoryRule (PRE0155)` pair sweep run over the remaining (non-self-unsat) rules. The two-phase design ensures attribution: a singleton self-impossibility is never blamed on an innocent paired rule.
 
 The scan also produces `UnreachableRowFact` instances into `ProofLedger.ProducedFacts` for every transition row with a proven-unsatisfiable guard. This is the first `ProofForwardingFact` variant produced by the proof engine itself (the others — `ReachabilityFact`, `DominancePathFact`, `EventCoverageFact`, `TerminalCompletenessFact`, `DeadEndStateFact` — are produced by the graph analyzer). The DU is extended rather than forked because consumption is uniform.
 
-**Cross-row interval composition.** `BuildNarrowedIntervals` composes sibling reject-row guards into the current row's per-field narrowing. When a reject row on the same `(state, event)` pair carries a guard that admits an interval `I`, the current row implicitly satisfies `¬I` — `BuildNarrowedIntervals` intersects the current row's narrowing with `¬I` (computed via half-open negation: `>= V` ⇒ `<= V-1` for integer fields, conservative for decimal). This closes the canonical "increment to cap" repro shape: `from S on E when Counter >= MaxCount -> reject ...` followed by `from S on E -> set Counter = Counter + 1` is now provable.
+**Cross-row interval composition.** `BuildNarrowedIntervals` composes sibling reject-row guards into the current row's per-field narrowing. When a single-leaf reject row on the same `(state, event)` pair carries a guard `F op V` that admits an interval `I`, the current row implicitly satisfies `¬I` — `BuildNarrowedIntervals` intersects the current row's narrowing with `¬I` (computed by `NegateConstraintToInterval`). This closes the canonical "increment to cap" repro shape: `from S on E when Counter >= MaxCount -> reject ...` followed by `from S on E -> set Counter = Counter + 1` is now provable.
+
+The narrowing is sound only when the reject guard reduces to a single trackable leaf. Multi-leaf conjunctions like `when A and B` carry the disjunctive negation `¬A ∨ ¬B`, which can't soundly narrow either field individually — `¬A` admits the field's full range whenever `B` is false. `BuildSiblingRejectExclusions` forfeits the narrowing in that case (sound under-approximation). Similarly, OR-branches in the current row's own guard union the per-branch narrowings across all branches; fields absent from a given branch are back-filled with their declared (base) interval so the OR-union does not over-narrow.
+
+`NegateConstraintToInterval` dispatches on the field's type. For integer-typed fields, `>= V` negates to `<= V - 1` (exact: no integer lies in `(V-1, V)`). For decimal-backed fields (Decimal, Number, Money, Quantity, Price, etc.), the strict-inequality boundary `< V` cannot be expressed as a closed interval, so the negation closes at `V` instead — a sound superset of truth that is over-wide by the single point `{V}`. The closed-bound form is precise enough for the interval-arithmetic checks downstream.
 
 **DimensionalProduct (Strategy 6).** Discharges `DimensionalProductProofRequirement` on `quantity × quantity` operations. The strategy multiplies the operand dimension vectors (UCUM-derived) and asks `DimensionCatalog.TryGetAlias` whether the product matches a curated business-domain dimension. Cancelling pairs (e.g. `kg × (1/kg)` → `count`) succeed; products outside the curated set fail to discharge and emit `IncompatibleDimensionalProduct` (PRE0157).
 
@@ -1404,7 +1415,7 @@ bool TryQualifierCompatibilityProof(ProofObligation obligation, SemanticIndex se
 
 **When it applies:** An obligation of kind `DimensionalProductProofRequirement` on a `quantity × quantity` site (currently produced by the `QuantityTimesQuantity` operator).
 
-**How it works:** Resolves each operand's unit qualifier (falling back to dimension), parses via UCUM into a `DimensionVector`, multiplies the two vectors (element-wise exponent addition), and asks `DimensionCatalog.TryGetAlias(product, ...)` whether the result matches a curated business-domain dimension (length, mass, volume, area, temperature, energy, pressure, force, speed, count).
+**How it works:** Resolves each operand's qualifier — unit-axis first (the most specific surface, parsed via UCUM into a `DimensionVector`), then dimension-axis as a fallback. Bare-dimension qualifiers like `quantity of 'length'` resolve through `DimensionCatalog.All[name]` directly, since dimension *names* are not UCUM unit symbols; the catalog is the authoritative lookup for that surface. The two operand vectors are then multiplied (element-wise exponent addition), and `DimensionCatalog.TryGetAlias(product, ...)` decides whether the result matches a curated business-domain dimension (length, mass, volume, area, temperature, energy, pressure, force, speed, count).
 
 ```csharp
 // Discharged by Strategy 6 (Dimensional Product Proof).
@@ -1637,7 +1648,7 @@ bool SignSetSatisfiesRequirement(NumericSignSet signSet, NumericProofRequirement
 
 **How it works:** `BuildNarrowedIntervals` (in `ProofEngine.Intervals.cs`) produces a per-field narrowing dictionary by walking the obligation's guard branches and applying sibling reject-row negations (the "cross-row composition" path documented in § 2-Pass Design). `IntervalOfNarrowed` then evaluates the assignment's value expression under that narrowing — propagating through `IntervalTransfer` functions on integer / decimal / number arithmetic — to compute a result interval. If the result interval fits within the target field's `[DeclaredMin, DeclaredMax]` bounds, the obligation discharges; otherwise `NumericOverflow` (PRE0078) emits with the computed interval surfaced in the diagnostic.
 
-The strategy is exact under decimal arithmetic. The conservative-on-decimal half-open negation in the cross-row sibling path (`NegateConstraintToInterval`) can under-claim on decimal-valued fields but never silently accepts an unsound discharge — see the doc-comment at `NegateConstraintToInterval` for the SUPERSET-of-true-admitted-range argument.
+The strategy is sound under all numeric domains. The cross-row sibling-reject negation in `NegateConstraintToInterval` produces an exact interval for integer-typed fields (`V ± 1` half-step) and a sound superset for decimal-backed fields (closed at `V`). Multi-leaf reject conjunctions and OR-branches in the current row's guard are handled by `BuildSiblingRejectExclusions` (forfeit) and `BuildNarrowedIntervals` (per-branch union with base-interval back-fill); see the per-pass paragraph in § 2-Pass Design for the AND/OR semantics.
 
 #### Strategy 9: Length Containment Proof
 
@@ -1678,6 +1689,7 @@ This section documents the implementation in `src/Precept/Pipeline/ProofEngine.Q
 | `CompoundUnitCancellationRequired` | For currency axes, return the first non-null currency/from-currency/to-currency qualifier from `Left` then `Right`. For unit/dimension axes, call `TryResolveCompoundCancellationUnit`. |
 | `CurrencyConversionRequired` | Only for `QualifierAxis.Currency`: resolve the exchange-rate operand on `QualifierAxis.ToCurrency`, then normalize it with `TranslateCurrencyAxis` (§7.3). |
 | `CompoundDimensionElevationRequired` | For currency axes, inherit from the left operand (the price side). For unit/dimension axes, call `TryResolveCompoundElevationDimension`. |
+| `PriceDenominatorInherited` | For currency axes, return `null` — the currency cancels in `money ÷ price`. For unit/dimension axes, call `TryResolvePriceDenominatorQualifier` to project the price operand's compound qualifier denominator (e.g., `'USD/each'` → `'each'`). Mirror image of `CompoundDimensionElevationRequired` (numerator vs denominator projection). |
 
 Recursion is therefore explicit for qualifying binary expressions and interpolated typed constants only. If qualifier information sits behind a `TypedUnaryOp`, `TypedFunctionCall`, `TypedConditional`, or another unhandled expression shape, this helper stops and returns `null`; Strategy 5 then stays conservative and leaves the obligation unresolved.
 

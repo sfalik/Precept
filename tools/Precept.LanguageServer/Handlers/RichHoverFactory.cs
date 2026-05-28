@@ -1012,6 +1012,22 @@ internal static class RichHoverFactory
                         binary.Left.ResultType == TypeKind.ExchangeRate ? binary.Left : binary.Right,
                         QualifierAxis.ToCurrency,
                         semantics),
+                    // money ÷ price → quantity in 'U': currency cancels; unit/dimension
+                    // inherited from the price operand. The price's CompoundPrice
+                    // qualifier stores UnitCode = denominator and DimensionName =
+                    // denominator-dimension (the slash form 'C/U' is split at parse
+                    // time), so ResolveQualifierFromExpression projecting onto the
+                    // Unit/Dimension axis returns the denominator directly via
+                    // TryProjectCompoundPrice.
+                    PriceDenominatorInherited =>
+                        axis == QualifierAxis.Currency
+                        || axis == QualifierAxis.FromCurrency
+                        || axis == QualifierAxis.ToCurrency
+                            ? null
+                            : ResolveQualifierFromExpression(
+                                binary.Left.ResultType == TypeKind.Price ? binary.Left : binary.Right,
+                                axis,
+                                semantics),
                     _ => ResolveQualifierFromExpression(binary.Left, axis, semantics)
                         ?? ResolveQualifierFromExpression(binary.Right, axis, semantics),
                 };

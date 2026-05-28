@@ -794,7 +794,7 @@ These resolve to `Period.FromDays`, `Period.FromMonths`, `Period.FromYears`, `Pe
 | `-period` | `period` | Unary negation. `-('3 months')` is equivalent to negating the period. |
 | `==`, `!=` | `boolean` | **Structural equality.** `1 month != 30 days` — structurally different. NodaTime's equality is structural. |
 
-**Compiler warning — always-false literal comparisons:** When both operands of a period `==` are constant expressions with non-overlapping components (e.g., `1 month == 30 days`), the compiler emits a warning: *"This is always `false` — `1 month` and `30 days` use different parts. Period equality compares each part (years, months, days) separately."* The comparison is legal (structural equality is well-defined), but the result is statically knowable and almost certainly not what the author intended. Similarly, `!=` between non-overlapping constants warns that it's always `true`.
+**Compiler warning — degenerate literal comparisons:** When both operands of a period `==` are constant expressions with non-overlapping components (e.g., `1 month == 30 days`), the compiler emits `DegeneratePeriodComparison`: *"This is always `false` — `1 month` and `30 days` use different parts. Period equality compares each part (years, months, days) separately."* The comparison is legal (structural equality is well-defined), but the result is statically knowable and almost certainly not what the author intended. The same code fires for `!=` between non-overlapping constants — the message reads *always `true`* in that case.
 
 | **Not supported** | **Why** |
 |---|---|

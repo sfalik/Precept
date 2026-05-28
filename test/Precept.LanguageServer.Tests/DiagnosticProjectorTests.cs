@@ -195,7 +195,8 @@ public class DiagnosticProjectorTests
             ImmutableArray<FaultSiteLink>.Empty,
             ImmutableArray<ConstraintInfluenceEntry>.Empty,
             ImmutableArray<InitialStateSatisfiabilityResult>.Empty,
-            ImmutableArray<PreceptDiagnostic>.Empty),
+            ImmutableArray<PreceptDiagnostic>.Empty,
+            ImmutableArray<ProofForwardingFact>.Empty),
         diagnostics.ToImmutableArray(),
         diagnostics.Any(diagnostic => diagnostic.Severity == Severity.Error));
 }

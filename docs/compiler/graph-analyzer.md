@@ -553,16 +553,18 @@ Package analysis results as typed facts for the proof engine:
 
 ### 6.7 Field-Write-Site Analysis (F-LANG-GRAPH-04)
 
-After reachability and completeness, the graph stage walks every typed field and collects discoverable write sites. A field with no write site emits `FieldNeverSet` (Warning) — it can only ever hold its declared default or remain unset, so any rule, ensure, or consumer-side read sees a constant value.
+After reachability and completeness, the graph stage walks every typed field and collects discoverable write sites. A field with no **reachable** write site emits `FieldNeverSet` (Warning) — it can only ever hold its declared default or remain unset, so any rule, ensure, or consumer-side read sees a constant value.
 
 Write sites consulted (catalog-driven via `ActionMeta.WriteSemantics`):
 
-1. **Computed expression** (`field X as T <- expr`) — implicit value-establishing site.
-2. **Field-level `editable`** (`ModifierKind.Write` in field modifiers) — grants caller-side write capability via the runtime API.
-3. **Per-state `modify F editable`** (a `TypedAccessMode` with `Mode == ModifierKind.Write`) — grants caller-side write capability while the entity is in that state.
-4. **Transition-row actions** — any `TypedAction` whose `ActionMeta.WriteSemantics == EstablishesValue` targeting the field. `Clear`/`Remove`/`RemoveAt`/`Dequeue`/`DequeueBy`/`Pop` (classified `ClearsContents`) do NOT suppress — clearing or removing doesn't establish a value.
-5. **Construction event rows** (`TypedEventRowSuccess.Actions`) — same establishes-value rule.
-6. **State entry/exit hooks** (`TypedStateHook.Actions`) — same rule.
+1. **Computed expression** (`field X as T <- expr`) — implicit value-establishing site. Unconditional (no state association).
+2. **Field-level `editable`** (`ModifierKind.Write` in field modifiers) — grants caller-side write capability via the runtime API. Unconditional.
+3. **Per-state `modify F editable`** (a `TypedAccessMode` with `Mode == ModifierKind.Write`) — grants caller-side write capability while the entity is in that state. **Filtered against the reachable state set** — an access mode anchored to an unreachable state cannot grant write capability at runtime.
+4. **Transition-row actions** — any `TypedAction` whose `ActionMeta.WriteSemantics == EstablishesValue` targeting the field. `Clear`/`Remove`/`RemoveAt`/`Dequeue`/`DequeueBy`/`Pop` (classified `ClearsContents`) do NOT suppress — clearing or removing doesn't establish a value. **Filtered against the reachable state set**, except wildcard rows (`FromState == null`) which are admitted unconditionally because they fire from every state.
+5. **Construction event rows** (`TypedEventRowSuccess.Actions`) — same establishes-value rule. Unconditional: a precept that can be constructed is reachable at construction time.
+6. **State entry/exit hooks** (`TypedStateHook.Actions`) — same rule. **Filtered against the reachable state set** — a hook anchored to an unreachable state can never fire.
+
+The reachable state set (`reachability.Reachable`) is computed earlier in `Analyze` (`ComputeReachability` on the state graph). `AnalyzeFieldWriteSites` and `HasAnyWriteSite` accept the set explicitly; the stateless path passes an empty set (only unconditional write sites apply in stateless precepts).
 
 Lives in `GraphAnalyzer.FieldWriteSites.cs` as a partial-class extension of `GraphAnalyzer` (matches the `Parser.Actions.cs`/`ProofEngine.Strategies.cs` convention). The analyzer runs in both the stateful and stateless paths of `Analyze` so stateless-precept field declarations get the same scrutiny.
 

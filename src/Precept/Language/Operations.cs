@@ -124,7 +124,7 @@ public static class Operations
             [
                 new NumericProofRequirement(new ParamSubject(PInteger), OperatorKind.NotEquals, 0m,
                     "Divisor must be non-zero"),
-            ]),
+            ]) { IntervalTransfer = DivideTransfer },
 
         OperationKind.IntegerModuloInteger => new BinaryOperationMeta(
             kind, OperatorKind.Modulo, PInteger, PInteger, TypeKind.Integer,
@@ -248,7 +248,7 @@ public static class Operations
             [
                 new NumericProofRequirement(new ParamSubject(PNumber), OperatorKind.NotEquals, 0m,
                     "Divisor must be non-zero"),
-            ]),
+            ]) { IntervalTransfer = NumberDivideTransfer },
 
         OperationKind.IntegerModuloNumber => new BinaryOperationMeta(
             kind, OperatorKind.Modulo, PInteger, PNumber, TypeKind.Number,

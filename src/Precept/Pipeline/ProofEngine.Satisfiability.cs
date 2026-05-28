@@ -186,7 +186,7 @@ public static partial class ProofEngine
                 ? existing
                 : ExtractFieldInterval(gc.Field, semantics);
 
-            var clipped = NarrowByConstraint(current, gc.Comparison, value);
+            var clipped = NarrowByConstraint(current, gc.Comparison, value, GetFieldType(gc.Field, semantics));
             if (clipped.IsEmpty) return true;
             byField[gc.Field] = clipped;
         }
@@ -198,23 +198,47 @@ public static partial class ProofEngine
     /// Apply a single constraint (comparison + literal value) to an interval,
     /// returning the tightened interval. Used by the satisfiability scan when
     /// composing guard-derived constraints with field-modifier bounds.
+    ///
+    /// Strict-inequality boundaries (`X &gt; V`, `X &lt; V`) dispatch on the
+    /// field's domain: integer fields use the exact `V ± 1` half-step
+    /// (no integer lies in `(V-1, V)`); decimal-backed fields (Decimal,
+    /// Number, Money, Quantity, Price, etc.) close at `V` instead — a sound
+    /// superset of truth that is over-wide by the single point `{V}`. Mirrors
+    /// the same dispatch in <c>NegateConstraintToInterval</c>.
+    ///
+    /// The half-step is also sentinel-safe: when <paramref name="value"/>
+    /// already sits at <see cref="decimal.MaxValue"/> / <see cref="decimal.MinValue"/>,
+    /// `V + 1` / `V - 1` saturates at the sentinel rather than overflowing.
     /// </summary>
-    private static NumericInterval NarrowByConstraint(NumericInterval current, OperatorKind comparison, decimal value)
+    private static NumericInterval NarrowByConstraint(
+        NumericInterval current,
+        OperatorKind comparison,
+        decimal value,
+        TypeKind fieldType)
     {
         if (current.IsUnbounded)
             current = new NumericInterval(decimal.MinValue, decimal.MaxValue);
 
+        bool isIntegerDomain = fieldType == TypeKind.Integer;
+        decimal strictUpper = isIntegerDomain && value < decimal.MaxValue ? value + 1m : value;
+        decimal strictLower = isIntegerDomain && value > decimal.MinValue ? value - 1m : value;
+
         return comparison switch
         {
-            OperatorKind.GreaterThan        => current.Intersect(new NumericInterval(value + 1m, decimal.MaxValue)),
-            OperatorKind.GreaterThanOrEqual => current.Intersect(new NumericInterval(value,       decimal.MaxValue)),
-            OperatorKind.LessThan           => current.Intersect(new NumericInterval(decimal.MinValue, value - 1m)),
-            OperatorKind.LessThanOrEqual   => current.Intersect(new NumericInterval(decimal.MinValue, value)),
+            OperatorKind.GreaterThan        => current.Intersect(new NumericInterval(strictUpper,    decimal.MaxValue)),
+            OperatorKind.GreaterThanOrEqual => current.Intersect(new NumericInterval(value,          decimal.MaxValue)),
+            OperatorKind.LessThan           => current.Intersect(new NumericInterval(decimal.MinValue, strictLower)),
+            OperatorKind.LessThanOrEqual    => current.Intersect(new NumericInterval(decimal.MinValue, value)),
             OperatorKind.Equals             => current.Intersect(NumericInterval.Point(value)),
             OperatorKind.NotEquals          => current, // point-exclusion isn't representable in a closed interval — conservative
             _ => current,
         };
     }
+
+    private static TypeKind GetFieldType(string fieldName, SemanticIndex semantics) =>
+        semantics.FieldsByName.TryGetValue(fieldName, out var field)
+            ? field.ResolvedType
+            : TypeKind.Decimal;
 
     // ─────────────────────────────────────────────────────────────────────────
     //  ContradictoryRule (PRE0155)
@@ -222,9 +246,34 @@ public static partial class ProofEngine
 
     private static void ScanRules(SemanticIndex semantics, List<Diagnostic> diagnostics)
     {
+        // PRE0159 UnsatisfiableRule pre-pass: classify each rule against its
+        // field-declared bounds (and the rule's own `when` guard, if any).
+        // Self-unsatisfiable rules emit PRE0159 and are excluded from the
+        // pair-wise sweep below, so they cannot mis-attribute ContradictoryRule
+        // to an innocent partner rule.
+        var selfUnsatisfiableRules = new HashSet<int>();
+        for (int i = 0; i < semantics.Rules.Length; i++)
+        {
+            var rule = semantics.Rules[i];
+            var composed = ComposeRulePredicateWithFieldBounds(rule, semantics);
+            foreach (var (field, interval) in composed)
+            {
+                if (!interval.IsEmpty) continue;
+                diagnostics.Add(Diagnostics.Create(
+                    DiagnosticCode.UnsatisfiableRule,
+                    rule.Condition.Span,
+                    FormatGuardText(rule.Condition),
+                    field));
+                selfUnsatisfiableRules.Add(i);
+                break; // one diagnostic per rule
+            }
+        }
+
         var ruleConstraints = new List<RuleConstraintSummary>();
         for (int i = 0; i < semantics.Rules.Length; i++)
         {
+            if (selfUnsatisfiableRules.Contains(i)) continue;
+
             var rule = semantics.Rules[i];
 
             // VacuousRule: rule predicate is provably-true under the fields'
@@ -240,7 +289,7 @@ public static partial class ProofEngine
                     var current = extraNarrowing.TryGetValue(gc.Field, out var existing)
                         ? existing
                         : new NumericInterval(decimal.MinValue, decimal.MaxValue);
-                    extraNarrowing[gc.Field] = NarrowByConstraint(current, gc.Comparison, v);
+                    extraNarrowing[gc.Field] = NarrowByConstraint(current, gc.Comparison, v, GetFieldType(gc.Field, semantics));
                 }
             }
 
@@ -252,7 +301,7 @@ public static partial class ProofEngine
                     FormatGuardText(rule.Condition)));
             }
 
-            var perField = SummariseRuleConstraints(rule.Condition);
+            var perField = SummariseRuleConstraints(rule.Condition, semantics);
             ruleConstraints.Add(new RuleConstraintSummary(i, rule, perField));
         }
 
@@ -269,9 +318,8 @@ public static partial class ProofEngine
                     var combined = currentInterval.Intersect(priorInterval);
                     if (!combined.IsEmpty) continue;
 
-                    // Scope-cut (Decision § 0.6 #1, soundness over completeness):
-                    // skip if either operand is Unbounded — verdict is "cannot
-                    // decide," not "contradicts."
+                    // Soundness over completeness: skip if either operand is
+                    // Unbounded — verdict is "cannot decide," not "contradicts."
                     if (currentInterval.IsUnbounded || priorInterval.IsUnbounded) continue;
 
                     diagnostics.Add(Diagnostics.Create(
@@ -291,7 +339,55 @@ public static partial class ProofEngine
     /// imposes. Returns empty when the predicate has OR-disjunction (per the
     /// design's scope-cut — only AND-conjoined-leaf shapes are handled).
     /// </summary>
-    private static Dictionary<string, NumericInterval> SummariseRuleConstraints(TypedExpression predicate)
+    /// <summary>
+    /// Compose a rule's predicate with its field-declared bounds AND its own
+    /// `when` guard (if any) to detect self-unsatisfiability. Differs from
+    /// <see cref="SummariseRuleConstraints"/> which seeds from a fresh
+    /// MinValue/MaxValue interval (correct for pair-wise comparison but blind to
+    /// field bounds). Per-field intervals here are the intersection of:
+    ///   * the field's declared [min, max] (via ExtractFieldInterval)
+    ///   * the rule's `when` guard leaf constraints, if present
+    ///   * the rule's predicate leaf constraints
+    /// A field whose per-field interval is empty indicates the rule is impossible
+    /// on its own (PRE0159 UnsatisfiableRule, distinct from PRE0155
+    /// ContradictoryRule which requires a pair of rules).
+    /// </summary>
+    private static Dictionary<string, NumericInterval> ComposeRulePredicateWithFieldBounds(
+        TypedRule rule,
+        SemanticIndex semantics)
+    {
+        var result = new Dictionary<string, NumericInterval>(System.StringComparer.Ordinal);
+
+        void Fold(TypedExpression expr)
+        {
+            foreach (var gc in ExtractGuardConstraints(expr))
+            {
+                if (gc.IsPresenceCheck) continue;
+                if (gc.Value is not { } v) continue;
+
+                if (!result.TryGetValue(gc.Field, out var current))
+                {
+                    // Seed from the field's declared interval. This is the
+                    // distinguishing seed for self-unsat detection (the pair-sweep
+                    // helper SummariseRuleConstraints seeds from MinValue/MaxValue).
+                    current = ExtractFieldInterval(gc.Field, semantics);
+                    if (current.IsUnbounded)
+                        current = new NumericInterval(decimal.MinValue, decimal.MaxValue);
+                }
+                result[gc.Field] = NarrowByConstraint(current, gc.Comparison, v, GetFieldType(gc.Field, semantics));
+            }
+        }
+
+        if (rule.Guard is not null)
+            Fold(rule.Guard);
+        Fold(rule.Condition);
+
+        return result;
+    }
+
+    private static Dictionary<string, NumericInterval> SummariseRuleConstraints(
+        TypedExpression predicate,
+        SemanticIndex semantics)
     {
         var result = new Dictionary<string, NumericInterval>(System.StringComparer.Ordinal);
         var constraints = ExtractGuardConstraints(predicate);
@@ -308,7 +404,7 @@ public static partial class ProofEngine
             if (current.IsUnbounded)
                 current = new NumericInterval(decimal.MinValue, decimal.MaxValue);
 
-            result[gc.Field] = NarrowByConstraint(current, gc.Comparison, value);
+            result[gc.Field] = NarrowByConstraint(current, gc.Comparison, value, GetFieldType(gc.Field, semantics));
         }
         return result;
     }

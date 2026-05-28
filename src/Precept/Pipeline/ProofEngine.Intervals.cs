@@ -410,6 +410,9 @@ public static partial class ProofEngine
         if (guard is not null)
         {
             var branches = ExtractGuardBranches(guard);
+            var perBranchNarrowings = new List<Dictionary<string, NumericInterval>>(branches.Length);
+            var unionFields = new HashSet<string>(StringComparer.Ordinal);
+
             foreach (var branch in branches)
             {
                 var branchNarrowings = new Dictionary<string, NumericInterval>(StringComparer.Ordinal);
@@ -434,15 +437,39 @@ public static partial class ProofEngine
                         _ => current
                     };
                     branchNarrowings[gc.Field] = current;
+                    unionFields.Add(gc.Field);
                 }
 
-                foreach (var (field, interval) in branchNarrowings)
+                perBranchNarrowings.Add(branchNarrowings);
+            }
+
+            // Cross-branch union under OR: for each field constrained in ANY
+            // branch, union the per-branch interval across ALL branches.
+            // Branches that don't constrain a given field contribute the
+            // field's base (declared) interval — an OR-arm that says nothing
+            // about a field admits the field's full base range.
+            foreach (var field in unionFields)
+            {
+                NumericInterval? unioned = null;
+                foreach (var branchNarrowings in perBranchNarrowings)
                 {
-                    if (builder.TryGetValue(field, out var existing))
-                        builder[field] = existing.Union(interval);
+                    NumericInterval branchInterval;
+                    if (branchNarrowings.TryGetValue(field, out var explicitInterval))
+                    {
+                        branchInterval = explicitInterval;
+                    }
                     else
-                        builder[field] = interval;
+                    {
+                        var baseInterval = ExtractFieldInterval(field, semantics);
+                        branchInterval = baseInterval.IsUnbounded
+                            ? NumericInterval.Unbounded
+                            : baseInterval;
+                    }
+
+                    unioned = unioned is null ? branchInterval : unioned.Value.Union(branchInterval);
                 }
+                if (unioned is not null)
+                    builder[field] = unioned.Value;
             }
         }
 
@@ -503,22 +530,48 @@ public static partial class ProofEngine
             var siblingBranches = ExtractGuardBranches(sibling.Guard);
             if (siblingBranches.Length != 1) continue; // multi-branch reject guards skipped (sound under-approximation)
             var branch = siblingBranches[0];
+
+            // A single-branch reject's guard is a conjunction A ∧ B ∧ ...;
+            // its negation is the disjunction ¬A ∨ ¬B ∨ ..., which can't
+            // soundly narrow any individual field (¬A admits the field's full
+            // range whenever some OTHER conjunct is false). Only branches
+            // with exactly one leaf (numeric and trackable) yield a sound
+            // per-field narrowing; any companion leaf — numeric on a
+            // different field, presence check, or non-numeric comparison —
+            // forfeits the narrowing. Same-field multi-leaves
+            // (e.g., `F >= V1 and F <= V2`) also forfeit under this rule:
+            // sound but coarser than necessary — a same-field conjunction
+            // could in principle compose by intersection before negation.
+            GuardConstraint? singleLeaf = null;
+            bool isMultiLeaf = false;
             foreach (var gc in branch)
             {
-                if (gc.IsPresenceCheck || gc.Value is null) continue;
-
-                // Negate the reject's leaf constraint: this row reaches only
-                // when the sibling's guard fails. Integer-style half-open
-                // arithmetic at the boundary (e.g., negating `X >= 10` ⇒
-                // `X < 10` ⇒ narrow to `[_, 9]`).
-                var negatedRange = NegateConstraintToInterval(gc.Comparison, gc.Value.Value);
-                if (negatedRange is null) continue;
-
-                result ??= new Dictionary<string, NumericInterval>(StringComparer.Ordinal);
-                result[gc.Field] = result.TryGetValue(gc.Field, out var existing)
-                    ? existing.Intersect(negatedRange.Value)
-                    : negatedRange.Value;
+                if (singleLeaf is null && !gc.IsPresenceCheck && gc.Value is not null)
+                {
+                    singleLeaf = gc;
+                }
+                else
+                {
+                    isMultiLeaf = true;
+                    break;
+                }
             }
+            if (singleLeaf is null || isMultiLeaf) continue;
+
+            var fieldType = semantics.FieldsByName.TryGetValue(singleLeaf.Field, out var rejectField)
+                ? rejectField.ResolvedType
+                : TypeKind.Decimal;
+
+            var negatedRange = NegateConstraintToInterval(singleLeaf.Comparison, singleLeaf.Value!.Value, fieldType);
+            if (negatedRange is null) continue;
+
+            // Multiple sibling-reject ROWS each contribute an independent
+            // narrowing; they compose by intersection (the current row reaches
+            // only when ALL sibling rejects' guards failed simultaneously).
+            result ??= new Dictionary<string, NumericInterval>(StringComparer.Ordinal);
+            result[singleLeaf.Field] = result.TryGetValue(singleLeaf.Field, out var existing)
+                ? existing.Intersect(negatedRange.Value)
+                : negatedRange.Value;
         }
 
         return result;
@@ -526,26 +579,40 @@ public static partial class ProofEngine
 
     /// <summary>
     /// Produce the negation of a constraint `field comparison value` as an
-    /// interval. Used to derive the narrowing the current row inherits from a
-    /// sibling reject-row above it. Integer-style half-open boundary (e.g.,
-    /// negating `>= 10` to `<= 9`).
+    /// interval. Used to derive the narrowing the current row inherits from
+    /// a sibling reject-row above it.
     ///
-    /// Conservative-for-decimal: decimal-valued fields are clipped to the
-    /// integer-style boundary, so e.g. a sibling rejecting `>= 10.0` narrows
-    /// the current row to `<= 9.0` rather than the precise `< 10.0`. The
-    /// resulting interval is a SUPERSET of the true admitted range, so the
-    /// proof engine under-claims discharges on decimal-heavy guards (a
-    /// missed discharge, never an unsoundness).
+    /// The half-open boundary differs by domain. For integer-typed fields,
+    /// negating `X >= V` to `X &lt;= V - 1` is exact (no integer lies in
+    /// (V-1, V)). For all other domains (Decimal/Number today; the dispatch
+    /// is forward-compatible for any decimal-backed type whose literals
+    /// reach the guard-constraint extractor), values exist strictly between
+    /// V-1 and V, so subtracting 1 produces a SUBSET of the truth — unsound
+    /// for the proof engine, which would over-claim discharges. For those
+    /// domains we close the boundary at V instead, yielding a SUPERSET of
+    /// the truth (over-wide by exactly the point {V}) that is sound at the
+    /// cost of slightly missed precision near the bound.
     /// </summary>
-    private static NumericInterval? NegateConstraintToInterval(OperatorKind comparison, decimal value) =>
-        comparison switch
+    private static NumericInterval? NegateConstraintToInterval(
+        OperatorKind comparison,
+        decimal value,
+        TypeKind fieldType)
+    {
+        bool isIntegerDomain = fieldType == TypeKind.Integer;
+
+        return comparison switch
         {
-            OperatorKind.GreaterThanOrEqual => new NumericInterval(decimal.MinValue, value - 1m),    // ¬(X ≥ V) ⇒ X ≤ V - 1
-            OperatorKind.GreaterThan        => new NumericInterval(decimal.MinValue, value),         // ¬(X > V)  ⇒ X ≤ V
-            OperatorKind.LessThanOrEqual    => new NumericInterval(value + 1m, decimal.MaxValue),    // ¬(X ≤ V) ⇒ X ≥ V + 1
-            OperatorKind.LessThan           => new NumericInterval(value,       decimal.MaxValue),   // ¬(X < V)  ⇒ X ≥ V
-            OperatorKind.Equals             => null,    // X ≠ V isn't representable as a single closed interval
-            OperatorKind.NotEquals          => NumericInterval.Point(value),    // ¬(X ≠ V) ⇒ X = V
+            OperatorKind.GreaterThanOrEqual => isIntegerDomain
+                ? new NumericInterval(decimal.MinValue, value - 1m)    // ¬(X ≥ V) ⇒ X ≤ V - 1
+                : new NumericInterval(decimal.MinValue, value),        // ¬(X ≥ V) ⇒ closed at V (sound superset of X < V)
+            OperatorKind.GreaterThan        => new NumericInterval(decimal.MinValue, value),    // ¬(X > V) ⇒ X ≤ V
+            OperatorKind.LessThanOrEqual    => isIntegerDomain
+                ? new NumericInterval(value + 1m, decimal.MaxValue)    // ¬(X ≤ V) ⇒ X ≥ V + 1
+                : new NumericInterval(value,       decimal.MaxValue),  // ¬(X ≤ V) ⇒ closed at V (sound superset of X > V)
+            OperatorKind.LessThan           => new NumericInterval(value, decimal.MaxValue),    // ¬(X < V) ⇒ X ≥ V
+            OperatorKind.Equals             => null,                                            // X ≠ V isn't representable as a single closed interval
+            OperatorKind.NotEquals          => NumericInterval.Point(value),                    // ¬(X ≠ V) ⇒ X = V
             _ => null,
         };
+    }
 }

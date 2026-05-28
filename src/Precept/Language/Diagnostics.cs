@@ -794,12 +794,24 @@ public static class Diagnostics
         // Contradictory rule pair. Two rules whose per-field constraints have
         // empty intersection on at least one shared field.
         DiagnosticCode.ContradictoryRule              => new(nameof(DiagnosticCode.ContradictoryRule),              DiagnosticStage.Proof, Severity.Warning, "Rule '{0}' contradicts an earlier rule on field '{1}' — no valid configuration can satisfy both",                                                       DiagnosticCategory.Proof,
-            RelatedCodes: [DiagnosticCode.UnsatisfiableGuard, DiagnosticCode.TautologicalGuard, DiagnosticCode.VacuousRule],
+            RelatedCodes: [DiagnosticCode.UnsatisfiableGuard, DiagnosticCode.TautologicalGuard, DiagnosticCode.VacuousRule, DiagnosticCode.UnsatisfiableRule],
             FixHint: "Reconcile the two rules — combine them, drop one, or refine their predicates so they admit a common configuration.",
             TriggerCondition: "The proof engine's satisfiability scan finds two rules whose interval constraints on the same field have empty intersection, so their conjunction is uninhabited.",
             RecoverySteps: ["Combine the two rules into one predicate", "Or remove whichever rule is the older / less-current intent"],
             ExampleBefore: "precept Example\nfield X as integer default 0 editable\nrule X > 10 because \"X must exceed 10\"\nrule X <= 5 because \"X must be at most 5\"\nstate Open initial",
             ExampleAfter: "precept Example\nfield X as integer default 0 editable\nrule X > 10 because \"X must exceed 10\"\nstate Open initial"),
+
+        // Unsatisfiable rule. A single rule's predicate produces an empty
+        // interval on at least one field under the field's declared bounds —
+        // the rule is impossible on its own, distinct from a pair-wise
+        // contradiction.
+        DiagnosticCode.UnsatisfiableRule              => new(nameof(DiagnosticCode.UnsatisfiableRule),              DiagnosticStage.Proof, Severity.Warning, "Rule '{0}' is unsatisfiable under the declared bounds on field '{1}' — no valid value can satisfy it",                                                       DiagnosticCategory.Proof,
+            RelatedCodes: [DiagnosticCode.UnsatisfiableGuard, DiagnosticCode.TautologicalGuard, DiagnosticCode.VacuousRule, DiagnosticCode.ContradictoryRule],
+            FixHint: "Rewrite the rule predicate to admit values inside the field's declared bounds, or widen the field's bounds if the rule reflects the true business intent.",
+            TriggerCondition: "The proof engine's satisfiability scan composes the rule's predicate with the field's declared interval bounds (and the rule's own `when` guard, if any) and finds the intersection empty on at least one field — no concrete value can satisfy the rule.",
+            RecoverySteps: ["Rewrite the predicate to fit within the field's bounds", "Or widen the field's `min`/`max` modifiers if the rule's stated intent is correct"],
+            ExampleBefore: "precept Example\nfield X as integer default 0 nonnegative max 4 editable\nrule X >= 10 because \"X must reach the cap\"\nstate Open initial",
+            ExampleAfter: "precept Example\nfield X as integer default 0 nonnegative max 4 editable\nrule X >= 4 because \"X must reach the cap\"\nstate Open initial"),
         DiagnosticCode.DivisionByZero                 => new(nameof(DiagnosticCode.DivisionByZero),                 DiagnosticStage.Proof, Severity.Error,   "Division is unsafe: '{0}' can be zero{1}",                                                                                              DiagnosticCategory.Proof,
             RelatedCodes: [DiagnosticCode.SqrtOfNegative, DiagnosticCode.UnsatisfiableGuard],
             FixHint: "Prove the divisor is non-zero with a guard, rule, or field modifier.",
@@ -1084,15 +1096,15 @@ public static class Diagnostics
             ExampleBefore: "precept Example\nfield Code as string default \"USD\"\nfield Amount as money in '{Code}' maxplaces currency.minorUnit\nstate Open initial",
             ExampleAfter: "precept Example\nfield Amount as money in 'USD' maxplaces currency.minorUnit\nstate Open initial"),
 
-        DiagnosticCode.AlwaysFalsePeriodComparison => new(
-            nameof(DiagnosticCode.AlwaysFalsePeriodComparison),
+        DiagnosticCode.DegeneratePeriodComparison => new(
+            nameof(DiagnosticCode.DegeneratePeriodComparison),
             DiagnosticStage.Type, Severity.Warning,
             "This is always {0} — '{1}' and '{2}' use different parts. Period equality compares each part (years, months, days) separately.",
             DiagnosticCategory.Safety,
-            TriggerCondition: "Both operands of a period == (or !=) are constant literal periods whose non-zero components are disjoint, so the comparison is statically knowable.",
+            TriggerCondition: "Both operands of a period == (or !=) are constant literal periods whose non-zero components are disjoint, so the comparison is statically knowable — `==` yields always-false, `!=` yields always-true.",
             RecoverySteps: ["Use a duration if you mean absolute time (e.g., '30 days' as a duration is exact)", "Or rewrite the comparison to test the specific part you care about (e.g., 'Period.days' if available)"],
             ExampleBefore: "precept Example\nfield A as period default '1 month'\nfield B as period default '30 days'\nstate Open initial\nfield AlwaysFalse as boolean default false <- A == B",
-            ExampleAfter: "precept Example\nfield A as duration default '30 days'\nfield B as duration default '30 days'\nstate Open initial\nfield AlwaysTrue as boolean default false <- A == B"),
+            ExampleAfter: "precept Example\nfield A as duration default '30 days'\nfield B as duration default '60 days'\nstate Open initial\nfield AreEqual as boolean default false <- A == B"),
 
         DiagnosticCode.IncompatibleDimensionalProduct => new(
             nameof(DiagnosticCode.IncompatibleDimensionalProduct),
@@ -1250,8 +1262,10 @@ public static class Diagnostics
             "Cannot combine '{0}' ({1}) with '{2}' ({3}) — explicit counting units must match exactly",
             DiagnosticCategory.BusinessDomain,
             FixHint: "Use matching counting units on both operands or convert values before combining them",
-            TriggerCondition: "A static comparison or same-match function call combines quantity values in different explicit counting units (for example, each vs box).",
-            RecoverySteps: ["Use the same counting unit on both operands", "Or convert quantities into a shared counting unit before the operation"]),
+            TriggerCondition: "Two quantity values combine via comparison, same-match function call, or arithmetic (+, -, ×, ÷) where both operands carry different explicit counting units (for example, 'each' vs 'box') in the shared 'count' dimension. The shared dimension does not make the units interchangeable — there is no universal conversion factor between named counts.",
+            RecoverySteps: ["Use the same counting unit on both operands", "Or convert quantities into a shared counting unit before the operation via an explicit conversion factor (e.g., 'quantity in \\'each/box\\'')"],
+            ExampleBefore: "precept Reorder\nfield UnitsToBuy as quantity in 'each' default '0 each'\nfield Cartons as quantity in 'box' default '12 box'\nfield Total as quantity <- UnitsToBuy * Cartons\nstate Open initial",
+            ExampleAfter: "precept Reorder\nfield UnitsToBuy as quantity in 'each' default '0 each'\nfield Cartons as quantity in 'box' default '12 box'\nfield BoxesPerEach as quantity in 'each/box' default '12 each/box'\nfield Total as quantity in 'each' <- Cartons * BoxesPerEach\nstate Open initial"),
 
         DiagnosticCode.InvalidPriceQualifier => new(
             nameof(DiagnosticCode.InvalidPriceQualifier),

@@ -31,6 +31,18 @@ surfaced for proper fixing.
 
 ## Fixed
 
+### Post-Phase-5 code-review remediation: interval-algebra soundness + catalog/diagnostic completeness
+
+- **Status**: ✅ **Fixed by post-Phase-5 remediation Slice 1 (2026-05-27).** An extra-high-effort `/code-review` on the Phase 5 spike branch surfaced 15 findings spanning soundness, catalog completeness, and naming. Slice 1 (1a/1b/1c/1d) addressed 11 of the 15 against the locked Phase-5 designs:
+  - **Interval-algebra soundness (Slice 1c)**: `BuildSiblingRejectExclusions` forfeits multi-leaf AND-branches (¬(A∧B) = ¬A∨¬B, not ¬A∧¬B); `BuildNarrowedIntervals` cross-branch OR-union back-fills the base interval for fields absent from a branch; `NegateConstraintToInterval` dispatches integer vs. decimal-backed domains — integer uses exact half-step `V ± 1`, decimal closes at `V` (sound superset). The same dispatch + sentinel-safe arithmetic applied to `NarrowByConstraint` in the satisfiability scan.
+  - **Catalog completeness (Slice 1b)**: `TryResolveDimensionVector` consults `DimensionCatalog` for bare dimension names (`quantity of 'length'` resolves via the catalog, not UCUM); access-modifier validation now respects `MutuallyExclusiveWith`; `IntegerDivideInteger` and `IntegerDivideNumber` got `IntervalTransfer` functions so narrowed counters propagate through division.
+  - **Cleanup (Slice 1a)**: removed dead `NumericInterval.Difference`; collapsed `ProofLedger` ctor to a single 6-arg form.
+  - **Diagnostic rename (Slice 1d)**: `AlwaysFalsePeriodComparison` → `DegeneratePeriodComparison` (the code fires for both always-false `==` and always-true `!=`).
+- **Discovered**: 2026-05-27 via 9-angle code-review on the Phase 5 spike branch
+- **Affected**: any precept whose proof discharge relies on the satisfiability scan or sibling-reject narrowing with multi-field guards, OR-branches, decimal-typed fields; any catalog consumer of bare-dimension qualifiers; any author writing `!=` with disjoint period literals.
+- **Tests added**: `test/Precept.Tests/ProofEngine/IntervalAlgebraSoundnessTests.cs` (3), `test/Precept.Tests/Operations/QuantityProductDimensionTests.cs::BareDimensionQualifier_LengthTimesLength_ResolvesViaDimensionCatalog` (1). Suite: 7140/7140 pass.
+- **Deferred**: 4 of 15 findings (qualifier-policy wiring for `MoneyDividePrice`, `each * box` dimensionless-product policy, `UnsatisfiableRule` diagnostic split, reachability threading into `FieldNeverSet`) require `/lifecycle-2-design` passes and are pending in Slices 2–5.
+
 ### F-LANG-BIZ-08: Discrete equality narrowing for `choice of` fields
 
 - **Status**: ✅ **Fixed by Phase 5 W-D BIZ-08 (2026-05-27, commit `08fae0ef`).** Extended `NumericConstraintSubsumes` in `ProofEngine.Strategies.cs` to recognize `F == V_lit` equality guards: when the guard pins a field to a singleton value, the singleton is checked directly against the obligation's (comparison, threshold) pair via a new `ValueSatisfiesRequirement` helper. Reuses the existing guard-decomposition pipeline (branch-walking discipline preserved — every OR branch must independently discharge). Minimal sound surface per the locked design: direct `F == literal` only; disjunctive equality and field-to-field equality are deferred as separate extensions. Tests in `test/Precept.Tests/ProofEngine/DiscreteEqualityNarrowingTests.cs` (4 new, including soundness negatives for `Severity == 0 ⇒ 1 / Severity` and field-scope checks).

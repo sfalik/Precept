@@ -354,14 +354,15 @@ public enum DiagnosticCode
     ContradictoryRule = 155,
 
     /// <summary>
-    /// PRE0156 — Always-false period literal comparison. When both operands of a
-    /// period `==` are constant expressions with non-overlapping components
-    /// (e.g., `'1 month' == '30 days'`), the comparison is statically false.
-    /// Period equality compares each part (years, months, days, etc.) separately;
-    /// disjoint components can never be structurally equal. Emitted as a Warning —
+    /// PRE0156 — Degenerate period literal comparison. When both operands of a
+    /// period `==` / `!=` are constant expressions with non-overlapping components
+    /// (e.g., `'1 month' == '30 days'`), the comparison is statically knowable —
+    /// `==` always returns false, `!=` always returns true. Period equality
+    /// compares each part (years, months, days, etc.) separately; disjoint
+    /// components can never be structurally equal. Emitted as a Warning —
     /// the comparison is legal but almost certainly not what the author intended.
     /// </summary>
-    AlwaysFalsePeriodComparison = 156,
+    DegeneratePeriodComparison = 156,
 
     /// <summary>
     /// PRE0157 — Incompatible dimensional product. Emitted when `quantity × quantity`
@@ -386,4 +387,16 @@ public enum DiagnosticCode
     /// computed, or delete it) so compilation continues.
     /// </summary>
     FieldNeverSet = 158,
+
+    /// <summary>
+    /// PRE0159 — Rule predicate is unsatisfiable. The named rule's predicate
+    /// produces an empty interval on at least one field when composed with that
+    /// field's declared bounds (and the rule's own `when` guard, if any). No
+    /// valid value of the field can satisfy the rule. Distinct from
+    /// `ContradictoryRule` (PRE0155) which requires two rules whose intervals
+    /// disagree on a shared field — here a single rule is impossible on its own.
+    /// Emitted as a Warning — the rule is recoverable (rewrite the predicate or
+    /// widen the field's bounds) so compilation continues.
+    /// </summary>
+    UnsatisfiableRule = 159,
 }

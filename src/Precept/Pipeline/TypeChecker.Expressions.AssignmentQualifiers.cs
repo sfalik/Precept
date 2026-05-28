@@ -351,6 +351,40 @@ internal static partial class TypeChecker
             CurrencyConversionRequired => ResolveCurrencyConversionAxis(binary, axis),
             CompoundDimensionElevationRequired => ResolveCompoundElevationAxis(binary, axis),
             CompoundUnitCancellationRequired => ResolveCompoundCancellationAxis(binary, axis),
+            PriceDenominatorInherited => ResolvePriceDenominatorAxis(binary, axis),
+            _ => new(axis, QualifierResolutionKind.Absent, null),
+        };
+    }
+
+    /// <summary>
+    /// Resolve qualifier axes for <c>money in 'C' ÷ price in 'C/U' → quantity in 'U'</c>:
+    /// currency cancels; unit/dimension inherited from the price operand. The price's
+    /// `CompoundPrice` qualifier already stores the denominator unit as `UnitCode` and
+    /// the denominator dimension as `DimensionName` (the slash form `'C/U'` is split
+    /// at parse time by `MapPriceInQualifier`). <see cref="ProjectQualifierForAxis"/>
+    /// projects `CompoundPrice → Unit(UnitCode=denominator)` / `Dimension(name=denominator)`
+    /// natively, so delegating to <see cref="ResolveAssignmentQualifierAxis"/> on the
+    /// Unit/Dimension axis returns the denominator directly. NOT a literal mirror of
+    /// <see cref="ResolveCompoundElevationAxis"/> — that case projects the numerator
+    /// of a compound-quantity Unit (slash-bearing `UnitCode`); here the source is a
+    /// `CompoundPrice` whose components are already separated.
+    /// </summary>
+    private static ResolvedQualifierAxis ResolvePriceDenominatorAxis(TypedBinaryOp binary, QualifierAxis axis)
+    {
+        var priceOperand = binary.Left.ResultType == TypeKind.Price ? binary.Left : binary.Right;
+
+        return axis switch
+        {
+            // Currency cancels in money ÷ price — Rule QR-A. The chain proof
+            // (QualifierChainProofRequirement) handles the operand-side currency
+            // sameness; the result quantity carries no currency.
+            QualifierAxis.Currency or QualifierAxis.FromCurrency or QualifierAxis.ToCurrency
+                => new(axis, QualifierResolutionKind.Absent, null),
+            // The price's CompoundPrice qualifier projects to Unit/Dimension with
+            // the denominator components — the existing axis-resolution path is
+            // sufficient; no slash-split helper is needed.
+            QualifierAxis.Unit or QualifierAxis.Dimension
+                => ResolveAssignmentQualifierAxis(priceOperand, axis),
             _ => new(axis, QualifierResolutionKind.Absent, null),
         };
     }

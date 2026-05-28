@@ -76,9 +76,14 @@ public static partial class ProofEngine
             return false;
         }
 
-        if (string.Equals(qualifierText, "count", StringComparison.OrdinalIgnoreCase))
+        // Bare dimension names (`quantity of 'length'`, `quantity of 'mass'`,
+        // etc.) resolve via the curated DimensionCatalog. UCUM parsing covers
+        // unit symbols (kg, m, s/N), but a dimension name like "length" is
+        // not a UCUM unit symbol — DimensionCatalog is the authoritative
+        // lookup for that surface.
+        if (DimensionCatalog.All.TryGetValue(qualifierText, out var alias) && alias is not null)
         {
-            vector = DimensionVector.None;
+            vector = alias.Vector;
             return true;
         }
 
@@ -365,6 +370,17 @@ public static partial class ProofEngine
                     }
                     // Unit/Dimension: elevated from compound-quantity numerator (right operand)
                     return TryResolveCompoundElevationDimension(binOp, axis, semantics);
+
+                case PriceDenominatorInherited:
+                    if (axis == QualifierAxis.Currency
+                        || axis == QualifierAxis.FromCurrency
+                        || axis == QualifierAxis.ToCurrency)
+                    {
+                        // Currency cancels in money ÷ price; result quantity is uncurrencyed.
+                        return null;
+                    }
+                    // Unit/Dimension: inherited from the price operand's compound-unit denominator.
+                    return TryResolvePriceDenominatorQualifier(binOp, axis, semantics);
             }
         }
 
@@ -495,6 +511,14 @@ public static partial class ProofEngine
                             ? ResolveQualifierFromExpression(binOp.Left, axis, semantics)
                             // Unit/Dimension: elevated from compound-quantity numerator
                             : TryResolveCompoundElevationDimension(binOp, axis, semantics),
+                    PriceDenominatorInherited =>
+                        axis == QualifierAxis.Currency
+                        || axis == QualifierAxis.FromCurrency
+                        || axis == QualifierAxis.ToCurrency
+                            // Currency cancels in money ÷ price; result quantity is uncurrencyed.
+                            ? null
+                            // Unit/Dimension: inherited from price's compound-unit denominator.
+                            : TryResolvePriceDenominatorQualifier(binOp, axis, semantics),
                     _ => null,
                 };
 
@@ -750,6 +774,26 @@ public static partial class ProofEngine
 
     private static bool TryDeriveCompoundNumeratorDimension(string unitCode, out string dimensionName) =>
         QualifierUnitHelpers.TryDeriveUnitDimensionName(unitCode, out dimensionName);
+
+    /// <summary>
+    /// Resolve the unit/dimension axis for <c>money in 'C' ÷ price in 'C/U' → quantity in 'U'</c>:
+    /// pick the price operand (whichever side has <see cref="TypeKind.Price"/>) and project
+    /// its qualifier onto the requested axis. The price's `CompoundPrice` qualifier already
+    /// stores `UnitCode = denominator` and `DimensionName = denominator-dimension` (the
+    /// slash form `'C/U'` is split at parse time by `MapPriceInQualifier`), so
+    /// <see cref="ResolveQualifierFromExpression"/> projecting onto the Unit/Dimension axis
+    /// returns the denominator directly via <see cref="TryProjectCompoundPrice"/>. No
+    /// slash-split helper is needed.
+    /// </summary>
+    private static DeclaredQualifierMeta? TryResolvePriceDenominatorQualifier(
+        TypedBinaryOp binOp, QualifierAxis axis, SemanticIndex semantics)
+    {
+        if (axis is not (QualifierAxis.Unit or QualifierAxis.Dimension))
+            return null;
+
+        var priceOperand = binOp.Left.ResultType == TypeKind.Price ? binOp.Left : binOp.Right;
+        return ResolveQualifierFromExpression(priceOperand, axis, semantics);
+    }
 
     /// <summary>Look up a field's qualifier on a specific axis (with standard fallbacks).</summary>
     /// <summary>

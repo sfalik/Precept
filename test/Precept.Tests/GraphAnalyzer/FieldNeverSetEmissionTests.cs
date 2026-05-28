@@ -218,6 +218,117 @@ public class FieldNeverSetEmissionTests
             && d.Message.Contains("Scores"));
     }
 
+    // ════════════════════════════════════════════════════════════════════════
+    //  Reachability-gated write-site detection — see graph-analyzer.md § 6.7.
+    //  A write site tied to an unreachable state is structurally dead and
+    //  must not suppress FieldNeverSet.
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Trips_WhenSoleWriteSiteIsOnTransitionFromUnreachableState()
+    {
+        // Orphan state is declared but never reachable from Initial. The only
+        // write site for `Priority` lives on a transition out of Orphan, which
+        // can never fire — FieldNeverSet should still trip.
+        var (_, _, graph) = Analyze("""
+            precept Widget
+            field Priority as integer default 0
+            state Initial initial
+            state Orphan
+            state Done terminal
+            event Submit(NewPriority as integer)
+            from Orphan on Submit -> set Priority = Submit.NewPriority -> transition Done
+            event Finish
+            from Initial on Finish -> transition Done
+            """);
+
+        graph.Diagnostics
+            .Where(d => d.Code == nameof(DiagnosticCode.FieldNeverSet))
+            .Should().Contain(d => d.Message.Contains("Priority"),
+                because: "the only write site for Priority is from Orphan, which is unreachable; the write can never execute");
+    }
+
+    [Fact]
+    public void Trips_WhenSoleAccessModeIsOnUnreachableState()
+    {
+        // `in Orphan modify Priority editable` is the only access mode for Priority,
+        // but Orphan is unreachable — the access mode can never grant write access.
+        var (_, _, graph) = Analyze("""
+            precept Widget
+            field Priority as integer default 0
+            state Initial initial
+            state Orphan
+            state Done terminal
+            in Orphan modify Priority editable
+            event Finish
+            from Initial on Finish -> transition Done
+            """);
+
+        graph.Diagnostics
+            .Where(d => d.Code == nameof(DiagnosticCode.FieldNeverSet))
+            .Should().Contain(d => d.Message.Contains("Priority"),
+                because: "the access mode is anchored to an unreachable state; it never grants write capability at runtime");
+    }
+
+    [Fact]
+    public void Trips_WhenSoleStateHookIsOnUnreachableState()
+    {
+        // `to Orphan -> set Priority = ...` is the only write site, but Orphan
+        // is unreachable so the on-entry hook can never fire.
+        var (_, _, graph) = Analyze("""
+            precept Widget
+            field Priority as integer default 0
+            state Initial initial
+            state Orphan
+            state Done terminal
+            to Orphan -> set Priority = 1
+            event Finish
+            from Initial on Finish -> transition Done
+            """);
+
+        graph.Diagnostics
+            .Where(d => d.Code == nameof(DiagnosticCode.FieldNeverSet))
+            .Should().Contain(d => d.Message.Contains("Priority"),
+                because: "the state-entry hook is on an unreachable state; the entry never happens at runtime");
+    }
+
+    [Fact]
+    public void NoTrip_WhenWildcardWriteSiteCoversReachableState()
+    {
+        // Wildcard rows (`from * on E`) fire from every state — the analyzer
+        // cannot soundly mark them unreachable. They suppress FieldNeverSet
+        // even when explicit overrides exist on unreachable states.
+        var (_, _, graph) = Analyze("""
+            precept Widget
+            field Priority as integer default 0
+            state Initial initial
+            state Done terminal
+            event Submit(NewPriority as integer)
+            from * on Submit -> set Priority = Submit.NewPriority -> transition Done
+            """);
+
+        graph.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.FieldNeverSet),
+            because: "wildcard rows fire from every state, including the reachable Initial state");
+    }
+
+    [Fact]
+    public void NoTrip_WhenConstructionRowEstablishes()
+    {
+        // Construction-row writes are unconditional — a precept that can be
+        // constructed is reachable at construction time, regardless of
+        // post-construction state reachability.
+        var (_, _, graph) = Analyze("""
+            precept Widget
+            field Priority as integer default 0
+            state Initial initial
+            event Create(NewPriority as integer) initial
+            from on Create -> set Priority = Create.NewPriority -> transition Initial
+            """);
+
+        graph.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.FieldNeverSet),
+            because: "construction-row writes establish a value during initial event firing and don't depend on state reachability");
+    }
+
     private static (SemanticIndex Index, IReadOnlyList<Diagnostic> Diagnostics, StateGraph Graph) Analyze(string source)
     {
         var (index, diagnostics) = TypeCheckerTestHelpers.Check(source);

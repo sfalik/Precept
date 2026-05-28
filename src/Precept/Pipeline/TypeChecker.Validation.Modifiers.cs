@@ -161,9 +161,11 @@ internal static partial class TypeChecker
         // DU subtype (AccessModifierMeta) so the value-modifier loop above
         // skips them. `editable` at field declaration is the unified
         // replacement for the retired `writable` value modifier.
+        var accessSeen = new HashSet<ModifierKind>();
         foreach (var mod in modifiers)
         {
-            if (Modifiers.GetMeta(mod.Kind) is not AccessModifierMeta) continue;
+            var modMeta = Modifiers.GetMeta(mod.Kind);
+            if (modMeta is not AccessModifierMeta) continue;
 
             // `editable` on a computed field is a contradiction — computed fields
             // are derived, not directly written.
@@ -172,6 +174,29 @@ internal static partial class TypeChecker
                 ctx.Diagnostics.Add(
                     Diagnostics.Create(DiagnosticCode.ComputedFieldNotWritable, mod.Span, declarationName));
             }
+
+            // Mutual exclusivity across access modifiers — the catalog declares
+            // editable/readonly/omit as a three-way exclusion group, but the
+            // value-modifier loop above doesn't see access modifiers. Apply
+            // the same conflict check here using the access modifier's
+            // catalog-declared MutuallyExclusiveWith group.
+            //
+            // The current grammar admits only one access modifier per field
+            // declaration and one per state-access row, so no end-to-end repro
+            // exists today — this branch is defensive against a future grammar
+            // relaxation (or a hand-built AST that bypasses the parser). Keep
+            // catalog-driven so the path stays correct when the grammar evolves.
+            foreach (var conflict in modMeta.MutuallyExclusiveWith)
+            {
+                if (!accessSeen.Contains(conflict))
+                    continue;
+
+                var conflictMeta = Modifiers.GetMeta(conflict);
+                ctx.Diagnostics.Add(
+                    Diagnostics.Create(DiagnosticCode.ConflictingModifiers, mod.Span,
+                        modMeta.Token.Text, conflictMeta.Token.Text));
+            }
+            accessSeen.Add(mod.Kind);
         }
 
         ValidateBoundQualifierRequirements(modifiers, resolvedType, declaredQualifiers, ctx);
