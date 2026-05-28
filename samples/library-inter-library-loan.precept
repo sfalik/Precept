@@ -41,8 +41,7 @@ field SelectedSourceLibrary as string optional maxlength 100
 field SourceLibrarian as string optional maxlength 100
 
 # Loan terms
-# BUG-003: `period default '<literal>'` crashes — host supplies.
-field LoanPeriod as period optional
+field LoanPeriod as period default '4 weeks'
 field LoanRenewable as boolean default false
 field MaxRenewals as integer default 0 nonnegative max 5
 field RenewalCount as integer default 0 nonnegative

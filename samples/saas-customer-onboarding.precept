@@ -23,10 +23,6 @@ field CompletedMilestones as integer default 0 nonnegative
 field SuccessThreshold as integer default 80 nonnegative max 100
 
 # Milestone progress percentage — computed from milestone counts.
-# BUG-006: would prefer `integer default 0 nonnegative max 100` but the
-# proof engine can't compose the guard `TotalMilestones > 0` with field
-# bounds to prove `(CompletedMilestones * 100) / TotalMilestones <= 100`.
-# Dropped `max 100`; runtime rule below.
 field MilestonePercentage as integer default 0 nonnegative
 rule MilestonePercentage <= 100 because "Milestone percentage is a 0-100 ratio — values above 100 indicate a calculation error"
 

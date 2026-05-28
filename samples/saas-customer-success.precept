@@ -15,10 +15,6 @@ field CustomerEmail as string notempty maxlength 200
 field AccountTier as choice of string("Startup", "Growth", "Enterprise")
 
 # Health metrics — each component is 0-100; the overall score is the average.
-# BUG-006: would prefer `integer default 50 nonnegative max 100` on
-# OverallHealthScore but the proof engine can't prove
-# `(Usage + Engagement + Satisfaction) / 3` stays in [0,100] even when each
-# component is bounded. Dropped `max 100`; runtime rule below.
 field OverallHealthScore as integer default 50 nonnegative
 rule OverallHealthScore <= 100 because "Health score is a 0-100 composite — values above 100 indicate a calculation error"
 field UsageScore as integer default 50 nonnegative max 100

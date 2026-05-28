@@ -64,9 +64,6 @@ field CreditCheckCompleted as boolean default false
 field FieldTechnicianName as string optional maxlength 100
 field InspectionPassed as boolean default false
 field InspectionFailureReason as string optional
-# BUG-006: the proof engine cannot narrow `InspectionAttemptCount + 1`
-# against a structural `max 5` after the guard, so the cap is expressed as a
-# rule rather than a modifier.
 field InspectionAttemptCount as integer default 0 nonnegative
 
 rule InspectionAttemptCount <= 5 because "Inspection attempts capped at 5 — the customer must withdraw or escalate after the fifth failure"

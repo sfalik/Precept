@@ -206,14 +206,13 @@ from Cart on ApplyPromotion
     -> set DiscountApplied = TotalValue * DiscountPercent / 100.0
     -> no transition
 
-# Remove promotion — deactivate by zeroing the entry. The lookup uses put
-# instead of remove because BUG-002 prevents direct value removal.
-from Cart on RemovePromotion when CartPromotions for RemovePromotion.PromotionCode <= 0
-    -> reject "Promotion {RemovePromotion.PromotionCode} is not active"
+# Remove promotion — deactivate by removing the entry from the lookup.
+from Cart on RemovePromotion when not (CartPromotions contains RemovePromotion.PromotionCode)
+    -> reject "Promotion {RemovePromotion.PromotionCode} is not on this cart"
 from Cart on RemovePromotion
     -> set DiscountPercent = max(0.0, DiscountPercent - RemovePromotion.AppliedDiscount)
     -> set DiscountApplied = TotalValue * DiscountPercent / 100.0
-    -> put CartPromotions RemovePromotion.PromotionCode = 0.0
+    -> remove CartPromotions RemovePromotion.PromotionCode
     -> no transition
 
 # Add gift message — FIFO queue, latest message tracked separately

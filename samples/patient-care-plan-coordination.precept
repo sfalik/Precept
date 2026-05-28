@@ -35,9 +35,7 @@ field GoalProgressPercent as integer nonnegative default 0 max 100
 field ProgressNotes as log of string
 field LastProgressUpdate as instant optional
 field NextScheduledReview as date optional editable
-# BUG-008: duration default crashes the compiler. Review-frequency scheduling
-# lives in the host until the bug is fixed; the precept governs progress
-# tracking only.
+field ReviewFrequency as duration default '14 days' editable
 
 field CarePlanReason as string optional
 

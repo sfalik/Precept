@@ -33,9 +33,6 @@ field LastPaymentAmount as money in 'USD' optional
 field LastPaymentStatus as choice of string("Success", "Failed", "Pending") optional
 field OutstandingBalance as money in 'USD' default '0.00 USD' nonnegative
 
-# BUG-006: would prefer `integer default 0 nonnegative max 365` but the proof
-# engine can't compose the guard `DaysPastDue < 365` with the field's `max 365`
-# to prove `DaysPastDue + 1 <= 365`. Dropping `max 365`; runtime rule below.
 field DaysPastDue as integer default 0 nonnegative
 
 # Cancellation

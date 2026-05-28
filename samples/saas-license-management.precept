@@ -25,10 +25,6 @@ field LicensesInUse as integer default 0 nonnegative
 field LicensesAvailable as integer default 0 nonnegative
 
 # Utilization metrics — derived from counts.
-# BUG-006: would prefer `integer default 0 nonnegative max 100` but the
-# proof engine can't compose the guard `LicensesAllocated > 0` with the
-# field bound to prove `(LicensesInUse * 100) / LicensesAllocated <= 100`.
-# Dropped `max 100`; runtime rule below.
 field UtilizationPercentage as integer default 0 nonnegative
 rule UtilizationPercentage <= 100 because "Utilization is a 0-100 ratio — values above 100 indicate a calculation error"
 field MaxUtilizationThreshold as integer default 90 nonnegative max 100 editable
@@ -45,9 +41,8 @@ field CostPerLicense as money in 'USD' default '0.00 USD' nonnegative
 field NextRenewalAmount as money in 'USD' default '0.00 USD' nonnegative
 field RenewalDiscountApplied as money in 'USD' default '0.00 USD' nonnegative
 
-# Lifecycle timestamps. Renewal and expiration dates are supplied by the
-# procurement system at the appropriate event (BUG-010 currently blocks
-# `now() + '<duration>'`, so we carry these as event-args).
+# Lifecycle timestamps. Expiration and renewal dates are derived server-side
+# from now() plus the standard annual subscription term.
 field PurchaseDate as instant
 field ActivationDate as instant optional
 field ExpirationDate as instant optional
@@ -100,12 +95,11 @@ event ReturnLicense(UserEmail as string notempty maxlength 200, Reason as string
 event MonitorUtilization(CurrentInUse as integer nonnegative)
 on MonitorUtilization ensure MonitorUtilization.CurrentInUse <= LicensesAllocated because "Reported in-use count {MonitorUtilization.CurrentInUse} cannot exceed allocated count {LicensesAllocated}"
 
-# Renewal events — host supplies the new expiration date.
-event MarkAsExpiring(ExpirationDate as instant)
-on MarkAsExpiring ensure MarkAsExpiring.ExpirationDate > now() because "Expiration date {MarkAsExpiring.ExpirationDate} must be in the future when entering Expiring"
+# Renewal events — expiration is derived server-side from now() plus the
+# standard 30-day grace window or annual renewal term.
+event MarkAsExpiring
 
-event RenewLicense(NewExpirationDate as instant, RenewalAmount as money in 'USD' positive, DiscountAmount as money in 'USD' nonnegative)
-on RenewLicense ensure RenewLicense.NewExpirationDate > now() because "Renewed expiration {RenewLicense.NewExpirationDate} must be in the future"
+event RenewLicense(RenewalAmount as money in 'USD' positive, DiscountAmount as money in 'USD' nonnegative)
 on RenewLicense ensure RenewLicense.DiscountAmount <= RenewLicense.RenewalAmount because "Discount of {RenewLicense.DiscountAmount} cannot exceed the renewal amount of {RenewLicense.RenewalAmount}"
 
 event ProcessExpiration(Reason as string notempty)
@@ -218,24 +212,25 @@ from InUse on MonitorUtilization
     -> append LicenseAuditLog "Utilization monitored: {MonitorUtilization.CurrentInUse} in use"
     -> no transition
 
-# Mark as expiring — Allocated or InUse → Expiring.
+# Mark as expiring — Allocated or InUse → Expiring. The 30-day grace window
+# is added to now() to derive the expiration timestamp.
 from Allocated, InUse on MarkAsExpiring
-    -> set ExpirationDate = MarkAsExpiring.ExpirationDate
+    -> set ExpirationDate = now() + '30 days'
     -> set LastAuditDate = now()
-    -> append LicenseAuditLog "License pool marked as expiring on {MarkAsExpiring.ExpirationDate}"
+    -> append LicenseAuditLog "License pool marked as expiring"
     -> transition Expiring
 
-# Renewal — Expiring → InUse; restores the pool for a fresh billing period.
+# Renewal — Expiring → InUse; restores the pool for a fresh annual term.
 from Expiring on RenewLicense
     -> set RenewalCount = RenewalCount + 1
     -> set LastRenewalDate = now()
-    -> set RenewalDate = RenewLicense.NewExpirationDate
-    -> set ExpirationDate = RenewLicense.NewExpirationDate
+    -> set RenewalDate = now() + '365 days'
+    -> set ExpirationDate = now() + '365 days'
     -> set NextRenewalAmount = RenewLicense.RenewalAmount
     -> set RenewalDiscountApplied = RenewLicense.DiscountAmount
     -> set TotalLicenseCost = TotalLicenseCost + RenewLicense.RenewalAmount - RenewLicense.DiscountAmount
     -> set LastAuditDate = now()
-    -> append LicenseAuditLog "License pool renewed through {RenewLicense.NewExpirationDate} (discount: {RenewLicense.DiscountAmount})"
+    -> append LicenseAuditLog "License pool renewed for an annual term (discount: {RenewLicense.DiscountAmount})"
     -> transition InUse
 
 # Expiration — from Expiring, Allocated, or InUse → Expired.

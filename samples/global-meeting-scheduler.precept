@@ -99,7 +99,7 @@ field ParticipantEmails as set of ~string
 # `put` and `for` always land on the same entry for a given person.
 field ParticipantZoneByEmail as lookup of ~string to timezone
 
-field ParticipantCount as integer default 0 nonnegative
+field ParticipantCount as integer default 0 nonnegative max 500
 
 # ── After-hours acknowledgement ───────────────────────────────────────────────
 # When IsAfterHoursForHost is true at scheduling time, the host must
@@ -121,14 +121,7 @@ field CancelledAt as instant optional
 
 # ── Rules ─────────────────────────────────────────────────────────────────────
 rule HostBusinessHoursEnd > HostBusinessHoursStart because "Business hours end {HostBusinessHoursEnd} must be after business hours start {HostBusinessHoursStart}"
-# BUG-008 family: `duration <= '<literal>'` crashes the compiler. Compare via
-# the totalHours accessor instead until typed-duration comparisons land.
-rule MeetingDuration.totalHours <= 8 because "A scheduled meeting may not exceed 8 hours — longer events should be split or marked as offsites"
-# BUG-006: the proof engine doesn't combine the AddParticipant guard
-# (`ParticipantCount < 500`) with a field-level `max 500` to satisfy the
-# arithmetic interval. Use a rule invariant instead.
-rule ParticipantCount <= 500 because "A single meeting record cannot host more than 500 participants"
-
+rule MeetingDuration <= '8 hours' because "A scheduled meeting may not exceed 8 hours — longer events should be split or marked as offsites"
 # ── States ────────────────────────────────────────────────────────────────────
 state Draft initial
 state Scheduled

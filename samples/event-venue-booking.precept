@@ -165,6 +165,7 @@ on SubmitInquiry ensure VenueSpace is set because "Venue space must be chosen be
 
 on AddService ensure AddService.Fee >= '0.00 USD' because "Add-on service fee cannot be negative"
 
+on Quote ensure ExpectedGuestCount is set because "Expected guest count must be set before quoting"
 on Quote ensure Quote.BaseFee > '0.00 USD' because "Base venue fee must be positive"
 on Quote ensure Quote.PerGuest >= '0.00 USD' because "Per-guest fee cannot be negative"
 on Quote ensure Quote.Deposit > '0.00 USD' because "Deposit must be positive"
@@ -221,9 +222,7 @@ from Inquiry, Quoted on RemoveService
 
 # Quote — venue coordinator prices the inquiry. The full quoted total includes
 # per-guest pricing and accumulated add-ons; deposit is set on the same event.
-# BUG-004 workaround: redundant `when ExpectedGuestCount is set` because event
-# ensures don't narrow transition rows. Inquiry's state ensure does not cover it.
-from Inquiry on Quote when ExpectedGuestCount is set
+from Inquiry on Quote
     -> set BaseVenueFee = Quote.BaseFee
     -> set PerGuestFee = Quote.PerGuest
     -> set GuestFeeSubtotal = Quote.PerGuest * ExpectedGuestCount
@@ -232,8 +231,6 @@ from Inquiry on Quote when ExpectedGuestCount is set
     -> set QuotedAt = now()
     -> append BookingLog "Quoted"
     -> transition Quoted
-from Inquiry on Quote
-    -> reject "Expected guest count must be set before quoting"
 
 # Deposit payment — booker pays toward the required deposit.
 from Quoted on PayDeposit when DepositPaid + PayDeposit.Amount > RequiredDeposit

@@ -24,15 +24,10 @@ field SelectedPlanName as choice of string("Free", "Pro Starter", "Pro", "Enterp
 field ConversionRejectionReason as string optional
 field SalesRepName as string optional maxlength 200
 
-# BUG-006: would prefer `integer default 0 nonnegative max 10` but the proof
-# engine can't compose row-level inductive narrowing with a field-level max.
-# Dropped `max`; runtime rule below.
 field ConversionAttempts as integer default 0 nonnegative
 rule ConversionAttempts <= 10 because "Conversion attempts capped at 10 — beyond that the trial should be expired"
 
-# BUG-006: same shape — would prefer `integer default 0 nonnegative max 3`.
-field ExtensionCount as integer default 0 nonnegative
-rule ExtensionCount <= 3 because "A trial may be extended at most three times — beyond that the customer must commit or expire"
+field ExtensionCount as integer default 0 nonnegative max 3
 
 # Reminders and follow-up
 field ReminderSent as boolean default false

@@ -83,12 +83,10 @@ event Create(
     UserRole as choice of string("Admin", "Editor", "Viewer"),
     LicenseType as choice of string("Full", "Limited", "Trial")) initial
 
-# Lifecycle events. Provisioning carries the license expiration as an
-# event-arg — the identity-management host computes it from the
-# subscription term (BUG-010 currently blocks `now() + '<duration>'`).
+# Lifecycle events. License expiration is computed server-side from now()
+# plus the standard annual term.
 event ApproveAccess(ApprovedBy as string notempty maxlength 200)
-event ProvisionUser(LicenseExpirationDate as instant)
-on ProvisionUser ensure ProvisionUser.LicenseExpirationDate > now() because "License expiration of {ProvisionUser.LicenseExpirationDate} must be in the future — provisioning a pre-expired license has no purpose"
+event ProvisionUser
 event SuspendUser(Reason as string notempty)
 event ReactivateUser
 event DeactivateUser(Reason as string notempty)
@@ -125,7 +123,7 @@ from Requested on ApproveAccess
 # expiration supplied by the host.
 from Approved on ProvisionUser when UserRole == "Admin"
     -> set ActivatedAt = now()
-    -> set LicenseExpirationDate = ProvisionUser.LicenseExpirationDate
+    -> set LicenseExpirationDate = now() + '365 days'
     -> set CanCreate = true
     -> set CanEdit = true
     -> set CanDelete = true
@@ -136,7 +134,7 @@ from Approved on ProvisionUser when UserRole == "Admin"
 
 from Approved on ProvisionUser when UserRole == "Editor"
     -> set ActivatedAt = now()
-    -> set LicenseExpirationDate = ProvisionUser.LicenseExpirationDate
+    -> set LicenseExpirationDate = now() + '365 days'
     -> set CanCreate = true
     -> set CanEdit = true
     -> set CanDelete = false
@@ -147,7 +145,7 @@ from Approved on ProvisionUser when UserRole == "Editor"
 
 from Approved on ProvisionUser
     -> set ActivatedAt = now()
-    -> set LicenseExpirationDate = ProvisionUser.LicenseExpirationDate
+    -> set LicenseExpirationDate = now() + '365 days'
     -> set CanCreate = false
     -> set CanEdit = false
     -> set CanDelete = false

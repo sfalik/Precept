@@ -30,8 +30,7 @@ field VehicleAgeYears as integer optional nonnegative max 100
 field VehicleWeightLbs as integer optional positive max 80000
 
 # Registration term — period for renewal length; date for boundaries.
-# BUG-003: `period default '<literal>'` crashes the compiler — host supplies.
-field RegistrationTerm as period optional
+field RegistrationTerm as period default '1 year'
 field PreviousExpirationDate as date optional
 field NewExpirationDate as date optional
 field NoticeIssueDate as date optional editable

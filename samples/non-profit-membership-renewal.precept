@@ -33,8 +33,7 @@ field PrimaryChapter as choice of string("Local","Regional","National","Internat
 field EnrolledOn as date optional
 field TermStartDate as date optional
 field TermEndDate as date optional
-# BUG-003: `period default '<literal>'` crashes the MCP compiler — host supplies.
-field GracePeriod as period optional editable
+field GracePeriod as period default '30 days' editable
 
 # Dues and payment tracking — exact money, no approximation
 field DuesAmount as money in 'USD' optional
@@ -152,9 +151,7 @@ from Draft, PendingPayment on Decline
 
 # Payment — recorded against the membership. The membership officer fires
 # Activate once dues are fully paid.
-# BUG-004: redundant `when DuesAmount is set` guard because event ensures don't
-# narrow transition-row bodies. PendingPayment's state ensure already proves it.
-from PendingPayment on RecordPayment when DuesAmount is set and AmountPaid + RecordPayment.Amount > DuesAmount
+from PendingPayment on RecordPayment when AmountPaid + RecordPayment.Amount > DuesAmount
     -> reject "Payment of {RecordPayment.Amount} would exceed dues ({DuesAmount} due, {AmountPaid} already paid)"
 from PendingPayment on RecordPayment
     -> set AmountPaid = AmountPaid + RecordPayment.Amount
@@ -162,8 +159,7 @@ from PendingPayment on RecordPayment
     -> no transition
 
 # Activate — requires dues paid in full.
-# BUG-004 workaround: redundant guard establishes DuesAmount presence for the row body.
-from PendingPayment on Activate when DuesAmount is set and AmountPaid < DuesAmount
+from PendingPayment on Activate when AmountPaid < DuesAmount
     -> reject "Cannot activate — dues of {DuesAmount} are not fully paid (only {AmountPaid} received)"
 from PendingPayment on Activate
     -> set ActivatedAt = now()

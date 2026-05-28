@@ -33,10 +33,7 @@ field LeaseClassification as choice of string("Operating","Finance","ShortTerm")
 field LeaseTerm as period optional
 field CommencementDate as date optional
 field ExpirationDate as date optional
-# BUG-003: `period default '<literal>'` crashes the MCP compiler (unhandled
-# exception, no diagnostic emitted). Until that's fixed, this lease's grace
-# period stays optional and the host fills it in. See docs/Working/bugs.md.
-field GracePeriod as period optional editable
+field GracePeriod as period default '10 days' editable
 
 # Payments
 field MonthlyPayment as money in 'USD' optional
@@ -142,12 +139,7 @@ on RecordOverageUsage ensure RecordOverageUsage.UsageHours > '0 h' because "Reco
 # Transitions
 
 # Quotation — the lease officer issues a binding quote to the lessee.
-# BUG-004: the event ensure `on Quote ensure MonthlyPayment is set` above provably
-# establishes presence before the row body runs, but the proof engine does not
-# credit event ensures for transition-row body narrowing (only `when` guards on
-# the row itself, and rule/ensure guards). The row carries a redundant
-# `when MonthlyPayment is set` guard to satisfy presence narrowing.
-from Draft on Quote when MonthlyPayment is set
+from Draft on Quote
     -> set QuotedAt = now()
     -> set TotalScheduledValue = MonthlyPayment * PaymentsScheduled
     -> append LeaseLog "Quoted"
@@ -213,10 +205,6 @@ from Active on CureDefault
 # dimensional cancellation (`price 'USD/h' * quantity of 'time'` -> `money`)
 # is enforced at compile time — billing in the wrong currency or feeding the
 # rate against a non-time quantity is structurally rejected.
-# BUG-006 family: the proof engine doesn't propagate forward the negation of
-# the first row's guard ("is not set -> reject" implies subsequent rows see
-# "is set"). Each downstream row carries an explicit `when HourlyOverageRate
-# is set` guard to satisfy presence narrowing.
 from Active on RecordOverageUsage when HourlyOverageRate is not set
     -> reject "No hourly overage rate is on file — set HourlyOverageRate during quotation before billing overage"
 from Active on RecordOverageUsage when HourlyOverageRate is set and TotalOverageHours is set
