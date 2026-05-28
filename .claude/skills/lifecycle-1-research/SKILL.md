@@ -9,6 +9,16 @@ Stage 1 of the engineering lifecycle. Conclusions that lock decisions feed forwa
 
 Research in this repo informs language design, architecture, tooling, and policy. The discipline matters as much as the findings — evidence-oriented, citation-rich, and never shadow policy.
 
+## Pre-research gate (Non-Negotiable)
+
+If the research topic is grounding a **new language-surface feature** (keyword, type, operator, modifier, construct, expression form, syntax) — not a pure comparator survey or feasibility check on already-authorized scope — the **CLAUDE.md Pre-Design Owner Consultation gate** must be satisfied before the research starts.
+
+Research can ground a decision the owner authorizes (good). Research **cannot** authorize the underlying *what should we build* question by itself; if no conversation has happened with the owner, the research will inherit a `what to design` decision the owner never made.
+
+Surface to the owner first: name the finding/gap, cite the canonical-doc area you'd check, sketch what kind of research would help. Get alignment on whether the research is the right next step. Then proceed.
+
+The exception is **horizon groundwork** — research that the project intentionally produces ahead of downstream decisions. Horizon research is authorized when the owner has said "this area is coming, do the upfront research" — that *is* the consultation. Mark such research with `status: Active` and a horizon-groundwork declaration per § Step 7.
+
 ## Step 1: Triage — Has This Been Researched Already?
 
 Before any external investigation, check whether the team has already covered the ground:

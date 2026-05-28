@@ -20,6 +20,17 @@ Stage 2 of the engineering lifecycle. Produces a locked design doc in `docs/Work
 - Already implementing — use `/lifecycle-5-promote` afterward to canonicalize
 - Pure bug-fix or polish work — designs not warranted
 
+## Pre-design gate (Non-Negotiable)
+
+Before writing any section of a design that introduces or modifies language surface (keyword, type, operator, modifier, construct, expression form, syntax), the **CLAUDE.md Pre-Design Owner Consultation gate** must be satisfied. Specifically:
+
+- The conversation that led to this design must contain a record of surfacing the proposal to the owner — what was checked, what was found in the canonical-doc area, what the owner authorized.
+- If the proposal touches an area where the canonical doc has a locked prior decision (`## Alternatives rejected`, locked Decision blocks, explicit "no X" statements), Tier 3 consultation evidence is required: the prior locked decision was quoted verbatim, the conflict was surfaced honestly, and the owner explicitly authorized the override / extension / closure path.
+
+**Refuse to lock a design that lacks consultation evidence in the conversation history.** A design that contradicts a canonical-doc locked decision with no upstream owner-authorization conversation is a Tier 3 violation regardless of how well its four-leg rationale is written. The four-leg discipline cannot retroactively authorize an override the owner never authorized.
+
+The skill produces the design; the owner authorizes the *what to design*. Confusing the two reintroduces the failure mode the gate exists to prevent.
+
 ## Before you start
 
 Read these before writing any section of the design. They ground every decision; reading them after is too late.

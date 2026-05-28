@@ -192,6 +192,52 @@ Delegate `.precept` file work to the **`precept-author` sub-agent** (`.claude/ag
 
 For inline snippets (a single line in an explanation, a short example in a comment), still: read at least one representative sample file from `samples/` first. Do not rely on memory or inference — read first, then write.
 
+## Pre-Design Owner Consultation (Non-Negotiable)
+
+A language-surface proposal must surface to the owner for **conversation** before any of: invoking `/lifecycle-1-research`, `/lifecycle-2-design`, or `/lifecycle-3-plan` on it; expanding a readiness-plan phase row from stub to populated workstreams; or spawning a sub-agent on language-surface work.
+
+The gate scales with risk. The *purpose* is to bring the owner into the **what should we do** question — not to bottleneck on yes/no approval. Push-back, redirection, "let's sketch a different shape," "is this even the right problem," "let's defer" are all expected responses. The fast path through the gate is **alignment, not approval**.
+
+### Tier 1 — No gate
+
+Mechanical work without language-surface change: direct bug fixes against locked spec, refactors, doc sweeps, test-fixture restores, pipeline-internal changes, tooling/MCP/LS internals, finding-ID work where the canonical doc has no prior locked decision to read against. Proceed normally. No consultation required.
+
+### Tier 2 — Conversation opener (new language surface, no spec conflict)
+
+Any proposal touching language surface (keyword, type, operator, modifier, construct, expression form, syntax) where the canonical-doc area has no prior locked decision. Before delegating, surface the proposal in plain text:
+
+- Name the finding/gap being addressed
+- Cite the canonical-doc area checked (e.g., "I read `business-domain-types.md § quantity`; no prior decision on cross-precept unit visibility")
+- Sketch the shape under consideration — framed as **opening a conversation**, not as a settled proposal: "I'm thinking X — does that match your intent? What else should I consider? Are there shapes I'm missing?"
+- **Encourage exploration**: invite alternative shapes, scope tightening, "should this even be a Phase N item" pushback. The owner may sketch ideas that didn't occur to you; you may sketch ideas that didn't occur to them. The conversation might converge in one turn or run for several.
+
+Then wait. No agent spawn, no design write, no readiness-plan expansion until there's alignment on the shape.
+
+### Tier 3 — Heavier conversation (spec conflict)
+
+Any proposal touching an area where the canonical doc has a locked prior decision — particularly `## Alternatives rejected` sections, locked Decision blocks, explicit "no X" statements, or `business-domain-types.md` / `precept-language-spec.md` decisions. Same as Tier 2, plus:
+
+- **Quote the prior locked decision verbatim** with section reference
+- Surface the conflict honestly: "the spec already answers this; here's how. Do we want to extend / override / close the finding as already-answered / something else?"
+- Frame the override cost explicitly: a locked spec decision cannot be overridden inside a design pass. The owner authorizes the override (or doesn't); the design pass implements it.
+- **Same conversational framing**: pushback, "let's revisit the rejection," "the spec is right, close the finding" are all expected responses.
+
+Then wait. Locked decisions are load-bearing; overriding one requires explicit owner direction.
+
+### When the gate is satisfied
+
+When proceeding past Tier 2 or Tier 3 into research/design/plan/agent-spawn, the assistant's response should make the consultation evidence visible — what was checked, what was found in the canonical area, what the owner authorized. This is post-hoc verifiable (a reviewer can grep the conversation for the consultation record).
+
+### Why this exists
+
+Broad delegation ("research, design, and plan Phase N") authorizes proceeding *after* the *what to do* question is settled with the owner. It does **not** authorize the assistant to settle that question unilaterally. A previous design pass conflated the two, introduced a `units { }` block construct that contradicted a locked rejection in `business-domain-types.md § D6`, and overrode the rejection inside the design pass with no owner consultation. This gate prevents that conflation by making the conversation a structural prerequisite, not an optional politeness.
+
+### Honest exits
+
+- **Mechanical work** (Tier 1) — proceed without consultation. The gate is for novel surface and spec conflicts, not execution of authorized work.
+- **Owner has already authorized the specific shape** in this session — proceed; do not re-consult on details within the authorized scope.
+- **Genuinely unsure whether a proposal touches language surface or not** — surface the ambiguity to the owner ("I'm not sure if X counts as language surface; how do you want me to treat it?"). When in doubt, surface.
+
 ## Language Surface Design (Non-Negotiable)
 
 New language surface — syntax, keywords, types, operators, modifiers, constructs, expression forms — must go through `/lifecycle-2-design`. Never propose or settle on a specific syntax approach in direct chat.
