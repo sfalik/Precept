@@ -1,5 +1,5 @@
 ---
-status: Externally-Grounded
+status: Draft — spec-coverage rework required (two spec-completeness audits 2026-05-28 found ~23 gaps incl. contract violations; see § Spec-coverage gaps at end). NOT lock-ready.
 phase-target: Phase 6 (F-LANG-BIZ-07 continuation) / standalone proof-engine work item
 comparable-systems-research-status: partial — flow-sensitive narrowing (occurrence/flow typing) cited inline in Language Design Grounding as the broader-field anchor; the load-bearing soundness decisions are grounded in Precept's own numeric discrete-equality narrowing precedent (F-LANG-BIZ-08), cited per-decision
 sources-consulted:
@@ -234,3 +234,30 @@ TypeScript's control-flow analysis is the closest architectural analogue: a sepa
 
 ## Open questions
 **One owner decision (cross-step reassignment, CONCERN-1)**: when a `set X = …` reassigns a narrowing subject earlier in the same body, is the stale-fact exposure (a) **fixed here** — the qualifier discharge implements reassignment-invalidation (D3 rule 9) and a follow-up finding checks/fixes the numeric path which shares the exposure; or (b) **scoped out** — documented as a pre-existing row-scoped assumption inherited from the numeric path, deferred to a dedicated soundness pass. The design assumes (a) (rule 9 + catalog row 7); confirm or redirect before lock. *(Everything else resolved inline: fact-vehicle D1; basis representation D5; unitofmeasure `.dimension` scope D7; interpolation-slot narrowing from open fields explicitly out of scope.)*
+
+## Spec-coverage gaps — MUST resolve before lock (audits 2026-05-28)
+
+Two spec-completeness audits (the first authored the design with insufficient spec reading; these audits read the relevant docs in full and cross-checked). The design is **not lock-ready** until these are resolved. Contract violations first.
+
+**Audit-2 (type-checker.md + literal-system.md):**
+- **G1 [contract violation]** — partition-by-LHS (D4) contradicts `literal-system.md`'s context-born-*then*-content-validated model: `ClosedSetValidator.Validate(rawText, validation)` takes no context arg; the `ContentValidation` DU *is* the closed registry. Either express partition as catalog metadata keyed by the already-known type, or change (and document) the content-validation contract. **Add `literal-system.md` to doc-update enumeration (currently omitted).**
+- **G2 [catalog violation]** — partition *selection* keyed on LHS `TypeKind` identity reintroduces the TypeKind-switch F-TC-04 removed (`type-checker.md:930`). Must be catalog-metadata-driven.
+- **G3 [tension]** — Site A (type-checker assignment-qualifier validation consulting the narrowing fact) conflicts with D2 (declaration-pure resolution, discharge in ProofEngine). The closed `ResolveAssignmentQualifierAxis` switch takes `(value, axis)` only — no guard context. Specify the mechanism or relocate.
+- **G4 [contract violation]** — `.basis` canonicalization at discharge (D5) violates the type-checker normalization-boundary contract; canonicalize the RHS at the checker, ProofEngine compares already-canonical strings.
+- **G5** — `dimension` content-validation table (`literal-system.md:223`) has no door for `date`/`time`/`datetime`; the "make `period.dimension == 'date'` compile" prerequisite is unreconciled (needs a partitioned closed set or a documented second exception alongside `stateref`).
+- **G6** — `ReturnsQualifier` accessor-metadata contract is undocumented in `type-checker.md`; the design must *introduce* it (meaning + consumers: hover, slot resolver), not just note four edits.
+- **G7** — error-recovery / ErrorType-propagation interaction for a partition-mismatch RHS (`TypedErrorExpression` vs diagnostic-with-valid-RHS) unspecified — affects whether a rejected RHS suppresses the narrowing seed.
+- **G8/G9** — dual seed predicates (`ReturnsQualifier≠None` axis case vs `.basis` String case) not crisply separated; doc-update omits `literal-system.md`.
+
+**Audit-1 (proof-contract + business-domain), the load-bearing ones:**
+- **A1 [contract]** — sequential proof flow / reassignment-invalidation (spec § 0.6 item 7) is mandated + claimed-implemented but absent in `src/` (BUG-014). Not an owner decision — implement it; correct the impl-status drift.
+- **A2 [contract]** — forward narrowing propagation (`set X = Y` copies Y's markers, § D9 Mechanism #4) entirely missing from the design.
+- **A3 [missing]** — proof attribution payload (§ 0.6 item 6): the discharge must produce a structured `ProofSatisfaction` projection (guard leaf + axis + value); design asserts attribution without a payload.
+- **A4 [missing]** — Tier-2 dynamic narrowing on identity-typed fields (`when ActiveCurrency == 'USD'`, § D9/D14 worked examples) — design's seed matches only member-access; deferred as out-of-scope but spec presents it first-class.
+- **A5 [missing]** — field-to-field dimension comparison (`Reading.dimension == AllowedDimension`, § dimension Patterns 1-3) both unsupported and not rejected; cross-partition field-to-field must error (§ dimension:792).
+- **A6 [missing]** — narrowing the unit axis of a declared-but-partial `quantity of 'mass'` field (§ D9 contract row 3); design scopes to open fields only.
+- **A7 [tension]** — stateless-precept guard-narrowing claim vs `proof-engine.md:2084` (Strategy 3 N/A for stateless — verify `EventHandlerContext.Handler.Guard` exists).
+- **A8/A9** — diagnostic-code attribution (spec names `QualifierMismatch` 68 / `DimensionCategoryMismatch` 69, not proof-stage PRE0141/0114/0113; new "partition-mismatch code" likely unwarranted — reuse `InvalidDimensionString` 77).
+- **A10–A14** — price three-axis disambiguation unstated; else-branch negation vs negation-narrows-nothing conflict; strategy ordinal not pinned; contradiction-as-unsatisfiable depends on unbuilt PRE0082; normalization-at-boundary (dup of G4).
+
+The full audit reports (with verbatim spec citations) are in the conversation record; this appendix is the actionable summary the rework consumes.

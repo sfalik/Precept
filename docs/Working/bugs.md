@@ -27,7 +27,28 @@ surfaced for proper fixing.
 
 ## Active
 
-*(empty — all known bugs and gap-findings have been fixed and promoted to § Fixed.)*
+### BUG-014: guard facts survive field reassignment — sequential-proof-flow (spec item 7) not implemented for guard narrowing
+
+- **Discovered**: 2026-05-28 while grounding the D9 qualifier-narrowing design (`docs/Working/d9-qualifier-narrowing-design.md`).
+- **Affected**: every guard-narrowing discharge — `TryGuardInPathProof` (numeric + presence), `TryFlowNarrowingProof` (field-to-field), `TryIndexBoundsProof`, `TryKeyPresenceProof`. All pull the row guard from `t.Row.Guard` (`ProofEngine.Strategies.cs`) and apply it to every body obligation regardless of intervening reassignment of the guarded field.
+- **Symptom**: a guard fact discharges an obligation *after* the guarded field was reassigned to a guard-violating value. Confirmed unsound divide-by-zero proof:
+  ```precept
+  precept ReassignProbe
+  field X as integer default 1
+  field R as integer default 0
+  state S initial
+  event E
+  from S on E when X != 0
+      -> set X = 0
+      -> set R = 100 / X
+      -> no transition
+  ```
+  `precept_compile` → `success: true`, divisor obligation `Proved` via `GuardInPath`. At runtime `100 / X` divides by zero; the engine declared it structurally safe — a Principle-1 violation.
+- **Root cause**: `precept-language-spec.md § 0.6` proof-contract **item 7 "Sequential proof flow"** mandates *"When a field is reassigned, prior proof facts about that field are invalidated before the new assignment's facts are stored."* The engine does not implement this for guard-derived facts — `TransitionRowContext(Row)` carries the whole row, not the obligation's action-chain position, so the discharge cannot tell a guard fact is stale. **Doc-drift**: § 0.6 Implementation status (~line 246) lists "sequential proof flow" among obligations *"implemented and exercised by the proof-engine test suite"* — false.
+- **Workaround used**: none (surfaced by a probe; no sample exploits it).
+- **Fix complexity**: large — thread action-chain position into the obligation/context (or precompute per-obligation "fields reassigned before me" in `WalkActions`, which already iterates actions in order) and have guard-consuming strategies drop constraints whose subject was reassigned before the obligation's site. Shared guard-substrate change benefiting all strategies.
+- **Priority**: blocks shipping (soundness). **Being fixed as the foundational step of the D9 qualifier-narrowing slice** — the new narrowing layer requires the same invalidation, so fixing the substrate fixes both; correct the § 0.6 Implementation-status drift in the same pass.
+- **Repro**: the `ReassignProbe` snippet above.
 
 ## Fixed
 
