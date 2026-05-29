@@ -260,4 +260,13 @@ Two spec-completeness audits (the first authored the design with insufficient sp
 - **A8/A9** — diagnostic-code attribution (spec names `QualifierMismatch` 68 / `DimensionCategoryMismatch` 69, not proof-stage PRE0141/0114/0113; new "partition-mismatch code" likely unwarranted — reuse `InvalidDimensionString` 77).
 - **A10–A14** — price three-axis disambiguation unstated; else-branch negation vs negation-narrows-nothing conflict; strategy ordinal not pinned; contradiction-as-unsatisfiable depends on unbuilt PRE0082; normalization-at-boundary (dup of G4).
 
+**Audit-3 (temporal-type-system.md full + spec §1-3 + parser.md + catalog-discipline) — new gaps beyond the above:**
+- **N1** — open-period `.basis` has no static canonical string to compare against (`.basis` on an open period is the *runtime* non-zero decomposition, `business-domain-types.md:1226`); the design's `.basis == 'hours'` narrowing (D5) assumes a *declared* basis. The open-period case — the one narrowing is *for* — is unaddressed (distinct from G4, which is only about where canonicalization runs).
+- **N2** — D14 acceptance is a `⊆` subset relation (`business-domain-types.md:922`), but the design's discharge `satisfies(v,w)` is value-*equality*. A declared `period in 'hours + minutes'` used where an `hours` obligation needs satisfying is a subset question equality can't express. Unspecified.
+- **N3** — composite legal-by-source-operation (W-C) and D9 narrowing both emit/suppress on the same `period` QualifierMismatch surface; ordering unspecified.
+- **N4** — CONCERN-2's hover/interpolation tests must include the `Datetime` case (`'{X.dimension}'` / hover on a composite period now resolves `datetime`); the enumeration only named currency/dimension.
+- **N5** — the W-A↔W-C seam: plan W-C NIT-1 (`Count > 1` / `== Date` dead heuristics) and the design's Decision 6/7 touch the *same* predicate; uncoordinated, one could re-introduce the false-green the plan warns of.
+
+**Audit-3 verdict on shipped work**: W-A (commit `3e116ced`) is **consistent** with temporal-type-system.md — no Decision #26, cancellation, or dimension-contract violation; the "no parser change" claim is confirmed against `parser.md`. The new gaps are all D9-design / W-C-seam, not in W-A's committed code.
+
 The full audit reports (with verbatim spec citations) are in the conversation record; this appendix is the actionable summary the rework consumes.
