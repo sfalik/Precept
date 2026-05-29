@@ -191,6 +191,11 @@ When the review target is a locked design doc (from `/lifecycle-2-design`):
 - Beyond verifying cited sources, look for **uncited sources the design should have consulted**. If a decision takes a position on, say, the modifier surface but didn't cite the modifier catalog, open the catalog yourself and check whether the design's enumeration is complete against what's actually there. Missing source citations the design clearly needed are findings.
 - "Source" is an open category — code files, doc sections, MCP tool outputs, sample files, test fixtures, bug entries, other design docs, research notes, RFCs, anything with a permanent address. Do not filter by source type.
 
+**Pre-existing-vs-new surface check (do not flag documented intent as new).** Before reporting that a design "introduces," "adds," or "newly requires" any surface — a keyword, type, operator, enum value, accessor, diagnostic, dimension value, constraint — **verify against the pre-change canonical doc** (`git show <base>^:<path>`, or read the doc section the change touches). If the surface is already documented intent (even if marked `(new)`, aspirational, or unbuilt), it is NOT a new-surface finding and does NOT carry an owner/consultation-gate decision. Distinguish two cases explicitly in the report:
+  - **Specced-but-unbuilt** (the doc documents it; the implementation lacks it) → an *implementation-gap* finding the readiness plan closes. No owner decision. State "pre-existing per `<doc> §<n>`."
+  - **Genuinely new** (no prior doc mention) → a new-surface finding; the consultation gate may apply.
+  Mis-classifying specced-but-unbuilt surface as "new" generates false owner-decision churn. When in doubt, open the pre-change doc and quote what was already there.
+
 **Research-citation check (Phase 8 addition).** When the design touches a topic with existing `research/` content, the reviewer mechanically verifies that the design cites that research:
 
 | Design touches | Reviewer always opens / checks the design cites |
