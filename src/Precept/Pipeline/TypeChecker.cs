@@ -392,13 +392,73 @@ internal static partial class TypeChecker
 
     private static DeclaredQualifierMeta.TemporalUnit MapTemporalUnitQualifier(string value, SourceSpan valueSpan, CheckContext ctx)
     {
-        if (!TemporalUnits.TryGet(value, out var entry))
+        var trimmed = value.Trim();
+
+        // Single-basis (no '+'): behavior-identical to the original single-atom path,
+        // including InvalidTemporalUnitString (PRE0118) on an unrecognized unit.
+        if (!trimmed.Contains('+'))
         {
-            ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.InvalidTemporalUnitString, valueSpan, value));
-            return new DeclaredQualifierMeta.TemporalUnit(value, PeriodDimension.Any);
+            if (!TemporalUnits.TryGet(trimmed, out var single))
+            {
+                ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.InvalidTemporalUnitString, valueSpan, value));
+                return new DeclaredQualifierMeta.TemporalUnit(value, PeriodDimension.Any);
+            }
+            var singleDim = single.IsCalendarBased ? PeriodDimension.Date : PeriodDimension.Time;
+            return new DeclaredQualifierMeta.TemporalUnit(value, singleDim);
         }
-        var dimension = entry.IsCalendarBased ? PeriodDimension.Date : PeriodDimension.Time;
-        return new DeclaredQualifierMeta.TemporalUnit(value, dimension);
+
+        // Composite basis: '+'-separated component list, lenient whitespace per component.
+        // Malformed lists emit the composite-specific diagnostics (PRE0160/0161/0162).
+        var seen = new HashSet<TemporalUnits.TemporalUnitEntry>();
+        var hadError = false;
+        foreach (var raw in trimmed.Split('+'))
+        {
+            var part = raw.Trim();
+            if (part.Length == 0)
+            {
+                ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.EmptyCompositeBasisComponent, valueSpan));
+                hadError = true;
+                continue;
+            }
+            if (!TemporalUnits.TryGet(part, out var entry))
+            {
+                ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.UnknownCompositeBasisComponent, valueSpan, part));
+                hadError = true;
+                continue;
+            }
+            if (!seen.Add(entry))
+            {
+                ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.DuplicateCompositeBasisComponent, valueSpan, entry.Plural));
+                hadError = true;
+            }
+        }
+
+        if (hadError || seen.Count == 0)
+            return new DeclaredQualifierMeta.TemporalUnit(value, PeriodDimension.Any);
+
+        // Canonicalize: coarse-to-fine order (AllEntries is already declared in that order),
+        // plural component names, single space around each '+'. Combined dimension spans
+        // both classes → Datetime (a return-only dimension, never a declarable 'of' constraint).
+        var components = ImmutableArray.CreateBuilder<string>(seen.Count);
+        var hasDate = false;
+        var hasTime = false;
+        foreach (var entry in TemporalUnits.AllEntries)
+        {
+            if (!seen.Contains(entry)) continue;
+            components.Add(entry.Plural);
+            if (entry.IsCalendarBased) hasDate = true; else hasTime = true;
+        }
+
+        var dimension = (hasDate, hasTime) switch
+        {
+            (true, true)  => PeriodDimension.Datetime,
+            (true, false) => PeriodDimension.Date,
+            _             => PeriodDimension.Time,
+        };
+        return new DeclaredQualifierMeta.TemporalUnit(string.Join(" + ", components), dimension)
+        {
+            Components = components.ToImmutable(),
+        };
     }
 
     /// <summary>

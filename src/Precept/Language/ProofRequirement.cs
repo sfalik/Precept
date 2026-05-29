@@ -72,6 +72,14 @@ public enum PeriodDimension
     Date,
     /// <summary>Must be a time-level dimension (hour, minute, second).</summary>
     Time,
+    /// <summary>
+    /// Spans both date and time components — the dimension a composite period basis
+    /// (e.g. <c>'days + hours'</c>) reports. Return/comparison value only: it is what
+    /// <c>.dimension</c> returns and what <c>when X.dimension == 'datetime'</c> compares
+    /// against. It is NOT a declarable <c>of</c> constraint — <c>period of 'datetime'</c>
+    /// admits all components and so proves nothing, and stays a QualifierMismatch.
+    /// </summary>
+    Datetime,
 }
 
 /// <summary>

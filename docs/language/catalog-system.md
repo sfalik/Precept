@@ -285,7 +285,7 @@ flowchart TB
     end
 
     subgraph L4["④ Failure modes"]
-        Diagnostics["Diagnostics (159)"]
+        Diagnostics["Diagnostics (162)"]
         Faults["Faults (15)"]
     end
 

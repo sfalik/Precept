@@ -244,9 +244,10 @@ public static partial class ProofEngine
         DeclaredQualifierMeta.TemporalUnit tu  => tu.UnitName,
         DeclaredQualifierMeta.TemporalDimension td => td.Value switch
         {
-            PeriodDimension.Date => "date",
-            PeriodDimension.Time => "time",
-            _                    => null,   // PeriodDimension.Any cannot satisfy chain comparisons
+            PeriodDimension.Date     => "date",
+            PeriodDimension.Time     => "time",
+            PeriodDimension.Datetime => "datetime",
+            _                        => null,   // PeriodDimension.Any cannot satisfy chain comparisons
         },
         DeclaredQualifierMeta.CompoundPrice cp => $"{cp.CurrencyCode}/{cp.UnitCode}",
         _                                      => null,

@@ -604,6 +604,7 @@ public static partial class ProofEngine
             {
                 PeriodDimension.Date => "date",
                 PeriodDimension.Time => "time",
+                PeriodDimension.Datetime => "datetime",
                 PeriodDimension.Any => "any",
                 _ => temporalDimension.Value.ToString()
             },

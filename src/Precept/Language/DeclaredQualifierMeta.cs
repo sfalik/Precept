@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 namespace Precept.Language;
 
 public enum QualifierOrigin
@@ -77,7 +79,18 @@ public abstract record DeclaredQualifierMeta(
         TokenKind? Preposition = TokenKind.In,
         ProofSatisfaction[]? ProofSatisfactions = null,
         string? SourceFieldName = null)
-        : DeclaredQualifierMeta(QualifierAxis.TemporalUnit, Origin, Preposition, ProofSatisfactions, SourceFieldName);
+        : DeclaredQualifierMeta(QualifierAxis.TemporalUnit, Origin, Preposition, ProofSatisfactions, SourceFieldName)
+    {
+        /// <summary>
+        /// The ordered, canonical (coarse-to-fine) period basis component atoms — e.g.
+        /// <c>["hours", "minutes"]</c> for <c>period in 'hours + minutes'</c>. A single-basis
+        /// declaration is a one-element array. <see cref="DeclaredQualifierMeta.TemporalUnit.UnitName"/>
+        /// is the canonical joined string (<c>"hours + minutes"</c>) and remains the value
+        /// single-atom consumers read. Defaults to a one-element array of <c>UnitName</c> so
+        /// existing single-basis construction sites need no change.
+        /// </summary>
+        public ImmutableArray<string> Components { get; init; } = ImmutableArray.Create(UnitName);
+    }
 
     /// <summary>
     /// Resolved from a compound <c>in 'currency/unit'</c> typed constant on a <c>price</c> field.

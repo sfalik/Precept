@@ -399,4 +399,28 @@ public enum DiagnosticCode
     /// widen the field's bounds) so compilation continues.
     /// </summary>
     UnsatisfiableRule = 159,
+
+    /// <summary>
+    /// PRE0160 — A composite period basis names the same component twice. A
+    /// <c>period in '...'</c> basis with a <c>+</c>-separated list repeats an atom
+    /// (e.g. <c>'hours + minutes + hours'</c>). The components are individually valid
+    /// but the list is not a set; the duplicate is reported by name.
+    /// </summary>
+    DuplicateCompositeBasisComponent = 160,
+
+    /// <summary>
+    /// PRE0161 — A composite period basis names an unrecognized component. A
+    /// <c>+</c>-separated basis list contains a token that is not a known period basis
+    /// atom (year/month/week/day/hour/minute/second) — e.g. <c>'years + fortnights'</c>.
+    /// Distinct from <c>QualifierMismatch</c>, which reports a recognized atom that is
+    /// illegal for the field's type or source operation; this is an unknown atom.
+    /// </summary>
+    UnknownCompositeBasisComponent = 161,
+
+    /// <summary>
+    /// PRE0162 — A composite period basis has an empty component. A leading, trailing,
+    /// or doubled <c>+</c> separator leaves a missing segment (<c>'years +'</c>,
+    /// <c>'+ months'</c>, <c>'years + + days'</c>). The basis string is malformed.
+    /// </summary>
+    EmptyCompositeBasisComponent = 162,
 }

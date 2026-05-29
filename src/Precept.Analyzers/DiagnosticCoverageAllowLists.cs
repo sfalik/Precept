@@ -212,6 +212,9 @@ internal static class DiagnosticCoverageAllowLists
         "UnsatisfiableGuard",
         "VacuousRule",
         "ZeroConstructionRows",
+        "DuplicateCompositeBasisComponent",
+        "UnknownCompositeBasisComponent",
+        "EmptyCompositeBasisComponent",
 
         // ── MCP tooling backstop ─────────────────────────────────────────────────
         // McpToolInternalError is exercised by tests in test/Precept.Mcp.Tests/ that

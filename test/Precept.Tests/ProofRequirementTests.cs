@@ -139,9 +139,12 @@ public class ProofRequirementTests
     // ── PeriodDimension enum ────────────────────────────────────────────────────
 
     [Fact]
-    public void PeriodDimension_HasThreeValues()
+    public void PeriodDimension_HasFourValues()
     {
-        Enum.GetValues<PeriodDimension>().Should().HaveCount(3);
+        // Any, Date, Time, plus Datetime — the return-only dimension reported by a
+        // composite basis spanning both date and time components (e.g. 'days + hours').
+        Enum.GetValues<PeriodDimension>().Should().HaveCount(4);
+        Enum.IsDefined(PeriodDimension.Datetime).Should().BeTrue();
     }
 
     // ── DU completeness ─────────────────────────────────────────────────────────
