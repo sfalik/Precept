@@ -400,13 +400,14 @@ Time units (`s`, `min`, `h`, `d`) are excluded from the `quantity` category syst
 
 `period of 'date'` and `period of 'time'` replace the temporal design's `dateonly` and `timeonly` constraint suffixes with the same general `of` mechanism. The `of` value is a `dimension` from the temporal partition — the same type used for UCUM dimensions on `quantity`, unified under a single partitioned registry. The proof semantics are identical — the compiler uses the dimension to verify that `time ± period` and `date ± period` are safe.
 
-`of` accepts only the three dimension-class atoms (`'date'`, `'time'`, `'datetime'`); composite syntax (`+` separator) is not valid on `of` — it constrains the dimension category, not the decomposition basis. `period of 'date + time'` emits `QualifierMismatch`; use `period of 'datetime'`.
+`of` accepts only the two constraint dimensions `'date'` and `'time'` — the dimensions whose single-class guarantee `date ± period` / `time ± period` arithmetic depends on. Composite syntax (`+` separator) is not valid on `of`; it constrains the dimension category, not the decomposition basis. Both `period of 'date + time'` and `period of 'datetime'` emit `QualifierMismatch`: `'datetime'` admits all components and so guarantees nothing a constraint could prove — it is identical to leaving `of` off. For a period that legitimately spans both date and time components, leave `of` off; such a period is usable in `datetime ± period` arithmetic (which accepts all components, needs no constraint) but not in `date ±` / `time ±` (which require the single-class proof). `'datetime'` remains a valid `.dimension` **return** value — see the accessor table — but it is not a declarable `of` constraint.
 
 | Temporal dimension | Admitted components | Replaces | NodaTime safety guarantee |
 |---|---|---|---|
 | `'date'` | years, months, weeks, days | `dateonly` | `LocalDate.Plus(Period)` throws on time components |
 | `'time'` | hours, minutes, seconds | `timeonly` | `LocalTime.Plus(Period)` throws on date components |
-| `'datetime'` | all components | (new) | `LocalDateTime.Plus(Period)` accepts all |
+
+(`'datetime'` is deliberately absent — it would admit all components, providing no proof, so it is not a valid `of` constraint. A both-spanning period is left unconstrained. `'datetime'` appears only as a `.dimension` return value for composite/both-spanning periods.)
 
 ### Bounds qualification rules
 
@@ -786,7 +787,7 @@ field AllowedDimension as dimension optional
 | Partition | Valid values | Used by |
 |-----------|-------------|--------|
 | UCUM (physical) | `'mass'`, `'length'`, `'volume'`, `'area'`, `'temperature'`, `'energy'`, `'pressure'` | `quantity.dimension`, `unitofmeasure.dimension`, `quantity of '...'` |
-| Temporal | `'date'`, `'time'`, `'datetime'` | `period.dimension`, `period of '...'` |
+| Temporal | `'date'`, `'time'` (constraints + returns); `'datetime'` (return-only) | `period.dimension` returns any of the three; `period of '...'` accepts only `'date'` / `'time'` (`'datetime'` is not a declarable constraint — it would prove nothing) |
 
 The type checker enforces partition correctness: `quantity.dimension == 'date'` is a compile error because `'date'` is not in the UCUM partition. `period.dimension == 'mass'` is a compile error because `'mass'` is not in the temporal partition. Cross-type comparison `quantity.dimension == period.dimension` is a compile error — different partitions are never equal.
 
@@ -1223,7 +1224,7 @@ Discrete equality narrowing plugs into the existing guard-narrowing pipeline fro
 | `quantity` | `.unit` | `unitofmeasure` | Specific UCUM unit |
 | `quantity` | `.dimension` | `dimension` | UCUM dimension category |
 | `period` | `.basis` | `string` | Canonical basis name from the field's `in` constraint (e.g., `'hours'`, `'hours + minutes'`), always in canonical coarse-to-fine order with spaced `+`. For open periods (no `in` constraint), returns the runtime decomposition basis — the canonical string of every component with a non-zero value at access time; zero-valued components are omitted (a `Period(Years: 2, Months: 0, Days: 5)` value returns `'years + days'`). NodaTime lowering: computed from which `PeriodUnits` flags are non-zero in the `Period` value |
-| `period` | `.dimension` | `dimension` | Temporal dimension: `'date'`, `'time'`, or `'datetime'`. Date bases: `years`, `months`, `weeks`, `days`. Time bases: `hours`, `minutes`, `seconds`, `milliseconds`, `nanoseconds`, `ticks`. Multi-basis periods spanning both date and time components (e.g., `'days + hours'`) return `'datetime'`. NodaTime lowering: computed from `HasDateComponent` / `HasTimeComponent` boolean properties |
+| `period` | `.dimension` | `dimension` | Temporal dimension: `'date'`, `'time'`, or `'datetime'`. Date bases: `years`, `months`, `weeks`, `days`. Time bases: `hours`, `minutes`, `seconds`. Multi-basis periods spanning both date and time components (e.g., `'days + hours'`) return `'datetime'` (a return-only dimension — not a declarable `of` constraint). NodaTime lowering: computed from `HasDateComponent` / `HasTimeComponent` boolean properties |
 | `price` | `.currency` | `currency` | Numerator currency |
 | `price` | `.unit` | `unitofmeasure` | Denominator unit |
 | `price` | `.dimension` | `dimension` | Denominator unit dimension category |
@@ -2033,7 +2034,7 @@ Parse failure returns a `QualifierMismatch`/`DimensionCategoryMismatch` diagnost
 
 ### Language server changes
 
-- Completions: ISO 4217 codes after `money in '`, UCUM unit names after `quantity in '`, UCUM dimension names after `quantity of '` and `dimension` field assignment, temporal dimension names (`date`/`time`/`datetime`) after `period of '`, period unit atoms after `period in '`.
+- Completions: ISO 4217 codes after `money in '`, UCUM unit names after `quantity in '`, UCUM dimension names after `quantity of '` and `dimension` field assignment, temporal constraint dimensions (`date`/`time` only — not `datetime`, which is return-only) after `period of '`, period unit atoms after `period in '`.
 - Diagnostics: cross-currency arithmetic errors, unit mismatch errors, invalid period basis for source type, `in`/`of` mutual exclusivity violation, dimension mismatch on `of` fields, duration-vs-variable-length-denominator errors.
 
 ### TextMate grammar changes

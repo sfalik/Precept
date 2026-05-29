@@ -948,6 +948,10 @@ Exit: all 12 design acceptance criteria pass; PR mergeable.
 **Goal**: `MapTemporalUnitQualifier` accepts and canonicalizes composite bases; malformed bases emit the three new diagnostics.
 
 **Steps**:
+0. **Close the pre-existing `PeriodDimension.Datetime` gap** (specced `(new)` in `business-domain-types.md` but never built). Add `Datetime` to the `PeriodDimension` enum (`src/Precept/Language/ProofRequirement.cs:66`). Wire it as a **return/comparison value only** — NOT as an `of`-acceptable input:
+   - `.dimension` accessor return + the combined-dimension computation in step 2 produce `Datetime` for both-spanning periods.
+   - `ExtractComparableValue` / proof-marker arms (`src/Precept/Pipeline/ProofEngine.Qualifiers.cs:247`) map `Datetime → "datetime"` so `when X.dimension == 'datetime'` narrows.
+   - **Do NOT** add a `"datetime"` arm to `MapTemporalDimensionQualifier` (`TypeChecker.cs:377`): `period of 'datetime'` stays a `QualifierMismatch` (vacuous constraint — admits all components, proves nothing). The current rejection is correct and unchanged.
 1. Extend `DeclaredQualifierMeta.TemporalUnit` (`src/Precept/Language/DeclaredQualifierMeta.cs:75`) to carry an ordered component set (e.g., `ImmutableArray<string> Components` + the existing `UnitName` retained as the canonical joined string for back-compat with single-basis consumers, or `UnitName` becomes the canonical composite string). Single-component stays a one-element set.
 2. Rewrite `MapTemporalUnitQualifier` (`src/Precept/Pipeline/TypeChecker.cs:393`): split the value on `+` with whitespace trimming per component; for each component call `TemporalUnits.TryGet`; detect duplicate (PRE0160), unknown atom (PRE0161), empty segment (PRE0162); canonicalize to coarse-to-fine order; compute combined `PeriodDimension` (date-only → Date, time-only → Time, mixed → Datetime).
 3. Add `DuplicateCompositeBasisComponent`, `UnknownCompositeBasisComponent`, `EmptyCompositeBasisComponent` to `DiagnosticCode.cs` (next free: PRE0160–0162); add factory entries to `Diagnostics.cs` with `FixHint`/`TriggerCondition`/`RecoverySteps`/`ExampleBefore`/`ExampleAfter`; wire emission at the `MapTemporalUnitQualifier` sites; register in `DiagnosticCoverageAllowLists.cs` only if any path lacks an emission site (expectation: all three emit, so no allow-list entry).
@@ -1011,12 +1015,13 @@ Exit: all 12 design acceptance criteria pass; PR mergeable.
 ## Discovered during planning
 
 The D4 amendment is an in-place spec edit (not a `/lifecycle-2-design` doc with `sources-consulted` frontmatter), so the code surface was mapped during this planning pass rather than enumerated at design time. Files the build will touch, none a design oversight:
+- `src/Precept/Language/ProofRequirement.cs` — add `PeriodDimension.Datetime` (return/comparison value; pre-existing specced-but-unbuilt gap)
 - `src/Precept/Language/DeclaredQualifierMeta.cs` — `TemporalUnit` shape extension
-- `src/Precept/Pipeline/TypeChecker.cs` — `MapTemporalUnitQualifier`
+- `src/Precept/Pipeline/TypeChecker.cs` — `MapTemporalUnitQualifier` (composite parse + combined dimension); `MapTemporalDimensionQualifier` is **not** touched (`of 'datetime'` stays rejected)
 - `src/Precept/Language/DiagnosticCode.cs`, `Diagnostics.cs` — 3 new codes + factories
 - `src/Precept.Analyzers/DiagnosticCoverageAllowLists.cs` — only if an emission gap exists
 - `src/Precept/Language/Types.cs` — `.basis`/`.dimension` accessors
-- `src/Precept/Pipeline/ProofEngine.Qualifiers.cs`, `ProofEngine.cs`, `ProofEngine.Strategies.cs` — single-atom-assumption audit
+- `src/Precept/Pipeline/ProofEngine.Qualifiers.cs`, `ProofEngine.cs`, `ProofEngine.Strategies.cs` — single-atom-assumption audit + `Datetime → "datetime"` comparison mapping
 - `src/Precept/Pipeline/TypeChecker.Expressions.cs` — period/price cancellation
 - `test/Precept.Tests/CompositePeriodBasisTests.cs` — new
 
