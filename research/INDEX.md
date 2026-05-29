@@ -65,11 +65,13 @@ If a topic has no research, that's the signal — surface a research-shaped gap 
 - [`language/expressiveness/type-system-follow-ons.md`](language/expressiveness/type-system-follow-ons.md) — follow-on questions.
 - [`language/type-checker-research-validation.md`](language/type-checker-research-validation.md) — type checker validation patterns.
 - [`architecture/compiler/context-sensitive-literal-typing-survey.md`](architecture/compiler/context-sensitive-literal-typing-survey.md) — context-sensitive literal typing.
+- [`architecture/compiler/flow-sensitive-check-placement-survey.md`](architecture/compiler/flow-sensitive-check-placement-survey.md) — where comparable systems (Roslyn nullable, Kotlin K2 FIR, Rust NLL borrowck, TypeScript CFA, occurrence typing) place flow-sensitive value-narrowing-dependent compatibility checks relative to the base type checker, and how they stage the resulting diagnostics. **Cited** — grounds the assignment-qualifier-discharge-placement (PRE0141 keep-vs-relocate) design pass; extends the pipeline-architecture, context-sensitive-literal-typing, and proof-attribution surveys.
 
 ## Proof engine, proof discharge
 
 - [`architecture/compiler/proof-engine-interval-arithmetic-survey.md`](architecture/compiler/proof-engine-interval-arithmetic-survey.md) — interval arithmetic strategies.
 - [`architecture/compiler/proof-attribution-witness-design-survey.md`](architecture/compiler/proof-attribution-witness-design-survey.md) — proof attribution / witness design.
+- [`architecture/compiler/type-proof-stage-contract-survey.md`](architecture/compiler/type-proof-stage-contract-survey.md) — how separate-proof-stage systems structure the type-checker↔verifier contract (who generates obligations, cross-stage communication, who emits diagnostics, patterns beyond VC-gen, IDE/incremental). Surveys Whiley, Dafny→Boogie, Frama-C/WP→Why3, SPARK, F*, Viper/IVL, Liquid Haskell, Rust borrowck, Roslyn nullable, Kotlin K2, GHC OutsideIn(X). **Cited** — grounds the assignment-qualifier-discharge-placement (B1 self-derive vs B2 VC-handoff) design pass and the broader type↔proof-contract direction; extends the proof-attribution, flow-sensitive-check-placement, and pipeline-architecture surveys.
 - [`language/references/static-reasoning-expansion.md`](language/references/static-reasoning-expansion.md) — static reasoning capability expansion.
 - [`philosophy/formal-spec-languages-comparators.md`](philosophy/formal-spec-languages-comparators.md) — Alloy / TLA+ / Event-B / Z notation comparison.
 

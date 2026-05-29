@@ -23,7 +23,7 @@
 | Phase 5 post-review remediation | 15 code-review findings + 3 surfaced soundness defects + cleanup | 22 | 2 (Slice 2 qualifier + dimensionless-product; Slice 4 satisfiability-attribution + reachability) | M (~1 session) | ✅ **Complete 2026-05-28** (commit `11599944` + sample-restore `332f76ac` + post-regression Slices 6–7 still local). Extra-high-effort `/code-review` on the Phase 5 spike branch surfaced 15 findings; remediated across Slice 1 (1a/1b/1c/1d direct bug fixes), Slice 3 (`PriceDenominatorInherited` `QualifierBinding` subtype wired across 5 consumer sites + PRE0137 lift from `!opComposesDimensions` gate), and Slice 5 (PRE0159 `UnsatisfiableRule` pre-pass + reachability-gated `FieldNeverSet`). Two locked designs via `/lifecycle-2-design`, now archived in `docs/Working/Archive/`. Three precept-reviewer audits cleared with remediations. A regression `/code-review` pass against the cumulative diff confirmed 0 of 15 originals survived and surfaced 3 NEW soundness defects (`BuildSiblingRejectExclusions` source-order + wildcard-row gate; `ScanRules` pair-sweep ignoring `when` guards) — fixed in Slice 6 with the guard mutual-exclusion pre-check and the source-order/wildcard checks. Slice 7 collapsed four duplicate fold-constraint sites onto a shared `FoldConstraintsInto` helper, removed dead code, cleaned doc-comment drift, downgraded `bugs.md` BUG-006 scope notes (literal-comparison sibling rejects only), and swept 6 stale narrative `# BUG-NNN` refs in samples. **7167/7167 tests pass** (was 7136 at Phase 5 close; +31 net new tests across the remediation slices). Two designs archived; `bugs.md` updated. |
 | 6 | composite period basis (F-LANG-BIZ-07) | 1 (F-LANG-BIZ-09 closed) | 2 (D6.1 sample? D6.2 runtime-lowering deferral — both resolved in the plan) | M (~2.5–3.5d) | 🟡 **Active — design locked, build planned 2026-05-28.** F-LANG-BIZ-09 closed as already-answered by `business-domain-types.md § D6`. F-LANG-BIZ-07 design locked: D4 amended `&`→`+` (commit `03dfc4da`, grounded by two internal surveys); 4 workstreams W-A–W-D detailed below. Runtime `Period.Between` lowering deferred to the runtime phase (compile-time surface only this phase). |
 | 7 | API surface solidity (typed descriptors) | ~6 | 1 | M-L | Stub — TBD |
-| 8 | Diagnostic completeness | ~7 | 3 | M | Stub — TBD |
+| 8 | Diagnostic completeness + **diagnostic-emission architecture** (DA-1 emission phase / DA-2 regularization audit / DA-3 counterexample witnesses — from the 2026-05-29 type↔proof-contract survey) | ~7 + 3 (DA) | 3 + 2 (DA) | M→L | Stub — TBD |
 | 9 | Polish + cleanup + `/lifecycle-7-audit` skill | ~20 | 4 | M | Stub — TBD |
 | 10 | Runtime gate verification | — | 0 | S | Stub — TBD |
 
@@ -1071,8 +1071,23 @@ Phase 6 is complete when: every WS exit criterion holds; `dotnet test` green; th
 - F-LANG-SPEC-12: wire OutOfRange constant-literal check or remove from spec § 3.10?
 - F-LANG-SPEC-13: NonOrderableCollectionExtreme distinct emission or consolidate?
 
-**Status**: Stub — detailed execution plan TBD pending Phase 7 completion and the 3 listed decisions.
-**Estimated effort**: M (~3 days — each diagnostic is small, but scenario-coverage matrix completion is broad).
+## Diagnostic-emission architecture (added 2026-05-29 — from the type↔proof-contract + flow-sensitive-check-placement surveys)
+
+Grounded in `research/architecture/compiler/type-proof-stage-contract-survey.md` and `flow-sensitive-check-placement-survey.md` (both `status: Cited`). These widen Phase 8 from *coverage* to *emission architecture*; all three sit within Precept's locked determinism boundary (no IVL/SMT — `proof-engine.md` opaque-solver rejection).
+
+- **DA-1 — Dedicated diagnostic-emission phase** (answers `research/architecture/README.md` open-question #2). The survey found 3 of 4 production compilers (Kotlin K2 `CHECKERS` phase, Rust MIR reporting walk, Roslyn) defer *all* diagnostic emission to one terminal phase, decoupled from where the check computes. Precept emits scattered across the type and proof stages; the Phase 6 Site-A PRE0141 Type→Proof re-stage (`docs/Working/assignment-qualifier-discharge-placement.md`) is a one-off symptom. A unified emission phase makes "which stage emits this" a non-question. **Stakes: medium (a pipeline-shape change); needs a `/lifecycle-2-design` pass.**
+- **DA-2 — Regularization audit: type-immediate checks that should be stamped obligations.** The assignment-qualifier check (Site-A) was the *lone* qualifier check done as a type-immediate emit instead of a stamped obligation (the `proof-engine.md` Decision-3 contract). Audit `DiagnosticCode.cs` / the type checker for *other* checks that are really proof obligations in disguise; regularizing them improves uniformity and may unlock narrowing/proof for them (as Site-A now does). **Small, discoverable — a grep-and-classify pass; Site-A handles its own instance in Phase 6, this finds the rest.**
+- **DA-3 — Counterexample / witness richness for unproved obligations.** Dafny/CBMC hand the author a concrete counterexample on a failed proof; Precept emits the diagnostic but not the witness. Surfacing "X could be 0 here" for an unproved obligation sharpens the domain-expert experience and is squarely in the inspectability commitment — without an external solver. **Medium; aligns with `proof-engine.md` proof-attribution.**
+- **Optional grounding (research, horizon):** a Whiley deep-dive — the closest structural analog (a language designed around a separate verification stage that self-derives, not VC/IVL) — would best inform DA-1/DA-3 if the owner wants deeper grounding before the design pass. Not a build item.
+
+(Recorded now so the survey's findings aren't lost; execution is post-Phase-6. The companion architecture-direction conclusion — *stay catalog/stamp; no VC-gen/IVL; no incremental* — is recorded in `research/architecture/README.md` open-questions #1/#2.)
+
+**Decisions required (added)**:
+- DA-1: introduce a dedicated diagnostic-emission phase, or keep per-stage emission with the Site-A-style targeted re-staging? (design pass)
+- DA-3: counterexample/witness surface — scope and shape (which obligation kinds; structured-data shape for tooling)?
+
+**Status**: Stub — detailed execution plan TBD pending Phase 7 completion and the listed decisions.
+**Estimated effort**: M→L (~3 days for the original coverage cluster; +the DA cluster — DA-2 small, DA-1/DA-3 each a design pass).
 
 ---
 
