@@ -27,8 +27,28 @@ surfaced for proper fixing.
 
 ## Active
 
+### BUG-015: reassignment-invalidation not applied to index-bounds / key-presence / field-to-field guard strategies (still over-proves)
+
+- **Discovered**: 2026-05-28 (BUG-014 follow-on; spec § 0.6 item 7 clause a).
+- **Affected**: `TryIndexBoundsProof`, `TryKeyPresenceProof`, `TryFlowNarrowingProof` (`ProofEngine.Strategies.cs`) — they pull the row guard and discharge via `ExtractGuardBranches` / raw-guard walks but do **not** consult `ProofObligation.ReassignedBefore`. So the BUG-014 class persists there: e.g. `when Idx >= 0 -> set Idx = -1 -> Log.append(Coll.at(Idx))` would still discharge the index lower-bound via the stale `Idx >= 0` guard.
+- **Symptom**: a `set`/`clear`-reassigned field's guard fact still discharges index-bounds / key-presence / field-to-field obligations after the reassignment — a live over-prove (unsound) hole, same shape as BUG-014 but in the strategies BUG-014's fix didn't cover.
+- **Root cause**: BUG-014 added the `ReassignedBefore` filter only to `TryGuardInPathProof` (numeric + presence — the confirmed/reported path). The other three strategies share the substrate exposure by construction (exposed-by-reasoning; not yet probe-confirmed).
+- **Fix complexity**: small-medium — apply the same `ReassignedBefore`-skip to the GuardConstraint-branch matches; the raw-guard walks (index upper-bound `ExtractParamUpperBoundsByBranch`, key-presence `GuardHasContainsCheck`) need the field-filter threaded through too.
+- **Priority**: blocks shipping (soundness) — but narrower/rarer than BUG-014's numeric divisor case. Deferred from the BUG-014 slice to avoid an under-tested broad change at session end; do with per-strategy probes + tests.
+- **Repro**: not yet probe-confirmed (reasoned from the shared substrate); construct an `Idx >= 0 -> set Idx = -1 -> .at(Idx)` probe when fixing.
+
+### BUG-016: collection-mutation forward-propagation — guard facts not effect-adjusted across grow/shrink
+
+- **Discovered**: 2026-05-28 (BUG-014 follow-on; spec § 0.6 item 7 clause b, "before the new assignment's facts are stored").
+- **Affected**: collection-mutation actions (`append`/`insert`/`remove`/`pop`/`dequeue`/`put`) in an action chain under a `count > 0` (or presence) guard.
+- **Symptom (two-sided)**: (1) *completeness* — a grow (`insert`/`append`) provably preserves `count > 0`, but BUG-014 deliberately doesn't track collection mutations, so a `set`-style fix can't re-establish the grown fact (no false positive today only because grows aren't treated as invalidating); (2) *latent soundness* — a shrink (`remove`/`pop`) can empty a collection, so `when count > 0 -> remove … -> <mutation needing count>0>` would discharge the second mutation via a stale `count > 0`. (`shopping-cart.precept`'s `insert`-then-`remove` is safe because the remove is last; a remove-then-mutate chain would not be.)
+- **Root cause**: spec § 0.6 item 7's forward-propagation clause (re-establish facts from the new value, effect-aware per action: grow preserves / shrink invalidates `count`/presence) is unimplemented. `ActionWriteSemantics` (`Actions.cs`) classifies establish/clear effects and is the catalog hook a real fix would derive from.
+- **Fix complexity**: design-required — effect-aware fact propagation, catalog-driven from `ActionWriteSemantics`. Overlaps the D9 design's gap A2 (forward narrowing propagation).
+- **Priority**: quality bar (the shrink-then-mutate soundness case is rare; no sample hits it). Pair with the D9 forward-propagation work.
+
 ### BUG-014: guard facts survive field reassignment — sequential-proof-flow (spec item 7) not implemented for guard narrowing
 
+- **Status**: ✅ **Fixed (numeric + presence, full-replacement) 2026-05-28.** `ProofObligation.ReassignedBefore` now carries the fields written by prior `set`/`clear` actions in the same chain (computed in `WalkActions`, `ProofEngine.cs`); `TryGuardInPathProof` skips guard constraints about those fields, so a `when X != 0` fact no longer discharges `100 / X` after `set X = 0` (and `when X is set` no longer survives `clear X`). Scope deliberately limited to **full-value-replacement** actions (`set`/`clear`): in-place collection mutations (`append`/`insert`/`remove`) transform rather than replace — blanket invalidation false-positived on `shopping-cart.precept`'s insert-then-remove (an `insert` grows the collection, so `count > 0` survives). Tests: `test/Precept.Tests/ProofEngine/ReassignmentInvalidationTests.cs` (4: divisor-reassign, no-reassign control, different-field control, presence-clear). Full suite 6433/6433. **Two follow-ons remain — see BUG-015 / BUG-016.** § 0.6 impl-status drift corrected in the same pass.
 - **Discovered**: 2026-05-28 while grounding the D9 qualifier-narrowing design (`docs/Working/d9-qualifier-narrowing-design.md`).
 - **Affected**: every guard-narrowing discharge — `TryGuardInPathProof` (numeric + presence), `TryFlowNarrowingProof` (field-to-field), `TryIndexBoundsProof`, `TryKeyPresenceProof`. All pull the row guard from `t.Row.Guard` (`ProofEngine.Strategies.cs`) and apply it to every body obligation regardless of intervening reassignment of the guarded field.
 - **Symptom**: a guard fact discharges an obligation *after* the guarded field was reassigned to a guard-violating value. Confirmed unsound divide-by-zero proof:

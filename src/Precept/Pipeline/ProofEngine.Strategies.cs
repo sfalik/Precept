@@ -663,6 +663,10 @@ public static partial class ProofEngine
             var thisBranchProved = false;
             foreach (var gc in branchConstraints)
             {
+                // Sequential proof flow (spec § 0.6 item 7): a guard fact about a field
+                // reassigned earlier in this action chain is stale — it must not discharge.
+                if (obligation.ReassignedBefore.Contains(gc.Field)) continue;
+
                 if (obligation.Requirement is NumericProofRequirement numeric)
                 {
                     if (GuardSubsumes(gc, numeric, obligation.Site)) { thisBranchProved = true; break; }

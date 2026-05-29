@@ -29,7 +29,24 @@ public sealed record ProofObligation(
     ProofStrategy? Strategy,
     DiagnosticCode? EmittedDiagnostic,
     NumericInterval? ComputedInterval = null
-);
+)
+{
+    private readonly ImmutableArray<string> _reassignedBefore = ImmutableArray<string>.Empty;
+
+    /// <summary>
+    /// Fields reassigned (written by a <c>set</c>/<c>clear</c>/collection-mutation action) earlier
+    /// in the same action chain, before this obligation's site. Per <c>precept-language-spec.md
+    /// § 0.6</c> item 7 (Sequential proof flow) — "When a field is reassigned, prior proof facts
+    /// about that field are invalidated before the new assignment's facts are stored" — a guard
+    /// fact about such a field must NOT discharge this obligation. Empty for obligations outside an
+    /// action chain (rules, ensures, field/arg defaults). IsDefault-safe (reads coalesce to Empty).
+    /// </summary>
+    public ImmutableArray<string> ReassignedBefore
+    {
+        get => _reassignedBefore.IsDefault ? ImmutableArray<string>.Empty : _reassignedBefore;
+        init => _reassignedBefore = value;
+    }
+};
 
 public abstract record ObligationContext;
 public sealed record TransitionRowContext(TypedTransitionRow Row) : ObligationContext;

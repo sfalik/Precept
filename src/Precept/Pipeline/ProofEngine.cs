@@ -388,8 +388,17 @@ public static partial class ProofEngine
     /// </summary>
     private static void WalkActions(ImmutableArray<TypedAction> actions, ObligationContext ctx, List<ProofObligation> obligations, SemanticIndex semantics)
     {
+        // Sequential proof flow (spec § 0.6 item 7): a guard fact about a field is invalidated
+        // for any obligation whose site comes AFTER that field is reassigned in the action chain.
+        // We track the prefix-write set and stamp each action's obligations with the fields
+        // written by PRIOR actions; the guard-discharge strategies then drop stale facts.
+        var writtenSoFar = ImmutableArray<string>.Empty;
+
         foreach (var action in actions)
         {
+            var reassignedBefore = writtenSoFar;
+            var start = obligations.Count;
+
             // Static obligations from action metadata (Catalog-driven)
             foreach (var req in action.ProofRequirements)
                 obligations.Add(new ProofObligation(req, CreateActionProofSite(action, req), ctx, ProofDisposition.Unresolved, null, null));
@@ -421,6 +430,27 @@ public static partial class ProofEngine
                 if (inputAction.SecondaryExpression is not null)
                     WalkExpression(inputAction.SecondaryExpression, ctx, obligations, semantics);
             }
+
+            // Stamp every obligation generated for THIS action (static + dynamic + RHS
+            // expression walk, all appended to [start..Count)) with the fields reassigned by
+            // prior actions. The action's OWN write is recorded afterward, so an obligation that
+            // reads a field this action also writes (e.g. `set X = X + 1`) still sees the pre-write
+            // guard fact — only strictly-prior reassignments invalidate.
+            if (!reassignedBefore.IsEmpty)
+                for (var i = start; i < obligations.Count; i++)
+                    obligations[i] = obligations[i] with { ReassignedBefore = reassignedBefore };
+
+            // Record this action's written field — but ONLY for full-value REPLACEMENT
+            // (`set`/`clear`). In-place collection mutations (`append`/`insert`/`remove`/…)
+            // transform rather than replace: a grow (`insert`/`append`) preserves `count > 0`,
+            // so blanket invalidation would false-positive on an insert-then-remove chain. The
+            // effect-aware reasoning for collection mutations (grow preserves, shrink may
+            // invalidate count/presence) is the separate forward-propagation concern (the second
+            // clause of spec § 0.6 item 7), tracked as a follow-on — not blanket invalidation here.
+            if (action.Kind is ActionKind.Set or ActionKind.Clear
+                && !string.IsNullOrEmpty(action.FieldName)
+                && !writtenSoFar.Contains(action.FieldName))
+                writtenSoFar = writtenSoFar.Add(action.FieldName);
         }
     }
 
