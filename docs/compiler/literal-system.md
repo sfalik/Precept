@@ -220,7 +220,7 @@ Given the context-determined type, the content must parse as a valid value of th
 | `period` | `NodaTimeValidation` | Temporal quantity or ISO period | `'30 days'`, `'P30D'` |
 | `currency` | `ClosedSetValidation` | ISO 4217 alpha code | `'USD'`, `'EUR'` |
 | `unitofmeasure` | `UcumValidation` | UCUM expression | `'kg'`, `'mg/dL'`, `'each'` |
-| `dimension` | `ClosedSetValidation` | Curated dimension name | `'mass'`, `'length'` |
+| `dimension` | `ClosedSetValidation` (partition-selected) | Curated dimension name — **partitioned** (see below) | `'mass'`, `'length'`, `'date'` |
 | `money` | `MoneyValidation` | `<amount> <currency>` | `'100 USD'`, `'50.25 EUR'` |
 | `quantity` | `QuantityValidation` | `<magnitude> <unit>` | `'5 kg'`, `'24 each'` |
 | `price` | `PriceValidation` | `<amount> <currency>/<unit>` | `'4.17 USD/each'` |
@@ -228,6 +228,11 @@ Given the context-determined type, the content must parse as a valid value of th
 | `stateref` | none — name binding | Plain identifier validated against declared state names | `'Open'`, `'UnderReview'` |
 
 **Content validation is compile-time first.** Static typed constants are validated during checking. Interpolated typed constants are typed at compile time, then re-parsed after substitution using the same domain parsers when the interpolated value is materialized.
+
+**Context-dependent content validation.** Two types validate against a context-selected set rather than a single global registry:
+
+- **`stateref`** — validated by the name binder against the declared state names, not by a domain parser (see the structural-fallback note below).
+- **`dimension`** — partitioned by the type the literal is observed on. A `dimension` typed constant compared against a `.dimension` accessor validates against the partition that accessor declares: a physical measurement (`quantity` / `unitofmeasure` / `price`) names a **UCUM** physical-dimension family (`mass`, `length`, …); a `period` names a **temporal** category (`date`, `time`, `datetime`). The two registries are disjoint except for the spelling `time`, which the partition disambiguates (UCUM physical time vs. temporal time). A value drawn from the wrong partition is a compile error (`InvalidDimensionString`). Partition selection is **catalog metadata** — the `.dimension` accessor carries a `DimensionPartition` tag that the type checker reads — not a per-type identity switch. The partition reaches validation through the dispatcher's existing `targetType`/`context` pass: `TypedConstantContext.DimensionPartition` selects the partition-specific `ClosedSetValidation`, leaving the context-free `ClosedSetValidator.Validate` contract unchanged. See [`business-domain-types.md` § dimension](../language/business-domain-types.md) for the partitioned-registry model.
 
 **Structural fallback:** if `TypeMeta.ContentValidation` is null, the typed constant is accepted as raw text for that type. `stateref` is the deliberate exception: it is validated by the name binder against declared state names, not by a domain parser.
 

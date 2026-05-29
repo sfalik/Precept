@@ -57,6 +57,25 @@ public enum QualifierAxis
     PriceIn,
 }
 
+/// <summary>
+/// The registry a <c>dimension</c>-typed value validates against. A <c>dimension</c> typed
+/// constant is partitioned by the parent type it is observed on: a physical measurement
+/// (quantity / unitofmeasure / price) names a UCUM physical-dimension family
+/// (<c>mass</c>, <c>length</c>, …), while a <c>period</c>'s dimension names a temporal
+/// category (<c>date</c>, <c>time</c>, <c>datetime</c>). The two registries are disjoint
+/// except for the surface spelling <c>time</c>, which the partition disambiguates
+/// (UCUM physical time vs. temporal time). A value drawn from the wrong partition is a
+/// compile error. Declared on the <c>.dimension</c> accessor so partition selection is
+/// catalog metadata, not a per-type identity switch.
+/// </summary>
+public enum DimensionPartition
+{
+    /// <summary>UCUM physical-dimension families (mass, length, volume, …).</summary>
+    Ucum = 1,
+    /// <summary>Temporal dimension categories (date, time, datetime).</summary>
+    Temporal = 2,
+}
+
 // ── QualifierShape ─────────────────────────────────────────────────────────────
 
 /// <summary>
@@ -121,6 +140,11 @@ public record TypeAccessor(
 /// recognition surface in modifier-value position (e.g., `currency.minorUnit` in
 /// `maxplaces`); when false (the default), the accessor is invalid in modifier-value
 /// position even if its return type matches the modifier's value contract.
+/// <see cref="DimensionPartition"/> declares which dimension registry a comparison
+/// against this accessor's result validates against (set only on <c>.dimension</c>
+/// accessors). It lets partition selection be catalog metadata rather than a per-type
+/// identity switch: the type checker reads the partition off the accessor the literal
+/// is compared against. Null on every non-dimension accessor.
 /// </summary>
 public sealed record FixedReturnAccessor(
     string        Name,
@@ -131,7 +155,8 @@ public sealed record FixedReturnAccessor(
     TypeTrait     RequiredTraits   = TypeTrait.None,
     ProofRequirement[]? ProofRequirements = null,
     QualifierAxis ReturnsQualifier = QualifierAxis.None,
-    bool          UseInModifierValueContext = false
+    bool          UseInModifierValueContext = false,
+    DimensionPartition? DimensionPartition = null
 ) : TypeAccessor(Name, Description, ParameterType, RequiredTraits, ProofRequirements);
 
 /// <summary>

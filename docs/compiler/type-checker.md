@@ -871,6 +871,14 @@ When resolving member access or method call expressions, the return type and par
 
 For method call expressions (accessor with parameters), validate the argument type against `paramType`. If `paramType` is null, the accessor is property-style — a call syntax `field.accessor()` emits a diagnostic.
 
+#### Accessor qualifier-axis metadata (`ReturnsQualifier`)
+
+A `FixedReturnAccessor` may declare `ReturnsQualifier`, the qualifier axis its result carries. `.currency` returns the `Currency` axis, `.unit` the `Unit` axis, `.from`/`.to` the `FromCurrency`/`ToCurrency` axes, and the `.dimension` accessors carry the dimension axis — `Dimension` for `quantity`/`unitofmeasure`/`price`, `TemporalDimension` for `period`. This metadata is consumed by the proof engine (qualifier resolution), the language-server hover (resolving the axis on the accessor's owner), and the interpolation-slot resolver (`SlotAccessorCanResolveAxis`), so an accessor that newly declares an axis activates those consumers for that accessor. The `period .basis` accessor returns `String` and deliberately carries **no** axis (`None`) — it is a discrete-string accessor, not a qualifier-axis accessor.
+
+#### Partition-aware dimension-literal validation
+
+A `dimension` typed constant is **partitioned by the type it is observed on**: a physical measurement names a UCUM physical-dimension family (`mass`, `length`, …); a `period` names a temporal category (`date`, `time`, `datetime`). The two registries are disjoint except for the spelling `time`, which the partition disambiguates. When the type checker validates a `dimension` literal compared against a `.dimension` accessor, it selects the partition from that accessor's catalog-declared `DimensionPartition` tag and validates the literal against the partition's closed set — so `period.dimension == 'date'` compiles, while `quantity.dimension == 'date'` is a cross-partition compile error (`InvalidDimensionString`). Partition **selection** is catalog metadata read off the accessor, **not** a per-`TypeKind` identity switch (consistent with the F-TC-04 removal below); partition **membership** is the UCUM `DimensionCatalog` plus the temporal set `{date, time, datetime}`. The partition reaches validation through the dispatcher's existing `targetType`/`context` pass (`TypedConstantContext.DimensionPartition`), leaving the context-free `ClosedSetValidator.Validate` contract unchanged. The `of`-constraint path (`period of 'date'|'time'`, `datetime` rejected) is unaffected — it resolves through `MapTemporalDimensionQualifier`, a separate path. See [`literal-system.md`](literal-system.md) (context-dependent content validation) and [`business-domain-types.md` § dimension](../language/business-domain-types.md).
+
 ### Identifier Resolution Priority
 
 When resolving an identifier expression, check scopes in this order:

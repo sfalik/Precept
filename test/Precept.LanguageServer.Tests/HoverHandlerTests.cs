@@ -311,6 +311,45 @@ state Draft initial
     }
 
     [Fact]
+    public void Hover_OnDerivedDimensionField_RendersWithoutRegression()
+    {
+        // The .dimension accessors now carry a qualifier axis (Dimension / TemporalDimension),
+        // which activates the accessor-axis arm of the hover's qualifier resolver
+        // (ResolveQualifierFromExpression). Hovering a field whose value derives from a
+        // quantity .dimension accessor must render without throwing or mis-resolving.
+        const string source = """
+            precept DimensionHover
+            field Weight as quantity in 'kg'
+            field WeightDim as dimension <- Weight.dimension
+            state Draft initial
+            """;
+
+        var markup = GetHoverMarkdown(source, "WeightDim as dimension");
+
+        markup.Should().Contain("WeightDim");
+        markup.Should().Contain("Weight");
+    }
+
+    [Fact]
+    public void Hover_OnDerivedPeriodDimensionField_RendersWithoutRegression()
+    {
+        // The period .dimension accessor carries the TemporalDimension axis; the hover's
+        // accessor-axis arm now fires for it. Hovering a field deriving from period .dimension
+        // must render without regression.
+        const string source = """
+            precept PeriodDimensionHover
+            field Grace as period of 'date'
+            field GraceDim as dimension <- Grace.dimension
+            state Draft initial
+            """;
+
+        var markup = GetHoverMarkdown(source, "GraceDim as dimension");
+
+        markup.Should().Contain("GraceDim");
+        markup.Should().Contain("Grace");
+    }
+
+    [Fact]
     public void Hover_OnStoredField_ShowsMutabilityGovernanceAndResolvedQualifiers()
     {
         var markup = GetHoverMarkdown(HoverV3Source, "Price as money");

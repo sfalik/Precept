@@ -69,13 +69,14 @@ internal static partial class TypeChecker
         ParsedExpression expr,
         CheckContext ctx,
         TypeKind? expectedType = null,
-        ImmutableArray<DeclaredQualifierMeta>? qualifiers = null) => expr switch
+        ImmutableArray<DeclaredQualifierMeta>? qualifiers = null,
+        DimensionPartition? dimensionPartition = null) => expr switch
     {
         // ── Missing sentinel → error + lightweight TC diagnostic to satisfy D26 ──
         MissingExpression m => ResolveMissing(m, ctx),
 
         // ── Literal ──
-        LiteralExpression lit => ResolveLiteral(lit, ctx, expectedType, qualifiers),
+        LiteralExpression lit => ResolveLiteral(lit, ctx, expectedType, qualifiers, dimensionPartition),
 
         // ── Identifier (field, arg, or quantifier binding) ──
         IdentifierExpression id => ResolveIdentifier(id, ctx),
@@ -140,7 +141,8 @@ internal static partial class TypeChecker
         LiteralExpression lit,
         CheckContext ctx,
         TypeKind? expectedType,
-        ImmutableArray<DeclaredQualifierMeta>? qualifiers)
+        ImmutableArray<DeclaredQualifierMeta>? qualifiers,
+        DimensionPartition? dimensionPartition = null)
     {
         if (expectedType == TypeKind.Choice && IsChoiceLiteralToken(lit.LiteralKind))
             return ResolveChoiceLiteral(lit);
@@ -153,7 +155,7 @@ internal static partial class TypeChecker
             TokenKind.NumberLiteral => ResolveNumericLiteral(lit, expectedType),
 
             // Typed constants: resolve with content validation from expectedType context
-            TokenKind.TypedConstant      => ResolveTypedConstant(lit, ctx, expectedType, qualifiers),
+            TokenKind.TypedConstant      => ResolveTypedConstant(lit, ctx, expectedType, qualifiers, dimensionPartition),
 
             // TypedConstantStart is now handled by InterpolatedTypedConstantExpression dispatch;
             // if it still appears as a bare LiteralExpression, treat as error
@@ -224,7 +226,8 @@ internal static partial class TypeChecker
         LiteralExpression lit,
         CheckContext ctx,
         TypeKind? expectedType,
-        ImmutableArray<DeclaredQualifierMeta>? qualifiers)
+        ImmutableArray<DeclaredQualifierMeta>? qualifiers,
+        DimensionPartition? dimensionPartition = null)
     {
         var rawText = lit.Text;
 
@@ -248,8 +251,8 @@ internal static partial class TypeChecker
         if (cv is null)
             return new TypedTypedConstant(targetType, rawText, rawText, null, lit.Span);
 
-        var typedConstantContext = qualifiers is not null
-            ? new TypedConstantContext(DeclaredQualifiers: qualifiers)
+        var typedConstantContext = qualifiers is not null || dimensionPartition is not null
+            ? new TypedConstantContext(DeclaredQualifiers: qualifiers, DimensionPartition: dimensionPartition)
             : null;
         var result = TypedConstantValidation.Validate(cv, rawText, targetType, typedConstantContext);
 
@@ -535,7 +538,7 @@ internal static partial class TypeChecker
 
         if (rightNeedsContext && !leftNeedsContext)
         {
-            var retried = Resolve(bin.Right, ctx, left.ResultType);
+            var retried = Resolve(bin.Right, ctx, left.ResultType, dimensionPartition: DimensionPartitionOf(left));
             if (retried is not TypedErrorExpression && retried.ResultType != right.ResultType)
             {
                 var result = TryResolveBinaryWithWidening(opMeta.Kind, left.ResultType, retried.ResultType);
@@ -548,7 +551,7 @@ internal static partial class TypeChecker
 
         if (leftNeedsContext && !rightNeedsContext)
         {
-            var retried = Resolve(bin.Left, ctx, right.ResultType);
+            var retried = Resolve(bin.Left, ctx, right.ResultType, dimensionPartition: DimensionPartitionOf(right));
             if (retried is not TypedErrorExpression && retried.ResultType != left.ResultType)
             {
                 var result = TryResolveBinaryWithWidening(opMeta.Kind, retried.ResultType, right.ResultType);
@@ -561,6 +564,18 @@ internal static partial class TypeChecker
 
         return null;
     }
+
+    /// <summary>
+    /// The dimension partition declared by the accessor a typed constant is compared against,
+    /// or null when the peer is not a partitioned <c>.dimension</c> accessor. A dimension typed
+    /// constant validates against the partition of the accessor it is compared with — a temporal
+    /// category for <c>period.dimension</c>, a UCUM family for quantity/uom/price. The partition
+    /// is read off catalog metadata, never derived from a per-type identity switch.
+    /// </summary>
+    private static DimensionPartition? DimensionPartitionOf(TypedExpression peer) =>
+        peer is TypedMemberAccess { ResolvedAccessor: FixedReturnAccessor { DimensionPartition: { } partition } }
+            ? partition
+            : null;
 
     private static bool NeedsContextRetry(ParsedExpression expression) => expression is LiteralExpression { LiteralKind: TokenKind.TypedConstant }
         or InterpolatedTypedConstantExpression;
@@ -886,8 +901,12 @@ internal static partial class TypeChecker
                 .ToList();
             rightContext = distinctRhsTypes.Count == 1 ? distinctRhsTypes[0] : left.ResultType;
         }
+        // A dimension typed constant validates against the partition declared by the
+        // accessor it is compared with (UCUM physical family vs. temporal category), so
+        // the RHS resolution carries the left peer's partition. Threaded on the proactive
+        // pass so the literal is validated against the right registry on first resolution.
         var right = rightContext.HasValue
-            ? Resolve(bin.Right, ctx, rightContext.Value)
+            ? Resolve(bin.Right, ctx, rightContext.Value, dimensionPartition: DimensionPartitionOf(left))
             : Resolve(bin.Right, ctx);
 
         // Symmetric: retry left-side typed/interpolated typed constants with right's type as context.
@@ -898,7 +917,7 @@ internal static partial class TypeChecker
             // Remove the stale unresolved-type diagnostic from the failed initial resolution.
             if (leftDiagEnd > leftDiagStart)
                 ctx.Diagnostics.RemoveRange(leftDiagStart, leftDiagEnd - leftDiagStart);
-            left = Resolve(bin.Left, ctx, right.ResultType);
+            left = Resolve(bin.Left, ctx, right.ResultType, dimensionPartition: DimensionPartitionOf(right));
         }
 
         // D13: ErrorType propagation — if either operand is error, propagate

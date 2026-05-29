@@ -1086,6 +1086,37 @@ public class TypeCheckerAssignmentQualifierTests
             .Should().BeOfType<TypedInputAction>().Which.InputExpression;
     }
 
+    // ════════════════════════════════════════════════════════════════════════
+    //  Interpolation-slot axis resolution: adding ReturnsQualifier to .dimension
+    //  activates the SlotAccessorCanResolveAxis consumer for the dimension axes.
+    //  A dimension slot must resolve; a non-dimension slot must not mis-resolve.
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Theory]
+    // The .dimension accessors now carry a qualifier axis, so a dimension-targeting slot resolves.
+    [InlineData(QualifierAxis.Dimension, QualifierAxis.Dimension, true)]
+    [InlineData(QualifierAxis.TemporalDimension, QualifierAxis.TemporalDimension, true)]
+    // A unit accessor still resolves a dimension slot (unit determines dimension) — unchanged.
+    [InlineData(QualifierAxis.Unit, QualifierAxis.Dimension, true)]
+    [InlineData(QualifierAxis.Unit, QualifierAxis.Unit, true)]
+    // A dimension accessor must NOT mis-resolve a currency / unit / temporal-unit slot.
+    [InlineData(QualifierAxis.Dimension, QualifierAxis.Currency, false)]
+    [InlineData(QualifierAxis.Dimension, QualifierAxis.Unit, false)]
+    [InlineData(QualifierAxis.TemporalDimension, QualifierAxis.Currency, false)]
+    [InlineData(QualifierAxis.TemporalDimension, QualifierAxis.Dimension, false)]
+    // The basis accessor carries no axis (None) and must never resolve a slot.
+    [InlineData(QualifierAxis.None, QualifierAxis.Dimension, false)]
+    public void SlotAccessorCanResolveAxis_DimensionAxes(QualifierAxis returnsQualifier, QualifierAxis targetAxis, bool expected)
+    {
+        var method = typeof(Precept.Pipeline.TypeChecker).GetMethod(
+            "SlotAccessorCanResolveAxis",
+            BindingFlags.NonPublic | BindingFlags.Static);
+
+        method.Should().NotBeNull();
+        var result = (bool)method!.Invoke(null, new object?[] { returnsQualifier, targetAxis })!;
+        result.Should().Be(expected);
+    }
+
     private static ResolvedQualifierAxis ResolveAssignmentQualifierAxisForTest(TypedExpression value, QualifierAxis axis)
     {
         var method = typeof(Precept.Pipeline.TypeChecker).GetMethod(

@@ -129,6 +129,28 @@ public static class Types
         ["length", "mass", "count"],
         InterpolationFormsCategory: InterpolationFormsCategory.SingleComponent);
 
+    // A dimension typed-constant is partitioned by the type it is observed on: a physical
+    // measurement names a UCUM family, a period names a temporal category. The two registries
+    // are disjoint except for the spelling 'time' (UCUM physical time vs. temporal time),
+    // disambiguated by partition. See business-domain-types.md § dimension (partitioned registry).
+    private static readonly ClosedSetValidation TemporalDimensionValidation = new(
+        "temporal dimensions",
+        FrozenSet.Create(StringComparer.OrdinalIgnoreCase, "date", "time", "datetime"),
+        "Temporal dimension category",
+        ["date", "time", "datetime"],
+        InterpolationFormsCategory: InterpolationFormsCategory.SingleComponent);
+
+    /// <summary>
+    /// The closed-set validation for a <c>dimension</c> typed constant in the given partition.
+    /// Partition selection is driven by the <c>.dimension</c> accessor's catalog-declared
+    /// <see cref="DimensionPartition"/>, never a per-type identity switch.
+    /// </summary>
+    public static ClosedSetValidation DimensionValidationFor(DimensionPartition partition) => partition switch
+    {
+        DimensionPartition.Temporal => TemporalDimensionValidation,
+        _                           => DimensionValidation,
+    };
+
     private static readonly MoneyValidation MoneyLiteralValidation = new(
         "Monetary amount: <decimal> <ISO-4217>",
         ["100 USD", "50.25 EUR"]);
@@ -478,7 +500,7 @@ public static class Types
                 new FixedReturnAccessor("hasDateComponent", TypeKind.Boolean, "Has year/month/day components"),
                 new FixedReturnAccessor("hasTimeComponent", TypeKind.Boolean, "Has hour/minute/second components"),
                 new FixedReturnAccessor("basis",     TypeKind.String,    "Period basis unit name"),
-                new FixedReturnAccessor("dimension", TypeKind.Dimension, "Dimension family of the unit"),
+                new FixedReturnAccessor("dimension", TypeKind.Dimension, "Dimension family of the unit", ReturnsQualifier: QualifierAxis.TemporalDimension, DimensionPartition: DimensionPartition.Temporal),
             ],
             DisplayName: "period",
             HoverDescription: "A calendar-relative duration measured in years, months, and days. Use for business deadlines and date offsets.",
@@ -588,7 +610,7 @@ public static class Types
             [
                 new FixedReturnAccessor("amount",    TypeKind.Decimal,       "Numeric magnitude"),
                 new FixedReturnAccessor("unit",      TypeKind.UnitOfMeasure, "Unit of measure", ReturnsQualifier: QualifierAxis.Unit),
-                new FixedReturnAccessor("dimension", TypeKind.Dimension,     "Dimension family"),
+                new FixedReturnAccessor("dimension", TypeKind.Dimension,     "Dimension family", ReturnsQualifier: QualifierAxis.Dimension, DimensionPartition: DimensionPartition.Ucum),
             ],
             DisplayName: "quantity",
             HoverDescription: "A measured amount bound to a unit of measure. Use 'in kg' to pin units or 'of length' to constrain by dimension. Arithmetic enforces same-dimension rules.",
@@ -604,7 +626,7 @@ public static class Types
             ImpliedModifiers: [ModifierKind.Notempty],
             Accessors:
             [
-                new FixedReturnAccessor("dimension", TypeKind.Dimension, "Dimension family of this unit"),
+                new FixedReturnAccessor("dimension", TypeKind.Dimension, "Dimension family of this unit", ReturnsQualifier: QualifierAxis.Dimension, DimensionPartition: DimensionPartition.Ucum),
             ],
             DisplayName: "unit of measure",
             HoverDescription: "A unit-of-measure identifier such as 'kg' or 'miles'. Carries notempty implicitly. Use .dimension to read the unit's dimension family.",
@@ -636,7 +658,7 @@ public static class Types
                 new FixedReturnAccessor("amount",    TypeKind.Decimal,       "Numeric amount"),
                 new FixedReturnAccessor("currency",  TypeKind.Currency,      "Currency identifier", ReturnsQualifier: QualifierAxis.Currency),
                 new FixedReturnAccessor("unit",      TypeKind.UnitOfMeasure, "Unit of measure", ReturnsQualifier: QualifierAxis.Unit),
-                new FixedReturnAccessor("dimension", TypeKind.Dimension,     "Dimension family"),
+                new FixedReturnAccessor("dimension", TypeKind.Dimension,     "Dimension family", ReturnsQualifier: QualifierAxis.Dimension, DimensionPartition: DimensionPartition.Ucum),
             ],
             DisplayName: "price",
             HoverDescription: "A monetary amount per unit — combines currency and dimension qualifiers. Use 'in USD/kg' for a specific price, or 'in USD of mass' for currency-pinned with dimension category.",

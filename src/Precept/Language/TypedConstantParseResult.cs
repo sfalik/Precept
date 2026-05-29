@@ -38,4 +38,12 @@ public sealed record TypedConstantDiagnostic(
 public sealed record TypedConstantContext(
     TypeKind? PeerType = null,
     OperatorKind? Operator = null,
-    ImmutableArray<DeclaredQualifierMeta>? DeclaredQualifiers = null);
+    ImmutableArray<DeclaredQualifierMeta>? DeclaredQualifiers = null,
+    /// <summary>
+    /// The dimension registry a <c>dimension</c> typed constant validates against, when the
+    /// constant is compared against a <c>.dimension</c> accessor that declares one. Lets a
+    /// <c>period.dimension</c> comparison validate the literal against the temporal partition
+    /// (<c>date</c>/<c>time</c>/<c>datetime</c>) while a quantity/uom/price comparison validates
+    /// against the UCUM partition. Null when the constant is not a partitioned dimension.
+    /// </summary>
+    DimensionPartition? DimensionPartition = null);
