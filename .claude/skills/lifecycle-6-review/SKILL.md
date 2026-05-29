@@ -43,6 +43,7 @@ The skill verifies the work item was processed through all 5 earlier stages:
    - Every decision has four-leg structure (Rationale + Alternatives + Precedent + Tradeoff)
    - Acceptance criteria are testable (not prose)
    - Doc-update enumeration is present
+   - **Spec-first verification**: for each decision / claimed gap / claimed "new surface", grep the canonical spec/design and confirm the claim holds. 🔴 if the design frames as an "open decision" something the canonical spec already settles (cite the settling section), or claims "new surface" for something the spec already documents (pre-existing — it's an implementation gap, not new surface), or claims a "gap" the spec already fills. ⚠️ if a decision's `Sources consulted` leg shows no check of the canonical spec for prior settlement. (This is the lifecycle-6 mirror of the precept-reviewer "pre-existing-vs-new" discipline and the design skill's guard 17.)
    - 🔴 if any of these are missing
 
 3. **Stage 3 — Plan**
@@ -117,6 +118,8 @@ Distinct from:
 | Phase row uses narrative prose instead of a bulleted checklist | ✅ if the prose contains (i) completion marker, (ii) test-suite outcome, (iii) commit refs, (iv) workstream enumeration with per-workstream one-line outcome — format is not prescribed |
 | Phase row narrative is missing one of the four elements above | ⚠️ — name the missing element ("no test-suite outcome stated" / "no commit refs cited") |
 | Phase has no exit criteria in any form | 🔴 — Stage 3 incomplete |
+| Design frames an "open decision" / "new surface" / "gap" the canonical spec already settles or documents | 🔴 — grep + cite the settling spec section; it's implementation against locked spec (or a Tier-3 override), not a fresh decision/surface |
+| A decision's `Sources consulted` shows no check of the canonical spec for prior settlement | ⚠️ — ask for the quote or an explicit "spec silent on this" |
 | Canonical doc not updated per plan's doc-touch list | 🔴 — Stage 5 incomplete; run `/lifecycle-5-promote` for the gap |
 | Tests exist but acceptance criterion has no test ref | ⚠️ — surface judgment question |
 | No research cited for a small bug fix, AND no `research-status: not-applicable` declaration | ⚠️ — likely OK; ask owner OR add a one-line `research-status: not-applicable — <reason>` to the design / plan row to convert to ✅ |

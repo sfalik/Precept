@@ -33,6 +33,18 @@ Read `research/README.md` and `research/language/README.md` first — they're th
 
 If existing research covers the question (in whole or in part), **cite it, don't duplicate it.** Build forward from prior findings; don't re-investigate solved problems.
 
+### Step 1b: Does the canonical spec already DECIDE this? (Non-Negotiable — spec-first)
+
+Before researching any language-surface or proof/typing/semantics question, **grep the canonical docs and read the relevant section** — the answer may already be locked there, making the research moot:
+
+```
+grep -in "<concept>" docs/language/precept-language-spec.md docs/language/business-domain-types.md docs/language/temporal-type-system.md docs/compiler/proof-engine.md docs/compiler/type-checker.md
+```
+
+If the canonical spec/design **already decides** the question (a locked Decision block, a `## Alternatives rejected` entry, an explicit "no X" / "X is …" statement), the research is **moot — cite the spec and stop.** Do not commission a survey to re-derive a conclusion the spec already locked. Quote the section that settles it.
+
+This is the research-side of the spec-first discipline: a survey that re-litigates a settled spec decision is wasted work that risks contradicting the lock (the `units { }` block failure — research was commissioned for entity-scoped units when `business-domain-types.md § D6` already rejected the construct). **The grep is the first action, not the last.** Honest exit: if the grep genuinely returns nothing on-point, say so (cite the sections checked) and proceed — that's the legitimate research case.
+
 ## Step 2: Determine the Right Folder
 
 The folder taxonomy is enforced — putting research in the wrong place creates shadow policy.
