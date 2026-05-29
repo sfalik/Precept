@@ -69,7 +69,7 @@ public static class Actions
             kind, Tokens.GetMeta(TokenKind.Set),
             "Assign a value to a scalar field",
             AnyType, ActionSyntaxShape.AssignValue, ActionWriteSemantics.EstablishesValue,
-            ReplacesEntireValue: true,
+            Effect: ActionEffectClass.ReplacesValue,
             ValueRequired: true, AllowedIn: AllActionContexts,
             HoverDescription: "Assigns a value to a field. Works on any scalar, temporal, or business-domain field.",
             SnippetTemplate: "set ${1:Field} = ${2:value}",
@@ -79,6 +79,7 @@ public static class Actions
             kind, Tokens.GetMeta(TokenKind.Add),
             "Add an element to a set",
             [new(TypeKind.Set), new(TypeKind.Bag)], ActionSyntaxShape.CollectionValue, ActionWriteSemantics.EstablishesValue,
+            Effect: ActionEffectClass.Grows,
             ValueRequired: true, AllowedIn: AllActionContexts,
             HoverDescription: "Adds an element to a set or bag field. Has no effect if the element is already present (for sets).",
             SnippetTemplate: "add ${1:Field} ${2:value}"),
@@ -87,6 +88,7 @@ public static class Actions
             kind, Tokens.GetMeta(TokenKind.Remove),
             "Remove an element from a set",
             [new(TypeKind.Set), new(TypeKind.Bag), new(TypeKind.List), new(TypeKind.Lookup)], ActionSyntaxShape.CollectionValue, ActionWriteSemantics.ClearsContents,
+            Effect: ActionEffectClass.Shrinks,
             ValueRequired: true, AllowedIn: AllActionContexts,
             HoverDescription: "Removes an element from a set, bag, list, or lookup field. Has no effect if the element is not present.",
             SnippetTemplate: "remove ${1:Field} ${2:value}"),
@@ -95,6 +97,7 @@ public static class Actions
             kind, Tokens.GetMeta(TokenKind.Enqueue),
             "Enqueue an element onto a queue",
             QueueOnly, ActionSyntaxShape.CollectionValue, ActionWriteSemantics.EstablishesValue,
+            Effect: ActionEffectClass.Grows,
             ValueRequired: true, AllowedIn: AllActionContexts,
             HoverDescription: "Appends an element to the back of a queue field.",
             SnippetTemplate: "enqueue ${1:Field} ${2:value}"),
@@ -104,6 +107,7 @@ public static class Actions
             "Dequeue the front element of a queue",
             [new(TypeKind.Queue), new(TypeKind.QueueBy)], ActionSyntaxShape.CollectionInto,
             ActionWriteSemantics.ClearsContents,
+            Effect: ActionEffectClass.Shrinks,
             ProofRequirements:
             [
                 new NumericProofRequirement(new SelfSubject(Types.CollectionCountAccessor), OperatorKind.GreaterThan, 0m,
@@ -117,6 +121,7 @@ public static class Actions
             kind, Tokens.GetMeta(TokenKind.Push),
             "Push an element onto a stack",
             StackOnly, ActionSyntaxShape.CollectionValue, ActionWriteSemantics.EstablishesValue,
+            Effect: ActionEffectClass.Grows,
             ValueRequired: true, AllowedIn: AllActionContexts,
             HoverDescription: "Pushes an element onto the top of a stack field.",
             SnippetTemplate: "push ${1:Field} ${2:value}"),
@@ -126,6 +131,7 @@ public static class Actions
             "Pop the top element of a stack",
             StackOnly, ActionSyntaxShape.CollectionInto,
             ActionWriteSemantics.ClearsContents,
+            Effect: ActionEffectClass.Shrinks,
             ProofRequirements:
             [
                 new NumericProofRequirement(new SelfSubject(Types.CollectionCountAccessor), OperatorKind.GreaterThan, 0m,
@@ -139,7 +145,7 @@ public static class Actions
             kind, Tokens.GetMeta(TokenKind.Clear),
             "Clear all elements from a collection or reset an optional field",
             ClearApplicable, ActionSyntaxShape.FieldOnly, ActionWriteSemantics.ClearsContents,
-            ReplacesEntireValue: true,
+            Effect: ActionEffectClass.Empties,
             AllowedIn: AllActionContexts,
             HoverDescription: "Removes all elements from a collection, or resets an optional field to null.",
             SnippetTemplate: "clear ${1:Field}"),
@@ -149,6 +155,7 @@ public static class Actions
             "Append an element to a log or list",
             [new(TypeKind.Log), new(TypeKind.List)],
             ActionSyntaxShape.CollectionValue, ActionWriteSemantics.EstablishesValue,
+            Effect: ActionEffectClass.Grows,
             ValueRequired: true,
             AllowedIn: AllActionContexts,
             HoverDescription: "Appends an element to the end of a log or list field.",
@@ -159,6 +166,7 @@ public static class Actions
             "Append an element with an ordering key to a log-by",
             [new(TypeKind.LogBy)],
             ActionSyntaxShape.CollectionValueBy, ActionWriteSemantics.EstablishesValue,
+            Effect: ActionEffectClass.Grows,
             ValueRequired: true,
             ProofRequirements:
             [
@@ -174,6 +182,7 @@ public static class Actions
             "Insert an element at a specific index in a list",
             [new(TypeKind.List)],
             ActionSyntaxShape.InsertAt, ActionWriteSemantics.EstablishesValue,
+            Effect: ActionEffectClass.Grows,
             ValueRequired: true,
             ProofRequirements:
             [
@@ -194,6 +203,7 @@ public static class Actions
             "Remove the element at a specific index from a list",
             [new(TypeKind.List)],
             ActionSyntaxShape.RemoveAtIndex, ActionWriteSemantics.ClearsContents,
+            Effect: ActionEffectClass.Shrinks,
             ProofRequirements:
             [
                 new NumericProofRequirement(new SelfSubject(Types.CollectionCountAccessor), OperatorKind.GreaterThan, 0m,
@@ -214,6 +224,7 @@ public static class Actions
             "Upsert a key-value pair into a lookup",
             [new(TypeKind.Lookup)],
             ActionSyntaxShape.PutKeyValue, ActionWriteSemantics.EstablishesValue,
+            Effect: ActionEffectClass.Grows,
             ValueRequired: true,
             AllowedIn: AllActionContexts,
             HoverDescription: "Inserts or updates a key-value pair in a lookup field.",
@@ -224,6 +235,7 @@ public static class Actions
             "Enqueue an element with an ordering key to a queue-by",
             [new(TypeKind.QueueBy)],
             ActionSyntaxShape.CollectionValueBy, ActionWriteSemantics.EstablishesValue,
+            Effect: ActionEffectClass.Grows,
             ValueRequired: true,
             AllowedIn: AllActionContexts,
             PrimaryActionKind: ActionKind.Enqueue,
@@ -234,6 +246,7 @@ public static class Actions
             "Dequeue the front element of a queue-by",
             [new(TypeKind.QueueBy)],
             ActionSyntaxShape.CollectionIntoBy, ActionWriteSemantics.ClearsContents,
+            Effect: ActionEffectClass.Shrinks,
             ProofRequirements:
             [
                 new NumericProofRequirement(new SelfSubject(Types.CollectionCountAccessor), OperatorKind.GreaterThan, 0m,

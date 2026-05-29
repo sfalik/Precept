@@ -27,16 +27,15 @@ surfaced for proper fixing.
 
 ## Active
 
-### BUG-016: collection-mutation forward-propagation — guard facts not effect-adjusted across grow/shrink
-
-- **Discovered**: 2026-05-28 (BUG-014 follow-on; spec § 0.6 item 7 clause b, "before the new assignment's facts are stored").
-- **Affected**: collection-mutation actions (`append`/`insert`/`remove`/`pop`/`dequeue`/`put`) in an action chain under a `count > 0` (or presence) guard.
-- **Symptom (two-sided)**: (1) *completeness* — a grow (`insert`/`append`) provably preserves `count > 0`, but BUG-014 deliberately doesn't track collection mutations, so a `set`-style fix can't re-establish the grown fact (no false positive today only because grows aren't treated as invalidating); (2) *latent soundness* — a shrink (`remove`/`pop`) can empty a collection, so `when count > 0 -> remove … -> <mutation needing count>0>` would discharge the second mutation via a stale `count > 0`. (`shopping-cart.precept`'s `insert`-then-`remove` is safe because the remove is last; a remove-then-mutate chain would not be.)
-- **Root cause**: spec § 0.6 item 7's forward-propagation clause (re-establish facts from the new value, effect-aware per action: grow preserves / shrink invalidates `count`/presence) is unimplemented. Note this is a *different* axis from BUG-014's `ActionMeta.ReplacesEntireValue` (full-replacement vs. not): forward-propagation needs grow-vs-shrink effect classification. `ActionWriteSemantics` (`Actions.cs`) classifies establish/clear but `EstablishesValue` lumps grows (`append`/`insert`) with non-collection assigns and `ClearsContents` lumps shrinks (`remove`/`pop`) with `clear`, so neither existing property carves grow-vs-shrink cleanly — a real fix likely adds a new effect-classification property.
-- **Fix complexity**: design-required — effect-aware fact propagation, catalog-driven from a new grow/shrink effect classification on `ActionMeta`. Overlaps the D9 design's gap A2 (forward narrowing propagation).
-- **Priority**: quality bar (the shrink-then-mutate soundness case is rare; no sample hits it). Pair with the D9 forward-propagation work.
+_None._
 
 ## Fixed
+
+### BUG-016: collection-mutation forward-propagation — guard facts not effect-adjusted across grow/shrink
+
+- **Status**: ✅ **Fixed 2026-05-29.** A new catalog axis `ActionMeta.Effect` (`ActionEffectClass`: `Grows`/`Shrinks`/`Empties`/`ReplacesValue`/`None`) classifies each action; `ReplacesEntireValue` (BUG-014) is now derived from it (`ReplacesValue | Empties`). `WalkActions` (`ProofEngine.cs`) runs a forward walk over the action chain tracking per-collection non-empty status, stamping each obligation with `CountEstablishedBefore` (grown) / `CountInvalidatedBefore` (shrunk). A grow establishes `count > 0` (new **Strategy 11 `CollectionGrowth`** discharges a following `dequeue`/`pop` non-empty obligation without an author guard — closes the completeness false-positive); a shrink invalidates a pre-shrink `count > 0` guard in `TryGuardInPathProof` (closes the latent soundness hole — `when Q.count > 0 -> dequeue -> dequeue` rejects the second). The two count sets are mutually exclusive (last effect wins), so a grow re-establishes after a shrink. Probe-confirmed both sides before/after. Tests: `test/Precept.Tests/ProofEngine/CollectionCountEffectTests.cs` (6) + `ActionsTests.cs` effect-classification canaries. Spec § 0.6 item 7 marked implemented; proof-engine stage doc § Strategy 3 documents the mechanism. **Bounded incompleteness retained** (sound, not a gap): the model is boolean not a count interval, so `count >= 2 -> dequeue -> dequeue` under-proves the second; membership-across-shrink (`F contains K` after `remove F K2`) is out of scope.
+- **Discovered**: 2026-05-28 (BUG-014 follow-on; spec § 0.6 item 7 clause b, "before the new assignment's facts are stored").
+- **Symptom (two-sided, both probe-confirmed)**: (1) *completeness* — `enqueue Q V -> dequeue Q` over-rejected (`UnguardedCollectionMutation`) even though the enqueue guarantees `count >= 1`; (2) *soundness* — `when Q.count > 0 -> dequeue Q -> dequeue Q` over-proved the second dequeue via the stale guard (the first may have emptied Q). `clear` was already sound via BUG-014's `ReplacesEntireValue`/`ReassignedBefore` path.
 
 ### BUG-015: reassignment-invalidation not applied to index-bounds / key-presence / field-to-field guard strategies (was over-proving)
 

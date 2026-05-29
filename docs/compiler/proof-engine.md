@@ -302,7 +302,12 @@ public enum ProofStrategy
     GuardInPath = 3,             // enclosing guard establishes the constraint
     FlowNarrowing = 4,           // same-row guard narrows the type state
     QualifierCompatibility = 5,  // qualifier values are provably compatible
-    CompositionalConstraint = 6  // field assignments satisfy modifiers via compositional sign inference
+    CompositionalConstraint = 6, // field assignments satisfy modifiers via compositional sign inference
+    IntervalContainment = 7,     // assigned value provably within declared min/max interval
+    LengthContainment = 8,       // string literal length within declared minlength/maxlength
+    CountContainment = 9,        // collection size within declared bounds
+    DimensionalProduct = 10,     // quantity × quantity lands in the curated business-domain dimension set
+    CollectionGrowth = 11        // a prior grow in the chain establishes `count > 0` (forward-propagation)
 }
 ```
 
@@ -449,6 +454,7 @@ The proof engine operates in two sequential passes:
 │    succeed marks the obligation Proved:                              │
 │    1. Literal                  — value literal at the site            │
 │    2. DeclarationAttribute     — field modifier (e.g., `nonnegative`) │
+│    •  CollectionGrowth         — prior grow establishes `count > 0`   │
 │    3. GuardInPath              — `when …` clause in the path's guard  │
 │    4. FlowNarrowing            — set-then-read interval flow          │
 │    5. QualifierCompatibility   — currency/unit/dimension match        │
@@ -609,7 +615,7 @@ public sealed record SelfSubject(TypeAccessor? Accessor = null) : ProofSubject;
 
 ### Proof Strategies
 
-Each strategy is a simple predicate function — not a solver. The first strategy that succeeds marks the obligation as `Proved`. The seven catalog-driven strategies (1–7) run unconditionally on every obligation; three further requirement-dispatched strategies (8–10) run only when the obligation carries a matching requirement subtype (`IntervalContainmentProofRequirement`, `LengthContainmentProofRequirement`, `CountContainmentProofRequirement`). Two more requirement-dispatched paths (KeyPresence, IndexBounds) reuse the `ProofStrategy.GuardInPath` reporting tag because they discharge via guard-derived bounds — they are dispatched on requirement subtype but credit the guard-in-path mechanic.
+Each strategy is a simple predicate function — not a solver. The first strategy that succeeds marks the obligation as `Proved`. The seven catalog-driven strategies (1–7) run unconditionally on every obligation; three further requirement-dispatched strategies (8–10) run only when the obligation carries a matching requirement subtype (`IntervalContainmentProofRequirement`, `LengthContainmentProofRequirement`, `CountContainmentProofRequirement`). Two more requirement-dispatched paths (KeyPresence, IndexBounds) reuse the `ProofStrategy.GuardInPath` reporting tag because they discharge via guard-derived bounds — they are dispatched on requirement subtype but credit the guard-in-path mechanic. One further path, **CollectionGrowth (Strategy 11)**, runs in the unconditional sequence but discharges only collection `count > 0` obligations — from a prior grow in the action chain rather than a guard (see *Sequential proof flow* above) — and carries its own reporting tag.
 
 ### Subject Resolution Utilities
 
@@ -1213,6 +1219,16 @@ record GuardConstraint(
 | `GreaterThanOrEqual` | `LessThan` |
 
 **Rationale:** AND-decomposition is safe because all conjuncts are true when the guard passes. OR-decomposition is unsafe because only one disjunct is guaranteed. Negation inversion is safe for simple comparisons but not for complex expressions.
+
+#### Sequential proof flow (reassignment-invalidation & collection forward-propagation)
+
+Guard facts are not valid for the whole action chain unconditionally — they track the actual mutation sequence (spec `precept-language-spec.md § 0.6` item 7). `WalkActions` walks each chain in order and stamps every obligation with the prefix-effect state of the actions *before* it. The guard-consuming strategies (3 GuardInPath, 4 FlowNarrowing, plus the requirement-dispatched IndexBounds / KeyPresence) then drop facts that the prefix made stale. The classification is catalog-driven via `ActionMeta.Effect` (`ActionEffectClass`) — the engine never switches on `ActionKind` identity to decide what an action does to a field.
+
+- **Full replacement** (`set`/`clear` — `ReplacesValue` / `Empties`, surfaced as `ActionMeta.ReplacesEntireValue`): stamped onto `ProofObligation.ReassignedBefore`. Every guard fact about the field is invalidated for obligations after the write — `when X != 0 → set X = 0 → 100 / X` no longer discharges divisor safety; `when X is set → clear X → X + 1` no longer discharges presence.
+- **Collection grow** (`add`/`append`/`insert`/`enqueue`/`push`/`put` and `*-by` — `Grows`): stamped onto `CountEstablishedBefore`. A grow adds ≥1 element, so `count > 0` holds afterward regardless of prior contents. **Strategy 11 (CollectionGrowth)** discharges a `count > 0` obligation (e.g. the non-empty requirement on a following `dequeue`/`pop`) directly from this fact — an independent positive proof source, not guard reuse, so it needs no author guard.
+- **Collection shrink** (`remove`/`removeAt`/`pop`/`dequeue` and `*-by` — `Shrinks`): stamped onto `CountInvalidatedBefore`. A shrink may reduce count to 0, so a pre-shrink `count > 0` guard must not discharge a `count > 0` obligation after it — `when Q.count > 0 → dequeue Q → dequeue Q` rejects the second dequeue. Upper-bound count facts (`count < N`) are preserved (a shrink only lowers count) and unaffected.
+
+The two count sets are mutually exclusive per field (last collection effect wins), so a grow re-establishes the non-empty fact after an intervening shrink. **Sound by construction:** the invalidation paths are pure rejections and grow-establishment proves only `count > 0` (threshold 0), which a single added element guarantees. **Known incompleteness:** the grow/shrink model is boolean, not a count interval — `count >= 2 → dequeue → dequeue` under-proves the second dequeue (sound, but conservative). Membership facts across a shrink (`F contains K` after `remove F K2`) are out of scope for this mechanism.
 
 #### Strategy 4: Straightforward Flow Narrowing
 
@@ -2331,7 +2347,7 @@ static bool ContainsErrorExpression(TypedExpression expr) => expr switch
 
 ### Decision 1: Bounded Strategy Set vs. SMT Solver
 
-**Decision:** The proof engine uses a bounded set of proof strategies — no general SMT solver. The set has grown by one strategy at a time as the language surface has expanded (currently seven catalog-driven strategies plus three requirement-dispatched ones); each addition has gone through `/lifecycle-2-design` review against this same rationale.
+**Decision:** The proof engine uses a bounded set of proof strategies — no general SMT solver. The set has grown by one strategy at a time as the language surface has expanded (currently a handful of catalog-driven strategies plus several requirement-dispatched ones); each addition has gone through `/lifecycle-2-design` review against this same rationale.
 
 **Rationale:**
 - **Predictability:** Every proof attempt completes in bounded, deterministic time. No solver timeouts, no "unknown" results, no resource exhaustion.

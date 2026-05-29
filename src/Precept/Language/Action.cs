@@ -8,14 +8,9 @@ namespace Precept.Language;
 /// Metadata for a state-machine action verb.
 /// <c>Token</c> is a <see cref="TokenMeta"/> object reference from the Tokens catalog.
 /// </summary>
-/// <param name="ReplacesEntireValue">
-/// True when the action fully determines the field's resulting value/presence independent
-/// of its prior contents — <c>set</c> assigns a fresh value; <c>clear</c> empties/resets.
-/// Such actions invalidate prior guard facts about the field, so a guard established before
-/// the action must not discharge an obligation after it (sequential proof flow). False for
-/// in-place collection mutations (<c>add</c>/<c>append</c>/<c>insert</c>/<c>remove</c>/…),
-/// which transform existing contents — whether a fact like <c>count &gt; 0</c> survives is the
-/// separate effect-aware forward-propagation concern, not blanket invalidation.
+/// <param name="Effect">
+/// How the action transforms the target field's contents, used by the proof engine's
+/// sequential-proof-flow reasoning (spec § 0.6 item 7). See <see cref="ActionEffectClass"/>.
 /// </param>
 public sealed record ActionMeta(
     ActionKind   Kind,
@@ -24,7 +19,7 @@ public sealed record ActionMeta(
     TypeTarget[] ApplicableTo,
     ActionSyntaxShape SyntaxShape,
     ActionWriteSemantics WriteSemantics,
-    bool         ReplacesEntireValue = false,
+    ActionEffectClass Effect = ActionEffectClass.None,
     bool         ValueRequired = false,
     ProofRequirement[]? ProofRequirements = null,
     ConstructKind[]?    AllowedIn         = null,
@@ -65,6 +60,46 @@ public sealed record ActionMeta(
     /// input role is the default <see cref="ActionSlotRole.Value"/> shape.
     /// </summary>
     public ActionSlotRole? InputSlotRole { get; } = InputSlotRole;
+
+    /// <summary>
+    /// True when the action fully determines the field's resulting value/presence independent
+    /// of its prior contents — <c>set</c> assigns a fresh value (<see cref="ActionEffectClass.ReplacesValue"/>);
+    /// <c>clear</c> empties/resets (<see cref="ActionEffectClass.Empties"/>). Such actions invalidate
+    /// every prior guard fact about the field, so a guard established before the action must not
+    /// discharge an obligation after it (sequential proof flow). False for in-place collection
+    /// grows/shrinks, whose effect on facts like <c>count &gt; 0</c> is the finer-grained
+    /// forward-propagation concern (see <see cref="ActionEffectClass.Grows"/> / <see cref="ActionEffectClass.Shrinks"/>).
+    /// </summary>
+    public bool ReplacesEntireValue => Effect is ActionEffectClass.ReplacesValue or ActionEffectClass.Empties;
+}
+
+/// <summary>
+/// How an action transforms the target field's contents, for the proof engine's
+/// sequential-proof-flow reasoning (spec § 0.6 item 7). Distinguishes full-value replacement
+/// from in-place collection grow/shrink — an axis <see cref="ActionWriteSemantics"/> cannot
+/// express (it lumps grows with scalar assigns and shrinks with <c>clear</c>). Catalog-driven
+/// so the proof engine never restates the classification by switching on <see cref="ActionKind"/>.
+/// </summary>
+public enum ActionEffectClass
+{
+    /// <summary>Does not write a field (e.g. reject, transition, no transition).</summary>
+    None          = 0,
+    /// <summary>Assigns a fresh whole value (<c>set</c>); the field's prior contents are discarded.</summary>
+    ReplacesValue = 1,
+    /// <summary>Empties / resets the field (<c>clear</c>): count becomes 0 / value becomes absent.</summary>
+    Empties       = 2,
+    /// <summary>
+    /// Adds to a collection (<c>add</c>/<c>append</c>/<c>insert</c>/<c>enqueue</c>/<c>push</c>/<c>put</c>
+    /// and <c>*-by</c> variants). Count is non-decreasing and is guaranteed <c>&gt;= 1</c> afterward,
+    /// so the action establishes a non-empty fact regardless of prior contents.
+    /// </summary>
+    Grows         = 3,
+    /// <summary>
+    /// Removes from a collection (<c>remove</c>/<c>removeAt</c>/<c>pop</c>/<c>dequeue</c> and
+    /// <c>*-by</c> variants). Count may decrease to 0, so a prior non-empty fact (<c>count &gt; 0</c>)
+    /// is no longer guaranteed and must be invalidated.
+    /// </summary>
+    Shrinks       = 4,
 }
 
 /// <summary>

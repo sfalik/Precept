@@ -629,8 +629,29 @@ public static partial class ProofEngine
         return true;
     }
 
+    /// <summary>
+    /// Discharges a collection non-empty obligation (<c>F.count &gt; 0</c>) when a prior grow action
+    /// in the same chain established <c>F</c> as non-empty (spec § 0.6 item 7, forward-propagation).
+    /// A grow adds at least one element, so <c>count &gt;= 1</c> holds regardless of prior contents
+    /// and regardless of any guard — this is an independent positive proof source, not guard reuse.
+    /// </summary>
+    private static bool TryCollectionGrowthProof(ProofObligation obligation)
+    {
+        if (!IsCollectionCountRequirement(obligation.Requirement, out var countReq)) return false;
+        return GetFieldName(countReq!.Subject, obligation.Site) is { } field
+            && obligation.CountEstablishedBefore.Contains(field);
+    }
+
     private static bool TryGuardInPathProof(ProofObligation obligation, SemanticIndex semantics)
     {
+        // Sequential proof flow (spec § 0.6 item 7): a non-empty (`count > 0`) guard fact is stale
+        // once the collection was shrunk earlier in the chain — the shrink may have reduced count
+        // to 0, so the pre-shrink guard must not discharge a `count > 0` obligation after it.
+        if (IsCollectionCountRequirement(obligation.Requirement, out var staleCountReq)
+            && GetFieldName(staleCountReq!.Subject, obligation.Site) is { } shrunkField
+            && obligation.CountInvalidatedBefore.Contains(shrunkField))
+            return false;
+
         var guard = obligation.Context switch
         {
             TransitionRowContext t => t.Row.Guard,

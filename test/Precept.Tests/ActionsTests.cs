@@ -86,6 +86,61 @@ public class ActionsTests
         Actions.GetMeta(kind).ValueRequired.Should().BeFalse($"{kind} takes no value");
     }
 
+    // ── Effect classification (ActionEffectClass) — drives sequential-proof-flow ─────
+
+    [Theory]
+    [InlineData(ActionKind.Add, ActionEffectClass.Grows)]
+    [InlineData(ActionKind.Append, ActionEffectClass.Grows)]
+    [InlineData(ActionKind.AppendBy, ActionEffectClass.Grows)]
+    [InlineData(ActionKind.Insert, ActionEffectClass.Grows)]
+    [InlineData(ActionKind.Enqueue, ActionEffectClass.Grows)]
+    [InlineData(ActionKind.EnqueueBy, ActionEffectClass.Grows)]
+    [InlineData(ActionKind.Push, ActionEffectClass.Grows)]
+    [InlineData(ActionKind.Put, ActionEffectClass.Grows)]
+    [InlineData(ActionKind.Remove, ActionEffectClass.Shrinks)]
+    [InlineData(ActionKind.RemoveAt, ActionEffectClass.Shrinks)]
+    [InlineData(ActionKind.Dequeue, ActionEffectClass.Shrinks)]
+    [InlineData(ActionKind.DequeueBy, ActionEffectClass.Shrinks)]
+    [InlineData(ActionKind.Pop, ActionEffectClass.Shrinks)]
+    [InlineData(ActionKind.Set, ActionEffectClass.ReplacesValue)]
+    [InlineData(ActionKind.Clear, ActionEffectClass.Empties)]
+    public void Effect_ClassifiesEveryAction(ActionKind kind, ActionEffectClass expected)
+    {
+        Actions.GetMeta(kind).Effect.Should().Be(expected);
+    }
+
+    [Fact]
+    public void Effect_NoActionIsUnclassified()
+    {
+        // Every action verb writes a field, so none should be left at the default None.
+        foreach (var kind in Enum.GetValues<ActionKind>())
+            Actions.GetMeta(kind).Effect.Should().NotBe(ActionEffectClass.None,
+                $"{kind} writes a field and must carry an effect classification");
+    }
+
+    [Theory]
+    [InlineData(ActionKind.Set)]
+    [InlineData(ActionKind.Clear)]
+    public void ReplacesEntireValue_TrueOnlyForFullReplacement(ActionKind kind)
+    {
+        // ReplacesEntireValue is derived from Effect (ReplacesValue | Empties).
+        Actions.GetMeta(kind).ReplacesEntireValue.Should().BeTrue($"{kind} replaces the whole field value");
+    }
+
+    [Theory]
+    [InlineData(ActionKind.Add)]
+    [InlineData(ActionKind.Append)]
+    [InlineData(ActionKind.Insert)]
+    [InlineData(ActionKind.Remove)]
+    [InlineData(ActionKind.RemoveAt)]
+    [InlineData(ActionKind.Dequeue)]
+    [InlineData(ActionKind.Pop)]
+    [InlineData(ActionKind.Put)]
+    public void ReplacesEntireValue_FalseForInPlaceMutations(ActionKind kind)
+    {
+        Actions.GetMeta(kind).ReplacesEntireValue.Should().BeFalse($"{kind} mutates in place, not a full replacement");
+    }
+
     // ── Into slot support (derived from ActionShapeMeta) ────────────────────────
 
     private static bool HasIntoSlot(ActionMeta meta) =>

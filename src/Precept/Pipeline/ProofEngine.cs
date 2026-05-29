@@ -392,11 +392,19 @@ public static partial class ProofEngine
         // for any obligation whose site comes AFTER that field is reassigned in the action chain.
         // We track the prefix-write set and stamp each action's obligations with the fields
         // written by PRIOR actions; the guard-discharge strategies then drop stale facts.
+        //   - writtenSoFar:     fields fully replaced (set/clear) → ALL prior facts stale.
+        //   - countEstablished: collections grown → non-empty (count > 0) guaranteed afterward.
+        //   - countInvalidated: collections shrunk → non-empty fact stale (may be empty).
+        // The two count sets are kept mutually exclusive per field (last collection effect wins).
         var writtenSoFar = ImmutableArray<string>.Empty;
+        var countEstablished = ImmutableArray<string>.Empty;
+        var countInvalidated = ImmutableArray<string>.Empty;
 
         foreach (var action in actions)
         {
             var reassignedBefore = writtenSoFar;
+            var establishedBefore = countEstablished;
+            var invalidatedBefore = countInvalidated;
             var start = obligations.Count;
 
             // Static obligations from action metadata (Catalog-driven)
@@ -432,25 +440,46 @@ public static partial class ProofEngine
             }
 
             // Stamp every obligation generated for THIS action (static + dynamic + RHS
-            // expression walk, all appended to [start..Count)) with the fields reassigned by
-            // prior actions. The action's OWN write is recorded afterward, so an obligation that
-            // reads a field this action also writes (e.g. `set X = X + 1`) still sees the pre-write
-            // guard fact — only strictly-prior reassignments invalidate.
-            if (!reassignedBefore.IsEmpty)
+            // expression walk, all appended to [start..Count)) with the prefix-state from PRIOR
+            // actions. The action's OWN effect is recorded afterward, so an obligation that reads a
+            // field this action also writes (e.g. `set X = X + 1`) still sees the pre-write guard
+            // fact — only strictly-prior effects apply. This is also why a shrink's own `count > 0`
+            // obligation (e.g. the non-empty requirement on `dequeue`) is evaluated against the
+            // pre-shrink state: the obligation must hold BEFORE the shrink executes.
+            if (!reassignedBefore.IsEmpty || !establishedBefore.IsEmpty || !invalidatedBefore.IsEmpty)
                 for (var i = start; i < obligations.Count; i++)
-                    obligations[i] = obligations[i] with { ReassignedBefore = reassignedBefore };
+                    obligations[i] = obligations[i] with
+                    {
+                        ReassignedBefore = reassignedBefore,
+                        CountEstablishedBefore = establishedBefore,
+                        CountInvalidatedBefore = invalidatedBefore,
+                    };
 
-            // Record this action's written field — but ONLY for full-value REPLACEMENT,
-            // a catalog-declared property (`set` assigns, `clear` empties/resets). In-place
-            // collection mutations (`append`/`insert`/`remove`/…) transform rather than replace:
-            // a grow (`insert`/`append`) preserves `count > 0`, so blanket invalidation would
-            // false-positive on an insert-then-remove chain. The effect-aware reasoning for
-            // collection mutations (grow preserves, shrink may invalidate count/presence) is the
-            // separate forward-propagation concern — not blanket invalidation here.
-            if (actionMeta.ReplacesEntireValue
-                && !string.IsNullOrEmpty(action.FieldName)
-                && !writtenSoFar.Contains(action.FieldName))
-                writtenSoFar = writtenSoFar.Add(action.FieldName);
+            // Record this action's effect on the field, classified by the Actions catalog
+            // (ActionEffectClass) rather than by switching on ActionKind identity:
+            //   ReplacesValue/Empties (set/clear) → full replacement: ALL prior facts stale.
+            //   Grows  → non-empty established (count > 0 guaranteed after adding ≥1 element).
+            //   Shrinks → non-empty invalidated (count may have dropped to 0).
+            // The count sets stay mutually exclusive (last effect wins); a full replacement
+            // subsumes both (writtenSoFar already blocks the count guard via ReassignedBefore).
+            var field = action.FieldName;
+            if (!string.IsNullOrEmpty(field))
+                switch (actionMeta.Effect)
+                {
+                    case ActionEffectClass.ReplacesValue or ActionEffectClass.Empties:
+                        if (!writtenSoFar.Contains(field)) writtenSoFar = writtenSoFar.Add(field);
+                        countEstablished = countEstablished.Remove(field);
+                        countInvalidated = countInvalidated.Remove(field);
+                        break;
+                    case ActionEffectClass.Grows:
+                        if (!countEstablished.Contains(field)) countEstablished = countEstablished.Add(field);
+                        countInvalidated = countInvalidated.Remove(field);
+                        break;
+                    case ActionEffectClass.Shrinks:
+                        if (!countInvalidated.Contains(field)) countInvalidated = countInvalidated.Add(field);
+                        countEstablished = countEstablished.Remove(field);
+                        break;
+                }
         }
     }
 
@@ -657,6 +686,8 @@ public static partial class ProofEngine
             return (ProofDisposition.Proved, ProofStrategy.Literal);
         if (TryDeclarationAttributeProof(obligation, semantics))
             return (ProofDisposition.Proved, ProofStrategy.DeclarationAttribute);
+        if (TryCollectionGrowthProof(obligation))
+            return (ProofDisposition.Proved, ProofStrategy.CollectionGrowth);
         if (TryGuardInPathProof(obligation, semantics))
             return (ProofDisposition.Proved, ProofStrategy.GuardInPath);
         if (TryFlowNarrowingProof(obligation, semantics))
