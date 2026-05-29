@@ -120,6 +120,24 @@ public sealed record QualifierChainProofRequirement(
 ) : ProofRequirement(ProofRequirementKind.QualifierChain, Description);
 
 /// <summary>
+/// Assignment qualifier compatibility: an OPEN field (no declared qualifier on
+/// <see cref="Axis"/>) assigned to a target field that requires <see cref="TargetQualifier"/>
+/// must be narrowed — by an enclosing guard — to a value satisfying the target on that axis.
+/// This is the open-field assignment case relocated from the type-checker-immediate PRE0141
+/// emit to a stamped proof obligation discharged at the proof stage (see
+/// <c>docs/compiler/proof-engine.md</c> § Sequential proof flow). <see cref="Subject"/>
+/// resolves to the assigned source expression (the obligation's Site); discharge consults the
+/// guard-narrowing facts.
+/// </summary>
+public sealed record AssignmentQualifierProofRequirement(
+    ProofSubject          Subject,
+    string                TargetFieldName,
+    DeclaredQualifierMeta TargetQualifier,
+    QualifierAxis         Axis,
+    string                Description
+) : ProofRequirement(ProofRequirementKind.AssignmentQualifier, Description);
+
+/// <summary>
 /// Modifier proof: the operand(s) matching <see cref="Subject"/> must have
 /// the specified modifier declared on their field. Used to enforce that
 /// operations requiring a field-level attribute (e.g. <c>ordered</c> for
@@ -296,6 +314,12 @@ public abstract record ProofRequirementMeta(
         : ProofRequirementMeta(ProofRequirementKind.QualifierChain,
             "Qualifier chain — cross-type, cross-axis qualifier validation",
             Language.DiagnosticCode.UnprovedQualifierCompatibility);
+
+    /// <summary>Assignment qualifier compatibility — open field assigned to a qualified target must narrow (under a guard) to the target value on the axis.</summary>
+    public sealed record AssignmentQualifier()
+        : ProofRequirementMeta(ProofRequirementKind.AssignmentQualifier,
+            "Assignment qualifier compatibility — open field assigned to a qualified target must narrow to the target value on the axis",
+            Language.DiagnosticCode.UnprovedAssignmentQualifierCompatibility);
 
     /// <summary>Interval containment — result interval must fit within target field's declared bounds.</summary>
     public sealed record IntervalContainment()

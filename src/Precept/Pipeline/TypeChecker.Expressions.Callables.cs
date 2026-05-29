@@ -140,16 +140,22 @@ internal static partial class TypeChecker
                             Types.GetMeta(fieldType).DisplayName, Types.GetMeta(value.ResultType).DisplayName));
                 }
 
+                var assignmentObligations = ImmutableArray<ProofRequirement>.Empty;
                 if (value is not TypedErrorExpression
                     && targetFieldMeta is not null
                     && !targetFieldMeta.DeclaredQualifiers.IsDefaultOrEmpty)
                 {
-                    ValidateAssignmentQualifiers(
+                    // `set`-action open-field qualifier check is discharged at the proof stage
+                    // (stamped obligation + guard narrowing); PRE0141 re-staged to Proof. The type
+                    // checker (authoritative resolver) decides what to stamp; we add it to the
+                    // action's ProofRequirements below for the proof engine to discharge.
+                    assignmentObligations = ValidateAssignmentQualifiers(
                         value,
                         fieldName,
                         targetFieldMeta.DeclaredQualifiers,
                         assign.Value.Span,
-                        ctx);
+                        ctx,
+                        dischargedAtProofStage: true);
                 }
 
                 // PRE0086/PRE0087/PRE0089: Choice value validation on assignment
@@ -183,7 +189,7 @@ internal static partial class TypeChecker
                     InputExpression: value,
                     SecondaryExpression: null,
                     SecondaryRole: null,
-                    ProofRequirements: proofReqs.ToImmutableArray(),
+                    ProofRequirements: [..proofReqs, ..assignmentObligations],
                     Span: assign.Span);
             }
 

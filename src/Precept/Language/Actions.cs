@@ -326,6 +326,11 @@ public static class Actions
                 null));
         }
 
+        // NOTE: open-field assignment-qualifier obligations are NOT generated here. They are stamped
+        // by the type checker (which owns the authoritative qualifier resolver) onto the action's
+        // ProofRequirements — see TypeChecker.Expressions.AssignmentQualifiers and Decision 3 in
+        // docs/compiler/proof-engine.md (type checker stamps, proof engine discharges).
+
         return obligations.ToImmutable();
     }
 

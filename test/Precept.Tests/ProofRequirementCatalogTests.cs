@@ -41,8 +41,9 @@ public class ProofRequirementCatalogTests
     [Fact]
     public void Total_Count()
     {
-        // F-LANG-BIZ-05 adds DimensionalProduct = 12, bringing the catalog to 12.
-        ProofRequirements.All.Should().HaveCount(12);
+        // DimensionalProduct = 12; AssignmentQualifier = 13 (open-field assignment-qualifier
+        // discharge relocated to the proof stage) brings the catalog to 13.
+        ProofRequirements.All.Should().HaveCount(13);
     }
 
     // ── DU subtype correctness ──────────────────────────────────────────────────
@@ -102,14 +103,15 @@ public class ProofRequirementCatalogTests
     [Fact]
     public void FiveKinds_AreSingleSubject()
     {
-        // DimensionalProduct is dual-subject (left and right operand of the
-        // multiplicative op), so the single-subject group stays at 9.
+        // DimensionalProduct is dual-subject (left and right operand of the multiplicative op),
+        // so the single-subject group is everything else. AssignmentQualifier (single-subject:
+        // the assigned source) brings it to 10.
         var singleSubject = ProofRequirements.All
             .Where(m => m is not ProofRequirementMeta.QualifierCompatibility
                         and not ProofRequirementMeta.QualifierChain
                         and not ProofRequirementMeta.DimensionalProduct)
             .ToList();
-        singleSubject.Should().HaveCount(9);
+        singleSubject.Should().HaveCount(10);
     }
 
     // ── Instance Kind property matches catalog ──────────────────────────────────
@@ -209,16 +211,16 @@ public class ProofRequirementCatalogTests
     [Fact]
     public void SingleSubjectKinds_NowIncludesIntervalContainment()
     {
-        // Single-subject kinds total 9 (DimensionalProduct is dual-subject):
+        // Single-subject kinds total 10 (DimensionalProduct is dual-subject):
         // Numeric, Presence, Dimension, Modifier, IntervalContainment, LengthContainment,
-        // CountContainment, KeyPresence, IndexBounds.
+        // CountContainment, KeyPresence, IndexBounds, AssignmentQualifier.
         var singleSubject = ProofRequirements.All
             .Where(m => m is not ProofRequirementMeta.QualifierCompatibility
                         and not ProofRequirementMeta.QualifierChain
                         and not ProofRequirementMeta.DimensionalProduct)
             .ToList();
-        singleSubject.Should().HaveCount(9,
-            "IndexBounds joins the existing single-subject kinds");
+        singleSubject.Should().HaveCount(10,
+            "AssignmentQualifier joins the existing single-subject kinds");
     }
 
     // ── Catalog-mediated DiagnosticCode ──────────────────────────────

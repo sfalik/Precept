@@ -18,24 +18,44 @@ internal sealed record ResolvedQualifierAxis(
 
 internal static partial class TypeChecker
 {
-    private static void ValidateAssignmentQualifiers(
+    /// <param name="dischargedAtProofStage">
+    /// True for <c>set</c>-action assignments, whose open-field (Unknown-axis) qualifier check is
+    /// stamped as a proof obligation and discharged at the proof stage (PRE0141 re-staged) — so the
+    /// type checker must NOT emit the type-stage PRE0141 for the Unknown case here. False (default)
+    /// for field/arg defaults, min/max bounds, and computed expressions, which the proof engine does
+    /// not walk — those keep emitting PRE0141 at the type stage. The definite-mismatch (Resolved)
+    /// case is unaffected either way.
+    /// </param>
+    /// <returns>
+    /// The assignment-qualifier proof obligations the caller must stamp onto the action's
+    /// <c>ProofRequirements</c> (non-empty only for a <c>set</c>-action open-field case with
+    /// <paramref name="dischargedAtProofStage"/>); empty otherwise. The type checker is the
+    /// authority on "is this source open on this axis" (its resolver handles interpolated /
+    /// function-call / field / binary-op sources), so it — not the proof engine — decides what to
+    /// stamp. The proof engine then discharges the stamped obligation (Decision 3).
+    /// </returns>
+    private static ImmutableArray<ProofRequirement> ValidateAssignmentQualifiers(
         TypedExpression value,
         string fieldName,
         ImmutableArray<DeclaredQualifierMeta> targetQualifiers,
         SourceSpan valueSpan,
-        CheckContext ctx)
+        CheckContext ctx,
+        bool dischargedAtProofStage = false)
     {
         if (targetQualifiers.IsDefaultOrEmpty || value is TypedErrorExpression)
-            return;
+            return [];
 
         if (value is TypedTypedConstant { ResultType: TypeKind.Quantity })
-            return;
+            return [];
 
         if (value is TypedConditional conditional)
         {
-            ValidateAssignmentQualifiers(conditional.ThenBranch, fieldName, targetQualifiers, valueSpan, ctx);
-            ValidateAssignmentQualifiers(conditional.ElseBranch, fieldName, targetQualifiers, valueSpan, ctx);
-            return;
+            // Conditionals are validated per-branch and kept at the type stage: each branch is a
+            // distinct sub-expression, but a stamped obligation's Site is the whole action value,
+            // so per-branch narrowing cannot be sited. Force type-stage emission (no relocation).
+            ValidateAssignmentQualifiers(conditional.ThenBranch, fieldName, targetQualifiers, valueSpan, ctx, dischargedAtProofStage: false);
+            ValidateAssignmentQualifiers(conditional.ElseBranch, fieldName, targetQualifiers, valueSpan, ctx, dischargedAtProofStage: false);
+            return [];
         }
 
         var requiredAxes = ExpandAssignmentTargetQualifiers(targetQualifiers);
@@ -45,7 +65,7 @@ internal static partial class TypeChecker
             .Select(axis => ResolveAssignmentQualifierAxis(value, axis))
             .ToImmutableArray();
 
-        ValidateResolvedQualifierAxes(sourceAxes, fieldName, requiredAxes, valueSpan, ctx);
+        return ValidateResolvedQualifierAxes(sourceAxes, fieldName, requiredAxes, valueSpan, ctx, dischargedAtProofStage);
     }
 
     private static ImmutableArray<DeclaredQualifierMeta> ExpandAssignmentTargetQualifiers(
@@ -85,13 +105,15 @@ internal static partial class TypeChecker
         return builder.ToImmutable();
     }
 
-    private static void ValidateResolvedQualifierAxes(
+    private static ImmutableArray<ProofRequirement> ValidateResolvedQualifierAxes(
         ImmutableArray<ResolvedQualifierAxis> sourceAxes,
         string fieldName,
         ImmutableArray<DeclaredQualifierMeta> targetQualifiers,
         SourceSpan valueSpan,
-        CheckContext ctx)
+        CheckContext ctx,
+        bool dischargedAtProofStage)
     {
+        ImmutableArray<ProofRequirement>.Builder? stamped = null;
         foreach (var targetQualifier in targetQualifiers)
         {
             var resolution = sourceAxes.First(axis => axis.Axis == targetQualifier.Axis);
@@ -106,15 +128,34 @@ internal static partial class TypeChecker
                     break;
 
                 case QualifierResolutionKind.Unknown:
-                    ctx.Diagnostics.Add(
-                        Diagnostics.Create(
-                            DiagnosticCode.UnprovedAssignmentQualifierCompatibility,
-                            valueSpan,
-                            FormatQualifierAxisName(targetQualifier.Axis),
-                            fieldName));
+                    // Open source on a required axis. For a `set`-action assignment, STAMP a proof
+                    // obligation the proof engine discharges via guard-narrowing (PRE0141 re-staged
+                    // to the proof stage) — do NOT emit here. For field/arg defaults, bounds, and
+                    // computed expressions (not walked by the proof engine) PRE0141 still emits at
+                    // the type stage.
+                    if (dischargedAtProofStage)
+                    {
+                        (stamped ??= ImmutableArray.CreateBuilder<ProofRequirement>()).Add(
+                            new AssignmentQualifierProofRequirement(
+                                new SelfSubject(),
+                                fieldName,
+                                targetQualifier,
+                                targetQualifier.Axis,
+                                $"Assignment qualifier: the value's {targetQualifier.Axis} must satisfy field '{fieldName}'"));
+                    }
+                    else
+                    {
+                        ctx.Diagnostics.Add(
+                            Diagnostics.Create(
+                                DiagnosticCode.UnprovedAssignmentQualifierCompatibility,
+                                valueSpan,
+                                FormatQualifierAxisName(targetQualifier.Axis),
+                                fieldName));
+                    }
                     break;
             }
         }
+        return stamped?.ToImmutable() ?? [];
     }
 
     private static ResolvedQualifierAxis ResolveAssignmentQualifierAxis(TypedExpression value, QualifierAxis axis)

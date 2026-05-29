@@ -1216,15 +1216,17 @@ public class TypeCheckerTypedConstantTests
     [Fact]
     public void InterpolatedTypedConstant_SourceNoDimension_EmitsUnprovedAssignmentQualifierCompatibility()
     {
-        // '1 {f1.unit}' where f1 is quantity (no dimension), target is quantity of 'mass' → assignment must now prove the dimension axis.
-        var (_, diagnostics) = TypeCheckerTestHelpers.Check("""
+        // '1 {f1.unit}' where f1 is quantity (no dimension), target is quantity of 'mass' → the
+        // open-field assignment-qualifier check is now a stamped obligation discharged at the proof
+        // stage, so PRE0141 surfaces from the full compile (proof stage), not the type-check pass.
+        var diagnostics = Precept.Compiler.Compile("""
             precept Test
             field target as quantity of 'mass'
             field f1 as quantity
             event Go
             on Go
                 -> set target = '1 {f1.unit}'
-            """);
+            """).Diagnostics;
 
         diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.UnprovedAssignmentQualifierCompatibility));
     }

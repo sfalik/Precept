@@ -136,7 +136,7 @@ Fifteen catalogs in three groups (12 language-definition + 2 failure-mode + 1 to
 | 8 | **Constructs** | Grammar forms / declaration shapes |
 | 9 | **ExpressionForms** | Expression grammar forms — expression node kinds (literal, identifier, binary op, function call, quantifier, CI function call, etc.) |
 | 10 | **Constraints** | Constraint declaration forms — invariant, state-anchored, event precondition (DU as identity) |
-| 11 | **ProofRequirements** | Proof obligation kinds — 10 members (numeric, presence, dimension, modifier, qualifier compatibility, qualifier chain, interval / length / count containment, key presence) — DU as identity; see § 11 ProofRequirements for the full inventory |
+| 11 | **ProofRequirements** | Proof obligation kinds — 13 members (numeric, presence, dimension, modifier, qualifier compatibility, qualifier chain, interval / length / count containment, key presence, index bounds, dimensional product, assignment qualifier) — DU as identity; see § 11 ProofRequirements for the full inventory |
 | 12 | **Outcomes** | Transition-row outcome forms — transition, no transition, reject (closed 3-member vocabulary) |
 
 **Failure Modes (how it tells you what's wrong):**
@@ -281,7 +281,7 @@ flowchart TB
         Functions["Functions (23)"]
         Modifiers["Modifiers (29)"]
         Actions["Actions (15)"]
-        ProofRequirements["ProofRequirements (10)"]
+        ProofRequirements["ProofRequirements (13)"]
     end
 
     subgraph L4["④ Failure modes"]
@@ -541,7 +541,7 @@ classDiagram
 
 #### ProofRequirements — catalog meta vs. obligation instances
 
-Two separate type hierarchies: **catalog meta** (static identity, 10 members in `ProofRequirements.All`) and **obligation instances** (per-use payload, carried inside other catalog entries that declare requirements).
+Two separate type hierarchies: **catalog meta** (static identity, 13 members in `ProofRequirements.All`) and **obligation instances** (per-use payload, carried inside other catalog entries that declare requirements).
 
 **Catalog meta — DU as identity (10 members):**
 

@@ -48,4 +48,7 @@ public enum ProofRequirementKind
     /// not a business-domain dimension).
     /// </summary>
     DimensionalProduct     = 12,
+
+    /// <summary>Assignment qualifier compatibility — an open field assigned to a qualified target must, under a guard, narrow to the target's qualifier value on the axis (the relocated PRE0141 open-field case; discharged at the proof stage).</summary>
+    AssignmentQualifier    = 13,
 }

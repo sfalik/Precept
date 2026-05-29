@@ -522,7 +522,7 @@ The type checker stamps these requirements onto `TypedExpression` and `TypedActi
 
 ### ProofRequirement Catalog DU
 
-The `ProofRequirement` discriminated union has subtypes for every `ProofRequirementKind` (five original kinds plus interval/length/count/key containment added by Slices 1–26):
+The `ProofRequirement` discriminated union has a subtype for every `ProofRequirementKind` (numeric, presence, dimension, modifier, qualifier-compatibility, qualifier-chain, interval/length/count containment, key-presence, index-bounds, dimensional-product, and assignment-qualifier — the open-field assignment case discharged via guard narrowing):
 
 ```csharp
 // Abstract base — discriminated union

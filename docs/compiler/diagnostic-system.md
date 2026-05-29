@@ -175,7 +175,7 @@ Three levels. No `Hidden` (unlike Roslyn) — Precept's diagnostic surface is sm
 
 ## DiagnosticCode Registry
 
-`PRE0141 UnprovedAssignmentQualifierCompatibility` is the assignment-time companion to proof-stage `PRE0114 UnprovedQualifierCompatibility`. Use `PRE0141` when the type checker cannot prove a required assignment qualifier axis; keep `PRE0114` for operand-pair proof obligations and keep `PRE0068` / `PRE0069` for definite mismatches.
+`PRE0141 UnprovedAssignmentQualifierCompatibility` is the assignment companion to `PRE0114 UnprovedQualifierCompatibility`; both are **proof-stage** obligations. For an open-field `set`-action assignment, the type checker stamps an `AssignmentQualifierProofRequirement` (it owns the authoritative source-qualifier resolution) and the proof engine discharges it via guard-narrowing — emitting `PRE0141` only when unproved. (`PRE0141` formerly emitted at the type stage; it was re-staged when open-field qualifier narrowing landed, so a guard like `when X.currency == 'USD'` can discharge it. Field/arg defaults, bounds, and computed expressions are not walked by the proof engine — their unresolved-qualifier case still emits `PRE0141` at the type stage.) Keep `PRE0114` for operand-pair obligations and `PRE0068` / `PRE0069` for definite mismatches.
 
 `PRE0142 UninitializedFieldReadInInitialAssignment` closes the construction-time gap where an initial-event assignment reads a required field before any default or prior assignment establishes its first value. It is distinct from `PRE0094 InitialEventMissingAssignments`: `PRE0094` means the field is never assigned on that construction path; `PRE0142` means the field is assigned, but the RHS reads an undefined value while doing so.
 

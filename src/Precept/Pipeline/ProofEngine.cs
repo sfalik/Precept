@@ -694,6 +694,10 @@ public static partial class ProofEngine
             return (ProofDisposition.Proved, ProofStrategy.FlowNarrowing);
         if (TryQualifierCompatibilityProof(obligation, semantics))
             return (ProofDisposition.Proved, ProofStrategy.QualifierCompatibility);
+        if (TryQualifierGuardNarrowingProof(obligation, semantics))
+            return (ProofDisposition.Proved, ProofStrategy.QualifierCompatibility);
+        if (TryAssignmentQualifierProof(obligation, semantics))
+            return (ProofDisposition.Proved, ProofStrategy.QualifierCompatibility);
         if (TryDimensionalProductProof(obligation, semantics))
             return (ProofDisposition.Proved, ProofStrategy.DimensionalProduct);
         if (TryCompositionalConstraintProof(obligation, semantics))

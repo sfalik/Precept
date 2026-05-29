@@ -24,6 +24,7 @@ public static class ProofRequirements
         ProofRequirementKind.KeyPresence           => new ProofRequirementMeta.KeyPresence(),
         ProofRequirementKind.IndexBounds           => new ProofRequirementMeta.IndexBounds(),
         ProofRequirementKind.DimensionalProduct    => new ProofRequirementMeta.DimensionalProduct(),
+        ProofRequirementKind.AssignmentQualifier   => new ProofRequirementMeta.AssignmentQualifier(),
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind,
             $"Unknown ProofRequirementKind: {kind}"),
     };

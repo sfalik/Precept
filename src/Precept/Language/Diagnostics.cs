@@ -614,7 +614,7 @@ public static class Diagnostics
             RecoverySteps: ["Use a unit that belongs to the field's declared dimension category", "Check the dimension name in the field declaration and use a compatible unit"],
             ExampleBefore: "precept Example\nfield Weight as quantity of 'mass' default 0\nfield Distance as quantity of 'length' default 0\nfield Bad as quantity <- Weight + Distance",
             ExampleAfter: "precept Example\nfield Weight1 as quantity of 'mass' default 0\nfield Weight2 as quantity of 'mass' default 0\nfield Total as quantity of 'mass' <- Weight1 + Weight2"),
-        DiagnosticCode.UnprovedAssignmentQualifierCompatibility => new(nameof(DiagnosticCode.UnprovedAssignmentQualifierCompatibility), DiagnosticStage.Type, Severity.Error,
+        DiagnosticCode.UnprovedAssignmentQualifierCompatibility => new(nameof(DiagnosticCode.UnprovedAssignmentQualifierCompatibility), DiagnosticStage.Proof, Severity.Error,
             "Cannot prove the value's '{0}' qualifier satisfies field '{1}'",
             DiagnosticCategory.BusinessDomain,
             RelatedCodes: [DiagnosticCode.QualifierMismatch, DiagnosticCode.UnprovedQualifierCompatibility],

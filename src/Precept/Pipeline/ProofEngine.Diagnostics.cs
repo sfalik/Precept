@@ -68,6 +68,14 @@ public static partial class ProofEngine
                     FormatQualifierValue(leftExpression is null ? null : ResolveQualifierFromExpression(leftExpression, chainReq.LeftAxis, semantics)),
                     FormatQualifierValue(rightExpression is null ? null : ResolveQualifierFromExpression(rightExpression, chainReq.RightAxis, semantics)));
 
+            case AssignmentQualifierProofRequirement aqReq:
+                // PRE0141 (assignment-qualifier compatibility) — re-staged from the type checker to
+                // the proof stage: the open-field assignment is discharged by guard-narrowing or
+                // surfaces here. Message preserves the type-stage wording (axis label + field name).
+                return Diagnostics.Create(DiagnosticCode.UnprovedAssignmentQualifierCompatibility, obligation.Site.Span,
+                    QualifierAxisLabel(aqReq.Axis),
+                    aqReq.TargetFieldName);
+
             case PresenceProofRequirement presence:
                 return Diagnostics.Create(DiagnosticCode.UnprovedPresenceRequirement, obligation.Site.Span,
                     DescribeSubject(presence.Subject, obligation.Site),
