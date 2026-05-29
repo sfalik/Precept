@@ -60,8 +60,29 @@ The numeric discrete-equality narrowing path (F-LANG-BIZ-08) is the **only** str
 6. **Negative equality (`!=`, `is not set`) narrows nothing usable** for a positive proof (open complement, not a singleton).
 7. **Compose-by-intersection with declared qualifiers** — a guard may refine an open axis but never contradict-and-win over a declared one; a contradiction branch is unsatisfiable, not a discharge.
 8. **Period `.dimension == 'date'` is sound as the runtime value's dimension** but must discharge only dimension-axis obligations, never unit/currency; `datetime` (composite) discharges nothing for Date/Time obligations; `PeriodDimension.Any` never satisfies a concrete obligation.
+9. **Reassignment invalidation** — a narrowing fact `narrowed(X, α, v)` is invalidated by any reassignment of `X` (`set X = …`) earlier in the same body; an obligation after the reassignment must NOT discharge against the pre-reassignment fact.
 
-Full 11-item failure-mode→required-test catalog in Lens B output; #1 (value-mismatch discharge) and #2 (OR-arm collapse) are the highest-risk.
+### Failure-mode → rule → required-test catalog (the soundness gate — every row needs a fail-before/pass-after test)
+
+| # | Failure mode (the unsound discharge to prevent) | Closed by rule | Required test |
+|---|---|---|---|
+| 1 | **Value-mismatch discharge** (THE trap): `X.currency=='USD'` then assign to `money in 'EUR'` passes on "X is narrowed" | 4 (value-exact) | guard `=='USD'` + assign to EUR field → MUST reject |
+| 2 | **OR-arm collapse**: `=='USD' or =='EUR'` discharges a USD-only assignment by picking one arm | 2 (all-branches) | OR-guard + assign to USD-only → MUST reject |
+| 3 | **Wrong-axis discharge**: `X.dimension=='date'` discharges a unit/currency obligation | 3 (axis match) | dimension guard + unit/currency obligation on same field → MUST reject |
+| 4 | **Negative-equality false positive**: `X.currency != 'JPY'` discharges a positive EUR obligation | 6 (negation narrows nothing) | `!=` guard + positive obligation → MUST reject |
+| 5 | **Field-to-field false value**: `X.currency == Y.currency` discharges an absolute-value obligation | 5 (literal RHS only) | field-to-field guard + absolute obligation → MUST reject |
+| 6 | **Cross-branch / sibling leak**: a guard on one row discharges an obligation in a sibling row | 1 (context-scoped) | guard on row A + obligation in sibling row B → MUST reject |
+| 7 | **Cross-pipeline-step leak**: `when X.cur=='USD' -> set X = <eur> -> set Usd = Usd + X` discharges step 2 against the step-1 fact invalidated by the reassignment | 9 (reassignment invalidation) | reassign narrowing subject mid-body, then rely on stale fact → MUST reject. **(CONCERN-1 — see § Cross-step note)** |
+| 8 | **Declared-qualifier override**: `X` declared `in 'USD'`, guard `=='EUR'`, EUR obligation discharges | 7 (intersect, never override) | contradiction branch → MUST NOT discharge (ideally flagged unsatisfiable) |
+| 9 | **Negated-conjunction over-credit**: `not(A and X.cur=='USD')` narrows X's currency | 6 + 2 | negated-conjunction guard → narrows nothing |
+| 10 | **Composite-period over-specification**: `X.dimension=='datetime'` discharges a concrete-unit or single-class (Date/Time) obligation | 8 (datetime inert) | `=='datetime'` + Date obligation → MUST NOT discharge |
+| 11 | **`PeriodDimension.Any` discharge**: a narrowing producing `Any` satisfies a concrete-dimension obligation | 8 (Any never satisfies) | Any-valued narrowing + concrete obligation → MUST reject |
+
+#1 (value-mismatch) and #2 (OR-collapse) are the highest-risk (natural author shapes that look correct on the happy path).
+
+### Cross-step note (CONCERN-1, surfaced at design review)
+
+The guard is **row-scoped**: `obligation.Context` for a `TransitionRowContext` carries the whole row, so `t.Row.Guard` is pulled for *every* body obligation (`Strategies.cs:622`). No structural prevention forbids `set X` (reassigning a narrowing subject) mid-body. The **numeric narrowing path shares this exact exposure** and equally does not model reassignment — so failure-mode 7 is a pre-existing assumption the qualifier layer inherits, not one it introduces. Two sound resolutions, owner's call: (a) **invalidate-on-reassignment** — the discharge verifies the subject was not rebound between the guard and the obligation site (rule 9; the qualifier layer implements it and a follow-up finding checks/【or fixes】 the numeric path); or (b) **scope out** — declare reassignment-of-a-narrowing-subject out of scope as a pre-existing row-scoped assumption, documented, with the numeric-path parity noted. Either way it must be **named**, not silent.
 
 ## Architecture (Lens C) — recommended shape
 
