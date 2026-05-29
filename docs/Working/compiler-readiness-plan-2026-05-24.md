@@ -984,12 +984,14 @@ Exit: all 12 design acceptance criteria pass; PR mergeable.
 **Goal**: composite bases do not cancel single-unit denominators (D15), and illegal atoms / non-subset assignments emit `QualifierMismatch`.
 
 **Steps**:
-1. Single-basis-assuming consumers must treat composite as "not single-basis": `src/Precept/Pipeline/TypeChecker.Expressions.cs:1322–1339` (period cancellation against price denominators) — a composite period must not cancel `price in 'USD/hours'`; emit/retain `CompoundPeriodDenominator`. Audit `ProofEngine.cs:602`, `ProofEngine.Qualifiers.cs:198/244`, `ProofEngine.Strategies.cs:236` for `UnitName` single-atom assumptions.
+1. Single-basis-assuming consumers must treat composite as "not single-basis": `src/Precept/Pipeline/TypeChecker.Expressions.cs:1322–1352` (period cancellation against price denominators) — a composite period must not cancel `price in 'USD/hours'`; emit/retain `CompoundPeriodDenominator`. Audit `ProofEngine.cs:602`, `ProofEngine.Qualifiers.cs:198/244`, `ProofEngine.Strategies.cs:236` for `UnitName` single-atom assumptions.
+   - **Carry-forward from W-A review (NIT-1)**: PRE0074's trigger is `rightTemporalDims.Count > 1` and PRE0073 gates on `DerivedDimension == PeriodDimension.Date`. After W-A a composite is a *single* `TemporalUnit` qualifier with `Components.Length > 1` — so the `Count > 1` heuristic is **dead for composites** (can never fire) and the `== Date` gate skips date+time composites (now `Datetime`). Switch these to `Components.Length > 1` / `Components`-based checks. These ops are currently dormant (no `period`/`period` or `price`/`period` division in the operations catalog), so this is latent, not an active defect — but it must land in W-C.
+   - **False-green trap (W-A review "strongest objection")**: when wiring the first `period in 'hours + minutes' * price in 'USD/hours'` cancellation test, confirm the test **fails before** the NIT-1 fix and passes after. If it passes against unmodified `TypeChecker.Expressions.cs:1340`, the dead `Count > 1` heuristic produced a false-green — investigate immediately.
 2. Legal-basis-by-source-operation (Gap 4): a composite atom illegal for the source operation (e.g., `hours` on `date - date`) emits `QualifierMismatch` per illegal atom.
 3. D14 composite subset (Gap 3): assignment whose non-zero component set ⊄ declared basis emits `QualifierMismatch`.
 
 **Exit criteria**:
-- `period in 'hours + minutes' * price in 'USD/hours'` emits `CompoundPeriodDenominator`.
+- `period in 'hours + minutes' * price in 'USD/hours'` emits `CompoundPeriodDenominator` (via a `Components.Length > 1` check, NOT the dead `Count > 1` heuristic — see step 1).
 - `date - date as period in 'days + hours'` emits `QualifierMismatch` for `hours`.
 - Assigning a Days-bearing value to `period in 'years + months'` emits `QualifierMismatch`.
 - `dotnet test` green.
@@ -1001,8 +1003,10 @@ Exit: all 12 design acceptance criteria pass; PR mergeable.
 **Goal**: the matrix is covered by scenario tests and the docs match shipped behavior.
 
 **Steps**:
-1. Scenario tests (`test/Precept.Tests/`, new `CompositePeriodBasisTests.cs`): canonicalization (order-independence, spaced canonical), lenient whitespace, PRE0160/0161/0162 emission, D14 subset accept/reject, legal-basis-by-operation, cancellation-blocked, `.basis`/`.dimension` returns.
-2. Resolve D6.1 (sample or not). If sample: add + `precept_compile` clean.
+1. Scenario tests (`test/Precept.Tests/`, extend `CompositePeriodBasisTests.cs` from W-A): canonicalization (order-independence, spaced canonical), lenient whitespace, PRE0160/0161/0162 emission, D14 subset accept/reject, legal-basis-by-operation, cancellation-blocked, `.basis`/`.dimension` returns.
+   - **Carry-forward from W-A review (NIT-4)**: the three malformed-basis tests use `CheckExpectingError` (asserts *presence*, not *exclusivity*). Strengthen them to assert no *other* error codes leak (exact-count or no-other-code), since they specifically exercise per-component recovery branching (`'years + + days'` must emit only Empty, not also Unknown/Duplicate).
+   - **Carry-forward from W-A review (NIT-3)**: add a test asserting the single-basis path's lenient-whitespace widening is intentional — `period in ' months '` (inner padding) resolves clean (W-A trims before `TryGet`). Documents the one behavioral delta vs. pre-W-A.
+2. **D6.1 resolved: ship the realistic sample.** Extend `samples/equipment-lease-agreement.precept` — `LeaseTerm as period optional` (line 33) → `LeaseTerm as period in 'years + months' optional`; the `Quote` event sets it to `'3 years + 6 months'`. `precept_compile` clean (LeaseTerm is a recorded field, not a date-arithmetic operand, so no `of 'date'` proof needed). Update this plan's D6.1 note from "recommend none" to "lease sample shipped."
 3. Verify no doc drift: `business-domain-types.md` composite sections describe shipped behavior; flip any status notes.
 
 **Exit criteria**:
