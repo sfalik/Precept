@@ -347,6 +347,16 @@ public static partial class ProofEngine
         }
         if (indexExpr is null || receiverField is null) return false;
 
+        // Sequential proof flow: the bound is established by a guard over the index subject
+        // (`N >= 0`) and the collection's count (`N < F.count`). If either the index field or
+        // the collection field was reassigned earlier in this action chain, the bound fact is
+        // stale and must not discharge. (Event args / literals are never reassigned by a
+        // full-replacement action, so only field subjects participate.)
+        if (obligation.ReassignedBefore.Contains(receiverField)) return false;
+        if (GetFieldName(indexExpr) is { } idxField
+            && obligation.ReassignedBefore.Contains(idxField))
+            return false;
+
         var guard = obligation.Context switch
         {
             TransitionRowContext t => t.Row.Guard,
@@ -594,6 +604,10 @@ public static partial class ProofEngine
     {
         var fieldName = GetFieldName(req.Subject, obligation.Site);
         if (fieldName is null) return false;
+
+        // Sequential proof flow: a `contains` guard fact over a collection reassigned earlier
+        // in this chain is stale — the membership the guard established is about the old value.
+        if (obligation.ReassignedBefore.Contains(fieldName)) return false;
 
         var guard = obligation.Context switch
         {
@@ -976,6 +990,13 @@ public static partial class ProofEngine
         var leftField = GetFieldName(binaryOp.Left);
         var rightField = GetFieldName(binaryOp.Right);
         if (leftField is null || rightField is null) return false;
+
+        // Sequential proof flow: the narrowing relies on a guard relating the two operands
+        // (e.g. `A >= B` discharges `A - B >= 0`). If either operand was reassigned earlier in
+        // this chain, that relation is stale and must not discharge.
+        if (obligation.ReassignedBefore.Contains(leftField)
+            || obligation.ReassignedBefore.Contains(rightField))
+            return false;
 
         var branches = ExtractFieldToFieldBranches(guard);
         if (branches.IsEmpty) return false;

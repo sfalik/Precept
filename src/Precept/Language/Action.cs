@@ -8,6 +8,15 @@ namespace Precept.Language;
 /// Metadata for a state-machine action verb.
 /// <c>Token</c> is a <see cref="TokenMeta"/> object reference from the Tokens catalog.
 /// </summary>
+/// <param name="ReplacesEntireValue">
+/// True when the action fully determines the field's resulting value/presence independent
+/// of its prior contents — <c>set</c> assigns a fresh value; <c>clear</c> empties/resets.
+/// Such actions invalidate prior guard facts about the field, so a guard established before
+/// the action must not discharge an obligation after it (sequential proof flow). False for
+/// in-place collection mutations (<c>add</c>/<c>append</c>/<c>insert</c>/<c>remove</c>/…),
+/// which transform existing contents — whether a fact like <c>count &gt; 0</c> survives is the
+/// separate effect-aware forward-propagation concern, not blanket invalidation.
+/// </param>
 public sealed record ActionMeta(
     ActionKind   Kind,
     TokenMeta    Token,
@@ -15,6 +24,7 @@ public sealed record ActionMeta(
     TypeTarget[] ApplicableTo,
     ActionSyntaxShape SyntaxShape,
     ActionWriteSemantics WriteSemantics,
+    bool         ReplacesEntireValue = false,
     bool         ValueRequired = false,
     ProofRequirement[]? ProofRequirements = null,
     ConstructKind[]?    AllowedIn         = null,

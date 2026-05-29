@@ -112,4 +112,132 @@ public class ReassignmentInvalidationTests
                  && o.Strategy == ProofStrategy.GuardInPath,
             because: "a cleared subject's presence guard must not discharge via GuardInPath");
     }
+
+    // ── Index-bounds reassignment (accessor site `.at(N)` and action site `remove F at N`) ──
+    // The guard `N >= 0 and N < F.count` discharges the index obligation. A `count > 0` guard is
+    // also present so the non-empty obligation discharges independently — isolating the index
+    // bound as the only thing a reassignment can invalidate.
+
+    [Fact]
+    public void IndexBounds_AtAccessor_NoReassignment_Discharges()
+    {
+        // Control / non-regression: with no intervening reassignment, the index obligation proves
+        // and no IndexBoundsGuard diagnostic surfaces.
+        var ledger = Prove("""
+            precept IdxAtOnly
+            field Items as list of string
+            field Idx as integer default 0
+            field Picked as string default ""
+            state Open initial
+            event Pick
+            from Open on Pick when Idx >= 0 and Idx < Items.count and Items.count > 0
+                -> set Picked = Items.at(Idx)
+                -> no transition
+            """);
+
+        ledger.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.IndexBoundsGuard),
+            because: "the bounds guard holds throughout — no reassignment invalidates it");
+        ledger.Obligations.Should().Contain(
+            o => o.Requirement is IndexBoundsProofRequirement && o.Disposition == ProofDisposition.Proved,
+            because: "the explicit lower/upper bound guard discharges the index obligation");
+    }
+
+    [Fact]
+    public void IndexBounds_AtAccessor_InvalidatedByIndexReassignment_NoLongerDischarges()
+    {
+        // `set Idx = 0` reassigns the index subject before `Items.at(Idx)`; the engine cannot carry
+        // the stale `Idx >= 0 and Idx < count` bound across the write, so the index obligation must
+        // surface. (The `Items.count > 0` obligation still proves — Items was not reassigned.)
+        var ledger = Prove("""
+            precept IdxAtReassign
+            field Items as list of string
+            field Idx as integer default 0
+            field Picked as string default ""
+            state Open initial
+            event Pick
+            from Open on Pick when Idx >= 0 and Idx < Items.count and Items.count > 0
+                -> set Idx = 0
+                -> set Picked = Items.at(Idx)
+                -> no transition
+            """);
+
+        ledger.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.IndexBoundsGuard),
+            because: "the index bound is stale after set Idx = 0");
+        ledger.Obligations.Should().NotContain(
+            o => o.Requirement is IndexBoundsProofRequirement && o.Disposition == ProofDisposition.Proved,
+            because: "a reassigned index's bound guard must not discharge");
+    }
+
+    [Fact]
+    public void IndexBounds_RemoveAtAction_NoReassignment_Discharges()
+    {
+        // Control / non-regression for the action-site shape (`remove L at Idx`).
+        var ledger = Prove("""
+            precept IdxRemoveOnly
+            field L as list of integer
+            field Idx as integer default 0
+            state Open initial
+            event E
+            from Open on E when Idx >= 0 and Idx < L.count and L.count > 0
+                -> remove L at Idx
+                -> no transition
+            """);
+
+        ledger.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.IndexBoundsGuard),
+            because: "the index and non-empty guards both hold — nothing invalidates them");
+        ledger.Obligations.Should().Contain(
+            o => o.Requirement is IndexBoundsProofRequirement && o.Disposition == ProofDisposition.Proved,
+            because: "the bounds guard discharges the remove-at index obligation");
+    }
+
+    [Fact]
+    public void IndexBounds_RemoveAtAction_InvalidatedByIndexReassignment_NoLongerDischarges()
+    {
+        // The collection L is untouched (its `count > 0` non-empty obligation still discharges),
+        // but the reassigned index Idx invalidates the index-in-bounds guard.
+        var ledger = Prove("""
+            precept IdxRemoveReassign
+            field L as list of integer
+            field Idx as integer default 0
+            state Open initial
+            event E
+            from Open on E when Idx >= 0 and Idx < L.count and L.count > 0
+                -> set Idx = 0
+                -> remove L at Idx
+                -> no transition
+            """);
+
+        ledger.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.IndexBoundsGuard),
+            because: "the index-in-bounds guard is stale after set Idx = 0, even though L is unchanged");
+        ledger.Obligations.Should().NotContain(
+            o => o.Requirement is IndexBoundsProofRequirement && o.Disposition == ProofDisposition.Proved,
+            because: "a reassigned index's bound guard must not discharge");
+    }
+
+    [Fact]
+    public void KeyPresence_AppendByUniqueness_InvalidatedByCollectionReassignment_NoLongerDischarges()
+    {
+        // when not (AuditLog contains Seq) -> clear AuditLog -> append AuditLog Entry by Seq
+        // The append-by uniqueness obligation discharges from the `not contains` guard. Once the
+        // collection is fully replaced (clear), that membership fact is about the old value and is
+        // stale. The engine does not model `clear ⟹ empty ⟹ key absent`, so it conservatively
+        // refuses to discharge (sound: it never claims uniqueness it cannot establish). This locks
+        // the filter into TryKeyPresenceProof; a `set`-to-a-populated-collection would be the
+        // genuinely-unsound case the same filter rejects.
+        var ledger = Prove("""
+            precept KeyReassign
+            field AuditLog as log of string by integer
+            state Open initial
+            event Record(Entry as string, Seq as integer)
+            from Open on Record when not (AuditLog contains Seq)
+                -> clear AuditLog
+                -> append AuditLog Entry by Seq
+                -> no transition
+            """);
+
+        ledger.Obligations
+            .Where(o => o.Requirement is KeyPresenceProofRequirement { RequireAbsence: true })
+            .Should().NotContain(o => o.Disposition == ProofDisposition.Proved,
+                because: "a reassigned collection's `contains` guard fact must not discharge the uniqueness obligation");
+    }
 }

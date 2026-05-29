@@ -1156,6 +1156,53 @@ public class ProofEngineTests
         }
 
         [Fact]
+        public void Strategy4_OperandReassignedBeforeSubtraction_FlowNarrowingDoesNotDischarge()
+        {
+            // Sequential proof flow (spec § 0.6 item 7): the `A > B` guard discharges `A - B > 0`
+            // via flow narrowing — but only while the relation holds. A prior `set A = 0` in the
+            // same action chain reassigns an operand, so the guard relation is stale and the
+            // subtraction obligation must NOT discharge against it.
+            var subtractionMeta = GetBinaryMeta(OperationKind.NumberMinusNumber);
+            var subtraction = MakeBinary(
+                TypeKind.Number,
+                OperationKind.NumberMinusNumber,
+                MakeFieldRef("A", TypeKind.Number),
+                MakeFieldRef("B", TypeKind.Number),
+                new NumericProofRequirement(
+                    new ParamSubject(subtractionMeta.Rhs),
+                    OperatorKind.GreaterThan,
+                    0m,
+                    "Difference must stay positive"));
+
+            var ledger = ProofEngine.Prove(
+                MakeSemantics(
+                    fields: ImmutableArray.Create(
+                        MakeField("A"),
+                        MakeField("B"),
+                        MakeField("X")),
+                    transitionRows: ImmutableArray.Create(
+                        MakeTransitionRow(
+                            "Draft",
+                            "Submit",
+                            MakeBinary(
+                                TypeKind.Boolean,
+                                OperationKind.NumberGreaterThanNumber,
+                                MakeFieldRef("A", TypeKind.Number),
+                                MakeFieldRef("B", TypeKind.Number)),
+                            // Reassign operand A, THEN compute A - B. The guard relation is now stale.
+                            MakeSetAction("A", TypeKind.Number, MakeLiteral(TypeKind.Number, 0m)),
+                            MakeSetAction("X", TypeKind.Number, subtraction)))),
+                StateGraph.Empty);
+
+            var obligation = ledger.Obligations.Single(o => o.Requirement is NumericProofRequirement);
+
+            obligation.Disposition.Should().NotBe(ProofDisposition.Proved,
+                because: "reassigning operand A invalidates the A > B guard relation");
+            obligation.Strategy.Should().NotBe(ProofStrategy.FlowNarrowing,
+                because: "a stale field-to-field relation must not discharge via flow narrowing");
+        }
+
+        [Fact]
         public void Strategy4_AGreaterThanB_SubtractionSqrtProved()
         {
             // FlowNarrowing (Strategy 4) requires obligation.Site to be a binary subtraction op.

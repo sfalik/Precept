@@ -440,14 +440,14 @@ public static partial class ProofEngine
                 for (var i = start; i < obligations.Count; i++)
                     obligations[i] = obligations[i] with { ReassignedBefore = reassignedBefore };
 
-            // Record this action's written field — but ONLY for full-value REPLACEMENT
-            // (`set`/`clear`). In-place collection mutations (`append`/`insert`/`remove`/…)
-            // transform rather than replace: a grow (`insert`/`append`) preserves `count > 0`,
-            // so blanket invalidation would false-positive on an insert-then-remove chain. The
-            // effect-aware reasoning for collection mutations (grow preserves, shrink may
-            // invalidate count/presence) is the separate forward-propagation concern (the second
-            // clause of spec § 0.6 item 7), tracked as a follow-on — not blanket invalidation here.
-            if (action.Kind is ActionKind.Set or ActionKind.Clear
+            // Record this action's written field — but ONLY for full-value REPLACEMENT,
+            // a catalog-declared property (`set` assigns, `clear` empties/resets). In-place
+            // collection mutations (`append`/`insert`/`remove`/…) transform rather than replace:
+            // a grow (`insert`/`append`) preserves `count > 0`, so blanket invalidation would
+            // false-positive on an insert-then-remove chain. The effect-aware reasoning for
+            // collection mutations (grow preserves, shrink may invalidate count/presence) is the
+            // separate forward-propagation concern — not blanket invalidation here.
+            if (actionMeta.ReplacesEntireValue
                 && !string.IsNullOrEmpty(action.FieldName)
                 && !writtenSoFar.Contains(action.FieldName))
                 writtenSoFar = writtenSoFar.Add(action.FieldName);
