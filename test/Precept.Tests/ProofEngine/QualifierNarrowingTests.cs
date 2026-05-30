@@ -171,4 +171,26 @@ public class QualifierNarrowingTests
                 -> no transition
             """).Should().BeFalse("a declared USD source matches the USD target with no narrowing needed");
     }
+
+    // ── Diagnostic names the narrowed value vs the required value ───────────────
+
+    [Fact]
+    public void MismatchedCurrencyGuard_DiagnosticNamesNarrowedAndRequiredValues()
+    {
+        var message = Compiler.Compile("""
+            precept P
+            field Payment as money
+            field Balance as money in 'USD'
+            state S initial
+            event E
+            from S on E when Payment.currency == 'EUR'
+                -> set Balance = Balance + Payment
+                -> no transition
+            """).Diagnostics
+            .First(d => d.Code == nameof(DiagnosticCode.UnprovedQualifierCompatibility))
+            .Message;
+
+        message.Should().Contain("EUR", "the message names what the guard narrowed the open operand to")
+            .And.Contain("USD", "and the required value it failed to match");
+    }
 }

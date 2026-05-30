@@ -599,17 +599,28 @@ public static partial class ProofEngine
         ProofSubject subject,
         TypedExpression site,
         QualifierAxis axis,
-        SemanticIndex semantics)
-        => DescribeQualifiedExpression(ResolveSubject(subject, site), axis, semantics);
+        SemanticIndex semantics,
+        ProofObligation? obligation = null)
+        => DescribeQualifiedExpression(ResolveSubject(subject, site), axis, semantics, obligation);
 
     private static (string Label, string QualifierValue) DescribeQualifiedExpression(
         TypedExpression? expr,
         QualifierAxis axis,
-        SemanticIndex semantics)
+        SemanticIndex semantics,
+        ProofObligation? obligation = null)
     {
         var label = DescribeExpression(expr);
         var qualifier = expr is null ? null : ResolveQualifierFromExpression(expr, axis, semantics);
-        return (label, FormatQualifierValue(qualifier));
+        if (qualifier is not null)
+            return (label, FormatQualifierValue(qualifier));
+
+        // Open operand: surface the guard-narrowed value so the diagnostic names what the guard
+        // pinned it to (e.g. "EUR (from guard)") instead of an opaque "unresolved" — this is the
+        // narrowed-vs-required signal. Null when no guard provably narrows it on this axis.
+        var narrowed = expr is not null && obligation is not null
+            ? NarrowedValueFromGuard(expr, axis, obligation, semantics)
+            : null;
+        return (label, narrowed is not null ? $"{narrowed} (from guard)" : FormatQualifierValue(null));
     }
 
     private static string DescribeExpression(TypedExpression? expr) => expr switch

@@ -40,13 +40,13 @@ public static partial class ProofEngine
                 (string Label, string QualifierValue) rightOperand;
                 if (obligation.Site is TypedBinaryOp qcBin)
                 {
-                    leftOperand = DescribeQualifiedExpression(qcBin.Left, qcReq.Axis, semantics);
-                    rightOperand = DescribeQualifiedExpression(qcBin.Right, qcReq.Axis, semantics);
+                    leftOperand = DescribeQualifiedExpression(qcBin.Left, qcReq.Axis, semantics, obligation);
+                    rightOperand = DescribeQualifiedExpression(qcBin.Right, qcReq.Axis, semantics, obligation);
                 }
                 else
                 {
-                    leftOperand = DescribeQualifiedSubject(qcReq.LeftSubject, obligation.Site, qcReq.Axis, semantics);
-                    rightOperand = DescribeQualifiedSubject(qcReq.RightSubject, obligation.Site, qcReq.Axis, semantics);
+                    leftOperand = DescribeQualifiedSubject(qcReq.LeftSubject, obligation.Site, qcReq.Axis, semantics, obligation);
+                    rightOperand = DescribeQualifiedSubject(qcReq.RightSubject, obligation.Site, qcReq.Axis, semantics, obligation);
                 }
 
                 return Diagnostics.Create(DiagnosticCode.UnprovedQualifierCompatibility, obligation.Site.Span,
