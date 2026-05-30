@@ -58,6 +58,14 @@ public static partial class ProofEngine
                     rightOperand.QualifierValue);
 
             case QualifierChainProofRequirement chainReq:
+                // Composite-period rejection: a period declared by a multi-component basis
+                // (`in 'hours + minutes'`) cannot cancel a single-unit denominator. The chain
+                // resolves the period's TemporalDimension only for a single basis, so the
+                // composite reaches here unproved — emit the precise CompoundPeriodDenominator
+                // rather than the generic chain-compatibility diagnostic.
+                if (TryCreateCompoundPeriodDenominatorDiagnostic(chainReq, obligation, semantics, out var compoundDiagnostic))
+                    return compoundDiagnostic;
+
                 var leftExpression = ResolveSubject(chainReq.LeftSubject, obligation.Site);
                 var rightExpression = ResolveSubject(chainReq.RightSubject, obligation.Site);
                 return Diagnostics.Create(DiagnosticCode.UnprovedQualifierCompatibility, obligation.Site.Span,
@@ -188,6 +196,61 @@ public static partial class ProofEngine
         }
 
         throw new InvalidOperationException($"Unexpected proof requirement type '{obligation.Requirement.GetType().FullName}'.");
+    }
+
+    /// <summary>
+    /// Detects the composite-period denominator case for a qualifier-chain obligation and, if
+    /// found, produces the precise <see cref="DiagnosticCode.CompoundPeriodDenominator"/> instead
+    /// of the generic chain-compatibility diagnostic. The period is the chain subject whose axis is
+    /// <see cref="QualifierAxis.TemporalDimension"/>; the diagnostic fires only when that subject
+    /// resolves to a multi-component <see cref="DeclaredQualifierMeta.TemporalUnit"/>. The price
+    /// denominator (arg1) is the opposing subject's unit. Single emission — never alongside the
+    /// generic code.
+    /// </summary>
+    private static bool TryCreateCompoundPeriodDenominatorDiagnostic(
+        QualifierChainProofRequirement chainReq,
+        ProofObligation obligation,
+        SemanticIndex semantics,
+        out Diagnostic diagnostic)
+    {
+        diagnostic = default!;
+
+        // Identify which side is the period (the TemporalDimension axis) and which is the price.
+        ProofSubject periodSubject;
+        ProofSubject denominatorSubject;
+        if (chainReq.RightAxis == QualifierAxis.TemporalDimension)
+        {
+            periodSubject = chainReq.RightSubject;
+            denominatorSubject = chainReq.LeftSubject;
+        }
+        else if (chainReq.LeftAxis == QualifierAxis.TemporalDimension)
+        {
+            periodSubject = chainReq.LeftSubject;
+            denominatorSubject = chainReq.RightSubject;
+        }
+        else
+        {
+            return false;
+        }
+
+        if (ResolveQualifierOnAxis(periodSubject, QualifierAxis.TemporalUnit, obligation.Site, semantics)
+            is not DeclaredQualifierMeta.TemporalUnit { Components.Length: > 1 } compositeUnit)
+        {
+            return false;
+        }
+
+        var compositeBasis = string.Join(" + ", compositeUnit.Components);
+        var denominatorQualifier =
+            ResolveQualifierOnAxis(denominatorSubject, QualifierAxis.Unit, obligation.Site, semantics)
+            ?? ResolveQualifierOnAxis(denominatorSubject, QualifierAxis.Dimension, obligation.Site, semantics);
+        var denominatorUnit =
+            (denominatorQualifier is not null ? ExtractComparableValue(denominatorQualifier) : null)
+            ?? compositeUnit.Components[0];
+
+        diagnostic = Diagnostics.Create(DiagnosticCode.CompoundPeriodDenominator, obligation.Site.Span,
+            compositeBasis,
+            denominatorUnit);
+        return true;
     }
 
     private static bool TryCreateCollectionSafetyDiagnostic(ProofObligation obligation, out Diagnostic diagnostic)

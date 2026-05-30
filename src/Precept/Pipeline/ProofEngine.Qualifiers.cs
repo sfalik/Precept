@@ -253,6 +253,19 @@ public static partial class ProofEngine
         _                                      => null,
     };
 
+    /// <summary>
+    /// Derives a <see cref="DeclaredQualifierMeta.TemporalDimension"/> from a single-basis
+    /// <see cref="DeclaredQualifierMeta.TemporalUnit"/> (e.g. <c>period in 'hours'</c> → Time).
+    /// Returns <c>null</c> for any non-TemporalUnit qualifier and — critically — for a composite
+    /// basis (<c>Components.Length &gt; 1</c>), which cannot cancel a single-unit denominator.
+    /// </summary>
+    private static DeclaredQualifierMeta.TemporalDimension? DeriveSingleBasisTemporalDimension(
+        DeclaredQualifierMeta qualifier) =>
+        qualifier is DeclaredQualifierMeta.TemporalUnit { Components.Length: 1 } tu
+            ? new DeclaredQualifierMeta.TemporalDimension(
+                tu.DerivedDimension, tu.Origin, tu.Preposition, tu.ProofSatisfactions, tu.SourceFieldName)
+            : null;
+
     private static DeclaredQualifierMeta? ResolveQualifierOnAxis(
         ProofSubject subject, QualifierAxis axis, TypedExpression site, SemanticIndex semantics)
     {
@@ -280,6 +293,16 @@ public static partial class ProofEngine
                 {
                     if (qual.Axis == QualifierAxis.TemporalDimension)
                         return qual;
+                }
+            }
+
+            // Axis fallback: TemporalDimension ← single-basis TemporalUnit (see field branch).
+            if (axis == QualifierAxis.TemporalDimension)
+            {
+                foreach (var qual in argQualifiers)
+                {
+                    if (DeriveSingleBasisTemporalDimension(qual) is { } derived)
+                        return derived;
                 }
             }
 
@@ -314,6 +337,16 @@ public static partial class ProofEngine
                 {
                     if (qual.Axis == QualifierAxis.TemporalDimension)
                         return qual;
+                }
+            }
+
+            // Axis fallback: TemporalDimension ← single-basis TemporalUnit (see field branch).
+            if (axis == QualifierAxis.TemporalDimension)
+            {
+                foreach (var qual in tcQualifiers)
+                {
+                    if (DeriveSingleBasisTemporalDimension(qual) is { } derived)
+                        return derived;
                 }
             }
 
@@ -412,6 +445,21 @@ public static partial class ProofEngine
             {
                 if (qual.Axis == QualifierAxis.TemporalDimension)
                     return qual;
+            }
+        }
+
+        // Axis fallback: TemporalDimension ← single-basis TemporalUnit. A period declared by
+        // basis (`in 'hours'`) carries a TemporalUnit whose DerivedDimension is the period's
+        // single dimension; surfacing it lets price×period cancel a single-unit denominator.
+        // Strictly gated on a single basis component: a composite (`in 'hours + minutes'`) has a
+        // derived dimension that is still one dimension, so resolving it here would unsoundly
+        // cancel — the composite must stay unresolved (→ unproved → CompoundPeriodDenominator).
+        if (axis == QualifierAxis.TemporalDimension)
+        {
+            foreach (var qual in field.DeclaredQualifiers)
+            {
+                if (DeriveSingleBasisTemporalDimension(qual) is { } derived)
+                    return derived;
             }
         }
 

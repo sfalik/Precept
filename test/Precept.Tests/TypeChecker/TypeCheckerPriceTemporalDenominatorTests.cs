@@ -89,15 +89,20 @@ public class TypeCheckerPriceTemporalDenominatorTests
     // ════════════════════════════════════════════════════════════════════════
     //  Cancellation (FULL pipeline — Compiler.Compile, so the proof-stage chain
     //  obligation is actually exercised). A temporal-denominator price cancels a
-    //  period declared with a temporal DIMENSION (`of 'time'`/`of 'date'`) or a
-    //  `duration`. A period declared only by BASIS (`in 'hours'`) does NOT yet
-    //  cancel — the price×period chain resolves the period's TemporalDimension,
-    //  which a declared TemporalUnit basis does not surface (pinned as a gap below).
+    //  period declared with a temporal DIMENSION (`of 'time'`/`of 'date'`), a
+    //  `duration`, or a single-basis BASIS (`in 'hours'`) — the price×period chain
+    //  derives the period's TemporalDimension from its single declared basis. A
+    //  composite basis (`in 'hours + minutes'`) does NOT cancel a single-unit
+    //  denominator; it is a compile error (PRE0074, CompoundPeriodDenominator).
     // ════════════════════════════════════════════════════════════════════════
 
     private static bool HasQualifierChainError(string source) =>
         Compiler.Compile(source).Diagnostics.Any(d =>
             d.Code == nameof(DiagnosticCode.UnprovedQualifierCompatibility));
+
+    private static bool HasCompoundPeriodDenominatorError(string source) =>
+        Compiler.Compile(source).Diagnostics.Any(d =>
+            d.Code == nameof(DiagnosticCode.CompoundPeriodDenominator));
 
     [Fact]
     public void PricePerHours_TimesPeriodOfTime_Cancels()
@@ -130,12 +135,12 @@ public class TypeCheckerPriceTemporalDenominatorTests
     }
 
     [Fact]
-    public void PricePerHours_TimesPeriodInHours_NotYetProven()
+    public void PricePerHours_TimesPeriodInHours_Cancels()
     {
-        // KNOWN GAP: per § D15 `period in 'hours'` should cancel `price in 'USD/hours'`, but the
-        // price×period chain resolves the period's TemporalDimension and a declared TemporalUnit
-        // basis does not surface one on that path — so it currently fails. Pinned so the gap is
-        // visible; a future fix flips this to BeFalse. Authors use `period of 'time'` meanwhile.
+        // Per § D15 `period in 'hours'` cancels `price in 'USD/hours'`: the price×period chain
+        // derives the period's TemporalDimension from its single declared basis ('hours' → time),
+        // so the chain obligation discharges. The single-basis guard is what makes this sound —
+        // a composite basis cannot derive a single dimension this way (see compound tests below).
         HasQualifierChainError("""
             precept Billing
             field Rate as price in 'USD/hours'
@@ -145,7 +150,66 @@ public class TypeCheckerPriceTemporalDenominatorTests
             state Done
             event Submit
             from Open on Submit -> set Pay = Rate * Worked -> transition Done
-            """).Should().BeTrue("a declared-basis period does not yet resolve its temporal dimension for the chain (gap)");
+            """).Should().BeFalse("a single-basis period resolves its temporal dimension and cancels the USD/hours denominator");
+    }
+
+    [Fact]
+    public void PricePerMonths_TimesPeriodInMonths_Cancels()
+    {
+        // Calendar single-basis: 'months' derives the date dimension and cancels USD/months.
+        HasQualifierChainError("""
+            precept Billing
+            field Rate as price in 'USD/months'
+            field Worked as period in 'months'
+            field Pay as money in 'USD'
+            state Open initial
+            state Done
+            event Submit
+            from Open on Submit -> set Pay = Rate * Worked -> transition Done
+            """).Should().BeFalse("a single calendar-basis period resolves the date dimension and cancels the USD/months denominator");
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    //  Composite basis rejection — a multi-component period cannot cancel a
+    //  single-unit denominator (PRE0074, CompoundPeriodDenominator), and must NOT
+    //  fall through to the generic UnprovedQualifierCompatibility.
+    // ════════════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void PricePerHours_TimesCompositePeriod_EmitsCompoundPeriodDenominator()
+    {
+        var source = """
+            precept Billing
+            field Rate as price in 'USD/hours'
+            field Worked as period in 'hours + minutes'
+            field Pay as money in 'USD'
+            state Open initial
+            state Done
+            event Submit
+            from Open on Submit -> set Pay = Rate * Worked -> transition Done
+            """;
+
+        HasCompoundPeriodDenominatorError(source)
+            .Should().BeTrue("a composite period cannot cancel a single-unit denominator");
+        HasQualifierChainError(source)
+            .Should().BeFalse("the composite case emits the precise PRE0074, not the generic chain error");
+    }
+
+    [Fact]
+    public void PricePerDays_TimesDatetimeSpanningCompositePeriod_EmitsCompoundPeriodDenominator()
+    {
+        // 'days + hours' spans calendar and clock atoms (a Datetime-spanning composite);
+        // it still cannot cancel the single-unit USD/days denominator.
+        HasCompoundPeriodDenominatorError("""
+            precept Billing
+            field Rate as price in 'USD/days'
+            field Worked as period in 'days + hours'
+            field Pay as money in 'USD'
+            state Open initial
+            state Done
+            event Submit
+            from Open on Submit -> set Pay = Rate * Worked -> transition Done
+            """).Should().BeTrue("a datetime-spanning composite period cannot cancel a single-unit denominator");
     }
 
     // ════════════════════════════════════════════════════════════════════════
