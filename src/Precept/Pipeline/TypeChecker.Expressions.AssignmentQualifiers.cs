@@ -45,6 +45,8 @@ internal static partial class TypeChecker
         if (targetQualifiers.IsDefaultOrEmpty || value is TypedErrorExpression)
             return [];
 
+        ValidateTemporalSubtractionBasis(value, fieldName, targetQualifiers, valueSpan, ctx);
+
         if (value is TypedTypedConstant { ResultType: TypeKind.Quantity })
             return [];
 
@@ -67,6 +69,73 @@ internal static partial class TypeChecker
 
         return ValidateResolvedQualifierAxes(sourceAxes, fieldName, requiredAxes, valueSpan, ctx, dischargedAtProofStage);
     }
+
+    /// <summary>
+    /// Legal-basis-by-source-operation (business-domain-types.md § D15 composite legality). A temporal
+    /// subtraction yields a <c>period</c> whose producible component atoms are fixed by the operand
+    /// dimension: <c>date − date</c> produces calendar atoms (years/months/weeks/days), <c>time − time</c>
+    /// produces clock atoms (hours/minutes/seconds), <c>datetime − datetime</c> produces either, and
+    /// <c>instant − instant</c> yields a <c>duration</c> (excluded by the period-result guard). Declaring
+    /// the result with an atom the source cannot produce is a contradiction — emit <see cref="DiagnosticCode.QualifierMismatch"/>
+    /// per illegal atom. Producible atoms are read from the <see cref="TemporalUnits"/> catalog
+    /// (<c>IsCalendarBased</c>), never a hardcoded list. The operand-type → dimension classification is
+    /// kept local rather than added to <c>TypeMeta.ImpliedQualifiers</c>: giving date/time/datetime an
+    /// implied <c>TemporalDimension</c> would change qualifier resolution for those types across the
+    /// proof engine, which this check does not need.
+    /// </summary>
+    private static void ValidateTemporalSubtractionBasis(
+        TypedExpression value,
+        string fieldName,
+        ImmutableArray<DeclaredQualifierMeta> targetQualifiers,
+        SourceSpan valueSpan,
+        CheckContext ctx)
+    {
+        // A period result with two same-type temporal-scalar operands uniquely identifies a temporal
+        // subtraction (date−date / time−time / datetime−datetime): date±period and time±period yield
+        // the scalar type, not a period, and instant−instant yields a duration. So matching on the
+        // result/operand shape avoids enumerating OperationKind members for dispatch.
+        if (value is not TypedBinaryOp { ResultType: TypeKind.Period } subtraction)
+            return;
+        if (subtraction.Left.ResultType != subtraction.Right.ResultType)
+            return;
+        if (TemporalScalarDimension(subtraction.Left.ResultType) is not { } producibleDimension)
+            return;
+        if (producibleDimension == PeriodDimension.Datetime)
+            return; // datetime − datetime produces any atom — nothing to reject
+
+        foreach (var target in targetQualifiers)
+        {
+            if (target is not DeclaredQualifierMeta.TemporalUnit tu)
+                continue;
+
+            foreach (var atom in tu.Components)
+            {
+                if (!TemporalUnits.TryGet(atom, out var entry))
+                    continue; // unknown atom is already reported at parse/basis validation — don't double-report
+
+                var producible = producibleDimension == PeriodDimension.Date
+                    ? entry.IsCalendarBased
+                    : !entry.IsCalendarBased; // PeriodDimension.Time
+                if (!producible)
+                    ctx.Diagnostics.Add(
+                        Diagnostics.Create(DiagnosticCode.QualifierMismatch, valueSpan, atom, fieldName));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Maps a scalar temporal <see cref="TypeKind"/> to the <see cref="PeriodDimension"/> its
+    /// subtraction result occupies (<c>date</c> → Date, <c>time</c> → Time, <c>datetime</c> → Datetime).
+    /// Returns <c>null</c> for non-scalar-temporal kinds. Local classification — see
+    /// <see cref="ValidateTemporalSubtractionBasis"/> for why this is not type-catalog metadata.
+    /// </summary>
+    private static PeriodDimension? TemporalScalarDimension(TypeKind kind) => kind switch
+    {
+        TypeKind.Date     => PeriodDimension.Date,
+        TypeKind.Time     => PeriodDimension.Time,
+        TypeKind.DateTime => PeriodDimension.Datetime,
+        _                 => null,
+    };
 
     private static ImmutableArray<DeclaredQualifierMeta> ExpandAssignmentTargetQualifiers(
         ImmutableArray<DeclaredQualifierMeta> targetQualifiers)
