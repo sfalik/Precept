@@ -48,7 +48,32 @@ public static partial class ProofEngine
             ? ExtractComparableValue(declared)
             : NarrowedValueFromGuard(source, aqReq.Axis, obligation, semantics);
 
-        return sourceValue is not null && string.Equals(sourceValue, targetValue, StringComparison.Ordinal);
+        if (sourceValue is null)
+            return false;
+
+        // D14 composite basis: the TemporalUnit axis discharges by SUBSET, not equality —
+        // assigning a {hours} value to a 'hours + minutes' field is sound, the reverse is not.
+        // Both values are canonical " + "-joined component strings (canonicalized at the checker).
+        if (aqReq.Axis == QualifierAxis.TemporalUnit)
+            return TemporalUnitComponentsSubset(sourceValue, targetValue);
+
+        return string.Equals(sourceValue, targetValue, StringComparison.Ordinal);
+    }
+
+    private static readonly string[] TemporalUnitComponentSeparator = [" + "];
+
+    /// <summary>
+    /// True iff the source basis's component atoms are a subset of the target basis's — both given as
+    /// canonical <c>" + "</c>-joined strings. Equal sets are a (trivial) subset, so an exact-basis guard
+    /// also discharges.
+    /// </summary>
+    private static bool TemporalUnitComponentsSubset(string source, string target)
+    {
+        var targetComponents = target.Split(TemporalUnitComponentSeparator, StringSplitOptions.None);
+        foreach (var component in source.Split(TemporalUnitComponentSeparator, StringSplitOptions.None))
+            if (Array.IndexOf(targetComponents, component) < 0)
+                return false;
+        return true;
     }
 
     /// <summary>Author-facing axis label for diagnostics (matches the type checker's `FormatQualifierAxisName`).</summary>
@@ -254,6 +279,22 @@ public static partial class ProofEngine
             && NarrowedLiteralValue(tc) is { } value)
         {
             builder.Add(new QualifierNarrowingConstraint(field.FieldName, axis, value));
+            return true;
+        }
+
+        // `.basis` carries no ReturnsQualifier (it's a plain string accessor), so the axis-bearing
+        // arm above does not match it. A `X.basis == '<canonical basis>'` guard narrows the period's
+        // TemporalUnit axis — the RHS literal is already W-A canonical (rewritten at the checker, G4),
+        // so the seeded value composes directly with the subset discharge in TryAssignmentQualifierProof.
+        if (maybeAccessor is TypedMemberAccess
+            {
+                Object: TypedFieldRef basisField,
+                ResolvedAccessor: FixedReturnAccessor { Name: "basis", Returns: TypeKind.String }
+            }
+            && maybeLiteral is TypedTypedConstant basisLiteral
+            && NarrowedLiteralValue(basisLiteral) is { } basisValue)
+        {
+            builder.Add(new QualifierNarrowingConstraint(basisField.FieldName, QualifierAxis.TemporalUnit, basisValue));
             return true;
         }
         return false;

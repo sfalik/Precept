@@ -509,8 +509,54 @@ internal static partial class TypeChecker
                             UnitDimensionHelper.DeriveUnitDimensionName(priceUnit)),
                     ];
                 break;
+            case TypeKind.Period:
+                // A period literal has a determinate basis = its non-zero component set (e.g.
+                // '2 years' → {years}, '2 years + 6 months' → {years, months}). Expose it as a
+                // TemporalUnit qualifier so the assignment-qualifier resolver sees the basis on the
+                // Resolved path and discharges by D14 subset — symmetric with money/quantity/price
+                // literals above. Without this the literal resolves Unknown on the TemporalUnit axis
+                // and a basis-declared field's default/computed assignment is wrongly unprovable.
+                if (parsedValue is NodaTime.Period period && DerivePeriodLiteralBasis(period) is { } basis)
+                    return [basis];
+                break;
         }
         return null;
+    }
+
+    /// <summary>
+    /// The canonical (coarse-to-fine) basis of a period literal — the catalog atom names of its
+    /// non-zero components — or <c>null</c> for a zero period (no determinate basis). Iterates
+    /// <see cref="TemporalUnits.AllEntries"/> in canonical order and reads each component via the
+    /// entry's catalog <c>PeriodComponent</c> accessor, so name/order/date-time-classification
+    /// stay catalog-derived (no per-unit-name switch). Matches <see cref="MapTemporalUnitQualifier"/>'s
+    /// canonical join/dimension rules.
+    /// </summary>
+    private static DeclaredQualifierMeta.TemporalUnit? DerivePeriodLiteralBasis(NodaTime.Period period)
+    {
+        var components = ImmutableArray.CreateBuilder<string>();
+        var hasDate = false;
+        var hasTime = false;
+        foreach (var entry in TemporalUnits.AllEntries)
+        {
+            if (entry.PeriodComponent(period) == 0)
+                continue;
+            components.Add(entry.Plural);
+            if (entry.IsCalendarBased) hasDate = true; else hasTime = true;
+        }
+
+        if (components.Count == 0)
+            return null;
+
+        var dimension = (hasDate, hasTime) switch
+        {
+            (true, true) => PeriodDimension.Datetime,
+            (true, false) => PeriodDimension.Date,
+            _ => PeriodDimension.Time,
+        };
+        return new DeclaredQualifierMeta.TemporalUnit(string.Join(" + ", components), dimension)
+        {
+            Components = components.ToImmutable(),
+        };
     }
 
 
@@ -580,6 +626,33 @@ internal static partial class TypeChecker
     private static bool NeedsContextRetry(ParsedExpression expression) => expression is LiteralExpression { LiteralKind: TokenKind.TypedConstant }
         or InterpolatedTypedConstantExpression;
 
+    /// <summary>
+    /// G4: when <paramref name="candidate"/> is the string-constant RHS of a <c>period.basis == '…'</c>
+    /// guard (its <paramref name="peer"/> is the <c>.basis</c> accessor on a <c>period</c>), rewrite the
+    /// constant's value to the W-A canonical basis form via <see cref="MapTemporalUnitQualifier"/> — so
+    /// the proof engine compares already-canonical strings and <c>'minutes + hours'</c> matches the
+    /// declared <c>'hours + minutes'</c>. Returns <paramref name="candidate"/> unchanged for every other
+    /// shape, so no unrelated string comparison is disturbed. Malformed composites (PRE0160/0161/0162)
+    /// surface through the canonicalizer; the original text is preserved when canonicalization fails.
+    /// </summary>
+    private static TypedExpression CanonicalizeBasisGuardLiteral(TypedExpression candidate, TypedExpression peer, CheckContext ctx)
+    {
+        if (candidate is not TypedTypedConstant { ResultType: TypeKind.String, ParsedValue: string literal } constant)
+            return candidate;
+
+        if (peer is not TypedMemberAccess
+            {
+                ResolvedAccessor: FixedReturnAccessor { Name: "basis", Returns: TypeKind.String },
+                Object: { ResultType: TypeKind.Period },
+            })
+            return candidate;
+
+        var canonical = MapTemporalUnitQualifier(literal, constant.Span, ctx).UnitName;
+        return canonical == literal
+            ? candidate
+            : constant with { RawText = canonical, ParsedValue = canonical };
+    }
+
     private static TypedBinaryOp CreateResolvedBinaryOp(
         SourceSpan span,
         OperatorMeta opMeta,
@@ -588,6 +661,15 @@ internal static partial class TypeChecker
         TypedExpression right,
         CheckContext ctx)
     {
+        // G4: canonicalize a `period.basis == '<literal>'` guard RHS to the W-A canonical basis
+        // form at the checker, so the proof engine compares already-canonical strings (subset
+        // discharge on the TemporalUnit axis). Localized to `.basis`-on-period == string-constant.
+        if (opMeta.Kind == OperatorKind.Equals)
+        {
+            left = CanonicalizeBasisGuardLiteral(left, right, ctx);
+            right = CanonicalizeBasisGuardLiteral(right, left, ctx);
+        }
+
         var resolved = new TypedBinaryOp(
             ResolveBinaryResultType(opMeta, resolvedOperation, left, ctx),
             resolvedOperation.Kind,

@@ -656,6 +656,12 @@ internal static partial class TypeChecker
             QualifierAxis.Dimension => TryGetQualifierText(sourceQualifier, QualifierAxis.Dimension, out var sourceDimension)
                 && TryGetQualifierText(targetQualifier, QualifierAxis.Dimension, out var targetDimension)
                 && StringComparer.OrdinalIgnoreCase.Equals(sourceDimension, targetDimension),
+            // D14 composite-basis assignment is satisfied iff the source's component set is a SUBSET
+            // of the target field's declared basis — assigning a {hours} value to a 'hours + minutes'
+            // field is sound; the reverse (superset) is not. Equality would wrongly reject the subset.
+            QualifierAxis.TemporalUnit when sourceQualifier is DeclaredQualifierMeta.TemporalUnit source
+                && targetQualifier is DeclaredQualifierMeta.TemporalUnit target =>
+                source.Components.All(target.Components.Contains),
             _ => TryGetQualifierText(sourceQualifier, targetQualifier.Axis, out var sourceValue)
                 && TryGetQualifierText(targetQualifier, targetQualifier.Axis, out var targetValue)
                 && StringComparer.OrdinalIgnoreCase.Equals(sourceValue, targetValue),
@@ -687,6 +693,19 @@ internal static partial class TypeChecker
                         fieldName));
             }
 
+            return;
+        }
+
+        // TemporalUnit carries its value in UnitName (the canonical joined basis string), which
+        // TryGetQualifierText does not project — emit the mismatch directly from the target basis.
+        if (targetQualifier is DeclaredQualifierMeta.TemporalUnit targetTemporalUnit)
+        {
+            ctx.Diagnostics.Add(
+                Diagnostics.Create(
+                    DiagnosticCode.QualifierMismatch,
+                    valueSpan,
+                    targetTemporalUnit.UnitName,
+                    fieldName));
             return;
         }
 
@@ -726,6 +745,7 @@ internal static partial class TypeChecker
         TypeKind.Quantity => [QualifierAxis.Unit, QualifierAxis.Dimension],
         TypeKind.Price => [QualifierAxis.Currency, QualifierAxis.Unit, QualifierAxis.Dimension],
         TypeKind.ExchangeRate => [QualifierAxis.FromCurrency, QualifierAxis.ToCurrency],
+        TypeKind.Period => [QualifierAxis.TemporalUnit],
         _ => [],
     };
 

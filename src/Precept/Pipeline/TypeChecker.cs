@@ -482,6 +482,15 @@ internal static partial class TypeChecker
             {
                 dimensionName = "count";
             }
+            else if (TemporalUnits.TryGet(unitPart, out var temporalEntry))
+            {
+                // NodaTime temporal-unit denominator (§ D15): a time-unit price denominator uses
+                // NodaTime vocabulary (hours/days/…), not UCUM (h/d). The denominator's dimension
+                // is the unit's temporal class — clock units → "time", calendar units → "date" —
+                // matching the period/duration TemporalDimension spellings so the existing
+                // price×period / price×duration cancellation chain resolves with no further change.
+                dimensionName = temporalEntry.IsCalendarBased ? "date" : "time";
+            }
             else
             {
                 var result = UcumParser.Parse(unitPart);
