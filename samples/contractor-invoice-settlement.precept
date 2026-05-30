@@ -1,0 +1,142 @@
+precept ContractorInvoiceSettlement
+
+# A contractor invoice that bills labor at an hourly rate, then settles when the
+# client remits payment. The shop logs hours worked against an agreed hourly rate;
+# the labor charge is the rate times the worked time. The client's ledger is kept
+# in USD, but a remittance may arrive in any currency — the remittance is recorded
+# as-is, then governance decides whether it can be applied to the USD ledger. Only
+# a remittance whose currency is USD may touch the balance; a foreign-currency
+# remittance is held for the client to convert and resubmit.
+#
+# Two domain-typed mechanisms carry the model:
+#   - Hourly billing as a temporal-denominator price. HourlyRate is a
+#     `price in 'USD/hours'` (money per unit of time) and WorkedTime is a
+#     `period of 'time'`. The product `HourlyRate * WorkedTime` cancels the
+#     time denominator and resolves to `money in 'USD'` — the engine proves the
+#     dimensional cancellation at compile time, so billing a rate against a
+#     non-time quantity, or in the wrong currency, is structurally impossible.
+#   - Open-payment governance via guard narrowing. Payment is an open `money`
+#     (no declared currency) because the client can remit in any currency. The
+#     apply transition guards `when Payment.currency == 'USD'`, which narrows the
+#     open field to USD and lets it be added to the USD ledger; the unguarded
+#     sibling row rejects a non-USD remittance. The narrowed assignment is proved
+#     statically — a guard on the wrong currency would not discharge it.
+
+# Identity
+field InvoiceNumber as string optional maxlength 40
+field ContractorName as string optional maxlength 200
+field ClientName as string optional maxlength 200
+
+# Labor billing — hourly rate as a temporal-denominator price; worked time as a
+# calendar-relative period whose dimension is 'time'. HourlyRate is required once
+# the invoice exists, but has no meaning while the invoice is still a draft, so it
+# is omitted in Draft and first set at issuance.
+field HourlyRate as price in 'USD/hours'
+field WorkedTime as period of 'time' default '0 hours'
+
+# Labor charge — derived from rate x time. The dimensional cancellation
+# (price 'USD/hours' x period 'time' -> money 'USD') is enforced structurally;
+# this computed field cannot be assigned and updates whenever its inputs change.
+# Because it reads HourlyRate, it is likewise absent while in Draft.
+field LaborCharge as money in 'USD' <- HourlyRate * WorkedTime
+
+# Client ledger — denominated in USD. AmountApplied accumulates applied
+# remittances; the outstanding balance is the labor charge less what's applied.
+field AmountApplied as money in 'USD' default '0.00 USD' nonnegative
+field OutstandingBalance as money in 'USD' <- LaborCharge - AmountApplied
+
+# Remittance under governance — the open-currency payment the client sent. It is
+# recorded as-is on RecordRemittance, then narrowed to USD (or rejected) on Apply.
+field Payment as money optional
+field RemittanceCurrencyOnRecord as currency optional
+field SettlementNote as string optional
+
+# Audit
+field InvoiceLog as log of string
+
+# Rules — applied payments can never exceed the labor charge billed. The rule
+# reads LaborCharge, which is omitted while in Draft/Voided, so it is automatically
+# scoped out of those lifecycle positions and enforced everywhere LaborCharge exists.
+rule AmountApplied <= LaborCharge because "Applied payments {AmountApplied} cannot exceed the labor charge billed ({LaborCharge})"
+
+# States
+state Draft initial
+state Issued
+state RemittanceHeld
+state Settled terminal
+state Voided terminal
+
+# HourlyRate (and therefore LaborCharge / OutstandingBalance) has no meaning in a
+# draft or voided invoice — there is no agreed rate in those positions.
+in Draft, Voided omit HourlyRate
+
+# Editable window — the shop fills the invoice header and logs worked time in Draft.
+in Draft modify InvoiceNumber, ContractorName, ClientName, WorkedTime editable
+
+# State ensures
+in Issued ensure InvoiceNumber is set because "An issued invoice must carry an invoice number"
+in RemittanceHeld ensure Payment is set because "A held remittance must have a recorded payment amount"
+
+# Events
+event Issue(Rate as price in 'USD/hours')
+on Issue ensure InvoiceNumber is set because "Invoice number is required before the invoice can be issued"
+on Issue ensure ContractorName is set because "Contractor name is required before the invoice can be issued"
+on Issue ensure WorkedTime.hours > 0 because "Worked time must be positive before billing — there is nothing to invoice for zero hours"
+
+# A remittance arrives in an open currency. The host passes whatever the client
+# actually paid; the precept records it, then governs whether it can be applied.
+event RecordRemittance(Amount as money, Note as string optional)
+event Apply
+event Reissue
+event Void(Reason as string notempty)
+
+# Transitions
+
+# Issue — the shop locks in the agreed hourly rate and bills the logged hours.
+from Draft on Issue
+    -> set HourlyRate = Issue.Rate
+    -> append InvoiceLog "Issued"
+    -> transition Issued
+
+# Record a remittance — captured as-is into the open Payment field, in whatever
+# currency the client actually sent. No currency judgment happens here.
+from Issued on RecordRemittance
+    -> set Payment = RecordRemittance.Amount
+    -> set SettlementNote = if RecordRemittance.Note is set then RecordRemittance.Note else "Remittance received"
+    -> append InvoiceLog "Remittance recorded"
+    -> transition RemittanceHeld
+
+# Apply — currency narrowing in action. The guard narrows the open Payment to USD,
+# which lets it be added to the USD ledger; the assignment is proved statically.
+# A USD remittance that fully covers the balance settles the invoice.
+from RemittanceHeld on Apply when Payment is set and Payment.currency == 'USD' and AmountApplied + Payment >= LaborCharge
+    -> set AmountApplied = LaborCharge
+    -> set RemittanceCurrencyOnRecord = Payment.currency
+    -> append InvoiceLog "Settled in full"
+    -> transition Settled
+
+# A USD remittance that covers only part of the balance is applied and the
+# invoice returns to Issued to await the remainder.
+from RemittanceHeld on Apply when Payment is set and Payment.currency == 'USD'
+    -> set AmountApplied = AmountApplied + Payment
+    -> set RemittanceCurrencyOnRecord = Payment.currency
+    -> append InvoiceLog "Partial remittance applied"
+    -> transition Issued
+
+# Wrong currency: the open remittance is not USD — it cannot touch the USD ledger.
+# The guard above did not narrow Payment to USD, so this row catches it.
+from RemittanceHeld on Apply
+    -> reject "Remittance is in {Payment.currency} — only USD remittances can be applied to this USD invoice. Convert and resubmit."
+
+# Reissue — a held foreign-currency remittance is cleared so the client can resend
+# in USD; the invoice returns to Issued awaiting a fresh remittance.
+from RemittanceHeld on Reissue
+    -> clear Payment
+    -> append InvoiceLog "Remittance returned for currency conversion"
+    -> transition Issued
+
+# Void — the invoice is cancelled before settlement.
+from Draft, Issued, RemittanceHeld on Void
+    -> set SettlementNote = Void.Reason
+    -> append InvoiceLog "Voided"
+    -> transition Voided
