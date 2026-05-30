@@ -992,6 +992,7 @@ Exit: all 12 design acceptance criteria pass; PR mergeable.
 
 **Exit criteria**:
 - `period in 'hours + minutes' * price in 'USD/hours'` emits `CompoundPeriodDenominator` (via a `Components.Length > 1` check, NOT the dead `Count > 1` heuristic — see step 1).
+- **Acceptance side (the D9-surfaced gap):** `period in 'hours' * price in 'USD/hours'` **cancels** (no `UnprovedQualifierCompatibility`). Today it over-rejects — the price×period `QualifierChainProofRequirement` resolves the period's `TemporalDimension`, which a declared single `TemporalUnit` basis does not surface on that path; `period of 'time'` is the only working form. W-C must resolve the single-basis dimension *and* keep rejecting composite (the two halves of basis-aware cancellation). Pinned RED→GREEN by `PricePerHours_TimesPeriodInHours_NotYetProven` (flip its assertion when this lands). The naive "derive dimension from basis" fix alone is UNSOUND — it would make composite wrongly cancel; the single-basis check is the guard.
 - `date - date as period in 'days + hours'` emits `QualifierMismatch` for `hours`.
 - Assigning a Days-bearing value to `period in 'years + months'` emits `QualifierMismatch`.
 - `dotnet test` green.
