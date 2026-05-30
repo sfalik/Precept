@@ -51,7 +51,7 @@
   - [Example — open money with guard narrowing](#example--open-money-with-guard-narrowing)
   - [Example — open quantity with dimension narrowing](#example--open-quantity-with-dimension-narrowing)
   - [Example — open period with dimension narrowing](#example--open-period-with-dimension-narrowing)
-  - [Relationship to the proof engine (#106)](#relationship-to-the-proof-engine-106)
+  - [Relationship to numeric proof](#relationship-to-numeric-proof)
 - [Period Extensions](#period-extensions)
   - [Period basis — Noda-faithful semantics](#period-basis--noda-faithful-semantics)
   - [Legal basis by source operation](#legal-basis-by-source-operation)
@@ -1206,14 +1206,16 @@ This is the same contract as optional narrowing: `field X as number optional` is
 
 ### Mechanism
 
-Discrete equality narrowing plugs into the existing guard-narrowing pipeline from the null-flow narrowing and proof-engine (#106) work:
+Guard-driven narrowing is a proof-engine fact, not a symbol-table rewrite. A guard of the form `when X.<accessor> == 'value'` records a *branch-scoped fact*: inside that guarded branch, the open field `X` is pinned to `value` on that axis. A downstream operation that needs `X` to satisfy a qualifier constraint discharges against that fact — soundly:
 
-1. **Guard decomposition** — `when X.currency == 'USD'` is decomposed into an equality assertion on the accessor.
-2. **Marker injection** — A `$eq:X.currency:USD` marker is injected into the symbol table for the guarded scope.
-3. **Cross-branch accumulation** — Already works. `else` branches see the negation; subsequent `when` branches see accumulated narrowing.
-4. **Sequential assignment flow** — `set X = Y` where Y is narrowed copies the markers (already handled by `ApplyAssignmentNarrowing`).
-5. **Compatibility check** — The type checker consumes `$eq:` markers alongside static `in`/`of` constraints when checking arithmetic operands.
-6. **Static `in` seeding** — Fields declared with static `in` values (e.g., `field Cost as money in 'USD'`) pre-seed `$eq:` markers at compile time. The type checker resolves the `in` value and injects `$eq:Cost.currency:USD` into the symbol table unconditionally — no guard required. This is why `money in 'USD'` fields can participate in arithmetic directly while open fields cannot.
+1. **Decomposition** — `when X.currency == 'USD'` becomes a fact `(X, currency, 'USD')`. `and` combines facts within a branch; `or` produces separate branches.
+2. **Axis-appropriate match** — identity axes (currency, unit, dimension, from/to currency) discharge on exact value equality; the **period basis** axis discharges by D14 subset (the value's non-zero component set ⊆ the required basis). A value narrowed to one currency never satisfies a different-currency requirement.
+3. **All branches must agree** — an `or` guard discharges only if every branch independently pins the field to the *same* value; `when X.currency == 'USD' or X.currency == 'EUR'` does **not** license assignment to a single-currency field.
+4. **Positive equality only** — `!=` and field-to-field comparisons (`X.currency == Y.currency`) pin no single value and narrow nothing.
+5. **Reassignment invalidates** — a `set X = …`/`clear X` earlier in the same action chain makes the fact stale; obligations after the reassignment do not discharge against it.
+6. **Declared fields need no guard** — a field declared `money in 'USD'` carries its currency as a *declared qualifier*, resolved directly; open fields carry none, which is why they require the guard.
+
+The period-basis guard literal is canonicalized to coarse-to-fine spaced form **at the type checker**, so the proof engine only ever compares already-canonical component sets.
 
 ### Accessors per type
 
@@ -1271,17 +1273,11 @@ from Active on Extend
     reject "Extension interval must use date components"
 ```
 
-### Relationship to the proof engine (#106)
+### Relationship to numeric proof
 
-The proof engine introduced by #106 handles **numeric interval reasoning** — `$ival:`, `$positive:`, `$nonzero:` markers for divisor safety and sqrt safety. Discrete equality narrowing handles **string equality reasoning** — `$eq:` markers for unit/currency/dimension compatibility.
+Numeric reasoning (divisor safety, range narrowing) and qualifier narrowing are two parallel fact families inside the same proof engine. Numeric guards build interval/value constraints over a field's magnitude; qualifier guards build the discrete `(field, axis, value)` facts described above. Both are branch-scoped, both honor the same all-branches-of-an-`or` and reassignment-invalidation rules, and both discharge a downstream operation's obligation rather than mutating the field's declared type.
 
-Both systems share the same infrastructure:
-- String-encoded markers in `IReadOnlyDictionary<string, StaticValueKind>`
-- Guard decomposition via `ApplyNarrowing`
-- Cross-branch accumulation
-- Sequential assignment flow via `ApplyAssignmentNarrowing`
-
-The proof engine does not need modification. Discrete equality narrowing is a parallel layer that reuses the pipeline but operates on a different domain (discrete values vs. numeric intervals).
+They share the guard branch-decomposition walk but keep **separate fact algebras** — numeric intervals vs. discrete identity (no numeric subsumption applies to a currency code). So qualifier narrowing was added as its own discharge strategies alongside the numeric ones; it is not a reuse of the numeric marker machinery.
 
 ---
 
@@ -1323,7 +1319,7 @@ For `period`, the `in` syntax is a **unit-selection instruction**, not an exactn
 
 - **`.basis` accessor** returns the canonical-order spaced string.
 - **Type equality** (qualifier-compatibility checks) compares canonical forms — `period in 'minutes + hours'` and `period in 'hours+minutes'` are the same type.
-- **Proof markers** use the canonical spelling — `$eq:X.basis:hours + minutes` regardless of declared order or input spacing.
+- **Narrowing facts** use the canonical spelling — a `when X.basis == 'minutes + hours'` guard pins the canonical `hours + minutes` regardless of declared order or input spacing.
 
 **Interpolation.** Composite basis strings must be literal at this time. Interpolated composite bases (`period in '{X}+{Y}'`) are not supported. Single-component interpolated bases (`period in '{X}'`) continue to work via the existing qualifier-value path — interpolated composites would defer component-validity to runtime, which the static-checking discipline (Principle 10) resists; the restriction can relax later if a concrete use case demands it.
 
@@ -1746,17 +1742,17 @@ For business-domain types, comparison operators carry domain preconditions. **Cr
 
 - **What:** A field declared without `in` or `of` is valid, but arithmetic with constrained fields is a compile error without a guard narrowing the open field. Applies uniformly to all `in`/`of`-constrained types.
 - **Why:** Per philosophy: "Prevention, not detection. Invalid entity configurations cannot exist." An open `money` field has no statically known currency. Adding it to `money in 'USD'` without proof would require runtime validation.
-- **Mechanism:** `when Amount.currency == 'USD'` injects `$eq:Amount.currency:USD` markers. Reuses existing guard-narrowing pipeline from null-flow and proof engine (#106).
+- **Mechanism:** `when Amount.currency == 'USD'` records a branch-scoped narrowing fact in the proof engine; a downstream operation discharges its qualifier obligation against it — value-exact for identity axes, D14 subset for the period basis. (See § Mechanism for the full rules.)
 - **Uniform pattern:**
-  | Type | Accessor | Guard pattern | Marker |
-  |------|----------|---------------|--------|
-  | `money` | `.currency` | `when X.currency == 'USD'` | `$eq:X.currency:USD` |
-  | `quantity` | `.unit` | `when X.unit == 'kg'` | `$eq:X.unit:kg` |
-  | `quantity` | `.dimension` | `when X.dimension == 'length'` | `$eq:X.dimension:length` |
-  | `period` | `.basis` | `when X.basis == 'hours + minutes'` | `$eq:X.basis:hours + minutes` |
-  | `period` | `.dimension` | `when X.dimension == 'date'` | `$eq:X.dimension:date` |
-  | `price` | `.currency`, `.unit`, `.dimension` | `when X.currency == 'USD'` | `$eq:X.currency:USD` |
-  | `exchangerate` | `.from`, `.to` | `when X.from == 'USD'` | `$eq:X.from:USD` |
+  | Type | Accessor | Guard pattern | Narrows (branch-scoped fact) |
+  |------|----------|---------------|------------------------------|
+  | `money` | `.currency` | `when X.currency == 'USD'` | X's currency pinned to USD (exact) |
+  | `quantity` | `.unit` | `when X.unit == 'kg'` | X's unit pinned to kg (exact) |
+  | `quantity` | `.dimension` | `when X.dimension == 'length'` | X's dimension pinned to length (exact) |
+  | `period` | `.basis` | `when X.basis == 'hours + minutes'` | X's basis pinned to {hours, minutes} (D14 subset) |
+  | `period` | `.dimension` | `when X.dimension == 'date'` | X's dimension pinned to date (exact) |
+  | `price` | `.currency`, `.unit`, `.dimension` | `when X.currency == 'USD'` | X's currency/unit/dimension pinned (exact) |
+  | `exchangerate` | `.from`, `.to` | `when X.from == 'USD'` | X's from/to currency pinned (exact) |
 - **Alternatives rejected:** (A) Require `in`/`of` on every field — eliminates open-field use cases. (B) Allow open fields but block all arithmetic. (C) Runtime validation — violates philosophy.
 - **Precedent:** Same contract as optional narrowing. Same friction, same reason.
 - **Tradeoff accepted:** Authors who use open fields must write guards.
@@ -1819,7 +1815,7 @@ For business-domain types, comparison operators carry domain preconditions. **Cr
 **Enforcement mechanism:** The `QualifierMismatch` diagnostic enforces `in` constraints at compile time using the proven-violation-only policy (same principle as the proof engine's interval diagnostics which apply to numeric range violations). Three enforcement tiers:
 
 1. **Literals with statically-known content:** `set CostUsd = '100 EUR'` where `CostUsd` is `money in 'USD'` — the compiler resolves the literal's currency to EUR, proves it violates the USD constraint, and emits `QualifierMismatch` as a compile-time error. Same for `set MonthsField = '30 days'` against `period in 'months'`.
-2. **Expressions with guard-narrowed proof:** `when Payment.currency == 'USD'` seeds a `$eq:Payment.currency:USD` proof marker. An assignment to `money in 'USD'` succeeds because the proof engine can verify the constraint is satisfied. Without the guard, `QualifierMismatch` fires (unproven — open field assigned to constrained field).
+2. **Expressions with guard-narrowed proof:** `when Payment.currency == 'USD'` records a branch-scoped narrowing fact (Payment's currency pinned to USD). An assignment to `money in 'USD'` succeeds because the proof engine discharges the constraint against that fact. Without the guard, `QualifierMismatch` fires (unproven — open field assigned to constrained field).
 3. **Runtime boundary validation:** Event args and `precept_fire`/`precept_update` inputs are validated at the API boundary before entering the engine. This is input validation, not mid-evaluation exception — consistent with the temporal proposal's `TryValidateEventArguments` pattern.
 
 ### D15. Time-unit denominators use NodaTime vocabulary and cancel against `period` or `duration`
@@ -1952,7 +1948,7 @@ This proposal extends mechanisms established by the temporal proposal (Issue #10
 |---|---|
 | [Issue #107](https://github.com/sfalik/Precept/issues/107) — Temporal type system | Establishes `period`, `duration`, typed constant delimiter, `in` syntax, and the NodaTime alignment directive this proposal extends. |
 | [Issue #115](https://github.com/sfalik/Precept/issues/115) — Evaluator semantic fidelity | **Completed prerequisite.** Delivered: `decimal`-preserving arithmetic path, context-sensitive literal typing, non-ambiguous inference invariant, and Option A operator tables. Business-domain operator tables require `decimal` scalars (D12 scalar operand contract) and the runtime must honor the `decimal` lane end to end. |
-| [Issue #106](https://github.com/sfalik/Precept/issues/106) — Proof engine | Provides the narrowing infrastructure (guard decomposition, marker injection, cross-branch accumulation) that discrete equality narrowing reuses. |
+| [Issue #106](https://github.com/sfalik/Precept/issues/106) — Proof engine | Provides the guard branch-decomposition walk that qualifier narrowing reuses; qualifier narrowing adds its own discrete-fact discharge strategies alongside the numeric ones. |
 | [Issue #111](https://github.com/sfalik/Precept/issues/111) — `nonzero` constraint | Needed for `money / decimal` and `price / decimal` divisor safety. |
 | [Issue #118](https://github.com/sfalik/Precept/issues/118) — Type checker decomposition | Should land before this proposal. #95 adds ~520–795 lines to `TryInferBinaryKind` (operator tables, typed-constant inference, dot-accessor resolution, dimensional cancellation). #118 plans a `PreceptTypeChecker.DomainTypeInference.cs` 7th partial file as the split point — `TryInferBinaryKind` gains early type-family dispatch ("if either operand is a business domain type, delegate to `TryInferDomainBinaryKind`"). Discrete equality narrowing (~30 lines) lands in `Narrowing.cs`. `in`/`of` validation lands in `FieldConstraints.cs`. |
 
@@ -1989,7 +1985,7 @@ This proposal extends mechanisms established by the temporal proposal (Issue #10
 - Period temporal dimension validation: for `period of 'date'`/`period of 'time'`, enforce the same proof semantics as the temporal design's `dateonly`/`timeonly`. The `of` value is a `dimension` from the temporal partition.
 - Period basis validation: verify that declared basis components are legal for the source operation type.
 - Mutual exclusivity: reject any field declaration that has both `in` and `of`.
-- **Discrete equality narrowing:** New `TryApplyEqualityNarrowing` method (~30 lines) pattern-matches `when Field.accessor == 'literal'` guards, injecting `$eq:Field.accessor:value` markers. Reuses existing guard decomposition, cross-branch accumulation, and `ApplyAssignmentNarrowing` infrastructure.
+- **Discrete equality narrowing:** A branch-scoped `QualifierNarrowingConstraint` fact, built from `when Field.accessor == 'literal'` guards and discharged by dedicated proof-engine strategies — value-exact for identity axes, D14 subset for the period basis. Reuses the guard branch-decomposition walk and the reassignment-invalidation pass; keeps a separate fact algebra from the numeric path.
 - **Money precision:** ISO 4217 minor-units lookup during constraint resolution. Default `maxplaces` derived from currency code. Half-even rounding on all money arithmetic results.
 - **Duration cancellation (D15):** When a duration operand appears against a compound type with a time-unit denominator, verify the denominator is `hours`, `minutes`, or `seconds`. Emit a compile error for `days`/`weeks`/`months`/`years` denominators with duration operands, with a teachable message explaining the fixed-length boundary.
 
