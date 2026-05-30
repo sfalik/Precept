@@ -1419,7 +1419,14 @@ internal static partial class TypeChecker
             }
         }
 
-        // PRE0073: Duration denominator with variable-length temporal unit
+        // PRE0073: Duration denominator with variable-length temporal unit.
+        // Dormant for the division path today: the gate requires a Duration/Period LEFT operand
+        // with a temporal-unit denominator, but no enabled divide op has that shape — `money ÷ period`
+        // and `quantity ÷ period` have a non-temporal numerator, and `duration ÷ duration` carries a
+        // TemporalDimension (not TemporalUnit) denominator. Composite divisors are caught by PRE0074
+        // below regardless of dimension; the `DerivedDimension == Date` gate here stays single-basis
+        // focused (a composite would derive Datetime) and is left as-is rather than re-aimed without a
+        // reachable test.
         var rightTemporalUnit = rightQualifiers.FirstOrDefault(q => q.Axis == QualifierAxis.TemporalUnit)
             as DeclaredQualifierMeta.TemporalUnit;
         if (rightTemporalUnit is not null
@@ -1432,23 +1439,20 @@ internal static partial class TypeChecker
             return;
         }
 
-        // PRE0074: Compound period as denominator against a single-unit denominator
-        // A period with multiple temporal qualifiers can't cleanly cancel a single-unit denominator.
-        var leftTemporalUnit = leftQualifiers.FirstOrDefault(q => q.Axis == QualifierAxis.TemporalUnit)
-            as DeclaredQualifierMeta.TemporalUnit;
-        var rightTemporalDims = rightQualifiers.Where(q =>
-            q.Axis == QualifierAxis.TemporalUnit || q.Axis == QualifierAxis.TemporalDimension).ToList();
-        if (leftTemporalUnit is not null && rightTemporalDims.Count > 1)
+        // PRE0074: a compound period cannot be a divisor. In a division the denominator is the
+        // right operand (`money ÷ period`, `quantity ÷ period`), and it carries the period basis.
+        // A composite basis — one TemporalUnit whose Components hold more than one atom, e.g.
+        // 'hours + minutes' — has no single magnitude to divide by: NodaTime stores period
+        // components separately and refuses to total a multi-basis period (business-domain-types.md
+        // § D15). The author must reduce to a single basis first; arg1 names the coarsest component
+        // as one candidate single-unit basis (the choice is the author's — reducing loses the finer
+        // components).
+        if (rightTemporalUnit is not null && rightTemporalUnit.Components.Length > 1)
         {
-            var compoundDesc = string.Join(" + ", rightTemporalDims.Select(q => q switch
-            {
-                DeclaredQualifierMeta.TemporalUnit tu => tu.UnitName,
-                DeclaredQualifierMeta.TemporalDimension td => td.Value.ToString().ToLowerInvariant(),
-                _ => "unknown",
-            }));
+            var compoundDesc = string.Join(" + ", rightTemporalUnit.Components);
             ctx.Diagnostics.Add(
                 Diagnostics.Create(DiagnosticCode.CompoundPeriodDenominator, span,
-                    compoundDesc, leftTemporalUnit.UnitName));
+                    compoundDesc, rightTemporalUnit.Components[0]));
         }
     }
 
