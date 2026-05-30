@@ -13,7 +13,15 @@
 | **S2b** | `.dimension` discharge wiring (quantity/price/uom/period) + period `.dimension` derivation + CONCERN-2 regression | D4, D6, D7 | S–M (1–2d) | after S1 ∧ S2a | ✅ `f662aad3` |
 | **(0)** | Temporal-denominator price parsing (`price in 'USD/hours'`) — § D15 NodaTime vocabulary; prerequisite surfaced building S3 | — | S | prereq | ✅ `5d071ffa` |
 | **S3** | Period `.basis` narrowing — **D14 subset assignment** discharge (D15 single-basis *cancellation* is NOT here — it is the W-C tightening) | D5 (locked) | M (2d) | after S1 (‖ S2b, coordinated) | ✅ `5d071ffa` |
-| **S4** | Diagnostics narrowed-vs-required + samples + doc-sync (§ D9 `$eq:` mechanism rewrite) | — | S–M (1–2d) | tail; draft ‖, finalize last | Stub |
+| **S4** | Diagnostics narrowed-vs-required + sample + doc-sync (§ D9 `$eq:` mechanism rewrite) | — | S–M (1–2d) | tail; draft ‖, finalize last | ✅ `5949de4b` (spec) `04bf5f0e`+`75b83980` (diagnostics) `75b83980` (sample) |
+
+**S4 as-built notes.**
+- § D9 `$eq:`/`StaticValueKind`/`ApplyNarrowing` fiction rewritten to the real proof-engine fact mechanism (`5949de4b`).
+- Narrowed-vs-required wording landed on the compatibility, qualifier-chain, and assignment diagnostics (`04bf5f0e`, `75b83980`).
+- Sample `samples/contractor-invoice-settlement.precept` (`75b83980`) — open-money currency narrowing + temporal-denominator pricing.
+- **Caught + fixed a self-inflicted false green** (`01ed818f`): the (0) cancellation tests used the type-checker-only `CheckExpectingClean` helper, hiding a proof-stage failure. Rewritten to full-pipeline `Compiler.Compile`.
+
+**Discovered gap (owner decision — NOT fixed).** Per § D15 `period in 'hours'` should cancel `price in 'USD/hours'`, but it does **not**: the `price × period` `QualifierChainProofRequirement` resolves the period's `TemporalDimension`, and a declared `TemporalUnit` basis does not surface one on that path. `period of 'time'` is the working form. Pinned by `PricePerHours_TimesPeriodInHours_NotYetProven`. Likely a small `ResolveQualifierOnAxis` fallback (TemporalUnit → derived TemporalDimension) but soundness-relevant — flag for a dedicated slice.
 
 ## Parallelization (answering "can we run parallel work in this phase?")
 
