@@ -756,7 +756,7 @@ bool TryLiteralProof(ProofObligation obligation)
 
 #### Strategy 2: Declaration Attribute Proof
 
-**When it applies:** The obligation can be discharged from declaration-site attributes of the subject — field modifiers, modifier-implied metadata, resolved period dimension, or resolved result metadata on the subject expression/accessor.
+**When it applies:** The obligation can be discharged from declaration-site attributes of the subject — field modifiers, modifier-implied metadata, resolved period dimension, or resolved result metadata on the subject expression/accessor. For a `DimensionProofRequirement` on an **open** period (no declared/derived dimension), it also consults a guard that narrows the period's dimension axis (`when X.dimension == 'date'`) via the shared guard-narrowing facts — value-exact, all-branches, reassignment-aware, with `'datetime'` compare-but-inert.
 
 **How it works:** Resolve the subject, read the relevant declaration attribute, then either check the requirement directly (dimension, required modifier, known non-negative return metadata) or consult modifier-declared `ProofSatisfactions` metadata for bound-establishing modifiers.
 
@@ -861,7 +861,12 @@ bool TryDeclarationAttributeProof(ProofObligation obligation, SemanticIndex sema
     if (obligation.Requirement is DimensionProofRequirement dimReq)
     {
         var subject = ResolveSubject(dimReq.Subject, obligation.Site);
-        var dimension = ResolvePeriodDimension(subject, semantics);
+        // Declared/derived dimension first; for an open period fall back to a guard that narrows
+        // its dimension axis (`when X.dimension == 'date'`), riding the same all-branches /
+        // reassignment-aware narrowing as the qualifier axes. A 'datetime' narrowing yields
+        // PeriodDimension.Datetime, which equals no single-class requirement (compare-but-inert).
+        var dimension = ResolvePeriodDimension(subject, semantics)
+                     ?? NarrowedPeriodDimensionFromGuard(subject, obligation, semantics);
         // PeriodDimension.Any always satisfies (permissive unqualified periods — locked decision)
         return dimension == PeriodDimension.Any || dimension == dimReq.RequiredDimension;
     }
@@ -989,7 +994,7 @@ A DU with 8 subtypes representing all qualifier axes:
 - `TemporalDimension(Any)` satisfies Dimension proof but NOT QualifierCompatibility
 
 **Strategy integration:**
-- Strategy 2 reads `field.DeclaredQualifiers` for `DimensionProofRequirement` — finds a `TemporalDimension` entry and checks dimension compatibility.
+- Strategy 2 reads `field.DeclaredQualifiers` for `DimensionProofRequirement` — finds a `TemporalDimension` entry and checks dimension compatibility; for an open period it falls back to a guard narrowing the dimension axis.
 - Strategy 5 resolves `DeclaredQualifierMeta` carriers from both operands — fields, event args, typed constants, interpolated typed constants, or recursive `TypedBinaryOp.ResultQualifier` propagation — then compares the resolved entries on the requested axis.
 
 #### ValueModifierMeta.ProofSatisfactions
@@ -1023,7 +1028,7 @@ Strategy 2 dispatches across three carrier surfaces by requirement kind:
 | `NumericProofRequirement` | `FixedReturnAccessor.ReturnNonnegative` | If the requirement subject is `SelfSubject(accessor)` and the accessor flag is true, discharge `>= 0` trivially |
 | `NumericProofRequirement` | `ValueModifierMeta.ProofSatisfactions` | Otherwise walk the field's effective modifiers and check each satisfaction entry |
 | `PresenceProofRequirement` | `DeclaredPresenceMeta` | Read `field.Presence`, check for `Guaranteed` subtype |
-| `DimensionProofRequirement` | `DeclaredQualifierMeta` | Read `field.DeclaredQualifiers`, find `TemporalDimension` entry |
+| `DimensionProofRequirement` | `DeclaredQualifierMeta` / guard narrowing | Read `field.DeclaredQualifiers`, find `TemporalDimension` entry; for an open period, consult a dimension-axis guard narrowing |
 | `ModifierRequirement` | Direct membership | `field.Modifiers.Contains(required)` — no carrier metadata |
 
 #### Strategy 5 → Carrier Dispatch

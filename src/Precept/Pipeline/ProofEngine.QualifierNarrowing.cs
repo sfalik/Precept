@@ -144,6 +144,30 @@ public static partial class ProofEngine
         return agreed;
     }
 
+    /// <summary>
+    /// The <see cref="PeriodDimension"/> an open period subject is narrowed to by the enclosing
+    /// guard (<c>when X.dimension == 'date'</c>), or <c>null</c> if the guard does not provably pin
+    /// it. Rides the same all-branches / reassignment-aware narrowing as the qualifier axes
+    /// (<see cref="NarrowedValueFromGuard"/> on the <see cref="QualifierAxis.TemporalDimension"/>
+    /// axis); the narrowed temporal-dimension spelling maps to its <see cref="PeriodDimension"/> by
+    /// name. A <c>'datetime'</c> narrowing yields <see cref="PeriodDimension.Datetime"/> — which
+    /// equals no single-class (Date/Time) requirement, so it discharges nothing (compare-but-inert).
+    /// <see cref="PeriodDimension.Any"/> is never a narrowable value and is excluded defensively.
+    /// </summary>
+    private static PeriodDimension? NarrowedPeriodDimensionFromGuard(
+        TypedExpression? subject, ProofObligation obligation, SemanticIndex semantics)
+    {
+        if (subject is null)
+            return null;
+
+        var narrowed = NarrowedValueFromGuard(subject, QualifierAxis.TemporalDimension, obligation, semantics);
+        return narrowed is not null
+            && Enum.TryParse<PeriodDimension>(narrowed, ignoreCase: true, out var dimension)
+            && dimension != PeriodDimension.Any
+            ? dimension
+            : null;
+    }
+
     /// <summary>The guard expression governing an obligation's context (row / hook / handler / rule / ensure).</summary>
     private static TypedExpression? GuardOfContext(ObligationContext context, SemanticIndex semantics) => context switch
     {

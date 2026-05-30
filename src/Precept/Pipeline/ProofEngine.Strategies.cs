@@ -44,7 +44,13 @@ public static partial class ProofEngine
         if (obligation.Requirement is DimensionProofRequirement dimReq)
         {
             var resolvedSubject = ResolveSubject(dimReq.Subject, obligation.Site);
-            var dimension = ResolvePeriodDimension(resolvedSubject, semantics);
+            // Declared (or derived) dimension first; for an open period, fall back to a guard that
+            // narrows its dimension axis (`when X.dimension == 'date'`) — riding the same
+            // all-branches / reassignment-aware narrowing as the qualifier axes. A 'datetime'
+            // narrowing yields PeriodDimension.Datetime, which equals no single-class (Date/Time)
+            // requirement, so it stays compare-but-inert.
+            var dimension = ResolvePeriodDimension(resolvedSubject, semantics)
+                         ?? NarrowedPeriodDimensionFromGuard(resolvedSubject, obligation, semantics);
             if (dimension is null) return false;
             return dimension == PeriodDimension.Any || dimension == dimReq.RequiredDimension;
         }
