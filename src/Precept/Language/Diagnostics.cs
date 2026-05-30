@@ -615,7 +615,7 @@ public static class Diagnostics
             ExampleBefore: "precept Example\nfield Weight as quantity of 'mass' default 0\nfield Distance as quantity of 'length' default 0\nfield Bad as quantity <- Weight + Distance",
             ExampleAfter: "precept Example\nfield Weight1 as quantity of 'mass' default 0\nfield Weight2 as quantity of 'mass' default 0\nfield Total as quantity of 'mass' <- Weight1 + Weight2"),
         DiagnosticCode.UnprovedAssignmentQualifierCompatibility => new(nameof(DiagnosticCode.UnprovedAssignmentQualifierCompatibility), DiagnosticStage.Proof, Severity.Error,
-            "Cannot prove the value's '{0}' qualifier satisfies field '{1}'",
+            "Cannot prove the value's '{0}' qualifier satisfies field '{1}' — {2}",
             DiagnosticCategory.BusinessDomain,
             RelatedCodes: [DiagnosticCode.QualifierMismatch, DiagnosticCode.UnprovedQualifierCompatibility],
             FixHint: "Provide a source value whose required qualifier is explicitly known at compile time, or relax the field's qualifier constraint.",

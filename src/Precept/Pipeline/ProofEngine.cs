@@ -623,6 +623,22 @@ public static partial class ProofEngine
         return (label, narrowed is not null ? $"{narrowed} (from guard)" : FormatQualifierValue(null));
     }
 
+    /// <summary>
+    /// The display value for an operand's qualifier on an axis: its declared value, or — when
+    /// open — the guard-narrowed value (suffixed "(from guard)"), or "unresolved". Mirrors
+    /// <see cref="DescribeQualifiedExpression"/>'s value half for diagnostics that format the
+    /// qualifier value directly (the qualifier-chain arm) rather than via a (label, value) pair.
+    /// </summary>
+    private static string FormatQualifierOrNarrowed(
+        TypedExpression? expr, QualifierAxis axis, ProofObligation obligation, SemanticIndex semantics)
+    {
+        var declared = expr is null ? null : ResolveQualifierFromExpression(expr, axis, semantics);
+        if (declared is not null)
+            return FormatQualifierValue(declared);
+        var narrowed = expr is not null ? NarrowedValueFromGuard(expr, axis, obligation, semantics) : null;
+        return narrowed is not null ? $"{narrowed} (from guard)" : FormatQualifierValue(null);
+    }
+
     private static string DescribeExpression(TypedExpression? expr) => expr switch
     {
         TypedFieldRef fieldRef => fieldRef.FieldName,

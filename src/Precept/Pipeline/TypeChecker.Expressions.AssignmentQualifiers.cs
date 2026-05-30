@@ -145,12 +145,19 @@ internal static partial class TypeChecker
                     }
                     else
                     {
+                        // Type-stage path (field/arg defaults, bounds, computed exprs the proof
+                        // engine does not walk) — no guard scope here, so the source's qualifier is
+                        // simply not statically known.
+                        var detail = TryGetQualifierText(targetQualifier, targetQualifier.Axis, out var requiredValue)
+                            ? $"the source's qualifier is not statically known; '{fieldName}' requires '{requiredValue}'"
+                            : "the source's qualifier is not statically known";
                         ctx.Diagnostics.Add(
                             Diagnostics.Create(
                                 DiagnosticCode.UnprovedAssignmentQualifierCompatibility,
                                 valueSpan,
                                 FormatQualifierAxisName(targetQualifier.Axis),
-                                fieldName));
+                                fieldName,
+                                detail));
                     }
                     break;
             }

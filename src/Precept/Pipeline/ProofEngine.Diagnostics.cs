@@ -65,16 +65,23 @@ public static partial class ProofEngine
                     DescribeExpression(rightExpression),
                     $"{chainReq.LeftAxis}↔{chainReq.RightAxis}",
                     contextClause,
-                    FormatQualifierValue(leftExpression is null ? null : ResolveQualifierFromExpression(leftExpression, chainReq.LeftAxis, semantics)),
-                    FormatQualifierValue(rightExpression is null ? null : ResolveQualifierFromExpression(rightExpression, chainReq.RightAxis, semantics)));
+                    FormatQualifierOrNarrowed(leftExpression, chainReq.LeftAxis, obligation, semantics),
+                    FormatQualifierOrNarrowed(rightExpression, chainReq.RightAxis, obligation, semantics));
 
             case AssignmentQualifierProofRequirement aqReq:
                 // PRE0141 (assignment-qualifier compatibility) — re-staged from the type checker to
                 // the proof stage: the open-field assignment is discharged by guard-narrowing or
-                // surfaces here. Message preserves the type-stage wording (axis label + field name).
+                // surfaces here. The detail clause names what (if anything) the guard narrowed the
+                // source to vs. the value the field requires — the narrowed-vs-required signal.
+                var aqRequired = ExtractComparableValue(aqReq.TargetQualifier);
+                var aqNarrowed = NarrowedValueFromGuard(obligation.Site, aqReq.Axis, obligation, semantics);
+                var aqDetail = aqNarrowed is not null
+                    ? $"the guard narrows it to '{aqNarrowed}', which does not satisfy the required '{aqRequired}'"
+                    : $"no guard narrows it to the required '{aqRequired}'";
                 return Diagnostics.Create(DiagnosticCode.UnprovedAssignmentQualifierCompatibility, obligation.Site.Span,
                     QualifierAxisLabel(aqReq.Axis),
-                    aqReq.TargetFieldName);
+                    aqReq.TargetFieldName,
+                    aqDetail);
 
             case PresenceProofRequirement presence:
                 return Diagnostics.Create(DiagnosticCode.UnprovedPresenceRequirement, obligation.Site.Span,

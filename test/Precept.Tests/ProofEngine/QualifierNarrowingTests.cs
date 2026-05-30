@@ -193,4 +193,25 @@ public class QualifierNarrowingTests
         message.Should().Contain("EUR", "the message names what the guard narrowed the open operand to")
             .And.Contain("USD", "and the required value it failed to match");
     }
+
+    [Fact]
+    public void MismatchedCurrencyGuard_AssignmentDiagnosticNamesNarrowedAndRequiredValues()
+    {
+        // The pure-assignment arm (PRE0141): `set UsdField = openSource` under a mismatched guard.
+        var message = Compiler.Compile("""
+            precept P
+            field Payment as money
+            field UsdField as money in 'USD'
+            state S initial
+            event E
+            from S on E when Payment.currency == 'EUR'
+                -> set UsdField = Payment
+                -> no transition
+            """).Diagnostics
+            .First(d => d.Code == nameof(DiagnosticCode.UnprovedAssignmentQualifierCompatibility))
+            .Message;
+
+        message.Should().Contain("EUR", "the assignment message names the guard-narrowed value")
+            .And.Contain("USD", "and the required value");
+    }
 }
