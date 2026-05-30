@@ -1,6 +1,6 @@
 ---
 name: lifecycle-4-execute
-description: Stage 4 of the engineering lifecycle — execute against a locked design and phased plan. Triggers on — implement, execute, ship, build this, start the work, "implement phase N", "do the next slice", "open the PR for X". Captures vertical-slice discipline, PR-body update protocol, commit conventions, and post-slice doc-touch verification. Does NOT design (use /lifecycle-2-design) or plan (use /lifecycle-3-plan).
+description: Stage 4 of the engineering lifecycle — execute against a locked design and phased plan. Triggers on — implement, execute, ship, build this, start the work, "implement phase N", "do the next slice", "open the PR for X". Captures the execution rigor (enumerate the input space + test-first before coding, delegate well-specified work to a fresh worktree agent, adversarial diff review before commit) and the execution cadence (vertical-slice discipline, PR-body update protocol, commit conventions, post-slice doc-touch verification). Does NOT design (use /lifecycle-2-design) or plan (use /lifecycle-3-plan).
 ---
 
 # Precept Execution
@@ -21,9 +21,20 @@ Stage 4 of the engineering lifecycle. Bridges plan (Stage 3) and promotion (Stag
 - The work is a small bug fix or polish with no design-and-plan upstream — just commit directly per the standard workflow in CONTRIBUTING.md
 - Promoting design content to canonical docs → use `/lifecycle-5-promote`
 
+## Execution mode: PR mode vs. spike-branch mode
+
+The cadence below has two modes. They differ **only** in the execution-hub artifact — the rigor, vertical-slice discipline, doc-sync, commit conventions, and review gates are identical in both.
+
+- **PR mode (default).** Issue → feature branch → draft PR → merge to `main`. The **draft PR body is the execution hub and the plan artifact** (`Closes #N`, Implementation Plan checklist). This is the `CONTRIBUTING.md` flow; use it for any branch destined to merge to `main`.
+- **Spike-branch mode.** Work on a long-lived `spike/*` branch where **no PR is opened** and commits land directly on the branch. There is no PR body, no `Closes #N`, no merge ceremony. The **execution hub and plan artifact is the plan doc** (`docs/Working/<topic>-plan-YYYY-MM-DD.md`) produced by `/lifecycle-3-plan` — its slice list is the checklist, its phase rows are the progress tracker. A GitHub issue is optional.
+
+**Detecting the mode:** if the current branch matches `spike/*` (or the owner has said "no PR on this branch"), you are in spike-branch mode — read every "PR body" instruction below as "plan doc," skip the draft-PR step, and commit directly on the spike branch. When in doubt, ask which mode applies; don't open a PR on a spike branch without confirmation.
+
+In both modes, slice boundaries still pause for review, and the plan/PR artifact is kept current after every slice — the rule "the plan is a live artifact, never a separate throwaway file" is mode-independent.
+
 ## Before you start
 
-Read these before opening the PR or writing code:
+Read these before opening the PR (PR mode) / updating the plan doc (spike mode) or writing code:
 
 **Always:**
 - `docs/philosophy.md` — Precept's core commitments
@@ -34,11 +45,38 @@ Read these before opening the PR or writing code:
 
 **By topic** — navigate via the README system per the change you're making (catalog change → catalog-system.md; pipeline change → relevant stage doc; etc.).
 
+## Rigor before cadence (enumerate → test-first → gate → delegate → review)
+
+The numbered workflow below is the execution *cadence* — slices, commits, doc-sync. This section is the *rigor* that precedes and surrounds it: the practices that keep a slice from shipping a gap. Grounded in Anthropic's Claude Code best practices ([best practices](https://code.claude.com/docs/en/best-practices), [building effective agents](https://www.anthropic.com/research/building-effective-agents)). Hard-won lesson: a slice coded from the acceptance / happy-path examples — without enumerating the full input space first — surfaces a pile of regressions mid-build instead of failing loudly up front.
+
+### Before writing code for a slice
+
+1. **Enumerate the full input/obligation space.** List every shape the change must handle — every source-expression form, every obligation/requirement kind, every soundness rule — and **probe real behavior** on each, not just the examples in the design. Under-enumeration is the most common cause of a mid-build regression pile.
+2. **Write the failing test matrix FIRST (test-first / TDD).** Turn the enumerated space into failing tests *before* implementation — one per shape, plus one per soundness/acceptance rule. Anthropic: *"write a failing test that reproduces the issue, then fix it"*; *"provide verification criteria with example test cases."* Writing the matrix first *forces* the enumeration, so a missing shape fails loudly up front. (This sharpens § 5 Tests below: tests come *before* the code, not alongside it.)
+3. **The gate (the repeat-preventer).** Code only when the slice is specified *and* tested tightly enough to brief a fresh agent **without judgment calls**. If it isn't, that's the signal to enumerate/design more — a slice needing a genuinely new mechanism gets a focused `/lifecycle-2-design` first, not a code-first attempt.
+
+> **⚠️ Fresh-build check before trusting `precept_compile`.** The precept MCP server serves the build from when it **last spawned** (`start-precept-mcp.js` rebuilds on spawn, then runs a frozen snapshot). If `src/Precept` or `tools/Precept.Mcp` changed this session, `precept_compile` / `precept_diagnostic` are **stale** — they reflect old compiler behavior. Ask the owner to run **`/mcp reconnect precept`** (rebuilds on reconnect — no session restart needed), *then* probe. When an MCP result disagrees with a freshly-built unit test (`dotnet test`), trust the test and suspect a stale server first — don't root-cause a phantom bug. For ground-truth that's never stale, compile directly against the freshly-built core (`Compiler.Compile(source).Diagnostics`) via the test project rather than the MCP wrapper.
+
+### Delegating implementation
+
+4. **Delegate well-specified implementation to a fresh worktree agent.** A `general-purpose` agent in an isolated git worktree, with a tight brief: the locked design, exact file pointers, the failing test matrix to make green, the constraints (catalog discipline, no transient refs), and the verification steps. Fresh context is the lever — not a "better coder" (the model is already top-tier). A delegated agent that hits an unspecified fork stops and reports it (good) rather than debugging mid-stream; worktree isolation lets parallel slices proceed without colliding.
+
+### Before counting a slice done
+
+5. **Adversarial review of the diff in a fresh context — before commit.** Run an adversarial reviewer (e.g. `precept-reviewer`) that sees only the diff + criteria, not the reasoning that produced it — Anthropic's documented "fresh subagent reviews the diff" pattern. **Required for soundness-critical slices** (proof engine, type system, catalog). Tell the reviewer to flag **correctness/requirement gaps, not style** — Opus 4.8 follows "be conservative / don't nitpick" *more* faithfully than prior models, and a refute-prompted reviewer always finds *something*; chasing every NIT leads to over-engineering. Fix the real findings, then commit.
+
+### Opus-4.8 levers
+- **`effort` parameter** — tune up (`extra` / `max`) for hard or soundness-critical slices; it scopes work strictly, so the default can under-scope an open-ended task.
+- **Dynamic Workflows / the `Workflow` tool** — for broad fan-outs (many-file migrations / audits), Claude writes its own orchestration over many parallel subagents; **test on a representative ~10% before the full run.**
+- The model **pushes back on unsound plans and catches its own flaws** — surface gaps and design errors openly rather than papering over them; that's the model working as intended.
+
 ## Required workflow
 
-### 1. Open the draft PR immediately
+### 1. Stand up the execution hub immediately
 
-The PR is the execution hub. Body structure per `CONTRIBUTING.md`:
+**PR mode:** open the draft PR immediately — it is the execution hub. **Spike-branch mode:** skip the PR; the plan doc (`docs/Working/<topic>-plan-YYYY-MM-DD.md`) is the execution hub, and its slice list / phase rows play the role the PR body plays below. Either way, the hub exists before the first slice lands.
+
+PR body structure per `CONTRIBUTING.md` (PR mode; in spike mode the same Summary / Why / slice-checklist content lives in the plan doc, minus `Closes #N`):
 
 ```markdown
 ## Summary
@@ -61,9 +99,9 @@ Each slice is a single coherent commit; the list is also the execution checklist
 
 **Anti-patterns:**
 
-- A separate `implementation-plan.md` file. The PR body is the plan artifact — never duplicate.
+- A separate `implementation-plan.md` file. The hub artifact (PR body in PR mode; the `/lifecycle-3-plan` plan doc in spike mode) is the plan — never duplicate it into a throwaway file.
 - An empty Implementation Plan post-design-review-clear. The plan is execution discipline; the section being empty signals execution has no scaffolding.
-- A PR opened before the design is locked. Open the draft PR after Stage 2 completes, not before.
+- A PR opened before the design is locked. Open the draft PR after Stage 2 completes, not before. (Spike mode opens no PR at all — don't open one on a `spike/*` branch without owner confirmation.)
 
 ### 2. Vertical slices
 
@@ -119,8 +157,9 @@ A slice that touches a non-negotiable surface (language surface, public API, dia
 
 After each slice lands:
 
-- Check off the slice in the PR-body Implementation Plan
+- Check off the slice in the hub artifact — the PR-body Implementation Plan (PR mode) or the plan doc's slice checklist (spike mode)
 - Update the plan doc's phase tracker if the plan tracks slice-level progress
+- **Pause for review at the slice boundary** before starting the next slice — don't auto-advance (owner preference; applies in both modes)
 - Update `docs/Working/bugs.md` if the slice closes a bug entry
 - Note any decisions surfaced during execution (per the plan's "Open decisions" section)
 
@@ -137,36 +176,43 @@ A phase is complete when:
 
 The skill enforces:
 
-1. **The PR body IS the implementation plan.** No separate implementation-plan.md file. Refused.
-2. **Pending design review until the gate clears.** Implementation Plan section says "Pending design review" until Track A or Track B (per CONTRIBUTING.md § 3) signs off. Plans written before the gate are refused.
-3. **Slices are coherent and incremental.** A slice that leaves tests red, mixes unrelated features, or skips doc-touch is refused.
-4. **Catalog-first.** For language-surface or pipeline-touching slices, the catalog entry lands in the slice that introduces the feature — not in a follow-up. Pipeline code derives from catalog; if pipeline code hardcodes catalog knowledge in the slice, refused.
-5. **Doc-sync in the same commit.** Affected docs (per the CLAUDE.md routing table) are updated in the slice that changes the behavior they describe. Cross-commit doc-sync (slice N changes code, slice N+1 updates docs) is refused — the description-of-current-reality drifts in slice N otherwise.
-6. **Sample-edit constraint.** Sample files in `samples/` are not modified by this workstream unless the plan explicitly authorizes the edit. Stray sample changes are refused.
-7. **No skipping vertical slices to amend.** When a pre-commit hook fails, fix the underlying issue and create a NEW commit; don't `--amend`. The hook failure means the commit didn't happen — `--amend` would modify the *previous* commit, potentially destroying earlier work.
+1. **The hub artifact IS the implementation plan.** PR body in PR mode; the `/lifecycle-3-plan` plan doc in spike-branch mode. Either way, no separate implementation-plan.md file. Refused.
+2. **No PR on a spike branch.** On a `spike/*` branch, commits land directly on the branch and the plan doc is the hub — opening a draft PR (or adding `Closes #N`) without owner confirmation is refused.
+3. **Pending design review until the gate clears.** Implementation Plan section says "Pending design review" until Track A or Track B (per CONTRIBUTING.md § 3) signs off. Plans written before the gate are refused.
+4. **Slices are coherent and incremental.** A slice that leaves tests red, mixes unrelated features, or skips doc-touch is refused.
+5. **Catalog-first.** For language-surface or pipeline-touching slices, the catalog entry lands in the slice that introduces the feature — not in a follow-up. Pipeline code derives from catalog; if pipeline code hardcodes catalog knowledge in the slice, refused.
+6. **Doc-sync in the same commit.** Affected docs (per the CLAUDE.md routing table) are updated in the slice that changes the behavior they describe. Cross-commit doc-sync (slice N changes code, slice N+1 updates docs) is refused — the description-of-current-reality drifts in slice N otherwise.
+7. **Sample-edit constraint.** Sample files in `samples/` are not modified by this workstream unless the plan explicitly authorizes the edit. Stray sample changes are refused.
+8. **No skipping vertical slices to amend.** When a pre-commit hook fails, fix the underlying issue and create a NEW commit; don't `--amend`. The hook failure means the commit didn't happen — `--amend` would modify the *previous* commit, potentially destroying earlier work.
+9. **Enumerate + test-first before code.** No implementation begins until the slice's input/obligation space is enumerated (with real behavior probed) and the failing test matrix exists. Coding from the acceptance examples alone is refused — it is the documented cause of mid-build regression piles.
+10. **Adversarial review before committing a soundness-critical slice.** Proof-engine / type-system / catalog slices get a fresh-context adversarial review of the diff (flagging correctness/requirement gaps, not style) before the commit lands.
 
 ## Composability
 
-- **Input**: a locked design doc (`/lifecycle-2-design` output) + a phased plan (`/lifecycle-3-plan` output) + a GitHub issue.
-- **Output**: a merged PR with vertical-slice commits, updated docs, green tests, and a checkable Implementation Plan in the PR body. Feeds `/lifecycle-5-promote` for canonicalizing the design's content into reference docs.
+- **Input**: a locked design doc (`/lifecycle-2-design` output) + a phased plan (`/lifecycle-3-plan` output) + (PR mode) a GitHub issue.
+- **Output**: vertical-slice commits, updated docs, green tests, and a checkable plan — landed as a merged PR (PR mode) or directly on the `spike/*` branch with the plan doc as the live tracker (spike mode). Feeds `/lifecycle-5-promote` for canonicalizing the design's content into reference docs.
 
 ## Anti-patterns to refuse
 
-- Open a separate `implementation-plan.md` file alongside the PR
+- Open a separate `implementation-plan.md` file alongside the hub (PR body / plan doc)
+- Open a draft PR on a `spike/*` branch (spike mode commits directly; the plan doc is the hub)
 - Begin coding before the design is locked
-- Skip the PR-body Implementation Plan ("I'll fill it in as I go")
+- Skip the Implementation Plan checklist in the hub artifact ("I'll fill it in as I go")
 - Commit a slice that leaves tests red
 - Land code changes in slice N and doc updates in slice N+1 ("docs are coming")
 - Hand-edit `tools/Precept.VsCode/syntaxes/precept.tmLanguage.json` (it's generated)
 - Skip pre-commit hooks with `--no-verify`
 - Modify samples without explicit plan authorization
 - Amend a commit when the pre-commit hook failed (create a new commit instead)
+- Start coding a slice from the acceptance examples without enumerating the full input space and writing the failing test matrix first
+- Commit a soundness-critical slice (proof engine / type system / catalog) without a fresh-context adversarial review of the diff
 
 ## Quick reference
 
 | Symptom | Skill response |
 |---|---|
-| Separate `implementation-plan.md` proposed | Refuse; PR body is the plan artifact |
+| Separate `implementation-plan.md` proposed | Refuse; the hub artifact (PR body / plan doc) is the plan |
+| Draft PR proposed on a `spike/*` branch | Refuse without owner confirm; commit directly, plan doc is the hub |
 | Code change without doc-touch in same slice | Refuse; routing-table doc updates land in the same commit |
 | Pipeline code hardcoding token sets / per-member kind dispatch | Refuse; catalog-driven discipline applies in the slice that adds the feature |
 | Sample edit not in plan | Refuse; sample-edit constraint applies |
@@ -174,3 +220,5 @@ The skill enforces:
 | `--amend` after pre-commit hook failure | Refuse; create a new commit |
 | Slice mixing unrelated features | Refuse; split into separate slices |
 | PR body Implementation Plan empty after design gate cleared | Prompt to fill before any code lands |
+| Coding from acceptance examples; no enumerated input space / failing test matrix | Refuse; enumerate + write failing tests first (guard 8) |
+| Soundness-critical slice committed with no adversarial diff review | Refuse; fresh-context review (correctness, not style) before commit (guard 9) |

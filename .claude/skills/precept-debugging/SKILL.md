@@ -19,6 +19,8 @@ When proposing a fix, match local `.precept` conventions where samples or nearby
 
 Call `precept_compile` with the full precept text. This is always the first step — never skip it. It catches syntax errors, type errors, and structural issues, and returns the full definition structure (states, fields, events, transitions).
 
+> **Stale-server caveat:** the precept MCP server serves the build from when it last spawned. If the compiler source (`src/Precept`) or `tools/Precept.Mcp` was changed this session, `precept_compile` reflects *old* behavior — ask the owner to run **`/mcp reconnect precept`** (rebuilds on reconnect, no session restart) before trusting its output. Diagnosing a `.precept` against a stale compiler chases phantom errors.
+
 Read the diagnostics carefully:
 
 - **Errors** — block the definition from loading. Fix these first.
