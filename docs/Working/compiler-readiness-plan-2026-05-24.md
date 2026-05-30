@@ -934,12 +934,12 @@ Exit: all 12 design acceptance criteria pass; PR mergeable.
 
 ## Workstream blocks
 
-| WS | Goal | Effort | Depends on |
-|---|---|---|---|
-| W-A | Composite representation + parse/validate/canonicalize + 3 diagnostics | M (~1–1.5d) | — |
-| W-B | `.basis` / `.dimension` accessor resolution for composite | S (~½d) | W-A |
-| W-C | Composite-aware cancellation + legal-basis-by-operation enforcement | M (~1d) | W-A |
-| W-D | Scenario-test matrix + doc-status verification | S (~½d) | W-B, W-C |
+| WS | Goal | Effort | Depends on | Status |
+|---|---|---|---|---|
+| W-A | Composite representation + parse/validate/canonicalize + 3 diagnostics | M (~1–1.5d) | — | (prior) |
+| W-B | `.basis` / `.dimension` accessor resolution for composite | S (~½d) | W-A | (prior) |
+| W-C | Composite-aware cancellation + legal-basis-by-operation enforcement | M (~1d) | W-A | ✅ **Complete** (commits `fd147dc2` `a42134e3` `7dd07f8b` `d2946dc0`) |
+| W-D | Scenario-test matrix + doc-status verification | S (~½d) | W-B, W-C | (pending) |
 
 **Total**: ~2.5–3.5 days serial; ~2–3 if W-B and W-C parallelize after W-A.
 
@@ -998,6 +998,16 @@ Exit: all 12 design acceptance criteria pass; PR mergeable.
 - `dotnet test` green.
 
 **Doc-update obligations**: verify `business-domain-types.md` § D15 cancellation + § Composite legality + D14 composite extension match implementation (already amended; confirm no drift).
+
+**✅ Completion note (W-C):** Shipped across four commits on `spike/Precept-V2-Radical`.
+- `fd147dc2` — **acceptance + composite rejection (multiplication path).** Single-basis `period in 'hours' * price in 'USD/hours'` now cancels (proof-engine `TemporalDimension ← single-basis TemporalUnit` fallback, gated `Components.Length == 1` for soundness); composite `* price` emits `CompoundPeriodDenominator` not the generic `UnprovedQualifierCompatibility`. Pinned test flipped (`PricePerHours_TimesPeriodInHours_NotYetProven` → `_Cancels`). False-green trap avoided — composite-reject test verified RED before, GREEN after.
+- `a42134e3` — **legal-basis-by-source-operation (Gap 4).** `date - date as period in 'days + hours'` emits `QualifierMismatch` for `hours` (and symmetric cases); catalog-driven via `TemporalUnits.IsCalendarBased`.
+- `7dd07f8b` — **research** grounding the divide-path keep/delete question (`research/architecture/divide-by-temporal-span-reachability.md`, `research/language/division-by-temporal-span-prior-art.md`): D15 mandates `money ÷ period` / `money ÷ duration`; prior art (NodaTime/java.time) divides by fixed `duration` but refuses calendar `period` — D15's period-divisor rows are a Precept extension beyond prior art (flagged as a future design item).
+- `d2946dc0` — **compound-period divisor rejection (division path, re-aimed) + D14 subset (Gap 3) tests.** The carry-forward NIT-1 cleanup was found to guard the *wrong operand* (left, not the denominator); re-aimed so `money ÷ period in 'hours + minutes'` (and `quantity ÷ …`) emits `CompoundPeriodDenominator` per D15. PRE0073 left as-is with a dormancy comment (composites now fully caught by PRE0074). D14 subset rejection (`{days} ⊄ {years, months}`) confirmed already enforced by D9's subset check; tests added.
+
+All four projects green (Precept.Tests 6593 / LS 413 / MCP 67 / Analyzers 291). `precept-reviewer` cleared each soundness-critical slice. No new diagnostic codes — reused `CompoundPeriodDenominator`, `QualifierMismatch`, `DurationDenominatorMismatch`. No `business-domain-types.md` drift found (§ D14/§ D15 already match).
+
+**Deferred to W-D / later:** the divide-path PRE0073 retains its single-basis `DerivedDimension == Date` gate (dormant for the divide path — no enabled op has a Duration/Period numerator with a temporal-unit denominator). The prior-art-vs-D15 period-divisor tension (does `money ÷ period` belong at all, given NodaTime refuses calendar-period division?) is a `/lifecycle-2-design` question, not a build gap — see the committed research.
 
 ### Workstream W-D — Scenario tests + doc-status verification
 
