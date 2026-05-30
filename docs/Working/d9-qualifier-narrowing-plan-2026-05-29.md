@@ -8,10 +8,10 @@
 
 | Slice | Goal | Decisions | Effort | Parallel? | Status |
 |---|---|---|---|---|---|
-| **S1** | Core narrowing mechanism on identity axes needing no catalog change (currency/unit/from/to) | D1, D2, D3 (locked) | M (2–3d) | critical path | Ready |
-| **S2a** | Partition-validation prerequisite: `ReturnsQualifier` on `.dimension`, partition-aware dimension-literal validation (PRE0053 fix) | D4 (locked) | M (2d) | **‖ S1** (file-disjoint) | Ready |
-| **S2b** | `.dimension` discharge wiring (quantity/price/uom/period) + period `.dimension` derivation + CONCERN-2 regression | D4, D6, D7 | S–M (1–2d) | after S1 ∧ S2a | Stub |
-| **S3** | Period `.basis` narrowing — D14 subset discharge + D15 cancellation | D5 (locked) | M (2d) | after S1 (‖ S2b, coordinated) | Stub |
+| **S1** | Core narrowing mechanism on identity axes needing no catalog change (currency/unit/from/to) | D1, D2, D3 (locked) | M (2–3d) | critical path | ✅ `4e5f837c` |
+| **S2a** | Partition-validation prerequisite: `ReturnsQualifier` on `.dimension`, partition-aware dimension-literal validation (PRE0053 fix) | D4 (locked) | M (2d) | **‖ S1** (file-disjoint) | ✅ `fc10db45` |
+| **S2b** | `.dimension` discharge wiring (quantity/price/uom/period) + period `.dimension` derivation + CONCERN-2 regression | D4, D6, D7 | S–M (1–2d) | after S1 ∧ S2a | ✅ `f662aad3` |
+| **S3** | Period `.basis` narrowing — D14 subset discharge + D15 cancellation | D5 (locked) | M (2d) | after S1 (‖ S2b, coordinated) | **Ready** (design locked) |
 | **S4** | Diagnostics narrowed-vs-required + samples + doc-sync | — | S–M (1–2d) | tail; draft ‖, finalize last | Stub |
 
 ## Parallelization (answering "can we run parallel work in this phase?")
@@ -91,9 +91,15 @@ Re-grounding (2026-05-29): cross-step reassignment-invalidation (was the design'
 
 **Doc-update obligations.** `docs/compiler/type-checker.md` (partition validation + `ReturnsQualifier`-on-`.dimension`); `docs/compiler/literal-system.md` (dimension partition as 2nd context-dependent case alongside `stateref`). (Spec § D9 / § dimension prose finalized in S4.)
 
-## S2b — `.dimension` discharge wiring (STUB)
+## S2b — `.dimension` discharge wiring (✅ `f662aad3`)
 
-**Status: Stub — TBD pending S1 + S2a completion.** Goal: wire the discharge for the `.dimension` axis (quantity/price/uom/period) onto S1's mechanism, including period `.dimension` derivation via shared `ResolvePeriodDimension` (D6) and `datetime` compare-but-inert (D7). Decisions: D4/D6/D7 (locked). Effort: S–M (1–2d). Independent of S3 (different axis), file-coordinated on the discharge dispatch.
+**Status: Complete.** Goal: wire the discharge for the `.dimension` axis (quantity/price/uom/period) onto S1's mechanism, including period `.dimension` derivation (D6) and `datetime` compare-but-inert (D7). Decisions: D4/D6/D7 (locked).
+
+**As-built notes (enumeration surfaced these against the locked plan):**
+- The quantity/price/uom `.dimension` assignment discharge was **already delivered by S1** (axis-generic `QualifierCompatibility`) — no new work needed there. The only genuine gap was the **period** `DimensionProofRequirement`.
+- The real period discharge site is `date ± period` / `time ± period` (`Operations.cs` `DatePlusPeriod`/`TimePlusPeriod` …), **not** `period + period` (which generates no dimension obligation). The discharge now consults the guard narrowing fact via `NarrowedPeriodDimensionFromGuard` mapping the narrowed spelling to `PeriodDimension` and feeding the existing `== Any || == Required` check; `'datetime'` → `Datetime` stays inert for free.
+- **For S4:** the design's acceptance example #3 (`set D = D + X`, D an open *period*) is imprecise — `period + period` carries no dimension obligation. Correct it to `date/time ± open-period` when rewriting § D9.
+- **Deferred (not this slice):** a same-axis AND-contradiction guard (`== 'date' and == 'time'`) discharges order-dependently — dead-code-only (unsatisfiable guard), parity with numeric narrowing's first-match; resolves when qualifier-contradiction detection (PRE0082) is built.
 
 ## S3 — Period `.basis` subset narrowing (STUB)
 
