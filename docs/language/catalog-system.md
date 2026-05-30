@@ -543,7 +543,7 @@ classDiagram
 
 Two separate type hierarchies: **catalog meta** (static identity, 13 members in `ProofRequirements.All`) and **obligation instances** (per-use payload, carried inside other catalog entries that declare requirements).
 
-**Catalog meta — DU as identity (10 members):**
+**Catalog meta — DU as identity (13 members):**
 
 ```mermaid
 classDiagram
@@ -563,6 +563,9 @@ classDiagram
     class LengthContainment { }
     class CountContainment { }
     class KeyPresence { }
+    class IndexBounds { }
+    class DimensionalProduct { }
+    class AssignmentQualifier { }
     ProofRequirementMeta <|-- Numeric
     ProofRequirementMeta <|-- Presence
     ProofRequirementMeta <|-- Dimension
@@ -573,6 +576,9 @@ classDiagram
     ProofRequirementMeta <|-- LengthContainment
     ProofRequirementMeta <|-- CountContainment
     ProofRequirementMeta <|-- KeyPresence
+    ProofRequirementMeta <|-- IndexBounds
+    ProofRequirementMeta <|-- DimensionalProduct
+    ProofRequirementMeta <|-- AssignmentQualifier
 ```
 
 The base record carries a `DiagnosticCode? DiagnosticCode` field (F-LANG-CAT-09) — the catalog-mediated diagnostic emitted when this obligation kind fails. Null only for `Numeric` (1:many mapping; routes to `DivisionByZero`, `SqrtOfNegative`, `UnguardedCollectionAccess`, or `UnguardedCollectionMutation` depending on context) and `KeyPresence` (routes to `PRE0099` or `PRE0101` depending on `RequireAbsence`). Source: `src/Precept/Language/ProofRequirement.cs:204`.

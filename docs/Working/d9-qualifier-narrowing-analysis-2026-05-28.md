@@ -1,7 +1,7 @@
 # Deep Analysis — D9 Open-Field Discrete-Equality Qualifier Narrowing
 
 **Date**: 2026-05-28
-**Status**: Analysis (feeds a forthcoming `/lifecycle-2-design`)
+**Status**: Analysis — consumed by `d9-qualifier-narrowing-design.md` (Locked 2026-05-29); implemented S1–S4 + (0) and promoted to `business-domain-types.md § D9`. Historical; reference only.
 **Origin**: Surfaced during Phase 6 W-B (composite period basis). Began as "fix PRE0053 so `period.dimension == 'date'` compiles + narrows." Deep analysis (3 independent lenses: requirements / soundness / architecture) revealed the scope is far larger.
 
 ## THE HEADLINE FINDING (all three lenses, independently)
