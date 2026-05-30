@@ -11,8 +11,9 @@
 | **S1** | Core narrowing mechanism on identity axes needing no catalog change (currency/unit/from/to) | D1, D2, D3 (locked) | M (2–3d) | critical path | ✅ `4e5f837c` |
 | **S2a** | Partition-validation prerequisite: `ReturnsQualifier` on `.dimension`, partition-aware dimension-literal validation (PRE0053 fix) | D4 (locked) | M (2d) | **‖ S1** (file-disjoint) | ✅ `fc10db45` |
 | **S2b** | `.dimension` discharge wiring (quantity/price/uom/period) + period `.dimension` derivation + CONCERN-2 regression | D4, D6, D7 | S–M (1–2d) | after S1 ∧ S2a | ✅ `f662aad3` |
-| **S3** | Period `.basis` narrowing — D14 subset discharge + D15 cancellation | D5 (locked) | M (2d) | after S1 (‖ S2b, coordinated) | **Ready** (design locked) |
-| **S4** | Diagnostics narrowed-vs-required + samples + doc-sync | — | S–M (1–2d) | tail; draft ‖, finalize last | Stub |
+| **(0)** | Temporal-denominator price parsing (`price in 'USD/hours'`) — § D15 NodaTime vocabulary; prerequisite surfaced building S3 | — | S | prereq | ✅ `5d071ffa` |
+| **S3** | Period `.basis` narrowing — **D14 subset assignment** discharge (D15 single-basis *cancellation* is NOT here — it is the W-C tightening) | D5 (locked) | M (2d) | after S1 (‖ S2b, coordinated) | ✅ `5d071ffa` |
+| **S4** | Diagnostics narrowed-vs-required + samples + doc-sync (§ D9 `$eq:` mechanism rewrite) | — | S–M (1–2d) | tail; draft ‖, finalize last | Stub |
 
 ## Parallelization (answering "can we run parallel work in this phase?")
 
@@ -103,7 +104,14 @@ Re-grounding (2026-05-29): cross-step reassignment-invalidation (was the design'
 
 ## S3 — Period `.basis` subset narrowing (STUB)
 
-**Status: Stub — TBD pending S1 completion.** Goal: `.basis` discrete-component-set narrowing; canonicalize guard RHS via the W-A canonicalizer; **D14 subset discharge** (N2: `components(narrowed) ⊆ components(required)`); D15 single-basis cancellation interaction; open-period basis (N1: guard supplies the value). Decisions: D5 (locked). Effort: M (2d). Independent of S2b; file-coordinated on the discharge dispatch.
+**Status: ✅ Complete `5d071ffa`.** Delivered `.basis` discrete-component-set narrowing: guard RHS canonicalized at the **type checker** (G4) via the W-A canonicalizer; **D14 subset discharge** (N2: `components(narrowed) ⊆ components(required)`) on the period **assignment** path; open-period basis (N1: the guard supplies the value). Decisions: D5 (locked).
+
+**As-built notes (enumeration/probe surfaced these against the design prose):**
+- The basis discharge target is **D14 composite-basis assignment** (`set <period in 'a+b'> = openPeriod`), the relation the design actually specifies (subset) — **not** the `price × period` cancellation the D5/N1 prose used as its example. That cancellation site is *dimension-level* (TemporalDimension), the same imprecision class as the S2b example-#3 carry-forward. Correct the D5/N1 example in the S4 § D9 rewrite.
+- Building it required making the dormant D14 assignment constraint **real for periods** (the assignment-qualifier path omitted the `TemporalUnit` axis entirely) — i.e. the minimal "one piece of W-C." Period **literals** now derive their own basis so the tightening is provable on default/literal paths.
+- **D15 single-basis *cancellation*** (`period in 'hours + minutes'` must NOT cancel `price in 'USD/hours'`) is a **separate tightening — W-C**, NOT this slice. The cancellation chain still discharges at dimension granularity (under-enforces declared-operand mismatches; pre-existing). See the (0) finding.
+- **(0)** temporal-denominator price parsing (`price in 'USD/hours'`) was a prerequisite found en route — without it the design's own example couldn't be declared (PRE0075). Shipped in the same commit.
+- 2 NITs carried forward: duplicated subset impl (type-checker `Components` vs proof-engine string-split); period literals now always carry a `TemporalUnit` qualifier (safe today; revisit if a new path resolves `TemporalUnit` off a non-field period expression).
 
 ## S4 — Diagnostics + samples + doc-sync (STUB)
 
