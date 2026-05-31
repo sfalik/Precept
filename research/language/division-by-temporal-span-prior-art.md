@@ -1,10 +1,21 @@
 ---
-status: Active
+status: Cited — grounds the precedent + tradeoff legs of `business-domain-types.md § D15`; cited from the W-C completion note in `docs/Working/compiler-readiness-plan-2026-05-24.md`
 authored: 2026-05-30
 author: research (external-engagement leg)
 topic: Prior art for dividing money/quantity by a time span (duration vs period) and the soundness asymmetry between fixed-length and calendar-relative divisors
 external-engagement: strong
 ---
+
+> **Resolution (2026-05-30, owner):** D15 is the settled answer — no further design needed. A
+> **single-basis** `period` divisor (`money ÷ period in 'hours'`, `… in 'months'`) is permitted because
+> it has a well-defined unit *and* count, exactly like a `quantity in 'kg'` divisor; a **compound**
+> period divisor (`'hours + minutes'`) is rejected via `CompoundPeriodDenominator` because it has no
+> single magnitude — which is the same boundary NodaTime/java.time honor by refusing to total a
+> multi-component period. Precept draws that boundary at *single-basis-allowed / compound-rejected*
+> rather than *no-period-division-at-all*; that is a **deliberate, owner-authorized extension** of the
+> prior-art type boundary, not an open question. This survey stands as the **precedent and tradeoff
+> record** for that decision — read every "owner must decide / W-C Part-B must resolve" phrasing below
+> as **already decided in D15's favor**.
 
 # Division by a Temporal Span — Prior Art and the Fixed-vs-Calendar Soundness Asymmetry
 
@@ -21,7 +32,7 @@ Precept's canonical spec **already locks** a related boundary in `docs/language/
 > "D15 amended to support dual cancellation — both `period` and `duration` cancel time-unit denominators, with a fixed-length boundary: `duration` cancels `hours`/`minutes`/`seconds` (always the same length); `days` and above remain `period`-only (variable length due to DST/calendar rules)."
 > — `business-domain-types.md` ("What changed in v2", accessed 2026-05-30)
 
-This survey grounds the **fixed-vs-variable-length** principle that D15 invokes ("always the same length" vs "variable length due to DST/calendar rules") with verbatim primary-source excerpts, and surfaces a tension the W-C Part-B decision must resolve: prior art draws the divisibility line at the **type** level (fixed-length `Duration` divides; calendar `Period` does not), whereas Precept's current D15 draws it at the **unit-grain** level (sub-day grains cancel; day-and-above don't). The survey does **not** override the lock — it supplies the precedent leg and names the tension for the consuming decision.
+This survey grounds the **fixed-vs-variable-length** principle that D15 invokes ("always the same length" vs "variable length due to DST/calendar rules") with verbatim primary-source excerpts, and records the difference between where prior art draws the divisibility line and where D15 draws it: prior art draws it at the **type** level (fixed-length `Duration` divides; calendar `Period` does not), whereas D15 permits a single-basis `Period` divisor and rejects compound ones. Per the Resolution above, that difference is a **settled, deliberate Precept extension**, not an unresolved tension — the survey supplies the precedent and tradeoff legs for the locked decision, and does not reopen it.
 
 ## Methodology
 
@@ -126,17 +137,17 @@ Training-data knowledge, **no excerpt obtained**: JSR-354 / Joda-Money / NodaMon
 
 - The fixed-vs-variable-length principle D15 invokes is **strongly and directly grounded**: NodaTime and java.time both (a) make the fixed-length type (`Duration`) divisible — by scalar and by another span — and (b) give the calendar type (`Period`) **no** division and **no** context-free total-conversion. D15's bare "NodaTime's Period/Duration split; java.time Period vs Duration" precedent can now cite this survey's verbatim excerpts.
 - **For the W-C Part-B keep / delete / build-properly call:** the evidence supports **building divide-by-`duration` properly** — it is first-class in NodaTime, java.time, Joda-Time (scalar), and the entire dimensional-analysis tradition (Frink et al.). It is the well-precedented, sound half.
-- **The `money / period → price` row in the current D15 table has weaker prior-art support than the `money / duration → price` row.** No surveyed library exposes division *by a calendar `Period`*. If W-C Part-B is deciding the disposition of dormant divide-by-period code, the prior-art signal is: divide-by-period is the operation no comparator offers, and NodaTime/java.time structurally refuse to even *total* a year/month-bearing period. The cleanest alignment with prior art is duration-divisor-yes / period-divisor-no — which is **narrower** than the current D15 dual-cancellation table. Whether to tighten D15 to match prior art, or keep dual-cancellation with the grain boundary as a deliberate Precept extension, is an owner decision (it touches a locked decision — Tier 3).
+- **The `money / period → price` row has no direct prior-art analogue — and that is a deliberate, settled extension (see Resolution above).** No surveyed library exposes division *by a calendar `Period`*; NodaTime/java.time structurally refuse to even *total* a year/month-bearing period. Precept nonetheless permits a **single-basis** period divisor (well-defined unit + count) and **rejects compound** period divisors (`CompoundPeriodDenominator`) — honoring the same no-total-for-a-multi-component-period constraint prior art enforces, but drawing the line at single-basis-allowed rather than no-period-division. The owner has confirmed this is intentional; this survey supplies the precedent (the duration half is well-grounded) and the tradeoff (the period half is a Precept extension beyond comparators), not an open decision.
 - **Span ÷ span ratio** (`duration ÷ duration → number`, `period ÷ period`): NodaTime and java.time (Java 9+) both support `Duration ÷ Duration → scalar`; neither supports `Period ÷ Period`. If Precept scopes a span-ratio operation, the same asymmetry applies — duration ratio is precedented, period ratio is not.
 
 ## Conclusions
 
-**Conclusion (Primary-grounded): Divide-by-fixed-`duration` is well-precedented and sound; divide-by-calendar-`period` is the operation prior art does not offer.** Build `duration`-divisor support properly; treat `period`-divisor as the prior-art-unsupported case requiring an explicit owner decision (extend deliberately, or drop to match prior art).
+**Conclusion (Primary-grounded): Divide-by-fixed-`duration` is well-precedented and sound; divide-by-calendar-`period` is the operation prior art does not offer — and Precept permits it for single-basis divisors as a deliberate, owner-authorized extension (settled in D15; see Resolution).** The `duration`-divisor half is precedent-grounded; the single-basis `period`-divisor half is a conscious Precept extension that honors the no-total-for-compound-period constraint by rejecting compound divisors (`CompoundPeriodDenominator`). No further design decision is open.
 
-- **Rationale** — A `duration`/`Duration` has a single fixed magnitude, so dividing money or quantity by it yields a rate with a well-defined denominator, and dividing two of them yields a well-defined ratio. A calendar `period`/`Period` has no fixed magnitude without an anchor date; NodaTime and java.time therefore expose **no** division on it and refuse to total a year/month-bearing period. Building duration-divisor matches the type that every surveyed library makes divisible; building period-divisor invents an operation none of them offer.
-- **Alternatives considered and rejected** — (a) *Build `period`-divisor with implicit month normalization (e.g. month = 30 days)*: rejected — presents approximation as exactness (violates Precept's honesty commitment) and no surveyed system does it; NodaTime/java.time explicitly refuse to total a year/month period. (b) *Build neither / delete the dormant code wholesale*: rejected — divide-by-fixed-time is first-class across NodaTime, java.time, Joda-Time, and the dimensional tradition, so the `duration`-divisor half is the well-precedented one, not dead weight. (c) *Build both symmetrically (the current D15 dual-cancellation table, extended)*: not rejected, but **flagged** — it goes beyond prior art for the `period` side and is an owner-authorized extension, not a precedent-grounded default.
-- **Precedent** — NodaTime `Duration` ("fixed (and calendar-independent)"; `/double`, `/long`, `/Duration`) vs `Period` (no division, no total-conversion, `ToDuration()` refuses years/months). java.time `Duration` (`dividedBy(long)`, `dividedBy(Duration)→long` Java 9+) vs `Period` (date-based, no divide). Joda-Time `Duration.dividedBy(long)` only. Frink: currency ÷ fixed-time is first-class dimensionally.
-- **Tradeoff accepted** — Authors who think in "per calendar month" cannot write `money ÷ '1 month'(period)` under the prior-art-aligned (narrow) shape; they must use a fixed `duration` (e.g. `'30 days'`) or model the rate explicitly. The language refuses to pick a month length for them — the same tradeoff Precept's honesty commitment already accepts elsewhere.
+- **Rationale** — A `duration`/`Duration` has a single fixed magnitude, so dividing money or quantity by it yields a rate with a well-defined denominator. A *single-basis* `period` (`'hours'`, `'months'`) has a well-defined unit and count and divides the same way a `quantity in 'kg'` does — so D15 permits it. A *compound* `period` (`'hours + minutes'`) has no single magnitude without an anchor date; NodaTime and java.time refuse to total a year/month-bearing period, and D15 honors that constraint by rejecting compound divisors (`CompoundPeriodDenominator`). The settled shape — duration exempt, single-basis period allowed, compound period rejected — is sound at every point.
+- **Alternatives considered and rejected** — (a) *Build `period`-divisor with implicit normalization (e.g. month = 30 days) so compound periods divide too*: rejected — presents approximation as exactness (violates Precept's honesty commitment) and no surveyed system does it; NodaTime/java.time explicitly refuse to total a year/month period. (b) *Build neither / delete the dormant code wholesale*: rejected — divide-by-fixed-time is first-class across NodaTime, java.time, Joda-Time, and the dimensional tradition, and single-basis period division is well-defined, so the code is spec-required, not dead weight. (c) *Tighten D15 to drop the `period`-divisor rows and match prior art's type boundary exactly (duration-only)*: **rejected by the owner (2026-05-30)** — a single-basis period divisor is well-defined and useful; D15 deliberately extends one step past prior art while keeping the compound case rejected. This is the chosen, settled shape.
+- **Precedent** — NodaTime `Duration` ("fixed (and calendar-independent)"; `/double`, `/long`, `/Duration`) vs `Period` (no division, no total-conversion, `ToDuration()` refuses years/months). java.time `Duration` (`dividedBy(long)`, `dividedBy(Duration)→long` Java 9+) vs `Period` (date-based, no divide). Joda-Time `Duration.dividedBy(long)` only. Frink: currency ÷ fixed-time is first-class dimensionally. Precept's single-basis period divisor extends this precedent deliberately; the compound rejection stays faithful to it.
+- **Tradeoff accepted** — Authors who think in "per *compound* span" (`'1 month + 15 days'`) cannot use it as a divisor — they must reduce to a single basis or a fixed `duration`. The language refuses to pick a magnitude for a compound period rather than approximate one — the same honesty tradeoff Precept accepts elsewhere. Single-basis "per month" / "per hour" rates are fully supported.
 
 ## What would change this conclusion
 
@@ -146,9 +157,9 @@ Training-data knowledge, **no excerpt obtained**: JSR-354 / Joda-Money / NodaMon
 
 ## Open Questions
 
-- **Reconcile the type-boundary (prior art) vs unit-grain (current D15) divisibility line.** Prior art divides at fixed-`Duration`-vs-calendar-`Period`; D15 divides at sub-day-vs-day-and-above. The NodaTime `'2 days' ≠ '48 hours'` excerpt supports the grain intuition for *addition*, but no library exposes division-by-`Period` at all. This is the central question W-C Part-B must settle, and it touches a locked decision (Tier 3 — owner-authorized).
-- **Money-library leg upgrade** — fetch JSR-354 / Joda-Money operator surface for a verbatim "no money÷time primitive" confirmation (currently Tertiary).
-- **`period ÷ period`** scope — neither NodaTime nor java.time offers it; if Precept wants it, it would be a Precept-original operation, not a precedented one.
+- ~~Reconcile the type-boundary (prior art) vs unit-grain (D15) divisibility line.~~ **Settled (2026-05-30, owner):** D15's single-basis-allowed / compound-rejected boundary is the deliberate, authorized shape — see Resolution at the top. Not an open question.
+- **Money-library leg upgrade** — fetch JSR-354 / Joda-Money operator surface for a verbatim "no money÷time primitive" confirmation (currently Tertiary). (Evidence-completeness only; does not affect the settled decision.)
+- **`period ÷ period`** scope — neither NodaTime nor java.time offers it; no `PeriodDividePeriod` operation exists in Precept's catalog. If ever wanted it would be a Precept-original operation — a *future* scoping question, not part of the settled D15 divisor decision.
 
 ## Sources
 

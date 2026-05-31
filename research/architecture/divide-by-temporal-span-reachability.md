@@ -1,11 +1,16 @@
 ---
-status: Active
+status: Cited — grounded the W-C Part-B disposition (KEEP: the checks are reachable + D15-mandated); cited from the W-C completion note in `docs/Working/compiler-readiness-plan-2026-05-24.md`
 authored: 2026-05-30
 author: research (internal leg)
 topic: Reachability + spec-mandate of the divide-path denominator-compatibility checks (PRE0073 / PRE0074) for period/duration denominators
 external-engagement: purely-internal
-horizon-groundwork: Feeds the W-C Part-B keep/delete/build decision for ValidateDenominatorCompatibility in TypeChecker.Expressions.cs. The owner directed this investigation as upfront groundwork for that decision; that direction is the consultation per the lifecycle-1-research horizon-groundwork exception. Intended consumer: the W-C dormant-code triage.
 ---
+
+> **Outcome (2026-05-30):** verdict was **(c) reachable + spec-mandated → KEEP** (not dead code). The
+> W-C Part-B disposition acted on this: PRE0074 was re-aimed to fire on the denominator operand
+> (commit `d2946dc0`); the divisor existence itself is a deliberate, settled D15 extension (see the
+> companion `research/language/division-by-temporal-span-prior-art.md` Resolution). This file is the
+> reachability/spec-mandate record for that decision.
 
 # Divide-by-Temporal-Span: Reachability of the Denominator-Compatibility Checks (PRE0073 / PRE0074)
 
@@ -241,6 +246,6 @@ There is **no remaining keep/delete/build question** for W-C on this code: the o
 
 The reachability and spec-mandate questions are fully resolved. Residual items, all minor:
 
-1. **`period`-in-hours cancellation gap.** The recent commit `4fdfd954 docs(phase-6): wire the period-in-hours cancellation gap into W-C exit criteria` suggests a *separate, narrower* known gap in the period-in-hours cancellation case (distinct from the keep/delete question this file answers). That gap is about cancellation completeness, not about the guard's reachability — worth confirming it is tracked separately and is not the same code path concluded KEEP here.
+1. ~~**`period`-in-hours cancellation gap.**~~ **Resolved** — that gap was the W-C Slice 1 acceptance side (single-basis `period * price` cancellation) and shipped in commit `fd147dc2`, distinct from this file's divide-path keep/delete question (KEEP, shipped in `d2946dc0`). Both are now closed.
 2. **Runtime evaluation parity.** Out of scope here (type-checker reachability only) — but a follow-up could confirm the evaluator computes `money ÷ period → price` consistently with the type result, since the spec marks the doc "Implemented (with documented gaps)."
 3. **`QuantityDivide*` failure-path test depth.** `MoneyDivide*` and `Price`-denominator paths have dedicated PRE0073/PRE0074 tests; a quick check that the `QuantityDividePeriod`/`QuantityDivideDuration` denominator failure cases are equally covered would close the symmetry (likely already covered via the shared guard, since the guard keys on operand result type + denominator qualifier, not on the specific OperationKind).

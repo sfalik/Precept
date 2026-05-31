@@ -1007,7 +1007,9 @@ Exit: all 12 design acceptance criteria pass; PR mergeable.
 
 All four projects green (Precept.Tests 6593 / LS 413 / MCP 67 / Analyzers 291). `precept-reviewer` cleared each soundness-critical slice. No new diagnostic codes — reused `CompoundPeriodDenominator`, `QualifierMismatch`, `DurationDenominatorMismatch`. No `business-domain-types.md` drift found (§ D14/§ D15 already match).
 
-**Deferred to W-D / later:** the divide-path PRE0073 retains its single-basis `DerivedDimension == Date` gate (dormant for the divide path — no enabled op has a Duration/Period numerator with a temporal-unit denominator). The prior-art-vs-D15 period-divisor tension (does `money ÷ period` belong at all, given NodaTime refuses calendar-period division?) is a `/lifecycle-2-design` question, not a build gap — see the committed research.
+**Deferred to W-D / later:** the divide-path PRE0073 retains its single-basis `DerivedDimension == Date` gate (dormant for the divide path — no enabled op has a Duration/Period numerator with a temporal-unit denominator; composites are caught by PRE0074 regardless). Re-aim it with a reachable test if a future op makes that shape live.
+
+**Settled (not deferred):** the `money ÷ period` / `quantity ÷ period` divisor surface is a **deliberate, owner-authorized D15 extension** — single-basis period divisors are permitted (well-defined unit + count), compound divisors rejected (`CompoundPeriodDenominator`), duration exempt. Prior art (NodaTime/java.time) divides only by fixed `duration` and refuses calendar-period division; D15 consciously goes one step further while honoring the same no-total-for-a-compound-period constraint. No further design needed. Precedent + tradeoff record: the two committed research docs (`research/language/division-by-temporal-span-prior-art.md`, `research/architecture/divide-by-temporal-span-reachability.md`).
 
 ### Workstream W-D — Scenario tests + doc-status verification
 
