@@ -16,6 +16,8 @@ sources-consulted:
 
 # Price × Quantity Cross-Unit Cancellation — Design (Auto-Convert Within Dimension)
 
+> **Review trail (2026-05-31):** reviewed by `precept-reviewer` (0 blockers; 2 concerns — dB position-vs-exactness conflation + a paraphrased philosophy excerpt — both applied) and by Frank/Squad (`phase7-slice2-design-review-FRANK-2026-05-31.md`, **conditionally approved**; conditions applied — `:168` doc-update disambiguation, `IsRatioScale` timing, `ScaleToBaseFactor` rename, forward-reference tracking home). Frank's prior Option-1 leaning formally withdrawn. Ready to lock pending owner sign-off.
+
 ## Goal
 
 When done, `price in 'USD/kg' × quantity in 'g' → money in 'USD'` compiles **and** evaluates to the correctly-scaled amount (the quantity is converted g→kg by the exact UCUM factor before cancelling), while cross-*dimension* (`kg × m`), no-universal-factor count pairs (`each × box`), and non-exact-factor units stay rejected — demonstrated by a scenario-test matrix and the runtime evaluator applying the factor.
@@ -42,7 +44,7 @@ When done, `price in 'USD/kg' × quantity in 'g' → money in 'USD'` compiles **
 | 10. Totality | Y | Runtime conversion is total over commensurable exact-factor pairs; non-total (transcendental) factors are compile-rejected (`spec §0.1 #10`). | N/A | N/A |
 | 11. Static completeness | Y | A well-typed cross-unit cancellation will not fault at runtime once the conversion ships; the exactness gate makes the unsupported cases compile errors, not runtime faults (`spec §0.1 #11`). | The runtime piece is unbuilt (PoC). | The compile-time contract is stated now; the evaluator obligation is documented so static-completeness holds when the runtime lands (this is the gate's purpose). |
 
-**Principle-1/11 tradeoff (stated, per the matrix):** The design accepts that, in the current pre-runtime PoC, the compile-time `"Proved"` for cross-unit cancellation is a *forward reference* to an unbuilt runtime conversion. This is honest **only** because (a) nothing ships — there is no external author who can observe a wrong result, and (b) the runtime requirement is explicitly documented (§ Semantic Rules → runtime obligation) and tracked (skipped test + this doc), rather than left as hidden certainty. When the runtime is built, applying the factor makes the `"Proved"` literally true. This is the philosophy-honest interpretation of "document the runtime requirements well."
+**Principle-1/11 tradeoff (stated, per the matrix):** The design accepts that, in the current pre-runtime PoC, the compile-time `"Proved"` for cross-unit cancellation is a *forward reference* to an unbuilt runtime conversion. This is honest **only** because (a) nothing ships — there is no external author who can observe a wrong result, and (b) the runtime requirement is explicitly documented (§ Semantic Rules → runtime obligation) and tracked (skipped test + this doc), rather than left as hidden certainty. When the runtime is built, applying the factor makes the `"Proved"` literally true. This is the philosophy-honest interpretation of "document the runtime requirements well." **The forward-reference is tracked in two durable places — the `evaluator.md` reduction-rule obligation (canonical) and the skipped `CrossUnit_SameDimension_MustNotSilentlyCancel` test — *not* a code comment, which the no-transient-refs-in-code rule would forbid for a reference to a design/slice; canonical-doc + test keeps the obligation visible without rotting refs.**
 
 **Companion commitments.** *Stateless-first-class*: unaffected — cancellation is data-arithmetic, works in stateless precepts identically. *Domain-expert-primary-author*: directly served — the author writes the natural `price in 'USD/kg' × quantity in 'g'` and gets the right answer without hand-converting units (see Audience).
 
@@ -113,7 +115,7 @@ Domain-targeted: it names the *real-world* mismatch ("priced per kilogram" / "me
 The evaluator must (1) look up the exact `decimal` factor `k = factor(u_q → u_p)` from the catalog (target-directed: convert the quantity to the price's denominator unit, per D8 resolution rule 1), (2) compute `m_q · k` in `decimal`, (3) multiply by the price magnitude, (4) tag the result `money in c`. For `u_q = u_p`, `k = 1` (Slice-1 behavior, already correct). **This reduction rule is the load-bearing runtime requirement** the owner asked to be documented well.
 
 **Proof obligations.** The existing `QualifierChainProofRequirement` (Dimension↔Dimension, `Operations.cs:650`, discharged via `ProofEngine.Qualifiers.cs`) is **extended** with two checks read from catalog metadata:
-- *Ratio-scale*: both operand units carry the `ratioScale` flag (reject absolute-position units → routes to Slice 4 when that exists; until then, no absolute-position unit is admissible as a `quantity`, so this is vacuously satisfied for current units).
+- *Ratio-scale*: both operand units carry the `IsRatioScale` flag (reject absolute-position units → routes to Slice 4 when that exists). The check is **wired now** but a **no-op** until Slice 4 introduces non-ratio units — every currently-cataloged unit is `IsRatioScale = true`.
 - *Exact factor*: `factor(u_q → u_p)` is flagged `exactDecimal` in the catalog. If not, the obligation does not discharge → diagnostic (non-exact factor not supported).
 
 No new `ProofRequirementKind` is required — the existing `QualifierChain` requirement gains catalog-driven side-conditions. (Inventory notes the metadata additions.)
@@ -142,7 +144,7 @@ The architectural problem — *where does per-unit conversion metadata live* —
 
 ## Inventory of what will be built
 
-- **Catalog (UCUM atom metadata):** add per-unit `AmountConversionFactor` (exact `decimal`, scale to the dimension's base unit) and `IsExactDecimalFactor` (bool); add `IsRatioScale` (bool; false for absolute-position units — none currently admissible as `quantity`, set the stage for Slice 4). Files: the UCUM/unit catalog source (`src/Precept/Language/Ucum/` — `DimensionCatalog.cs` and the atom table) + `UnitDimensionHelper.cs`.
+- **Catalog (UCUM atom metadata):** add per-unit `ScaleToBaseFactor` (exact `decimal`, scale to the dimension's base unit) and `IsExactDecimalFactor` (bool); add `IsRatioScale` (bool) — **stored now, `true` for every currently-cataloged unit** (no absolute-position unit is admissible as a `quantity` yet); Slice 4 introduces the `false`-flagged point units. The proof-engine `IsRatioScale` check is **wired now and is a no-op** until those units exist (so Slice 4 adds units + flag values, not a proof-engine change). Files: the UCUM/unit catalog source (`src/Precept/Language/Ucum/` — `DimensionCatalog.cs` and the atom table) + `UnitDimensionHelper.cs`.
 - **Proof engine:** extend the `QualifierChain` discharge in `ProofEngine.Qualifiers.cs` to read `IsRatioScale` (both operands) and `IsExactDecimalFactor(factor(u_q→u_p))`; emit a diagnostic when the factor is non-exact. No new `ProofRequirementKind`.
 - **Evaluator (documented obligation, built when runtime lands):** the reduction rule — look up `factor(u_q→u_p)`, apply in `decimal`, cancel, tag `money`.
 - **Diagnostics:** broaden PRE0114 wording (domain-targeted); add (or variant) "non-exact conversion factor not supported."
@@ -233,9 +235,9 @@ The architectural problem — *where does per-unit conversion metadata live* —
 
 ## Doc-update enumeration
 
-- `docs/language/business-domain-types.md` § price / § D8 — extend D8's stated scope to price cancellation; state the exactness gate and the absolute-position exclusion.
+- `docs/language/business-domain-types.md` § price / § D8 — extend D8's stated scope to price cancellation; state the exactness gate and the absolute-position exclusion; **clarify `:168` ("Unit conversion is explicit") to mean *visible and traceable to inspection*, not *requires a manual conversion expression* — D8 governs the arithmetic auto-conversion, and the hover/trace inspectability requirement preserves the "explicit" spirit (conversion is explicit to inspection, not erased).**
 - `docs/compiler/proof-engine.md` § QualifierChain — the ratio-scale + exact-factor side-conditions on the cross-unit discharge.
-- `docs/language/catalog-system.md` § (UCUM/unit catalog) — the new `AmountConversionFactor` / `IsExactDecimalFactor` / `IsRatioScale` metadata.
+- `docs/language/catalog-system.md` § (UCUM/unit catalog) — the new `ScaleToBaseFactor` / `IsExactDecimalFactor` / `IsRatioScale` metadata.
 - `docs/compiler/diagnostic-system.md` — the broadened PRE0114 wording + the non-exact-factor diagnostic.
 - `docs/tooling/language-server.md` — hover surfaces the conversion.
 - `docs/runtime/evaluator.md` — the conversion reduction rule (the runtime obligation), flagged as pending runtime implementation.
@@ -243,7 +245,7 @@ The architectural problem — *where does per-unit conversion metadata live* —
 ## Operational dimensions
 
 - **Observability** (touches evaluation + diagnostics): when a cross-unit cancellation surfaces a diagnostic (cross-dimension, count, or non-exact factor), the message names the real-world mismatch and the fix (see Audience). When it *succeeds*, the conversion (units + factor) is surfaced in hover/proof-attribution so the author can see the `/1000` happened — required by the inspectability principle. Runtime conversion, once built, should be traceable in the structured outcome.
-- **Evolvability** (depends on UCUM): the `AmountConversionFactor` / `IsExactDecimalFactor` values are pinned to a specific UCUM version (the catalog's UCUM atom table). Migration story: a UCUM revision that changes a factor or reclassifies a unit's exactness requires a catalog update + a re-run of the conversion scenario tests; the catalog is the single point of change (Decision 4). If UCUM removes/renames an atom Precept catalogs, that surfaces as a catalog-vs-UCUM diff at update time, not a silent drift. Pinning the UCUM version in the catalog source is required.
+- **Evolvability** (depends on UCUM): the `ScaleToBaseFactor` / `IsExactDecimalFactor` values are pinned to a specific UCUM version (the catalog's UCUM atom table). Migration story: a UCUM revision that changes a factor or reclassifies a unit's exactness requires a catalog update + a re-run of the conversion scenario tests; the catalog is the single point of change (Decision 4). If UCUM removes/renames an atom Precept catalogs, that surfaces as a catalog-vs-UCUM diff at update time, not a silent drift. Pinning the UCUM version in the catalog source is required.
 
 ## Open questions
 
