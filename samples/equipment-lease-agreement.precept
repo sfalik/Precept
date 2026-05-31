@@ -30,7 +30,7 @@ field EquipmentValueAtCommencement as money in 'USD' optional
 field LeaseClassification as choice of string("Operating","Finance","ShortTerm") optional
 
 # Lease term and dates
-field LeaseTerm as period optional
+field LeaseTerm as period in 'years + months' optional
 field CommencementDate as date optional
 field ExpirationDate as date optional
 field GracePeriod as period default '10 days' editable
