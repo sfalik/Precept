@@ -354,6 +354,17 @@ rejecting it.
 
 ### Conclusion 3 — Exclude affine/offset and log-scale units from multiplicative cancellation
 
+> **Refined post-survey (2026-05-31, owner discussion).** This conclusion's scope is **narrower** than
+> first stated. The surveyed libraries forbid multiplying the **absolute/point** form of these units
+> (offset/`absolute<>`/point-origin), but they *allow* the **amount/increment** form (Pint `delta_degC`,
+> GNU `degC`). Since Precept's `quantity` is *always an amount* (never an absolute position — the
+> `duration`-not-`instant` analog), `quantity` amounts of °C/°F **and** dB convert by scale factor only
+> (offset cancels in a difference) and price cleanly — they are **not** excluded. What is excluded is
+> *absolute positions* (thermostat readings, `dBm` levels), which `quantity` does not model — tracked as
+> Phase 7 Slice 4. See `docs/Working/price-cross-unit-cancellation-2026-05-31.md` § Decision & scope
+> correction. The excerpts below remain accurate (they describe the libraries forbidding **point**
+> multiplication); it is the "exclude all affine/log" framing that narrowed.
+
 - **Rationale** — Affine units (°C, °F, dB, pH) are points in an affine space, not ratio-scale
   magnitudes; a point has no meaningful product or quotient. Auto-converting-then-cancelling a `°C`
   operand would produce a number with no real-world meaning. Excluding them keeps cancellation honest.

@@ -1,9 +1,30 @@
 # Price × Quantity Cross-Unit Cancellation — Investigation
 
-**Status**: Draft — investigation; decision parked (investigate-then-decide). **The hole is now LIVE** as of the Slice 1 fix (2026-05-31): Slice 1 fixed same-unit `price × quantity` cancellation and, by owner decision (option C), deliberately left the cross-unit case open — it currently cancels silently, dropping the conversion factor. This doc is the tracker for closing it; a skipped test (`PriceTimesQuantityTests.CrossUnit_SameDimension_MustNotSilentlyCancel`) marks the gap in the suite.
+**Status**: Draft — **decision made 2026-05-31: auto-convert within dimension** (see § Decision below); `/lifecycle-2-design` formalizes the lock. **The hole is currently LIVE** as of the Slice 1 fix: Slice 1 fixed same-unit `price × quantity` cancellation and, by owner decision (option C), left the cross-unit case open — it currently cancels silently, dropping the conversion factor; the auto-convert decision closes it. A skipped test (`PriceTimesQuantityTests.CrossUnit_SameDimension_MustNotSilentlyCancel`) marks the gap in the suite.
 **Context**: Phase 7 (total language conformance sweep), Slice 2. Surfaced while doing the Slice 1 spec-understanding pass on `price × quantity → money`. This doc preserves the detailed evidence so the decision can be made later without re-deriving it.
 **Scope**: compile-time semantics only — Precept's runtime evaluator is still a stub, so no magnitude arithmetic exists to test against.
-**Decides nothing.** The decision belongs to a future `/lifecycle-2-design` pass; this is the neutral evidence base for it.
+**Was the neutral evidence base; the decision is now made.** The 3-option framing below is retained as the record of how it was reached.
+
+---
+
+## Decision & scope correction (2026-05-31)
+
+**Decision: auto-convert within dimension** (the original "Option B" / "Option 2"). When a price denominator unit and a quantity unit are the same dimension but different scale, the language converts (target-directed to the price's denominator unit, per D8's resolution rule) and applies the exact UCUM factor, producing correctly-scaled `money`. Grounded by [`research/language/expressiveness/cross-unit-conversion-arithmetic-survey.md`](../../research/language/expressiveness/cross-unit-conversion-arithmetic-survey.md): every runtime-capable unit system auto-converts; F#'s explicit-conversion requirement is forced by compile-time erasure, not a design choice.
+
+**Scope correction — the exclusion is much narrower than first thought.** The survey's "exclude affine and log units (°C, °F, dB, pH)" conclusion was **too broad**. The real distinction is **amount vs. absolute position**, not linear-vs-affine-vs-log:
+
+- `quantity` is *always an amount* (a magnitude), never a position — the measurement analog of `duration`, not `instant`. Multiplying an operand only makes sense for an amount.
+- Converting an *amount* across units uses the **scale factor only**, never the offset: a 20 °C *change* → °F is `× 1.8` (= 36 °F of change), not `× 1.8 + 32`. The offset cancels in any difference. So °C/°F amounts convert and cancel **cleanly**.
+- The same holds for **log units as amounts**: a 10 dB *gain* converts to nepers by a fixed factor (1 Np = 8.686 dB) and prices consistently (`$5/dB × 10 dB = $50` = `$43.43/Np × 1.1513 Np`). dB-gain is a uniform-step magnitude; the "adding dB multiplies ratios" property concerns the underlying power ratio, not whether a dB count scales against a price.
+- **Therefore nothing is excluded for `quantity` cancellation.** kg, °C-of-change, and dB-gain all price cleanly.
+
+**What is genuinely carved out: absolute positions.** An absolute *reading* — a thermostat temperature, an absolute level (`dBm`, relative to a reference), absolute pH — is a *point* relative to a reference/origin: the measurement analog of `instant`. A point can't be multiplied (combining a level with a gain has offset/log structure), so it needs separate offset/reference-aware arithmetic. Precept's `quantity` does not model absolute positions and does not need to for pricing. **Tracked as Phase 7 Slice 4** (a new point-type construct) — out of scope for this cancellation decision.
+
+**Design consequences for `/lifecycle-2-design`:**
+- Auto-convert across exact-`decimal`, ratio-of-scale factors for `quantity` amounts of any dimension — including °C/dB amounts (scale-only conversion).
+- The catalog must carry, per temperature/log unit, the **amount-conversion scale factor** (distinct from any absolute-conversion function).
+- Exactness gate still applies: transcendental / non-terminating / multiply-defined factors are out of scope (state the exact-`decimal` boundary).
+- **Teachability, not exclusion:** log/affine units need the level-vs-amount distinction taught (the `instant`-vs-`duration` discipline). The pricing-an-amount math is sound.
 
 ---
 
