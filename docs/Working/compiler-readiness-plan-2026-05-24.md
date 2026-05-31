@@ -1,6 +1,6 @@
 # Compiler Readiness Plan — 2026-05-24
 
-**Status**: Draft — Phases 1-2 planned in detail; Phases 3-10 stubbed pending decisions and Phase 1-2 completion.
+**Status**: Active — Phases 1–6 complete; **Phase 7 (total language conformance sweep) active, kicking off 2026-05-30** and planned in detail; Phases 8–11 stubbed pending decisions and upstream-phase completion.
 **Companion docs**:
 - [`compiler-readiness-review-2026-05-24.md`](compiler-readiness-review-2026-05-24.md) — audit findings (the "what we found")
 - This doc — phased execution plan (the "what we'll do")
@@ -22,12 +22,13 @@
 | 5 | Proof engine satisfiability + BUG-004 + BUG-006 + FieldNeverSet/unification + BIZ operator extensions | **14** | 2 | XL (~3 sessions) | ✅ **Complete 2026-05-27** (all 6 workstreams W-A through W-F shipped across 20 commits; 7136/7136 tests pass across all 4 projects; 2 precept-reviewer rounds + remediations; 3 locked designs via `/lifecycle-2-design` — W-B FieldNeverSet, W-C satisfiability cluster, W-D BIZ operator extensions. **Workstream summary**: W-A BUG-004 event-ensure narrowing (`034a5976`); W-B F-LANG-GRAPH-04 FieldNeverSet + writable→editable unification — 8 slices, 4 commits, 27 sample fixes (`0d61f792` `12d7c422` `0feb135a` `2ac416b5`); W-C satisfiability cluster — SPEC-02 UnsatisfiableGuard wire-up + SPEC-03 ContradictoryRule + SPEC-04 VacuousRule + SPEC-05 TautologicalGuard + SPEC-12 UnreachableRowFact + BUG-006 cross-row interval composition (`a6c35e36` `ffb7288b` `c16be77b` `42cee783`); W-D BIZ operator extensions — BIZ-01 `money / price → quantity` + BIZ-05 `DimensionalProductProofRequirement` + PRE0157 + BIZ-08 discrete equality narrowing (`5d945711` `e71e09d2` `08fae0ef` `fdf33095`); W-E F-LANG-TEMP-04 always-false period comparison (`27dfe325`); W-F BUG-013 sample fixture restore (`766637c0`). Phase-close audit (`34d11e61` + `ed1f4193`) addressed 1 BLOCKER + 5 CONCERNs + 2 NITs from the reviewer punch list; pre-existing proof-engine.md strategy-chain doc gap closed in (`6a35369c`). 6 new diagnostic codes (PRE0153–PRE0158); 1 new ProofRequirementKind (DimensionalProduct); 1 new ProofForwardingFact variant (UnreachableRowFact); 1 new ResultQualifierPolicy (InheritPriceDenominatorUnit); 1 new ActionMeta property (WriteSemantics); 1 new ProofStrategy (DimensionalProduct); 1 retired ModifierKind (Writable) + TokenKind; NumericInterval gains Empty/Intersect/Difference; Integer arithmetic ops gain IntervalTransfer functions. Five §0.6 obligations move from Specification-only to Implemented.) |
 | Phase 5 post-review remediation | 15 code-review findings + 3 surfaced soundness defects + cleanup | 22 | 2 (Slice 2 qualifier + dimensionless-product; Slice 4 satisfiability-attribution + reachability) | M (~1 session) | ✅ **Complete 2026-05-28** (commit `11599944` + sample-restore `332f76ac` + post-regression Slices 6–7 still local). Extra-high-effort `/code-review` on the Phase 5 spike branch surfaced 15 findings; remediated across Slice 1 (1a/1b/1c/1d direct bug fixes), Slice 3 (`PriceDenominatorInherited` `QualifierBinding` subtype wired across 5 consumer sites + PRE0137 lift from `!opComposesDimensions` gate), and Slice 5 (PRE0159 `UnsatisfiableRule` pre-pass + reachability-gated `FieldNeverSet`). Two locked designs via `/lifecycle-2-design`, now archived in `docs/Working/Archive/`. Three precept-reviewer audits cleared with remediations. A regression `/code-review` pass against the cumulative diff confirmed 0 of 15 originals survived and surfaced 3 NEW soundness defects (`BuildSiblingRejectExclusions` source-order + wildcard-row gate; `ScanRules` pair-sweep ignoring `when` guards) — fixed in Slice 6 with the guard mutual-exclusion pre-check and the source-order/wildcard checks. Slice 7 collapsed four duplicate fold-constraint sites onto a shared `FoldConstraintsInto` helper, removed dead code, cleaned doc-comment drift, downgraded `bugs.md` BUG-006 scope notes (literal-comparison sibling rejects only), and swept 6 stale narrative `# BUG-NNN` refs in samples. **7167/7167 tests pass** (was 7136 at Phase 5 close; +31 net new tests across the remediation slices). Two designs archived; `bugs.md` updated. |
 | 6 | composite period basis (F-LANG-BIZ-07) | 1 (F-LANG-BIZ-09 closed) | 2 (D6.1 sample? D6.2 runtime-lowering deferral — both resolved in the plan) | M (~2.5–3.5d) | ✅ **Complete 2026-05-30.** All 4 workstreams shipped (W-A/W-B prior; W-C `fd147dc2`/`a42134e3`/`d2946dc0`; W-D scenario-test matrix + lease sample `31faa2ba` + single-basis whitespace-trim fix `02a1e44f`). Composite period basis (`period in 'hours + minutes'`) parses/validates/canonicalizes; `.basis`/`.dimension` accessors return composite/derived values; composite bases do not cancel single-unit denominators (D15); legal-basis-by-operation + D14 subset enforced. Full suite green (Precept.Tests 6597 + LS/MCP/Analyzers). Runtime `Period.Between` lowering deferred to the runtime phase (D6.2). Spec-conformance gaps surfaced during W-D (price×quantity resolver, exchangerate slash, PRE0073 — all *outside* composite-period scope) tracked in `spec-conformance-audit-2026-05-30.md` for a remediation phase. |
-| 7 | API surface solidity (typed descriptors) | ~6 | 1 | M-L | Stub — TBD |
-| 8 | Diagnostic completeness + **diagnostic-emission architecture** (DA-1 emission phase / DA-2 regularization audit / DA-3 counterexample witnesses — from the 2026-05-29 type↔proof-contract survey) | ~7 + 3 (DA) | 3 + 2 (DA) | M→L | Stub — TBD |
-| 9 | Polish + cleanup + `/lifecycle-7-audit` skill | ~20 | 4 | M | Stub — TBD |
-| 10 | Runtime gate verification | — | 0 | S | Stub — TBD |
+| 7 | **Total language conformance sweep** — every spec/catalog construct, type, operator, modifier, and diagnostic probed against the implementation; every confirmed spec↔impl gap fixed | open-ended / exploration-driven (audit is one seed — A1–A4 / B1–B9 / C1–C4 / D1–D4 from `spec-conformance-audit-2026-05-30.md`; also commissioned audits, probing, conformance tests; count grows as discovery continues) | per-row owner rulings (spec-internal contradictions; A1↔C1 shared-root grouping; Phase 9 diagnostic-completeness seam) | XL | **Active — kicking off 2026-05-30** |
+| 8 | API surface solidity (typed descriptors) | ~6 | 1 | M-L | Stub — TBD |
+| 9 | Diagnostic completeness + **diagnostic-emission architecture** (DA-1 emission phase / DA-2 regularization audit / DA-3 counterexample witnesses — from the 2026-05-29 type↔proof-contract survey) | ~7 + 3 (DA) | 3 + 2 (DA) | M→L | Stub — TBD |
+| 10 | Polish + cleanup + `/lifecycle-7-audit` skill | ~20 | 4 | M | Stub — TBD |
+| 11 | Runtime gate verification | — | 0 | S | Stub — TBD |
 
-**Overall estimate**: 7-11 weeks of focused work (was 6-10; Phase 2 grew). Phase 1 includes (a) 5 lifecycle skill builds + rename, (b) 16 Archive promotion obligations, (c) CONTRIBUTING.md lifecycle updates. Phase 2 grew from ~2-3 days to ~4-5 days after integrating 10 active bugs from `bugs.md` (sample-remediation work, 2026-05-24): 6 MCP-crash family bugs (BUG-003 period, -005 symptom, -007 domains, -008 duration, -010 now()+duration, -011 timezone+time), 1 MCP transport bug (BUG-009 payload limit), plus the original F-LANG-SPEC-10. Coordinated MCP-layer instrumentation pass catches the whole family in one fix. Phase 5 (proof engine satisfiability) remains the highest variance.
+**Overall estimate**: 7-11 weeks of focused work (was 6-10; Phase 2 grew). Phase 1 includes (a) 5 lifecycle skill builds + rename, (b) 16 Archive promotion obligations, (c) CONTRIBUTING.md lifecycle updates. Phase 2 grew from ~2-3 days to ~4-5 days after integrating 10 active bugs from `bugs.md` (sample-remediation work, 2026-05-24): 6 MCP-crash family bugs (BUG-003 period, -005 symptom, -007 domains, -008 duration, -010 now()+duration, -011 timezone+time), 1 MCP transport bug (BUG-009 payload limit), plus the original F-LANG-SPEC-10. Coordinated MCP-layer instrumentation pass catches the whole family in one fix. Phase 5 (proof engine satisfiability) remains the highest variance. **Phase 7 (total language conformance sweep, inserted 2026-05-30) is open-ended by design** — it runs slice after slice until the owner is satisfied the compiler is fully implemented and accurate to the spec; its size is bounded by what the probe matrix surfaces, not a week estimate, so the overall total is no longer a meaningful single number while Phase 7 is active.
 
 **`bugs.md` as ongoing source**: sample-authoring work discovers bugs that surface in real authoring workflows (not in code-vs-doc audits). Plan integrates bugs.md as a standing input. Phase-kickoff protocol includes "re-read bugs.md for new entries since last integration."
 
@@ -371,7 +372,7 @@ Output: completion report. If clean: Phase 1 complete. If 🔴: remediate before
 - [ ] All 8 Phase-1 decisions recorded in this doc's § "Decisions captured" and in the remediation doc § 1a.
 - [ ] `catalog-system.md` count claims match `grep -c` of corresponding `*Kind.cs` files (Tokens, Types, Operators, Functions, Actions, Modifiers, Constructs, ConstructSlots, ExpressionForms, Constraints, ProofRequirements, Outcomes, Diagnostics, Faults — 14 catalogs).
 - [ ] Every metadata-record shape claim in `catalog-system.md` matches the actual C# record definition (`Token.cs`, `Type.cs`, etc.).
-- [ ] No "✅ Resolved" claim in `catalog-system.md` references code that doesn't exist (revert any that the owner decided not to implement; implement the rest in Phase 7 as part of API solidity work).
+- [ ] No "✅ Resolved" claim in `catalog-system.md` references code that doesn't exist (revert any that the owner decided not to implement; implement the rest in Phase 8 as part of API solidity work).
 - [ ] All per-stage Status fields (`parser.md`, `type-checker.md`, `lexer.md`, `tooling-surface.md`, `primitive-types.md`, `business-domain-types.md`, `temporal-type-system.md`) reflect actual implementation state.
 - [ ] `grep -rn "milestone" docs/language/precept-language-spec.md docs/compiler/` returns zero results in modifier context.
 - [ ] Spec § 0.5 enumerates only shipped capabilities; roadmap doc (or sub-section) covers the 10 deferred modifiers.
@@ -930,7 +931,7 @@ Exit: all 12 design acceptance criteria pass; PR mergeable.
 ## Open decisions
 
 - **D6.1 — Sample exercising composite basis?** No current sample uses composite basis. **Options**: (a) ship the feature with scenario-test coverage only, no sample; (b) add a sample (e.g., a billing/SLA precept using `period in 'years + months'`). **Recommended**: (a) — the feature is fully exercised by scenario tests. A sample can follow as a clean add. **Lands**: W-D kickoff.
-- **D6.2 — Runtime `Period.Between` lowering**: out of scope this phase. **Decided**: the runtime evaluator is still stub (no `Period.Between` call exists in `src/`); composite-basis runtime lowering lands with the runtime phase (Phase 10+). This phase delivers the compile-time surface only — parsing, validation, canonicalization, accessors, cancellation discipline. Noted here so it is not silently dropped.
+- **D6.2 — Runtime `Period.Between` lowering**: out of scope this phase. **Decided**: the runtime evaluator is still stub (no `Period.Between` call exists in `src/`); composite-basis runtime lowering lands with the runtime phase (Phase 11+). This phase delivers the compile-time surface only — parsing, validation, canonicalization, accessors, cancellation discipline. Noted here so it is not silently dropped.
 
 ## Workstream blocks
 
@@ -1048,7 +1049,100 @@ Phase 6 is complete when: every WS exit criterion holds; `dotnet test` green; th
 
 ---
 
-# Phase 7: API surface solidity (typed descriptors + analyzer extensions)
+# Phase 7: Total language conformance sweep
+
+**Status**: Active — kicking off 2026-05-30. **Exploratory and open-ended; not driven by any single document.** The [`spec-conformance-audit-2026-05-30.md`](spec-conformance-audit-2026-05-30.md) register is the *first seed*, not the spine — it is known to be non-comprehensive. Phase 7 also commissions fresh audits, builds conformance tests, probes the catalog surface, and adds new discovery modes and slices as findings accumulate. The phase ends on owner judgment, not on exhausting any one input.
+
+## Goal
+
+Every construct, type, operator, modifier, action, and diagnostic in the locked spec and catalogs behaves in the implementation **exactly as specified** — established by exhaustive, reproducible probing, and every confirmed mismatch fixed. The premise of the phase: the 2026-05-30 audit was a *spot check* that already surfaced a confirmed soundness/functional gap on the spec's own headline example (A1), an internal spec/catalog contradiction (A2), and a backlog of unverified enforcement and diagnostic-identity suspicions (B/C class). That hit rate on a partial pass implies the language is broadly under-tested against its own spec. This phase replaces spot-checking with **total coverage**.
+
+**Authority rule (non-negotiable, inherited from the audit):** the spec (`docs/language/*.md`) and the catalogs are the source of truth. Any spec-vs-impl mismatch is an **implementation gap to fix** — not a spec edit — *unless* (a) the owner rules a specific spec line is itself wrong, or (b) two spec surfaces contradict each other (e.g. prose vs catalog `UsageExample`), in which case it is an **owner ruling**, not a find-and-fix. The A2 exchangerate flip-flop is the cautionary precedent: before labeling a gap, check whether the spec is internally consistent on the point.
+
+## Method — register-driven, one row at a time
+
+This phase runs on the audit's proven discipline, scaled to the whole language. The failure mode it exists to prevent is "synthesize across everything at once," which produces confident-but-wrong findings. Instead:
+
+- **One row = one spec claim + one canonical declaration form + one direct MCP probe + one verdict.** Verdicts: `unverified` → `CONFIRMED` (spec quote + reproducing probe recorded) / `DROPPED` (canonical form actually works; agent used a non-canonical form) / `DOC-ONLY` (impl correct, doc stale) / `NEEDS OWNER RULING` (spec internally contradictory or possibly-wrong spec line).
+- **No agent summary is treated as fact.** Every CONFIRMED carries a verbatim spec line (with the spec's own canonical form) and the probe output that reproduces the gap, recorded in the register so it is independently checkable.
+- **Catalog-driven completeness.** Because the catalogs *are* the language spec in machine-readable form, the probe matrix is **derived from the catalog enumerations** — `Types`, `Operators`, `Modifiers`, `Constructs`, `Actions`, `ProofRequirements`, `Diagnostics`. Enumerate the catalog members; for each, probe every declaration/usage form the spec gives as canonical. This is what makes "the entire language" a finite, checkable set rather than a vibe.
+- **Probe surface is the MCP server** (`precept_compile` / `precept_diagnostic` / `precept_types` / `precept_operations` / `precept_syntax`) — the same consumer-facing path the audit used. (Watch for build-staleness: after any `src/Precept` fix, the MCP server serves its last-spawn build until `/mcp reconnect precept`.)
+- **Fix one at a time, test-first.** Each CONFIRMED gap → a failing scenario test reproducing it → the fix → re-probe to green → doc-sync in the same pass. No batching fixes across unrelated roots.
+
+## Discovery sources (the audit is one of several)
+
+The 2026-05-30 audit is **not comprehensive and is not the sole driver.** It is the first seed. Phase 7 surfaces gaps from a growing set of discovery modes, and the slice list grows as each mode turns something up:
+
+- **The 2026-05-30 audit register** — the opening rows (below). A partial manual spot-check; valuable but known-incomplete.
+- **Commissioned audits** — fresh, scoped sweeps over surfaces the 2026-05-30 pass never reached (and re-sweeps of areas it touched shallowly), each run with the register discipline so its output is checkable, not a trusted summary.
+- **Exploratory probing** — the catalog-derived probe matrix (every Type / Operator / Modifier / Construct / Action / Diagnostic × its canonical spec forms), run against the MCP compile path.
+- **Conformance tests as a discovery instrument** — writing scenario/conformance tests against the spec's stated behavior, where a failing or missing test *is* a finding, not just a regression guard. Tests built here become the durable proof the gap stays closed.
+- **Whatever else surfaces gaps** — the discovery-mode list is open; new modes (sample-authoring stress, differential probing, spec re-reads) get added as slices when they prove useful.
+
+What unifies them is the **discipline**, not the source: every finding from any mode lands as a register row with a verbatim spec claim, a reproduction, and a verdict, then gets fixed one at a time. The register is the living tracker for the whole phase; the 2026-05-30 audit is simply its first contributor.
+
+### First seed: the 2026-05-30 audit register
+
+This phase **absorbs** `spec-conformance-audit-2026-05-30.md` as its opening rows — that register is the durable tracker and nothing in it is lost:
+
+- **A-class (functional gaps)** — A1 price×quantity (CONFIRMED), A2 exchangerate slash (owner-ruled SLASH canonical; impl fix + `to`→`/` doc/test sweep), A3 date+literal-quantity, A4 `kg/hour` compound (both unverified). The audit's own routing note already named "a NEW remediation phase (this audit doc is its driver)" for A-class — **that phase is this one.**
+- **B-class (enforcement gaps — spec says error, compiler accepts; soundness holes)** — B1–B9, all unverified. Re-homed here from the old Phase 8: these are *conformance* defects (the language doesn't reject what the spec says is illegal), which is this phase's charter, not the catalog-completeness lens.
+- **C-class (diagnostic-identity gaps — rejected correctly but wrong/generic code)** — C1–C4. C-items entangled with A1's root cause (the PRE0114 "unresolved" qualifier-chain signature) ride here with the A-class fix; standalone catalog-wiring C-items may route to Phase 9. The **A1↔C1 shared-root-cause grouping check is the gating question** before sequencing fixes.
+- **D-class (doc-stale — impl correct, doc out of date)** — D1–D4. DOC-ONLY track; owner confirms the spec is the stale side, then doc fix (includes the A2 `to`→`/` doc sweep).
+
+## Slices
+
+Work proceeds as a plain numbered sequence — **Slice 1, Slice 2, Slice 3, …** — added as we go. Each slice is one focused unit of work. We do not pre-enumerate them all: we define the next slice, do it, review at the boundary, then define the next. The sequence runs until the owner is satisfied the compiler is fully implemented and accurate to the spec.
+
+Every slice, whatever its content, follows the same rigor: enumerate/probe → failing-test-first → fix → adversarial review → re-probe → doc-sync.
+
+**The kinds of work a slice can be** (the menu we draw from — not a fixed order):
+- Probe the catalog surface against the spec (every type / operator / modifier / construct / action / diagnostic × its canonical spec form) and record what fails.
+- Commission a scoped audit — a fresh sub-agent sweep over a surface the 2026-05-30 pass missed, landing its findings as checkable rows (no trusted summaries).
+- Fix one confirmed gap, test-first, and leave the test behind as the proof it stays closed.
+- Build out conformance tests, where a missing or failing test is itself a finding.
+- Reconcile a stale doc once the owner confirms the implementation is the correct side.
+- Anything else that surfaces gaps — the menu is open.
+
+### Slice log
+
+| Slice | What | Status |
+|---|---|---|
+| 1 | Fix `price × quantity → money` not compiling — the spec's headline example errored `PRE0114` ("quantity dimension unresolved"). Root cause: qualifier resolvers lacked a `Dimension ← Unit` projection; added `TryProjectUnitToDimension`. Same-unit cancellation now works. **Caveat (owner decision, option C):** the fix matches at dimension granularity, so cross-unit (`'USD/kg' × quantity in 'g'`) now cancels silently — left open, tracked as Slice 3. | ✅ Done 2026-05-31 |
+| 2 | `exchangerate` slash syntax — parse `'USD/EUR'` into from/to, remove the `to`-form, sweep the `to` form out of the type docs, the catalog example, and the old tests. (Owner ruled slash canonical 2026-05-30.) | Planned |
+| 3 | **Explore → decide-later:** how does `price × quantity` cancel across same-dimension / different units? (`price in 'USD/kg' × quantity in 'g'`). The impl checks **dimension** match, not unit, and tracks no conversion factor → latent scale-factor hole, masked today by Slice 1. Spec is in tension (price exact-unit `:1866` / "conversion is explicit" `:168` vs quantity-arithmetic auto-convert D8 `:445–452` vs count-unit reject PRE0137 `:397`). Genuine semantics decision, not a bug. **Full evidence + 3-option decision space:** [`price-cross-unit-cancellation-2026-05-31.md`](price-cross-unit-cancellation-2026-05-31.md). Decide via `/lifecycle-2-design` when we get there. | Investigated — decision parked; **hole now LIVE** after Slice 1 (option C) — cross-unit cancels silently until decided |
+
+*(Append a row per slice as we go. This log is the running record of the phase.)*
+
+## Decisions required
+
+- **Is the price×quantity bug one bug or two?** It and a related "wrong diagnostic code" case both show the same "unresolved qualifier" signature, so they may share a single root cause. Check before sequencing fixes — if shared, one fix closes both. (Register rows: A1 and C1/PRE0073.)
+- **The Phase 7 / Phase 9 line.** Which diagnostic problems are *conformance* (the language behaves wrong → fixed here) vs *catalog-completeness / emission architecture* (every declared code is wired or retired → Phase 9)? Proposed split recorded above; owner confirms.
+- **Spec-contradicts-itself cases** — when two parts of the spec disagree, or a spec line may itself be wrong, that's an owner ruling, not a find-and-fix. Surfaced one at a time as they arise. (The exchangerate slash-vs-`to` case is already settled: slash wins.)
+- **Doc-stale cases** — confirm the implementation is the correct side and the doc is just out of date, before fixing the doc instead of the code.
+
+## Exit criteria
+
+- [ ] Every catalog member (type, operator, modifier, construct, action, diagnostic) has been probed against its spec form and given a verdict — nothing left unchecked.
+- [ ] Every spec example marked "✓ compiles" actually compiles (the spec's own headline examples pass).
+- [ ] Every confirmed feature gap and every confirmed soundness hole (spec says reject, compiler accepts) is fixed, each with a test that failed before the fix and passes after, and the docs synced.
+- [ ] Every case where the compiler reports a generic error instead of the spec's named one is fixed and re-probed.
+- [ ] Every doc-stale case is owner-confirmed and the doc fixed (including the exchangerate slash sweep across the type docs, the catalog example, and the old `to`-form tests).
+- [ ] No unverified rows remain in the finding register.
+- [ ] Full suite green across all 4 projects after the fixes.
+- [ ] **Owner judgment** — the owner is satisfied the compiler is fully implemented and accurate to the spec. This is the load-bearing gate: the checklist above is necessary, but the phase closes when the owner says the language matches its spec, not on a count.
+
+## Cadence and completion
+
+This phase is **open-ended by owner intent**: slice after slice after slice, for as long as it takes, until the owner is satisfied the compiler is fully implemented and accurate to the spec. There is no fixed finding count and no week budget — the register grows as enumeration and probing surface new rows, and the phase runs until it is exhausted *and* the owner signs off. Each slice follows the locked per-slice rigor (enumerate/probe → failing-test-first → fix → adversarial review → re-probe → doc-sync), and the plan pauses for review at each slice boundary rather than auto-advancing.
+
+## Estimated effort
+
+**XL / open-ended.** Coverage is the cost driver — the fix count is unknown until the probe matrix is built and the probes run. The audit's hit rate on a partial manual pass (1 confirmed functional gap + 1 spec contradiction + ~13 unverified suspicions) suggests a substantial backlog. Sequence as: enumerate → probe to verdicts → group by root cause → fix one at a time. Treat the register's resolution + owner sign-off as the unit of progress, not a day estimate.
+
+---
+
+# Phase 8: API surface solidity (typed descriptors + analyzer extensions)
 
 **Goal**: The compile-time public API surface uses typed descriptors, not string-keyed field references. Defensive-throw pattern removed in favor of compile-time enforcement via extended `[HandlesCatalogExhaustively]` coverage.
 
@@ -1063,12 +1157,12 @@ Phase 6 is complete when: every WS exit criterion holds; `dotnet test` green; th
 **Decisions required**:
 - F-API-01: ship as standalone refactor before runtime (this phase), or open the runtime phase with it? Owner ruling needed at planning time.
 
-**Status**: Stub — detailed execution plan TBD pending Phase 6 completion and F-API-01 sequencing decision.
+**Status**: Stub — detailed execution plan TBD pending Phase 7 (conformance sweep) completion and F-API-01 sequencing decision.
 **Estimated effort**: M-L (~3-5 days — F-API-01 alone is a broad public-API change; the analyzer extensions are smaller).
 
 ---
 
-# Phase 8: Diagnostic completeness
+# Phase 9: Diagnostic completeness
 
 **Goal**: Every diagnostic code declared in `DiagnosticCode.cs` is either emitted from a real code path, has scenario-test coverage that asserts it fires, or is explicitly retired. CI enforcement is bidirectional.
 
@@ -1086,7 +1180,7 @@ Phase 6 is complete when: every WS exit criterion holds; `dotnet test` green; th
 
 ## Diagnostic-emission architecture (added 2026-05-29 — from the type↔proof-contract + flow-sensitive-check-placement surveys)
 
-Grounded in `research/architecture/compiler/type-proof-stage-contract-survey.md` and `flow-sensitive-check-placement-survey.md` (both `status: Cited`). These widen Phase 8 from *coverage* to *emission architecture*; all three sit within Precept's locked determinism boundary (no IVL/SMT — `proof-engine.md` opaque-solver rejection).
+Grounded in `research/architecture/compiler/type-proof-stage-contract-survey.md` and `flow-sensitive-check-placement-survey.md` (both `status: Cited`). These widen this phase from *coverage* to *emission architecture*; all three sit within Precept's locked determinism boundary (no IVL/SMT — `proof-engine.md` opaque-solver rejection).
 
 - **DA-1 — Dedicated diagnostic-emission phase** (answers `research/architecture/README.md` open-question #2). The survey found 3 of 4 production compilers (Kotlin K2 `CHECKERS` phase, Rust MIR reporting walk, Roslyn) defer *all* diagnostic emission to one terminal phase, decoupled from where the check computes. Precept emits scattered across the type and proof stages; the Phase 6 Site-A PRE0141 Type→Proof re-stage (`docs/Working/assignment-qualifier-discharge-placement.md`) is a one-off symptom. A unified emission phase makes "which stage emits this" a non-question. **Stakes: medium (a pipeline-shape change); needs a `/lifecycle-2-design` pass.**
 - **DA-2 — Regularization audit: type-immediate checks that should be stamped obligations.** The assignment-qualifier check (Site-A) was the *lone* qualifier check done as a type-immediate emit instead of a stamped obligation (the `proof-engine.md` Decision-3 contract). Audit `DiagnosticCode.cs` / the type checker for *other* checks that are really proof obligations in disguise; regularizing them improves uniformity and may unlock narrowing/proof for them (as Site-A now does). **Small, discoverable — a grep-and-classify pass; Site-A handles its own instance in Phase 6, this finds the rest.**
@@ -1099,12 +1193,11 @@ Grounded in `research/architecture/compiler/type-proof-stage-contract-survey.md`
 - DA-1: introduce a dedicated diagnostic-emission phase, or keep per-stage emission with the Site-A-style targeted re-staging? (design pass)
 - DA-3: counterexample/witness surface — scope and shape (which obligation kinds; structured-data shape for tooling)?
 
-**Status**: Stub — detailed execution plan TBD pending Phase 7 completion and the listed decisions.
-**Estimated effort**: M→L (~3 days for the original coverage cluster; +the DA cluster — DA-2 small, DA-1/DA-3 each a design pass).
+**Status**: Stub — detailed execution plan TBD pending Phase 8 completion and the listed decisions. **Seam with Phase 7**: the conformance sweep (Phase 7) fixes spec↔impl behavior gaps including B-class enforcement holes and A1-entangled C-class diagnostic-identity items; this phase owns the *catalog-completeness* lens (every declared `DiagnosticCode` emits-or-retires) and the emission-architecture work (DA-1/2/3). Re-scope this phase's finding list against what Phase 7 closes before kickoff.
 
 ---
 
-# Phase 9: Polish + cleanup
+# Phase 10: Polish + cleanup
 
 **Goal**: Burn down the remaining P2 polish items. Remove dead code, defensive cleanups, doc cosmetics, deprecated tokens.
 
@@ -1119,15 +1212,15 @@ Grounded in `research/architecture/compiler/type-proof-stage-contract-survey.md`
 **Decisions required** (4):
 - F-NB-01: delete BuildDictionaries() or repurpose to materialize immutable dictionaries?
 - F-LANG-CAT-23: Roslyn rules doc location (Phase 1 may have settled this — re-check)
-- F-X-03 cleanup of removed defensive throws (Phase 7 may have settled — re-check)
+- F-X-03 cleanup of removed defensive throws (Phase 8 may have settled — re-check)
 - Any P2s where the implementer needs guidance.
 
-**Status**: Stub — detailed execution plan TBD pending Phase 8 completion.
+**Status**: Stub — detailed execution plan TBD pending Phase 9 completion.
 **Estimated effort**: M (~3 days — many small items, parallelizable).
 
 ---
 
-# Phase 10: Runtime gate verification
+# Phase 11: Runtime gate verification
 
 **Goal**: Confirm the compiler is production-ready. Open the runtime gate.
 
@@ -1145,7 +1238,7 @@ Grounded in `research/architecture/compiler/type-proof-stage-contract-survey.md`
 7. F-CAT-01 delta confirms zero P0/P1 catalog discipline violations remain.
 8. Owner sign-off — runtime gate opens.
 
-**Status**: Stub — detailed verification plan TBD pending Phase 9 completion.
+**Status**: Stub — detailed verification plan TBD pending Phase 10 completion.
 **Estimated effort**: S (~1 day verification work).
 
 ---

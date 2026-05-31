@@ -1,6 +1,6 @@
 # Spec-Conformance Audit & Remediation — 2026-05-30
 
-**Status**: Active — candidate register. Goal: find every spec↔implementation gap and fix the implementation (the spec is authoritative). Feeds the compiler-readiness plan as a remediation phase.
+**Status**: Active — candidate register. Goal: find every spec↔implementation gap and fix the implementation (the spec is authoritative). This register is the **first seed of Phase 7 (total language conformance sweep)** of the compiler-readiness plan (inserted 2026-05-30) — one input among several, known to be non-comprehensive. Phase 7 also commissions fresh audits, builds conformance tests, and probes the catalog surface, running slice after slice until the owner is satisfied the compiler is accurate to the spec. The Phase 7 finding register is the living tracker; this audit is its first contributor.
 
 **Method (non-negotiable, to keep findings trustworthy)**:
 - The spec (`docs/language/*.md`) is the source of truth. Any spec-vs-code mismatch = an implementation gap to fix (not a spec change), unless the owner rules a specific spec line is itself wrong.
@@ -23,7 +23,7 @@
 
 | # | Spec claim (doc:line) | Canonical form per spec | Probe result | Verdict |
 |---|---|---|---|---|
-| A1 | `price × quantity → money` cancels; `business-domain-types.md:211-220` headline example | `field OrderQty as quantity in 'each'` (the `in 'unit'` form) | `price in 'USD/each' * quantity in 'each'` → PRE0114, quantity Dimension "unresolved" | **CONFIRMED** (probed 2026-05-30; spec's own `✓` example does not compile) |
+| A1 | `price × quantity → money` cancels; `business-domain-types.md:211-220` headline example | `field OrderQty as quantity in 'each'` (the `in 'unit'` form) | `price in 'USD/each' * quantity in 'each'` → PRE0114, quantity Dimension "unresolved" | **FIXED (Phase 7 Slice 1, 2026-05-31)** — root cause: qualifier resolvers lacked a `Dimension ← Unit` projection (the quantity's `in '<unit>'` qualifier carries its dimension but was never consulted on the Dimension axis); added `TryProjectUnitToDimension` at all four projection sites in `ProofEngine.Qualifiers.cs`. Same-unit cancellation now works (headline example compiles). **Caveat:** the fix matches at *dimension* granularity, so same-dimension/different-unit (`'USD/kg' × quantity in 'g'`) now cancels silently (scale-factor hole) — deliberately left open (owner decision) pending the cross-unit policy decision tracked in [`price-cross-unit-cancellation-2026-05-31.md`](price-cross-unit-cancellation-2026-05-31.md). |
 | A2 | `exchangerate` declaration — **two contradictory forms appear in the spec** | (see both) | (see both) | **NEEDS OWNER RULING** — spec/catalog contradiction, not a clean impl gap |
 
 **A2 detail (spec-vs-catalog contradiction — owner decision required):**
@@ -70,16 +70,16 @@
 
 ## Coverage gaps in the audit itself (not yet probed)
 - `precept-language-spec.md` §1 (lexer), §2.7 (parser), §3.10 (full diagnostic catalog), §3A semantics — not audited.
-- The 162 `DiagnosticCode` members: not cross-checked for "emits from a real path" (that is Phase 8's stated job).
+- The 162 `DiagnosticCode` members: not cross-checked for "emits from a real path" (the catalog-completeness lens — **Phase 9**'s stated job; distinct from the conformance/identity probing this register drives, which is **Phase 7**).
 
 ## Phase routing (where each cluster gets fixed)
 
-This register is the durable tracker — nothing is lost as long as every row lands in a phase here.
+This register is the durable tracker — nothing is lost as long as every row lands in a phase here. **This register is Phase 7's driver doc** ([`compiler-readiness-plan-2026-05-24.md` § Phase 7](compiler-readiness-plan-2026-05-24.md)): the "total language conformance sweep" inserted 2026-05-30 is the execution arm for these rows.
 
-- **A-class (functional gaps: A1 price×quantity, A2 exchangerate slash, A3 date+literal-quantity, A4 kg/hour compound)** → **NEW remediation phase** (this audit doc is its driver). Phase 3/5 (the natural type-system/proof-engine owners) are closed. **A1 and the PRE0073/compound-denominator C-items may share ONE root cause** (qualifier-chain resolver not reading the right operand's `in`-declared qualifier — same `PRE0114 "unresolved"` signature; Slice 1 of W-C already fixed the analogous period case). **Verify that grouping before routing** — if shared, the temporal C-items ride with A1, not Phase 8.
-- **B-class (spec says error, doesn't fire)** → **Phase 8** (its charter: every diagnostic emits from a real path or is retired).
-- **C-class (wrong/generic code, incl. PRE0073)** → **Phase 8** *unless* root-caused with A1 → then with the A-class fix.
-- **D-class (doc-stale)** → doc cleanup sweep (incl. the slash `to`→`/` doc/test sweep from A2, which rides with the A2 impl fix).
+- **A-class (functional gaps: A1 price×quantity, A2 exchangerate slash, A3 date+literal-quantity, A4 kg/hour compound)** → **Phase 7** (this audit doc is its driver). Phase 3/5 (the natural type-system/proof-engine owners) are closed. **A1 and the PRE0073/compound-denominator C-items may share ONE root cause** (qualifier-chain resolver not reading the right operand's `in`-declared qualifier — same `PRE0114 "unresolved"` signature; the analogous period case was fixed during Phase 6 W-C). **Verify that grouping before routing** — if shared, the temporal C-items ride with A1 in Phase 7.
+- **B-class (spec says error, doesn't fire — soundness holes)** → **Phase 7** (re-homed from the old Phase 8: these are conformance defects — the language fails to reject what the spec declares illegal — which is Phase 7's charter, not the catalog-completeness lens).
+- **C-class (wrong/generic code, incl. PRE0073)** → **Phase 7** when entangled with A1's root cause (the named spec diagnostic must fire); standalone catalog-wiring C-items → **Phase 9** (diagnostic completeness / emission architecture). The A1↔C1 grouping check decides.
+- **D-class (doc-stale)** → doc cleanup sweep within Phase 7 W-F (incl. the slash `to`→`/` doc/test sweep from A2, which rides with the A2 impl fix).
 
 **Phase 6 (composite period basis) — what actually stays here:** only **W-D** (scenario-test matrix + lease sample + doc-sync) remains. PRE0073 is *temporally* adjacent to W-C but is mechanically a C-class diagnostic gap likely entangled with A1 — so it routes with the A-class root-cause fix, NOT as a Phase 6 item, pending the grouping check. (Recorded so it is not lost: see C1.)
 
