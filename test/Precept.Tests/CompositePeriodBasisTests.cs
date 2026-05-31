@@ -81,6 +81,30 @@ public class CompositePeriodBasisTests
         tu.DerivedDimension.Should().Be(PeriodDimension.Datetime);
     }
 
+    // ── Malformed-basis diagnostics ──────────────────────────────────────────
+    // Per-component recovery branching: each malformed basis must emit ONLY its own
+    // composite code — not also leak a sibling (Duplicate/Unknown/Empty).
+    // `AssertOnlyCompositeBasisError` checks exclusivity across the three composite codes.
+
+    private static readonly DiagnosticCode[] CompositeBasisCodes =
+    [
+        DiagnosticCode.DuplicateCompositeBasisComponent,
+        DiagnosticCode.UnknownCompositeBasisComponent,
+        DiagnosticCode.EmptyCompositeBasisComponent,
+    ];
+
+    private static void AssertOnlyCompositeBasisError(string precept, DiagnosticCode expected)
+    {
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check(precept);
+        diagnostics.Should().Contain(d => d.Code == expected.ToString(),
+            $"expected {expected}");
+        foreach (var other in CompositeBasisCodes.Where(c => c != expected))
+        {
+            diagnostics.Should().NotContain(d => d.Code == other.ToString(),
+                $"only {expected} should fire, but {other} also leaked");
+        }
+    }
+
     [Fact]
     public void Composite_DuplicateComponent_EmitsDuplicateDiagnostic()
     {
@@ -89,7 +113,7 @@ public class CompositePeriodBasisTests
             field Elapsed as period in 'hours + minutes + hours'
             state Open initial
             """;
-        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.DuplicateCompositeBasisComponent);
+        AssertOnlyCompositeBasisError(precept, DiagnosticCode.DuplicateCompositeBasisComponent);
     }
 
     [Fact]
@@ -112,7 +136,7 @@ public class CompositePeriodBasisTests
             field Term as period in 'years + fortnights'
             state Open initial
             """;
-        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.UnknownCompositeBasisComponent);
+        AssertOnlyCompositeBasisError(precept, DiagnosticCode.UnknownCompositeBasisComponent);
     }
 
     [Fact]
@@ -123,7 +147,7 @@ public class CompositePeriodBasisTests
             field Term as period in 'years +'
             state Open initial
             """;
-        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.EmptyCompositeBasisComponent);
+        AssertOnlyCompositeBasisError(precept, DiagnosticCode.EmptyCompositeBasisComponent);
     }
 
     [Fact]
@@ -134,17 +158,45 @@ public class CompositePeriodBasisTests
             field Term as period in 'years + + days'
             state Open initial
             """;
-        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.EmptyCompositeBasisComponent);
+        AssertOnlyCompositeBasisError(precept, DiagnosticCode.EmptyCompositeBasisComponent);
     }
 
     [Fact]
     public void SingleBasis_StillParsesUnchanged()
     {
-        // Non-regression: the single-component path is behavior-identical to before W-A.
+        // Non-regression: the single-component path stays behavior-identical (modulo the
+        // outer-whitespace trim covered below).
         var tu = ResolveBasis("field Grace as period in 'months'", "Grace");
         tu.UnitName.Should().Be("months");
         tu.Components.Should().Equal("months");
         tu.DerivedDimension.Should().Be(PeriodDimension.Date);
+    }
+
+    [Theory]
+    [InlineData(" months ")]   // both sides padded
+    [InlineData(" months")]    // leading only
+    [InlineData("months ")]    // trailing only
+    public void SingleBasis_OuterWhitespace_TrimsToCanonical(string padded)
+    {
+        // Lenient whitespace is uniform across single and composite bases: the single-basis path
+        // must trim outer padding so the STORED basis is canonical (`'months'`), not merely resolve
+        // the lookup. Regression guard — the qualifier must be built from the trimmed string, so
+        // UnitName/Components never hold the padded form.
+        var tu = ResolveBasis($"field Grace as period in '{padded}'", "Grace");
+        tu.UnitName.Should().Be("months");
+        tu.Components.Should().Equal("months");
+        tu.DerivedDimension.Should().Be(PeriodDimension.Date);
+    }
+
+    [Fact]
+    public void Composite_OuterWhitespace_TrimsToCanonical()
+    {
+        // Regression: the composite branch already trims; confirm outer padding on the whole
+        // value canonicalizes identically to the single-basis path.
+        var tu = ResolveBasis("field Span as period in ' hours + minutes '", "Span");
+        tu.UnitName.Should().Be("hours + minutes");
+        tu.Components.Should().Equal("hours", "minutes");
+        tu.DerivedDimension.Should().Be(PeriodDimension.Time);
     }
 
     [Fact]

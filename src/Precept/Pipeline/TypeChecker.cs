@@ -400,11 +400,17 @@ internal static partial class TypeChecker
         {
             if (!TemporalUnits.TryGet(trimmed, out var single))
             {
+                // Diagnostic echoes the author's raw text (`value`), consistent with other
+                // qualifier paths; the stored basis uses `trimmed` so the recovery placeholder
+                // carries the canonical (whitespace-trimmed) basis.
                 ctx.Diagnostics.Add(Diagnostics.Create(DiagnosticCode.InvalidTemporalUnitString, valueSpan, value));
-                return new DeclaredQualifierMeta.TemporalUnit(value, PeriodDimension.Any);
+                return new DeclaredQualifierMeta.TemporalUnit(trimmed, PeriodDimension.Any);
             }
+            // Construct from `trimmed`, not the raw `value` — the stored UnitName (and Components,
+            // which defaults to [UnitName]) must be the canonical basis, trimming outer whitespace
+            // uniformly with the composite branch below.
             var singleDim = single.IsCalendarBased ? PeriodDimension.Date : PeriodDimension.Time;
-            return new DeclaredQualifierMeta.TemporalUnit(value, singleDim);
+            return new DeclaredQualifierMeta.TemporalUnit(trimmed, singleDim);
         }
 
         // Composite basis: '+'-separated component list, lenient whitespace per component.
