@@ -7,7 +7,7 @@
 - [`compiler-readiness-review-2026-05-24-appendices/`](compiler-readiness-review-2026-05-24-appendices/) — full sub-agent reports
 **Scope gate**: blocks runtime implementation
 **Owner-decision policy**: each phase opens only when its listed upstream decisions are settled. Triage is just-in-time, not all-up-front.
-**Sample-edit constraint**: do NOT modify `samples/*.precept` from this workstream — parallel session owns samples; cross-reference via [`bugs.md`](bugs.md).
+**Sample-edit constraint**: lifted (2026-05-30) — `samples/*.precept` may be edited directly by this plan's workstreams. Historical sample-side bugs are tracked in [`bugs.md`](bugs.md).
 
 ---
 
@@ -27,9 +27,9 @@
 | 9 | Polish + cleanup + `/lifecycle-7-audit` skill | ~20 | 4 | M | Stub — TBD |
 | 10 | Runtime gate verification | — | 0 | S | Stub — TBD |
 
-**Overall estimate**: 7-11 weeks of focused work (was 6-10; Phase 2 grew). Phase 1 includes (a) 5 lifecycle skill builds + rename, (b) 16 Archive promotion obligations, (c) CONTRIBUTING.md lifecycle updates. Phase 2 grew from ~2-3 days to ~4-5 days after integrating 10 active bugs from `bugs.md` (parallel sample-remediation session, 2026-05-24): 6 MCP-crash family bugs (BUG-003 period, -005 symptom, -007 domains, -008 duration, -010 now()+duration, -011 timezone+time), 1 MCP transport bug (BUG-009 payload limit), plus the original F-LANG-SPEC-10. Coordinated MCP-layer instrumentation pass catches the whole family in one fix. Phase 5 (proof engine satisfiability) remains the highest variance.
+**Overall estimate**: 7-11 weeks of focused work (was 6-10; Phase 2 grew). Phase 1 includes (a) 5 lifecycle skill builds + rename, (b) 16 Archive promotion obligations, (c) CONTRIBUTING.md lifecycle updates. Phase 2 grew from ~2-3 days to ~4-5 days after integrating 10 active bugs from `bugs.md` (sample-remediation work, 2026-05-24): 6 MCP-crash family bugs (BUG-003 period, -005 symptom, -007 domains, -008 duration, -010 now()+duration, -011 timezone+time), 1 MCP transport bug (BUG-009 payload limit), plus the original F-LANG-SPEC-10. Coordinated MCP-layer instrumentation pass catches the whole family in one fix. Phase 5 (proof engine satisfiability) remains the highest variance.
 
-**`bugs.md` as ongoing source**: parallel sample-authoring sessions continue to discover bugs that surface in real authoring workflows (not in code-vs-doc audits). Plan integrates bugs.md as a standing input. Phase-kickoff protocol includes "re-read bugs.md for new entries since last integration."
+**`bugs.md` as ongoing source**: sample-authoring work discovers bugs that surface in real authoring workflows (not in code-vs-doc audits). Plan integrates bugs.md as a standing input. Phase-kickoff protocol includes "re-read bugs.md for new entries since last integration."
 
 **Bug-to-phase coverage map** (as of 2026-05-25, after Phase 2 commit `38712543`):
 
@@ -47,7 +47,7 @@
 | BUG-010 | ✅ Fixed (crash) / open (type-inference) | 2 crash + 4 type-inference | `now() + '<duration>'` — structured diagnostic; full inference fix Phase 4+ |
 | BUG-011 | ✅ Fixed | 2 | Timezone / time typed-constant default crash |
 | BUG-012 | ✅ Fixed | 4 (W-G; pulled forward from Phase 5) | Ordered-choice + literal proof gap — typed-literal inference in `TryDeclarationAttributeProof` lifts modifier from binary-op sibling |
-| BUG-013 | Active (parallel-session owned) | n/a | `samples/Test.precept` missing; the test references a sample the parallel session didn't carry forward. **Parallel-session triage**: either re-add the fixture or rewrite the test inline. Not assigned to a numbered phase because the test-side fix is trivial and the sample-side ownership lives outside this plan. |
+| BUG-013 | Active | n/a | `samples/Test.precept` missing; the test references a sample that was never carried forward. **Triage**: either re-add the fixture or rewrite the test inline — the test-side fix is trivial. |
 
 ---
 
@@ -92,7 +92,7 @@ All three Phase-3-gating decisions are settled. Each carries the four-leg ration
   - **`~string` (CI) supports ordering**: rejected — would imply collation-aware ordering, same runtime-dependence problem.
 - **Precedent**: Documented in `research/language/expressiveness/` (6 research files surveying how other languages handle this); spec § 3.6 expression-typing table; `primitive-types.md` § String Ordering — Out of Scope (four-leg rationale block).
 - **Tradeoff accepted**: Tier/rank domains require the slightly more verbose `choice of string(...) ordered` shape (or equivalent integer ordering) instead of inline string comparison. Bug-012 surfaces a residual proof-engine gap when the field-vs-literal case isn't proved — tracked separately for Phase 5.
-- **Settled by**: Parallel session commit `090764d3` (2026-05-25).
+- **Settled by**: commit `090764d3` (2026-05-25).
 
 **F-LANG-PRIM-04 — `nonnegative` + `positive` mutex severity**
 
@@ -363,7 +363,7 @@ Run `/lifecycle-6-review --strict` against Phase 1 deliverables:
 Output: completion report. If clean: Phase 1 complete. If 🔴: remediate before proceeding to Phase 2.
 
 ## Dependencies
-- Sample-edit constraint: do not touch `samples/*.precept` from this workstream — parallel session owns samples; cross-reference via `bugs.md`.
+- Sample-edit constraint: lifted (2026-05-30) — samples may be edited directly; historical sample-side bugs tracked in `bugs.md`.
 - Workstream A.2 (`/lifecycle-5-promote`) is the critical-path dependency for Workstream E. Build A.2 first; B/C/D can run in parallel after.
 - All 8 Phase-1 gating decisions are settled (see plan-level "Decisions captured so far"). No pre-execution triage required.
 
@@ -429,7 +429,7 @@ All six share the same symptom: `precept_compile` (or `precept_domains` for BUG-
 
 2 from the gating list above (unchanged):
 - **F-LANG-04**: was the pattern renamed (recommend: rename test method to match `"Constructor Pattern (Atomic Creation)"`), or deliberately separate and lost (re-add an "Existential Fields" pattern)?
-- **F-X-01**: delete `F5TempVerify.cs` outright (parallel session's `SampleFieldStateRegressionTests.cs` already covers samples) OR promote to permanent `SampleCompilesCleanTests.cs` (drop the "TEMPORARY" docstring, update file count from "30" to "all `samples/*.precept`", remove dev-only language)?
+- **F-X-01**: delete `F5TempVerify.cs` outright (`SampleFieldStateRegressionTests.cs` already covers samples) OR promote to permanent `SampleCompilesCleanTests.cs` (drop the "TEMPORARY" docstring, update file count from "30" to "all `samples/*.precept`", remove dev-only language)?
 
 ## Step-by-step execution
 
@@ -494,7 +494,7 @@ Decision 4 in Wave 0 was **implement**. Files:
 
 2 from the gating list above:
 - **F-LANG-04**: was the pattern renamed (recommend: rename test method to match `"Constructor Pattern (Atomic Creation)"`), or deliberately separate and lost (re-add an "Existential Fields" pattern)? Need to inspect git history if owner doesn't recall — `git log -p src/Precept/Language/SyntaxReference.cs` may reveal.
-- **F-X-01**: delete `F5TempVerify.cs` outright (parallel session's `SampleFieldStateRegressionTests.cs` already covers samples) OR promote to permanent `SampleCompilesCleanTests.cs` (drop the "TEMPORARY" docstring, update file count from "30" to "all `samples/*.precept`", remove dev-only language)?
+- **F-X-01**: delete `F5TempVerify.cs` outright (`SampleFieldStateRegressionTests.cs` already covers samples) OR promote to permanent `SampleCompilesCleanTests.cs` (drop the "TEMPORARY" docstring, update file count from "30" to "all `samples/*.precept`", remove dev-only language)?
 
 Plus, since Phase 1's F-LANG-CAT-15 decision was "implement," `Operations.Resolve` is a Phase 2 sub-task (Step 2.6 below).
 
@@ -539,7 +539,7 @@ Plus, since Phase 1's F-LANG-CAT-15 decision was "implement," `Operations.Resolv
 **Decision executions (3):**
 - F-LANG-PRIM-04 (doc clarification — error stays)
 - F-LANG-TEMP-08 (remove `OperationKind.ZonedDateTimePlusPeriod` + `MinusPeriod` from catalog)
-- F-LANG-PRIM-01 (already shipped by parallel session; Phase 3 verifies)
+- F-LANG-PRIM-01 (already shipped; Phase 3 verifies)
 
 **Temporal extensions (5):**
 - F-LANG-TEMP-01/02 (context-aware `TemporalQuantityParser`)
@@ -564,7 +564,7 @@ Plus, since Phase 1's F-LANG-CAT-15 decision was "implement," `Operations.Resolv
 
 - **3.1a F-LANG-PRIM-04 doc clarification**: `docs/language/primitive-types.md` (sections at lines ~197, 230, 265) — add "use `positive` OR `nonnegative`, not both" note under each numeric-type modifier list. `docs/language/catalog-system.md` § Modifiers — add the meaning-vs-syntax layered-concerns note (`Subsumes` drives proof-obligation discharge + `RedundantModifier`; `MutuallyExclusiveWith` drives `ConflictingModifiers` error; both fire on `nonnegative + positive` intentionally).
 - **3.1b F-LANG-TEMP-08 catalog cleanup**: `src/Precept/Language/OperationKind.cs:91-92` delete `ZonedDateTimePlusPeriod` + `MinusPeriod`; `src/Precept/Language/Operations.cs:396-401` delete the two GetMeta arms. Pre-execution doc-touch grep: `grep -rn "ZonedDateTime.*Period\|operation count" docs/` to catch any spec-level docs needing update.
-- **3.1c F-LANG-PRIM-01 ratification**: verification only — confirm parallel-session work shipped at `docs/language/primitive-types.md § String Ordering — Out of Scope` and `precept-language-spec.md § 3.6`.
+- **3.1c F-LANG-PRIM-01 ratification**: verification only — confirm the work shipped at `docs/language/primitive-types.md § String Ordering — Out of Scope` and `precept-language-spec.md § 3.6`.
 
 ### Step 3.2 — Temporal extensions (2-3 days, L)
 
@@ -617,7 +617,7 @@ Plus, since Phase 1's F-LANG-CAT-15 decision was "implement," `Operations.Resolv
 ## Exit criteria (testable, ≥13 conditions)
 
 - [ ] `dotnet build` 0 warnings, 0 errors
-- [ ] `dotnet test --no-build` 0 failures across all 4 projects (except BUG-013, parallel-session-owned); 3× run, no flakes
+- [ ] `dotnet test --no-build` 0 failures across all 4 projects (except BUG-013); 3× run, no flakes
 - [ ] MCP probe battery (9 inputs) all return expected outcomes
 - [ ] `OperationKind` no longer contains `ZonedDateTimePlusPeriod` / `MinusPeriod`
 - [ ] `Modifiers.ZeroBoundNumericTypes` contains `Duration` and `Period`
@@ -929,7 +929,7 @@ Exit: all 12 design acceptance criteria pass; PR mergeable.
 
 ## Open decisions
 
-- **D6.1 — Sample exercising composite basis?** No current sample uses composite basis. **Options**: (a) ship the feature with scenario-test coverage only, no sample; (b) add a sample (e.g., a billing/SLA precept using `period in 'years + months'`). **Recommended**: (a) — the feature is fully exercised by scenario tests; sample-corpus churn is owned by the parallel sample-authoring session per prior phases. A sample can follow as a clean add. **Lands**: W-D kickoff.
+- **D6.1 — Sample exercising composite basis?** No current sample uses composite basis. **Options**: (a) ship the feature with scenario-test coverage only, no sample; (b) add a sample (e.g., a billing/SLA precept using `period in 'years + months'`). **Recommended**: (a) — the feature is fully exercised by scenario tests. A sample can follow as a clean add. **Lands**: W-D kickoff.
 - **D6.2 — Runtime `Period.Between` lowering**: out of scope this phase. **Decided**: the runtime evaluator is still stub (no `Period.Between` call exists in `src/`); composite-basis runtime lowering lands with the runtime phase (Phase 10+). This phase delivers the compile-time surface only — parsing, validation, canonicalization, accessors, cancellation discipline. Noted here so it is not silently dropped.
 
 ## Workstream blocks
@@ -1179,7 +1179,7 @@ The compiler is declared production-ready when **all** of the following hold:
 - [`compiler-readiness-review-2026-05-24-appendices/audit-type-system-docs.md`](compiler-readiness-review-2026-05-24-appendices/audit-type-system-docs.md) — sub-agent: primitive/temporal/business-domain.
 - [`compiler-readiness-review-2026-05-24-appendices/audit-collections-grammar-docs.md`](compiler-readiness-review-2026-05-24-appendices/audit-collections-grammar-docs.md) — sub-agent: collections + grammar.
 - [`compiler-readiness-review-2026-05-24-appendices/audit-catalog-system.md`](compiler-readiness-review-2026-05-24-appendices/audit-catalog-system.md) — sub-agent: catalog system.
-- [`bugs.md`](bugs.md) — sample-side bugs (parallel session).
+- [`bugs.md`](bugs.md) — sample-side bugs.
 
 ---
 
