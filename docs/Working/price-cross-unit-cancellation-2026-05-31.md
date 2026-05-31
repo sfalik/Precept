@@ -1,7 +1,7 @@
 # Price × Quantity Cross-Unit Cancellation — Investigation
 
 **Status**: Draft — investigation; decision parked (investigate-then-decide). **The hole is now LIVE** as of the Slice 1 fix (2026-05-31): Slice 1 fixed same-unit `price × quantity` cancellation and, by owner decision (option C), deliberately left the cross-unit case open — it currently cancels silently, dropping the conversion factor. This doc is the tracker for closing it; a skipped test (`PriceTimesQuantityTests.CrossUnit_SameDimension_MustNotSilentlyCancel`) marks the gap in the suite.
-**Context**: Phase 7 (total language conformance sweep), Slice 3. Surfaced while doing the Slice 1 spec-understanding pass on `price × quantity → money`. This doc preserves the detailed evidence so the decision can be made later without re-deriving it.
+**Context**: Phase 7 (total language conformance sweep), Slice 2. Surfaced while doing the Slice 1 spec-understanding pass on `price × quantity → money`. This doc preserves the detailed evidence so the decision can be made later without re-deriving it.
 **Scope**: compile-time semantics only — Precept's runtime evaluator is still a stub, so no magnitude arithmetic exists to test against.
 **Decides nothing.** The decision belongs to a future `/lifecycle-2-design` pass; this is the neutral evidence base for it.
 
