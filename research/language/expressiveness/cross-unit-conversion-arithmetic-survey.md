@@ -358,10 +358,14 @@ rejecting it.
 > first stated. The surveyed libraries forbid multiplying the **absolute/point** form of these units
 > (offset/`absolute<>`/point-origin), but they *allow* the **amount/increment** form (Pint `delta_degC`,
 > GNU `degC`). Since Precept's `quantity` is *always an amount* (never an absolute position — the
-> `duration`-not-`instant` analog), `quantity` amounts of °C/°F **and** dB convert by scale factor only
-> (offset cancels in a difference) and price cleanly — they are **not** excluded. What is excluded is
-> *absolute positions* (thermostat readings, `dBm` levels), which `quantity` does not model — tracked as
-> Phase 7 Slice 4. See `docs/Working/price-cross-unit-cancellation-2026-05-31.md` § Decision & scope
+> `duration`-not-`instant` analog), `quantity` amounts are **not excluded by the position rule** (an
+> amount has no offset to trip on). **Cross-scale admissibility is then the exactness gate's call**, and
+> the two diverge for log units: °C↔°F (×1.8, an exact decimal) is admitted; dB↔Np (÷8.686 = 20/ln 10,
+> *irrational*) is **rejected** like angle→radian. So a dB *gain* is an amount (position-rule-fine) and
+> prices same-unit (factor 1), but its cross-scale conversion is exactness-gated, **not** "clean" — the
+> "dB converts cleanly to nepers" framing first stated here was the conflation. What the position rule
+> excludes is only *absolute positions* (thermostat readings, `dBm` levels), which `quantity` does not
+> model — tracked as Phase 7 Slice 4. See `docs/Working/price-cross-unit-cancellation-2026-05-31.md` § Decision & scope
 > correction. The excerpts below remain accurate (they describe the libraries forbidding **point**
 > multiplication); it is the "exclude all affine/log" framing that narrowed.
 
