@@ -1718,13 +1718,15 @@ Recursion is therefore explicit for qualifying binary expressions and interpolat
 
 #### 7.2 — Axis-Fallback Chains: Field Refs, Event Args, Typed Constants
 
-Three resolution paths share the same axis fallback order: exact axis first, then `Unit → Dimension`, then `Dimension → TemporalDimension`.
+Three resolution paths share the same axis fallback order: exact axis first, then `Unit → Dimension`, then `Dimension → TemporalDimension`, then two projections — `CompoundPrice → {Currency, Unit, Dimension}` and `Unit → Dimension` (a `Unit` qualifier carries a resolved `DimensionName`, surfaced as a `Dimension` qualifier when the Dimension axis is requested). The `Unit → Dimension` projection is what lets a unit-declared quantity (`quantity in 'kg'`) cancel against a price's projected denominator dimension in `price × quantity → money`.
 
-**Field refs.** `ResolveFieldQualifier` scans `field.DeclaredQualifiers` for the requested axis. If no exact match exists, `QualifierAxis.Unit` falls back to a declared `Dimension`, and `QualifierAxis.Dimension` falls back to a declared `TemporalDimension`. Only after declared qualifiers are exhausted does the helper consult `Types.GetMeta(field.ResolvedType).ImpliedQualifiers`, and that implied-qualifier lookup is exact-axis only.
+**Field refs.** `ResolveFieldQualifier` scans `field.DeclaredQualifiers` for the requested axis. If no exact match exists, `QualifierAxis.Unit` falls back to a declared `Dimension`, and `QualifierAxis.Dimension` falls back to a declared `TemporalDimension`; then the `CompoundPrice` and `Unit → Dimension` projections run. Only after declared qualifiers are exhausted does the helper consult `Types.GetMeta(field.ResolvedType).ImpliedQualifiers`, and that implied-qualifier lookup is exact-axis only.
 
-**Event args (`TypedArgRef`).** Both `ResolveQualifierOnAxis` and `ResolveQualifierFromExpression` scan `arg.DeclaredQualifiers` in the same order: exact axis, then `Unit → Dimension`, then `Dimension → TemporalDimension`. There is no type-level implied-qualifier pass for args.
+**Event args (`TypedArgRef`).** Both `ResolveQualifierOnAxis` and `ResolveQualifierFromExpression` scan `arg.DeclaredQualifiers` in the same order: exact axis, then `Unit → Dimension`, then `Dimension → TemporalDimension`, then the `CompoundPrice` and `Unit → Dimension` projections. There is no type-level implied-qualifier pass for args.
 
-**Typed constants (`TypedTypedConstant`).** Both helpers apply the same sequence to `TypedTypedConstant.DeclaredQualifiers`: exact axis, then `Unit → Dimension`, then `Dimension → TemporalDimension`. Again, there is no follow-up implied-qualifier lookup.
+**Typed constants (`TypedTypedConstant`).** Both helpers apply the same sequence to `TypedTypedConstant.DeclaredQualifiers`: exact axis, then `Unit → Dimension`, then `Dimension → TemporalDimension`, then the `CompoundPrice` and `Unit → Dimension` projections. Again, there is no follow-up implied-qualifier lookup.
+
+> **Known gap — cross-unit cancellation.** The `Unit → Dimension` projection matches operands at *dimension* granularity, so `price × quantity` currently cancels for same-dimension but **different-unit** operands (`'USD/kg' × quantity in 'g'`, `'USD/each' × quantity in 'box'`), silently dropping the UCUM conversion factor. Whether such pairs should reject (exact-unit), auto-convert, or split by unit kind is an undecided policy; until it is settled, this cancellation is unsound for cross-unit operands.
 
 If the chain exhausts without a carrier, the helper returns `null`. At Strategy 5 call sites that means "cannot prove" rather than "proved incompatible": the obligation remains `Unresolved`.
 

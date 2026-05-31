@@ -306,10 +306,12 @@ public static partial class ProofEngine
                 }
             }
 
-            // PriceIn fallback: project CompoundPrice onto Currency/Unit/Dimension axes
+            // PriceIn fallback: project CompoundPrice onto Currency/Unit/Dimension axes.
+            // Dimension fallback: project a Unit qualifier's resolved dimension onto the
+            // Dimension axis so a unit-declared quantity cancels against a price denominator.
             foreach (var qual in argQualifiers)
             {
-                var projected = TryProjectCompoundPrice(qual, axis);
+                var projected = TryProjectCompoundPrice(qual, axis) ?? TryProjectUnitToDimension(qual, axis);
                 if (projected is not null) return projected;
             }
         }
@@ -350,10 +352,12 @@ public static partial class ProofEngine
                 }
             }
 
-            // PriceIn fallback: project CompoundPrice onto Currency/Unit/Dimension axes
+            // PriceIn fallback: project CompoundPrice onto Currency/Unit/Dimension axes.
+            // Dimension fallback: project a Unit qualifier's resolved dimension onto the
+            // Dimension axis so a unit-declared quantity cancels against a price denominator.
             foreach (var qual in tcQualifiers)
             {
-                var projected = TryProjectCompoundPrice(qual, axis);
+                var projected = TryProjectCompoundPrice(qual, axis) ?? TryProjectUnitToDimension(qual, axis);
                 if (projected is not null) return projected;
             }
         }
@@ -463,10 +467,12 @@ public static partial class ProofEngine
             }
         }
 
-        // PriceIn fallback: project CompoundPrice onto Currency/Unit/Dimension axes
+        // PriceIn fallback: project CompoundPrice onto Currency/Unit/Dimension axes.
+        // Dimension fallback: project a Unit qualifier's resolved dimension onto the
+        // Dimension axis so a unit-declared quantity field cancels against a price denominator.
         foreach (var qual in field.DeclaredQualifiers)
         {
-            var projected = TryProjectCompoundPrice(qual, axis);
+            var projected = TryProjectCompoundPrice(qual, axis) ?? TryProjectUnitToDimension(qual, axis);
             if (projected is not null) return projected;
         }
 
@@ -884,10 +890,12 @@ public static partial class ProofEngine
                 if (q.Axis == QualifierAxis.TemporalDimension) return q;
 
         // PriceIn fallback: CompoundPrice carries Currency, Unit, and Dimension components
-        // (checked before implied qualifiers — explicit CompoundPrice is stronger than type-level implied)
+        // (checked before implied qualifiers — explicit CompoundPrice is stronger than type-level implied).
+        // Dimension fallback: project a Unit qualifier's resolved dimension onto the Dimension axis
+        // so a unit-declared quantity field cancels against a price denominator.
         foreach (var q in field.DeclaredQualifiers)
         {
-            var projected = TryProjectCompoundPrice(q, axis);
+            var projected = TryProjectCompoundPrice(q, axis) ?? TryProjectUnitToDimension(q, axis);
             if (projected is not null) return projected;
         }
 
@@ -922,6 +930,25 @@ public static partial class ProofEngine
                     compound.ProofSatisfactions, compound.SourceFieldName),
             _ => null,
         };
+    }
+
+    /// <summary>
+    /// Projects a unit-axis <see cref="DeclaredQualifierMeta.Unit"/> onto the Dimension axis.
+    /// A unit qualifier (<c>quantity in 'kg'</c>) already carries its resolved dimension name
+    /// (<c>"mass"</c>); surfacing it as a <see cref="DeclaredQualifierMeta.Dimension"/> lets a
+    /// unit-declared quantity cancel against a price's projected denominator dimension in
+    /// <c>price × quantity → money</c> (per business-domain-types.md § price). Returns
+    /// <c>null</c> off the Dimension axis or for any non-Unit qualifier — mirroring the
+    /// Dimension-case guard in <see cref="TryProjectCompoundPrice"/>.
+    /// </summary>
+    private static DeclaredQualifierMeta? TryProjectUnitToDimension(DeclaredQualifierMeta qualifier, QualifierAxis axis)
+    {
+        if (axis != QualifierAxis.Dimension)
+            return null;
+        if (qualifier is DeclaredQualifierMeta.Unit u && !string.IsNullOrEmpty(u.DimensionName))
+            return new DeclaredQualifierMeta.Dimension(
+                u.DimensionName, u.Origin, u.Preposition, u.ProofSatisfactions, u.SourceFieldName);
+        return null;
     }
 }
 
