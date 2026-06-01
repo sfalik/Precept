@@ -851,9 +851,9 @@ public static class Diagnostics
         DiagnosticCode.UnprovedQualifierCompatibility => new(
             nameof(DiagnosticCode.UnprovedQualifierCompatibility),
             DiagnosticStage.Proof, Severity.Error,
-            "Cannot prove {2} qualifier compatibility between '{0}' [{2}: {4}] and '{1}' [{2}: {5}]{3}",
+            "Cannot combine '{0}' ({2}: {4}) and '{1}' ({2}: {5}) — their {2} qualifiers don't match. Align both declarations, or insert an explicit conversion{3}",
             DiagnosticCategory.Proof,
-            FixHint: "Make both operands resolve to the same {2} qualifier before using them together.",
+            FixHint: "Align both operands' {2} qualifiers — adjust the declarations, or insert an explicit conversion.",
             TriggerCondition: "Two operands in an arithmetic or comparison expression do not resolve to a provably compatible qualifier value on the required axis.",
             RecoverySteps: ["Check the resolved {2} qualifier on both operands.", "Align the declarations or insert an explicit conversion.", "If one side is symbolic, make sure both sides resolve from the same source qualifier field."],
             ExampleBefore: "precept Example\nfield CatalogCurrency as currency default 'USD'\nfield Revenue as money in '{CatalogCurrency}' default '10.00 USD'\nfield Cost as money in 'EUR' default '1.00 EUR'\nfield Profit as money in '{CatalogCurrency}' <- Revenue - Cost",

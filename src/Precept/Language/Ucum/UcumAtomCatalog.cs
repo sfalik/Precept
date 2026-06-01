@@ -249,7 +249,8 @@ public static class UcumAtomCatalog
                     candidate.Prefixable,
                     null,
                     candidate.PrintSymbol,
-                    candidate.AffineOffset);
+                    candidate.AffineOffset,
+                    candidate.ScaleIsRational && evaluation.ScaleIsRational);
                 pending.RemoveAt(index);
                 progress = true;
             }
@@ -287,7 +288,8 @@ public static class UcumAtomCatalog
                 false,
                 null,
                 null,
-                result.Unit.AffineOffset);
+                result.Unit.AffineOffset,
+                result.Unit.UsedAtoms.All(used => used.ScaleIsRational));
         }
 
         throw new InvalidOperationException($"Tier 1 UCUM code '{code}' was not found in UcumAtomCatalog.All and could not be derived via parsing.");
@@ -326,7 +328,10 @@ public static class UcumAtomCatalog
         atoms["cd"] = new UcumAtom("cd", "candela", new DimensionVector(0, 0, 0, 0, 0, 0, 1), UcumExactFactor.One, true, null);
         atoms["g"] = new UcumAtom("g", "gram", new DimensionVector(0, 1, 0, 0, 0, 0, 0), UcumExactFactor.Parse("1e-3"), true, null);
         atoms["C"] = new UcumAtom("C", "coulomb", new DimensionVector(0, 0, 1, 1, 0, 0, 0), UcumExactFactor.One, false, null);
-        atoms["rad"] = new UcumAtom("rad", "radian", DimensionVector.None, UcumExactFactor.One, false, null);
+        // rad is the plane-angle base; the angle family's scale-to-base is irrational
+        // (its members reduce through [pi]), so the family is not exact-rational for
+        // amount-conversion. See UcumAtom.ScaleIsRational.
+        atoms["rad"] = new UcumAtom("rad", "radian", DimensionVector.None, UcumExactFactor.One, false, null, ScaleIsRational: false);
         atoms["each"] = new UcumAtom("each", "each", DimensionVector.None, UcumExactFactor.One, false, null);
 
         // Precept-defined count/logistics atoms (not in UCUM; same dimension as "each")
@@ -382,7 +387,34 @@ public static class UcumAtomCatalog
             return null;
 
         var affineOffset = ResolveAffineOffset(code, functionNames);
-        return new PendingAtom(code, name, expression, prefixable, printSymbol, affineOffset);
+        var scaleIsRational = ScaleIsRational(expression, functionNames);
+        return new PendingAtom(code, name, expression, prefixable, printSymbol, affineOffset, scaleIsRational);
+    }
+
+    /// <summary>
+    /// Whether an atom's scale-to-base is an exact rational suitable for amount-conversion.
+    /// <c>false</c> when the reduction passes through <c>[pi]</c> (the plane-angle family —
+    /// the stored scale is a rational approximation of an irrational value) or when the unit
+    /// is defined by any non-affine special function — logarithmic (<c>lg</c>/<c>ln</c>/<c>ld</c>/
+    /// <c>lgTimes2</c>/<c>pH</c>), trigonometric (<c>100tan</c>), or homeopathic potency (<c>hp*</c>) —
+    /// none of which is a multiplicative scale. Only the affine temperature functions
+    /// (<c>Cel</c>/<c>degF</c>/<c>degRe</c>) stay <c>true</c>: their amount-conversion scale is an
+    /// exact rational; the affine offset is a separate, absolute-reading concern.
+    /// See <see cref="UcumAtom.ScaleIsRational"/>.
+    /// </summary>
+    private static bool ScaleIsRational(string expression, ImmutableArray<string> functionNames)
+    {
+        // Allowlist: a special-function unit keeps an exact-rational amount-scale ONLY for the
+        // affine temperature functions; every other special function is non-multiplicative.
+        if (functionNames.Any(name =>
+                !string.Equals(name, "Cel", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(name, "degF", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(name, "degRe", StringComparison.OrdinalIgnoreCase)))
+        {
+            return false;
+        }
+
+        return !expression.Contains("[pi]", StringComparison.Ordinal);
     }
 
     private static string? GetDefinitionExpression(XElement element, string code, out ImmutableArray<string> functionNames)
@@ -529,16 +561,20 @@ public static class UcumAtomCatalog
         return null;
     }
 
-    private readonly record struct UnitEvaluation(DimensionVector Vector, UcumExactFactor Scale)
+    // ScaleIsRational propagates through the reduction: a derived unit is exact-rational
+    // only if every atom it reduces through is (so 'gon' = 0.9 deg and "'" = deg/60 inherit
+    // deg's irrationality transitively). Pure numeric factors are rational. See
+    // UcumAtom.ScaleIsRational.
+    private readonly record struct UnitEvaluation(DimensionVector Vector, UcumExactFactor Scale, bool ScaleIsRational = true)
     {
         public UnitEvaluation Multiply(UnitEvaluation other) =>
-            new(Vector.Multiply(other.Vector), Scale.Multiply(other.Scale));
+            new(Vector.Multiply(other.Vector), Scale.Multiply(other.Scale), ScaleIsRational && other.ScaleIsRational);
 
         public UnitEvaluation Divide(UnitEvaluation other) =>
-            new(Vector.Divide(other.Vector), Scale.Divide(other.Scale));
+            new(Vector.Divide(other.Vector), Scale.Divide(other.Scale), ScaleIsRational && other.ScaleIsRational);
 
         public UnitEvaluation Pow(int exponent) =>
-            new(Vector.Pow(exponent), Scale.Pow(exponent));
+            new(Vector.Pow(exponent), Scale.Pow(exponent), ScaleIsRational);
     }
 
     private sealed record PendingAtom(
@@ -547,7 +583,8 @@ public static class UcumAtomCatalog
         string Expression,
         bool Prefixable,
         string? PrintSymbol = null,
-        decimal? AffineOffset = null);
+        decimal? AffineOffset = null,
+        bool ScaleIsRational = true);
 
     private sealed partial class MiniExpressionEvaluator
     {
@@ -669,7 +706,7 @@ public static class UcumAtomCatalog
                     return false;
                 }
 
-                evaluation = new UnitEvaluation(_atoms[code].Vector, _atoms[code].Scale).Pow(exponent);
+                evaluation = new UnitEvaluation(_atoms[code].Vector, _atoms[code].Scale, _atoms[code].ScaleIsRational).Pow(exponent);
                 return true;
             }
 
@@ -688,7 +725,7 @@ public static class UcumAtomCatalog
                     continue;
                 }
 
-                evaluation = new UnitEvaluation(atom.Vector, prefix.Factor.Multiply(atom.Scale)).Pow(exponent);
+                evaluation = new UnitEvaluation(atom.Vector, prefix.Factor.Multiply(atom.Scale), atom.ScaleIsRational).Pow(exponent);
                 return true;
             }
 

@@ -662,7 +662,22 @@ Interval hover answers: **is this value's range safe?** It uses the existing bad
 
 **Repair hint belongs on line 3, not in the expanded view.** Users need to know what to do without expanding. Expanded view adds the mathematical detail, not the instruction.
 
-#### 7.4.5 Routing Rules
+#### 7.4.5 Cross-Unit Conversion Surfacing
+
+When a `price × quantity → money` cancellation proves and the operand units differ within the shared dimension, the qualifier-chain proof card appends a conversion line so the implicit unit conversion is **visible** in inspection (the author can see the `/1000` happened, not just that the chain "verified"). The quantity is converted to the price's denominator unit; the line shows `from-unit → to-unit` and, when the conversion is exact, the exact-rational factor:
+
+```
+✅ Proven · `UnitPrice * NetWeight`
+⚖️ Qualifier chain verified
+🔬 Proven via same-qualifier propagation
+🔁 converted g → kg  ×1/1000  (exact)
+```
+
+**Exact vs. approximate.** The factor and its label are driven by the UCUM atom `ScaleIsRational` metadata (see `catalog-system.md` § Qualifier Registries). When both operand units are exact-rational, the line shows the reduced rational factor (e.g. `×1/12` for `[in_i] → [ft_i]`, `×5/9` for the affine `[degF] → Cel` amount) labelled `(exact)`. When either operand unit's scale is an approximated irrational — the plane-angle family or logarithmic units (`dB`/`B`/`Np`) — the line shows only the units and the `(approximate)` label, never a misleading exact factor. The same-unit (factor-1) case shows no conversion line when exact, and surfaces `(approximate)` for a non-rational same-unit cancellation (e.g. `dB × dB`).
+
+This card surfaces the compile-time conversion; the runtime application of the factor is the evaluator's reduction-rule obligation (see `docs/runtime/evaluator.md`).
+
+#### 7.4.6 Routing Rules
 
 Hover routing is strictly ordered. When multiple cards could fire on overlapping spans, the earlier rule wins.
 
@@ -675,7 +690,7 @@ Hover routing is strictly ordered. When multiple cards could fire on overlapping
 
 The strict ordering is itself a design decision: silent tie-breakers (last-write-wins, biggest-span-wins) produce non-determinism users can't reason about. Hover routing must be a function of the cursor span and the artifacts, not of evaluation order.
 
-#### 7.4.6 V1 Boundary
+#### 7.4.7 V1 Boundary
 
 The current rich-hover implementation ships with these inputs available:
 
@@ -685,7 +700,7 @@ The current rich-hover implementation ships with these inputs available:
 
 **Compact-helper philosophy.** Hover assumes compact helper projections, not new runtime surfaces. New facts go onto pipeline artifacts (graph, proof ledger, semantic index) so every consumer benefits — hover, inspect, MCP.
 
-#### 7.4.7 Mechanics
+#### 7.4.8 Mechanics
 
 Hover finds the symbol at the cursor position via `SemanticIndex`, then formats documentation from catalog metadata.
 

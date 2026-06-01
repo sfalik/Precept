@@ -143,23 +143,39 @@ public class PriceTimesQuantityTests
             from Draft on Receive -> set Total = Receive.UnitCost * Receive.Qty -> no transition
             """);
 
-        compilation.Diagnostics.Should().Contain(d => d.Code == Pre0114);
+        var diagnostic = compilation.Diagnostics.Should().ContainSingle(d => d.Code == Pre0114).Which;
+        // Domain-targeted PRE0114 names both operands so the mismatch is teachable.
+        diagnostic.Message.Should().Contain("UnitCost").And.Contain("Qty");
     }
 
-    // ---- Known gap: cross-unit (same-dimension, different-unit) -------------
+    [Fact]
+    public void CrossCountingUnit_QuantityArithmetic_StillRejects()
+    {
+        // 'each' and 'box' share the count dimension but have no universal factor.
+        // PRE0137 fires for quantity × quantity (both operands quantities) per
+        // business-domain-types.md § quantity. (The price × quantity cancellation
+        // path does not currently route to PRE0137 — see the count-unit note below.)
+        var compilation = Compiler.Compile("""
+            precept Widget
+            field Total as quantity in 'each' default '0 each' editable
+            state Draft initial
+            event Receive(A as quantity in 'each', B as quantity in 'box')
+            from Draft on Receive -> set Total = Receive.A * Receive.B -> no transition
+            """);
 
-    // Resolving the quantity on the Dimension axis makes same-dimension but
-    // different-unit pairs cancel silently, dropping the UCUM conversion factor
-    // ('USD/kg' × 'g' is off by 1000×; 'each' × 'box' bypasses the count-unit
-    // restriction of business-domain-types.md § quantity). Whether such pairs
-    // should reject (exact-unit), auto-convert, or split by unit kind is an
-    // undecided policy. This is skipped until that policy is decided — at which
-    // point it is un-skipped (reject) or rewritten to assert the converted
-    // result (auto-convert). It currently documents that silent cancellation is
-    // not the intended end-state.
-    [Fact(Skip = "Cross-unit price×quantity cancellation policy is undecided; it currently cancels silently and drops the conversion factor.")]
+        compilation.Diagnostics.Should()
+            .Contain(d => d.Code == nameof(DiagnosticCode.CrossCountingUnitOperation));
+    }
+
+    // ---- Cross-unit (same-dimension, different-unit) cancels cleanly --------
+
+    [Fact]
     public void CrossUnit_SameDimension_MustNotSilentlyCancel()
     {
+        // USD/kg × g: same dimension (mass), different unit. The exact g→kg factor
+        // is 1/1000; the cancellation is admitted (no PRE0114) and the conversion is
+        // surfaced in hover (HoverHandlerTests). The runtime application of the factor
+        // is the documented evaluator obligation (see docs/runtime/evaluator.md).
         var compilation = Compiler.Compile("""
             precept Widget
             field Total as money in 'USD' default '0.00 USD' editable
@@ -168,6 +184,90 @@ public class PriceTimesQuantityTests
             from Draft on Receive -> set Total = Receive.UnitCost * Receive.Qty -> no transition
             """);
 
-        compilation.Diagnostics.Should().Contain(d => d.Code == Pre0114);
+        compilation.Diagnostics.Should().NotContain(d => d.Code == Pre0114);
+    }
+
+    [Fact]
+    public void CrossUnit_InchFoot_CancelsCleanly()
+    {
+        // USD/[ft_i] × [in_i]: length, exact rational factor 1/12.
+        var compilation = Compiler.Compile("""
+            precept Widget
+            field Total as money in 'USD' default '0.00 USD' editable
+            state Draft initial
+            event Receive(UnitCost as price in 'USD/[ft_i]', Qty as quantity in '[in_i]')
+            from Draft on Receive -> set Total = Receive.UnitCost * Receive.Qty -> no transition
+            """);
+
+        compilation.Diagnostics.Should().NotContain(d => d.Code == Pre0114);
+    }
+
+    [Fact]
+    public void CrossUnit_AffineAmount_CancelsCleanly()
+    {
+        // USD/Cel × [degF]: temperature amount; the amount-conversion scale (5/9) is an
+        // exact rational. The affine offset is an absolute-reading concern, not a scale
+        // concern — the cancellation is admitted.
+        var compilation = Compiler.Compile("""
+            precept Widget
+            field Total as money in 'USD' default '0.00 USD' editable
+            state Draft initial
+            event Receive(UnitCost as price in 'USD/Cel', Qty as quantity in '[degF]')
+            from Draft on Receive -> set Total = Receive.UnitCost * Receive.Qty -> no transition
+            """);
+
+        compilation.Diagnostics.Should().NotContain(d => d.Code == Pre0114);
+    }
+
+    // ---- Exactness guard: ScaleIsRational catalog flag ----------------------
+
+    [Theory]
+    [InlineData("kg")]
+    [InlineData("[ft_i]")]
+    [InlineData("[in_i]")]
+    [InlineData("g")]
+    [InlineData("Cel")]
+    [InlineData("[degF]")]
+    public void ScaleIsRational_IsTrue_ForMetricCustomaryAndAffineUnits(string code)
+    {
+        UcumAtomCatalog.All.TryGetValue(code, out var atom).Should().BeTrue($"'{code}' should be a cataloged atom");
+        atom!.ScaleIsRational.Should().BeTrue(
+            $"'{code}' has an exact-rational scale-to-base (affine offset is a separate concern)");
+    }
+
+    [Theory]
+    [InlineData("B")]      // bel (logarithmic) — backs the dB unit
+    [InlineData("Np")]     // neper (logarithmic)
+    [InlineData("[pH]")]   // pH (logarithmic special function — not just lg/ln)
+    [InlineData("deg")]    // degree of arc ([pi]-reducing → irrational)
+    [InlineData("rad")]    // radian — angle family
+    [InlineData("gon")]    // gon ([pi]-reducing)
+    public void ScaleIsRational_IsFalse_ForLogAndAngleUnits(string code)
+    {
+        UcumAtomCatalog.All.TryGetValue(code, out var atom).Should().BeTrue($"'{code}' should be a cataloged atom");
+        atom!.ScaleIsRational.Should().BeFalse(
+            $"'{code}' has a non-affine special-function or [pi]-derived scale that is not an exact rational");
+    }
+
+    // ---- Characterization: out-of-scope count gap (price-path) ---------------
+
+    [Fact]
+    public void CrossCountingUnit_PricePath_CurrentlyCancelsSilently_KnownGap()
+    {
+        // KNOWN GAP (out of this slice's scope): `price × quantity` across two count
+        // units with no universal factor (`each` vs `box`) currently cancels silently —
+        // the count-mismatch rejection (PRE0137) is gated on BOTH operands being
+        // quantities (TypeChecker), so the price-cancellation path skips it. This test
+        // pins the *current* behavior so a regression is noticed; it does NOT endorse it.
+        var compilation = Compiler.Compile("""
+            precept Widget
+            field Total as money in 'USD' default '0.00 USD' editable
+            state Draft initial
+            event Receive(UnitCost as price in 'USD/each', Qty as quantity in 'box')
+            from Draft on Receive -> set Total = Receive.UnitCost * Receive.Qty -> no transition
+            """);
+
+        compilation.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.CrossCountingUnitOperation));
+        compilation.Diagnostics.Should().NotContain(d => d.Code == Pre0114);
     }
 }

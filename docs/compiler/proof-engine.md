@@ -2211,7 +2211,7 @@ Template parameter population for proof-stage diagnostics:
 | `UnsatisfiableGuard` (82) | `"Guard '{0}' on event '{1}' is unsatisfiable under the declared constraints{2} — this row can never fire"` | Guard expression text | Event name | Context clause | — | — | — |
 | `UnprovedModifierRequirement` (112) | `"Cannot prove that '{0}' satisfies the required modifier '{1}'{2}"` | Subject label | Required modifier name | Usage suffix | — | — | — |
 | `UnprovedDimensionRequirement` (113) | `"'{0}' must declare \`of '{1}'\` before it can be used here{2}"` | Subject label | Required dimension | Usage suffix | — | — | — |
-| `UnprovedQualifierCompatibility` (114) | `"Cannot prove {2} qualifier compatibility between '{0}' [{2}: {4}] and '{1}' [{2}: {5}]{3}"` | Left operand label | Right operand label | Qualifier axis | Context clause | Left qualifier value | Right qualifier value |
+| `UnprovedQualifierCompatibility` (114) | `"Cannot combine '{0}' ({2}: {4}) and '{1}' ({2}: {5}) — their {2} qualifiers don't match. Align both declarations, or insert an explicit conversion{3}"` | Left operand label | Right operand label | Qualifier axis | Context clause | Left qualifier value | Right qualifier value |
 | `UnsatisfiableInitialState` (115) | `"Initial state '{0}' is unsatisfiable: {1}"` | Initial state name | Violation reason | — | — | — | — |
 | `UnprovedPresenceRequirement` (116) | `"Cannot prove that '{0}' is present{1} — guard with 'when {0} is set', initialize it earlier, or make it required"` | Subject label | Usage suffix | — | — | — | — |
 

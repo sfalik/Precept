@@ -455,7 +455,113 @@ internal static class RichHoverFactory
         var tail = obligation.Disposition == ProofDisposition.Proved
             ? $"🔬 Proven via {HumanizeProofStrategy(obligation.Strategy ?? ProofStrategy.CompositionalConstraint)}"
             : $"🔬 {DescribeQualifierGapEvidenceLine(compilation, expression.Left, expression.Right, requirement.LeftAxis)}";
-        return string.Join("\n", new[] { header, middle, tail });
+
+        var lines = new List<string> { header, middle, tail };
+        if (obligation.Disposition == ProofDisposition.Proved
+            && TryDescribeCrossUnitConversion(expression, compilation.Semantics, out var conversionLine))
+        {
+            lines.Add(conversionLine);
+        }
+
+        return string.Join("\n", lines);
+    }
+
+    /// <summary>
+    /// For a proved <c>price × quantity → money</c> cancellation, describes the cross-unit
+    /// conversion the runtime applies: the quantity is converted to the price's denominator
+    /// unit by the exact-rational factor <c>Scale(quantity) / Scale(denominator)</c>. The line
+    /// is labelled <c>(exact)</c> when both operand scales are exact rationals, or
+    /// <c>(approximate)</c> when either scale is an approximated irrational (angle/log units —
+    /// see <see cref="UcumAtom.ScaleIsRational"/>), in which case no misleading factor is shown.
+    /// Returns <c>false</c> for the same-unit (factor 1) case or when an operand unit can't be
+    /// resolved to a concrete UCUM unit (e.g. the <c>of '&lt;dimension&gt;'</c> price form).
+    /// </summary>
+    private static bool TryDescribeCrossUnitConversion(TypedBinaryOp expression, SemanticIndex semantics, out string line)
+    {
+        line = string.Empty;
+
+        var priceOperand = expression.Left.ResultType == TypeKind.Price ? expression.Left
+            : expression.Right.ResultType == TypeKind.Price ? expression.Right
+            : null;
+        var quantityOperand = expression.Left.ResultType == TypeKind.Quantity ? expression.Left
+            : expression.Right.ResultType == TypeKind.Quantity ? expression.Right
+            : null;
+        if (priceOperand is null || quantityOperand is null)
+            return false;
+
+        var denominatorCode = ResolvePriceDenominatorUnitCode(priceOperand, semantics);
+        var quantityCode = ResolveQualifierFromExpression(quantityOperand, QualifierAxis.Unit, semantics) is DeclaredQualifierMeta.Unit qUnit
+            ? qUnit.UnitCode
+            : null;
+        if (string.IsNullOrWhiteSpace(denominatorCode) || string.IsNullOrWhiteSpace(quantityCode))
+            return false;
+
+        var denominator = UcumParser.Parse(denominatorCode);
+        var quantity = UcumParser.Parse(quantityCode);
+        if (!denominator.IsValid || denominator.Unit is null || !quantity.IsValid || quantity.Unit is null)
+            return false;
+
+        var exact = quantity.Unit.UsedAtoms.All(atom => atom.ScaleIsRational)
+            && denominator.Unit.UsedAtoms.All(atom => atom.ScaleIsRational);
+
+        // A unit whose scale is an approximated irrational is surfaced approximate — never with
+        // a misleading exact factor — even in the same-unit (factor-1) case (e.g. dB × dB).
+        if (!exact)
+        {
+            line = $"🔁 converted {EscapeInline(quantityCode)} → {EscapeInline(denominatorCode)}  (approximate)";
+            return true;
+        }
+
+        // Same exact-rational unit: the degenerate factor-1 case needs no conversion line.
+        if (StringComparer.Ordinal.Equals(denominatorCode, quantityCode))
+            return false;
+
+        var factor = quantity.Unit.Scale.Divide(denominator.Unit.Scale);
+        line = $"🔁 converted {EscapeInline(quantityCode)} → {EscapeInline(denominatorCode)}  ×{FormatConversionFactor(factor)}  (exact)";
+        return true;
+    }
+
+    /// <summary>
+    /// The price's denominator unit code — read from the <see cref="DeclaredQualifierMeta.CompoundPrice.UnitCode"/>
+    /// of a compound <c>in 'currency/unit'</c> price, or the <see cref="DeclaredQualifierMeta.Unit.UnitCode"/>
+    /// when the price was declared <c>in 'currency' of 'dimension'</c> with a concrete unit. Returns
+    /// <c>null</c> when no concrete unit is recoverable (e.g. a dimension-only denominator).
+    /// </summary>
+    private static string? ResolvePriceDenominatorUnitCode(TypedExpression priceOperand, SemanticIndex semantics) =>
+        ResolveQualifierFromExpression(priceOperand, QualifierAxis.PriceIn, semantics) switch
+        {
+            DeclaredQualifierMeta.CompoundPrice compound when !string.IsNullOrWhiteSpace(compound.UnitCode) => compound.UnitCode,
+            DeclaredQualifierMeta.Unit unit when !string.IsNullOrWhiteSpace(unit.UnitCode) => unit.UnitCode,
+            _ => ResolveQualifierFromExpression(priceOperand, QualifierAxis.Unit, semantics) is DeclaredQualifierMeta.Unit u
+                && !string.IsNullOrWhiteSpace(u.UnitCode)
+                ? u.UnitCode
+                : null,
+        };
+
+    /// <summary>
+    /// Renders an exact-rational conversion factor compactly: an integer when the denominator is 1
+    /// (after folding the base-10 exponent), otherwise <c>numerator/denominator</c>.
+    /// </summary>
+    private static string FormatConversionFactor(UcumExactFactor factor)
+    {
+        var numerator = factor.Numerator;
+        var denominator = factor.Denominator;
+        if (factor.Base10Exponent >= 0)
+            numerator *= System.Numerics.BigInteger.Pow(10, factor.Base10Exponent);
+        else
+            denominator *= System.Numerics.BigInteger.Pow(10, -factor.Base10Exponent);
+
+        var gcd = System.Numerics.BigInteger.GreatestCommonDivisor(
+            System.Numerics.BigInteger.Abs(numerator), denominator);
+        if (!gcd.IsZero)
+        {
+            numerator /= gcd;
+            denominator /= gcd;
+        }
+
+        return denominator.IsOne
+            ? numerator.ToString(CultureInfo.InvariantCulture)
+            : $"{numerator.ToString(CultureInfo.InvariantCulture)}/{denominator.ToString(CultureInfo.InvariantCulture)}";
     }
 
     private static string CreateGenericProofExpressionMarkdown(Compilation compilation, TypedBinaryOp expression, ProofObligation obligation)

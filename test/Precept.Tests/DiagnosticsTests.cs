@@ -294,7 +294,7 @@ public class DiagnosticsTests
         { DiagnosticCode.SqrtOfNegative, "'{0}' can be negative{1}, so sqrt(...) is unsafe" },
         { DiagnosticCode.UnprovedModifierRequirement, "Cannot prove that '{0}' satisfies the required modifier '{1}'{2}" },
         { DiagnosticCode.UnprovedDimensionRequirement, "'{0}' must declare `of '{1}'` before it can be used here{2}" },
-        { DiagnosticCode.UnprovedQualifierCompatibility, "Cannot prove {2} qualifier compatibility between '{0}' [{2}: {4}] and '{1}' [{2}: {5}]{3}" },
+        { DiagnosticCode.UnprovedQualifierCompatibility, "Cannot combine '{0}' ({2}: {4}) and '{1}' ({2}: {5}) — their {2} qualifiers don't match. Align both declarations, or insert an explicit conversion{3}" },
         { DiagnosticCode.UnsatisfiableInitialState, "Initial state '{0}' is unsatisfiable: {1}" },
         { DiagnosticCode.UnprovedPresenceRequirement, "Cannot prove that '{0}' is present{1} — guard with 'when {0} is set', initialize it earlier, or make it required" },
         { DiagnosticCode.InvalidInterpolatedTypedConstantForm, "'{0}' doesn't match a recognized pattern for this type — check the expected format (e.g. '{{amount}} USD' for money)" },

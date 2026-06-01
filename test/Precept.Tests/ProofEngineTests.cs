@@ -4737,7 +4737,7 @@ public class ProofEngineTests
             var diagnostic = compilation.Diagnostics
                 .Single(d => d.Code == nameof(DiagnosticCode.UnprovedQualifierCompatibility));
 
-            diagnostic.Message.Should().Be("Cannot prove Currency qualifier compatibility between '(A - B)' [Currency: 'USD'] and 'C' [Currency: 'EUR'] in the computed expression for field 'Result'");
+            diagnostic.Message.Should().Be("Cannot combine '(A - B)' (Currency: 'USD') and 'C' (Currency: 'EUR') — their Currency qualifiers don't match. Align both declarations, or insert an explicit conversion in the computed expression for field 'Result'");
             diagnostic.Message.Should().NotContain("<expression>");
             diagnostic.Message.Should().NotContain("<unknown>");
         }

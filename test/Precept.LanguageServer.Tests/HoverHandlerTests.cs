@@ -869,6 +869,83 @@ state Draft initial
     }
 
     [Fact]
+    public void Hover_OnCrossUnitPriceQuantity_InchFoot_SurfacesExactConversion()
+    {
+        const string source = """
+            precept CrossUnitHover
+            field UnitPrice as price in 'USD/[ft_i]' default '12.00 USD/[ft_i]'
+            field Length as quantity in '[in_i]' default '36 [in_i]'
+            field LineTotal as money in 'USD' <- UnitPrice * Length
+            state Open initial
+            """;
+
+        var markup = GetHoverMarkdown(source, "UnitPrice * Length", offset: 10);
+
+        markup.Should().Contain("[in_i] → [ft_i]");
+        markup.Should().Contain("1/12");
+        markup.Should().Contain("(exact)");
+    }
+
+    [Fact]
+    public void Hover_OnCrossUnitPriceQuantity_GramKilogram_SurfacesExactConversion()
+    {
+        const string source = """
+            precept CrossUnitHover
+            field UnitPrice as price in 'USD/kg' default '4.00 USD/kg'
+            field NetWeight as quantity in 'g' default '500 g'
+            field LineTotal as money in 'USD' <- UnitPrice * NetWeight
+            state Open initial
+            """;
+
+        var markup = GetHoverMarkdown(source, "UnitPrice * NetWeight", offset: 10);
+
+        markup.Should().Contain("g → kg");
+        markup.Should().Contain("1/1000");
+        markup.Should().Contain("(exact)");
+    }
+
+    [Fact]
+    public void Hover_OnCrossUnitPriceQuantity_AffineAmount_SurfacesExactConversion()
+    {
+        // Event-arg form: a price default 'in USD/Cel' can't normalize (affine denominator),
+        // so the price arrives via an event argument — the cancellation still cancels and the
+        // amount-conversion scale (5/9) is an exact rational.
+        const string source = """
+            precept CrossUnitHover
+            field Total as money in 'USD' default '0.00 USD' editable
+            state Draft initial
+            event Receive(UnitCost as price in 'USD/Cel', Qty as quantity in '[degF]')
+            from Draft on Receive -> set Total = Receive.UnitCost * Receive.Qty -> no transition
+            """;
+
+        var markup = GetHoverMarkdown(source, "Receive.UnitCost * Receive.Qty", offset: 17);
+
+        markup.Should().Contain("[degF] → Cel");
+        markup.Should().Contain("5/9");
+        markup.Should().Contain("(exact)");
+    }
+
+    [Fact]
+    public void Hover_OnCrossUnitPriceQuantity_LogUnit_SurfacesApproximate_NeverExact()
+    {
+        // dB is backed by the logarithmic 'B' atom (ScaleIsRational = false): the
+        // conversion must be surfaced approximate, never with a misleading exact factor —
+        // even in the same-unit (factor-1) case.
+        const string source = """
+            precept CrossUnitHover
+            field Total as money in 'USD' default '0.00 USD' editable
+            state Draft initial
+            event Receive(UnitCost as price in 'USD/dB', Qty as quantity in 'dB')
+            from Draft on Receive -> set Total = Receive.UnitCost * Receive.Qty -> no transition
+            """;
+
+        var markup = GetHoverMarkdown(source, "Receive.UnitCost * Receive.Qty", offset: 17);
+
+        markup.Should().Contain("(approximate)");
+        markup.Should().NotContain("(exact)");
+    }
+
+    [Fact]
     public void Hover_OnQualifierExpression_ShowsCompactQualifierCard()
     {
         var markup = GetHoverMarkdown(HoverV3Source, "money in 'USD'", offset: 9);
