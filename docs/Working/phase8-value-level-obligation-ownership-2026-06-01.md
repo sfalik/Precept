@@ -213,6 +213,9 @@ Ada/SPARK is the precedent for both the range-vs-overflow split and the per-cons
 
 ### Decision 5: Relocate the assignment-qualifier residual onto the stamped obligation where the proof engine walks; `TypedConditional` stays a type-stage carve-out
 **Stakes**: medium
+
+> **Amended during 3b execution (`ecce5d51`)**: the relocation reaches **default + computed-expr** sites only. The proof engine does **not** walk min/max **bound expressions** (no carrier/consumer), so flipping bound sites would drop the diagnostic — they **stay type-emitted**. PRE0141 therefore has **two** legitimate type-stage carve-outs the 3c analyzer must allow: the `TypedConditional` value **and** bound expressions. Closing the bound-site residual needs a separate bound-expression walk (future, not this slice). Also: D5 proof-ownership is **not observable via `Diagnostic.Stage`** (PRE0141's meta stage is always Proof) — the observable signal is obligation-presence, which is how it is tested.
+
 - **Rationale**: `dischargedAtProofStage` is true only for set-actions today, so defaults/bounds/computed-exprs emit PRE0141 inline (`AssignmentQualifiers.cs:223`). The discharge (`ProofEngine.QualifierNarrowing.cs`) is site-agnostic; extending stamping to walkable sites makes PRE0141 proof-owned. `TypedConditional` can't be sited per-branch (`AssignmentQualifiers.cs:53-59`) → permanent type-stage carve-out.
 - **Tradeoff accepted**: PRE0141 not 100% proof-owned — one documented carve-out the 3c analyzer must allow.
 - **Alternatives considered**: per-branch siting (rejected — disproportionate obligation-model change); leave whole residual type-stage (rejected — defaults/bounds/computed are walkable now).
