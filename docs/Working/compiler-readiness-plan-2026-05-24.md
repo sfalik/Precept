@@ -1291,7 +1291,7 @@ The compiler is declared production-ready when **all** of the following hold:
 - [`phase8-slice3-emission-ownership-2026-05-31.md`](phase8-slice3-emission-ownership-2026-05-31.md) — Phase 8 Slice 3: diagnostic-emission ownership architecture (Draft; subsumes the former `DiagnosticStage`-taxonomy work).
 - [`phase8-slice2-dispatch-deepdive-2026-06-01.md`](phase8-slice2-dispatch-deepdive-2026-06-01.md) — deep dive on the dynamically-dispatched emission families (what/why/worth-it/standardize), grounding Slice 2.
 - [`phase8-slice2-code-mediation-2026-06-01.md`](phase8-slice2-code-mediation-2026-06-01.md) — Phase 8 Slice 2: no-behavior-change standardization of diagnostic-code selection (catalog-mediation) so Slice 3's analyzer reads a uniform surface.
-- [`phase8-slices2-3-execution-plan-2026-06-01.md`](phase8-slices2-3-execution-plan-2026-06-01.md) — `/lifecycle-3-plan` output: 4 build phases (P1 uniform selection → P2 honest taxonomy + dual consolidation → P3 proof-walk → P4 ownership analyzer) for the two Locked designs.
+- [`phase8-slices2-3-execution-plan-2026-06-01.md`](phase8-slices2-3-execution-plan-2026-06-01.md) — `/lifecycle-3-plan` output: build sequence Slice 2 (✅ `59fe2666`) → Slice 3a (taxonomy + dual consolidation) → Slice 3b (proof-walk) → Slice 3c (ownership analyzer) for the two Locked designs.
 
 ---
 
