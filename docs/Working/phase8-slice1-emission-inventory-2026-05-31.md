@@ -42,8 +42,10 @@ All three share one root cause: they evaluate a proof-shaped property **inline b
 | Code | Site | Proof analog | Narrowing-unlock? |
 |---|---|---|---|
 | `OutOfRange` (PRE0079) | `TypeChecker.Validation.Modifiers.cs` via `TryReportNumericViolation` (~561) | `NumericProofRequirement` / `UnprovedModifierRequirement` | No — fires only on static constants (`TryGetStaticMagnitude` bail); **uniformity-only** |
-| `MaxPlacesExceeded` | `TypeChecker.cs:1091` | numeric bound | No — static magnitude; uniformity-only |
+| ~~`MaxPlacesExceeded`~~ | `TypeChecker.cs:1091` | ~~numeric bound~~ → **none** | **Corrected 2026-06-01 (Slice 3 Decision 6): NOT Class-O.** Per `business-domain-types.md:1581-1590`, maxplaces is static-only at compile time; its non-static enforcement (arithmetic-result-at-`set`) is **runtime**, not proof. No `ProofRequirement` kind, no proof role → legitimately **type-stage-owned (Class-S)**. Stays `Type`, not relocated. |
 | `UnprovedAssignmentQualifierCompatibility` (residual) | `TypeChecker.Expressions.AssignmentQualifiers.cs:223` | `AssignmentQualifierProofRequirement` (already discharged at proof for walked contexts) | Would unlock if the context were walked |
+
+> **Correction (2026-06-01)**: this slice originally counted **3** wired Class-O checks. Slice 3's spec-first verification (Decision 6) found `MaxPlacesExceeded` is not a proof-obligation-in-disguise — its value-level enforcement is runtime, not proof. The genuine wired Class-O population is **2** (`OutOfRange` + the assignment-qualifier residual); both relocate to the proof stage in Slice 3b. `MaxPlacesExceeded` is Class-S (type-stage-owned).
 
 **Key structural finding**: the qualifier / unit / dimension families are *already correctly split* — resolved→immediate, open→stamped — and the code says so:
 - Assignment qualifiers (`AssignmentQualifiers.cs:185-234`): `Resolved`+incompatible → immediate `QualifierMismatch`/`DimensionCategoryMismatch` (S); `Unknown`+proof-walked → **stamps** `AssignmentQualifierProofRequirement`; `Unknown`+not-walked → the residual above.

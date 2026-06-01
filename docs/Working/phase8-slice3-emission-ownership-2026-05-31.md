@@ -1,5 +1,5 @@
 ---
-status: Locked 2026-06-01
+status: Locked 2026-06-01 (amended 2026-06-01 — Decision 6 added: MaxPlacesExceeded stays Type)
 phase-target: Phase 8 Slice 3 (diagnostic-emission ownership architecture)
 comparable-systems-research-status: partial — load-bearing precedent is in-tree (the Precept000x analyzers + DiagnosticCoverageScanner, read for this design); Roslyn DiagnosticDescriptor cited as an external parallel from general API knowledge. No irreversible decision, so the research-adequacy gate does not fire.
 sources-consulted:
@@ -11,6 +11,8 @@ sources-consulted:
   - docs/compiler/proof-engine.md: Decision 3 (stamp-vs-discharge contract); the catalog-driven obligation model
   - docs/compiler/diagnostic-system.md: DiagnosticStage as producing-component classification (corrected 2026-06-01)
   - docs/philosophy.md / precept-language-spec.md § 0.1: prevention-not-detection, compile-time structural impossibility
+  - docs/language/business-domain-types.md:1581-1590: the three-point maxplaces enforcement model (Decision 6) — point 1 compile-time, points 2–3 runtime
+  - src/Precept/Pipeline/TypeChecker.cs:1078 + src/Precept/Language/ProofRequirement.cs: maxplaces is static-only at compile time; no decimal-places ProofRequirement kind (Decision 6)
 ---
 
 # Slice 3 — Diagnostic-Emission Ownership Architecture
@@ -97,12 +99,12 @@ No runtime reconciliation layer — the invariant is enforced at compile time, w
 ## Inventory of what will be built
 
 - **`DiagnosticStage` enum** (`Diagnostic.cs`): add `Bind`, `Tooling`; ordinal carries no semantics.
-- **Meta table** (`Diagnostics.cs`): set each code's `Stage` to its true owning stage — relabel binder codes `→ Bind`, `McpToolInternalError → Tooling`; value-level codes (`OutOfRange`, `MaxPlacesExceeded`, `UnprovedAssignmentQualifierCompatibility`, future `NullInNonNullableContext`) `→ Proof`.
+- **Meta table** (`Diagnostics.cs`): set each code's `Stage` to its true owning stage — relabel binder codes `→ Bind`, `McpToolInternalError → Tooling`; proof-dischargeable value-level codes (`OutOfRange`, `UnprovedAssignmentQualifierCompatibility`, future `NullInNonNullableContext`) `→ Proof`. **`MaxPlacesExceeded` stays `Type`** (Decision 6 — no compile-time proof obligation).
 - **New analyzer** `PreceptNNNN DiagnosticStageOwnership` (`Precept.Analyzers`), reading the uniform surface the precursor produces (verified against `DiagnosticCoverageScanner`):
   - *Literal sites* — `Diagnostics.Create(DiagnosticCode.X, …)`: compare the emitting site's **containing type** (`TypeChecker`/`GraphAnalyzer`/`ProofEngine`/… — namespace is NOT a discriminator; all pipeline files share `namespace Precept.Pipeline`, so detection is by `ContainingType`, the same mechanism `Precept0003` already uses) to `Diagnostics.GetMeta(X).Stage`; flag mismatch.
   - *Catalog-mediated sites* — after the precursor, every dynamic code-selection is a read of a single catalog-meta `DiagnosticCode` field (`CIDiagnosticCode`, `Format/SemanticErrorCode`, `ProofRequirementMeta.DiagnosticCode`). The analyzer asserts the **catalog invariant**: every code reachable from such a field has `Stage` equal to the consuming stage (CI ⇒ `Type`; proof ⇒ `Proof`).
   - *Pattern-2 residue* — the precursor documents the bounded candidate set for each context-determined site (lexer mode-switch; proof `Numeric`/`KeyPresence`/`QualifierChain` cases); the analyzer checks each set's codes are owned by the emitting stage. Bounded, so still enforceable with no allow-list.
-- **Type checker**: replace inline value-level emits for defaults/bounds with obligation stamping (`AssignmentQualifiers.cs` residual branch; `Modifiers.cs` `TryReportNumericViolation`/`OutOfRange`; `TypeChecker.cs` `MaxPlacesExceeded`).
+- **Type checker**: replace inline value-level emits for defaults/bounds with obligation stamping — `AssignmentQualifiers.cs` residual branch; `Modifiers.cs` `TryReportNumericViolation`/`OutOfRange`. (`TypeChecker.cs` `MaxPlacesExceeded` is **not** relocated — Decision 6; it stays an inline Type-stage static check.)
 - **Proof engine**: extend `CollectDefaultObligations`/`CollectArgDefaultObligations`/computed-field walk to collect the newly-stamped numeric-modifier + assignment-qualifier + presence obligations.
 - **Dual-emission consolidation**: `NoInitialState` → Graph only (delete the `TypeChecker.cs:704` emit + the `GraphAnalyzer.cs:85` `HasDiagnostic` guard); `CircularComputedField` → single owner (consolidate `NameBinder.cs:305` + `Structural.cs:248`).
 - **LS hover**: `RichHoverFactory` keys on obligation-presence not `Stage == Proof`.
@@ -143,7 +145,8 @@ No runtime reconciliation layer — the invariant is enforced at compile time, w
 
 **Stakes**: high (touches proof-obligation placement and the type-checker→proof-engine contract).
 
-- **Rationale**: the three wired Class-O codes emit inline at the type stage *only* because the proof engine's default/computed walk doesn't yet stamp their obligation kinds. The hooks already exist (`CollectObligations` walks computed exprs + field/arg defaults for interval containment); extending what they stamp makes the proof stage the sole owner of value-level codes, which the Decision-1 analyzer then enforces. This is the principled end state — no code straddles stages.
+- **Scope (amended 2026-06-01)**: this relocation applies to **two** value-level checks — `OutOfRange` and the `UnprovedAssignmentQualifierCompatibility` residual. `MaxPlacesExceeded` was originally in this set but is **excluded** — it has no compile-time proof obligation (see Decision 6).
+- **Rationale**: these value-level codes emit inline at the type stage *only* because the proof engine's default/computed walk doesn't yet stamp their obligation kinds, **and** each maps to an existing, proof-narrowable obligation: `OutOfRange` → `NumericProofRequirement`/`ModifierRequirement` (min/max/positive are guard-narrowable; `proof-engine.md` Decision 5 modifier-proof), the residual → `AssignmentQualifierProofRequirement` (the Site-A pattern). The hooks already exist (`CollectObligations` walks computed exprs + field/arg defaults for interval containment); extending what they stamp makes the proof stage the sole owner of the *proof-dischargeable* value-level codes, which the Decision-1 analyzer then enforces.
 - **Tradeoff accepted**: more work than allow-listing the Site-A residual, and it changes the constant-default numeric check's diagnostic identity (Decision 5). Accepted because the owner chose "no shortcuts" — the allow-list would have been permanent debt. **Caveat (collector shape gap)**: "extend what the hooks stamp" understates the work — `CollectDefaultObligations` (`ProofEngine.Analysis.cs:405`) today handles *only* `InterpolatedTypedConstant` defaults and bails on `IsUnbounded` (`:414`), whereas the inline `OutOfRange` fires on any `TryGetStaticMagnitude` success (incl. plain `TypedTypedConstant`). So the extension must (a) add the `TypedTypedConstant` default shape to the collector and (b) **not double-emit** on an `InterpolatedTypedConstant`-with-bounds default that the existing `IntervalContainment` walk already covers. The removed reconciliation step would have masked a double-emit here; with no dedup, the collector must be correct by construction.
 - **Alternatives considered**: *Allow-list the Site-A dual until later.* Rejected by owner ("no shortcuts"). *Leave constant-default checks inline and exempt them.* Rejected — that's the Class-O-in-disguise the analyzer exists to catch.
 - **Precedent**: `proof-engine.md` Decision 3 (stamp/discharge); the existing `CollectDefaultObligations` interval-containment walk is the in-tree template for stamping default obligations; the Site-A `set`-action discharge (`AssignmentQualifiers.cs:205-214`) is the template for the qualifier obligation.
@@ -174,6 +177,20 @@ No runtime reconciliation layer — the invariant is enforced at compile time, w
 - **Alternatives considered**: *Retire `OutOfRange` for `NumericOverflow`.* Possible, but a bigger author-facing change; defer the call to Phase 9 with this design flagging the coupling.
 - **Precedent**: the PRE0141 re-stage (a code moved type→proof while keeping identity) is the in-tree template.
 - **Sources consulted for this decision**: `docs/compiler/diagnostic-system.md:178` (the PRE0141 re-stage precedent); `phase8-slice1-emission-inventory-2026-05-31.md` §3.
+
+### Decision 6: `MaxPlacesExceeded` stays type-stage-owned — it has no compile-time proof obligation (amendment, 2026-06-01)
+
+**Stakes**: medium (refines D3's scope and the relabel; touches the analyzer's ownership set; reversible, pre-release).
+
+- **Rationale**: `maxplaces` enforcement is spec'd at three points (`business-domain-types.md:1581-1590`): point 1 (static literal) at **compile time**; points 2–3 (event-arg input, arithmetic-result-at-`set`) at **runtime**. A non-static value's decimal-place count isn't statically known, so the spec defers it to the runtime boundary + author `round()`, *not* to a compile-time proof. The compile-time `MaxPlacesExceeded` is therefore inherently the static-magnitude case (it bails on `!TryGetStaticMagnitude`), correctly produced at the **Type** stage. The proof engine has **no maxplaces role** — there is no proof-dischargeable obligation to relocate (no `ProofRequirement` kind for decimal-places, and rightly so). So `MaxPlacesExceeded` stays `Stage = Type`; the ownership analyzer (Decision 1) accepts it as legitimately Type-owned.
+- **Tradeoff accepted**: a slight asymmetry with `OutOfRange` — both are emitted on static magnitudes today, but `OutOfRange`'s underlying obligation (numeric bounds) is proof-narrowable for non-static values (a guard can discharge `positive`), so it relocates to Proof; `maxplaces`'s non-static case is runtime-enforced, not provable, so it stays Type. The asymmetry is correct (it tracks proof-dischargeability), not arbitrary.
+- **Alternatives considered**: (a) *Relocate `MaxPlacesExceeded` to Proof per the original D3* — rejected: no proof obligation exists or should (decimal-places of a non-static value isn't statically provable; inventing a places-`ProofRequirement` + strategy would be over-cataloging for the static case and wrong for the non-static case, which the spec assigns to runtime). (b) *Relabel `→ Proof` but keep emitting from Type* — rejected: that's the wrong-stage emission the analyzer forbids.
+- **Precedent**: `business-domain-types.md:1581-1590` (the three-point maxplaces enforcement model, points 2–3 runtime); the typed-constant content codes are the in-tree precedent for static-value-form checks owned at the type stage; deep-dive `phase8-slice2-dispatch-deepdive-2026-06-01.md` §7 (don't over-catalog).
+- **Sources consulted for this decision**:
+  - `docs/language/business-domain-types.md:1581-1590` — "`maxplaces` is checked at three points: 1. Literal assignment (compile time) … 2. Event-arg input (runtime boundary) … 3. Arithmetic result assignment (runtime) … the author must apply `round()`."
+  - `src/Precept/Pipeline/TypeChecker.cs:1078` — `ValidateMaxplaces` bails `if (!TypedExpressionMagnitude.TryGetStaticMagnitude(resolved, out var magnitude)) return;` — static-only.
+  - `src/Precept/Language/ProofRequirement.cs` — the 12 `ProofRequirement` kinds; none is decimal-places/precision.
+- **Known gap (not Slice 3 scope)**: maxplaces points 2–3 (runtime boundary + arithmetic-result enforcement) appear unimplemented (the runtime is still stub). That is **runtime-phase** work (Phase 12) and a spec-conformance item — *not* a proof-engine or emission-architecture concern. Flagged here so it isn't mistaken for a Slice 3 obligation.
 
 ## Falsifiers
 
