@@ -13,8 +13,9 @@
 
 | Phase | Goal | Items | Decisions | Effort | Status |
 |---|---|---|---|---|---|
-| 1 | Buildable-now — catalog metadata + proof-engine surfacing + hover + diagnostics + tests + doc-sync | 6 | 0 (design locked) | **M (~2–3 days)** | **Active** |
-| 2 | Runtime reduction rule — evaluator applies the exact-rational factor | 1 | 0 (gated on runtime existing) | S–M (~0.5–1 day once runtime exists) | Stub — deferred to the runtime phase |
+| 1 | Buildable-now — catalog metadata + proof-engine surfacing + hover + diagnostics + tests + doc-sync (**incl. documenting the runtime reduction-rule requirement in `evaluator.md`**) | 7 | 0 (design locked) | **M (~2–3 days)** | **Active** |
+
+**This slice has one executable phase.** The runtime value-application (actually applying the factor) is **out of Slice 2's scope** — it is built in the readiness-plan **runtime phase (Phase 11)**, governed by the requirement this slice *documents* in `evaluator.md` + the locked design's § Semantic Rules. Slice 2's runtime deliverable is the **documentation of the requirement**, not the build — so the durable carrier of the runtime obligation is canonical docs, not a tracked execution phase.
 
 ## Decisions captured
 
@@ -25,7 +26,7 @@
 ## Open decisions
 
 - **None gate Phase 1.** One low-stakes execution-time choice (not a gate): the exact wording of the hover/inspection "approximate" label — settle in execution, doc in `language-server.md`.
-- **Phase 2 gate**: the runtime evaluator must exist (it is currently a stub). Tracked as readiness-plan **Phase 11** (runtime gate). No design decision pending — purely a dependency.
+- **Runtime build dependency** (not a Slice-2 gate): the evaluator reduction rule is built in the readiness-plan **runtime phase (Phase 11)** against the requirement this slice documents in `evaluator.md`. No decision pending — purely a dependency; the build is out of Slice 2's scope.
 
 ---
 
@@ -77,30 +78,26 @@
 - `docs/language/catalog-system.md` § (UCUM/unit catalog) — the `ScaleToBaseFactor` / `ScaleIsRational` / `IsRatioScale` metadata.
 - `docs/compiler/diagnostic-system.md` — the broadened `PRE0114` wording.
 - `docs/tooling/language-server.md` — hover surfaces the conversion + status.
+- `docs/runtime/evaluator.md` — **document the runtime reduction-rule requirement thoroughly** (the slice's runtime deliverable): `k = ScaleToBase(u_q)/ScaleToBase(u_p)` applied in `decimal`, target-directed to the price denominator unit (D8 rule 1), rounding at `maxplaces`; for `u_q = u_p`, `k = 1`. Mark it a **pending obligation** to be implemented in the runtime phase. The doc — not a tracked execution phase — is the durable carrier of this requirement.
 
 ---
 
-## Phase 2 (lightweight stub) — Runtime reduction rule
+## Runtime requirement (documented this slice; built in the runtime phase)
 
-**Goal**: the evaluator applies the exact-rational factor `k = ScaleToBase(u_q)/ScaleToBase(u_p)` in `decimal` (rounding at `maxplaces`), so cross-unit `price × quantity` produces the correct money value — making the compile-time `"Proved"` literally true.
+The reduction rule that **applies** the factor is **not** built in Slice 2 — the evaluator is a stub. Slice 2's obligation is to make sure the requirement is **well documented** so the runtime phase implements against a clear spec, and the requirement cannot get lost:
 
-**Scope**: the reduction rule from the design's § Semantic Rules; the un-skipped test gains a runtime-magnitude assertion (`4.00 USD/ft × 36 in → 12.00 USD`).
+- **Where it lives**: the locked design's § Semantic Rules (reduction rule + soundness) + `docs/runtime/evaluator.md` (Phase 1 doc-sync obligation above) + the skipped `CrossUnit_SameDimension_MustNotSilentlyCancel` test (marks the gap).
+- **The requirement**: on evaluation of `price × quantity` where the operand units differ within a dimension, convert the quantity to the price's denominator unit by the exact-rational factor `k` (`UcumExactFactor.Multiply`/`Divide` preserve rationality), then cancel, rounding the money result at the field's `maxplaces`. For same-unit operands `k = 1`.
+- **When built**: the readiness-plan **runtime phase (Phase 11)** picks this up — no decisions pending, purely the runtime dependency. At that point the skipped test gains a runtime-magnitude assertion (`4.00 USD/ft × 36 in → 12.00 USD`) and `evaluator.md` flips to Implemented.
 
-**Decisions required**: none (design locked) — gated only on the runtime evaluator existing.
-
-**Effort**: S–M (~0.5–1 day once the runtime exists; `UcumExactFactor.Multiply`/`Divide` already preserve rationality).
-
-**Doc-update obligation**: `docs/runtime/evaluator.md` — the conversion reduction rule (already documented as a pending obligation; mark Implemented when built).
-
-**Status**: Stub — TBD pending the runtime phase (readiness-plan Phase 11). The obligation is documented in the locked design (§ Semantic Rules) + `evaluator.md`; the skipped test marks the gap until then.
+This is a deliberate choice (your direction): the runtime obligation is carried by **documentation**, not by a parallel execution phase that would otherwise sit indefinitely as a stub.
 
 ---
 
 ## Definition of done
 
-- **Phase 1 done** → cross-unit price × quantity is correct and surfaced at compile-time + catalog + inspection; the live hole's compile-time behavior is closed; all four test projects green; docs synced. (This is the executable scope now.)
-- **Phase 2 done** (when the runtime ships) → the factor is actually applied; the test asserts the correct magnitude; `evaluator.md` flips to Implemented.
-- **Slice 2 fully done** when both phases complete. Until Phase 2, Slice 2 is "compile-time + catalog + inspection complete; runtime value-application pinned."
+- **Slice 2 done = Phase 1 complete**: cross-unit price × quantity is correct and surfaced at compile-time + catalog + inspection; the live hole's compile-time behavior is closed; all four test projects green; docs synced **including the runtime reduction-rule requirement documented in `evaluator.md`**.
+- The **runtime value-application is out of Slice 2's scope** — it is the readiness-plan runtime phase's job, governed by the documented requirement. (When it lands: the factor is applied, the skipped test gains a magnitude assertion, `evaluator.md` flips to Implemented — but that is *that* phase's done-condition, not Slice 2's.)
 
 ## Discovered during planning (guard 7 — plan-touches vs. design `sources-consulted`)
 
@@ -115,6 +112,6 @@ The design frontmatter's `sources-consulted` lists `business-domain-types.md`, `
 
 ## Plan update protocol
 
-- After **Phase 1** lands: mark it done in the readiness-plan Slice 2 row; the slice's runtime portion (Phase 2) stays pinned.
-- When the **runtime phase** opens: promote Phase 2 from stub to heavyweight; un-skip the runtime-magnitude assertion.
+- After **Phase 1** lands: mark Slice 2 done in the readiness-plan slice log; the runtime application is carried as a documented requirement (`evaluator.md`), not a tracked stub.
+- When the **runtime phase (Phase 11)** opens: it implements the documented reduction-rule requirement and un-skips the runtime-magnitude assertion — as part of *that* phase, not a re-opening of Slice 2.
 - If execution uncovers a surface the design didn't name: stop, flag it (design re-lock vs. discovered-during-planning), don't silently absorb.
