@@ -29,9 +29,16 @@ public enum TypedConstantErrorKind
     Semantic = 2,
 }
 
+/// <summary>
+/// A typed-constant validation failure. <see cref="SpecificCode"/> is the domain-specific
+/// diagnostic the validator owns (e.g. a quantity's dimension/qualifier mismatch); it is
+/// <c>null</c> when the validator has no specific code, in which case the type checker maps the
+/// failure through the family's catalog <c>FormatErrorCode</c>/<c>SemanticErrorCode</c> by
+/// <see cref="ErrorKind"/>.
+/// </summary>
 public sealed record TypedConstantDiagnostic(
-    string Code,
     string Message,
+    DiagnosticCode? SpecificCode = null,
     string? Suggestion = null,
     TypedConstantErrorKind ErrorKind = TypedConstantErrorKind.Format);
 

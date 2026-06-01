@@ -13,6 +13,6 @@ public static class UcumValidator
             ? new TypedConstantParseResult(true, result.Unit, result.Unit?.CanonicalCode, validation.FormatDescription, [])
             : TypedConstantParseResult.Failed(
                 validation.FormatDescription,
-                result.Diagnostics.Select(diagnostic => new TypedConstantDiagnostic(diagnostic.Code, diagnostic.Message, diagnostic.Suggestion)).ToArray());
+                result.Diagnostics.Select(diagnostic => new TypedConstantDiagnostic(diagnostic.Message, Suggestion: diagnostic.Suggestion)).ToArray());
     }
 }

@@ -9,6 +9,6 @@ public static class CurrencyValidator
             ? new TypedConstantParseResult(true, currency, currency.AlphaCode, "ISO 4217 currency code", [])
             : TypedConstantParseResult.Failed(
                 "ISO 4217 currency code",
-                new TypedConstantDiagnostic("TC010", $"'{rawText}' is not a recognized ISO 4217 currency code."));
+                new TypedConstantDiagnostic($"'{rawText}' is not a recognized ISO 4217 currency code."));
     }
 }

@@ -14,7 +14,7 @@ public static class TypedConstantValidation
         // validate against that partition's registry rather than the default (UCUM) set, so
         // period.dimension == 'date' resolves and a cross-partition value is rejected.
         ClosedSetValidation closed when context?.DimensionPartition is { } partition =>
-            ClosedSetValidator.Validate(rawText, Types.DimensionValidationFor(partition), nameof(DiagnosticCode.InvalidDimensionString)),
+            ClosedSetValidator.Validate(rawText, Types.DimensionValidationFor(partition), DiagnosticCode.InvalidDimensionString),
         ClosedSetValidation closed => ClosedSetValidator.Validate(rawText, closed),
         RegexValidation regex => RegexValidator.Validate(rawText, regex),
         UcumValidation ucum => UcumValidator.Validate(rawText, targetType, ucum, context),

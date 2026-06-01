@@ -38,7 +38,6 @@
   - [Why PRECEPT0003 and PRECEPT0004 are both needed](#why-precept0003-and-precept0004-are-both-needed)
   - [The divide-by-zero example, end to end](#the-divide-by-zero-example-end-to-end)
 - [Language Server Consumption](#language-server-consumption)
-  - [Diagnostic Suppression](#diagnostic-suppression)
   - [LSP Mapping](#lsp-mapping)
   - [MCP Consumption](#mcp-consumption)
 - [Design Rationale and Decisions](#design-rationale-and-decisions)
@@ -78,7 +77,6 @@ The Precept compiler pipeline produces diagnostics at six stages: lexing, parsin
 **Does NOT OWN:**
 - Diagnostic emission sites — each pipeline stage (`Lexer`, `Parser`, `NameBinder`, `TypeChecker`, `GraphAnalyzer`, `ProofEngine`) owns its calls to `Diagnostics.Create()`
 - LSP-level filtering, range conversion (0-based), and severity mapping — owned by the Language Server
-- Downstream diagnostic suppression logic (upstream-error cascading) — owned by the Language Server
 - MCP serialization format — owned by the MCP tool layer
 - Fix application — Precept has no code-fix providers
 - Roslyn rules PRECEPT0001–PRECEPT0026 — owned by the analyzer project (`src/Precept.Analyzers/`)
@@ -154,7 +152,11 @@ public enum DiagnosticStage
 }
 ```
 
-One value per pipeline stage. The lexer has its own stage — unterminated strings, invalid characters, and unrecognized tokens are `Lex` diagnostics, distinct from `Parse` (structural syntax) errors. This matches the actual pipeline shape: the lexer is a separate stage that can fail independently. NameBinder diagnostics use `DiagnosticStage.Type` — name binding is a pipeline stage but not a diagnostic stage. Adding a `Bind` stage would break the upstream-error suppression model in the LS.
+One value per pipeline stage. The lexer has its own stage — unterminated strings, invalid characters, and unrecognized tokens are `Lex` diagnostics, distinct from `Parse` (structural syntax) errors. This matches the actual pipeline shape: the lexer is a separate stage that can fail independently.
+
+`DiagnosticStage` is a **producing-component classification**, not a precedence axis — no consumer orders by the enum's ordinal. Its consumers are: LS rich-hover (which surfaces `Proof`-stage obligations), MCP/CLI output serialization (the stage string is emitted as diagnostic metadata), a type-error count in the compile tool, and the diagnostic-meta tests.
+
+Two classification compromises follow from the enum having no dedicated value for some producers: NameBinder diagnostics use `DiagnosticStage.Type` (name-binding is a real pipeline stage), and `McpToolInternalError` uses `DiagnosticStage.Lex` as a catch-all (it is emitted outside the pipeline — see the note below). Making the component taxonomy honest (a dedicated `Bind` and `Tooling` value, no mislabeling) is tracked as Phase 8 Slice 3 (the diagnostic-emission ownership architecture).
 
 > **Tooling-side diagnostics.** A small set of diagnostics is emitted from **outside** the pipeline — currently just `McpToolInternalError` (PRE0149), which the MCP-tool wrapper produces when a tool body throws unhandled. These are classified `DiagnosticStage.Lex` as a catch-all because no Tooling/External stage exists yet; consumers that filter by stage should treat any tooling-side code as a non-stage diagnostic. If more tooling-side codes accumulate, a dedicated `Tooling` stage value would be the structural fix. See `mcp.md § 5.1` for the wrapper contract.
 
@@ -494,6 +496,27 @@ var constraints = Diagnostics.All
     .ToList();
 ```
 
+### Emission shapes
+
+Every diagnostic is produced by `Diagnostics.Create(code, span, args…)`. The `code` is sourced in one of two uniform shapes, plus a small, explicitly-bounded context-determined residue:
+
+1. **Literal** — `Diagnostics.Create(DiagnosticCode.X, …)`, the code chosen at the branch that decides it. The common case across the front-end stages.
+2. **Catalog-mediated** — the code is read from a single `DiagnosticCode` field on a catalog-meta record, and the emission site reads `meta.<Field>`. This keeps the code-per-member association in catalog metadata rather than a parallel `*Kind → code` switch. The fields are:
+   - `BinaryOperationMeta.CIDiagnosticCode` / `FunctionMeta.CIDiagnosticCode` — the case-insensitive variant code for a `~string` operator/function (presence of the code is what marks the operation as having a CI variant).
+   - `ContentValidation.FormatErrorCode` / `SemanticErrorCode` — the typed-constant family's format vs. semantic code. A validator carries a typed `DiagnosticCode?` only when it owns a domain-specific code (e.g. a quantity dimension/qualifier mismatch); otherwise it carries `null` and the family's format/semantic field decides by error kind. There is no string round-trip — the code is typed end to end.
+   - `ProofRequirementMeta.DiagnosticCode` — the subtype-fixed proof obligation code. `CreateDiagnostic` reads this for the subtype-fixed kinds (the same field `CreateFaultSiteLink` reads), so the code lives in exactly one place.
+3. **Context-determined residue** — the code is a function of runtime context the stamped metadata cannot capture, with a bounded, statically-enumerable candidate set:
+   - **Lexer mode-switch** — the unterminated-construct code is chosen from the open `LexerMode` at EOF drain (candidate set: the `Unterminated*` codes).
+   - **Proof Numeric-by-site** — the same numeric obligation surfaces as `DivisionByZero` / `SqrtOfNegative` / `UnguardedCollectionAccess` / `UnguardedCollectionMutation` / `IndexBoundsGuard` by the discharge site's shape.
+   - **Proof KeyPresence-flag** — `KeyPresenceSafety` vs. `KeyUniquenessGuard` by the requirement's absence flag.
+   - **Proof QualifierChain compound-period override** — `CompoundPeriodDenominator` replaces the generic chain code when the period subject resolves to a multi-component basis.
+
+The authoritative enumeration of these shapes lives in `src/Precept.Analyzers/DiagnosticCoverageScanner.cs` (Pattern 1 = literal, Pattern 2 = catalog-mediated field, Pattern 3 = the dispatch residue). The `Precept0027` coverage gate reads that scanner to require every `DiagnosticCode` member to have at least one emission site; a literal `Diagnostics.Create(DiagnosticCode.X)` grep alone is incomplete because it misses the catalog-mediated shape.
+
+### The `[StaticallyPreventable]`-derived fault map
+
+The `DiagnosticCode → FaultCode` link a runtime fault site records is the inverse of the `[StaticallyPreventable(code)]` declarations on `FaultCode` (see the chain below). The bijective core of that map is **derived by reflecting the attribute** (`StaticallyPreventableMap`), not re-listed in pipeline code — the attribute is the single source of truth. The proof engine keeps two pieces of policy as explicit code because the attribute cannot express them: the collection-safety many-to-one collapse (`KeyPresenceSafety` / `KeyUniquenessGuard` / `IndexBoundsGuard` onto the shared empty-collection faults) and the conservative backstop for proof-only obligation families that have no representable runtime fault of their own.
+
 ---
 
 ## FaultCode → DiagnosticCode Chain
@@ -675,28 +698,6 @@ The typed `FaultCode Code` field on `Fault` prevents one bypass — you can't us
 ---
 
 ## Language Server Consumption
-
-### Diagnostic Suppression
-
-The LS suppresses downstream diagnostics when upstream stages produce errors:
-
-```csharp
-IEnumerable<Diagnostic> VisibleDiagnostics(Compilation result)
-{
-    if (result.Diagnostics.Any(d => d.Stage == DiagnosticStage.Lex && d.Severity == Severity.Error))
-        return result.Diagnostics.Where(d => d.Stage == DiagnosticStage.Lex);
-
-    if (result.Diagnostics.Any(d => d.Stage == DiagnosticStage.Parse && d.Severity == Severity.Error))
-        return result.Diagnostics.Where(d => d.Stage <= DiagnosticStage.Parse);
-
-    if (result.Diagnostics.Any(d => d.Stage == DiagnosticStage.Type && d.Severity == Severity.Error))
-        return result.Diagnostics.Where(d => d.Stage <= DiagnosticStage.Type);
-
-    return result.Diagnostics;
-}
-```
-
-This prevents cascading errors from confusing users — if the file doesn't lex, showing parse/type/graph/proof errors is noise.
 
 ### LSP Mapping
 

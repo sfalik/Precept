@@ -13,9 +13,11 @@ namespace Precept.Analyzers;
 /// - Test-referenced codes (DiagnosticCode.X in test sources)
 ///
 /// Emission detection covers:
-/// 1. Diagnostics.Create(DiagnosticCode.X, ...) — direct emission
-/// 2. CIDiagnosticCode: DiagnosticCode.X — catalog-mediated emission (Operations/Functions)
-/// 3. ProofEngine dispatch branches referencing DiagnosticCode.X in Diagnostics.Create calls
+/// 1. Diagnostics.Create(DiagnosticCode.X, ...) — direct (literal) emission
+/// 2. Catalog-mediated emission — a DiagnosticCode carried on a catalog-meta field that an
+///    emission site reads: CIDiagnosticCode (Operations/Functions), FormatErrorCode /
+///    SemanticErrorCode (typed-constant content validation), and the proof-requirement
+///    subtype-fixed DiagnosticCode (ProofRequirementMeta)
 ///
 /// Excludes:
 /// - Diagnostics.GetMeta(DiagnosticCode.X) — catalog reads
@@ -157,13 +159,16 @@ internal static class DiagnosticCoverageScanner
                 }
             }
 
-            // Pattern 2b: Named argument CIDiagnosticCode: in constructor.
+            // Pattern 2b: catalog-mediated emission — a DiagnosticCode carried on a catalog-meta
+            // field that an emission site reads (CI variant codes, typed-constant format/semantic
+            // codes, and the proof-requirement subtype-fixed code).
             if (current is IArgumentOperation argument)
             {
                 var paramName = argument.Parameter?.Name;
                 if (paramName == "CIDiagnosticCode"
                     || paramName == "FormatErrorCode"
-                    || paramName == "SemanticErrorCode")
+                    || paramName == "SemanticErrorCode"
+                    || paramName == "DiagnosticCode")
                 {
                     return true;
                 }

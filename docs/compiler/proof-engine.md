@@ -2219,6 +2219,8 @@ Template parameter population for proof-stage diagnostics:
 
 **Field name resolution:** Use `GetFieldName(requirement.Subject, obligation.Site)`. If the subject resolves to a field, use the field name. If resolution fails, use `"<unknown>"`.
 
+**Diagnostic-code selection:** For the subtype-fixed obligation kinds, `CreateDiagnostic` reads the code from `ProofRequirementMeta.DiagnosticCode` (`ProofRequirements.GetMeta(kind).DiagnosticCode`) — the same catalog field `CreateFaultSiteLink` reads — so the code lives in exactly one place. The per-subtype arms keep only message-argument formatting. The genuinely context-determined kinds select their code explicitly because it is a function of the discharge site rather than a per-kind constant: `Numeric` (via `GetNumericRequirementDiagnosticCode`, by site shape), `KeyPresence` (by the requirement's absence flag), and the `QualifierChain` compound-period override.
+
 ### Partial Results
 
 The proof engine always produces a complete `ProofLedger`, regardless of how many obligations fail:
@@ -2493,6 +2495,8 @@ Roslyn analyzers PRECEPT0001 and PRECEPT0002 enforce:
 - Every `FaultCode` links to its prevention `DiagnosticCode`
 
 This makes fault–diagnostic correspondence a **build-time invariant**. A fault cannot be added without declaring its prevention diagnostic. A diagnostic cannot be removed while its fault still exists.
+
+The attribute is also the **single source of truth for the `DiagnosticCode → FaultCode` map** that `CreateFaultSiteLink` records on each fault site: the bijective core is derived by reflecting `[StaticallyPreventable]` (`StaticallyPreventableMap`), not re-listed in the proof engine. Two pieces of policy remain explicit code because the attribute cannot express them — the collection-safety many-to-one collapse (`KeyPresenceSafety` / `KeyUniquenessGuard` / `IndexBoundsGuard` onto the shared empty-collection faults) and the conservative backstop for proof-only obligation families with no representable runtime fault of their own.
 
 ### Bounded, Non-Extensible Strategy Set
 

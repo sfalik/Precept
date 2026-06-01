@@ -14,7 +14,7 @@ public static class ExchangeRateValidator
         if (!match.Success)
             return TypedConstantParseResult.Failed(
                 validation.FormatDescription,
-                new TypedConstantDiagnostic("TC014", "Exchange rate must be '<decimal> <ISO-4217>/<ISO-4217>'."));
+                new TypedConstantDiagnostic("Exchange rate must be '<decimal> <ISO-4217>/<ISO-4217>'."));
 
         var rate = decimal.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture);
         var fromResult = CurrencyValidator.Validate(match.Groups[2].Value);

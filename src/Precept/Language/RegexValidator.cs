@@ -10,6 +10,6 @@ public static class RegexValidator
             ? new TypedConstantParseResult(true, rawText, rawText, validation.FormatDescription, [])
             : TypedConstantParseResult.Failed(
                 validation.FormatDescription,
-                new TypedConstantDiagnostic("TC003", $"Value does not match {validation.FormatDescription}."));
+                new TypedConstantDiagnostic($"Value does not match {validation.FormatDescription}."));
     }
 }

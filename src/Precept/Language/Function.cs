@@ -44,7 +44,6 @@ public sealed record FunctionMeta(
     string? UsageExample = null,
     string? SnippetTemplate = null,
     string? HoverDescription = null,
-    bool HasCIVariant = false,
     FunctionKind? CIVariantOf = null,
     /// <summary>
     /// True when this function's trailing argument is a user-facing message string.
@@ -52,4 +51,11 @@ public sealed record FunctionMeta(
     /// <c>string.quoted.double.message.precept</c> scope at that argument position.
     /// </summary>
     bool IsMessagePosition = false,
-    DiagnosticCode? CIDiagnosticCode = null);
+    DiagnosticCode? CIDiagnosticCode = null)
+{
+    /// <summary>
+    /// True when this function has a case-insensitive variant — i.e. it carries a
+    /// <see cref="CIDiagnosticCode"/>. Derived so the variant fact has a single source.
+    /// </summary>
+    public bool HasCIVariant => CIDiagnosticCode is not null;
+}

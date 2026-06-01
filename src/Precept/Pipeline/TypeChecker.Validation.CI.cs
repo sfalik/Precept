@@ -78,7 +78,7 @@ internal static partial class TypeChecker
         {
             case TypedBinaryOp bin:
                 if (Operations.GetMeta(bin.ResolvedOp) is BinaryOperationMeta
-                        { HasCIVariant: true, CIDiagnosticCode: { } binaryDiagCode } binaryMeta)
+                        { CIDiagnosticCode: { } binaryDiagCode } binaryMeta)
                 {
                     if (binaryMeta.Op == OperatorKind.Contains)
                     {
@@ -97,7 +97,7 @@ internal static partial class TypeChecker
 
             case TypedFunctionCall func:
                 var funcMeta = Functions.GetMeta(func.ResolvedFunction);
-                if (funcMeta is { HasCIVariant: true, CIDiagnosticCode: { } functionDiagCode } &&
+                if (funcMeta is { CIDiagnosticCode: { } functionDiagCode } &&
                     func.Arguments.Length > 0 && IsCIExpression(func.Arguments[0]))
                 {
                     var ciFieldName = ((TypedFieldRef)func.Arguments[0]).FieldName;

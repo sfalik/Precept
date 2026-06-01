@@ -91,7 +91,6 @@ public static class Operations
             new ParameterMeta(TypeKind.Error, "value"),
             TypeKind.Boolean,
             "Collection membership",
-            HasCIVariant: true,
             CIDiagnosticCode: DiagnosticCode.CaseInsensitiveValueInCaseSensitiveContains),
         OperationKind.LookupAccess => new BinaryOperationMeta(
             kind, OperatorKind.LookupAccess,
@@ -851,12 +850,10 @@ public static class Operations
         OperationKind.StringEqualsString => new BinaryOperationMeta(
             kind, OperatorKind.Equals, PString, PString, TypeKind.Boolean,
             "String equality",
-            HasCIVariant: true,
             CIDiagnosticCode: DiagnosticCode.CaseInsensitiveFieldRequiresTildeEquals),
         OperationKind.StringNotEqualsString => new BinaryOperationMeta(
             kind, OperatorKind.NotEquals, PString, PString, TypeKind.Boolean,
             "String inequality",
-            HasCIVariant: true,
             CIDiagnosticCode: DiagnosticCode.CaseInsensitiveFieldRequiresTildeNotEquals),
 
         // ── Orderable same-type: choice ─────────────────────────────

@@ -18,14 +18,14 @@ public static class QuantityValidator
         if (!match.Success)
             return TypedConstantParseResult.Failed(
                 validation.FormatDescription,
-                new TypedConstantDiagnostic("TC012", "Quantity must be '<decimal> <UCUM-unit>'."));
+                new TypedConstantDiagnostic("Quantity must be '<decimal> <UCUM-unit>'."));
 
         var amount = decimal.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture);
         var unitResult = UcumParser.Parse(match.Groups[2].Value);
         if (!unitResult.IsValid)
             return TypedConstantParseResult.Failed(
                 validation.FormatDescription,
-                unitResult.Diagnostics.Select(diagnostic => new TypedConstantDiagnostic(diagnostic.Code, diagnostic.Message, diagnostic.Suggestion)).ToArray());
+                unitResult.Diagnostics.Select(diagnostic => new TypedConstantDiagnostic(diagnostic.Message, Suggestion: diagnostic.Suggestion)).ToArray());
 
         if (context?.DeclaredQualifiers is { } qualifiers && !qualifiers.IsDefaultOrEmpty)
         {
@@ -41,8 +41,8 @@ public static class QuantityValidator
                         return TypedConstantParseResult.Failed(
                             validation.FormatDescription,
                             new TypedConstantDiagnostic(
-                                DiagnosticCode.QualifierMismatch.ToString(),
-                                $"Unit '{match.Groups[2].Value}' does not match compound qualifier '{compoundUnitDimension}'"));
+                                $"Unit '{match.Groups[2].Value}' does not match compound qualifier '{compoundUnitDimension}'",
+                                SpecificCode: DiagnosticCode.QualifierMismatch));
                     }
 
                     continue;
@@ -62,8 +62,8 @@ public static class QuantityValidator
                     return TypedConstantParseResult.Failed(
                         validation.FormatDescription,
                         new TypedConstantDiagnostic(
-                            DiagnosticCode.DimensionCategoryMismatch.ToString(),
-                            $"Unit '{unitResult.Unit!.CanonicalCode}' has dimension '{literalDimension}' but field requires '{requiredDimension}'"));
+                            $"Unit '{unitResult.Unit!.CanonicalCode}' has dimension '{literalDimension}' but field requires '{requiredDimension}'",
+                            SpecificCode: DiagnosticCode.DimensionCategoryMismatch));
                 }
             }
         }

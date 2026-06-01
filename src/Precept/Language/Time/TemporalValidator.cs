@@ -25,7 +25,7 @@ public static class TemporalValidator
         return TypedConstantParseResult.Failed(
             validation.FormatDescription,
             temporalResult.Diagnostics.Select(diagnostic => new TypedConstantDiagnostic(
-                diagnostic.Code, diagnostic.Message, diagnostic.Suggestion, diagnostic.ErrorKind)).ToArray());
+                diagnostic.Message, Suggestion: diagnostic.Suggestion, ErrorKind: diagnostic.ErrorKind)).ToArray());
     }
 
     private static TypedConstantParseResult Success(string formatDescription, object? value, string? canonicalText) =>

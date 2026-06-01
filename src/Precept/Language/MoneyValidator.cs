@@ -14,7 +14,7 @@ public static class MoneyValidator
         if (!match.Success)
             return TypedConstantParseResult.Failed(
                 validation.FormatDescription,
-                new TypedConstantDiagnostic("TC011", "Money must be '<decimal> <ISO-4217>'."));
+                new TypedConstantDiagnostic("Money must be '<decimal> <ISO-4217>'."));
 
         var amount = decimal.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture);
         var currencyResult = CurrencyValidator.Validate(match.Groups[2].Value);

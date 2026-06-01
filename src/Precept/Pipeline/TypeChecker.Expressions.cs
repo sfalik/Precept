@@ -346,7 +346,11 @@ internal static partial class TypeChecker
         ContentValidation validation,
         ImmutableArray<DeclaredQualifierMeta>? qualifiers)
     {
-        if (Enum.TryParse<DiagnosticCode>(diagnostic.Code, out var specificCode)
+        // The validator carries a typed code only when it owns a domain-specific diagnostic;
+        // otherwise the family's catalog format/semantic mapping decides. The concrete-vs-
+        // interpolated gate suppresses the specific code when a qualifier carries interpolation
+        // braces (the value isn't statically known), falling back to the catalog code.
+        if (diagnostic.SpecificCode is { } specificCode
             && ShouldUseSpecificTypedConstantDiagnostic(specificCode, qualifiers))
         {
             return specificCode;

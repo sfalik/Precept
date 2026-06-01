@@ -91,11 +91,16 @@ public sealed record BinaryOperationMeta(
     bool BidirectionalLookup = false,
     QualifierMatch Match = QualifierMatch.Any,
     ProofRequirement[]? ProofRequirements = null,
-    bool HasCIVariant = false,
     DiagnosticCode? CIDiagnosticCode = null,
     ResultQualifierPolicy ResultQualifierPolicy = ResultQualifierPolicy.None)
     : OperationMeta(Kind, Op, Result, Description)
 {
+    /// <summary>
+    /// True when this operation has a case-insensitive variant — i.e. it carries a
+    /// <see cref="CIDiagnosticCode"/>. Derived so the variant fact has a single source.
+    /// </summary>
+    public bool HasCIVariant => CIDiagnosticCode is not null;
+
     /// <summary>Proof obligations the type checker must verify at call sites.</summary>
     public ProofRequirement[] ProofRequirements { get; } = ProofRequirements ?? [];
 

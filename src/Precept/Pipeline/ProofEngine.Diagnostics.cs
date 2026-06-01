@@ -13,6 +13,13 @@ public static partial class ProofEngine
         var contextClause = FormatContextClause(obligation.Context);
         var usageSuffix = FormatUsageContextSuffix(obligation.Context);
 
+        // Subtype-fixed obligation kinds source their diagnostic code from catalog metadata — the
+        // same field CreateFaultSiteLink reads — so the code lives in exactly one place. The arms
+        // below keep only message-argument formatting. The genuinely context-determined kinds
+        // (Numeric, KeyPresence, and the QualifierChain compound-period override) select their code
+        // explicitly because it is a function of the discharge site, not a per-kind constant.
+        DiagnosticCode MetaCode() => ProofRequirements.GetMeta(obligation.Requirement.Kind).DiagnosticCode!.Value;
+
         switch (obligation.Requirement)
         {
             case NumericProofRequirement numeric when TryCreateCollectionSafetyDiagnostic(obligation, out var collectionDiagnostic):
@@ -24,13 +31,13 @@ public static partial class ProofEngine
                     contextClause);
 
             case ModifierRequirement modReq:
-                return Diagnostics.Create(DiagnosticCode.UnprovedModifierRequirement, obligation.Site.Span,
+                return Diagnostics.Create(MetaCode(), obligation.Site.Span,
                     DescribeSubject(modReq.Subject, obligation.Site),
                     modReq.Required.ToString(),
                     usageSuffix);
 
             case DimensionProofRequirement dimReq:
-                return Diagnostics.Create(DiagnosticCode.UnprovedDimensionRequirement, obligation.Site.Span,
+                return Diagnostics.Create(MetaCode(), obligation.Site.Span,
                     DescribeSubject(dimReq.Subject, obligation.Site),
                     FormatPeriodDimension(dimReq.RequiredDimension),
                     usageSuffix);
@@ -49,7 +56,7 @@ public static partial class ProofEngine
                     rightOperand = DescribeQualifiedSubject(qcReq.RightSubject, obligation.Site, qcReq.Axis, semantics, obligation);
                 }
 
-                return Diagnostics.Create(DiagnosticCode.UnprovedQualifierCompatibility, obligation.Site.Span,
+                return Diagnostics.Create(MetaCode(), obligation.Site.Span,
                     leftOperand.Label,
                     rightOperand.Label,
                     qcReq.Axis.ToString(),
@@ -68,7 +75,7 @@ public static partial class ProofEngine
 
                 var leftExpression = ResolveSubject(chainReq.LeftSubject, obligation.Site);
                 var rightExpression = ResolveSubject(chainReq.RightSubject, obligation.Site);
-                return Diagnostics.Create(DiagnosticCode.UnprovedQualifierCompatibility, obligation.Site.Span,
+                return Diagnostics.Create(MetaCode(), obligation.Site.Span,
                     DescribeExpression(leftExpression),
                     DescribeExpression(rightExpression),
                     $"{chainReq.LeftAxis}↔{chainReq.RightAxis}",
@@ -86,13 +93,13 @@ public static partial class ProofEngine
                 var aqDetail = aqNarrowed is not null
                     ? $"the guard narrows it to '{aqNarrowed}', which does not satisfy the required '{aqRequired}'"
                     : $"no guard narrows it to the required '{aqRequired}'";
-                return Diagnostics.Create(DiagnosticCode.UnprovedAssignmentQualifierCompatibility, obligation.Site.Span,
+                return Diagnostics.Create(MetaCode(), obligation.Site.Span,
                     QualifierAxisLabel(aqReq.Axis),
                     aqReq.TargetFieldName,
                     aqDetail);
 
             case PresenceProofRequirement presence:
-                return Diagnostics.Create(DiagnosticCode.UnprovedPresenceRequirement, obligation.Site.Span,
+                return Diagnostics.Create(MetaCode(), obligation.Site.Span,
                     DescribeSubject(presence.Subject, obligation.Site),
                     usageSuffix);
 
@@ -103,7 +110,7 @@ public static partial class ProofEngine
                     : string.Empty;
                 var displayMin = intervalReq.AuthoredMin ?? intervalReq.DeclaredMin;
                 var displayMax = intervalReq.AuthoredMax ?? intervalReq.DeclaredMax;
-                return Diagnostics.Create(DiagnosticCode.NumericOverflow, obligation.Site.Span,
+                return Diagnostics.Create(MetaCode(), obligation.Site.Span,
                     intervalReq.TargetField,
                     $"[{displayMin?.ToString() ?? "−∞"} .. {displayMax?.ToString() ?? "+∞"}]{computedStr}");
             }
@@ -113,7 +120,7 @@ public static partial class ProofEngine
                 var literalLength = obligation.Site is TypedLiteral { Value: string s } ? s.Length.ToString() : "?";
                 var minStr = lengthReq.DeclaredMinLength?.ToString() ?? "0";
                 var maxStr = lengthReq.DeclaredMaxLength?.ToString() ?? "∞";
-                return Diagnostics.Create(DiagnosticCode.LengthBoundViolation, obligation.Site.Span,
+                return Diagnostics.Create(MetaCode(), obligation.Site.Span,
                     literalLength,
                     lengthReq.TargetField,
                     minStr,
@@ -124,7 +131,7 @@ public static partial class ProofEngine
             {
                 var minStr = countReq.DeclaredMinCount?.ToString() ?? "0";
                 var maxStr = countReq.DeclaredMaxCount?.ToString() ?? "∞";
-                return Diagnostics.Create(DiagnosticCode.CountBoundViolation, obligation.Site.Span,
+                return Diagnostics.Create(MetaCode(), obligation.Site.Span,
                     "?",
                     minStr,
                     maxStr,
@@ -169,7 +176,7 @@ public static partial class ProofEngine
                     fieldName = "?";
                     indexLabel = "<index>";
                 }
-                return Diagnostics.Create(DiagnosticCode.IndexBoundsGuard, obligation.Site.Span,
+                return Diagnostics.Create(MetaCode(), obligation.Site.Span,
                     fieldName, indexLabel);
             }
 
@@ -190,7 +197,7 @@ public static partial class ProofEngine
                         rightLabel = DescribeQualifiedExpression(dimBin.Right, QualifierAxis.Dimension, semantics).QualifierValue;
                     productLabel = $"{leftLabel}·{rightLabel}";
                 }
-                return Diagnostics.Create(DiagnosticCode.IncompatibleDimensionalProduct, obligation.Site.Span,
+                return Diagnostics.Create(MetaCode(), obligation.Site.Span,
                     leftLabel, rightLabel, productLabel);
             }
         }
@@ -409,20 +416,23 @@ public static partial class ProofEngine
 
     private static FaultSiteLink CreateFaultSiteLink(ProofObligation obligation, DiagnosticCode diagnosticCode)
     {
-        var faultCode = diagnosticCode switch
-        {
-            DiagnosticCode.DivisionByZero => FaultCode.DivisionByZero,
-            DiagnosticCode.SqrtOfNegative => FaultCode.SqrtOfNegative,
-            DiagnosticCode.UnguardedCollectionAccess => FaultCode.CollectionEmptyOnAccess,
-            DiagnosticCode.UnguardedCollectionMutation => FaultCode.CollectionEmptyOnMutation,
-            DiagnosticCode.KeyPresenceSafety => FaultCode.CollectionEmptyOnAccess,
-            DiagnosticCode.KeyUniquenessGuard => FaultCode.CollectionEmptyOnMutation,
-            DiagnosticCode.IndexBoundsGuard => FaultCode.CollectionEmptyOnAccess,
-            DiagnosticCode.NumericOverflow => FaultCode.NumericOverflow,
-            DiagnosticCode.LengthBoundViolation => FaultCode.LengthBoundViolation,
-            DiagnosticCode.CountBoundViolation => FaultCode.CountBoundViolation,
-            _ => FaultCode.DivisionByZero // Proof-only obligation families still share the existing conservative runtime backstop.
-        };
+        // Bijective core: the 1:1 DiagnosticCode→FaultCode rows are the inverse of the
+        // [StaticallyPreventable] declarations on FaultCode — derived, not re-listed here.
+        var faultCode = StaticallyPreventableMap.TryGetBijectiveFault(diagnosticCode)
+
+            // Collection-safety codes collapse many-to-one onto the shared empty-collection faults:
+            // a key-presence/index-bounds failure is, at runtime, an empty-collection access or
+            // mutation. This is not a per-member fact the attribute can express.
+            ?? diagnosticCode switch
+            {
+                DiagnosticCode.KeyPresenceSafety => FaultCode.CollectionEmptyOnAccess,
+                DiagnosticCode.KeyUniquenessGuard => FaultCode.CollectionEmptyOnMutation,
+                DiagnosticCode.IndexBoundsGuard => FaultCode.CollectionEmptyOnAccess,
+
+                // Proof-only obligation families share the conservative runtime backstop: they have
+                // no representable runtime fault of their own, so they surface as the generic fault.
+                _ => FaultCode.DivisionByZero,
+            };
 
         return new FaultSiteLink(obligation, faultCode, diagnosticCode, obligation.Site.Span);
     }

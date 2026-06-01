@@ -14,7 +14,7 @@ public static class PriceValidator
         if (!match.Success)
             return TypedConstantParseResult.Failed(
                 validation.FormatDescription,
-                new TypedConstantDiagnostic("TC013", "Price must be '<decimal> <ISO-4217>/<UCUM-unit>'."));
+                new TypedConstantDiagnostic("Price must be '<decimal> <ISO-4217>/<UCUM-unit>'."));
 
         var amount = decimal.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture);
         var currencyResult = CurrencyValidator.Validate(match.Groups[2].Value);
@@ -25,7 +25,7 @@ public static class PriceValidator
         if (!unitResult.IsValid)
             return TypedConstantParseResult.Failed(
                 validation.FormatDescription,
-                unitResult.Diagnostics.Select(diagnostic => new TypedConstantDiagnostic(diagnostic.Code, diagnostic.Message, diagnostic.Suggestion)).ToArray());
+                unitResult.Diagnostics.Select(diagnostic => new TypedConstantDiagnostic(diagnostic.Message, Suggestion: diagnostic.Suggestion)).ToArray());
 
         var canonicalText = $"{amount.ToString(CultureInfo.InvariantCulture)} {currencyResult.CanonicalText}/{unitResult.Unit!.CanonicalCode}";
         return new TypedConstantParseResult(true, (amount, currencyResult.Value, unitResult.Unit), canonicalText, validation.FormatDescription, []);
