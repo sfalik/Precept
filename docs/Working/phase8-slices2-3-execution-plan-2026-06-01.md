@@ -16,7 +16,7 @@
 | **Slice 3b-count** | Build the stubbed `TryCountContainmentProof` + stamp `CountContainment` for collection/notempty defaults; revive the dead `CountBoundViolation` | same design (D9) | none (Locked) | M (~2d) | Stub (after 3b) |
 | **Slice 3c** | The ownership analyzer (enforces single-stage ownership; one documented carve-out: the `TypedConditional` qualifier residual) | Slice 3 D1 | none (Locked) | M (~2d) | Stub |
 
-**Why this order (strict):** Slice 3c's analyzer can only reach green-with-no-allow-list once everything it checks holds — code uniformly sourced (Slice 2), stages honest + no structural duals (3a), value-level codes genuinely proof-owned (3b). So the analyzer lands **last**. Slice 2 is pure no-behavior-change (safest first); 3a carries one author-visible change (stage strings/counts); 3b is the behavioral change (relocating value-level checks); 3c is enforcement.
+**Why this order (strict):** Slice 3c's analyzer can only reach green-with-one-carve-out once everything it checks holds — code uniformly sourced (Slice 2), stages honest + no structural duals (3a), and the whole declared-bound family genuinely proof-owned (3b numeric/length/qualifier + 3b-count). So the analyzer lands **last**. Slice 2 is pure no-behavior-change (safest first); 3a carries one author-visible change (stage strings/counts); 3b/3b-count are the behavioral changes (relocating + reviving declared-bound checks); 3c is enforcement. 3b-count follows 3b because it builds a new proof strategy (the stubbed count prover) rather than relocating an existing check — separable and independently verifiable.
 
 ## Decisions captured
 
@@ -36,7 +36,7 @@ All decisions are **Locked** in the two design docs (2026-06-01) — nothing to 
 
 Converged every diagnostic-code selection onto two shapes (literal `DiagnosticCode.X` or a single catalog-meta `DiagnosticCode` field read). Delivered the Slice 2 design's Decisions P1–P4: killed the typed-constant string round-trip; `CreateDiagnostic` reads `ProofRequirementMeta.DiagnosticCode` for subtype-fixed kinds; fault map derived from `[StaticallyPreventable]` (`StaticallyPreventableMap`, with the collapse/backstop kept explicit); CI field pair collapsed. **Byte-identical** verified — full suite green (6624/417/291/67, 0 failed) + adversarial diff review clean. A pre-existing `[StaticallyPreventable]`↔`:412` drift (`UnprovedPresenceRequirement`) was found and behavior-preservingly documented (design Falsifier 2). Doc-sync: `diagnostic-system.md` "Emission shapes" subsection + `proof-engine.md` note.
 
-## Heavyweight block (current)
+## Heavyweight blocks (Slice 3a ✅ complete · Slice 3b current)
 
 ### Slice 3a — Honest taxonomy + dual-emission consolidation ✅ `f7e5dee6`
 
@@ -74,28 +74,67 @@ Converged every diagnostic-code selection onto two shapes (literal `DiagnosticCo
 - `src/Precept/Language/Diagnostic.cs` — `DiagnosticStage`/`Stage`-field doc-comments retitled to producing-component (code-comment doc-sync).
 - `docs/tooling/mcp.md` — note the stage-string + per-stage-count change in `precept_compile` output.
 
+### Slice 3b — Declared-bound obligation ownership (numeric + length + qualifier)
+
+**Design**: [`phase8-value-level-obligation-ownership-2026-06-01.md`](phase8-value-level-obligation-ownership-2026-06-01.md) (Locked, 3 review rounds → LOCKABLE; expands Slice 3 D3, resolves D5). 3b builds the **numeric** (D1–D4), **string-length** (D8), and **qualifier-residual** (D5) closure + the stage relabels (D3). The **collection-count** family (D9) is split to **3b-count** (it builds a new proof strategy). `notempty`-on-strings is in 3b (length min=1); `notempty`-on-collections is in 3b-count.
+
+**Goal**: every numeric/length declared-bound violation on a default, and every numeric computation-result overflow, is proof-owned and single-coded (numeric default → `OutOfRange`; computation → `NumericOverflow`; string default → `LengthBoundViolation`; qualifier residual → proof-stage PRE0141), with no double-emit, no field/arg split, and no silent length-default gap.
+
+**Decisions required before kicking off**: none (design Locked + reviewed; D1–D10 approved).
+
+**Step-by-step** (enumerate → failing-test matrix first, per `/lifecycle-4-execute`):
+1. **Stage relabels (D3)** — `Diagnostics.cs`: `NumericOverflow` + `OutOfRange` meta `Type → Proof`; update `DiagnosticsTests` stage assertions.
+2. **OutOfRange dispatch arm (D2)** — `ProofEngine.Diagnostics.cs` `GetNumericRequirementDiagnosticCode`: add an arm returning `OutOfRange` when `obligation.Context` is `FieldDefaultContext`/`ArgDefaultContext` (Context-axis, non-overlapping with the existing Site-shape arms).
+3. **Numeric default stamping (D2)** — `TypeChecker.cs:799-815`/`:985-1004`: replace `ValidateDefaultAgainstNumericModifiers` with stamping `NumericProofRequirement(SelfValue,⊕,bound)` per applicable modifier (preserve field implied-modifiers + reuse the magnitude/normalization helpers from `Modifiers.cs:524-614`). `ProofEngine.Analysis.cs` collectors: drop the IntervalContainment-for-numeric-defaults usage; route numeric defaults through the stamped Numeric obligation.
+4. **Computed-field gap (D4)** — extend the computed-expr walk (`ProofEngine.cs:233-241`) / add a collector stamping `IntervalContainmentProofRequirement` for a computed numeric field's result vs its declared bounds → `NumericOverflow` (reuses `IntervalOfNarrowed`).
+5. **Length defaults (D8)** — `ProofEngine.Analysis.cs` collectors: add a `LengthContainment` branch for string defaults (declared minlength/maxlength + literal string); fold `notempty`-on-string as `min=1` (detect `ModifierKind.Notempty`, since it sets no `DeclaredMinLength`). Discharged by the existing literal-only `TryLengthContainmentProof`.
+6. **Qualifier residual (D5)** — `AssignmentQualifiers.cs`: set `dischargedAtProofStage` true for field/arg-default, bound, computed-expr sites; leave `false` only for `TypedConditional` (the carve-out). PRE0141 becomes proof-owned except the conditional.
+7. **Doc-sync** (same commit): proof-engine.md, diagnostic-system.md, mcp.md, `ProofRequirementKind.cs` comment.
+
+**Dependencies**: Slice 3a (✅ `f7e5dee6` — hover already keyed on obligation-presence); Slice 2 uniform surface.
+
+**Exit criteria** (testable — from the design's acceptance matrix):
+- **Numeric single-emission**: {field, arg} default × {literal, TypedTypedConstant, resolvable interpolated} below `min` → exactly one `OutOfRange` (Proof); **no `NumericOverflow` on any default cell** (double-emit + split gone).
+- **Numeric computed-field (D4)**: `field T as number max N <- e` with `IntervalOf(e)` exceeding `[..N]` → exactly one `NumericOverflow` (Proof); in-bounds computed field clean.
+- **Length (D8)**: `field/arg as string minlength M default "<short>"` → exactly one `LengthBoundViolation` (Proof); `notempty` string default `""` → one `LengthBoundViolation`; in-bounds clean; **set-action length unchanged**.
+- **Qualifier residual (D5)**: open-qualifier default/bound/computed → PRE0141 from **Proof**; `TypedConditional` value → PRE0141 from **Type** (the only remaining type-stage PRE0141 site).
+- **Behavior-preservation golden**: constant numeric defaults produce byte-identical message+code (only stage differs).
+- **Stage relabels**: `GetMeta(NumericOverflow).Stage == Proof`, `… OutOfRange … == Proof`.
+- **Full suite green**; `precept_compile` per-stage counts shift as documented, asserted not silent.
+- **NOT in 3b**: collection-count (→ 3b-count), `MaxPlacesExceeded` (D6/Slice 5), the analyzer (3c).
+
+**Estimated effort**: **M–L (~3–4 days)** — three surfaces' default stamping + the OutOfRange dispatch + the computed-field collector + the qualifier-residual relocation, each behavior-changing with per-cell coverage tests; numeric-constant behavior-preservation is the hard gate.
+
+**Doc-update obligations**:
+- `docs/compiler/proof-engine.md` — Numeric 1:many OutOfRange arm; IntervalContainment extended to computed fields; defaults route through the stamped Numeric obligation; `ProofRequirementKind` "eleven"→"thirteen"; `TryLengthContainmentProof` file-location fix (`ProofEngine.Lengths.cs`) + strategy-number/kind-ordinal reconcile.
+- `docs/compiler/diagnostic-system.md` — `NumericOverflow`/`OutOfRange` stage = Proof; the declared-value-vs-computation partition.
+- `docs/tooling/mcp.md` — per-stage count shift + new length-default diagnostics.
+- `src/Precept/Language/ProofRequirementKind.cs` — "eleven"→"thirteen" (code-comment doc-sync).
+
 ## Lightweight stubs (later slices)
 
-### Slice 3b — Declared-bound obligation ownership (the whole value-vs-bound family)
-**Now has a dedicated locked + reviewed design**: [`phase8-value-level-obligation-ownership-2026-06-01.md`](phase8-value-level-obligation-ownership-2026-06-01.md) (3 adversarial review rounds; LOCKABLE). It **expands** Slice 3 D3 and **resolves** D5 — the original "two value-level checks" framing was incomplete: enumeration found the relocation collides with the existing `IntervalContainment`→`NumericOverflow` mechanism, and that the string-length and collection-count families carried the identical silent-gap pathology (with `CountBoundViolation` a **dead `[StaticallyPreventable]` code**). **Goal**: every declared-bound violation (numeric/length/count, incl. `notempty`) is single-stage-owned + single-coded — numeric defaults → `OutOfRange` via a stamped `Numeric(SelfValue)` obligation; computations → `NumericOverflow` via `IntervalContainment` (extended to computed fields); string/collection defaults → `Length`/`CountContainment`; the qualifier residual → the stamped `AssignmentQualifier` obligation (`TypedConditional` carve-out). `MaxPlacesExceeded` stays Type (D6/Slice 5). See the design's Decisions D1–D10, Falsifiers, and per-cell acceptance matrix. **Effort**: M–L (~3–4 days; the count proof-strategy build is split to **Slice 3b-count**). **Status: design-locked, ready for `/lifecycle-3-plan` (or direct execution per owner).**
+### Slice 3b-count — Build the collection-count proof strategy (D9)
+**Goal**: implement the stubbed `TryCountContainmentProof` (mirror `TryLengthContainmentProof` on `TypedListLiteral.Elements.Length`); stamp `CountContainment` for collection field/arg defaults (list-literal shape) + `notempty`-on-collection as `mincount 1`; **revive the dead `CountBoundViolation`** and re-place it in `DiagnosticCoverageAllowLists`. **Scope**: reaches `list`-typed defaults; set/queue/stack/bag/log reject list-literal defaults upstream (PRE0044/PRE0018 — named, out of scope). Keep `CountContainment` disjoint from the `Numeric(count-accessor)` action-safety path (D10). **Design decisions**: D9, D10. **Decisions required**: none (Locked). **Effort**: M (~2 days). **Status: Stub — TBD pending Slice 3b completion.** Key acceptance: a NEW default-bearing `list of string mincount 2 default ["a"]` test asserts exactly one `CountBoundViolation` (Proof); the existing no-default `set` test (`ProofEngineStringCollectionBoundTests.cs:253-267`) KEEPS asserting `BeEmpty`; `TryCountContainmentProof` returns `false` on a violating list literal, `null` on a non-literal collection.
 
 ### Slice 3c — The ownership analyzer
-**Goal**: new `Precept.Analyzers` analyzer enforcing single-stage ownership — for each emission site (literal + catalog-mediated field reads + the bounded Pattern-2 residue candidate sets), the emitting stage equals `Diagnostics.GetMeta(code).Stage`. **Green with zero allow-list** (true by construction because Slice 2 + 3a + 3b made the surface uniform + single-owned). Reuses `DiagnosticCoverageScanner`; detection by containing type. **Design decision**: Slice 3 D1. **Decisions required**: none (Locked). **Effort**: M (~2 days). **Status: Stub — TBD pending Slice 3b completion** (the analyzer can't be green until value-level codes are proof-owned).
+**Goal**: new `Precept.Analyzers` analyzer enforcing single-stage ownership — for each emission site (literal + catalog-mediated field reads + the bounded Pattern-2 residue candidate sets), the emitting stage equals `Diagnostics.GetMeta(code).Stage`. **Green with exactly one documented carve-out** — the `TypedConditional`-valued assignment-qualifier residual (`UnprovedAssignmentQualifierCompatibility`), which cannot be sited per-branch and so legitimately emits from the type stage (design D5). Every other declared-bound/value-level code is single-owned by construction after Slice 2 + 3a + 3b + 3b-count. Reuses `DiagnosticCoverageScanner`; detection by containing type. **Design decision**: Slice 3 D1 (+ the D5 carve-out). **Decisions required**: none (Locked). **Effort**: M (~2 days). **Status: Stub — TBD pending Slice 3b + 3b-count completion** (the analyzer can't be green until value-level codes are proof-owned).
 
 ## Definition of done
 
 The Slices 2–3 workstream is complete when:
-- The ownership analyzer is **green with zero allow-list entries**; a deliberately wrong-stage `Diagnostics.Create` in a test fixture trips it.
-- No `DiagnosticCode` is emitted from two stages (all **6** duals consolidated — incl. the `Undeclared*` family → Bind; `GraphAnalyzer.cs:85` guard gone; latent double-emission fixed).
-- The 2 proof-dischargeable value-level checks (`OutOfRange`, assignment-qualifier residual) discharge at the proof stage; constant-default violations still produce a diagnostic (proof-owned), verified on the corpus. (`MaxPlacesExceeded` stays Type-owned — Decision 6.)
-- `DiagnosticStage` has honest `Bind`/`Tooling`; no mislabels; no precedence semantics.
-- All doc-touch obligations met (`diagnostic-system.md`, `proof-engine.md`, `Diagnostic.cs` comments, `mcp.md`).
-- Full suite green across all 4 projects; `precept_compile` output stable except the **documented** Slice 3a stage-string/count changes and the Slice 3b `OutOfRange` re-stage.
-- Scope gate opens: Slice 4 (witness richness) can start; Phase 9 inherits a uniform catalog-mediated surface.
+- The ownership analyzer is **green with exactly one documented carve-out** (the `TypedConditional` qualifier residual, design D5); a deliberately wrong-stage `Diagnostics.Create` in a test fixture trips it.
+- No `DiagnosticCode` is emitted from two stages (all 6 Slice-3a duals consolidated; the numeric `OutOfRange`/`NumericOverflow` double-emit + field/arg split removed; `GraphAnalyzer.cs:85` guard gone).
+- The **whole declared-bound family** is proof-owned and single-coded: numeric defaults → `OutOfRange`, computations (set-action + computed field) → `NumericOverflow`, string defaults → `LengthBoundViolation`, collection defaults → `CountBoundViolation`, qualifier residual → proof-stage PRE0141. Constant-default violations still produce a diagnostic (behavior-preserving), verified on the corpus. The **dead `CountBoundViolation` is revived** (a standing Principle-11 violation closed). (`MaxPlacesExceeded` stays Type-owned — Decision 6 / Slice 5.)
+- `DiagnosticStage` has honest `Bind`/`Tooling`; `NumericOverflow`/`OutOfRange` relabeled to `Proof`; no mislabels; no precedence semantics.
+- All doc-touch obligations met (`diagnostic-system.md`, `proof-engine.md`, `Diagnostic.cs` comments, `mcp.md`, `ProofRequirementKind.cs` comment).
+- Full suite green across all 4 projects; `precept_compile` output stable except the **documented** changes (3a stage-strings/counts; 3b numeric Type→Proof + new length-default diagnostics; 3b-count new collection-count diagnostics).
+- Scope gate opens: Slice 4 (witness richness) can start; Phase 9 inherits a uniform catalog-mediated surface with no dead `[StaticallyPreventable]` declared-bound codes.
 
 ## Discovered during planning
 
-Guard-7 check (plan-touches ⊆ designs' `sources-consulted` ∪ Inventory): **no out-of-design sources.** Every file this plan touches — the per-type validators, `TypeChecker.Expressions.cs`, `ProofEngine.Diagnostics.cs`/`ProofEngine.cs`, `FaultCode.cs`, `Diagnostics.cs`, `Diagnostic.cs`, `Operation.cs`/`Function.cs`/`Operations.cs`/`Functions.cs`, `CI.cs`, `GraphAnalyzer.cs`, `NameBinder.cs`, `Structural.cs`, `TypeChecker.cs`, `RichHoverFactory.cs`, `CompileTool.cs`, `CatalogFormatters.cs`, `DiagnosticCoverageScanner.cs`, the new analyzer, and the test projects — appears in the two designs' Inventory / `sources-consulted` / doc-update, or in the deep-dive evidence index they cite. No design re-lock required.
+Guard-7 check (plan-touches ⊆ designs' `sources-consulted` ∪ Inventory): **no out-of-design sources.** Every file Slices 2/3a touch — the per-type validators, `TypeChecker.Expressions.cs`, `ProofEngine.Diagnostics.cs`/`ProofEngine.cs`, `FaultCode.cs`, `Diagnostics.cs`, `Diagnostic.cs`, `Operation.cs`/`Function.cs`/`Operations.cs`/`Functions.cs`, `CI.cs`, `GraphAnalyzer.cs`, `NameBinder.cs`, `Structural.cs`, `TypeChecker.cs`, `RichHoverFactory.cs`, `CompileTool.cs`, `CatalogFormatters.cs`, `DiagnosticCoverageScanner.cs`, the new analyzer, and the test projects — appears in those designs' Inventory / `sources-consulted` / doc-update, or the deep-dive evidence index they cite.
+
+Slice 3b/3b-count derive from `phase8-value-level-obligation-ownership-2026-06-01.md`; every file they touch — `ProofEngine.Diagnostics.cs`, `ProofEngine.Analysis.cs`, `ProofEngine.Lengths.cs`, `ProofEngine.Strategies.cs`, `TypeChecker.cs`, `TypeChecker.Validation.Modifiers.cs`, `AssignmentQualifiers.cs`, `Diagnostics.cs`, `ProofRequirement.cs`, `ProofRequirementKind.cs`, `Actions.cs`, `SemanticIndex.cs`, `DiagnosticCoverageAllowLists.cs`, `collection-types.md`, the proof-stage test projects — is in that design's `sources-consulted`/Inventory. **One execution surface acknowledged in the design body but not its frontmatter**: `ProofEngine.Intervals.cs` (`IntervalOfNarrowed`), the discharge path the D4 computed-field obligation reuses — listed here for completeness; not a design gap (the design references `IntervalOfNarrowed` and proof-engine.md:1672 explicitly), no re-lock required.
 
 ## Plan update protocol
 
