@@ -331,6 +331,8 @@ rejecting it.
 
 ### Conclusion 2 — Auto-conversion is sound only across exact-`decimal`, ratio-scale factors; this is a scope condition, not a blocker
 
+> **Superseded by owner ruling (2026-05-31) — see design Decision 2 (`docs/Working/price-cross-unit-cancellation-design-2026-05-31.md`).** This conclusion recommended *rejecting* non-exact-`decimal` factors. The owner ruled **allow all commensurable conversions and *surface* the exact-vs-approximate status** instead — on the basis that (a) `in→ft = 1/12` is an *exact rational* (non-terminating in base-10 is the same rounding as any `money / 3`, absorbed at `maxplaces`), (b) the author's explicit cross-unit expression makes the conversion non-silent, and (c) P8 requires the line be *visible*, not *forbidden*. The **findings below stand** (exact-rational vs float representation, the exactness spectrum); only the "reject inexact" *recommendation* is overridden. The same supersession applies to the "Exactness" bullet in § Implications.
+
 - **Rationale** — Auto-conversion injects the conversion factor into the result. Where the factor is an
   exact `decimal` (kg↔g, L↔mL, lb↔kg = 0.45359237 exactly), `decimal` arithmetic preserves exactness and
   the result is honest. Where the factor is transcendental/irrational (angle↔radian via π), log-scale
@@ -359,15 +361,20 @@ rejecting it.
 > (offset/`absolute<>`/point-origin), but they *allow* the **amount/increment** form (Pint `delta_degC`,
 > GNU `degC`). Since Precept's `quantity` is *always an amount* (never an absolute position — the
 > `duration`-not-`instant` analog), `quantity` amounts are **not excluded by the position rule** (an
-> amount has no offset to trip on). **Cross-scale admissibility is then the exactness gate's call**, and
-> the two diverge for log units: °C↔°F (×1.8, an exact decimal) is admitted; dB↔Np (÷8.686 = 20/ln 10,
-> *irrational*) is **rejected** like angle→radian. So a dB *gain* is an amount (position-rule-fine) and
-> prices same-unit (factor 1), but its cross-scale conversion is exactness-gated, **not** "clean" — the
-> "dB converts cleanly to nepers" framing first stated here was the conflation. What the position rule
+> amount has no offset to trip on). The **libraries' finding** — they forbid affine/log *point*
+> operations — is unchanged and stands. But **Precept's own decision diverges**: per the owner's
+> allow-all-with-surfacing ruling (2026-05-31), Precept admits **all** commensurable conversions and
+> *surfaces* exact-vs-approximate rather than rejecting. So for Precept, dB *amounts* cancel: same-unit
+> (factor 1) exactly, and cross-scale (dB↔Np, ÷8.686 = 20/ln 10, *irrational*) **allowed and surfaced as
+> approximate** — like angle→radian, also allowed and surfaced. Precept is thus **more permissive** than
+> the libraries (which reject the point form) while keeping the exact/approximate status visible. The
+> "dB converts cleanly to nepers" framing first stated here was the conflation: the cross-scale factor is
+> irrational, so the conversion is *labelled approximate*, not silently "clean." What the position rule
 > excludes is only *absolute positions* (thermostat readings, `dBm` levels), which `quantity` does not
 > model — tracked as Phase 7 Slice 4. See `docs/Working/price-cross-unit-cancellation-2026-05-31.md` § Decision & scope
 > correction. The excerpts below remain accurate (they describe the libraries forbidding **point**
-> multiplication); it is the "exclude all affine/log" framing that narrowed.
+> multiplication); it is the "exclude all affine/log" framing that narrowed, and Precept's own rejection
+> framing that the allow-all ruling replaced.
 
 - **Rationale** — Affine units (°C, °F, dB, pH) are points in an affine space, not ratio-scale
   magnitudes; a point has no meaningful product or quotient. Auto-converting-then-cancelling a `°C`
