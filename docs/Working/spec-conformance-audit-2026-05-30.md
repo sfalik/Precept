@@ -79,7 +79,7 @@ Surfaced while mapping full-UCUM special-unit behavior for the cross-unit cancel
 
 ## Coverage gaps in the audit itself (not yet probed)
 - `precept-language-spec.md` §1 (lexer), §2.7 (parser), §3.10 (full diagnostic catalog), §3A semantics — not audited.
-- The 162 `DiagnosticCode` members: not cross-checked for "emits from a real path" (the catalog-completeness lens — **Phase 8**'s stated job; distinct from the conformance/identity probing this register drives, which is **Phase 7**).
+- The 162 `DiagnosticCode` members: not cross-checked for "emits from a real path" (the catalog-completeness lens — **Phase 9**'s stated job; distinct from the conformance/identity probing this register drives, which is **Phase 7**).
 
 ## Phase routing (where each cluster gets fixed)
 
@@ -87,7 +87,7 @@ This register is the durable tracker — nothing is lost as long as every row la
 
 - **A-class (functional gaps: A1 price×quantity, A2 exchangerate slash, A3 date+literal-quantity, A4 kg/hour compound)** → **Phase 7** (this audit doc is its driver). Phase 3/5 (the natural type-system/proof-engine owners) are closed. **A1 and the PRE0073/compound-denominator C-items may share ONE root cause** (qualifier-chain resolver not reading the right operand's `in`-declared qualifier — same `PRE0114 "unresolved"` signature; the analogous period case was fixed during Phase 6 W-C). **Verify that grouping before routing** — if shared, the temporal C-items ride with A1 in Phase 7.
 - **B-class (spec says error, doesn't fire — soundness holes)** → **Phase 7** (re-homed from the diagnostic-completeness phase: these are conformance defects — the language fails to reject what the spec declares illegal — which is Phase 7's charter, not the catalog-completeness lens).
-- **C-class (wrong/generic code, incl. PRE0073)** → **Phase 7** when entangled with A1's root cause (the named spec diagnostic must fire); standalone catalog-wiring C-items → **Phase 8** (diagnostic completeness / emission architecture). The A1↔C1 grouping check decides.
+- **C-class (wrong/generic code, incl. PRE0073)** → **Phase 7** when entangled with A1's root cause (the named spec diagnostic must fire); standalone catalog-wiring C-items → **Phase 9** (diagnostic completeness). The A1↔C1 grouping check decides.
 - **D-class (doc-stale)** → doc cleanup sweep within Phase 7 W-F (incl. the slash `to`→`/` doc/test sweep from A2, which rides with the A2 impl fix).
 
 **Phase 6 (composite period basis) — what actually stays here:** only **W-D** (scenario-test matrix + lease sample + doc-sync) remains. PRE0073 is *temporally* adjacent to W-C but is mechanically a C-class diagnostic gap likely entangled with A1 — so it routes with the A-class root-cause fix, NOT as a Phase 6 item, pending the grouping check. (Recorded so it is not lost: see C1.)

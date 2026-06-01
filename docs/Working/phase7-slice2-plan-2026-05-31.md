@@ -30,7 +30,7 @@ The `/lifecycle-4-execute` enumerate-step probed the **full UCUM** behavior (not
 |---|---|---|---|---|---|
 | 1 | Buildable-now — `ScaleIsRational` guard + hover surfacing + `PRE0114` reword + tests + doc-sync | 5 | 0 (design locked) | M (~2–3 days) | ✅ **Done `fe7d1187`** (precept-reviewer pass applied; 6621/417/67/291 green). Stage-5 promotion of D8/§168 + `evaluator.md` runtime requirement still pending. |
 
-**This slice has one executable phase.** The runtime value-application (actually applying the factor) is **out of Slice 2's scope** — it is built in the readiness-plan **runtime phase (Phase 11)**, governed by the requirement this slice *documents* in `evaluator.md` + the locked design's § Semantic Rules. Slice 2's runtime deliverable is the **documentation of the requirement**, not the build — so the durable carrier of the runtime obligation is canonical docs, not a tracked execution phase.
+**This slice has one executable phase.** The runtime value-application (actually applying the factor) is **out of Slice 2's scope** — it is built in the readiness-plan **runtime phase (Phase 12)**, governed by the requirement this slice *documents* in `evaluator.md` + the locked design's § Semantic Rules. Slice 2's runtime deliverable is the **documentation of the requirement**, not the build — so the durable carrier of the runtime obligation is canonical docs, not a tracked execution phase.
 
 ## Decisions captured
 
@@ -41,7 +41,7 @@ The `/lifecycle-4-execute` enumerate-step probed the **full UCUM** behavior (not
 ## Open decisions
 
 - **None gate Phase 1.** One low-stakes execution-time choice (not a gate): the exact wording of the hover/inspection "approximate" label — settle in execution, doc in `language-server.md`.
-- **Runtime build dependency** (not a Slice-2 gate): the evaluator reduction rule is built in the readiness-plan **runtime phase (Phase 11)** against the requirement this slice documents in `evaluator.md`. No decision pending — purely a dependency; the build is out of Slice 2's scope.
+- **Runtime build dependency** (not a Slice-2 gate): the evaluator reduction rule is built in the readiness-plan **runtime phase (Phase 12)** against the requirement this slice documents in `evaluator.md`. No decision pending — purely a dependency; the build is out of Slice 2's scope.
 
 ---
 
@@ -101,7 +101,7 @@ The reduction rule that **applies** the factor is **not** built in Slice 2 — t
 
 - **Where it lives**: the locked design's § Semantic Rules (reduction rule + soundness) + `docs/runtime/evaluator.md` (Phase 1 doc-sync obligation above) + the skipped `CrossUnit_SameDimension_MustNotSilentlyCancel` test (marks the gap).
 - **The requirement**: on evaluation of `price × quantity` where the operand units differ within a dimension, convert the quantity to the price's denominator unit by the exact-rational factor `k` (`UcumExactFactor.Multiply`/`Divide` preserve rationality), then cancel, rounding the money result at the field's `maxplaces`. For same-unit operands `k = 1`.
-- **When built**: the readiness-plan **runtime phase (Phase 11)** picks this up — no decisions pending, purely the runtime dependency. At that point the skipped test gains a runtime-magnitude assertion (`4.00 USD/ft × 36 in → 12.00 USD`) and `evaluator.md` flips to Implemented.
+- **When built**: the readiness-plan **runtime phase (Phase 12)** picks this up — no decisions pending, purely the runtime dependency. At that point the skipped test gains a runtime-magnitude assertion (`4.00 USD/ft × 36 in → 12.00 USD`) and `evaluator.md` flips to Implemented.
 
 This is a deliberate choice (your direction): the runtime obligation is carried by **documentation**, not by a parallel execution phase that would otherwise sit indefinitely as a stub.
 
@@ -126,5 +126,5 @@ The design frontmatter's `sources-consulted` lists `business-domain-types.md`, `
 ## Plan update protocol
 
 - After **Phase 1** lands: mark Slice 2 done in the readiness-plan slice log; the runtime application is carried as a documented requirement (`evaluator.md`), not a tracked stub.
-- When the **runtime phase (Phase 11)** opens: it implements the documented reduction-rule requirement and un-skips the runtime-magnitude assertion — as part of *that* phase, not a re-opening of Slice 2.
+- When the **runtime phase (Phase 12)** opens: it implements the documented reduction-rule requirement and un-skips the runtime-magnitude assertion — as part of *that* phase, not a re-opening of Slice 2.
 - If execution uncovers a surface the design didn't name: stop, flag it (design re-lock vs. discovered-during-planning), don't silently absorb.
