@@ -22,9 +22,9 @@
 | 5 | Proof engine satisfiability + BUG-004 + BUG-006 + FieldNeverSet/unification + BIZ operator extensions | **14** | 2 | XL (~3 sessions) | ✅ **Complete 2026-05-27** (all 6 workstreams W-A through W-F shipped across 20 commits; 7136/7136 tests pass across all 4 projects; 2 precept-reviewer rounds + remediations; 3 locked designs via `/lifecycle-2-design` — W-B FieldNeverSet, W-C satisfiability cluster, W-D BIZ operator extensions. **Workstream summary**: W-A BUG-004 event-ensure narrowing (`034a5976`); W-B F-LANG-GRAPH-04 FieldNeverSet + writable→editable unification — 8 slices, 4 commits, 27 sample fixes (`0d61f792` `12d7c422` `0feb135a` `2ac416b5`); W-C satisfiability cluster — SPEC-02 UnsatisfiableGuard wire-up + SPEC-03 ContradictoryRule + SPEC-04 VacuousRule + SPEC-05 TautologicalGuard + SPEC-12 UnreachableRowFact + BUG-006 cross-row interval composition (`a6c35e36` `ffb7288b` `c16be77b` `42cee783`); W-D BIZ operator extensions — BIZ-01 `money / price → quantity` + BIZ-05 `DimensionalProductProofRequirement` + PRE0157 + BIZ-08 discrete equality narrowing (`5d945711` `e71e09d2` `08fae0ef` `fdf33095`); W-E F-LANG-TEMP-04 always-false period comparison (`27dfe325`); W-F BUG-013 sample fixture restore (`766637c0`). Phase-close audit (`34d11e61` + `ed1f4193`) addressed 1 BLOCKER + 5 CONCERNs + 2 NITs from the reviewer punch list; pre-existing proof-engine.md strategy-chain doc gap closed in (`6a35369c`). 6 new diagnostic codes (PRE0153–PRE0158); 1 new ProofRequirementKind (DimensionalProduct); 1 new ProofForwardingFact variant (UnreachableRowFact); 1 new ResultQualifierPolicy (InheritPriceDenominatorUnit); 1 new ActionMeta property (WriteSemantics); 1 new ProofStrategy (DimensionalProduct); 1 retired ModifierKind (Writable) + TokenKind; NumericInterval gains Empty/Intersect/Difference; Integer arithmetic ops gain IntervalTransfer functions. Five §0.6 obligations move from Specification-only to Implemented.) |
 | Phase 5 post-review remediation | 15 code-review findings + 3 surfaced soundness defects + cleanup | 22 | 2 (Slice 2 qualifier + dimensionless-product; Slice 4 satisfiability-attribution + reachability) | M (~1 session) | ✅ **Complete 2026-05-28** (commit `11599944` + sample-restore `332f76ac` + post-regression Slices 6–7 still local). Extra-high-effort `/code-review` on the Phase 5 spike branch surfaced 15 findings; remediated across Slice 1 (1a/1b/1c/1d direct bug fixes), Slice 3 (`PriceDenominatorInherited` `QualifierBinding` subtype wired across 5 consumer sites + PRE0137 lift from `!opComposesDimensions` gate), and Slice 5 (PRE0159 `UnsatisfiableRule` pre-pass + reachability-gated `FieldNeverSet`). Two locked designs via `/lifecycle-2-design`, now archived in `docs/Working/Archive/`. Three precept-reviewer audits cleared with remediations. A regression `/code-review` pass against the cumulative diff confirmed 0 of 15 originals survived and surfaced 3 NEW soundness defects (`BuildSiblingRejectExclusions` source-order + wildcard-row gate; `ScanRules` pair-sweep ignoring `when` guards) — fixed in Slice 6 with the guard mutual-exclusion pre-check and the source-order/wildcard checks. Slice 7 collapsed four duplicate fold-constraint sites onto a shared `FoldConstraintsInto` helper, removed dead code, cleaned doc-comment drift, downgraded `bugs.md` BUG-006 scope notes (literal-comparison sibling rejects only), and swept 6 stale narrative `# BUG-NNN` refs in samples. **7167/7167 tests pass** (was 7136 at Phase 5 close; +31 net new tests across the remediation slices). Two designs archived; `bugs.md` updated. |
 | 6 | composite period basis (F-LANG-BIZ-07) | 1 (F-LANG-BIZ-09 closed) | 2 (D6.1 sample? D6.2 runtime-lowering deferral — both resolved in the plan) | M (~2.5–3.5d) | ✅ **Complete 2026-05-30.** All 4 workstreams shipped (W-A/W-B prior; W-C `fd147dc2`/`a42134e3`/`d2946dc0`; W-D scenario-test matrix + lease sample `31faa2ba` + single-basis whitespace-trim fix `02a1e44f`). Composite period basis (`period in 'hours + minutes'`) parses/validates/canonicalizes; `.basis`/`.dimension` accessors return composite/derived values; composite bases do not cancel single-unit denominators (D15); legal-basis-by-operation + D14 subset enforced. Full suite green (Precept.Tests 6597 + LS/MCP/Analyzers). Runtime `Period.Between` lowering deferred to the runtime phase (D6.2). Spec-conformance gaps surfaced during W-D (price×quantity resolver, exchangerate slash, PRE0073 — all *outside* composite-period scope) tracked in `spec-conformance-audit-2026-05-30.md` for a remediation phase. |
-| 7 | **Total language conformance sweep** — every spec/catalog construct, type, operator, modifier, and diagnostic probed against the implementation; every confirmed spec↔impl gap fixed | open-ended / exploration-driven (audit is one seed — A1–A4 / B1–B9 / C1–C4 / D1–D4 from `spec-conformance-audit-2026-05-30.md`; also commissioned audits, probing, conformance tests; count grows as discovery continues) | per-row owner rulings (spec-internal contradictions; A1↔C1 shared-root grouping; Phase 9 diagnostic-completeness seam) | XL | **Active — kicking off 2026-05-30** |
-| 8 | API surface solidity (typed descriptors) | ~6 | 1 | M-L | Stub — TBD |
-| 9 | Diagnostic completeness + **diagnostic-emission architecture** (DA-1 emission phase / DA-2 regularization audit / DA-3 counterexample witnesses — from the 2026-05-29 type↔proof-contract survey) | ~7 + 3 (DA) | 3 + 2 (DA) | M→L | Stub — TBD |
+| 7 | **Total language conformance sweep** — every spec/catalog construct, type, operator, modifier, and diagnostic probed against the implementation; every confirmed spec↔impl gap fixed | open-ended / exploration-driven (audit is one seed — A1–A4 / B1–B9 / C1–C4 / D1–D4 from `spec-conformance-audit-2026-05-30.md`; also commissioned audits, probing, conformance tests; count grows as discovery continues) | per-row owner rulings (spec-internal contradictions; A1↔C1 shared-root grouping; Phase 8 diagnostic-completeness seam) | XL | **Active — kicking off 2026-05-30** |
+| 8 | Diagnostic completeness + **diagnostic-emission architecture** (DA-1 emission phase / DA-2 regularization audit / DA-3 counterexample witnesses — from the 2026-05-29 type↔proof-contract survey) | ~7 + 3 (DA) | 3 + 2 (DA) | M→L | Stub — TBD |
+| 9 | API surface solidity (typed descriptors) | ~6 | 1 | M-L | Stub — TBD |
 | 10 | Polish + cleanup + `/lifecycle-7-audit` skill | ~20 | 4 | M | Stub — TBD |
 | 11 | Runtime gate verification | — | 0 | S | Stub — TBD |
 
@@ -372,7 +372,7 @@ Output: completion report. If clean: Phase 1 complete. If 🔴: remediate before
 - [ ] All 8 Phase-1 decisions recorded in this doc's § "Decisions captured" and in the remediation doc § 1a.
 - [ ] `catalog-system.md` count claims match `grep -c` of corresponding `*Kind.cs` files (Tokens, Types, Operators, Functions, Actions, Modifiers, Constructs, ConstructSlots, ExpressionForms, Constraints, ProofRequirements, Outcomes, Diagnostics, Faults — 14 catalogs).
 - [ ] Every metadata-record shape claim in `catalog-system.md` matches the actual C# record definition (`Token.cs`, `Type.cs`, etc.).
-- [ ] No "✅ Resolved" claim in `catalog-system.md` references code that doesn't exist (revert any that the owner decided not to implement; implement the rest in Phase 8 as part of API solidity work).
+- [ ] No "✅ Resolved" claim in `catalog-system.md` references code that doesn't exist (revert any that the owner decided not to implement; implement the rest in Phase 9 as part of API solidity work).
 - [ ] All per-stage Status fields (`parser.md`, `type-checker.md`, `lexer.md`, `tooling-surface.md`, `primitive-types.md`, `business-domain-types.md`, `temporal-type-system.md`) reflect actual implementation state.
 - [ ] `grep -rn "milestone" docs/language/precept-language-spec.md docs/compiler/` returns zero results in modifier context.
 - [ ] Spec § 0.5 enumerates only shipped capabilities; roadmap doc (or sub-section) covers the 10 deferred modifiers.
@@ -1086,8 +1086,8 @@ What unifies them is the **discipline**, not the source: every finding from any 
 This phase **absorbs** `spec-conformance-audit-2026-05-30.md` as its opening rows — that register is the durable tracker and nothing in it is lost:
 
 - **A-class (functional gaps)** — A1 price×quantity (CONFIRMED), A2 exchangerate slash (owner-ruled SLASH canonical; impl fix + `to`→`/` doc/test sweep), A3 date+literal-quantity, A4 `kg/hour` compound (both unverified). The audit's own routing note already named "a NEW remediation phase (this audit doc is its driver)" for A-class — **that phase is this one.**
-- **B-class (enforcement gaps — spec says error, compiler accepts; soundness holes)** — B1–B9, all unverified. Re-homed here from the old Phase 8: these are *conformance* defects (the language doesn't reject what the spec says is illegal), which is this phase's charter, not the catalog-completeness lens.
-- **C-class (diagnostic-identity gaps — rejected correctly but wrong/generic code)** — C1–C4. C-items entangled with A1's root cause (the PRE0114 "unresolved" qualifier-chain signature) ride here with the A-class fix; standalone catalog-wiring C-items may route to Phase 9. The **A1↔C1 shared-root-cause grouping check is the gating question** before sequencing fixes.
+- **B-class (enforcement gaps — spec says error, compiler accepts; soundness holes)** — B1–B9, all unverified. Re-homed here from the diagnostic-completeness phase: these are *conformance* defects (the language doesn't reject what the spec says is illegal), which is this phase's charter, not the catalog-completeness lens.
+- **C-class (diagnostic-identity gaps — rejected correctly but wrong/generic code)** — C1–C4. C-items entangled with A1's root cause (the PRE0114 "unresolved" qualifier-chain signature) ride here with the A-class fix; standalone catalog-wiring C-items may route to Phase 8. The **A1↔C1 shared-root-cause grouping check is the gating question** before sequencing fixes.
 - **D-class (doc-stale — impl correct, doc out of date)** — D1–D4. DOC-ONLY track; owner confirms the spec is the stale side, then doc fix (includes the A2 `to`→`/` doc sweep).
 
 ## Slices
@@ -1120,7 +1120,7 @@ Every slice, whatever its content, follows the same rigor: enumerate/probe → f
 ## Decisions required
 
 - **Is the price×quantity bug one bug or two?** It and a related "wrong diagnostic code" case both show the same "unresolved qualifier" signature, so they may share a single root cause. Check before sequencing fixes — if shared, one fix closes both. (Register rows: A1 and C1/PRE0073.)
-- **The Phase 7 / Phase 9 line.** Which diagnostic problems are *conformance* (the language behaves wrong → fixed here) vs *catalog-completeness / emission architecture* (every declared code is wired or retired → Phase 9)? Proposed split recorded above; owner confirms.
+- **The Phase 7 / Phase 8 line.** Which diagnostic problems are *conformance* (the language behaves wrong → fixed here) vs *catalog-completeness / emission architecture* (every declared code is wired or retired → Phase 8)? Proposed split recorded above; owner confirms.
 - **Spec-contradicts-itself cases** — when two parts of the spec disagree, or a spec line may itself be wrong, that's an owner ruling, not a find-and-fix. Surfaced one at a time as they arise. (The exchangerate slash-vs-`to` case is already settled: slash wins.)
 - **Doc-stale cases** — confirm the implementation is the correct side and the doc is just out of date, before fixing the doc instead of the code.
 
@@ -1145,27 +1145,9 @@ This phase is **open-ended by owner intent**: slice after slice after slice, for
 
 ---
 
-# Phase 8: API surface solidity (typed descriptors + analyzer extensions)
+# Phase 8: Diagnostic completeness
 
-**Goal**: The compile-time public API surface uses typed descriptors, not string-keyed field references. Defensive-throw pattern removed in favor of compile-time enforcement via extended `[HandlesCatalogExhaustively]` coverage.
-
-**Findings in scope** (~6):
-- F-API-01 (typed field descriptor refactor — D8/R4 + G1/G9 milestones — affects `Inspection.cs`, `SharedTypes.cs`, `UpdateOutcome.cs`, `SemanticIndex.TypedFieldRef`)
-- F-X-03 (extend `[HandlesCatalogExhaustively]` analyzer coverage)
-- F-PAR-04 (defensive `InvalidOperationException` in Parser dispatch — becomes unreachable after F-X-03)
-- F-TC-02 (D26 invariant runtime throws → factory-enforced construction)
-- F-TC-03 (D5 SecondaryExpression invariant → DU subtype split)
-- F-LEX-02 (per-decision rationale policy enforcement — if owner ruled "all four legs required even retroactively," this phase backfills the rationale across stage docs)
-
-**Decisions required**:
-- F-API-01: ship as standalone refactor before runtime (this phase), or open the runtime phase with it? Owner ruling needed at planning time.
-
-**Status**: Stub — detailed execution plan TBD pending Phase 7 (conformance sweep) completion and F-API-01 sequencing decision.
-**Estimated effort**: M-L (~3-5 days — F-API-01 alone is a broad public-API change; the analyzer extensions are smaller).
-
----
-
-# Phase 9: Diagnostic completeness
+*(Swapped with API surface solidity 2026-05-31 — no dependency between them; diagnostics follow naturally from the Phase 7 conformance sweep, API-solidity sits closer to the runtime phase.)*
 
 **Goal**: Every diagnostic code declared in `DiagnosticCode.cs` is either emitted from a real code path, has scenario-test coverage that asserts it fires, or is explicitly retired. CI enforcement is bidirectional.
 
@@ -1185,7 +1167,7 @@ This phase is **open-ended by owner intent**: slice after slice after slice, for
 
 Grounded in `research/architecture/compiler/type-proof-stage-contract-survey.md` and `flow-sensitive-check-placement-survey.md` (both `status: Cited`). These widen this phase from *coverage* to *emission architecture*; all three sit within Precept's locked determinism boundary (no IVL/SMT — `proof-engine.md` opaque-solver rejection).
 
-- **DA-1 — Dedicated diagnostic-emission phase** (answers `research/architecture/README.md` open-question #2). The survey found 3 of 4 production compilers (Kotlin K2 `CHECKERS` phase, Rust MIR reporting walk, Roslyn) defer *all* diagnostic emission to one terminal phase, decoupled from where the check computes. Precept emits scattered across the type and proof stages; the Phase 6 Site-A PRE0141 Type→Proof re-stage (`docs/Working/assignment-qualifier-discharge-placement.md`) is a one-off symptom. A unified emission phase makes "which stage emits this" a non-question. **Stakes: medium (a pipeline-shape change); needs a `/lifecycle-2-design` pass.**
+- **DA-1 — Dedicated diagnostic-emission phase** (answers `research/architecture/README.md` open-question #2). The survey found 3 of 4 production compilers (Kotlin K2 `CHECKERS` phase, Rust MIR reporting walk, Roslyn) defer *all* diagnostic emission to one terminal phase, decoupled from where the check computes. Precept emits scattered across the type and proof stages; the Phase 6 Site-A PRE0141 Type→Proof re-stage (`docs/Working/Archive/assignment-qualifier-discharge-placement.md`) is a one-off symptom. A unified emission phase makes "which stage emits this" a non-question. **Stakes: medium (a pipeline-shape change); needs a `/lifecycle-2-design` pass.**
 - **DA-2 — Regularization audit: type-immediate checks that should be stamped obligations.** The assignment-qualifier check (Site-A) was the *lone* qualifier check done as a type-immediate emit instead of a stamped obligation (the `proof-engine.md` Decision-3 contract). Audit `DiagnosticCode.cs` / the type checker for *other* checks that are really proof obligations in disguise; regularizing them improves uniformity and may unlock narrowing/proof for them (as Site-A now does). **Small, discoverable — a grep-and-classify pass; Site-A handles its own instance in Phase 6, this finds the rest.**
 - **DA-3 — Counterexample / witness richness for unproved obligations.** Dafny/CBMC hand the author a concrete counterexample on a failed proof; Precept emits the diagnostic but not the witness. Surfacing "X could be 0 here" for an unproved obligation sharpens the domain-expert experience and is squarely in the inspectability commitment — without an external solver. **Medium; aligns with `proof-engine.md` proof-attribution.**
 - **Optional grounding (research, horizon):** a Whiley deep-dive — the closest structural analog (a language designed around a separate verification stage that self-derives, not VC/IVL) — would best inform DA-1/DA-3 if the owner wants deeper grounding before the design pass. Not a build item.
@@ -1196,7 +1178,27 @@ Grounded in `research/architecture/compiler/type-proof-stage-contract-survey.md`
 - DA-1: introduce a dedicated diagnostic-emission phase, or keep per-stage emission with the Site-A-style targeted re-staging? (design pass)
 - DA-3: counterexample/witness surface — scope and shape (which obligation kinds; structured-data shape for tooling)?
 
-**Status**: Stub — detailed execution plan TBD pending Phase 8 completion and the listed decisions. **Seam with Phase 7**: the conformance sweep (Phase 7) fixes spec↔impl behavior gaps including B-class enforcement holes and A1-entangled C-class diagnostic-identity items; this phase owns the *catalog-completeness* lens (every declared `DiagnosticCode` emits-or-retires) and the emission-architecture work (DA-1/2/3). Re-scope this phase's finding list against what Phase 7 closes before kickoff.
+**Status**: Stub — detailed execution plan TBD pending Phase 7 (conformance sweep) completion and the listed decisions. **Seam with Phase 7**: the conformance sweep (Phase 7) fixes spec↔impl behavior gaps including B-class enforcement holes and A1-entangled C-class diagnostic-identity items; this phase owns the *catalog-completeness* lens (every declared `DiagnosticCode` emits-or-retires) and the emission-architecture work (DA-1/2/3). Re-scope this phase's finding list against what Phase 7 closes before kickoff.
+
+---
+
+# Phase 9: API surface solidity (typed descriptors + analyzer extensions)
+
+**Goal**: The compile-time public API surface uses typed descriptors, not string-keyed field references. Defensive-throw pattern removed in favor of compile-time enforcement via extended `[HandlesCatalogExhaustively]` coverage.
+
+**Findings in scope** (~6):
+- F-API-01 (typed field descriptor refactor — D8/R4 + G1/G9 milestones — affects `Inspection.cs`, `SharedTypes.cs`, `UpdateOutcome.cs`, `SemanticIndex.TypedFieldRef`)
+- F-X-03 (extend `[HandlesCatalogExhaustively]` analyzer coverage)
+- F-PAR-04 (defensive `InvalidOperationException` in Parser dispatch — becomes unreachable after F-X-03)
+- F-TC-02 (D26 invariant runtime throws → factory-enforced construction)
+- F-TC-03 (D5 SecondaryExpression invariant → DU subtype split)
+- F-LEX-02 (per-decision rationale policy enforcement — if owner ruled "all four legs required even retroactively," this phase backfills the rationale across stage docs)
+
+**Decisions required**:
+- F-API-01: ship as standalone refactor before runtime (this phase), or open the runtime phase with it? Owner ruling needed at planning time.
+
+**Status**: Stub — detailed execution plan TBD pending Phase 8 completion and F-API-01 sequencing decision.
+**Estimated effort**: M-L (~3-5 days — F-API-01 alone is a broad public-API change; the analyzer extensions are smaller).
 
 ---
 
@@ -1215,7 +1217,7 @@ Grounded in `research/architecture/compiler/type-proof-stage-contract-survey.md`
 **Decisions required** (4):
 - F-NB-01: delete BuildDictionaries() or repurpose to materialize immutable dictionaries?
 - F-LANG-CAT-23: Roslyn rules doc location (Phase 1 may have settled this — re-check)
-- F-X-03 cleanup of removed defensive throws (Phase 8 may have settled — re-check)
+- F-X-03 cleanup of removed defensive throws (Phase 9 may have settled — re-check)
 - Any P2s where the implementer needs guidance.
 
 **Status**: Stub — detailed execution plan TBD pending Phase 9 completion.
