@@ -7,7 +7,22 @@
 - Research: [`cross-unit-conversion-arithmetic-survey.md`](../../research/language/expressiveness/cross-unit-conversion-arithmetic-survey.md)
 - Phase hub: [`compiler-readiness-plan-2026-05-24.md`](compiler-readiness-plan-2026-05-24.md) § Phase 7 slice log
 **Execution mode**: spike-branch (`spike/Precept-V2-Radical`) — no PR; **this plan doc is the execution hub**, the readiness-plan slice log points to it.
-**Scope gate**: closes the live cross-unit hole at compile-time + catalog + inspection; the runtime value-application is pinned for the runtime phase.
+**Scope gate**: surfaces the exact cross-unit conversion + adds the exactness soundness-guard; the runtime value-application is pinned for the runtime phase.
+
+## Enumeration findings & re-scope (2026-05-31)
+
+The `/lifecycle-4-execute` enumerate-step probed the **full UCUM** behavior (not just the Tier-1 curated catalog) and found the original Phase-1 scope was wrong in both directions. Facts (probed via `Compiler.Compile` / MCP on the current build; mapped against `src/Precept/Language/Ucum/`):
+
+- **Cross-unit cancellation already works (Slice 1).** `USD/[ft_i] × [in_i]`, `USD/kg × g`, `USD/Cel × Cel`, `USD/dB × dB` all already cancel (`QualifierChain: Proved`). The proof decides by **dimension-NAME string match** (`ProofEngine.Qualifiers.cs:105`) — **it computes no conversion factor at all.** So `Proved` today means "same dimension name," not "correct factor applied."
+- **`ScaleToBaseFactor` already exists** — every UCUM atom carries `.Scale: UcumExactFactor` (exact rational). Net-new is only the *exactness flag* + the surfacing.
+- **Angle units (`deg`/`rad`/`gon`) are rejected** (`PRE0114`, empty dimension name via `UnitDimensionHelper.cs:48`) — a **divergence from the locked design** (which says allow + surface). → split to its own slice.
+- **The catalog silently holds rational approximations of irrational scales:** `deg` ≈ π/180 from a 64-digit rational `[pi]`; `dB`/`Np` have their `lg`/`ln` function **stripped** (`UcumAtomCatalog.cs:466`) → meaningless `0.1`/`1` scales that are **not** the real `dB↔Np` factor. No flag marks any of this. A pre-existing path (`ProofEngine.Intervals.cs:295`) already reads these scales for interval proofs. → the `ScaleIsRational` flag is the **soundness guard** and is **not deferrable**.
+
+**Re-scoped Slice 2 = exact-conversion surfacing + the exactness guard** (sound, design-clear). **Split out:**
+- **Angle cancellation** → Slice 5 (give angle a dimension identity so it cancels per the design).
+- **Log cross-unit handling** → Slice 6, gated on a **design ruling** — the locked Decision 2 said "allow + surface" but the catalog holds *no real `dB↔Np` factor* and the field's libraries *forbid* multiplying log units; allow-with-what vs. restrict needs deciding, not executing.
+- **Conformance finding** (silent irrational-scale approximations read without a flag) → recorded in `spec-conformance-audit-2026-05-30.md`; the `ScaleIsRational` work here begins closing it.
+- **Runtime factor application** → documented requirement (unchanged).
 
 ## Phase summary
 
@@ -32,32 +47,30 @@
 
 ## Phase 1 (heavyweight, current) — Buildable-now: compile-time + catalog + inspection
 
-**Goal**: `price × quantity` cross-unit cancellation is correct and surfaced at compile-time + catalog + inspection; the live hole's compile-time behavior is closed and tested; the runtime value-application is documented as an obligation.
+**Goal**: the **exact** cross-unit conversion is surfaced to the author (hover shows from→to unit + factor), and an **exactness flag** guards against any conversion being silently surfaced as "exact" when its scale is an approximated irrational — for the cases that cancel today and have a real exact-rational factor (`in↔ft`, `kg↔g`, `Cel↔degF`). Angle + log are split out (Slices 5/6); the runtime value-application is a documented obligation.
 
-**Items in scope** (from the design Inventory):
-1. **Catalog metadata** on the UCUM atom catalog: `ScaleToBaseFactor` (exact rational — uses the existing `UcumExactFactor`), `ScaleIsRational` (false for π/log atoms — for surfacing), `IsRatioScale` (true for every current unit — wired, no-op until Slice 4).
-2. **Proof engine**: extend the existing `QualifierChainProofRequirement` discharge in `ProofEngine.Qualifiers.cs` to read `IsRatioScale` (no-op now); compute the exact/approximate classification **for surfacing, not gating**. No new `ProofRequirementKind`.
-3. **Inspection/hover** (language server): surface the conversion (which unit → which, the factor) and its exact/approximate status.
-4. **Diagnostics**: broaden `PRE0114` wording to name the real-world mismatch (domain-targeted), per the design's Audience error-message.
-5. **Tests** (`test/Precept.Tests/Operations/PriceTimesQuantityTests.cs`): the matrix below.
-6. **Doc-sync** (the doc-update obligations below).
+**Items in scope** (re-scoped 2026-05-31):
+1. **Exactness flag** on the UCUM atom catalog: add `ScaleIsRational` (bool) — **false** for any unit whose scale derives from `[pi]` (angle) or a stripped log/affine function (`dB`/`Np`/`Cel`/`[degF]`), **true** otherwise. (`ScaleToBaseFactor` already exists as `atom.Scale`; `IsRatioScale` is Slice-4 substrate — documented, not built here.)
+2. **Hover / inspection** (language server): for a cross-unit cancellation, surface the conversion — from-unit → to-unit + the exact-rational factor (computed from `atom.Scale`) + an **exact** label; a unit flagged `ScaleIsRational = false` is surfaced **approximate** (never "exact"). No proof-engine *gating* change (the proof still matches on dimension name — Slice 1's behavior).
+3. **Diagnostics**: broaden `PRE0114` wording to name the real-world mismatch (domain-targeted), per the design's Audience error-message.
+4. **Tests** (`test/Precept.Tests/Operations/PriceTimesQuantityTests.cs`): the matrix below.
+5. **Doc-sync** (the doc-update obligations below).
 
 **Decisions required before kicking off**: none (design locked).
 
 **Step-by-step execution** (per `/lifecycle-4-execute` rigor — enumerate + failing-tests-first, catalog-first, doc-sync in-commit):
-1. **Enumerate the input space + write the failing-test matrix FIRST**:
-   - `price in 'USD/ft' × quantity in 'in'` → cancels, no `PRE0114` (exact rational 1/12). *(red now)*
-   - `price in 'USD/kg' × quantity in 'g'` → cancels, no `PRE0114` (already green post-Slice-1; assert stays green).
-   - un-skip `CrossUnit_SameDimension_MustNotSilentlyCancel` → rewrite to assert **correct cancellation** (no `PRE0114`), not the old "must error".
-   - an **irrational-factor** pair (if such a unit is cataloged, e.g. an angle pair) → cancels, no `PRE0114`, **surfaced approximate**. *(if no irrational unit is cataloged yet, assert the classification on `ScaleIsRational` directly + leave a note.)*
-   - `price in 'USD/kg' × quantity in 'm'` (cross-dimension) → `PRE0114` fires. *(regression guard, present)*
-   - `price in 'USD/each' × quantity in 'box'` (count, no factor) → still errors (`PRE0137`). *(regression guard)*
-2. **Catalog-first**: add the three metadata fields to the UCUM atom catalog (`src/Precept/Language/Ucum/`); populate `ScaleToBaseFactor` from `UcumExactFactor`; set `ScaleIsRational` / `IsRatioScale`.
-3. **Proof engine**: wire the `IsRatioScale` read + the exact/approximate surfacing classification onto the existing `QualifierChain` discharge.
-4. **Hover/LS**: surface conversion + status.
-5. **Diagnostics**: broaden `PRE0114` wording.
-6. **Make the matrix green**; **doc-sync in the same commits**.
-7. **Adversarial review** (`precept-reviewer`) of the diff before commit (proof-engine/catalog = soundness-critical).
+1. **Enumerate + write failing tests FIRST** (correct UCUM codes — `[in_i]`/`[ft_i]`, not `'in'`/`'ft'`):
+   - `price in 'USD/[ft_i]' × quantity in '[in_i]'` → cancels (already `Proved` post-Slice-1); **hover surfaces `[in_i]→[ft_i] ×1/12 (exact)`**. *(hover assertion red now)*
+   - `price in 'USD/kg' × quantity in 'g'` → cancels; hover surfaces `g→kg ×1/1000 (exact)`. Un-skip `CrossUnit_SameDimension_MustNotSilentlyCancel` → assert clean cancellation (no `PRE0114`) **+ the exact hover surfacing**.
+   - `price in 'USD/Cel' × quantity in '[degF]'` → cancels; hover surfaces the `×5/9 (exact)` conversion.
+   - **Exactness-guard test**: a `ScaleIsRational = false` unit (e.g. `dB` or `deg`) is **never surfaced "exact"** (asserted on the flag / hover). The soundness guard. *(Does NOT assert angle/log cancellation — that's Slices 5/6.)*
+   - `price in 'USD/kg' × quantity in 'm'` (cross-dimension) → `PRE0114` (new wording). *(regression)*
+   - `price in 'USD/each' × quantity in 'box'` (count) → `PRE0137`. *(regression)*
+2. **Catalog-first**: add `ScaleIsRational` to the UCUM atom catalog (`src/Precept/Language/Ucum/`); populate it `false` for units whose reduction passes through `[pi]` or a stripped log/affine function, `true` otherwise. (Use the existing `atom.Scale`; do not add `ScaleToBaseFactor`/`IsRatioScale`.)
+3. **Hover/LS**: compute the conversion factor from `atom.Scale` and surface from→to + factor + exact/approximate (driven by `ScaleIsRational`). No proof-engine gating change.
+4. **Diagnostics**: broaden `PRE0114` wording.
+5. **Make the matrix green**; **doc-sync in the same commits**.
+6. **Adversarial review** (`precept-reviewer`) of the diff before commit (catalog/soundness-guard = soundness-critical).
 
 **Dependencies**: Slice 1 (`b7c17482`, the `Dimension ← Unit` projection) shipped; `UcumExactFactor.cs` exists (the rational substrate).
 

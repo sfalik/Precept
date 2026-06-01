@@ -66,6 +66,14 @@
 - D3 — composite malformed-basis codes (PRE0160-0162) marked "TBD" but shipped
 - D4 — `temporal-type-system.md` cites non-existent code spellings (TEMP005/007/017, PRECEPT0007, C92/C93)
 
+## E. Unit-scale honesty gaps (silent irrational approximation) — found 2026-05-31 (Phase 7 Slice 2 enumeration)
+
+Surfaced while mapping full-UCUM special-unit behavior for the cross-unit cancellation work. The catalog silently holds rational approximations of irrational scales, with no flag to surface them, and one path already reads them. Honesty/soundness against P8 ("the exact/approximate line must be visible"). Verdicts CONFIRMED by code read + probe.
+
+- **E1 — `[pi]`-derived units carry a silent rational approximation of π.** `deg`/`rad`/`gon`/`'`/`''` reduce through `[pi]` (a 64-digit rational literal in `ucum-essence.xml`), so their `UcumExactFactor.Scale` is an *approximation of an irrational* with no `exact/approximate` marker. `ProofEngine.Intervals.cs:295` (`ApplyStaticUnitScaling`) + `TypedConstantNormalizer.cs:91` already read `Scale → decimal` for interval proofs, so a bound check on a `deg`-valued typed constant already trusts an approximated scale while reporting `Proved`. **CONFIRMED.** *Mitigation begins in Phase 7 Slice 2 (the `ScaleIsRational` flag).*
+- **E2 — log units have their function stripped → meaningless scales.** `dB`/`B`/`Np` lose their `lg`/`ln` wrapper (`UcumAtomCatalog.cs:466`), leaving scales (`dB`=0.1, `Np`=1) that bear no relation to the true `dB↔Np` log relationship (≈8.686). Cross-log cancellation cancels on dimension name (`count`) but any code that "converts" with these scales computes a wrong number. **CONFIRMED.** *Routed to Phase 7 Slice 6 (log cross-unit policy — design ruling needed).*
+- **E3 — angle units rejected vs. allowed.** `deg`/`rad` resolve to an *empty* dimension name (`UnitDimensionHelper.cs:48`) → `PRE0114` even same-unit, diverging from the locked cross-unit-cancellation design (allow + surface). **CONFIRMED.** *Routed to Phase 7 Slice 5.*
+
 ---
 
 ## Coverage gaps in the audit itself (not yet probed)
