@@ -28,7 +28,7 @@ The `/lifecycle-4-execute` enumerate-step probed the **full UCUM** behavior (not
 
 | Phase | Goal | Items | Decisions | Effort | Status |
 |---|---|---|---|---|---|
-| 1 | Buildable-now — catalog metadata + proof-engine surfacing + hover + diagnostics + tests + doc-sync (**incl. documenting the runtime reduction-rule requirement in `evaluator.md`**) | 7 | 0 (design locked) | **M (~2–3 days)** | **Active** |
+| 1 | Buildable-now — `ScaleIsRational` guard + hover surfacing + `PRE0114` reword + tests + doc-sync | 5 | 0 (design locked) | M (~2–3 days) | ✅ **Done `fe7d1187`** (precept-reviewer pass applied; 6621/417/67/291 green). Stage-5 promotion of D8/§168 + `evaluator.md` runtime requirement still pending. |
 
 **This slice has one executable phase.** The runtime value-application (actually applying the factor) is **out of Slice 2's scope** — it is built in the readiness-plan **runtime phase (Phase 11)**, governed by the requirement this slice *documents* in `evaluator.md` + the locked design's § Semantic Rules. Slice 2's runtime deliverable is the **documentation of the requirement**, not the build — so the durable carrier of the runtime obligation is canonical docs, not a tracked execution phase.
 
