@@ -10,8 +10,8 @@
 
 | Build phase | Slice | Goal | Items | Decisions req. | Effort | Status |
 |---|---|---|---|---|---|---|
-| **P1** | Slice 2 | Uniform code selection (literal or single catalog field); no behavior change | P1–P4 | none (Locked) | M (~2–3d) | **Next** |
-| **P2** | Slice 3a | Honest `DiagnosticStage` taxonomy + dual-emission consolidation + hover decouple | D2, D4 | none (Locked) | S–M (~1–2d) | Planned (heavyweight below) |
+| **P1** | Slice 2 | Uniform code selection (literal or single catalog field); no behavior change | P1–P4 | none (Locked) | M (~2–3d) | ✅ **Complete `59fe2666`** |
+| **P2** | Slice 3a | Honest `DiagnosticStage` taxonomy + dual-emission consolidation + hover decouple | D2, D4 | none (Locked) | S–M (~1–2d) | **Next** (heavyweight below) |
 | **P3** | Slice 3b | Proof-walk extension — value-level checks become proof-owned obligations | D3, D5 | none (Locked) | M (~2–3d) | Stub |
 | **P4** | Slice 3c | The ownership analyzer (enforces single-stage ownership; zero allow-list) | D1 | none (Locked) | M (~2d) | Stub |
 
