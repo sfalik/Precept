@@ -11,8 +11,8 @@
 | Build slice | Goal | Design decisions | Decisions req. | Effort | Status |
 |---|---|---|---|---|---|
 | **Slice 2** | Uniform code selection (literal or single catalog field); no behavior change | Slice 2 P1–P4 | none (Locked) | M (~2–3d) | ✅ **Complete `59fe2666`** |
-| **Slice 3a** | Honest `DiagnosticStage` taxonomy + dual-emission consolidation (6 duals incl. name-resolution → Bind) + hover decouple | Slice 3 D2, D4 (amended) | none (Locked) | M (~2–3d) | **Next** (heavyweight below) |
-| **Slice 3b** | Proof-walk extension — value-level checks become proof-owned obligations | Slice 3 D3, D5 | none (Locked) | M (~2–3d) | Stub |
+| **Slice 3a** | Honest `DiagnosticStage` taxonomy + dual-emission consolidation (6 duals incl. name-resolution → Bind) + hover decouple | Slice 3 D2, D4 (amended) | none (Locked) | M (~2–3d) | ✅ **Complete `f7e5dee6`** |
+| **Slice 3b** | Proof-walk extension — value-level checks become proof-owned obligations | Slice 3 D3, D5 | none (Locked) | M (~2–3d) | **Next** |
 | **Slice 3c** | The ownership analyzer (enforces single-stage ownership; zero allow-list) | Slice 3 D1 | none (Locked) | M (~2d) | Stub |
 
 **Why this order (strict):** Slice 3c's analyzer can only reach green-with-no-allow-list once everything it checks holds — code uniformly sourced (Slice 2), stages honest + no structural duals (3a), value-level codes genuinely proof-owned (3b). So the analyzer lands **last**. Slice 2 is pure no-behavior-change (safest first); 3a carries one author-visible change (stage strings/counts); 3b is the behavioral change (relocating value-level checks); 3c is enforcement.
@@ -37,7 +37,9 @@ Converged every diagnostic-code selection onto two shapes (literal `DiagnosticCo
 
 ## Heavyweight block (current)
 
-### Slice 3a — Honest taxonomy + dual-emission consolidation
+### Slice 3a — Honest taxonomy + dual-emission consolidation ✅ `f7e5dee6`
+
+**Outcome**: delivered all six steps below. Full suite green (**6648**/417/291/67, 0 failed — +24 over the Slice 2 baseline of 6624). Adversarial diff review (`precept-reviewer`) confirmed the D26 soundness gate holds (every dropped type-checker name-resolution emit traces to a binder emit at the same syntactic position) and surfaced two issues fixed before commit: (1) the binder's Kahn detector over-reported `CircularComputedField` on fields merely *downstream* of a cycle (fabricated cycle string) — now restricted to fields genuinely on a cycle (reachable from themselves); (2) a repeated unknown state name in a from-list double-emitted `UndeclaredState` — the binder now dedups the list so the duplicate yields only the type checker's `DuplicateStateInList`. One scope-expansion surfaced during the build: the D26 self-containment checks became upstream-aware (`CheckContext.UpstreamDiagnostics`) because name-resolution error nodes now get their diagnostic from the binder.
 
 **Goal**: `DiagnosticStage` truthfully names the producer (`Bind`/`Tooling` added, `NameBinder→Type`/`Mcp→Lex` mislabels removed, no precedence semantics); **all six** dual-emissions consolidate to single owners (incl. the name-resolution family → Bind, fixing a latent double-emission); LS hover surfaces obligations by obligation-presence, not the `Proof` stage label.
 
