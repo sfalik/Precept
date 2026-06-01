@@ -392,25 +392,64 @@ public static partial class ProofEngine
     // ════════════════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Generates interval-containment proof obligations for fields whose
-    /// <see cref="TypedField.DefaultExpression"/> is an <see cref="InterpolatedTypedConstant"/>
-    /// and whose declared bounds are non-empty. Only emits obligations where
-    /// <see cref="IntervalOf"/> returns a bounded (non-<see cref="NumericInterval.Unbounded"/>) result,
-    /// so Unit-slot and multi-slot interpolated defaults are safely skipped.
+    /// Generates declared-bound proof obligations for fields with a <see cref="TypedField.DefaultExpression"/>:
+    /// a numeric <see cref="NumericProofRequirement"/> per applicable value-bounding modifier (the
+    /// OutOfRange family — replaces the prior interval-containment-for-defaults usage), a
+    /// <see cref="LengthContainmentProofRequirement"/> for a string default with declared length bounds
+    /// (or <c>notempty</c>), and the stamped open-axis assignment-qualifier residual the type checker
+    /// recorded. Computed-field result-vs-bound obligations are stamped separately
+    /// (<see cref="CollectComputedFieldBoundObligations"/>).
     /// </summary>
     internal static void CollectDefaultObligations(SemanticIndex semantics, List<ProofObligation> obligations)
     {
         foreach (var field in semantics.Fields)
         {
-            if (field.DefaultExpression is not InterpolatedTypedConstant || field.IsComputed)
+            if (field.IsComputed)
                 continue;
+
+            // Assignment-qualifier residual stamped by the type checker (sited on the default expr).
+            EmitCarriedQualifierObligations(field.DefaultQualifierObligations, field.DefaultExpression,
+                new FieldDefaultContext(field), obligations);
+
+            if (field.DefaultExpression is null)
+                continue;
+
+            var context = new FieldDefaultContext(field);
+
+            CollectNumericDefaultObligations(
+                field.Modifiers, field.ImpliedModifiers,
+                field.NormalizedDeclaredMin, field.NormalizedDeclaredMax,
+                field.ResolvedType, field.DefaultExpression, context, obligations);
+
+            CollectLengthDefaultObligation(
+                field.ResolvedType, field.Modifiers, field.DeclaredMinLength, field.DeclaredMaxLength,
+                field.Name, field.DefaultExpression, context, obligations);
+        }
+    }
+
+    /// <summary>
+    /// Stamps an <see cref="IntervalContainmentProofRequirement"/> on a computed numeric field's
+    /// result expression against its own declared bounds → NumericOverflow when the result interval
+    /// exceeds them. Closes the computed-field result-vs-bound gap (computed fields are excluded from
+    /// the default collector). Discharged by the existing narrowed interval-containment strategy.
+    /// </summary>
+    internal static void CollectComputedFieldBoundObligations(SemanticIndex semantics, List<ProofObligation> obligations)
+    {
+        foreach (var field in semantics.Fields)
+        {
+            if (!field.IsComputed || field.ComputedExpression is null)
+                continue;
+
+            // Open-axis assignment-qualifier residual stamped by the type checker on the computed
+            // expression (sited on the computed expr so guard-narrowing discharge can reach it).
+            EmitCarriedQualifierObligations(field.DefaultQualifierObligations, field.ComputedExpression,
+                new FieldExpressionContext(field), obligations);
 
             var (min, max) = GetFieldBounds(field);
             if (!min.HasValue && !max.HasValue)
                 continue;
 
-            // Use the full IntervalOf path (includes ApplyStaticUnitScaling) so unit conversion is applied.
-            var interval = IntervalOf(field.DefaultExpression, semantics);
+            var interval = IntervalOf(field.ComputedExpression, semantics);
             if (interval.IsUnbounded)
                 continue;
 
@@ -423,29 +462,166 @@ public static partial class ProofEngine
                 field.Name,
                 min, max,
                 authoredMin, authoredMax,
-                $"Interval containment: default of '{field.Name}' must be within declared bounds [{minStr} .. {maxStr}]");
+                $"Interval containment: computed value of '{field.Name}' must be within declared bounds [{minStr} .. {maxStr}]");
 
             obligations.Add(new ProofObligation(
                 intervalReq,
-                field.DefaultExpression,
-                new FieldDefaultContext(field),
+                field.ComputedExpression,
+                new FieldExpressionContext(field),
                 ProofDisposition.Unresolved,
                 null,
                 null));
         }
     }
 
+    /// <summary>
+    /// Stamps one <see cref="NumericProofRequirement"/> per applicable value-bounding modifier
+    /// (declared + implied) carried as a SelfValue numeric satisfaction. The obligation carries the
+    /// violated-modifier label and the authored display value so the proof stage reconstructs the
+    /// OutOfRange diagnostic verbatim; the discharge evaluates the default's static value against the
+    /// (normalized) bound.
+    /// </summary>
+    private static void CollectNumericDefaultObligations(
+        ImmutableArray<ModifierKind> modifiers,
+        ImmutableArray<ModifierKind> impliedModifiers,
+        decimal? normalizedDeclaredMin,
+        decimal? normalizedDeclaredMax,
+        TypeKind targetType,
+        TypedExpression defaultExpr,
+        ObligationContext context,
+        List<ProofObligation> obligations)
+    {
+        var displayValue = DefaultDisplayValue(defaultExpr);
+
+        var allModifiers = impliedModifiers.IsDefaultOrEmpty
+            ? modifiers
+            : modifiers.Concat(impliedModifiers);
+
+        foreach (var modKind in allModifiers)
+        {
+            if (Modifiers.GetMeta(modKind) is not ValueModifierMeta meta || meta.ProofSatisfactions is null)
+                continue;
+
+            foreach (var satisfaction in meta.ProofSatisfactions)
+            {
+                if (satisfaction is not ProofSatisfaction.Numeric numeric) continue;
+                if (numeric.Projection is not SatisfactionProjection.SelfValue) continue;
+
+                decimal? bound = numeric.Bound switch
+                {
+                    NumericBoundSource.Constant c => c.Value,
+                    NumericBoundSource.DeclarationValue => modKind switch
+                    {
+                        ModifierKind.Min => normalizedDeclaredMin,
+                        ModifierKind.Max => normalizedDeclaredMax,
+                        _ => null,
+                    },
+                    _ => null,
+                };
+                if (bound is null) continue;
+
+                var label = meta.Token.Text ?? modKind.ToString();
+                obligations.Add(new ProofObligation(
+                    new NumericProofRequirement(
+                        new SelfSubject(),
+                        numeric.Comparison,
+                        bound.Value,
+                        $"Default value of '{DescribeContextTarget(context)}' must satisfy '{label}'",
+                        BoundModifierLabel: label,
+                        DisplayValue: displayValue),
+                    defaultExpr,
+                    context,
+                    ProofDisposition.Unresolved,
+                    null,
+                    null));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Stamps a <see cref="LengthContainmentProofRequirement"/> for a bounded string default (literal
+    /// string), discharged literal-only by <see cref="TryLengthContainmentProof"/>. <c>notempty</c>
+    /// folds to a <c>minlength 1</c> lower bound (it sets no DeclaredMinLength).
+    /// </summary>
+    private static void CollectLengthDefaultObligation(
+        TypeKind targetType,
+        ImmutableArray<ModifierKind> modifiers,
+        int? declaredMinLength,
+        int? declaredMaxLength,
+        string targetName,
+        TypedExpression defaultExpr,
+        ObligationContext context,
+        List<ProofObligation> obligations)
+    {
+        if (targetType != TypeKind.String)
+            return;
+        if (defaultExpr is not TypedLiteral { ResultType: TypeKind.String })
+            return;
+
+        var minLength = declaredMinLength;
+        if (!modifiers.IsDefaultOrEmpty && modifiers.Contains(ModifierKind.Notempty))
+            minLength = Math.Max(minLength ?? 0, 1); // notempty ⇒ length ≥ 1
+
+        if (!minLength.HasValue && !declaredMaxLength.HasValue)
+            return;
+
+        obligations.Add(new ProofObligation(
+            new LengthContainmentProofRequirement(
+                new SelfSubject(),
+                targetName,
+                minLength,
+                declaredMaxLength,
+                $"Length containment: default of '{targetName}' must have length in [{minLength?.ToString() ?? "0"} .. {declaredMaxLength?.ToString() ?? "∞"}]"),
+            defaultExpr,
+            context,
+            ProofDisposition.Unresolved,
+            null,
+            null));
+    }
+
+    private static void EmitCarriedQualifierObligations(
+        ImmutableArray<ProofRequirement> carried,
+        TypedExpression? site,
+        ObligationContext context,
+        List<ProofObligation> obligations)
+    {
+        if (carried.IsDefaultOrEmpty || site is null)
+            return;
+        foreach (var requirement in carried)
+            obligations.Add(new ProofObligation(requirement, site, context, ProofDisposition.Unresolved, null, null));
+    }
+
+    private static string DescribeContextTarget(ObligationContext context) => context switch
+    {
+        FieldDefaultContext fdc => fdc.Field.Name,
+        ArgDefaultContext adc => adc.Arg.Name,
+        _ => "value",
+    };
+
+    /// <summary>
+    /// The authored display value for the OutOfRange message: a typed constant's raw text (quoted),
+    /// a bare literal's value, or the static magnitude — matching the prior type-stage formatting so
+    /// the relocated diagnostic is byte-identical for constant defaults.
+    /// </summary>
+    private static string DefaultDisplayValue(TypedExpression defaultExpr) => defaultExpr switch
+    {
+        TypedTypedConstant ttc => "'" + ttc.RawText + "'",
+        // Numeric literals route through the same magnitude→InvariantCulture path the prior
+        // type-stage helper used, so the display value is culture-independent and byte-identical
+        // (e.g. a decimal default renders "1.50", never "1,50").
+        _ => TypedExpressionMagnitude.TryGetStaticMagnitude(defaultExpr, out var m)
+            ? m.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            : DescribeExpression(defaultExpr),
+    };
+
     // ════════════════════════════════════════════════════════════════════════════
     //  Part C — Arg default obligation collector
     // ════════════════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Generates interval-containment proof obligations for event args whose
-    /// <see cref="TypedArg.DefaultExpression"/> is non-null and whose declared
-    /// bounds are non-empty. Handles both <see cref="TypedTypedConstant"/> and
-    /// <see cref="InterpolatedTypedConstant"/> defaults. Only emits obligations where
-    /// <see cref="IntervalOf"/> returns a bounded (non-<see cref="NumericInterval.Unbounded"/>)
-    /// result.
+    /// Generates declared-bound proof obligations for event-arg defaults — the same numeric
+    /// (OutOfRange), length, and assignment-qualifier-residual treatment as field defaults. Event
+    /// args carry no implied modifiers. Normalized bounds drive the numeric obligation's threshold.
     /// </summary>
     internal static void CollectArgDefaultObligations(SemanticIndex semantics, List<ProofObligation> obligations)
     {
@@ -453,38 +629,23 @@ public static partial class ProofEngine
         {
             foreach (var arg in evt.Args)
             {
+                EmitCarriedQualifierObligations(arg.DefaultQualifierObligations, arg.DefaultExpression,
+                    new ArgDefaultContext(arg), obligations);
+
                 if (arg.DefaultExpression is null)
                     continue;
 
-                var min = arg.NormalizedDeclaredMin ?? arg.DeclaredMin;
-                var max = arg.NormalizedDeclaredMax ?? arg.DeclaredMax;
-                if (!min.HasValue && !max.HasValue)
-                    continue;
+                var context = new ArgDefaultContext(arg);
 
-                // Use the full IntervalOf path (includes ApplyStaticUnitScaling) so unit conversion is applied.
-                var interval = IntervalOf(arg.DefaultExpression, semantics);
-                if (interval.IsUnbounded)
-                    continue;
+                CollectNumericDefaultObligations(
+                    arg.Modifiers, ImmutableArray<ModifierKind>.Empty,
+                    arg.NormalizedDeclaredMin ?? arg.DeclaredMin,
+                    arg.NormalizedDeclaredMax ?? arg.DeclaredMax,
+                    arg.ResolvedType, arg.DefaultExpression, context, obligations);
 
-                var authoredMin = arg.DeclaredMin;
-                var authoredMax = arg.DeclaredMax;
-                var minStr = (authoredMin ?? min)?.ToString() ?? "−∞";
-                var maxStr = (authoredMax ?? max)?.ToString() ?? "+∞";
-                var targetLabel = $"{evt.Name}.{arg.Name}";
-                var intervalReq = new IntervalContainmentProofRequirement(
-                    new SelfSubject(),
-                    targetLabel,
-                    min, max,
-                    authoredMin, authoredMax,
-                    $"Interval containment: default of '{targetLabel}' must be within declared bounds [{minStr} .. {maxStr}]");
-
-                obligations.Add(new ProofObligation(
-                    intervalReq,
-                    arg.DefaultExpression,
-                    new ArgDefaultContext(arg),
-                    ProofDisposition.Unresolved,
-                    null,
-                    null));
+                CollectLengthDefaultObligation(
+                    arg.ResolvedType, arg.Modifiers, arg.DeclaredMinLength, arg.DeclaredMaxLength,
+                    arg.Name, arg.DefaultExpression, context, obligations);
             }
         }
     }

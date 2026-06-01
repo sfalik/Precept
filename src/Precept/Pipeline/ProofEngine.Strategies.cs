@@ -36,6 +36,50 @@ public static partial class ProofEngine
         };
     }
 
+    // ── Declared-value default bound (OutOfRange family) ──────────────────────
+    //
+    // A numeric field/arg default carries a stamped Numeric(SelfValue, ⊕, bound) obligation per
+    // applicable modifier. Discharge by evaluating the default's static value against the bound:
+    // a point magnitude (literal / typed constant, unit-normalized — covers duration/period the
+    // interval domain does not) or, for an interpolated default whose magnitude resolves only to an
+    // interval (e.g. '{n} kg' with n bounded), the relevant interval edge. An unresolvable magnitude
+    // leaves the obligation Unresolved only when the engine cannot decide — but a value the engine
+    // CAN place outside the bound fails here, surfacing OutOfRange.
+    private static bool? TryNumericDefaultBoundProof(ProofObligation obligation, SemanticIndex semantics)
+    {
+        if (obligation.Requirement is not NumericProofRequirement { BoundModifierLabel: not null } numeric)
+            return null;
+        if (obligation.Context is not (FieldDefaultContext or ArgDefaultContext))
+            return null;
+
+        // Point magnitude first (literal/typed-constant, unit-normalized) — this is the path that
+        // covers duration/period defaults, which the interval domain returns Unbounded for.
+        if (TypedExpressionMagnitude.TryGetStaticMagnitude(obligation.Site, out var pointMagnitude))
+        {
+            var comparable = NormalizeDefaultMagnitudeForComparison(pointMagnitude, obligation.Site);
+            return ValueSatisfiesRequirement(comparable, numeric);
+        }
+
+        // Interval magnitude (interpolated default whose slot resolves to a bounded interval).
+        var interval = IntervalOf(obligation.Site, semantics);
+        if (interval.IsUnbounded)
+            return null; // unresolvable magnitude — conservative no-decision (Decision 7)
+
+        // A point interval [v,v] decides every comparison; a strict interval decides only the
+        // monotone bound checks (≥/>/≤/<). != / == over a non-point interval is undecidable here.
+        var isPoint = interval.Min == interval.Max;
+        return numeric.Comparison switch
+        {
+            OperatorKind.GreaterThanOrEqual => interval.Min >= numeric.Threshold,
+            OperatorKind.GreaterThan        => interval.Min >  numeric.Threshold,
+            OperatorKind.LessThanOrEqual    => interval.Max <= numeric.Threshold,
+            OperatorKind.LessThan           => interval.Max <  numeric.Threshold,
+            OperatorKind.NotEquals when isPoint => interval.Min != numeric.Threshold,
+            OperatorKind.Equals when isPoint    => interval.Min == numeric.Threshold,
+            _ => null,
+        };
+    }
+
     // ── Strategy 2: Declaration Attribute Proof ───────────────────────────────
 
     private static bool TryDeclarationAttributeProof(ProofObligation obligation, SemanticIndex semantics)
@@ -959,6 +1003,27 @@ public static partial class ProofEngine
             OperatorKind.NotEquals          => value != requirement.Threshold,
             _ => false,
         };
+
+    /// <summary>
+    /// Unit-normalizes a default's raw point magnitude for comparison against its declared
+    /// (normalized) bound: quantity → UCUM base unit, price → per-base-unit. Other types compare
+    /// as-authored. This is the discharge-side counterpart of the bound normalization the type
+    /// checker applies when it records NormalizedDeclaredMin/Max.
+    /// </summary>
+    private static decimal NormalizeDefaultMagnitudeForComparison(decimal rawMagnitude, TypedExpression site)
+    {
+        if (site is not TypedTypedConstant ttc)
+            return rawMagnitude;
+
+        return ttc.ParsedValue switch
+        {
+            ValueTuple<decimal, UcumParsedUnit?> (_, var unit) when site.ResultType == TypeKind.Quantity =>
+                TypedConstantNormalizer.NormalizeQuantity(rawMagnitude, unit),
+            ValueTuple<decimal, object?, UcumParsedUnit?> (_, _, var denominatorUnit) when site.ResultType == TypeKind.Price =>
+                TypedConstantNormalizer.NormalizePrice(rawMagnitude, denominatorUnit),
+            _ => rawMagnitude,
+        };
+    }
 
     private static OperatorKind InvertOp(OperatorKind op) => op switch
     {

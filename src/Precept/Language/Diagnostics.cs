@@ -681,14 +681,14 @@ public static class Diagnostics
             ExampleAfter: "precept Example\nfield Weight as quantity of 'mass'"),
 
         // ── Runtime / value safety ────────────────────────────────────────────────
-        DiagnosticCode.NumericOverflow                => new(nameof(DiagnosticCode.NumericOverflow),                DiagnosticStage.Type,  Severity.Error,   "Numeric computation exceeded the representable range on field '{0}'",                                                                  DiagnosticCategory.Safety,
+        DiagnosticCode.NumericOverflow                => new(nameof(DiagnosticCode.NumericOverflow),                DiagnosticStage.Proof, Severity.Error,   "Numeric computation exceeded the representable range on field '{0}'",                                                                  DiagnosticCategory.Safety,
             FixHint: "Reduce the magnitude of operands, or widen the field type to number",
             PreventsFault: FaultCode.NumericOverflow,
             TriggerCondition: "A numeric computation or constant value exceeds the representable range for the field's declared type.",
             RecoverySteps: ["Reduce the magnitude of the operands or constant value", "Or widen the field type to 'number' if a larger range is needed"],
             ExampleBefore: "precept Example\nfield X as integer default 9999999999999999999",
             ExampleAfter: "precept Example\nfield X as integer default 0"),
-        DiagnosticCode.OutOfRange                     => new(nameof(DiagnosticCode.OutOfRange),                     DiagnosticStage.Type,  Severity.Error,   "Default value {1} for field '{0}' violates declared '{2}'",                                                                            DiagnosticCategory.Safety,
+        DiagnosticCode.OutOfRange                     => new(nameof(DiagnosticCode.OutOfRange),                     DiagnosticStage.Proof, Severity.Error,   "Default value {1} for field '{0}' violates declared '{2}'",                                                                            DiagnosticCategory.Safety,
             RelatedCodes: [DiagnosticCode.InvalidModifierBounds],
             FixHint: "Change the default to satisfy the modifier, or adjust the modifier",
             PreventsFault: FaultCode.OutOfRange,

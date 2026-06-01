@@ -25,6 +25,17 @@ public static partial class ProofEngine
             case NumericProofRequirement numeric when TryCreateCollectionSafetyDiagnostic(obligation, out var collectionDiagnostic):
                 return collectionDiagnostic;
 
+            // Declared-value bound on a field/arg default → OutOfRange, reconstructed verbatim from
+            // the obligation's carried display value + violated-modifier label and the default
+            // context's field/arg name. The display value and label are computed by the type checker
+            // when stamping (it owns the authored-text and modifier-token vocabulary).
+            case NumericProofRequirement { BoundModifierLabel: { } modifierLabel } numericBound
+                when obligation.Context is FieldDefaultContext or ArgDefaultContext:
+                return Diagnostics.Create(DiagnosticCode.OutOfRange, obligation.Site.Span,
+                    DefaultContextTargetName(obligation.Context),
+                    numericBound.DisplayValue ?? DescribeSubject(numericBound.Subject, obligation.Site),
+                    modifierLabel);
+
             case NumericProofRequirement numeric:
                 return Diagnostics.Create(GetNumericRequirementDiagnosticCode(obligation, numeric), obligation.Site.Span,
                     DescribeSubject(numeric.Subject, obligation.Site),
@@ -318,8 +329,24 @@ public static partial class ProofEngine
         return false;
     }
 
+    private static string DefaultContextTargetName(ObligationContext context) => context switch
+    {
+        FieldDefaultContext fdc => fdc.Field.Name,
+        ArgDefaultContext adc => adc.Arg.Name,
+        _ => "?",
+    };
+
     private static DiagnosticCode GetNumericRequirementDiagnosticCode(ProofObligation obligation, NumericProofRequirement requirement)
     {
+        // Context-axis discriminator (distinct from the Site-shape arms below): a declared-value
+        // bound stamped on a field/arg default selects OutOfRange. Default contexts never carry the
+        // collection-count / sqrt / divisor Numeric obligations the Site-shape arms key on.
+        if (requirement.BoundModifierLabel is not null
+            && obligation.Context is FieldDefaultContext or ArgDefaultContext)
+        {
+            return DiagnosticCode.OutOfRange;
+        }
+
         if (IsCollectionCountRequirement(requirement, out _))
         {
             return obligation.Site switch

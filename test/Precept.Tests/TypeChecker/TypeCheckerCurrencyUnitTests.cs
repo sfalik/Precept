@@ -27,7 +27,7 @@ public class TypeCheckerCurrencyUnitTests
             state Open initial
             """;
 
-        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.CrossCurrencyArithmetic);
+        TypeCheckerTestHelpers.CompileExpectingError(precept, DiagnosticCode.CrossCurrencyArithmetic);
     }
 
     [Fact]
@@ -436,7 +436,7 @@ public class TypeCheckerCurrencyUnitTests
     [Fact]
     public void ExchangeRate_ZeroValue_EmitsPositiveViolation()
     {
-        TypeCheckerTestHelpers.CheckExpectingError("""
+        TypeCheckerTestHelpers.CompileExpectingError("""
             precept Example
             field FxRate as exchangerate default '0 USD/EUR'
             """, DiagnosticCode.OutOfRange);
@@ -445,7 +445,7 @@ public class TypeCheckerCurrencyUnitTests
     [Fact]
     public void ExchangeRate_NegativeValue_EmitsPositiveViolation()
     {
-        TypeCheckerTestHelpers.CheckExpectingError("""
+        TypeCheckerTestHelpers.CompileExpectingError("""
             precept Example
             field FxRate as exchangerate default '-1.0 USD/EUR'
             """, DiagnosticCode.OutOfRange);

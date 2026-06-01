@@ -1667,17 +1667,19 @@ bool SignSetSatisfiesRequirement(NumericSignSet signSet, NumericProofRequirement
 
 #### Strategy 8: Interval Containment Proof (narrowed)
 
-**When it applies:** An obligation of kind `IntervalContainmentProofRequirement` — produced by every value-establishing action on a field whose declared `min` / `max` modifier bounds (or business-domain qualifier bounds) form a closed interval.
+**When it applies:** An obligation of kind `IntervalContainmentProofRequirement` — produced by every value-establishing **computation** on a field whose declared `min` / `max` modifier bounds (or business-domain qualifier bounds) form a closed interval. This is the *computation* half of the numeric declared-bound partition: set-action assignments and **computed-field result expressions** (a computed numeric field's result vs its own declared bounds). Declared *default values* take the disjoint OutOfRange path (the stamped `Numeric` default obligation below) rather than IntervalContainment.
 
 **How it works:** `BuildNarrowedIntervals` (in `ProofEngine.Intervals.cs`) produces a per-field narrowing dictionary by walking the obligation's guard branches and applying sibling reject-row negations (the "cross-row composition" path documented in § 2-Pass Design). `IntervalOfNarrowed` then evaluates the assignment's value expression under that narrowing — propagating through `IntervalTransfer` functions on integer / decimal / number arithmetic — to compute a result interval. If the result interval fits within the target field's `[DeclaredMin, DeclaredMax]` bounds, the obligation discharges; otherwise `NumericOverflow` (PRE0078) emits with the computed interval surfaced in the diagnostic.
+
+**Numeric declared-bound defaults → OutOfRange.** A field/arg *default* whose value violates a declared value-bounding modifier (`min`/`max`/`positive`/`nonnegative`/`nonzero`) is the disjoint **declared-value** half of the partition. The type checker stamps one `NumericProofRequirement(SelfValue, ⊕, bound)` per applicable modifier (carrying the violated-modifier label and the authored display value); the discharge evaluates the default's static value — a unit-normalized point magnitude, or, for a resolvable-interval interpolated default like `'{n} kg'`, the relevant interval edge — against the bound. An undischargeable bound surfaces `OutOfRange` (PRE0079) via the Context-axis dispatch arm in `GetNumericRequirementDiagnosticCode` (default contexts select `OutOfRange`, disjoint from the divisor/sqrt/collection-count Site-shape arms). A genuinely unresolvable magnitude is conservatively not range-checked.
 
 The strategy is sound under all numeric domains. The cross-row sibling-reject negation in `NegateConstraintToInterval` produces an exact interval for integer-typed fields (`V ± 1` half-step) and a sound superset for decimal-backed fields (closed at `V`). Multi-leaf reject conjunctions and OR-branches in the current row's guard are handled by `BuildSiblingRejectExclusions` (forfeit) and `BuildNarrowedIntervals` (per-branch union with base-interval back-fill); see the per-pass paragraph in § 2-Pass Design for the AND/OR semantics.
 
 #### Strategy 9: Length Containment Proof
 
-**When it applies:** An obligation of kind `LengthContainmentProofRequirement` — produced when a string literal is assigned to a field declared with `minlength` / `maxlength` modifiers.
+**When it applies:** An obligation of kind `LengthContainmentProofRequirement` — produced when a string literal is assigned to a field declared with `minlength` / `maxlength` modifiers, or stamped on a **string field/arg default** that is a string literal (a `notempty`-on-string default folds to a `minlength 1` lower bound).
 
-**How it works:** A direct character-count check on the literal's value against the field's declared bounds. Literal-only by design: a field-to-field string assignment cannot establish length statically (the source field's value is dynamic), so the strategy returns `false` on non-literal sites and the obligation flows to `LengthBoundViolation` (PRE0135) only when the literal length actually exceeds the declared bound. Lives in `ProofEngine.Intervals.cs:TryLengthContainmentProof`.
+**How it works:** A direct character-count check on the literal's value against the field's declared bounds. Literal-only by design: a field-to-field string assignment cannot establish length statically (the source field's value is dynamic), so the strategy returns `false` on non-literal sites and the obligation flows to `LengthBoundViolation` (PRE0135) only when the literal length actually exceeds the declared bound. Lives in `ProofEngine.Lengths.cs:TryLengthContainmentProof`.
 
 #### Strategy 10: Count Containment Proof
 
@@ -2628,7 +2630,7 @@ Unlike SPARK Ada's `pragma Annotate` or Dafny's `assert`/`assume`, Precept does 
 | `src/Precept/Pipeline/ProofEngine.cs` | Proof engine implementation — `ProofEngine` static class with `Prove(SemanticIndex, StateGraph)` entry point |
 | `src/Precept/Pipeline/ProofLedger.cs` | `ProofLedger` — obligation ledger artifact (currently minimal, needs expansion) |
 | `src/Precept/Language/ProofRequirement.cs` | `ProofRequirement` DU base and subtypes, `ProofSubject` DU |
-| `src/Precept/Language/ProofRequirementKind.cs` | `ProofRequirementKind` enum (5 members) |
+| `src/Precept/Language/ProofRequirementKind.cs` | `ProofRequirementKind` enum (thirteen members) |
 | `src/Precept/Language/ProofRequirements.cs` | `ProofRequirements` catalog with `GetMeta()` and `All` |
 | `src/Precept/Language/FaultCode.cs` | `FaultCode` enum with `[StaticallyPreventable]` attributes |
 | `src/Precept/Language/Faults.cs` | `Faults` catalog with `GetMeta()` and fault message templates |

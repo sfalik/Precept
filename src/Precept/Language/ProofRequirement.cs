@@ -45,12 +45,20 @@ public abstract record ProofRequirement(ProofRequirementKind Kind, string Descri
 /// Numeric interval proof: the subject's value compared with
 /// <see cref="Comparison"/> against <see cref="Threshold"/> must hold.
 /// Examples: divisor != 0, sqrt operand >= 0, collection count > 0.
+///
+/// <see cref="BoundModifierLabel"/> and <see cref="DisplayValue"/> are populated only when this
+/// obligation carries a declared-value bound on a field/arg default (the OutOfRange family) — the
+/// label names the violated modifier (e.g. "max", "nonnegative") and the display value is the
+/// authored default as written, so the OutOfRange diagnostic can be reconstructed verbatim at the
+/// proof stage. Null for every operation/function/action-safety Numeric obligation.
 /// </summary>
 public sealed record NumericProofRequirement(
     ProofSubject Subject,
     OperatorKind Comparison,
     decimal      Threshold,
-    string       Description
+    string       Description,
+    string?      BoundModifierLabel = null,
+    string?      DisplayValue = null
 ) : ProofRequirement(ProofRequirementKind.Numeric, Description);
 
 /// <summary>

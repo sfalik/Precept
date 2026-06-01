@@ -402,7 +402,8 @@ public sealed record TypedField(
     int? DeclaredMinLength = null,
     int? DeclaredMaxLength = null,
     int? DeclaredMinCount = null,
-    int? DeclaredMaxCount = null
+    int? DeclaredMaxCount = null,
+    ImmutableArray<ProofRequirement> DefaultQualifierObligations = default
 );
 
 /// <summary>Typed state declaration.</summary>
@@ -442,7 +443,10 @@ public sealed record TypedArg(
     decimal? NormalizedDeclaredMin = null,
     decimal? NormalizedDeclaredMax = null,
     ImmutableArray<DeclaredQualifierMeta> DeclaredMinBoundQualifiers = default,
-    ImmutableArray<DeclaredQualifierMeta> DeclaredMaxBoundQualifiers = default
+    ImmutableArray<DeclaredQualifierMeta> DeclaredMaxBoundQualifiers = default,
+    ImmutableArray<ProofRequirement> DefaultQualifierObligations = default,
+    int? DeclaredMinLength = null,
+    int? DeclaredMaxLength = null
 );
 
 // ════════════════════════════════════════════════════════════════════════════

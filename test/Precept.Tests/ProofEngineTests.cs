@@ -558,8 +558,10 @@ public class ProofEngineTests
                 from Draft on Submit -> set X = Y / D -> no transition
                 """);
 
+            // BoundModifierLabel:null selects the divisor obligation, not the nonzero-default
+            // bound obligation on D (which also carries a NotEquals-0 numeric requirement).
             var obligation = ledger.Obligations.Single(o =>
-                o.Requirement is NumericProofRequirement { Comparison: OperatorKind.NotEquals, Threshold: 0m });
+                o.Requirement is NumericProofRequirement { Comparison: OperatorKind.NotEquals, Threshold: 0m, BoundModifierLabel: null });
 
             obligation.Disposition.Should().Be(ProofDisposition.Proved);
             obligation.Strategy.Should().Be(ProofStrategy.DeclarationAttribute);
@@ -580,8 +582,10 @@ public class ProofEngineTests
                 from Draft on Submit -> set X = Y / D -> no transition
                 """);
 
+            // BoundModifierLabel:null selects the divisor obligation, not the nonzero-default
+            // bound obligation on D (which also carries a NotEquals-0 numeric requirement).
             var obligation = ledger.Obligations.Single(o =>
-                o.Requirement is NumericProofRequirement { Comparison: OperatorKind.NotEquals, Threshold: 0m });
+                o.Requirement is NumericProofRequirement { Comparison: OperatorKind.NotEquals, Threshold: 0m, BoundModifierLabel: null });
 
             obligation.Disposition.Should().Be(ProofDisposition.Proved);
             obligation.Strategy.Should().Be(ProofStrategy.DeclarationAttribute);
@@ -684,7 +688,7 @@ public class ProofEngineTests
                 """);
 
             var obligation = ledger.Obligations.Single(o =>
-                o.Requirement is NumericProofRequirement { Comparison: OperatorKind.NotEquals, Threshold: 0m });
+                o.Requirement is NumericProofRequirement { Comparison: OperatorKind.NotEquals, Threshold: 0m, BoundModifierLabel: null });
 
             obligation.Disposition.Should().Be(ProofDisposition.Proved);
             obligation.Strategy.Should().Be(ProofStrategy.DeclarationAttribute,
@@ -2411,8 +2415,10 @@ public class ProofEngineTests
                 on Submit -> set X = Y / D
                 """);
 
+            // BoundModifierLabel:null selects the divisor obligation, not the nonzero-default
+            // bound obligation on D (which also carries a NotEquals-0 numeric requirement).
             var obligation = ledger.Obligations.Single(o =>
-                o.Requirement is NumericProofRequirement { Comparison: OperatorKind.NotEquals, Threshold: 0m });
+                o.Requirement is NumericProofRequirement { Comparison: OperatorKind.NotEquals, Threshold: 0m, BoundModifierLabel: null });
 
             obligation.Disposition.Should().Be(ProofDisposition.Proved);
             obligation.Strategy.Should().Be(ProofStrategy.DeclarationAttribute);
@@ -2768,8 +2774,10 @@ public class ProofEngineTests
                 from Draft on Submit -> set X = Y / D -> no transition
                 """);
 
+            // BoundModifierLabel:null selects the divisor obligation, not the nonzero-default
+            // bound obligation on D (which also carries a NotEquals-0 numeric requirement).
             var obligation = ledger.Obligations.Single(o =>
-                o.Requirement is NumericProofRequirement { Comparison: OperatorKind.NotEquals, Threshold: 0m });
+                o.Requirement is NumericProofRequirement { Comparison: OperatorKind.NotEquals, Threshold: 0m, BoundModifierLabel: null });
 
             obligation.Disposition.Should().Be(ProofDisposition.Proved);
             obligation.Strategy.Should().Be(ProofStrategy.DeclarationAttribute);
@@ -2829,7 +2837,7 @@ public class ProofEngineTests
                 """);
 
             ledger.Obligations.Single(o =>
-                o.Requirement is NumericProofRequirement { Comparison: OperatorKind.NotEquals, Threshold: 0m })
+                o.Requirement is NumericProofRequirement { Comparison: OperatorKind.NotEquals, Threshold: 0m, BoundModifierLabel: null })
                 .Disposition.Should().Be(ProofDisposition.Proved);
         }
 
@@ -2866,7 +2874,7 @@ public class ProofEngineTests
                 """);
 
             ledger.Obligations.Single(o =>
-                o.Requirement is NumericProofRequirement { Comparison: OperatorKind.NotEquals, Threshold: 0m })
+                o.Requirement is NumericProofRequirement { Comparison: OperatorKind.NotEquals, Threshold: 0m, BoundModifierLabel: null })
                 .Disposition.Should().Be(ProofDisposition.Proved,
                     because: "GetFieldName returned 'D' from the TypedFieldRef; modifier lookup succeeded");
         }
@@ -2968,8 +2976,10 @@ public class ProofEngineTests
                 from Draft on Submit -> set X = Y / D -> no transition
                 """);
 
+            // BoundModifierLabel:null selects the divisor obligation, not the nonzero-default
+            // bound obligation on D (which also carries a NotEquals-0 numeric requirement).
             var obligation = ledger.Obligations.Single(o =>
-                o.Requirement is NumericProofRequirement { Comparison: OperatorKind.NotEquals, Threshold: 0m });
+                o.Requirement is NumericProofRequirement { Comparison: OperatorKind.NotEquals, Threshold: 0m, BoundModifierLabel: null });
 
             obligation.Disposition.Should().Be(ProofDisposition.Proved);
             obligation.Strategy.Should().Be(ProofStrategy.DeclarationAttribute);

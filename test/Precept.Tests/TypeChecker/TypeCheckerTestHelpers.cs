@@ -57,6 +57,21 @@ internal static class TypeCheckerTestHelpers
     }
 
     /// <summary>
+    /// Runs the FULL compiler (including the proof stage, which the type-checker-only
+    /// <see cref="CheckExpectingError"/> skips) and asserts that a diagnostic with code
+    /// <paramref name="code"/> is present at Error severity. Use for proof-owned codes
+    /// (e.g. OutOfRange / NumericOverflow, which are emitted at the proof stage).
+    /// </summary>
+    public static void CompileExpectingError(string preceptText, DiagnosticCode code)
+    {
+        Precept.Compiler.Compile(preceptText).Diagnostics
+            .Where(d => d.Severity == Severity.Error)
+            .Select(d => d.Code)
+            .Should().Contain(code.ToString(),
+                because: $"expected diagnostic {code} to be emitted at Error severity from the full pipeline");
+    }
+
+    /// <summary>
     /// Runs the full pipeline on <paramref name="preceptText"/> and asserts that
     /// no Error-severity diagnostics were produced. Returns the <see cref="SemanticIndex"/>
     /// for further assertions.

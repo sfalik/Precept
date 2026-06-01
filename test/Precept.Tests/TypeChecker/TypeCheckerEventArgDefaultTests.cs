@@ -14,12 +14,15 @@ namespace Precept.Tests.TypeChecker;
 /// </summary>
 public class TypeCheckerEventArgDefaultTests
 {
-    // ── Test 1: quantity default exceeds max → NumericOverflow ───────────────────────
+    // Declared-value arg defaults are the OutOfRange family — a max-violating arg default carries a
+    // stamped Numeric(max) obligation discharged at the proof stage, not an interval-containment one.
+
+    // ── Test 1: quantity default exceeds max → OutOfRange ────────────────────────────
 
     [Fact]
-    public void EventArgDefault_QuantityExceedsMax_EmitsNumericOverflow()
+    public void EventArgDefault_QuantityExceedsMax_EmitsOutOfRange()
     {
-        // '15 kg' → normalized 15000 g. max '10 kg' → 10000 g. 15000 > 10000 → NumericOverflow.
+        // '15 kg' → normalized 15000 g. max '10 kg' → 10000 g. 15000 > 10000 → OutOfRange.
         const string precept = """
             precept ArgDefaultExceedsMax
             event Load(weight: quantity of 'mass' max '10 kg' default '15 kg')
@@ -29,11 +32,12 @@ public class TypeCheckerEventArgDefaultTests
         var result = Compiler.Compile(precept);
 
         result.Diagnostics.Should().Contain(
-            d => d.Code == nameof(DiagnosticCode.NumericOverflow),
+            d => d.Code == nameof(DiagnosticCode.OutOfRange),
             because: "default '15 kg' exceeds the declared max of '10 kg'");
+        result.Diagnostics.Where(d => d.Code == nameof(DiagnosticCode.NumericOverflow)).Should().BeEmpty();
 
         result.Proof.Obligations
-            .Where(o => o.Requirement is IntervalContainmentProofRequirement { TargetField: "Load.weight" }
+            .Where(o => o.Requirement is NumericProofRequirement { BoundModifierLabel: not null }
                      && o.Context is ArgDefaultContext)
             .Should().ContainSingle()
             .Which.Disposition.Should().Be(ProofDisposition.Unresolved,
@@ -55,11 +59,11 @@ public class TypeCheckerEventArgDefaultTests
         var result = Compiler.Compile(precept);
 
         result.Diagnostics
-            .Where(d => d.Code == nameof(DiagnosticCode.NumericOverflow))
+            .Where(d => d.Code is nameof(DiagnosticCode.OutOfRange) or nameof(DiagnosticCode.NumericOverflow))
             .Should().BeEmpty(because: "default '5 kg' is within the declared max of '10 kg'");
 
         result.Proof.Obligations
-            .Where(o => o.Requirement is IntervalContainmentProofRequirement { TargetField: "Load.weight" }
+            .Where(o => o.Requirement is NumericProofRequirement { BoundModifierLabel: not null }
                      && o.Context is ArgDefaultContext)
             .Should().ContainSingle()
             .Which.Disposition.Should().Be(ProofDisposition.Proved,
@@ -81,23 +85,23 @@ public class TypeCheckerEventArgDefaultTests
         var result = Compiler.Compile(precept);
 
         result.Diagnostics
-            .Where(d => d.Code == nameof(DiagnosticCode.NumericOverflow))
+            .Where(d => d.Code is nameof(DiagnosticCode.OutOfRange) or nameof(DiagnosticCode.NumericOverflow))
             .Should().BeEmpty(because: "6 lb ≈ 2722 g is within the 5 kg (5000 g) max");
 
         result.Proof.Obligations
-            .Where(o => o.Requirement is IntervalContainmentProofRequirement { TargetField: "Load.weight" }
+            .Where(o => o.Requirement is NumericProofRequirement { BoundModifierLabel: not null }
                      && o.Context is ArgDefaultContext)
             .Should().ContainSingle()
             .Which.Disposition.Should().Be(ProofDisposition.Proved,
                 because: "6 lb ≈ 2722 g fits inside the 5 kg bound");
     }
 
-    // ── Test 4: cross-unit default exceeds bounds → NumericOverflow ──────────────────
+    // ── Test 4: cross-unit default exceeds bounds → OutOfRange ───────────────────────
 
     [Fact]
-    public void EventArgDefault_CrossUnit_ExceedsBounds_EmitsNumericOverflow()
+    public void EventArgDefault_CrossUnit_ExceedsBounds_EmitsOutOfRange()
     {
-        // 6 lb_av × 453.59237 g/lb ≈ 2721.55 g. max '2 kg' → 2000 g. 2721.55 > 2000 → NumericOverflow.
+        // 6 lb_av × 453.59237 g/lb ≈ 2721.55 g. max '2 kg' → 2000 g. 2721.55 > 2000 → OutOfRange.
         const string precept = """
             precept ArgDefaultCrossUnitExceeded
             event Load(weight: quantity of 'mass' max '2 kg' default '6 [lb_av]')
@@ -107,11 +111,11 @@ public class TypeCheckerEventArgDefaultTests
         var result = Compiler.Compile(precept);
 
         result.Diagnostics.Should().Contain(
-            d => d.Code == nameof(DiagnosticCode.NumericOverflow),
+            d => d.Code == nameof(DiagnosticCode.OutOfRange),
             because: "6 lb ≈ 2722 g exceeds the 2 kg (2000 g) max");
 
         result.Proof.Obligations
-            .Where(o => o.Requirement is IntervalContainmentProofRequirement { TargetField: "Load.weight" }
+            .Where(o => o.Requirement is NumericProofRequirement { BoundModifierLabel: not null }
                      && o.Context is ArgDefaultContext)
             .Should().ContainSingle()
             .Which.Disposition.Should().Be(ProofDisposition.Unresolved,
@@ -133,11 +137,11 @@ public class TypeCheckerEventArgDefaultTests
         var result = Compiler.Compile(precept);
 
         result.Diagnostics
-            .Where(d => d.Code == nameof(DiagnosticCode.NumericOverflow))
+            .Where(d => d.Code is nameof(DiagnosticCode.OutOfRange) or nameof(DiagnosticCode.NumericOverflow))
             .Should().BeEmpty(because: "default '50 USD' is within the declared max of '100 USD'");
 
         result.Proof.Obligations
-            .Where(o => o.Requirement is IntervalContainmentProofRequirement { TargetField: "Load.cost" }
+            .Where(o => o.Requirement is NumericProofRequirement { BoundModifierLabel: not null }
                      && o.Context is ArgDefaultContext)
             .Should().ContainSingle()
             .Which.Disposition.Should().Be(ProofDisposition.Proved,

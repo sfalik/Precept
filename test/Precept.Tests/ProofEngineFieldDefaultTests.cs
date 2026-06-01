@@ -18,12 +18,16 @@ public class ProofEngineFieldDefaultTests
 {
     // ── Test 1: magnitude within max (same unit) — Proved ────────────────────────────
 
+    // A numeric field default — including a resolvable-interval interpolated default like '{n} kg'
+    // — is the OutOfRange family: it carries a stamped Numeric(max) obligation discharged at the
+    // proof stage by interval reasoning, not an interval-containment-→-NumericOverflow obligation.
+
     [Fact]
     public void FieldDefault_InterpolatedTypedConstant_MagnitudeWithinMax_CompilesClean()
     {
         // n max 3 → interval max = 3 * 1000 g/kg = 3000 g.
         // x max '5 kg' → NormalizedDeclaredMax = 5000 g.
-        // 3000 ≤ 5000 → obligation Proved → no NumericOverflow.
+        // 3000 ≤ 5000 → obligation Proved → no diagnostic.
         const string precept = """
             precept FieldDefaultBoundsOk
             field n as integer max 3 default 0
@@ -34,25 +38,25 @@ public class ProofEngineFieldDefaultTests
         var result = Compiler.Compile(precept);
 
         result.Diagnostics
-            .Where(d => d.Code == nameof(DiagnosticCode.NumericOverflow))
+            .Where(d => d.Code is nameof(DiagnosticCode.OutOfRange) or nameof(DiagnosticCode.NumericOverflow))
             .Should().BeEmpty(because: "n max 3 kg ≤ field max 5 kg — default is within bounds");
 
         result.Proof.Obligations
-            .Where(o => o.Requirement is IntervalContainmentProofRequirement { TargetField: "x" }
-                     && o.Context is FieldDefaultContext)
+            .Where(o => o.Requirement is NumericProofRequirement { BoundModifierLabel: not null }
+                     && o.Context is FieldDefaultContext { Field.Name: "x" })
             .Should().ContainSingle()
             .Which.Disposition.Should().Be(ProofDisposition.Proved,
                 because: "the interpolated default '{n} kg' with n max 3 fits inside the 5 kg bound");
     }
 
-    // ── Test 2: magnitude exceeds max (same unit) — NumericOverflow ──────────────────
+    // ── Test 2: magnitude exceeds max (same unit) — OutOfRange ───────────────────────
 
     [Fact]
-    public void FieldDefault_InterpolatedTypedConstant_MagnitudeExceedsMax_EmitsNumericOverflow()
+    public void FieldDefault_InterpolatedTypedConstant_MagnitudeExceedsMax_EmitsOutOfRange()
     {
         // n max 10 → interval max = 10 * 1000 = 10000 g.
         // x max '5 kg' → NormalizedDeclaredMax = 5000 g.
-        // 10000 > 5000 → obligation Unresolved → NumericOverflow.
+        // 10000 > 5000 → obligation Unresolved → OutOfRange.
         const string precept = """
             precept FieldDefaultBoundsExceeded
             field n as integer max 10 default 0
@@ -63,15 +67,16 @@ public class ProofEngineFieldDefaultTests
         var result = Compiler.Compile(precept);
 
         result.Diagnostics.Should().Contain(
-            d => d.Code == nameof(DiagnosticCode.NumericOverflow),
-            because: "n max 10 kg exceeds the field max of 5 kg — default can overflow");
+            d => d.Code == nameof(DiagnosticCode.OutOfRange),
+            because: "n max 10 kg exceeds the field max of 5 kg — default is out of range");
+        result.Diagnostics.Where(d => d.Code == nameof(DiagnosticCode.NumericOverflow)).Should().BeEmpty();
 
         result.Proof.Obligations
-            .Where(o => o.Requirement is IntervalContainmentProofRequirement { TargetField: "x" }
-                     && o.Context is FieldDefaultContext)
+            .Where(o => o.Requirement is NumericProofRequirement { BoundModifierLabel: not null }
+                     && o.Context is FieldDefaultContext { Field.Name: "x" })
             .Should().ContainSingle()
             .Which.Disposition.Should().Be(ProofDisposition.Unresolved,
-                because: "the default interval [−∞..10000 g] is not contained by the bound [−∞..5000 g]");
+                because: "the default interval [−∞..10000 g] is not contained by the 5000 g max");
     }
 
     // ── Test 3: cross-unit default within bounds — Proved ────────────────────────────
@@ -92,25 +97,25 @@ public class ProofEngineFieldDefaultTests
         var result = Compiler.Compile(precept);
 
         result.Diagnostics
-            .Where(d => d.Code == nameof(DiagnosticCode.NumericOverflow))
+            .Where(d => d.Code is nameof(DiagnosticCode.OutOfRange) or nameof(DiagnosticCode.NumericOverflow))
             .Should().BeEmpty(because: "2 lb ≈ 907 g is well within the 5 kg max");
 
         result.Proof.Obligations
-            .Where(o => o.Requirement is IntervalContainmentProofRequirement { TargetField: "x" }
-                     && o.Context is FieldDefaultContext)
+            .Where(o => o.Requirement is NumericProofRequirement { BoundModifierLabel: not null }
+                     && o.Context is FieldDefaultContext { Field.Name: "x" })
             .Should().ContainSingle()
             .Which.Disposition.Should().Be(ProofDisposition.Proved,
                 because: "2 lb ≈ 907 g fits inside the 5 kg bound");
     }
 
-    // ── Test 4: cross-unit default exceeds bounds — NumericOverflow ──────────────────
+    // ── Test 4: cross-unit default exceeds bounds — OutOfRange ───────────────────────
 
     [Fact]
-    public void FieldDefault_InterpolatedTypedConstant_CrossUnit_ExceedsBounds_EmitsNumericOverflow()
+    public void FieldDefault_InterpolatedTypedConstant_CrossUnit_ExceedsBounds_EmitsOutOfRange()
     {
         // n max 10 → '{n} [lb_av]' → interval max = 10 * 453.59237 ≈ 4535 g.
         // x max '2 kg' → NormalizedDeclaredMax = 2000 g.
-        // 4535 > 2000 → Unresolved → NumericOverflow.
+        // 4535 > 2000 → Unresolved → OutOfRange.
         const string precept = """
             precept FieldDefaultCrossUnitExceeded
             field n as integer max 10 default 0
@@ -121,12 +126,12 @@ public class ProofEngineFieldDefaultTests
         var result = Compiler.Compile(precept);
 
         result.Diagnostics.Should().Contain(
-            d => d.Code == nameof(DiagnosticCode.NumericOverflow),
+            d => d.Code == nameof(DiagnosticCode.OutOfRange),
             because: "10 lb ≈ 4535 g exceeds the 2 kg max (2000 g)");
 
         result.Proof.Obligations
-            .Where(o => o.Requirement is IntervalContainmentProofRequirement { TargetField: "x" }
-                     && o.Context is FieldDefaultContext)
+            .Where(o => o.Requirement is NumericProofRequirement { BoundModifierLabel: not null }
+                     && o.Context is FieldDefaultContext { Field.Name: "x" })
             .Should().ContainSingle()
             .Which.Disposition.Should().Be(ProofDisposition.Unresolved,
                 because: "10 lb ≈ 4535 g is not contained by the 2000 g bound");

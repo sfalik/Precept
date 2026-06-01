@@ -721,6 +721,14 @@ internal static partial class TypeChecker
                     : arg.ParsedModifiers.FirstOrDefault(m => m.Kind == ModifierKind.Max) is { Value: { } maxExpr }
                         ? TryGetComparableModifierValue(maxExpr, resolvedType, declaredQualifiers)
                         : null;
+                var declaredMinLengthBound = arg.ParsedModifiers.IsDefaultOrEmpty ? null
+                    : arg.ParsedModifiers.FirstOrDefault(m => m.Kind == ModifierKind.Minlength) is { Value: { } minLenExpr }
+                        ? TryGetComparableModifierValue(minLenExpr, TypeKind.Integer, ImmutableArray<DeclaredQualifierMeta>.Empty)
+                        : null;
+                var declaredMaxLengthBound = arg.ParsedModifiers.IsDefaultOrEmpty ? null
+                    : arg.ParsedModifiers.FirstOrDefault(m => m.Kind == ModifierKind.Maxlength) is { Value: { } maxLenExpr }
+                        ? TryGetComparableModifierValue(maxLenExpr, TypeKind.Integer, ImmutableArray<DeclaredQualifierMeta>.Empty)
+                        : null;
                 argsBuilder.Add(new TypedArg(
                     Name: arg.Name,
                     EventName: arg.EventName,
@@ -739,7 +747,9 @@ internal static partial class TypeChecker
                     NormalizedDeclaredMin: declaredMinBound?.NormalizedMagnitude,
                     NormalizedDeclaredMax: declaredMaxBound?.NormalizedMagnitude,
                     DeclaredMinBoundQualifiers: declaredMinBound?.Qualifiers ?? ImmutableArray<DeclaredQualifierMeta>.Empty,
-                    DeclaredMaxBoundQualifiers: declaredMaxBound?.Qualifiers ?? ImmutableArray<DeclaredQualifierMeta>.Empty));
+                    DeclaredMaxBoundQualifiers: declaredMaxBound?.Qualifiers ?? ImmutableArray<DeclaredQualifierMeta>.Empty,
+                    DeclaredMinLength: declaredMinLengthBound?.DeclaredMagnitude is { } argMnL ? (int)argMnL : null,
+                    DeclaredMaxLength: declaredMaxLengthBound?.DeclaredMagnitude is { } argMxL ? (int)argMxL : null));
 
                 // Track choice domain for event args (PRE0087/PRE0089)
                 if (arg.Type is ChoiceTypeReference argChoiceRef && !argChoiceRef.Domain.IsEmpty)
@@ -794,30 +804,25 @@ internal static partial class TypeChecker
                                 Types.GetMeta(typedField.ResolvedType).DisplayName,
                                 Types.GetMeta(resolved.ResultType).DisplayName));
                     }
-                    else if (!typedField.DeclaredQualifiers.IsDefaultOrEmpty)
+                    var defaultQualifierObligations = ImmutableArray<ProofRequirement>.Empty;
+                    if (!typedField.DeclaredQualifiers.IsDefaultOrEmpty)
                     {
-                        ValidateAssignmentQualifiers(
+                        // The open-axis assignment-qualifier residual on a default is stamped as a
+                        // proof obligation and discharged at the proof stage (PRE0141 proof-owned);
+                        // the TypedConditional branches stay type-stage (cannot be sited per-branch).
+                        defaultQualifierObligations = ValidateAssignmentQualifiers(
                             resolved,
                             typedField.Name,
                             typedField.DeclaredQualifiers,
                             defaultMod.Value.Span,
-                            ctx);
+                            ctx,
+                            dischargedAtProofStage: true);
                     }
 
                     // PRE0067 — MaxPlacesExceeded: check decimal places against maxplaces
                     ValidateMaxPlaces(resolved, typedField, defaultMod.Value.Span, ctx);
 
-                    // PRE0079 — OutOfRange: default value vs. declared/implied numeric modifiers
-                    ValidateDefaultAgainstNumericModifiers(
-                        resolved,
-                        typedField.ResolvedType,
-                        typedField.Modifiers,
-                        typedField.ImpliedModifiers,
-                        typedField.NormalizedDeclaredMin,
-                        typedField.NormalizedDeclaredMax,
-                        typedField.Name,
-                        defaultMod.Value.Span,
-                        ctx);
+                    ctx.Fields[i] = ctx.Fields[i] with { DefaultQualifierObligations = defaultQualifierObligations };
                 }
                 ctx.Fields[i] = ctx.Fields[i] with { DefaultExpression = resolved };
                 ctx.FieldLookup[typedField.Name] = ctx.Fields[i];
@@ -895,16 +900,25 @@ internal static partial class TypeChecker
                 ctx.CurrentScope = FieldScopeMode.AllFields;
                 ctx.CurrentFieldIndex = i;
                 var resolved = Resolve(computeSlot.Expression, ctx, typedField.ResolvedType, typedField.DeclaredQualifiers);
+                var computedQualifierObligations = ImmutableArray<ProofRequirement>.Empty;
                 if (resolved is not TypedErrorExpression && !typedField.DeclaredQualifiers.IsDefaultOrEmpty)
                 {
-                    ValidateAssignmentQualifiers(
+                    // Open-axis assignment-qualifier residual on a computed-field expression: stamped
+                    // as a proof obligation and discharged at the proof stage (the engine walks the
+                    // computed expression); the TypedConditional branches stay type-stage.
+                    computedQualifierObligations = ValidateAssignmentQualifiers(
                         resolved,
                         typedField.Name,
                         typedField.DeclaredQualifiers,
                         computeSlot.Expression.Span,
-                        ctx);
+                        ctx,
+                        dischargedAtProofStage: true);
                 }
-                ctx.Fields[i] = ctx.Fields[i] with { ComputedExpression = resolved };
+                ctx.Fields[i] = ctx.Fields[i] with
+                {
+                    ComputedExpression = resolved,
+                    DefaultQualifierObligations = computedQualifierObligations,
+                };
                 ctx.FieldLookup[typedField.Name] = ctx.Fields[i];
                 ctx.CurrentScope = FieldScopeMode.AllFields;
                 ctx.CurrentFieldIndex = -1;
@@ -980,29 +994,21 @@ internal static partial class TypeChecker
                             Types.GetMeta(typedArg.ResolvedType).DisplayName,
                             Types.GetMeta(resolved.ResultType).DisplayName));
                     }
-                    else if (!typedArg.DeclaredQualifiers.IsDefaultOrEmpty)
+                    if (!typedArg.DeclaredQualifiers.IsDefaultOrEmpty)
                     {
-                        ValidateAssignmentQualifiers(
+                        // Open-axis assignment-qualifier residual on an arg default: stamped as a
+                        // proof obligation, discharged at the proof stage (PRE0141 proof-owned).
+                        var argQualifierObligations = ValidateAssignmentQualifiers(
                             resolved,
                             typedArg.Name,
                             typedArg.DeclaredQualifiers,
                             defaultMod.Value.Span,
-                            ctx);
+                            ctx,
+                            dischargedAtProofStage: true);
+                        typedArg = typedArg with { DefaultQualifierObligations = argQualifierObligations };
                     }
 
                     ValidateMaxPlaces(resolved, typedArg.Modifiers, declaredArg.ParsedModifiers, typedArg.DeclaredQualifiers, typedArg.Name, defaultMod.Value.Span, ctx);
-
-                    // PRE0079 — OutOfRange: default value vs. declared numeric modifiers (event args carry no implied modifiers)
-                    ValidateDefaultAgainstNumericModifiers(
-                        resolved,
-                        typedArg.ResolvedType,
-                        typedArg.Modifiers,
-                        ImmutableArray<ModifierKind>.Empty,
-                        typedArg.NormalizedDeclaredMin,
-                        typedArg.NormalizedDeclaredMax,
-                        typedArg.Name,
-                        defaultMod.Value.Span,
-                        ctx);
                 }
 
                 argsBuilder[argIdx] = typedArg with { DefaultExpression = resolved };

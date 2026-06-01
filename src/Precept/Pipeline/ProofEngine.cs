@@ -146,6 +146,12 @@ public static partial class ProofEngine
 
         ApplyTrustedRuleFacts(obligations, suppressDiagnostics, semantics);
 
+        // A default holds one value; the declared-bound check reports the first violated
+        // numeric bound (in declared-then-implied order) and stops — so a default that
+        // violates several bounds yields one diagnostic, not one per bound. The per-modifier
+        // obligations are stamped in that order, so keeping the first failed OutOfRange per
+        // default site reproduces it.
+        var emittedDefaultBoundSites = new HashSet<ObligationContext>();
         for (int i = 0; i < obligations.Count; i++)
         {
             if (suppressDiagnostics[i])
@@ -153,6 +159,11 @@ public static partial class ProofEngine
 
             var obligation = obligations[i];
             if (obligation.Disposition != ProofDisposition.Unresolved)
+                continue;
+
+            if (obligation.Requirement is NumericProofRequirement { BoundModifierLabel: not null }
+                && obligation.Context is FieldDefaultContext or ArgDefaultContext
+                && !emittedDefaultBoundSites.Add(obligation.Context))
                 continue;
 
             diagnostics.Add(CreateDiagnostic(obligation, semantics));
@@ -240,10 +251,13 @@ public static partial class ProofEngine
             }
         }
 
-        // Fields[].DefaultExpression — interval containment for interpolated defaults
+        // Fields[].ComputedExpression — result-interval vs the field's own declared bounds
+        CollectComputedFieldBoundObligations(semantics, obligations);
+
+        // Fields[].DefaultExpression — numeric/length declared-bound + qualifier-residual obligations
         CollectDefaultObligations(semantics, obligations);
 
-        // Events[].Args[].DefaultExpression — interval containment for arg defaults
+        // Events[].Args[].DefaultExpression — numeric/length declared-bound + qualifier-residual obligations
         CollectArgDefaultObligations(semantics, obligations);
 
         return obligations;
@@ -709,6 +723,18 @@ public static partial class ProofEngine
 
     private static (ProofDisposition, ProofStrategy?) TryDischarge(ProofObligation obligation, SemanticIndex semantics)
     {
+        // Declared-value default bound (OutOfRange family): a stamped numeric default obligation is
+        // discharged by evaluating the default's static value against the bound. true → proved;
+        // false → violated, leave Unresolved so OutOfRange surfaces; null → undecidable magnitude,
+        // conservative no-emit (proved vacuously per the unresolvable-magnitude limitation).
+        if (obligation.Requirement is NumericProofRequirement { BoundModifierLabel: not null }
+            && obligation.Context is FieldDefaultContext or ArgDefaultContext)
+        {
+            return TryNumericDefaultBoundProof(obligation, semantics) == false
+                ? (ProofDisposition.Unresolved, null)
+                : (ProofDisposition.Proved, ProofStrategy.Literal);
+        }
+
         if (TryLiteralProof(obligation))
             return (ProofDisposition.Proved, ProofStrategy.Literal);
         if (TryDeclarationAttributeProof(obligation, semantics))

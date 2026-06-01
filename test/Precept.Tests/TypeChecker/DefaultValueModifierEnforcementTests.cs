@@ -17,7 +17,7 @@ public class DefaultValueModifierEnforcementTests
 
     [Fact]
     public void Money_MaxplacesExceeded_DefaultEmitsDiagnostic() =>
-        TypeCheckerTestHelpers.CheckExpectingError("""
+        TypeCheckerTestHelpers.CompileExpectingError("""
             precept Example
             field A as money in 'USD' maxplaces 2 default '1.999 USD'
             """, DiagnosticCode.MaxPlacesExceeded);
@@ -47,35 +47,35 @@ public class DefaultValueModifierEnforcementTests
 
     [Fact]
     public void Money_NonnegativeViolatedByNegativeDefault_EmitsOutOfRange() =>
-        TypeCheckerTestHelpers.CheckExpectingError("""
+        TypeCheckerTestHelpers.CompileExpectingError("""
             precept Example
             field A as money in 'USD' nonnegative default '-1.00 USD'
             """, DiagnosticCode.OutOfRange);
 
     [Fact]
     public void Money_PositiveViolatedByZeroDefault_EmitsOutOfRange() =>
-        TypeCheckerTestHelpers.CheckExpectingError("""
+        TypeCheckerTestHelpers.CompileExpectingError("""
             precept Example
             field A as money in 'USD' positive default '0.00 USD'
             """, DiagnosticCode.OutOfRange);
 
     [Fact]
     public void Money_NonzeroViolatedByZeroDefault_EmitsOutOfRange() =>
-        TypeCheckerTestHelpers.CheckExpectingError("""
+        TypeCheckerTestHelpers.CompileExpectingError("""
             precept Example
             field A as money in 'USD' nonzero default '0.00 USD'
             """, DiagnosticCode.OutOfRange);
 
     [Fact]
     public void Quantity_PositiveViolatedByNegativeDefault_EmitsOutOfRange() =>
-        TypeCheckerTestHelpers.CheckExpectingError("""
+        TypeCheckerTestHelpers.CompileExpectingError("""
             precept Example
             field A as quantity of 'length' positive default '-1 m'
             """, DiagnosticCode.OutOfRange);
 
     [Fact]
     public void Price_PositiveViolatedByZeroDefault_EmitsOutOfRange() =>
-        TypeCheckerTestHelpers.CheckExpectingError("""
+        TypeCheckerTestHelpers.CompileExpectingError("""
             precept Example
             field A as price in 'USD' of 'length' positive default '0 USD/m'
             """, DiagnosticCode.OutOfRange);
@@ -84,14 +84,14 @@ public class DefaultValueModifierEnforcementTests
 
     [Fact]
     public void ExchangeRate_ImpliedPositiveViolatedByZeroDefault_EmitsOutOfRange() =>
-        TypeCheckerTestHelpers.CheckExpectingError("""
+        TypeCheckerTestHelpers.CompileExpectingError("""
             precept Example
             field A as exchangerate default '0 USD/EUR'
             """, DiagnosticCode.OutOfRange);
 
     [Fact]
     public void ExchangeRate_ImpliedPositiveViolatedByNegativeDefault_EmitsOutOfRange() =>
-        TypeCheckerTestHelpers.CheckExpectingError("""
+        TypeCheckerTestHelpers.CompileExpectingError("""
             precept Example
             field A as exchangerate default '-1.0 USD/EUR'
             """, DiagnosticCode.OutOfRange);
@@ -100,21 +100,21 @@ public class DefaultValueModifierEnforcementTests
 
     [Fact]
     public void Duration_NonnegativeViolatedByNegativeDefault_EmitsOutOfRange() =>
-        TypeCheckerTestHelpers.CheckExpectingError("""
+        TypeCheckerTestHelpers.CompileExpectingError("""
             precept Example
             field A as duration nonnegative default '-14 hours'
             """, DiagnosticCode.OutOfRange);
 
     [Fact]
     public void Duration_NonzeroViolatedByZeroDefault_EmitsOutOfRange() =>
-        TypeCheckerTestHelpers.CheckExpectingError("""
+        TypeCheckerTestHelpers.CompileExpectingError("""
             precept Example
             field A as duration nonzero default '0 seconds'
             """, DiagnosticCode.OutOfRange);
 
     [Fact]
     public void Period_NonnegativeViolatedByNegativeDefault_EmitsOutOfRange() =>
-        TypeCheckerTestHelpers.CheckExpectingError("""
+        TypeCheckerTestHelpers.CompileExpectingError("""
             precept Example
             field A as period nonnegative default '-1 month'
             """, DiagnosticCode.OutOfRange);
@@ -123,14 +123,14 @@ public class DefaultValueModifierEnforcementTests
 
     [Fact]
     public void Money_MinViolatedByDefault_EmitsOutOfRange() =>
-        TypeCheckerTestHelpers.CheckExpectingError("""
+        TypeCheckerTestHelpers.CompileExpectingError("""
             precept Example
             field A as money in 'USD' min '100.00 USD' default '50.00 USD'
             """, DiagnosticCode.OutOfRange);
 
     [Fact]
     public void Money_MaxViolatedByDefault_EmitsOutOfRange() =>
-        TypeCheckerTestHelpers.CheckExpectingError("""
+        TypeCheckerTestHelpers.CompileExpectingError("""
             precept Example
             field A as money in 'USD' max '500.00 USD' default '600.00 USD'
             """, DiagnosticCode.OutOfRange);
@@ -139,14 +139,14 @@ public class DefaultValueModifierEnforcementTests
 
     [Fact]
     public void Decimal_NonnegativeViolatedByNegativeDefault_EmitsOutOfRange() =>
-        TypeCheckerTestHelpers.CheckExpectingError("""
+        TypeCheckerTestHelpers.CompileExpectingError("""
             precept Example
             field A as decimal nonnegative default -1
             """, DiagnosticCode.OutOfRange);
 
     [Fact]
     public void Decimal_PositiveViolatedByZeroDefault_EmitsOutOfRange() =>
-        TypeCheckerTestHelpers.CheckExpectingError("""
+        TypeCheckerTestHelpers.CompileExpectingError("""
             precept Example
             field A as decimal positive default 0
             """, DiagnosticCode.OutOfRange);
@@ -155,7 +155,7 @@ public class DefaultValueModifierEnforcementTests
 
     [Fact]
     public void EventArg_NonnegativeViolatedByNegativeDefault_EmitsOutOfRange() =>
-        TypeCheckerTestHelpers.CheckExpectingError("""
+        TypeCheckerTestHelpers.CompileExpectingError("""
             precept Example
             state Open initial
             event Begin(Amount as money in 'USD' nonnegative default '-1.00 USD')
