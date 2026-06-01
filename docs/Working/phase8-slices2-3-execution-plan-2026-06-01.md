@@ -11,7 +11,7 @@
 | Build slice | Goal | Design decisions | Decisions req. | Effort | Status |
 |---|---|---|---|---|---|
 | **Slice 2** | Uniform code selection (literal or single catalog field); no behavior change | Slice 2 P1–P4 | none (Locked) | M (~2–3d) | ✅ **Complete `59fe2666`** |
-| **Slice 3a** | Honest `DiagnosticStage` taxonomy + dual-emission consolidation + hover decouple | Slice 3 D2, D4 | none (Locked) | S–M (~1–2d) | **Next** (heavyweight below) |
+| **Slice 3a** | Honest `DiagnosticStage` taxonomy + dual-emission consolidation (6 duals incl. name-resolution → Bind) + hover decouple | Slice 3 D2, D4 (amended) | none (Locked) | M (~2–3d) | **Next** (heavyweight below) |
 | **Slice 3b** | Proof-walk extension — value-level checks become proof-owned obligations | Slice 3 D3, D5 | none (Locked) | M (~2–3d) | Stub |
 | **Slice 3c** | The ownership analyzer (enforces single-stage ownership; zero allow-list) | Slice 3 D1 | none (Locked) | M (~2d) | Stub |
 
@@ -21,7 +21,7 @@
 
 All decisions are **Locked** in the two design docs (2026-06-01) — nothing to re-litigate:
 - **Slice 2 design** (Decisions P1–P4): P1 typed `DiagnosticCode?` carriage (null⇒catalog; kill round-trip + dual-surface); P2 fault map from `[StaticallyPreventable]` (keep collapse/backstop); P3 document Pattern-2 residue; P4 collapse CI field pair.
-- **Slice 3 design** (Decisions D1–D5): D1 catalog-ownership + analyzer (no dedup); D2 honest `Bind`/`Tooling` taxonomy; D3 proof-walk extension; D4 `NoInitialState`→Graph, `CircularComputedField`→Bind, delete dedup guard; D5 `OutOfRange` kept proof-owned.
+- **Slice 3 design** (Decisions D1–D5): D1 catalog-ownership + analyzer (no dedup); D2 honest `Bind`/`Tooling` taxonomy; D3 proof-walk extension; D4 (amended) dual-emission consolidation — 6 duals: `NoInitialState`→Graph, `CircularComputedField`+the `Undeclared*` name-resolution family→Bind (type checker defers to binder markers; fixes a latent double-emission), delete dedup guard; D5 `OutOfRange` kept proof-owned; D6 `MaxPlacesExceeded` stays Type.
 - Cross-cutting: no runtime reconciliation/dedup; no allow-list; behavior-preservation is the hard gate for Slice 2 (and for the constant cases in Slice 3b).
 
 ## Open decisions
@@ -39,30 +39,32 @@ Converged every diagnostic-code selection onto two shapes (literal `DiagnosticCo
 
 ### Slice 3a — Honest taxonomy + dual-emission consolidation
 
-**Goal**: `DiagnosticStage` truthfully names the producer (`Bind`/`Tooling` added, `NameBinder→Type`/`Mcp→Lex` mislabels removed, no precedence semantics); the structural dual-emissions consolidate to single owners; LS hover surfaces obligations by obligation-presence, not the `Proof` stage label.
+**Goal**: `DiagnosticStage` truthfully names the producer (`Bind`/`Tooling` added, `NameBinder→Type`/`Mcp→Lex` mislabels removed, no precedence semantics); **all six** dual-emissions consolidate to single owners (incl. the name-resolution family → Bind, fixing a latent double-emission); LS hover surfaces obligations by obligation-presence, not the `Proof` stage label.
 
-**Design decisions delivered**: Slice 3 D2, D4 (+ the hover decouple).
+**Design decisions delivered**: Slice 3 D2, D4 (amended — 6 duals incl. the `Undeclared*` family) (+ the hover decouple).
 
-**Decisions required before kicking off**: none (Locked; `CircularComputedField`→Bind settled with a falsifier).
+**Decisions required before kicking off**: none (Locked; `CircularComputedField`/`Undeclared*` → Bind settled in D4 with a coverage falsifier).
 
 **Step-by-step**:
 1. Add `Bind`, `Tooling` to the `DiagnosticStage` enum (`Diagnostic.cs`); update the enum + `Stage`-field doc-comments to "producing-component classification, no precedence" (the comment doc-sync from Slice 3's doc-update).
-2. Relabel meta (`Diagnostics.cs`): NameBinder-produced codes → `Bind`; `McpToolInternalError` → `Tooling`. (Value-level codes that become proof-owned are relabeled to `Proof` in **Slice 3b**, when the proof-walk actually emits them — not here.) Update `DiagnosticsTests` stage assertions.
+2. Relabel meta (`Diagnostics.cs`): NameBinder-produced codes → `Bind`; `McpToolInternalError` → `Tooling`; the `Undeclared*` family → `Bind` (they're Bind-owned post-consolidation, step 5). (Value-level codes that become proof-owned are relabeled to `Proof` in **Slice 3b** — not here.) Update `DiagnosticsTests` stage assertions.
 3. D4 — `NoInitialState` → Graph only: delete the `TypeChecker.cs:704` emit and the `GraphAnalyzer.cs:85` `HasDiagnostic` guard; confirm the graph path covers every case the type-checker emit did (coverage check).
 4. D4 — `CircularComputedField` → Bind only: delete the `Structural.cs:248` DFS detector; run the falsifier coverage check (binder topological-sort detector catches every cycle class the DFS did) before deleting.
-5. Hover decouple: `RichHoverFactory` keys obligation-surfacing on obligation-presence rather than `Stage == Proof`.
+5. D4 — **name-resolution family `UndeclaredField`/`UndeclaredState`/`UndeclaredEvent` → Bind**: the type checker stops emitting `Undeclared*` at its ~9 sites (`Normalization.cs:208,328,455`, `Expressions.Callables.cs:394,962`, `Expressions.cs:949`, `TypeChecker.cs:1150,1214,1300`), deferring to the binder's `UnresolvedTarget` markers (it keeps *looking names up* for typing — only the emit moves). Lift the binder's state-*list* resolution from first-name-only to full-list. Per-site coverage check before deleting each emit. (Also reconcile the `Event.notAnArg` mis-coding: type checker's `UndeclaredField` at `Callables.cs:962` → the binder's `UndeclaredArg`.)
+6. Hover decouple: `RichHoverFactory` keys obligation-surfacing on obligation-presence rather than `Stage == Proof`.
 
 **Dependencies**: Slice 2 (uniform surface — so the relabel and consolidation don't fight the round-trip/dual-surface).
 
 **Exit criteria** (testable):
-- Test: every NameBinder-produced code reports `Bind`; `McpToolInternalError` reports `Tooling`.
-- Test: `NoInitialState` emits exactly once (Graph); `CircularComputedField` emits exactly once (Bind); the binder-detector-sufficiency coverage check passes.
+- Test: every NameBinder-produced code reports `Bind`; `McpToolInternalError` reports `Tooling`; the `Undeclared*` family reports `Bind`.
+- Test: each of the six dual codes emits **exactly once** — `NoInitialState` (Graph); `CircularComputedField` (Bind); `UndeclaredField`/`UndeclaredState`/`UndeclaredEvent` (Bind). **Double-emission fixed**: the tolerant tests (`TypeCheckerTransitionTests.cs:196-199`, `≥2`/`Contain`) tightened to exact counts; an undeclared name in a state-list produces one diagnostic per missing name.
+- Per-emit coverage check passed before each type-checker emit deletion (binder owner catches every case the dropped twin did).
 - `GraphAnalyzer.cs:85` `HasDiagnostic` guard deleted.
 - LS hover surfaces obligation-bearing diagnostics identically on the corpus, keyed on obligation-presence.
-- `precept_compile` per-stage error counts shift as expected (binder errors now `Bind`) — asserted, not silent.
+- `precept_compile` per-stage error counts shift as expected (binder errors now `Bind`; fewer total on undeclared-name inputs) — asserted, not silent.
 - Full suite green.
 
-**Estimated effort**: S–M (~1–2 days).
+**Estimated effort**: **M (~2–3 days)** — the name-resolution consolidation (defer ~9 type-checker emits to binder markers + lift the binder's state-list resolution) is a real refactor with per-site coverage checks, not the original "relabel + 2 duals" S–M.
 
 **Doc-update obligations**:
 - `docs/compiler/diagnostic-system.md § Diagnostic Stages` — `Bind`/`Tooling`, the two distortions resolved.
@@ -81,7 +83,7 @@ Converged every diagnostic-code selection onto two shapes (literal `DiagnosticCo
 
 The Slices 2–3 workstream is complete when:
 - The ownership analyzer is **green with zero allow-list entries**; a deliberately wrong-stage `Diagnostics.Create` in a test fixture trips it.
-- No `DiagnosticCode` is emitted from two stages (the 3 duals consolidated; `GraphAnalyzer.cs:85` guard gone).
+- No `DiagnosticCode` is emitted from two stages (all **6** duals consolidated — incl. the `Undeclared*` family → Bind; `GraphAnalyzer.cs:85` guard gone; latent double-emission fixed).
 - The 2 proof-dischargeable value-level checks (`OutOfRange`, assignment-qualifier residual) discharge at the proof stage; constant-default violations still produce a diagnostic (proof-owned), verified on the corpus. (`MaxPlacesExceeded` stays Type-owned — Decision 6.)
 - `DiagnosticStage` has honest `Bind`/`Tooling`; no mislabels; no precedence semantics.
 - All doc-touch obligations met (`diagnostic-system.md`, `proof-engine.md`, `Diagnostic.cs` comments, `mcp.md`).

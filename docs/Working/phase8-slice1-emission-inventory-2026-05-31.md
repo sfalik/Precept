@@ -35,7 +35,7 @@ A check is decided against `docs/compiler/proof-engine.md` Decision 3 (type chec
 
 ---
 
-## 3. Class-O — obligation-in-disguise population (exactly 3, all type-checker)
+## 3. Class-O — obligation-in-disguise population (2 wired, all type-checker — corrected from 3; see note below)
 
 All three share one root cause: they evaluate a proof-shaped property **inline because the proof engine does not walk their context** (field/arg defaults, bounds, computed/non-`set`).
 
@@ -67,13 +67,20 @@ Decidable from typed structure without value reasoning. Listed because Slice 3's
 
 ## 5. Cross-stage dual-emissions (verified) — the concrete Slice 3 symptom
 
-The same `DiagnosticCode` emitted from two stages, reconciled today by context-split or an ad-hoc guard. This is the "which stage emits this?" non-question a terminal emission phase eliminates.
+The same `DiagnosticCode` emitted from two stages, reconciled today by context-split, an ad-hoc guard, or (the name-resolution family) **not reconciled at all** — a latent double-emission.
+
+> **Correction (2026-06-01, name-resolution investigation)**: this section originally listed **3** duals. The genuine count is **6** — the name-resolution family `UndeclaredField`/`UndeclaredState`/`UndeclaredEvent` is also dual-emitted (binder + type checker, ~10 sites) and was missed because it spans many sites. Added below. Slice 3 D4 (amended) consolidates all six.
 
 | Code | Locus A | Locus B | How reconciled today |
 |---|---|---|---|
 | `UnprovedAssignmentQualifierCompatibility` | type checker `AssignmentQualifiers.cs:223` | proof engine `ProofEngine.Diagnostics.cs:89` | deliberate context split (walked vs not-walked) |
 | `CircularComputedField` | name-binder `NameBinder.cs:305` | type checker `Validation.Structural.cs:248` | two independent cycle detectors |
 | `NoInitialState` | type checker `TypeChecker.cs:704` | graph analyzer `GraphAnalyzer.cs:88` | ad-hoc `HasDiagnostic(...)` dedup guard at `GraphAnalyzer.cs:85` |
+| `UndeclaredField` | name-binder `NameBinder.cs:714,775` | type checker `Normalization.cs:455`, `Expressions.Callables.cs:394,962`, `Expressions.cs:949` | **none — double-emission** (tolerant tests, `TypeCheckerTransitionTests.cs:196-199`) |
+| `UndeclaredState` | name-binder `NameBinder.cs:734` | type checker `Normalization.cs:328`, `TypeChecker.cs:1214` | **none — double-emission** |
+| `UndeclaredEvent` | name-binder `NameBinder.cs:754` | type checker `Normalization.cs:208`, `TypeChecker.cs:1150,1300` | **none — double-emission** |
+
+Investigation conclusion: the name-resolution family is **redundant re-resolution, not type-gated** — all consolidatable to the binder (Bind owns; type checker defers to `UnresolvedTarget` markers). See Slice 3 D4 (amended).
 
 ---
 
@@ -93,13 +100,13 @@ Triage by **declared enum category + registry `TriggerCondition`/spec rule** (gr
 
 **Grounded result**: of the 4 provisional future-O candidates, **only `NullInNonNullableContext` is a genuine future-O** (presence-family); the other 3 are S (literal / declaration-shape / constant-arg, narrowable variants already covered by existing proof obligations).
 
-**Implication for Slice 3**: the "3 Class-O today" is the *wired* obligation surface; the *eventual* surface is ~3 wired + 1 future ≈ **4**, all presence/numeric/qualifier families the proof engine already models. Slice 3 must design the emission model against the **spec** surface, with a defined home for `NullInNonNullableContext` (presence channel), or Phase 9 will wire it into the legacy scatter and re-create the problem Slice 3 exists to fix. **Phase 8 (emission architecture) and Phase 9 (completeness/emit-or-retire) are coupled at this seam**: Slice 3 defines the model + the future-emitter home; Phase-9 wiring targets that model.
+**Implication for Slice 3**: the wired obligation surface is **2** Class-O (corrected from 3 — `MaxPlacesExceeded` reclassified Class-S per Slice 3 D6); the *eventual* surface is 2 wired + 1 future ≈ **3**, all presence/numeric/qualifier families the proof engine already models. Slice 3 must design the emission model against the **spec** surface, with a defined home for `NullInNonNullableContext` (presence channel), or Phase 9 will wire it into the legacy scatter and re-create the problem Slice 3 exists to fix. **Phase 8 (emission architecture) and Phase 9 (completeness/emit-or-retire) are coupled at this seam**: Slice 3 defines the model + the future-emitter home; Phase-9 wiring targets that model.
 
 ---
 
 ## 7. What Slice 3 inherits from this slice
 
-1. Obligation-conversion is narrow: 3 wired Class-O + up-to-4 future-O, all one root cause (non-proof-walked contexts: defaults/bounds/computed). The design question is *extend the proof-walk to those contexts, or unify only emission and accept inline evaluation there.*
+1. Obligation-conversion is narrow: **2** wired Class-O (`OutOfRange`, the assignment-qualifier residual — `MaxPlacesExceeded` is Class-S per Slice 3 D6) + 1 future-O, one root cause (non-proof-walked contexts: defaults/bounds/computed). The design question is *extend the proof-walk to those contexts, or unify only emission and accept inline evaluation there.* (Separately: **6** cross-stage dual-emissions, not 3 — see §5 correction.)
 2. "One terminal emission phase" spans ≥4 loci, most of them flow/graph/SAT, **not** obligations — it is not equivalent to "make everything a proof obligation." Class F and the 6 proof-direct SAT scans must have a home in the model.
 3. The 3 dual-emissions (one with an ad-hoc dedup guard) are the symptom to cure.
 4. Design against the spec surface (§6), not the wired surface.

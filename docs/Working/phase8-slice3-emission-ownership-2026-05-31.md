@@ -1,5 +1,5 @@
 ---
-status: Locked 2026-06-01 (amended 2026-06-01 — Decision 6 added: MaxPlacesExceeded stays Type)
+status: Locked 2026-06-01 (amended 2026-06-01 — D6 added: MaxPlacesExceeded stays Type; D4 expanded: name-resolution family UndeclaredField/State/Event → Bind, 6 duals not 3)
 phase-target: Phase 8 Slice 3 (diagnostic-emission ownership architecture)
 comparable-systems-research-status: partial — load-bearing precedent is in-tree (the Precept000x analyzers + DiagnosticCoverageScanner, read for this design); Roslyn DiagnosticDescriptor cited as an external parallel from general API knowledge. No irreversible decision, so the research-adequacy gate does not fire.
 sources-consulted:
@@ -13,6 +13,7 @@ sources-consulted:
   - docs/philosophy.md / precept-language-spec.md § 0.1: prevention-not-detection, compile-time structural impossibility
   - docs/language/business-domain-types.md:1581-1590: the three-point maxplaces enforcement model (Decision 6) — point 1 compile-time, points 2–3 runtime
   - src/Precept/Pipeline/TypeChecker.cs:1078 + src/Precept/Language/ProofRequirement.cs: maxplaces is static-only at compile time; no decimal-places ProofRequirement kind (Decision 6)
+  - name-resolution investigation 2026-06-01: NameBinder Undeclared* (:577,714,734,754,775) + type-checker twins (Normalization.cs:208,328,455; Expressions.Callables.cs:394,962; Expressions.cs:949; TypeChecker.cs:1150,1214,1300) — all symbol-table existence checks, none type-gated; double-emission documented at TypeCheckerTransitionTests.cs:196-199 (D4 amendment)
 ---
 
 # Slice 3 — Diagnostic-Emission Ownership Architecture
@@ -86,7 +87,7 @@ The hooks already exist (`CollectDefaultObligations`, `CollectArgDefaultObligati
 No runtime reconciliation layer — the invariant is enforced at compile time, which is where Precept puts structural guarantees.
 
 **Cross-component propagation:**
-- **Runtime (parser/type checker/evaluator/diagnostics):** type checker stops inline-emitting the three wired Class-O codes for defaults/bounds, stamps obligations instead; proof engine's default/computed walk extended to collect them; `DiagnosticStage` enum gains `Bind`/`Tooling`; meta relabels the two distorted code sets; `NoInitialState`/`CircularComputedField` emission consolidated to single owners.
+- **Runtime (parser/type checker/evaluator/diagnostics):** type checker stops inline-emitting the three wired Class-O codes for defaults/bounds, stamps obligations instead; proof engine's default/computed walk extended to collect them; `DiagnosticStage` enum gains `Bind`/`Tooling`; meta relabels the two distorted code sets; the six dual-emissions (`NoInitialState`→Graph; `CircularComputedField` + the `Undeclared*` name-resolution family→Bind, type checker defers to binder markers) consolidated to single owners — fixing a latent double-emission of `Undeclared*`.
 - **Tooling (syntax/completions/hover/semantic tokens):** LS hover keys obligation-surfacing on obligation-presence, not `Stage == Proof` (`RichHoverFactory.cs:245` already half-does this).
 - **MCP (vocabulary/DTOs/tool output):** `CatalogFormatters.cs:600` serializes the (now honest) stage string; the constant-default numeric code's identity may change (Decision 5); **and `precept_compile`'s per-stage error count changes** — `CompileTool.cs:70` computes `typeErrors` as `Count(Stage == Type)`, so moving binder codes `Type→Bind` (D2) and value-level codes `Type→Proof` (D3) *reduces* the reported type-error count and shifts those into bind/proof counts. All visible in `precept_compile` output. No external consumers (pre-release).
 
@@ -106,7 +107,7 @@ No runtime reconciliation layer — the invariant is enforced at compile time, w
   - *Pattern-2 residue* — the precursor documents the bounded candidate set for each context-determined site (lexer mode-switch; proof `Numeric`/`KeyPresence`/`QualifierChain` cases); the analyzer checks each set's codes are owned by the emitting stage. Bounded, so still enforceable with no allow-list.
 - **Type checker**: replace inline value-level emits for defaults/bounds with obligation stamping — `AssignmentQualifiers.cs` residual branch; `Modifiers.cs` `TryReportNumericViolation`/`OutOfRange`. (`TypeChecker.cs` `MaxPlacesExceeded` is **not** relocated — Decision 6; it stays an inline Type-stage static check.)
 - **Proof engine**: extend `CollectDefaultObligations`/`CollectArgDefaultObligations`/computed-field walk to collect the newly-stamped numeric-modifier + assignment-qualifier + presence obligations.
-- **Dual-emission consolidation**: `NoInitialState` → Graph only (delete the `TypeChecker.cs:704` emit + the `GraphAnalyzer.cs:85` `HasDiagnostic` guard); `CircularComputedField` → single owner (consolidate `NameBinder.cs:305` + `Structural.cs:248`).
+- **Dual-emission consolidation** (six duals — D4): `NoInitialState` → Graph only (delete the `TypeChecker.cs:704` emit + the `GraphAnalyzer.cs:85` `HasDiagnostic` guard); `CircularComputedField` → Bind (delete `Structural.cs:248`); **the name-resolution family `UndeclaredField`/`UndeclaredState`/`UndeclaredEvent` → Bind** — the type checker stops emitting `Undeclared*` (~9 sites: `Normalization.cs:208,328,455`, `Expressions.Callables.cs:394,962`, `Expressions.cs:949`, `TypeChecker.cs:1150,1214,1300`), deferring to the binder's `UnresolvedTarget` markers; the binder's state-list resolution is lifted from first-name-only to full-list. Fixes the current double-emission (tolerant tests tightened to exact counts).
 - **LS hover**: `RichHoverFactory` keys on obligation-presence not `Stage == Proof`.
 - **Tests**: ownership analyzer tests; `DiagnosticsTests` stage-assertion updates; proof-stage discharge tests for the relocated value-level checks; `NoInitialState`/`CircularComputedField` single-emission tests.
 - **No** reconciliation/dedup code.
@@ -157,16 +158,26 @@ No runtime reconciliation layer — the invariant is enforced at compile time, w
 - **Reversibility**: Hard (proof-engine + type-checker contract), no public/author contract.
 - **Blast radius**: `ProofEngine.cs` default/computed walk, type-checker stamping sites, proof-stage discharge tests. Couples to Decision 5 (code identity).
 
-### Decision 4: Resolve the structural dual-emissions to single owners
+### Decision 4: Resolve the dual-emissions to single owners (amended 2026-06-01 — name-resolution family added)
 
-**Stakes**: medium.
+**Stakes**: medium → (amendment) the name-resolution family is a larger consolidation than the original two structural duals.
 
-- **Rationale**: `NoInitialState` and `CircularComputedField` are each detected in two stages today; single-ownership requires one. `NoInitialState` is a graph property → Graph owns; the type-checker emit + the `HasDiagnostic` guard are deleted. `CircularComputedField` is a dependency-graph cycle → one of Bind/Type owns; consolidate.
-- **Tradeoff accepted**: must verify neither dropped emitter caught a case its surviving owner misses (a small coverage check during execution).
-- **Alternatives considered**: *Distinct codes per stage.* Rejected — same author-facing meaning; two codes would be noise.
-- **Precedent**: Slice 1 §5 (the dual-emission inventory); `GraphAnalyzer.cs` owns the other initial-state/reachability diagnostics already.
-- **Sources consulted for this decision**: `docs/Working/phase8-slice1-emission-inventory-2026-05-31.md` §5; `GraphAnalyzer.cs:85-88`, `TypeChecker.cs:704`, `NameBinder.cs:305`, `Structural.cs:248`.
-- **Resolved at lock (2026-06-01) — `CircularComputedField` owner**: **Bind** owns it (a computed-field cycle is a name-dependency-graph property the binder already computes via topological sort at `NameBinder.cs:305`); the Type-stage DFS detector at `Structural.cs:248` is removed. *Falsifier*: if the binder's topological-sort detector misses a cycle class the Type-stage DFS catches (e.g. a cycle only visible after type resolution), the owner is Type instead — an execution-time coverage check confirms the binder detector is sufficient before the Type detector is deleted.
+**The real dual-emission set is six, not three** (Slice 1 undercounted — see corrected inventory). Each must become single-owned for the Decision-1 zero-allow-list analyzer:
+1. `NoInitialState` (Type + Graph) → **Graph**.
+2. `CircularComputedField` (Bind + Type) → **Bind**.
+3–5. `UndeclaredField` / `UndeclaredState` / `UndeclaredEvent` (Bind + Type, ~10 sites) → **Bind** (the name-resolution family — added by this amendment).
+6. `UnprovedAssignmentQualifierCompatibility` (Type + Proof) → resolved by D3 (proof-walk relocation), not here.
+
+- **Rationale**: each code is detected in two stages today; single-stage ownership requires one owner. A focused investigation (2026-06-01) of the name-resolution family found the type-checker emissions are **redundant re-resolutions, not type-gated** — every `Undeclared*` site is a pure symbol-table existence check (the binder's three dictionaries suffice); the only genuinely type-dependent member-access path emits `InvalidMemberAccess`, a different code. So all of it consolidates to the **binder**, which runs first and already produces `UnresolvedTarget` markers. Mechanism: the type checker keeps *looking names up* for typing but **stops emitting `Undeclared*`**, deferring to the binder's markers; the binder's state-*list* resolution is lifted from first-name-only (`SlotValue.cs:84` compat getter) to full-list. `NoInitialState` → Graph and `CircularComputedField` → Bind are graph/name-graph properties (the binder already computes the cycle via topological sort at `NameBinder.cs:305`).
+- **Tradeoff accepted**: this is **not behavior-neutral** — it *fixes a latent double-emission bug*. Today an undeclared name can produce two diagnostics (one per stage), documented in `TypeCheckerTransitionTests.cs:196-199` (*"Missing1 receives two UndeclaredState diagnostics, one from each pipeline stage"*); the suite tolerates it with `≥2`/`Contain` matchers. Consolidation makes it emit once — author-visible (fewer duplicates), a quality improvement, but the tolerant tests must be tightened to exact counts. Must verify the binder owner catches every case its dropped type-checker twin did (coverage check before deleting each type-checker emit).
+- **Alternatives considered**: *Distinct codes per stage* — rejected (same author-facing meaning; noise). *A scoped allow-list for the name-resolution family* — rejected: the investigation showed consolidation is feasible (not type-gated), so an allow-list would be an unnecessary hole in the zero-allow-list guarantee. *Keep first-name-only in the binder* — rejected: it would leave the type checker as the only full-list resolver, re-creating the dual.
+- **Precedent**: the binder is already the first-pass resolver (`NameBinder.cs` `ResolveReferences`); `GraphAnalyzer.cs` already owns the other initial-state/reachability diagnostics; the investigation (this session) grounds the type-free claim per-site.
+- **Sources consulted for this decision**:
+  - `docs/Working/phase8-slice1-emission-inventory-2026-05-31.md` §5 (the dual inventory, now corrected to 6).
+  - Investigation (2026-06-01): NameBinder `Undeclared*` at `:577,714,734,754,775` (symbol-table-only); type-checker twins at `Normalization.cs:208,328,455`, `Expressions.Callables.cs:394,962`, `Expressions.cs:949`, `TypeChecker.cs:1150,1214,1300` — all existence checks, none type-gated. Double-emission documented at `test/Precept.Tests/.../TypeCheckerTransitionTests.cs:196-199`. Binder produces `UnresolvedTarget` markers at `NameBinder.cs:717,737,757,778`.
+  - `GraphAnalyzer.cs:85-88`, `TypeChecker.cs:704` (`NoInitialState`); `NameBinder.cs:305`, `Structural.cs:248` (`CircularComputedField`).
+- **Falsifier**: if any binder owner misses a case its dropped type-checker twin caught (a name reachable only in a type-checker context the binder doesn't walk), that emit can't be dropped — the coverage check gates each deletion. For `CircularComputedField`: if the binder's topological sort misses a cycle class the Type-stage DFS catches, Type owns instead.
+- **Note (Phase-9/identity)**: `Event.notAnArg` is mis-coded — `UndeclaredArg` from the binder (`:577`) vs `UndeclaredField` from the type checker (`Callables.cs:962`). Consolidating to the binder naturally resolves it to `UndeclaredArg`; flag the identity reconciliation for Phase 9 if it surfaces author-facing.
 
 ### Decision 5: Diagnostic identity for the relocated constant-default numeric check — keep `OutOfRange`, re-own to Proof
 
