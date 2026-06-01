@@ -283,15 +283,23 @@ public static class NameBinder
                 }
             }
 
-            var cyclicFields = dependencies
+            // Fields still carrying unresolved dependencies after the topological
+            // drain are either on a cycle or merely downstream of one. Both are
+            // unorderable (so both go to the tail of the evaluation order), but only
+            // fields genuinely on a cycle — able to reach themselves through the
+            // residual graph — get a CircularComputedField diagnostic. Emitting for a
+            // downstream-only field would fabricate a cycle it isn't part of.
+            var residualFields = dependencies
                 .Where(static kvp => kvp.Value.Count > 0)
                 .Select(static kvp => kvp.Key)
                 .OrderBy(GetFieldDeclarationOrder)
                 .ThenBy(static name => name, StringComparer.Ordinal)
                 .ToArray();
-            var cyclicSet = cyclicFields.ToHashSet(StringComparer.Ordinal);
+            var cyclicSet = residualFields
+                .Where(name => ReachesSelf(name, dependencies))
+                .ToHashSet(StringComparer.Ordinal);
 
-            foreach (var fieldName in cyclicFields)
+            foreach (var fieldName in residualFields.Where(cyclicSet.Contains))
             {
                 var field = _fieldsByName[fieldName];
                 var cycleMembers = dependencies[fieldName]
@@ -308,7 +316,7 @@ public static class NameBinder
                     cycle));
             }
 
-            orderedFields.AddRange(cyclicFields);
+            orderedFields.AddRange(residualFields);
 
             return orderedFields
                 .Select(field => constructByField[field])
@@ -323,6 +331,37 @@ public static class NameBinder
             _fieldsByName.TryGetValue(fieldName, out var field)
                 ? field.DeclarationOrder
                 : int.MaxValue;
+
+        // True when <paramref name="start"/> can reach itself through the residual
+        // dependency graph — i.e. it lies on a cycle, rather than merely depending on one.
+        private static bool ReachesSelf(string start, Dictionary<string, HashSet<string>> dependencies)
+        {
+            var visited = new HashSet<string>(StringComparer.Ordinal);
+            var stack = new Stack<string>(dependencies[start]);
+            while (stack.Count > 0)
+            {
+                var node = stack.Pop();
+                if (string.Equals(node, start, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+
+                if (!visited.Add(node))
+                {
+                    continue;
+                }
+
+                if (dependencies.TryGetValue(node, out var deps))
+                {
+                    foreach (var dep in deps)
+                    {
+                        stack.Push(dep);
+                    }
+                }
+            }
+
+            return false;
+        }
 
         private static void CollectFieldDependencies(
             ParsedExpression expression,
@@ -401,12 +440,11 @@ public static class NameBinder
                 contextEvent = evt;
             }
 
-            // Resolve state target slots
+            // Resolve state target slots — the full comma-separated list, not just the
+            // first name. (Wildcard/duplicate-list diagnostics remain the type checker's;
+            // the binder owns only UndeclaredState.)
             var stateTargetSlot = construct.GetSlot<StateTargetSlot>(ConstructSlotKind.StateTarget);
-            if (stateTargetSlot?.StateName is { } stateName)
-            {
-                ResolveStateReference(stateName, stateTargetSlot.NameSpan);
-            }
+            ResolveStateTargetList(stateTargetSlot);
 
             // Resolve event target slots (the event name reference itself)
             if (eventTargetSlot?.EventName is { } eventRefName)
@@ -715,6 +753,39 @@ public static class NameBinder
                 span,
                 name));
             _references.Add(new SymbolReference(span, name, new UnresolvedTarget(name, SymbolCategory.Field)));
+        }
+
+        private void ResolveStateTargetList(StateTargetSlot? stateSlot)
+        {
+            if (stateSlot is null || stateSlot.StateNames.IsDefaultOrEmpty)
+            {
+                return;
+            }
+
+            // A list mixing a wildcard with named states is malformed; the type checker
+            // owns that diagnostic (StateListContainsWildcard). Don't surface name-resolution
+            // diagnostics for the named entries in that case.
+            var wildcardCount = stateSlot.StateNames.Count(IsStateWildcardKeyword);
+            if (wildcardCount > 0)
+            {
+                return;
+            }
+
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            for (var i = 0; i < stateSlot.StateNames.Length; i++)
+            {
+                var name = stateSlot.StateNames[i];
+                if (!seen.Add(name))
+                {
+                    // A repeated name in the list is a duplicate; the type checker owns
+                    // DuplicateStateInList. Resolving it again would double-emit any
+                    // name-resolution diagnostic for the same name.
+                    continue;
+                }
+
+                var span = i < stateSlot.NameSpans.Length ? stateSlot.NameSpans[i] : stateSlot.NameSpan;
+                ResolveStateReference(name, span);
+            }
         }
 
         private void ResolveStateReference(string name, SourceSpan span)

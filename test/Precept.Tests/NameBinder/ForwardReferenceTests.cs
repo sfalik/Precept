@@ -160,6 +160,27 @@ public sealed class ForwardReferenceTests
         cycleDiag.Message.Should().Contain("Y", because: "cycle message must name field Y");
     }
 
+    [Fact]
+    public void ComputedField_DownstreamOfCycle_NotFlaggedCircular()
+    {
+        // A <- B, B <- A form a cycle; Tail <- B merely depends on the cycle.
+        // Tail is unorderable but is not itself on a cycle, so it must not be flagged.
+        var compilation = Compile("""
+            precept DownstreamOfCycle
+            field A as number <- B + 1
+            field B as number <- A + 1
+            field Tail as number <- B + 1
+            """);
+
+        var circular = compilation.Diagnostics
+            .Where(d => d.Code == nameof(DiagnosticCode.CircularComputedField))
+            .ToList();
+        circular.Should().HaveCount(2,
+            because: "only the two fields on the cycle (A, B) are circular");
+        circular.Should().NotContain(d => d.Message.Contains("Tail"),
+            because: "a field that merely depends on a cycle must not be reported as circular");
+    }
+
     // ── DefaultForwardReference: non-computed defaults are scope-restricted ───────
 
     [Fact]

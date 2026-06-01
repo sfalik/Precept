@@ -279,8 +279,10 @@ public class GraphAnalyzerTests
     }
 
     [Fact]
-    public void Analyze_NoInitialState_DoesNotDuplicateDiagnosticWhenTypeCheckerAlreadyReportedIt()
+    public void Analyze_NoInitialState_EmittedOnce_OwnedByGraph()
     {
+        // NoInitialState is owned solely by the graph analyzer — the type checker no longer
+        // emits it, so it appears exactly once across the combined diagnostic stream.
         var (_, diagnostics, graph) = AnalyzeAllowingDiagnostics("""
             precept Workflow
             state Draft
@@ -290,8 +292,8 @@ public class GraphAnalyzerTests
             from Draft on Submit -> transition Review
             """);
 
-        diagnostics.Should().ContainSingle(d => d.Code == nameof(DiagnosticCode.NoInitialState));
-        graph.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.NoInitialState));
+        diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.NoInitialState));
+        graph.Diagnostics.Should().ContainSingle(d => d.Code == nameof(DiagnosticCode.NoInitialState));
         diagnostics.Concat(graph.Diagnostics)
             .Count(d => d.Code == nameof(DiagnosticCode.NoInitialState))
             .Should().Be(1);

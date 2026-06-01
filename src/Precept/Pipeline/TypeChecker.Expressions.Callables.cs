@@ -390,8 +390,7 @@ internal static partial class TypeChecker
                 return (field.Name, field.ResolvedType);
             }
 
-            ctx.Diagnostics.Add(
-                Diagnostics.Create(DiagnosticCode.UndeclaredField, id.Span, id.Name));
+            // Name resolution (UndeclaredField) is owned by the binder.
             return (id.Name, TypeKind.Error);
         }
 
@@ -958,8 +957,8 @@ internal static partial class TypeChecker
                 return new TypedArgRef(arg.ResolvedType, ev.Name, arg.Name, arg.DeclaredQualifiers, expr.Span);
             }
 
-            ctx.Diagnostics.Add(
-                Diagnostics.Create(DiagnosticCode.UndeclaredField, expr.Span, expr.MemberName));
+            // Name resolution (UndeclaredArg, for a member that isn't an arg of a
+            // known event) is owned by the binder.
             return new TypedErrorExpression(expr.Span);
         }
 

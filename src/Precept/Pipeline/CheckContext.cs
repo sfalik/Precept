@@ -172,4 +172,12 @@ internal sealed class CheckContext
 
     /// <summary>All diagnostics emitted during the check pass.</summary>
     public List<Diagnostic> Diagnostics { get; } = [];
+
+    /// <summary>
+    /// Diagnostics produced by the upstream name binder. Name-resolution errors
+    /// (UndeclaredField/State/Event, UndeclaredArg) are binder-owned; the type checker
+    /// still produces <see cref="TypedErrorExpression"/> for the unresolved name, so the
+    /// accompanying error diagnostic lives here rather than in <see cref="Diagnostics"/>.
+    /// </summary>
+    public ImmutableArray<Diagnostic> UpstreamDiagnostics { get; set; } = ImmutableArray<Diagnostic>.Empty;
 }

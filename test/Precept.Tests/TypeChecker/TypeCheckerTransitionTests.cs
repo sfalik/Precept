@@ -192,11 +192,10 @@ public class TypeCheckerTransitionTests
     [Fact]
     public void TransitionRow_MultiStateFromList_MultipleUnknownStates_EmitsPerStateDiagnostic()
     {
-        // B4: each unknown name in a comma-list must produce its own UndeclaredState diagnostic,
-        // and both expanded rows must still be emitted with the unknown from-state names preserved.
-        // NOTE: NameBinder also resolves the first state name (via the StateName compat getter),
-        // so Missing1 receives two UndeclaredState diagnostics (one from each pipeline stage)
-        // while Missing2 receives one. Total is >= 2; both states must have at least one entry.
+        // B4: each unknown name in a comma-list must produce exactly one UndeclaredState
+        // diagnostic, and both expanded rows must still be emitted with the unknown
+        // from-state names preserved. UndeclaredState is owned solely by the binder, whose
+        // full-list resolution emits once per missing name — no per-stage duplication.
         var precept = """
             precept Widget
             field Count as number default 0
@@ -208,15 +207,39 @@ public class TypeCheckerTransitionTests
         var (index, diagnostics) = TypeCheckerTestHelpers.Check(precept);
 
         var undeclared = diagnostics.Where(d => d.Code == nameof(DiagnosticCode.UndeclaredState)).ToList();
-        undeclared.Should().HaveCountGreaterThanOrEqualTo(2,
-            because: "each unknown state name in the list must produce at least one UndeclaredState diagnostic");
-        undeclared.Should().Contain(d => d.Args.Contains("Missing1"),
+        undeclared.Should().HaveCount(2,
+            because: "each unknown state name in the list must produce exactly one UndeclaredState diagnostic");
+        undeclared.Where(d => d.Args.Contains("Missing1")).Should().ContainSingle(
             because: "Missing1 is not a declared state");
-        undeclared.Should().Contain(d => d.Args.Contains("Missing2"),
+        undeclared.Where(d => d.Args.Contains("Missing2")).Should().ContainSingle(
             because: "Missing2 is not a declared state");
 
         index.TransitionRows.Should().HaveCount(2);
         index.TransitionRows.Select(row => row.FromState).Should().Equal("Missing1", "Missing2");
+    }
+
+    [Fact]
+    public void TransitionRow_DuplicateUnknownStateInList_EmitsUndeclaredStateOnce()
+    {
+        // A repeated unknown name resolves once: the binder dedups the list so the
+        // second occurrence yields DuplicateStateInList (type checker) rather than a
+        // second UndeclaredState (binder).
+        var precept = """
+            precept Widget
+            field Count as number default 0
+            state Active initial
+            event Submit
+            from Bogus, Bogus on Submit -> no transition
+            """;
+
+        var (_, diagnostics) = TypeCheckerTestHelpers.Check(precept);
+
+        diagnostics.Where(d => d.Code == nameof(DiagnosticCode.UndeclaredState) && d.Args.Contains("Bogus"))
+            .Should().ContainSingle(
+                because: "a repeated unknown name must produce exactly one UndeclaredState, not one per occurrence");
+        diagnostics.Where(d => d.Code == nameof(DiagnosticCode.DuplicateStateInList))
+            .Should().ContainSingle(
+                because: "the repeated occurrence is still a duplicate the type checker reports");
     }
 
     [Fact]

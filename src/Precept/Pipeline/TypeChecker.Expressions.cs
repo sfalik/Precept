@@ -945,8 +945,7 @@ internal static partial class TypeChecker
             }
         }
 
-        ctx.Diagnostics.Add(
-            Diagnostics.Create(DiagnosticCode.UndeclaredField, id.Span, name));
+        // Name resolution (UndeclaredField) is owned by the binder.
         return new TypedErrorExpression(id.Span);
     }
 

@@ -82,12 +82,9 @@ public static partial class GraphAnalyzer
         ReachabilityResult reachability;
         if (initialState is null)
         {
-            if (!HasDiagnostic(semantics.Diagnostics, DiagnosticCode.NoInitialState))
-            {
-                diagnostics.Add(Diagnostics.Create(
-                    DiagnosticCode.NoInitialState,
-                    semantics.States[0].NameSpan));
-            }
+            diagnostics.Add(Diagnostics.Create(
+                DiagnosticCode.NoInitialState,
+                semantics.States[0].NameSpan));
 
             reachability = ReachabilityResult.AllUnreachable(semantics.States.Select(state => state.Name));
         }
@@ -862,17 +859,6 @@ public static partial class GraphAnalyzer
         }
 
         return spans.ToImmutable();
-    }
-
-    /// <summary>
-    /// Typed cross-stage diagnostic lookup — avoids fragile string literals by deriving
-    /// the code name from the <see cref="DiagnosticCode"/> enum value, matching the
-    /// <c>nameof(DiagnosticCode.X)</c> convention used by <see cref="Diagnostics.Create"/>.
-    /// </summary>
-    private static bool HasDiagnostic(ImmutableArray<Diagnostic> diagnostics, DiagnosticCode code)
-    {
-        var codeString = code.ToString();
-        return diagnostics.Any(d => d.Code == codeString);
     }
 }
 

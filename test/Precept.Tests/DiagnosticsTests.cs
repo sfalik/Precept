@@ -110,6 +110,20 @@ public class DiagnosticsTests
         Diagnostics.GetMeta(code).Stage.Should().Be(DiagnosticStage.Proof);
     }
 
+    [Theory]
+    [MemberData(nameof(BindCodes))]
+    public void BindStageCodes_AllHaveBindStage(DiagnosticCode code)
+    {
+        Diagnostics.GetMeta(code).Stage.Should().Be(DiagnosticStage.Bind);
+    }
+
+    [Theory]
+    [MemberData(nameof(ToolingCodes))]
+    public void ToolingStageCodes_AllHaveToolingStage(DiagnosticCode code)
+    {
+        Diagnostics.GetMeta(code).Stage.Should().Be(DiagnosticStage.Tooling);
+    }
+
     // ── Severity spot-checks ────────────────────────────────────────────────────
 
     [Fact]
@@ -333,17 +347,12 @@ public class DiagnosticsTests
     public static TheoryData<DiagnosticCode> TypeCodes => new()
     {
         // ── Type (main) ──────────────────────────────────────────────────────────
-        DiagnosticCode.UndeclaredField,
         DiagnosticCode.TypeMismatch,
         DiagnosticCode.NullInNonNullableContext,
         DiagnosticCode.InvalidMemberAccess,
         DiagnosticCode.FunctionArityMismatch,
         DiagnosticCode.FunctionArgConstraintViolation,
-        DiagnosticCode.DuplicateFieldName,
-        DiagnosticCode.DuplicateStateName,
-        DiagnosticCode.DuplicateEventName,
         DiagnosticCode.DuplicateArgName,
-        DiagnosticCode.UndeclaredState,
         DiagnosticCode.StateListContainsWildcard,
         DiagnosticCode.DuplicateStateInList,
         DiagnosticCode.OmittedFieldReadInState,
@@ -353,10 +362,8 @@ public class DiagnosticsTests
         DiagnosticCode.MaterializedFieldSelfReference,
         DiagnosticCode.UninitializedCrossFieldReadInInitialAssignment,
         DiagnosticCode.ConstructionGuardReadsUninitializedField,
-        DiagnosticCode.UndeclaredEvent,
         DiagnosticCode.UndeclaredFunction,
         DiagnosticCode.MultipleInitialStates,
-        DiagnosticCode.NoInitialState,
         DiagnosticCode.InvalidModifierForType,
         DiagnosticCode.InvalidModifierBounds,
         DiagnosticCode.InvalidModifierValue,
@@ -364,7 +371,6 @@ public class DiagnosticsTests
         DiagnosticCode.RedundantModifier,
         DiagnosticCode.ComputedFieldNotWritable,
         DiagnosticCode.ComputedFieldWithDefault,
-        DiagnosticCode.CircularComputedField,
         DiagnosticCode.EditableOnEventArg,
         DiagnosticCode.ConflictingAccessModes,
         DiagnosticCode.ListLiteralOutsideDefault,
@@ -406,7 +412,6 @@ public class DiagnosticsTests
         DiagnosticCode.IndexBoundsGuard,
         DiagnosticCode.KeyUniquenessGuard,
         DiagnosticCode.InvalidQuantifierTarget,
-        DiagnosticCode.BindingShadowsField,
         DiagnosticCode.RequiredTraitViolation,
         DiagnosticCode.MissingOrderingKey,
         DiagnosticCode.CollectionInnerTypeError,
@@ -433,6 +438,25 @@ public class DiagnosticsTests
         DiagnosticCode.UnhandledEvent,
         DiagnosticCode.DeadEndState,
         DiagnosticCode.StructuralSinkState,
+        DiagnosticCode.NoInitialState,
+    };
+
+    public static TheoryData<DiagnosticCode> BindCodes => new()
+    {
+        DiagnosticCode.UndeclaredField,
+        DiagnosticCode.UndeclaredState,
+        DiagnosticCode.UndeclaredEvent,
+        DiagnosticCode.UndeclaredArg,
+        DiagnosticCode.DuplicateFieldName,
+        DiagnosticCode.DuplicateStateName,
+        DiagnosticCode.DuplicateEventName,
+        DiagnosticCode.BindingShadowsField,
+        DiagnosticCode.CircularComputedField,
+    };
+
+    public static TheoryData<DiagnosticCode> ToolingCodes => new()
+    {
+        DiagnosticCode.McpToolInternalError,
     };
 
     public static TheoryData<DiagnosticCode> ProofCodes=> new()

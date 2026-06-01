@@ -3,13 +3,20 @@ using Precept.Pipeline;
 
 namespace Precept.Language;
 
+/// <summary>
+/// Producing-component classification for a diagnostic — identifies WHICH pipeline
+/// component emits the code, not when it fires. The ordinal carries no precedence
+/// or ordering semantics; it is a pure component label.
+/// </summary>
 public enum DiagnosticStage
 {
-    Lex   = 1,
-    Parse = 2,
-    Type  = 3,
-    Graph = 4,
-    Proof = 5,
+    Lex     = 1,
+    Parse   = 2,
+    Type    = 3,
+    Graph   = 4,
+    Proof   = 5,
+    Bind    = 6,
+    Tooling = 7,
 }
 
 public enum Severity
@@ -21,7 +28,7 @@ public enum Severity
 
 /// <summary>
 /// Thematic grouping for a diagnostic — describes WHAT the diagnostic is about,
-/// complementing <see cref="DiagnosticStage"/> which describes WHEN it fires.
+/// complementing <see cref="DiagnosticStage"/> which classifies WHICH component produces it.
 /// Used by the language server for filtering, documentation generation, and AI grounding.
 /// </summary>
 public enum DiagnosticCategory

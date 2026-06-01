@@ -978,13 +978,19 @@ public class TypeCheckerSymbolTests
     [Fact]
     public void ZeroInitialStates_EmitsNoInitialStateDiagnostic()
     {
+        // NoInitialState is owned by the graph analyzer; assert against the full pipeline.
         var precept = """
             precept Widget
             state Open
             state Closed
             """;
 
-        TypeCheckerTestHelpers.CheckExpectingError(precept, DiagnosticCode.NoInitialState);
+        var compilation = Precept.Compiler.Compile(precept);
+
+        compilation.Diagnostics
+            .Where(d => d.Code == nameof(DiagnosticCode.NoInitialState))
+            .Should().ContainSingle(because: "a stateful precept with no initial state must emit NoInitialState once")
+            .Which.Stage.Should().Be(DiagnosticStage.Graph);
     }
 
     [Fact]

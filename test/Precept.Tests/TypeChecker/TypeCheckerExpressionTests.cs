@@ -167,15 +167,17 @@ public class TypeCheckerExpressionTests
     }
 
     [Fact]
-    public void UnknownIdentifier_EmitsUndeclaredFieldDiagnostic()
+    public void UnknownIdentifier_ReturnsError_DefersUndeclaredFieldToBinder()
     {
+        // UndeclaredField is owned by the name binder; the type checker still resolves the
+        // unknown identifier to an error expression but no longer emits the diagnostic itself.
         var ctx = MinimalContext();
         var expr = new IdentifierExpression("NoSuchField", TestSpan);
         var result = Resolve(expr, ctx);
 
         result.Should().BeOfType<TypedErrorExpression>();
         ctx.Diagnostics
-            .Should().ContainSingle(d => d.Code == DiagnosticCode.UndeclaredField.ToString());
+            .Should().NotContain(d => d.Code == DiagnosticCode.UndeclaredField.ToString());
     }
 
     [Fact]
@@ -1042,9 +1044,9 @@ public class TypeCheckerExpressionTests
         var result = Resolve(expr, ctx);
 
         result.Should().BeOfType<TypedErrorExpression>();
-        // Only the UndeclaredField diagnostic from identifier resolution — no TypeMismatch from conditional
-        ctx.Diagnostics.Should().ContainSingle()
-            .Which.Code.Should().Be(nameof(DiagnosticCode.UndeclaredField));
+        // The undeclared-name diagnostic is binder-owned; the conditional must not emit any
+        // second (TypeMismatch) diagnostic of its own when a branch is already an error.
+        ctx.Diagnostics.Should().BeEmpty();
     }
 
     [Fact]
@@ -1059,9 +1061,8 @@ public class TypeCheckerExpressionTests
         var result = Resolve(expr, ctx);
 
         result.Should().BeOfType<TypedErrorExpression>();
-        // Only UndeclaredField from identifier resolution — no branch-type diagnostic
-        ctx.Diagnostics.Should().ContainSingle()
-            .Which.Code.Should().Be(nameof(DiagnosticCode.UndeclaredField));
+        // UndeclaredField is binder-owned — the conditional emits no branch-type diagnostic.
+        ctx.Diagnostics.Should().BeEmpty();
     }
 
     [Fact]
@@ -1076,8 +1077,8 @@ public class TypeCheckerExpressionTests
         var result = Resolve(expr, ctx);
 
         result.Should().BeOfType<TypedErrorExpression>();
-        ctx.Diagnostics.Should().ContainSingle()
-            .Which.Code.Should().Be(nameof(DiagnosticCode.UndeclaredField));
+        // UndeclaredField is binder-owned — the conditional emits no branch-type diagnostic.
+        ctx.Diagnostics.Should().BeEmpty();
     }
 
     // ── Branch type incompatibility ──────────────────────────────────────

@@ -311,7 +311,7 @@ public class TypeCheckerQuantifierTests
     }
 
     [Fact]
-    public void BindingVar_OutOfScope_AfterQuantifier_EmitsUndeclaredField()
+    public void BindingVar_OutOfScope_AfterQuantifier_ResolvesToError()
     {
         var ctx = CollectionContext();
 
@@ -331,8 +331,10 @@ public class TypeCheckerQuantifierTests
 
         result.Should().BeOfType<TypedErrorExpression>(
             because: "binding 'x' should be popped after quantifier completes");
+        // UndeclaredField is binder-owned; the type checker resolves to an error expression
+        // without emitting the name-resolution diagnostic itself.
         ctx.Diagnostics
-            .Should().Contain(d => d.Code == DiagnosticCode.UndeclaredField.ToString());
+            .Should().NotContain(d => d.Code == DiagnosticCode.UndeclaredField.ToString());
     }
 
     // ════════════════════════════════════════════════════════════════════════

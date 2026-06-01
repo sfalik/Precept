@@ -29,7 +29,7 @@ internal static partial class TypeChecker
     /// </summary>
     internal static SemanticIndex Check(ConstructManifest manifest, SymbolTable symbols)
     {
-        var ctx = new CheckContext();
+        var ctx = new CheckContext { UpstreamDiagnostics = symbols.Diagnostics };
 
         // Pass 1: populate typed symbols from SymbolTable declarations
         PopulateFields(symbols, ctx);
@@ -696,13 +696,8 @@ internal static partial class TypeChecker
             }
         }
 
-        // D7: Zero initial states on a stateful precept → diagnostic
-        // A stateless precept (no states at all) is valid; only fire when states exist but none is initial.
-        if (symbols.States.Length > 0 && firstInitialStateName is null)
-        {
-            ctx.Diagnostics.Add(
-                Diagnostics.Create(DiagnosticCode.NoInitialState, symbols.States[0].NameSpan));
-        }
+        // Zero initial states on a stateful precept is owned by the graph analyzer
+        // (NoInitialState), which fires on the same condition with the same span.
     }
 
     /// <summary>
@@ -1103,7 +1098,7 @@ internal static partial class TypeChecker
     /// </summary>
     internal static CheckContext CreateContext(ConstructManifest manifest, SymbolTable symbols)
     {
-        var ctx = new CheckContext();
+        var ctx = new CheckContext { UpstreamDiagnostics = symbols.Diagnostics };
         PopulateFields(symbols, ctx);
         PopulateStates(symbols, ctx);
         PopulateEvents(symbols, ctx);
@@ -1145,9 +1140,8 @@ internal static partial class TypeChecker
             }
             else
             {
+                // Name resolution (UndeclaredEvent) is owned by the binder.
                 eventName = eventTargetSlot.EventName;
-                ctx.Diagnostics.Add(
-                    Diagnostics.Create(DiagnosticCode.UndeclaredEvent, eventTargetSlot.NameSpan, eventTargetSlot.EventName));
             }
         }
 
@@ -1210,8 +1204,7 @@ internal static partial class TypeChecker
                         }
                         else
                         {
-                            ctx.Diagnostics.Add(
-                                Diagnostics.Create(DiagnosticCode.UndeclaredState, trans.StateSpan, trans.StateName));
+                            // Name resolution (UndeclaredState) is owned by the binder.
                         }
                         break;
                     case NoTransitionOutcome:
@@ -1295,9 +1288,8 @@ internal static partial class TypeChecker
             }
             else
             {
+                // Name resolution (UndeclaredEvent) is owned by the binder.
                 eventName = eventTargetSlot.EventName;
-                ctx.Diagnostics.Add(
-                    Diagnostics.Create(DiagnosticCode.UndeclaredEvent, eventTargetSlot.NameSpan, eventTargetSlot.EventName));
             }
         }
 
@@ -1451,9 +1443,12 @@ internal static partial class TypeChecker
             ArgReferences:    ctx.ArgReferences.ToImmutableArray(),
             Diagnostics:      ctx.Diagnostics.ToImmutableArray());
 
-        // D26: If any TypedErrorExpression exists, at least one Error diagnostic must be present
+        // D26: If any TypedErrorExpression exists, at least one Error diagnostic must
+        // accompany it — either from this stage or from the upstream binder (which owns
+        // name-resolution errors for the unresolved names the type checker marks as errors).
         if (ContainsAnyErrorExpression(index)
-            && !index.Diagnostics.Any(d => d.Severity == Severity.Error))
+            && !index.Diagnostics.Any(d => d.Severity == Severity.Error)
+            && !ctx.UpstreamDiagnostics.Any(d => d.Severity == Severity.Error))
         {
             throw new InvalidOperationException(
                 "D26 violated: TypedErrorExpression present but no Error diagnostic in SemanticIndex");

@@ -242,7 +242,7 @@ internal static class RichHoverFactory
                 Diagnostic = diagnostic,
                 Obligation = FindProofObligationForDiagnostic(compilation, diagnostic, position),
             })
-            .Where(entry => entry.Diagnostic.Stage == DiagnosticStage.Proof || entry.Obligation is not null)
+            .Where(entry => entry.Obligation is not null)
             .OrderBy(entry => GetSpanWidth(entry.Diagnostic.Span))
             .ToImmutableArray();
         if (diagnostics.IsEmpty)

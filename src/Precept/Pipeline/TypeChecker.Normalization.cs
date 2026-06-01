@@ -32,9 +32,11 @@ internal static partial class TypeChecker
             }
         }
 
-        // D26: if any TypedErrorExpression in transition rows → at least one Error diagnostic must exist
+        // D26: any TypedErrorExpression in transition rows must be accompanied by an Error
+        // diagnostic — from this stage or the upstream binder (name-resolution owner).
         if (ctx.TransitionRows.Any(r => ContainsErrorExpression(r))
-            && !ctx.Diagnostics.Any(d => d.Severity == Severity.Error))
+            && !ctx.Diagnostics.Any(d => d.Severity == Severity.Error)
+            && !ctx.UpstreamDiagnostics.Any(d => d.Severity == Severity.Error))
         {
             throw new InvalidOperationException(
                 "D26 violated: TypedErrorExpression present in transition rows but no Error-severity diagnostic emitted.");
@@ -66,9 +68,11 @@ internal static partial class TypeChecker
             }
         }
 
-        // D26: if any TypedErrorExpression in event handlers → at least one Error diagnostic must exist
+        // D26: any TypedErrorExpression in event handlers must be accompanied by an Error
+        // diagnostic — from this stage or the upstream binder (name-resolution owner).
         if (ctx.EventHandlers.OfType<TypedEventRowSuccess>().Any(h => h.Actions.Any(a => a is TypedInputAction ia && ContainsErrorExpressionInAction(ia)))
-            && !ctx.Diagnostics.Any(d => d.Severity == Severity.Error))
+            && !ctx.Diagnostics.Any(d => d.Severity == Severity.Error)
+            && !ctx.UpstreamDiagnostics.Any(d => d.Severity == Severity.Error))
         {
             throw new InvalidOperationException(
                 "D26 violated: TypedErrorExpression present in event handlers but no Error-severity diagnostic emitted.");
@@ -203,9 +207,9 @@ internal static partial class TypeChecker
                     }
                     else
                     {
+                        // Name resolution (UndeclaredEvent) is owned by the binder; keep the
+                        // unresolved name for downstream typing only.
                         anchorEvent = eventSlot.EventName;
-                        ctx.Diagnostics.Add(
-                            Diagnostics.Create(DiagnosticCode.UndeclaredEvent, eventSlot.NameSpan, eventSlot.EventName));
                     }
                 }
 
@@ -323,9 +327,9 @@ internal static partial class TypeChecker
             }
             else
             {
+                // Name resolution (UndeclaredState) is owned by the binder; preserve the
+                // unknown name in the resolved targets for downstream row expansion only.
                 builder.Add(new ResolvedStateTarget(stateName, nameSpan, IsWildcard: false));
-                ctx.Diagnostics.Add(
-                    Diagnostics.Create(DiagnosticCode.UndeclaredState, nameSpan, stateName));
             }
         }
 
@@ -337,21 +341,20 @@ internal static partial class TypeChecker
         if (manifest.ByKind.Contains(ConstructKind.AccessMode))
         {
             foreach (var construct in manifest.ByKind[ConstructKind.AccessMode])
-                PopulateAccessModesForConstruct(construct, ctx, forcedMode: null, emitUndeclaredDiagnostics: true);
+                PopulateAccessModesForConstruct(construct, ctx, forcedMode: null);
         }
 
         if (manifest.ByKind.Contains(ConstructKind.OmitDeclaration))
         {
             foreach (var construct in manifest.ByKind[ConstructKind.OmitDeclaration])
-                PopulateAccessModesForConstruct(construct, ctx, ModifierKind.Omit, emitUndeclaredDiagnostics: false);
+                PopulateAccessModesForConstruct(construct, ctx, ModifierKind.Omit);
         }
     }
 
     private static void PopulateAccessModesForConstruct(
         ParsedConstruct construct,
         CheckContext ctx,
-        ModifierKind? forcedMode,
-        bool emitUndeclaredDiagnostics)
+        ModifierKind? forcedMode)
     {
         // —— State reference ——
         var stateSlot = construct.GetSlot<StateTargetSlot>(ConstructSlotKind.StateTarget);
@@ -363,7 +366,7 @@ internal static partial class TypeChecker
         var additionalFieldNames = ImmutableArray<(string FieldName, SourceSpan Span)>.Empty;
         if (fieldSlot?.FieldName is not null)
         {
-            fieldName = ResolveAccessModeFieldName(fieldSlot.FieldName, fieldSlot.NameSpan, ctx, emitUndeclaredDiagnostics);
+            fieldName = ResolveAccessModeFieldName(fieldSlot.FieldName, fieldSlot.NameSpan, ctx);
 
             if (!fieldSlot.AdditionalFields.IsDefaultOrEmpty)
             {
@@ -371,7 +374,7 @@ internal static partial class TypeChecker
                 foreach (var (additionalFieldName, additionalFieldSpan) in fieldSlot.AdditionalFields)
                 {
                     additionalBuilder.Add((
-                        ResolveAccessModeFieldName(additionalFieldName, additionalFieldSpan, ctx, emitUndeclaredDiagnostics),
+                        ResolveAccessModeFieldName(additionalFieldName, additionalFieldSpan, ctx),
                         additionalFieldSpan));
                 }
 
@@ -435,8 +438,7 @@ internal static partial class TypeChecker
     private static string ResolveAccessModeFieldName(
         string fieldName,
         SourceSpan fieldSpan,
-        CheckContext ctx,
-        bool emitUndeclaredDiagnostics)
+        CheckContext ctx)
     {
         if (HasKeywordTokenMeta(fieldName, meta => meta.IsFieldBroadcast))
         {
@@ -449,12 +451,7 @@ internal static partial class TypeChecker
             return typedField.Name;
         }
 
-        if (emitUndeclaredDiagnostics)
-        {
-            ctx.Diagnostics.Add(
-                Diagnostics.Create(DiagnosticCode.UndeclaredField, fieldSpan, fieldName));
-        }
-
+        // Name resolution (UndeclaredField) is owned by the binder.
         return fieldName;
     }
 

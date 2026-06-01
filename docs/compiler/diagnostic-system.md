@@ -148,17 +148,19 @@ public enum DiagnosticStage
     Parse,
     Type,
     Graph,
-    Proof
+    Proof,
+    Bind,
+    Tooling
 }
 ```
 
-One value per pipeline stage. The lexer has its own stage — unterminated strings, invalid characters, and unrecognized tokens are `Lex` diagnostics, distinct from `Parse` (structural syntax) errors. This matches the actual pipeline shape: the lexer is a separate stage that can fail independently.
+One value per producing component. The lexer has its own stage — unterminated strings, invalid characters, and unrecognized tokens are `Lex` diagnostics, distinct from `Parse` (structural syntax) errors. The name binder owns `Bind` (duplicate declarations, name resolution, computed-field cycles); tooling-side diagnostics emitted outside the compile pipeline are `Tooling`.
 
-`DiagnosticStage` is a **producing-component classification**, not a precedence axis — no consumer orders by the enum's ordinal. Its consumers are: LS rich-hover (which surfaces `Proof`-stage obligations), MCP/CLI output serialization (the stage string is emitted as diagnostic metadata), a type-error count in the compile tool, and the diagnostic-meta tests.
+`DiagnosticStage` is a **producing-component classification**, not a precedence axis — the ordinal carries no precedence or ordering semantics, and no consumer orders by it. Its consumers are: LS rich-hover (which surfaces obligation-bearing diagnostics by obligation-presence), MCP/CLI output serialization (the stage string is emitted as diagnostic metadata), a type-error count in the compile tool, and the diagnostic-meta tests.
 
-Two classification compromises follow from the enum having no dedicated value for some producers: NameBinder diagnostics use `DiagnosticStage.Type` (name-binding is a real pipeline stage), and `McpToolInternalError` uses `DiagnosticStage.Lex` as a catch-all (it is emitted outside the pipeline — see the note below). Making the component taxonomy honest (a dedicated `Bind` and `Tooling` value, no mislabeling) is tracked as Phase 8 Slice 3 (the diagnostic-emission ownership architecture).
+Each code is owned by exactly one producing component, and the meta `Stage` names that component honestly. Name-binder-produced codes — `DuplicateFieldName`/`DuplicateStateName`/`DuplicateEventName`, `BindingShadowsField`, `UndeclaredArg`, the name-resolution family `UndeclaredField`/`UndeclaredState`/`UndeclaredEvent`, and `CircularComputedField` — are `Bind`. `NoInitialState` is owned by the graph analyzer (`Graph`); the type checker resolves names for typing but no longer emits the name-resolution family or `NoInitialState`. `McpToolInternalError` is `Tooling`.
 
-> **Tooling-side diagnostics.** A small set of diagnostics is emitted from **outside** the pipeline — currently just `McpToolInternalError` (PRE0149), which the MCP-tool wrapper produces when a tool body throws unhandled. These are classified `DiagnosticStage.Lex` as a catch-all because no Tooling/External stage exists yet; consumers that filter by stage should treat any tooling-side code as a non-stage diagnostic. If more tooling-side codes accumulate, a dedicated `Tooling` stage value would be the structural fix. See `mcp.md § 5.1` for the wrapper contract.
+> **Tooling-side diagnostics.** A small set of diagnostics is emitted from **outside** the compile pipeline — currently just `McpToolInternalError` (PRE0149), which the MCP-tool wrapper produces when a tool body throws unhandled. These are classified `DiagnosticStage.Tooling`. See `mcp.md § 5.1` for the wrapper contract.
 
 ### Severity
 
