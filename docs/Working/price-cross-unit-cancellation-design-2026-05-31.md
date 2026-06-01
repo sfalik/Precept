@@ -1,5 +1,5 @@
 ---
-status: Externally-Grounded
+status: Locked 2026-05-31
 phase-target: Phase 7 (Slice 2)
 comparable-systems-research-status: strong — cites the Stage-1 survey `research/language/expressiveness/cross-unit-conversion-arithmetic-survey.md`
 sources-consulted:
@@ -16,7 +16,7 @@ sources-consulted:
 
 # Price × Quantity Cross-Unit Cancellation — Design (Auto-Convert Within Dimension)
 
-> **Review trail (2026-05-31):** reviewed by `precept-reviewer` (0 blockers; 2 concerns — dB position-vs-exactness conflation + a paraphrased philosophy excerpt — both applied) and by Frank/Squad (`phase7-slice2-design-review-FRANK-2026-05-31.md`, **conditionally approved**; conditions applied — `:168` doc-update disambiguation, `IsRatioScale` timing, `ScaleToBaseFactor` rename, forward-reference tracking home). Frank's prior Option-1 leaning formally withdrawn. Ready to lock pending owner sign-off. Decision 2 was subsequently revised (owner ruling 2026-05-31) from a rejection gate to allow-all-with-surfacing; the prior precept-reviewer + Frank approvals of the rejection gate are superseded and a re-review is pending.
+> **Review trail (2026-05-31):** reviewed by `precept-reviewer` (0 blockers; 2 concerns — dB position-vs-exactness conflation + a paraphrased philosophy excerpt — both applied) and by Frank/Squad (`phase7-slice2-design-review-FRANK-2026-05-31.md`, **conditionally approved**; conditions applied — `:168` doc-update disambiguation, `IsRatioScale` timing, `ScaleToBaseFactor` rename, forward-reference tracking home). Frank's prior Option-1 leaning formally withdrawn. Ready to lock pending owner sign-off. Decision 2 was subsequently revised (owner ruling 2026-05-31) from a rejection gate to allow-all-with-surfacing; the prior precept-reviewer + Frank approvals of the rejection gate are superseded. Re-reviewed: precept-reviewer (2026-05-31) returned **READY TO LOCK** (0 blockers, 0 concerns, 1 NIT on P8's "type system" clause). **Owner affirmed (2026-05-31)** that inspection-surfacing — backed by the `maxplaces`-exactness type guarantee — satisfies P8's "visible in the type system" clause (no type-level approximate-`money` marker is built now; the second Falsifier watches the only future case where that would flip). **Locked 2026-05-31.**
 
 ## Goal
 
