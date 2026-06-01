@@ -1,5 +1,7 @@
 # D9 Open-Field Qualifier Narrowing — Build Plan — 2026-05-29
 
+> **Archived 2026-05-31** — D9 build plan; all slices shipped and the carried-forward W-C `.basis`-cancellation debt closed (`fd147dc2`). Historical reference; do not edit.
+
 **Status**: Active
 **Companion docs**: design `docs/Working/d9-qualifier-narrowing-design.md` (Locked 2026-05-29); analysis `docs/Working/d9-qualifier-narrowing-analysis-2026-05-28.md`; readiness plan `docs/Working/compiler-readiness-plan-2026-05-24.md` (Phase 6 — link this plan from the Phase 6 D9 row).
 **Scope gate**: delivers the spec § D9 promise (guard-driven discrete-equality qualifier narrowing) repo-wide; unblocks the W-B/W-C composite-period premises (composite `.dimension`/`.basis` guards both compile and narrow).

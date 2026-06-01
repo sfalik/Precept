@@ -1,5 +1,7 @@
 # Lifecycle Review — Phase 5 + Post-Phase-5 Remediation
 
+> **Archived 2026-05-31** — completed Phase-5 + remediation sign-off review (Phase 5 complete, 7167/7167 tests). Historical reference; do not edit.
+
 **Date**: 2026-05-28
 **Work item**: Phase 5 (proof engine satisfiability + BUG-004/006 + FieldNeverSet/unification + BIZ operator extensions) + the cumulative post-Phase-5 code-review remediation arc.
 **Branch**: `spike/Precept-V2-Radical`

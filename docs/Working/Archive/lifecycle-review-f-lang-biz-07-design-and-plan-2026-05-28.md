@@ -1,5 +1,7 @@
 # Lifecycle Review — F-LANG-BIZ-07 Design + Plan (pre-execution)
 
+> **Archived 2026-05-31** — pre-execution review of BIZ-07 composite period basis, which fully shipped (Phase 6 complete). Historical reference; do not edit.
+
 **Date**: 2026-05-28
 **Work item**: F-LANG-BIZ-07 composite period basis — **design + plan only**, before implementation.
 **Branch**: `spike/Precept-V2-Radical`

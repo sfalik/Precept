@@ -7,6 +7,8 @@ verdict: APPROVED with notes
 
 # Architectural Review: `FieldNeverSet` + `writable` vs `editable` Naming
 
+> **Archived 2026-05-31** — completed review of Phase-5 W-B FieldNeverSet + writable→editable, which shipped (`FieldNeverSet`/`editable` live; `writable` retired). Historical reference; do not edit.
+
 ## Part 1: `writable` vs `editable` — Findings
 
 ### What they are

@@ -21,6 +21,8 @@ sources-consulted:
   - test/Precept.Tests/ProofEngine/DiscreteEqualityNarrowingTests.cs — numeric narrowing precedent (the structural template)
 ---
 
+> **Archived 2026-05-31** — shipped + promoted to `docs/language/business-domain-types.md § D9`. Historical reference; do not edit.
+
 # Open-field discrete-equality qualifier narrowing (spec § D9)
 
 > Build the guard-driven qualifier narrowing the spec § D9 promises but never delivered: `when X.<accessor> == '<value>'` seeds a branch-scoped fact that lets a downstream operation discharge an open field's qualifier obligation — soundly, across currency/unit/dimension/from/to/basis axes — plus the partition-aware dimension-literal validation that makes `period.dimension == 'date'` compile in the first place.

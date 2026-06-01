@@ -1,5 +1,7 @@
 # Lifecycle-6 Completion Review — D9 Open-Field Qualifier Narrowing
 
+> **Archived 2026-05-31** — completed lifecycle-6 review of the (shipped) D9 work. Historical reference; do not edit.
+
 **Date**: 2026-05-29
 **Work item**: D9 open-field qualifier narrowing (Phase 6) — slices S1, S2a, S2b, S3 + the (0) temporal-denominator price-parsing prerequisite.
 **Branch**: `spike/Precept-V2-Radical` (spike mode — no PR; plan doc is the hub).

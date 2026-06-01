@@ -12,6 +12,8 @@ sources-consulted:
   - docs/Working/d9-qualifier-narrowing-design.md § G3 — the under-specified gap this resolves
 ---
 
+> **Promoted to:** `docs/compiler/proof-engine.md` (Strategy 5 / `AssignmentQualifierProofRequirement`) + `docs/compiler/diagnostic-system.md` (PRE0141, proof-stage re-stage). **Status:** Promoted 2026-05-31 — shipped (`ProofEngine.QualifierNarrowing.cs`). Historical reference; do not edit.
+
 # Open-field assignment-qualifier compatibility: placement & diagnostic stage
 
 ## Goal
