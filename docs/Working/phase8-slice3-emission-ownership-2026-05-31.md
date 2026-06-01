@@ -191,6 +191,7 @@ No runtime reconciliation layer — the invariant is enforced at compile time, w
   - `src/Precept/Pipeline/TypeChecker.cs:1078` — `ValidateMaxplaces` bails `if (!TypedExpressionMagnitude.TryGetStaticMagnitude(resolved, out var magnitude)) return;` — static-only.
   - `src/Precept/Language/ProofRequirement.cs` — the 12 `ProofRequirement` kinds; none is decimal-places/precision.
 - **Known gap (not Slice 3 scope)**: maxplaces points 2–3 (runtime boundary + arithmetic-result enforcement) appear unimplemented (the runtime is still stub). That is **runtime-phase** work (Phase 12) and a spec-conformance item — *not* a proof-engine or emission-architecture concern. Flagged here so it isn't mistaken for a Slice 3 obligation.
+- **Superseded-by (if built)**: this decision (maxplaces = Type-owned, no proof obligation) is the **interim**. **Phase 8 Slice 5** (`maxplaces` compile-time precision proof — a decimal-scale abstract domain + a `PrecisionContainmentProofRequirement`) would give maxplaces a real compile-time proof obligation and relocate it to `Proof` (like `OutOfRange`), making it prevention-not-detection. If Slice 5 ships, D6 is superseded. D6 stands until then.
 
 ## Falsifiers
 
