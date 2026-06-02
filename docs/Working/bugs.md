@@ -79,6 +79,19 @@ surfaced for proper fixing.
 - **Priority**: soundness (a declared bound that does nothing is a silent governance hole) + correctness (undeclared reference uncaught).
 - **Repro**: the three cases above.
 
+### BUG-021: Set-action assignment does not enforce a field's lower bound (`min`) when the field has no `max` — value provably below `min` compiles clean (Principle-10/11 soundness hole)
+
+- **Discovered**: 2026-06-02 during Slice-1 step-0 probing (resolving the set-action-subtraction obligation-coverage question; verified via `precept_compile`, MCP reconnected).
+- **Affected**: `Actions.cs` interval-containment obligation generation for `set`. The obligation appears to be created on the **upper** (max / representable-range) direction but not the **lower** (min) direction when the target has a `min` but no `max`.
+- **Symptom** (both `precept_compile`):
+  - `field X as integer min 0 max 100` + `set X = A - B` (`A,B nonnegative`, so `A-B` unbounded) → **`PRE0078`**, `IntervalContainment` obligation `Unresolved` `[−∞..+∞]`. ✓ correct (upper direction).
+  - `field X as integer nonnegative` (min 0, no max) + `set X = A - B` with `A,B ∈ [0,10]` (so `A-B ∈ [−10,10]`, provably can be `−10 < 0`) → **clean, no `IntervalContainment` obligation at all**. ✗ the lower-bound violation is silently accepted.
+- **Root cause**: same family as [[BUG-017]] — the containment obligation is not *created* for the lower-bound direction on a min-only field; the asymmetry with the (sound) upper direction is the tell. This reconciles the precept-author "set-action subtraction into a nonnegative field emits no obligation" finding with the Phase-2 "set-action path is sound" finding: both are right, on different bound directions.
+- **Workaround used**: none.
+- **Fix complexity**: small, same shape as the slice's other breaches — generate the interval-containment obligation for the `min` direction on `set` regardless of whether a `max` is declared; unprovable ⇒ emit (`OutOfRange`/`PRE0079`).
+- **Priority**: soundness — a declared `min` silently unenforced on assignment; pre-release.
+- **Repro**: SubProbe1 (emits) vs SubProbe3 (clean) above.
+
 ## Fixed
 
 ### BUG-016: collection-mutation forward-propagation — guard facts not effect-adjusted across grow/shrink
