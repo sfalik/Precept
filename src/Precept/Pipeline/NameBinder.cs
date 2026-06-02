@@ -490,6 +490,24 @@ public static class NameBinder
                 WalkExpression(ensureSlot.Expression, eventContext, ImmutableHashSet<string>.Empty, null);
             }
 
+            // Modifier-value field references (e.g. `min Floor` — the field-reference bound
+            // form, spec-legal sugar for the relation `Field >= Floor`). Resolving them here
+            // keeps name resolution (and the UndeclaredField diagnostic) binder-owned: an
+            // identifier in bound position that names no declared field is an undeclared name,
+            // not a silently-dropped value. Literal / typed-constant bound values are no-ops.
+            var modListSlot = construct.GetSlot<ModifierListSlot>(ConstructSlotKind.ModifierList);
+            if (modListSlot is not null)
+            {
+                foreach (var modifier in modListSlot.Modifiers)
+                {
+                    if (modifier.Kind is ModifierKind.Min or ModifierKind.Max
+                        && modifier.Value is IdentifierExpression idValue)
+                    {
+                        WalkExpression(idValue, eventContext, ImmutableHashSet<string>.Empty, null);
+                    }
+                }
+            }
+
             // Compute expression (field declarations)
             var computeSlot = construct.GetSlot<ComputeExpressionSlot>(ConstructSlotKind.ComputeExpression);
             if (computeSlot is not null)
