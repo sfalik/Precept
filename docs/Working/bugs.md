@@ -27,7 +27,20 @@ surfaced for proper fixing.
 
 ## Active
 
-_None._
+### BUG-017: Proof engine silently skips the result-bound check when the result interval is unbounded (Principle-10/11 soundness hole)
+
+- **Discovered**: 2026-06-01 during the dynamic-modifier-bounds design investigation (probing what the proof engine actually proves relationally).
+- **Affected**: `ProofEngine` interval-containment discharge for `NumericOverflow` (computed-field + set-action result vs the field's declared `min`/`max`); broadly, every `IntervalTransfer`-unbounded path that currently emits nothing rather than rejecting.
+- **Symptom**: a computed field that declares a bound but is computed from an *unbounded* operand compiles clean even though the result provably can exceed the bound. The check fires correctly when the operand is bounded-and-exceeds, but silently skips when the operand is unbounded — the unsound direction. Probe-confirmed against a fresh build (not the MCP):
+  - `field A as integer min 0 max 20 default 0` + `field C as integer min 0 max 100 <- A * 10` → **NumericOverflow** (200 > 100). ✓ correct.
+  - `field A as integer min 0 max 1000 default 0` + same `C` → **NumericOverflow** (10000 ≫ 100). ✓ correct.
+  - `field A as integer min 0 default 0` (no `max` — unbounded above) + same `C` → **no diagnostic**. ✗ `A * 10` is unbounded, exceeds `C`'s `max 100` (and the type's representable range), yet compiles clean.
+- **Root cause**: the IntervalContainment obligation is not emitted when `IntervalOf(result)` is unbounded — the obligation collectors skip unbounded intervals and the discharge returns "not proved, but not collected." For a **prevention** engine the direction is backwards: an unprovable result must **reject** (emit), not **skip**. "Conservative" here imported a detection-tool mindset (skip-to-avoid-false-positives) into a contract whose guarantee is the opposite — Principle 10 (*"the compiler must either prove safety **or emit a diagnostic** requiring the author to supply constraints that make safety provable"*) and Principle 11 (*"if a precept compiles without diagnostics, it does not fault at runtime"*). An unbounded operand = unprovable = must emit, asking the author to bound the operand.
+- **Already mischaracterized once**: the Slice 3b design (`phase8-value-level-obligation-ownership-2026-06-01.md`) noted this exact "IntervalTransfer-unbounded → silent" behavior and called it *"acceptable-by-design conservative,"* deferring it as a coverage hole. That characterization was wrong — it is a soundness hole, not an acceptable deferral. The design's deferred-residual note should be corrected when this is fixed.
+- **Workaround used**: none.
+- **Fix complexity**: design-required. Flipping "unbounded → skip" to "unbounded → emit" must (a) decide the diagnostic + audience-targeted message ("cannot prove the result of `<expr>` stays within `[min .. max]`; constrain its operands"), (b) cover every unbounded path uniformly (computed-field results, set-action results, any other `IntervalTransfer`-unbounded site — enumerate them, do not fix one), and (c) measure corpus impact — existing samples with unbounded computed/assigned results would newly require constraints (same falsifier shape as Slice 3b D4; if >~3 samples need new constraints, the narrowing may be too weak rather than the inputs genuinely unprovable).
+- **Priority**: quality bar / soundness — a Principle-11 violation, but on a specific shape (unbounded operands) and pre-release.
+- **Repro**: the three integer `A`/`C` cases above; the middle one (`A` unbounded, no `NumericOverflow`) is the bug.
 
 ## Fixed
 
