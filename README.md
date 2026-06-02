@@ -114,6 +114,8 @@ See the [Runtime API design](docs/runtime/runtime-api.md) for the integration su
 - **Conditional expressions** — `if...then...else` selects between values inline, replacing row duplication for data-dependent field assignments
 - **Computed fields** — `field X as number -> A + B` declares a derived value that recomputes automatically after every mutation, eliminating manual synchronization
 
+*What's guaranteed at compile time versus enforced at runtime is specified in the [guarantee contract](docs/language/precept-language-spec.md#07-the-compile-time-and-runtime-guarantee-contract) (spec §0.7).*
+
 Precept is not a workflow orchestrator, event sourcing framework, or ORM — it integrates with all of them. It governs the entity contract; they handle orchestration, persistence, and storage. Think: scattered governance across six service classes — Precept puts it in one file.
 
 ---
