@@ -104,7 +104,7 @@ The language must preserve these principles. They are non-negotiable — any red
 
 8. **Approximation honesty.** The language does not present approximation as exactness. If a value or operation is inherently approximate, that fact must be explicit in the contract. Exact-value lanes remain exact. Silent approximation inside an exact-looking path weakens the user's ability to reason about outcomes. The line between exact and approximate behavior must be visible in the type system and the language surface.
 
-9. **Mandatory rationale.** Every constraint carries a mandatory reason. The engine requires not just the rule, but its rationale. This is a language requirement, not a convention — the `because` clause is syntactically required on every rule and ensure.
+9. **Mandatory rationale.** Every constraint carries a mandatory reason. The engine requires not just the rule, but its rationale. This is a language requirement, not a convention — the `because` clause is syntactically required on every rule and ensure. Constraint modifiers (§2.4) are rule shorthand and carry a *generated* rationale, which satisfies this requirement without an authored clause; an author who wants a specific reason writes the constraint as a full `rule … because "…"`.
 
 10. **Totality.** Every expression evaluates to a result — never silent `NaN`, `Infinity`, or `null`. The evaluation surface has no undefined behavior. For any expression that *could* fault at runtime — division by zero, overflow, empty collection access — the compiler must either prove safety or emit a diagnostic requiring the author to supply constraints that make safety provable. A precept that compiles without diagnostics has no unproven arithmetic or access faults. Runtime fault traps exist only as defensive redundancy for paths the compiler has already proven unreachable.
 
@@ -1105,6 +1105,13 @@ Type qualifiers narrow the value domain: `in '<unit>'` pins to a specific unit o
 ### 2.4 Field Modifiers
 
 Field modifiers appear after the type reference and before any computed expression.
+
+**Constraint modifiers are shorthand for rules.** A constraint modifier — `nonnegative`, `positive`, `nonzero`, `notempty`, `min`, `max`, `minlength`, `maxlength`, `mincount`, `maxcount`, `maxplaces` — desugars to the equivalent `rule` with a generated rationale. `field Qty as number min 5` is shorthand for `field Qty as number` plus `rule Qty >= 5 because "Qty must be at least 5"`. They exist precisely to remove that boilerplate — the constraint and its self-evident reason — for the common per-field bound. Two consequences follow:
+
+- The modifier's rationale is **generated**, which satisfies the mandatory-reason requirement (§0.1 Principle 9) without an authored `because`. A constraint modifier is not a rationale-free constraint; it is a rule whose reason the compiler supplies. An author who wants a more specific rationale simply writes the constraint as a full `rule … because "…"` instead of the modifier shorthand — the two are equivalent, so choosing the longhand is purely a choice to spell out a custom reason.
+- A constraint modifier **participates in compile-time proof identically to the equivalent rule** (§5 — "field constraints, rules, and guards contribute provable numeric ranges"). `min 5` and `rule X >= 5` are interchangeable to the proof engine. Proof participation is a function of a constraint's **decidability**, not its syntactic form: a literal bound is always decidable, and a relational constraint is decidable only insofar as the referenced fields' own bounds make it so — equally true whether written as a modifier or as a `rule`.
+
+The flag modifiers `optional`, `editable`, and `ordered` are *not* rule shorthand — they declare nullability, per-state write access, and ordinal-comparison capability respectively, none of which is a value constraint.
 
 | Modifier | Syntax | Category |
 |----------|--------|----------|
