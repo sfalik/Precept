@@ -1323,7 +1323,7 @@ Fields, states, and events are all declared at the top level. They are visible e
 | Event handler actions | All field names + current event's args |
 | Default value expression | Field names declared **before** this field (no self-reference, no forward reference) |
 | Computed expression (`field X as T <- Expr`) | All field names except those that would form a dependency cycle (no self-reference, no mutual cycles) |
-| Modifier value expressions (`min N`, `max N`, etc.) | Only literal values — no field references |
+| Modifier value expressions (`min N`, `max N`, etc.) | All field names — a constraint modifier is rule shorthand (§2.4), so its value expression has the same scope as a rule condition. Self-reference is vacuous (`min X` ⟹ `X >= X`), not a cycle; no forward-reference restriction, matching rules. |
 
 Field names that resolve to fields declared `omit` in the anchoring state are syntactically in scope but produce `OmittedFieldReadInState` (D130) — reading a structurally absent field is a compile error.
 
