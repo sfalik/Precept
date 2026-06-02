@@ -97,6 +97,18 @@ The guarantee is **prevention, not detection.** Invalid entity configurations ca
 
 Everything in this document — every pipeline stage, every artifact, every runtime operation — exists to deliver that guarantee.
 
+### 1.1 The guarantee contract — mechanism
+
+The guarantee *statement* — what an author can rely on — is in the language spec (§0.7). This section is its *mechanism*: how the pipeline and runtime deliver the two halves.
+
+**Fault prevention** (compile-time). The type checker stamps a proof obligation at every fault-prone site (division → divisor non-zero; arithmetic into a bounded field → interval containment; collection access → non-empty; assignment → declared-bound containment). The proof engine discharges each obligation by establishing that the operand carries a discharging fact — a declared modifier/rule narrowed into its interval, a `when`-guard fact on the path, or a statically-known value. Discharge is **prove-or-reject**: an obligation the engine cannot prove emits its diagnostic. The obligation is *created at every site* and gated only on *discharge* — never on creation. Gating creation on provability (skipping the obligation when an interval is unbounded) is a soundness inversion: an unprovable bound must emit, never skip.
+
+**Governance** (runtime). Ingress (`TypeRuntime` / `TypeRuntimeMeta`) enforces every declared constraint on externally-sourced values — event arguments, construction inputs, field edits — before the working copy derives any dependent value. Enforcement is operation-blind. Mutations run on a working copy that is discarded if any constraint fails (spec §3A.4), so no invalid configuration commits.
+
+**Composition.** The compile-time proof for an externally-sourced operand relies on the operand's *declared* constraint; ingress governance makes that constraint hold on the actual value. The compiler never inspects the value — it proves the structural "carries a constraint" fact and rejects when it cannot. The runtime check is the discharge of that declared precondition, not a fallback for a proof the compiler skipped.
+
+**Out-of-contract data and traps.** The `[StaticallyPreventable]` evaluator fault codes are defense-in-depth, unreachable for data that entered through the contract. They cover only out-of-contract entry: state restored from a different definition version (which re-validates declared constraints) and host injection bypassing the engine. A trap firing for contract data indicates a proof-engine gap — a defect to fix, not an accommodated path.
+
 ## 2. Architectural approach
 
 ### Catalog-driven design

@@ -12,7 +12,7 @@
 
 Four-part statement, converged in conversation 2026-06-01/02:
 
-1. **Fault-freedom is established entirely at compile time** (Principles 7/10/11). For every fault-prone op the compiler proves the operand *carries* a sufficient discharging constraint (declared modifier/rule, author guard, or statically-known value) — a **structural** fact, not the concrete value. If it cannot, it **rejects**. It never defers a fault obligation to runtime.
+1. **Fault prevention is established entirely at compile time** (Principles 7/10/11). For every fault-prone op the compiler proves the operand *carries* a sufficient discharging constraint (declared modifier/rule, author guard, or statically-known value) — a **structural** fact, not the concrete value. If it cannot, it **rejects**. It never defers a fault obligation to runtime.
 2. **Governance is enforced at runtime on external input** (Principle 6). Declared constraints are enforced on every externally-sourced value at ingress, before any dependent computation reads it; operation-blind; atomicity (§3A.4) discards on failure so no invalid configuration persists — **prevention, not detection**.
 3. **Composition**: the compile-time proof for an external operand rests on the structural "carries a declared constraint" fact; governance makes that constraint true on the value. Proof complete at compile time; nothing deferred.
 4. **Runtime fault traps are redundant** — unreachable for contract data. They fire only for **out-of-contract data** (cross-version Restore, external injection). A fault from a **proof-engine gap is a bug**, not an accommodated condition.
@@ -21,19 +21,19 @@ Four-part statement, converged in conversation 2026-06-01/02:
 
 | Phase | Goal | Items | Decisions required | Effort | Status |
 |---|---|---|---|---|---|
-| 1 | Lock the canonical contract statement + decide where it lives | contract §1–4; placement | D1 placement; D2 philosophy wording sign-off | S–M (1–2d) | Draft |
-| 2 | Empirical grounding: verify code prove-or-reject vs drift per fault class | divisor, overflow/bounds, sqrt, empty-access, count, maxplaces; ingress; Restore | none (read-only) | M (2–3d) | Stub |
-| 3 | Propagate to canonical compiler/runtime docs | spec §0/§3A, proof-engine.md, fault-system.md, runtime-api.md, evaluator.md | D3 Restore truth (from Phase 2) | M–L (3–5d) | Stub |
+| 1 | Lock the canonical contract statement + decide where it lives | contract §1–4; placement | D1 placement ✅; D2 philosophy ✅ | S–M (1–2d) | ✅ Landed (spec §0.7 + design §1.1) |
+| 2 | Empirical grounding: verify code prove-or-reject vs drift per fault class | divisor, overflow/bounds, sqrt, empty-access, count, maxplaces; ingress; Restore | none (read-only) | M (2–3d) | ✅ Done — `proof-engine-contract-grounding-2026-06-02.md`; D3 resolved (Restore re-validates); BUG-017 scoped + BUG-018/019 filed |
+| 3 | Propagate to canonical compiler/runtime docs | spec §0/§3A, proof-engine.md, fault-system.md, runtime-api.md, evaluator.md | D3 Restore truth (from Phase 2) ✅ | M–L (3–5d) | Next |
 | 4 | Consumer-facing docs (owner-authored) | philosophy.md, README.md | D2 (philosophy) | S (1d) | Stub |
 
 ## Decisions captured (converged 2026-06-01/02)
 
-- **Governance ↔ fault-freedom are distinct axes.** Runtime constraint enforcement is governance (P6), not a deferred fault check. Settles the apparent Principle 11 tension *without* a P11 reword.
+- **Governance ↔ fault prevention are distinct axes.** Runtime constraint enforcement is governance (P6), not a deferred fault check. Settles the apparent Principle 11 tension *without* a P11 reword.
 - **Prove-or-reject, never defer.** The compiler proves the operand *carries* its constraint or rejects; it never punts a fault obligation to runtime.
 - **"Carries proof" is the right framing.** The compiler proves a structural fact about external operands (they carry declared constraints), not their values — so "the compiler can't prove anything about external values" is *false* and must not appear in any doc.
 - **Prevention, not detection — holds.** Atomicity (§3A.4) means an invalid configuration never persists; rejecting before commit is prevention. (Rejects Frank A3.)
 - **A proof-engine gap is a bug, not defense-in-depth.** Out-of-contract data (cross-version Restore, external injection) is the *only* legitimate reason a `[StaticallyPreventable]` trap fires. (Rejects Frank MQ2 / the "within current proof coverage" softening.)
-- **The three-layer model is consistent with the contract** (Layer 1 = fault-freedom, Layer 2 = governance, Layer 3 = redundant traps); it needs *sharpening*, not reversal.
+- **The three-layer model is consistent with the contract** (Layer 1 = fault prevention, Layer 2 = governance, Layer 3 = redundant traps); it needs *sharpening*, not reversal.
 
 ## Consolidated audit disposition
 
@@ -62,7 +62,10 @@ Both audits, each finding mapped to a contract-aligned action. `TIGHTEN` = fix t
 
 ## Open decisions (gate the phases)
 
-- **D1 — Where the canonical contract lives.** Options: (a) new spec §0 subsection (principles-adjacent) for the §1–4 statement + detailed mechanics in `compiler-and-runtime-design.md`; (b) all of it in `compiler-and-runtime-design.md` with a one-paragraph pointer from spec §0 and philosophy; (c) a dedicated `docs/guarantee-contract.md`. Recommended: (a) — keep the principle-level composition statement beside the principles, mechanics in the compiler/runtime design doc, everything else references it. *Land in P1.*
+- **D1 — Where the canonical contract lives.** ✅ **Resolved 2026-06-02** — **both** the language spec and `compiler-and-runtime-design.md`, split by *facet* (no duplicated text, so no divergence):
+  - **`precept-language-spec.md` — owns the GUARANTEE (semantic commitment).** A new §0 subsection (after §0.6 proof philosophy) states the four-part contract as what an author can rely on: fault prevention is compile-time prove-or-reject (never deferred); governance enforces declared constraints on external input at ingress (atomicity → prevention, not detection); the two compose via *carries-proof*; the guarantee covers data entering through the contract (out-of-contract = bounded exception). Plus the one composition sentence woven near §0.1 connecting P6 ↔ P7/10/11.
+  - **`compiler-and-runtime-design.md` — owns the MECHANISM (architecture).** How the pipeline delivers it: the compiler discharges each fault obligation by proving the operand carries a constraint (type-check/proof stages) or rejects; governance enforces at ingress before dependent computation; evaluator traps are redundant; out-of-contract boundary mechanics (Restore re-validates; injection out of envelope).
+  - Everything else (philosophy, README, fault-system, runtime-api, evaluator) references one of these two by facet — pointer philosophy. *Drafted in P1.*
 - **D2 — Philosophy wording sign-off (owner-gated).** ✅ **Resolved 2026-06-02** — owner approved the single Phase-4 insertion verbatim (carries-proof + composition + "not a second line of defense"); keep lines 49/51/53-rest/57; reject the A3/A4-soften/MQ2/MQ3/C2 changes. Landing still sequenced after Phases 1–3. Line-35 caveat remains contingent on the Phase 2 Restore finding.
 - **D3 — Restore truth.** Does `Restore` re-validate constraints (per runtime-api + `RestoreConstraintsFailed`) or bypass (per evaluator `FromJson`)? Resolved by Phase 2 code-grounding before any doc edit. *Land in P2.*
 
@@ -73,7 +76,7 @@ Both audits, each finding mapped to a contract-aligned action. `TIGHTEN` = fix t
 **Steps**:
 1. Decide D1 (placement) with the owner.
 2. Draft the canonical statement at the chosen home: the four parts above, plus the "carries proof" framing and the explicit prove-or-reject / never-defer rule.
-3. Add the **composition statement** to spec §0 (the bridge between P6 governance and P10/11 fault-freedom) — the one genuinely-missing principle-level sentence.
+3. Add the **composition statement** to spec §0 (the bridge between P6 governance and P10/11 fault prevention) — the one genuinely-missing principle-level sentence.
 4. Record the two rejections (Frank A3, MQ2) and the no-P11-reword decision inline, so future readers see them settled.
 5. Cross-reference targets enumerated for Phase 3 (every doc that currently re-states a guarantee points here instead — pointer philosophy).
 

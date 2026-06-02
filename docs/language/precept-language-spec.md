@@ -30,7 +30,8 @@
   - [0.4 Execution Model Properties](#04-execution-model-properties)
   - [0.5 Graph Analyzer Design Contract](#05-graph-analyzer-design-contract)
   - [0.6 Proof Engine Design Contract](#06-proof-engine-design-contract)
-  - [0.7 Authoring Audience](#07-authoring-audience)
+  - [0.7 The Compile-Time and Runtime Guarantee Contract](#07-the-compile-time-and-runtime-guarantee-contract)
+  - [0.8 Authoring Audience](#08-authoring-audience)
 - [1. Lexer](#1-lexer)
   - [1.1 Token Vocabulary](#11-token-vocabulary)
   - [1.2 Reserved Keywords](#12-reserved-keywords)
@@ -108,7 +109,7 @@ The language must preserve these principles. They are non-negotiable — any red
 
 10. **Totality.** Every expression evaluates to a result — never silent `NaN`, `Infinity`, or `null`. The evaluation surface has no undefined behavior. For any expression that *could* fault at runtime — division by zero, overflow, empty collection access — the compiler must either prove safety or emit a diagnostic requiring the author to supply constraints that make safety provable. A precept that compiles without diagnostics has no unproven arithmetic or access faults. Runtime fault traps exist only as defensive redundancy for paths the compiler has already proven unreachable.
 
-11. **Static completeness.** If a precept compiles without diagnostics, it does not fault at runtime. The compiler catches all type errors, proves all arithmetic safety obligations, and verifies all access preconditions at compile time. Every fault class that the evaluator can produce — type mismatch, division by zero, overflow, empty collection access, constraint range impossibility — is linked to a compiler diagnostic that prevents it. Runtime fault checks exist only as defensive redundancy, never as the primary enforcement mechanism. This is the bridge between the compiler and the evaluator: the compiler's job is to make every evaluator error path unreachable.
+11. **Static completeness.** If a precept compiles without diagnostics, it does not fault at runtime. The compiler catches all type errors, proves all arithmetic safety obligations, and verifies all access preconditions at compile time. Every fault class that the evaluator can produce — type mismatch, division by zero, overflow, empty collection access, constraint range impossibility — is linked to a compiler diagnostic that prevents it. Runtime fault checks exist only as defensive redundancy, never as the primary enforcement mechanism. This is the bridge between the compiler and the evaluator: the compiler's job is to make every evaluator error path unreachable. (How compile-time fault prevention and runtime governance compose to deliver this without deferral: §0.7.)
 
 ### 0.2 Language Model
 
@@ -254,7 +255,23 @@ Both directions are *sound by construction* (invalidation paths are pure rejecti
 
 ---
 
-### 0.7 Authoring Audience
+### 0.7 The Compile-Time and Runtime Guarantee Contract
+
+Precept's guarantees are delivered by two distinct mechanisms; keeping them distinct is what makes the guarantee precise rather than magical.
+
+**Fault prevention — established entirely at compile time.** A precept that compiles without diagnostics cannot produce a runtime fault — no division by zero, no overflow, no empty-collection access, no result outside a declared bound. The compiler delivers it by discharging, at every fault-prone operation, an obligation that each operand *carries* a sufficient constraint — a declared modifier or rule, an author guard, or a statically-known safe value. It proves a structural fact — that the operand carries its constraint — never the concrete runtime value. If it cannot, it **rejects the definition** and names what would make the operation provably safe. It never compiles a fault-prone operation in the hope a runtime check catches it; there is no deferral. (Principles 7, 10, 11.)
+
+**Governance — enforced at runtime on external input.** Every declared constraint is enforced on every value entering the entity from outside the definition — event arguments, construction inputs, direct field edits — at the moment it enters, before any computation derives from it. This enforcement is operation-blind: it upholds the field's declared contract whether or not any fault-prone operation references the field. Because mutations execute on a working copy that is discarded if any constraint fails (§3A.4), an invalid configuration never persists — this is prevention, not detection. (Principles 1, 6.)
+
+**Composition.** For a value supplied at runtime, the compiler's proof that the operation cannot fault rests on the structural fact that the value carries a declared constraint; governance makes that constraint true of the value at ingress. The proof is therefore complete at compile time and the fault never occurs — proven by the compiler, its precondition discharged by governance, nothing left to a runtime check.
+
+**The boundary of the guarantee.** The guarantee covers every value entering through the contract — construction, events, edits. Data that enters *outside* the contract — state restored from persistence written under a different definition, or values injected by a host that bypassed the engine — is re-validated where the engine can (restoration re-checks declared constraints) and is otherwise outside the guarantee's envelope. Runtime fault traps exist only for these out-of-contract cases; for contract data they are unreachable, and a fault that fires for any other reason is a compiler defect, not an accommodated condition.
+
+Mechanism — how the pipeline discharges these obligations and where governance runs — is in `compiler-and-runtime-design.md`.
+
+---
+
+### 0.8 Authoring Audience
 
 The primary author of a `.precept` definition is the **domain expert** — a business analyst, product owner, regulatory specialist, or subject-matter expert who reasons in terms of "what is this data allowed to become." Not the software developer.
 
