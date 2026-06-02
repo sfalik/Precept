@@ -30,7 +30,11 @@ public static partial class ProofEngine
         string Field,
         OperatorKind Comparison,
         decimal? Value,
-        bool IsPresenceCheck);
+        bool IsPresenceCheck,
+        // True when Field names an event arg rather than a declared field. Field and
+        // arg names share a flat namespace in this representation, so a constraint over
+        // an arg must not be resolved against a same-named field's declared interval.
+        bool IsArg = false);
 
     private record ContainsGuardConstraint(
         string Field,

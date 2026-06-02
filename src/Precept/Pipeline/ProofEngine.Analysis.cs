@@ -449,10 +449,10 @@ public static partial class ProofEngine
             if (!min.HasValue && !max.HasValue)
                 continue;
 
-            var interval = IntervalOf(field.ComputedExpression, semantics);
-            if (interval.IsUnbounded)
-                continue;
-
+            // The obligation is created whenever the computed field carries declared
+            // bounds — even when the operand interval is unbounded. An unbounded result
+            // stays Unresolved at discharge → NumericOverflow, rather than silently
+            // passing as if the bound were vacuously satisfied.
             var authoredMin = field.DeclaredMin;
             var authoredMax = field.DeclaredMax;
             var minStr = (authoredMin ?? min)?.ToString() ?? "−∞";

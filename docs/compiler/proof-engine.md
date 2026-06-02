@@ -595,6 +595,10 @@ public sealed record IntervalContainmentProofRequirement(
 
 > **Normalization boundary.** For `quantity` and `price` fields, the TypeChecker normalizes `min`/`max` modifier magnitudes to UCUM base units at field-typing time, storing the results as `NormalizedDeclaredMin`/`NormalizedDeclaredMax` on `TypedField` and `TypedArg`. The obligation collectors (`ProofEngine.Analysis.cs`, `Actions.cs`) then construct `IntervalContainmentProofRequirement` by calling `GetFieldBounds()`, which reads these pre-normalized values. Downstream consumers — Strategy 8 (IntervalContainment), `TypedFieldRef` interval extraction, and the MCP `precept_compile` tool — read the pre-normalized `DeclaredMin`/`DeclaredMax` values. Raw authored magnitudes are preserved on `TypedField.DeclaredMin/Max` and `IntervalContainmentProofRequirement.AuthoredMin/Max` for diagnostic display only. Explicit counting-unit mismatches (e.g. `each` vs `box`) are not normalized — they must match qualifiers or use a separate runtime conversion field.
 
+> **Computed-field bound containment.** A computed numeric field carrying explicit declared bounds gets an `IntervalContainmentProofRequirement` against its own bounds — created **whenever the field has bounds**, including when the result interval is unbounded. An unbounded result stays `Unresolved` at discharge and surfaces as `NumericOverflow`, rather than silently passing as if the bound were vacuously satisfied. Discharge uses the operand-interval inference (`IntervalOf` → division/`+`/`-`/`*` propagation), so a provably-safe computed field such as `(A + B) / 2` over bounded operands discharges clean.
+
+> **Flag-modifier lower bounds in operand intervals.** `GetFieldBounds()` deliberately reads only `DeclarationValue`-sourced bounds, excluding the `Constant`-sourced bounds carried by flag modifiers. The operand-interval **read** path (`ExtractFieldInterval`) folds those flag lower bounds back in — `nonnegative` ⇒ lower bound `0`; `positive` ⇒ lower bound `0` (a sound over-approximation of `> 0`); `nonzero` contributes nothing (it is a hole at `0`, not a lower bound). The bound is derived from catalog metadata (any `SelfValue` numeric satisfaction with a `≥`/`>` comparison against a `Constant`). This tightening lives in `ExtractFieldInterval` only — `GetFieldBounds()`'s own return value is unchanged, so the set-action obligation-creation path in `Actions.cs` sees no difference. Because a `nonnegative`/`positive` field's value genuinely lies within these bounds, the fold can only tighten operand intervals and help discharge — it never creates a rejection.
+
 #### ProofSubject
 
 Identifies what a proof obligation targets:
@@ -1178,12 +1182,19 @@ bool GuardSubsumes(GuardConstraint guard, NumericProofRequirement requirement, T
 ```csharp
 // Internal to ProofEngine — not part of public API
 record GuardConstraint(
-    string Field,                    // field name
+    string Field,                    // field (or event-arg) name
     OperatorKind Comparison,         // comparison operator
     decimal? Value,                  // literal threshold (null for presence checks)
-    bool IsPresenceCheck             // true for "field is set" patterns
+    bool IsPresenceCheck,            // true for "field is set" patterns
+    bool IsArg = false               // true when Field names an event arg, not a declared field
 );
 ```
+
+Field and event-arg names share a flat namespace in this representation. When a constraint
+originates from an event-arg reference (e.g. `when E.N >= 0`), `IsArg` is set so the constraint
+is **not** resolved against a same-named declared field's interval — an arg carries its own
+(typically unbounded) bounds. Consumers seed arg-sourced constraints unbounded and the
+tautological/satisfiability scans decline to discharge them (soundness over completeness).
 
 **Decomposition rules:**
 

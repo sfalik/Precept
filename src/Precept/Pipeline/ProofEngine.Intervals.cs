@@ -177,8 +177,52 @@ public static partial class ProofEngine
         if (!semantics.FieldsByName.TryGetValue(fieldName, out var field))
             return NumericInterval.Unbounded;
         var (min, max) = GetFieldBounds(field);
+
+        // Tighten the lower bound from flag-modifier constant lower bounds (nonnegative ⇒ ≥ 0;
+        // positive ⇒ ≥ 0 as a sound over-approximation of > 0). GetFieldBounds deliberately reads
+        // only DeclarationValue-sourced bounds, so the Constant-sourced flag bounds are folded here —
+        // in the operand-interval READ path only — never into GetFieldBounds itself. A field's value
+        // genuinely lies within these bounds, so this can only tighten the operand interval and help
+        // discharge; it never creates a rejection.
+        var flagMin = FlagLowerBound(field);
+        if (flagMin.HasValue)
+            min = min.HasValue ? Math.Max(min.Value, flagMin.Value) : flagMin.Value;
+
         if (!min.HasValue && !max.HasValue) return NumericInterval.Unbounded;
         return new NumericInterval(min ?? decimal.MinValue, max ?? decimal.MaxValue);
+    }
+
+    /// <summary>
+    /// The tightest constant lower bound implied by the field's value-bounding flag modifiers, derived
+    /// from catalog metadata — any SelfValue numeric satisfaction with a ≥ / &gt; comparison against a
+    /// Constant bound. nonzero (a NotEquals hole, not a lower bound) contributes nothing. Returns null
+    /// when no flag implies a constant lower bound.
+    /// </summary>
+    private static decimal? FlagLowerBound(TypedField field)
+    {
+        decimal? lower = null;
+
+        foreach (var modifierKind in field.Modifiers.Concat(field.ImpliedModifiers))
+        {
+            if (Modifiers.GetMeta(modifierKind) is not ValueModifierMeta modifierMeta)
+                continue;
+            if (!ModifierAppliesToField(modifierMeta, field))
+                continue;
+
+            foreach (var satisfaction in modifierMeta.ProofSatisfactions.OfType<ProofSatisfaction.Numeric>())
+            {
+                if (satisfaction.Projection is not SatisfactionProjection.SelfValue)
+                    continue;
+                if (satisfaction.Comparison is not (OperatorKind.GreaterThanOrEqual or OperatorKind.GreaterThan))
+                    continue;
+                if (satisfaction.Bound is not NumericBoundSource.Constant constant)
+                    continue;
+
+                lower = lower.HasValue ? Math.Max(lower.Value, constant.Value) : constant.Value;
+            }
+        }
+
+        return lower;
     }
 
     private static NumericInterval ExtractArgInterval(string argName, string eventName, SemanticIndex semantics)

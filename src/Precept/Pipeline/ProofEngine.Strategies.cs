@@ -902,14 +902,14 @@ public static partial class ProofEngine
                 {
                     var litValue = ToDecimal(rightArgLit.Value);
                     if (litValue is not null)
-                        builder.Add(new GuardConstraint(leftArg.ArgName, compOp, litValue, false));
+                        builder.Add(new GuardConstraint(leftArg.ArgName, compOp, litValue, false, IsArg: true));
                 }
                 // literal op arg → invert
                 else if (bin.Left is TypedLiteral leftArgLit && bin.Right is TypedArgRef rightArg)
                 {
                     var litValue = ToDecimal(leftArgLit.Value);
                     if (litValue is not null)
-                        builder.Add(new GuardConstraint(rightArg.ArgName, InvertOp(compOp), litValue, false));
+                        builder.Add(new GuardConstraint(rightArg.ArgName, InvertOp(compOp), litValue, false, IsArg: true));
                 }
                 break;
             }
@@ -921,7 +921,7 @@ public static partial class ProofEngine
 
             case TypedPostfixOp post when !post.IsNegated && post.Operand is TypedArgRef postArg:
                 // event arg is set
-                builder.Add(new GuardConstraint(postArg.ArgName, OperatorKind.NotEquals, null, true));
+                builder.Add(new GuardConstraint(postArg.ArgName, OperatorKind.NotEquals, null, true, IsArg: true));
                 break;
 
             case TypedUnaryOp { ResolvedOp: var uop } un when Operations.GetMeta(uop).Op == OperatorKind.Not:

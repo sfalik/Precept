@@ -69,6 +69,10 @@ public static partial class ProofEngine
             {
                 if (gc.IsPresenceCheck) return false; // out of scope for this check
                 if (gc.Value is not { } value) return false;
+                // An arg-sourced constraint must not be proven against a same-named field's
+                // interval — the arg carries its own (here unbounded) bounds, so the
+                // tautological scan cannot discharge it (soundness over completeness).
+                if (gc.IsArg) return false;
                 if (!IsConstraintProvablyTrue(gc.Field, gc.Comparison, value, semantics, extraNarrowing))
                     return false;
             }
@@ -251,7 +255,10 @@ public static partial class ProofEngine
             if (gc.Value is not { } v) continue;
 
             if (!result.TryGetValue(gc.Field, out var current))
-                current = seedFn(gc.Field);
+                // An arg-sourced constraint must not adopt a same-named field's declared
+                // interval as its seed — seed it unbounded so only the constraint itself
+                // narrows it.
+                current = gc.IsArg ? new NumericInterval(decimal.MinValue, decimal.MaxValue) : seedFn(gc.Field);
 
             result[gc.Field] = NarrowByConstraint(current, gc.Comparison, v, GetFieldType(gc.Field, semantics));
         }
