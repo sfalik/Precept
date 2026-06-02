@@ -277,7 +277,7 @@ Recovery hints are per-code guidance, not per-instance guidance. Moving `Recover
 
 ### Defense-in-depth, not a primary error path
 
-When the compiler emits errors, `Precept.From(Compilation)` cannot produce a `Precept` — the evaluator never runs. `Fault` is therefore a defense-in-depth type: it classifies failures that *should never occur* but must be handled if they do (e.g. data loaded from external sources bypassing the compile-time check, or a proof engine gap). See also Q3 below.
+When the compiler emits errors, `Precept.From(Compilation)` cannot produce a `Precept` — the evaluator never runs. `Fault` is therefore a defense-in-depth type: it classifies failures that *should never occur* for data that entered through the contract. They are reachable only for **out-of-contract** data — values loaded from external sources that bypassed compile-time checking. A fault on *contract* data would instead indicate a **proof-engine gap** — a defect to fix, not a condition to design around (spec §0.7). See also Q3 below.
 
 ### Relationship to prototype
 
@@ -313,7 +313,7 @@ The current stub carries none of this. The answers depend on what MCP `precept_f
 
 ### Q3 — Fault vs. structural impossibility
 
-When the compiler emits errors, `Precept.From(Compilation)` cannot produce a `Precept` — the evaluator never runs. `Fault` is therefore a defense-in-depth type: it classifies failures that *should never occur* but must be handled if they do (e.g. data loaded from external sources bypassing the compile-time check, or a proof engine gap).
+When the compiler emits errors, `Precept.From(Compilation)` cannot produce a `Precept` — the evaluator never runs. `Fault` is therefore a defense-in-depth type: it classifies failures that *should never occur* for data that entered through the contract. They are reachable only for **out-of-contract** data — values loaded from external sources that bypassed compile-time checking. A fault on *contract* data would instead indicate a **proof-engine gap** — a defect to fix, not a condition to design around (spec §0.7).
 
 This affects how aggressively the evaluator should assert vs. gracefully fault. Decision needed at evaluator design time.
 

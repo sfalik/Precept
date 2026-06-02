@@ -651,9 +651,9 @@ Precept enforces field constraints across three layers:
 
 1. **Compile-time diagnostics** — 132 diagnostic codes catch invalid configurations statically. The proof engine resolves interval-containment obligations and emits `NumericOverflow` for values that demonstrably exceed declared bounds. Unit-aware normalization (UCUM scale factors) prevents false positives on cross-unit assignments.
 
-2. **Ingress validation** — `TypeRuntimeMeta` / `TypeRuntime` validate values at runtime ingress (event firing, field assignment) against declared qualifiers and bounds. This catches cases the proof engine cannot prove statically.
+2. **Ingress governance** — `TypeRuntimeMeta` / `TypeRuntime` enforce a field's *declared* constraints (qualifiers, bounds) on every externally-sourced value at runtime ingress (event firing, field assignment). This is governance, not deferral: it upholds the declared contract on values that enter at runtime — values the compiler never saw — and is *not* a fallback for fault-safety the compiler couldn't prove. Fault-safety is always proven or rejected at compile time (spec §0.7).
 
-3. **Defense-in-depth evaluator faults** — 15 `[StaticallyPreventable]` fault codes fire at evaluation time for expressions the proof engine should have caught. These represent defense-in-depth, not the primary enforcement path.
+3. **Defense-in-depth evaluator faults** — 15 `[StaticallyPreventable]` fault codes exist at evaluation time as a backstop. For data that entered through the contract they are unreachable; they are reachable only for out-of-contract data (state restored under a different definition, host injection bypassing the engine). A fault firing for contract data indicates a proof-engine gap — a defect to fix, not the enforcement path (spec §0.7).
 
 ### Thread Safety
 
