@@ -1,6 +1,6 @@
 # Proof-Engine Guarantee Contract — Doc-Clarity Plan — 2026-06-02
 
-**Status**: Draft
+**Status**: Complete 2026-06-02 — all 4 phases landed (commits d4367254, 5af46537, c4a50887, 9fa6a16c, 63e08963, e7c1255f). One follow-up: remove superseded `RestoreConstraintsFailed` at Restore-API finalization.
 **Companion docs**:
 - `docs/Working/compile-time-vs-runtime-contract-clarity-2026-06-01.md` (clarity assessment — neutral)
 - `docs/Working/guarantee-claims-doc-audit-2026-06-02.md` (Frank's guarantee-claims audit)
@@ -24,7 +24,7 @@ Four-part statement, converged in conversation 2026-06-01/02:
 | 1 | Lock the canonical contract statement + decide where it lives | contract §1–4; placement | D1 placement ✅; D2 philosophy ✅ | S–M (1–2d) | ✅ Landed (spec §0.7 + design §1.1) |
 | 2 | Empirical grounding: verify code prove-or-reject vs drift per fault class | divisor, overflow/bounds, sqrt, empty-access, count, maxplaces; ingress; Restore | none (read-only) | M (2–3d) | ✅ Done — `proof-engine-contract-grounding-2026-06-02.md`; D3 resolved (Restore re-validates); BUG-017 scoped + BUG-018/019 filed |
 | 3 | Propagate to canonical compiler/runtime docs | spec §0/§3A, fault-system.md, runtime-api.md, evaluator.md | D3 Restore truth ✅; D4 restore semantics ✅ | M–L (3–5d) | ✅ Done (proof-engine.md left — no framing drift; breaches tracked as bugs) |
-| 4 | Consumer-facing docs (owner-authored) | philosophy.md (insertion + line-35 treatment), README.md | D2 (philosophy) | S (1d) | Next |
+| 4 | Consumer-facing docs (owner-authored) | philosophy.md (insertion + line-35 treatment), README.md | D2 (philosophy) ✅ | S (1d) | ✅ Done — composition insertion landed; line 35 left unchanged (operation-scoped; §0.7 authoritative); README pointer added |
 
 ## Decisions captured (converged 2026-06-01/02)
 
