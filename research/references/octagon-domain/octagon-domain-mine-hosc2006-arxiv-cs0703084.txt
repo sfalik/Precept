@@ -1,0 +1,1840 @@
+1
+
+The Octagon Abstract Domain
+Antoine Miné
+
+arXiv:cs/0703084v2 [cs.PL] 16 Mar 2007
+
+École Normale Supérieure de Paris, France,
+mine@di.ens.fr,
+http://www.di.ens.fr/~mine
+
+Abstract— This article presents a new numerical abstract
+domain for static analysis by abstract interpretation. It extends
+a former numerical abstract domain based on Difference-Bound
+Matrices and allows us to represent invariants of the form
+(±x ± y ≤ c), where x and y are program variables and c
+is a real constant.
+We focus on giving an efficient representation based on
+Difference-Bound Matrices—O(n2 ) memory cost, where n is
+the number of variables—and graph-based algorithms for all
+common abstract operators—O(n3 ) time cost. This includes a
+normal form algorithm to test equivalence of representation and
+a widening operator to compute least fixpoint approximations.
+Index Terms— abstract interpretation, abstract domains, linear
+invariants, safety analysis, static analysis tools.
+
+I. I NTRODUCTION
+This article presents practical algorithms to represent and
+manipulate invariants of the form (±x ± y ≤ c), where x
+and y are numerical variables and c is a numeric constant. It
+extends the analysis we previously proposed in our PADO-II
+article [1]. Sets described by such invariants are special kind of
+polyhedra called octagons because they feature at most eight
+edges in dimension 2 (Figure 2). Using abstract interpretation,
+this allows discovering automatically common errors, such as
+division by zero, out-of-bound array access or deadlock, and
+more generally to prove safety properties for programs.
+Our method works well for reals and rationals. Integer
+variables can be assumed, in the analysis, to be real in order
+to find approximate but safe invariants.
+Example. The very simple program described in Figure
+1 simulates M one-dimensional random walks of m steps
+and stores the hits in the array tab. Assertions in curly
+braces are discovered automatically by a simple static analysis
+using our octagonal abstract domain. Thanks to the invariants
+discovered, we have the guarantee that the program does not
+perform out-of-bound array access at lines 2 and 10. The
+difficult point in this example is the fact that the bounds of
+the array tab are not known at the time of the analysis; thus,
+they must be treated symbolically.
+For the sake of brevity, we omit proofs of theorems in this
+article. The complete proof for all theorems can be found in
+the author’s Master thesis [2].
+II. P REVIOUS W ORK
+A. Numerical Abstract Domains.
+Static analysis has developed a successful methodology,
+based on the abstract interpretation framework—see Cousot
+
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+
+int tab[−m . . . m];
+for i = −m to m tab[i] = 0; {−m ≤ i ≤ m}
+for j = 1 to M do
+int a = 0;
+for i = 1 to m
+{ 1 ≤ i ≤ m; −i + 1 ≤ a ≤ i − 1 }
+if rand(2) = 0
+then a = a + 1; { −i + 1 ≤ a ≤ i }
+else a = a − 1; { −i ≤ a ≤ i − 1 }
+tab[a] = tab[a] + 1; { −m ≤ a ≤ m }
+done;
+
+Fig. 1. Simulation of a random walk. The assertions in curly brackets {. . .}
+are discovered automatically and prove that this program does not perform
+index out of bound error when accessing the array tab.
+
+and Cousot’s POPL’77 paper [3]—to build analyzers that
+discover invariants automatically: all we need is an abstract
+domain, which is a practical representation of the invariants
+we want to study, together with a fixed set of operators and
+transfer functions (union, intersection, widening, assignment,
+guard, etc.) as described in Cousot and Cousot’s POPL’79
+article [4].
+There exists many numerical abstract domains. The most
+used are the lattice of intervals (described in Cousot and
+Cousot’s ISOP’76 article [5]) and the lattice of polyhedra
+(described in Cousot and Halbwachs’s POPL’78 article [6]).
+They represent, respectively, invariants of the form (v ∈
+[c1 ; c2 ]) and (α1 v1 + · · · + αn vn ≤ c), where v, v1 , . . . , vn
+are program variables and c, c1 , c2 , α1 , . . . , αn are constants.
+Whereas the interval analysis is very efficient—linear memory
+and time cost—but not very precise, the polyhedron analysis is
+much more precise (Figure 2) but has a huge memory cost—in
+practice, it is exponential in the number of variables.
+Remark that the correctness of the program in Figure 1
+depends on the discovery of invariants of the form (a ∈
+[−m, m]) where m must not be treated as a constant, but
+as a variable—its value is not known at analysis time. Thus,
+this example is beyond the scope of interval analysis. It can
+be solved, of course, using polyhedron analysis.
+B. Difference-Bound Matrices.
+Several satisfiability algorithms for set of constraints involving only two variables per constraint have been proposed in
+order to solve Constraint Logic Programming (CLP) problems.
+Pratt analyses, in [7], the simple case of constraints of the
+
+2
+
+form (x − y ≤ c) and (±x ≤ c) which he called separation
+theory. Shostak then extends, in [8], this to a loop residue
+algorithm for the case (αx + βy ≤ c). However, the algorithm
+is complete only for reals, not for integers. Recently, Harvey
+and Stuckey proposed, in their ACSC’97 article [9], a complete
+algorithm, inspired from [8], for integer constraints of the form
+(±x ± y ≤ c).
+Unlike CLP, when analyzing programs, we are not only
+interested in testing the satisfiability of constraint sets, we also
+need to manipulate them and apply operators that mimic the
+one used to define the semantics of programs (assignments,
+tests, control flow junctions, loops, etc.).
+The model-checking community has developed a practical
+representation, called Difference-Bound Matrices (DBMs), for
+constraints of the form (x−y ≤ c) and (±x ≤ c), together with
+many operators, in order to model-check timed automata (see
+Yovine’s ES’98 article [10] and Larsen, Larsson, Pettersson,
+and Yi’s RTSS’97 article [11]). These operators are tied to
+model checking and do not meet the abstract interpretation
+needs. This problem was addressed in our PADO-II article [1]
+and in Shaham, Kolodner, and Sagiv’s CC2000 article [12]
+which propose abstract domains based on DBMs, featuring
+widenings and transfer functions adapted to real-live programming languages. All these works are based on the concept of
+shortest-path closure already present in Pratt’s article [7] as
+the base of the satisfiability algorithm for constraints of the
+form (x− y ≤ c). The closure also leads to a normal form that
+allows easy equality and inclusion testing. Good understanding
+of the interactions between closure and the other operators is
+needed to ensure the best precision possible and termination of
+the analysis. These interactions are described in our PADO-II
+article [1].
+Again, proof of the correctness of the program in Figure
+1 is beyond the scope of the DBM-based abstract domains
+presented in [1], [12] because the invariant (−a − m ≤ 0) we
+need does not match (x − y ≤ c).
+C. Our Contribution.
+Our goal is to propose a numerical abstract domain that is
+between, in term of expressiveness and cost, the interval and
+the polyhedron domains. The set of invariants we discover
+can be seen as special cases of linear inequalities; but the
+underlying algorithmic is very different from the one used in
+the polyhedron domain [6], and much more efficient.
+In this article, we show that DBMs can be extended to
+describe invariants of the form (±x ± y ≤ c). We build a
+new numerical abstract domain, called the octagon abstract
+domain, extending the abstract domain we presented in our
+PADO-II article [1] and detail algorithms implementing all
+operators needed for abstract interpretation. Most algorithms
+are adapted from [1] but some are much more complex. In
+particular, the closure algorithm is replaced by a strong closure
+algorithm.
+It is very important to understand that an abstract domain
+is only a brick in the design of a static analyzer. For the
+sake of simplicity, this paper presents an application of our
+domain on a simple forward analysis of a toy programming
+
+y
+
+y
+
+11111111
+00000000
+00000000
+11111111
+00000000
+11111111
+00000000
+11111111
+00000000
+11111111
+00000000
+11111111
+00000000
+11111111
+00000000
+11111111
+x
+
+x
+
+(a)
+
+(b)
+y
+
+y
+
+11111111
+00000000
+00000000
+11111111
+00000000
+11111111
+00000000
+11111111
+00000000
+11111111
+00000000
+11111111
+00000000
+11111111
+
+11111111
+00000000
+00000000
+11111111
+00000000
+11111111
+00000000
+11111111
+00000000
+11111111
+00000000
+11111111
+00000000
+11111111
+
+x
+
+x
+
+(c)
+
+(d)
+
+Fig. 2. A set of points (a), and its best approximation in the interval (b),
+polyhedron (c), and octagon (d) abstract domains.
+
+language. However, one could imagine to plug this domain
+in various analyses, such as Bourdoncle’s S YNTOX analyzer
+[13], Deutsch’s pointer analysis [14], Dor, Rodeh, and Sagiv’s
+string cleanness checking [15], etc.
+Section III recalls the DBM representation for potential
+constraints (x − y ≤ c). Section IV explains how DBMs
+can be used to represent a wider range of constraints: interval
+constraints (±x ≤ c), and sum constraints (±x ± y ≤ c). We
+then stick to this last extension, as it is the core contribution of
+this article, and discuss in Section V about normal form and
+in Section VI about operators and transfer functions. Section
+VII builds two lattice structures using these operators. Section
+VIII presents some practical results and gives some ideas for
+improvement.
+III. D IFFERENCE -B OUND M ATRICES
+In this section, we recall some definitions and simple facts
+about Difference-Bound Matrices (DBMs) and their use in
+order to represent sets of invariants of the form (x − y ≤ c).
+DBMs are described in [11], [10] from a model-checking point
+of view and in [1] for abstract interpretation use.
+Let V = {v0 , . . . , vN −1 } be a finite set of variables with
+value in a numerical set I (which can be Z, Q or R). We extend
+I to I by adding the +∞ element; the standard operations ≤,
+=, +, min and max are extended to I as usual.
+A. Potential Constraints, DBMs.
+A potential constraint over V is a constraint of the form
+(vi − vj ≤ c), with vi , vj ∈ V and c ∈ I. Let C be a set
+of potential constraint over V. We suppose, without loss of
+generality, that there do not exist two constraints (vi − vj ≤ c)
+and (vi −vj ≤ d) in C with c 6= d. Then, C can be represented
+uniquely by a N × N matrix m with elements in I :
+
+3
+
+v0
+v1
+v2
++∞
+4
+3
+−1 +∞ +∞
+−1
+1
++∞
+
+v0
+v1
+v2
+
+v0
+
+4
+−1
+
+v1
+
+−1
+3
+
+v2
+
+1
+
+(a)
+
+(c)
+A DBM (a), its potential graph (b) and its V-domain (c).
+
+mij =
+
+v0
+0
+−1
+−1
+
+v1
+v2
+5
+3
++∞ +∞
+1
++∞
+(b)
+
+IV. E XTENDING D IFFERENCE -B OUND M ATRICES
+
+v1
+
+
+
+v0
+v1
+v2
+
+Fig. 4. Two different DBMs with the same V-domain. Remark that (a) and
+(b) are not even comparable with respect to P.
+
+v0
+
+△
+
+v0
+v1
+v2
++∞
+4
+3
+−1 +∞ +∞
+−1
+1
++∞
+(a)
+
+(b)
+v2
+
+Fig. 3.
+
+v0
+v1
+v2
+
+c
++∞
+
+if (vj − vi ≤ c) ∈ C,
+elsewhere .
+
+A. Representing intervals.
+
+m is called a Difference-Bound Matrix (DBM).
+B. Potential Graph.
+It is convenient to consider m as the adjacency matrix of a
+weighted graph G(m) = {V, A, w}, called its potential graph,
+and defined by:
+A ⊆ V × V,
+
+w ∈ A 7→ I,
+
+△
+
+A = {(vi , vj ) | mij < +∞},
+
+Discovering invariants of the single potential form (x −
+y ≤ c) is not very interesting; however DBMs can be used
+to represent broader constraint forms. In this section, we first
+present briefly how to add interval constraints (±x ≤ c). This
+extension is not new: [11], [1] use it instead of pure DBM.
+We then present our new extension allowing representation of
+the more general constraints (±x ± y ≤ c).
+
+△
+
+w((vi , vj )) = mij .
+
+We will denote by hi1 , . . . , ik i a finite set of nodes representing a path from node vi1 to node vik in G(m). A cycle is
+a path such that i1 = ik .
+C. P Order.
+
+The ≤ order on I induces a point-wise partial order P on
+the set of DBMs:
+△
+
+m P n ⇐⇒ ∀i, j, mij ≤ nij .
+The corresponding equality relation is simply the matrix
+equality =.
+D. V-domain.
+Given a DBM m, the subset of V 7→ I (which will be
+often assimilated to a subset of IN ) verifying the constraints
+∀i, j, vj − vi ≤ mij will be denoted by D(m) and called m’s
+V-domain:
+△
+
+D(m) = {(s0 , . . . , sN −1 ) ∈ IN | ∀i, j, sj − si ≤ mij } .
+By extension, we will call V-domain any subset of V 7→ I
+which is the V-domain of some DBM.
+Remark 1: We have m P n =⇒ D(m) ⊆ D(n), but
+the converse is false. As a consequence, representation of Vdomains is not unique and we can have D(m) = D(n) but
+m 6= n (Figure 4).
+
+Given a finite set of variables V 0 = {v0 , . . . , vN −1 }, in
+order to represent constraints of the form (vi − vj ≤ c) and
+(±vi ≤ c), we simply add to V 0 a special variable, named
+0, which is supposed to be always equal to 0. Constraints of
+the form (vi ≤ c) and (vj ≥ d) can then be rewritten as
+(vi − 0 ≤ c) and (0 − vj ≤ −d), which are indeed potential
+constraints over the set V = {0, v0 , . . . , vN −1 }.
+We will use a 0 superscript to denote that a DBM over V
+represents a set of extended constraints over V 0 . Given such a
+DBM m0 , we will not be interested in its V-domain, D(m0 ),
+which is a subset of V 7→ I, but in its V 0 -domain, denoted by
+D0 (m0 ) and defined by:
+
+
+(s0 , . . . , sN −1 ) ∈ IN |
+0
+0 △
+D (m ) =
+⊆ V 0 7→ I .
+(0, s0 , . . . , sN −1 ) ∈ D(m0 )
+
+We will call V 0 -domain any subset of V 0 7→ I which is
+the V 0 -domain of some DBM m0 . As before, m0 P n0 =⇒
+D0 (m0 ) ⊆ D0 (n0 ), but the converse is false.
+
+B. Representing sums.
+We suppose that V + = {v0 , . . . , vN −1 } is a finite set of
+variables. The goal of this article is to present a new DBM
+extension adapted to represent constraints of the form (±vi ±
+vj ≤ c), with vi , vj ∈ V + and c ∈ I.
+In order to do this, we consider that each variable vi in V +
+comes in two flavors: a positive form vi+ and a negative form
++
+−
+vi− . We introduce the set V = { v0+ , v0− , . . . , vN
+−1 , vN −1 }
+and consider DBMs over V. Within a potential constraint, a
+positive variable vi+ will be interpreted as +vi , and a negative
+variable vi− as −vi ; thus it is possible to represent (vi +vj ≤ c)
+by (vi+ −vj− ≤ c). More generally, any set of constraints of the
+form (±vi ± vj ≤ c), with vi , vj ∈ V + can be represented by
+a DBM over V, following the translation described in Figure
+5.
+Remark 2: We do not need to add a special variable 0 to
+represent interval constraints as we did before. Constraints of
+
+4
+
+constraint over V +
+constraint(s) over V
+vi − vj ≤ c (i 6= j) vi+ − vj+ ≤ c, vj− − vi− ≤ c
+vi + vj ≤ c (i 6= j) vi+ − vj− ≤ c, vj+ − vi− ≤ c
+−vi − vj ≤ c (i 6= j) vj− − vi+ ≤ c, vi− − vj+ ≤ c
+vi ≤ c
+vi+ − vi− ≤ 2c
+vi ≥ c
+vi− − vi+ ≤ −2
+
+v1
+3
+
+v0+
+−3
+
+0
+
+v1+
+
+Fig. 5. Translation between extended constraints over V + and potential
+constraints over V.
+
+the form (vi ≤ c) and (vi ≥ c) can be represented as (vi+ −
+vi− ≤ 2c) and (vi− − vi+ ≤ −2c).
+
+v1−
+0
+
+3
+
+v0−
+
+(a)
+
+111111111111111111111
+000000000000000000000
+000000000000000000000
+111111111111111111111
+000000000000000000000
+111111111111111111111
+000000
+111111
+0000002v1 ≥ 3
+111111
+000000000000000000000
+111111111111111111111
+000000
+111111
+000000
+000000111111
+111111
+000000
+111111
+000000
+111111
+000000
+000000111111
+111111
+000000
+111111
+v0
+000000111111
+111111
+000000
+
+v1 − v0 ≤ 0
+
+v0 + v1 ≤ 3
+
+(b)
+
+Fig. 6. A potential graph G(m+ ) in Z with no strictly negative cycle (a) and
+the corresponding V + -domain (b) D + (m+ ) = {( 32 , 32 )} which is empty in
+Z2 .
+
+V. E MPTINESS T EST AND N ORMAL F ORMS
+C. Index Notation.
+We will use a + superscript to denote that a DBM over V
+represents a set of extended constraints over V + . Such a DBM
+m+ is a 2N × 2N matrix with the following convention: a
+row or column index of the form 2i, i < N corresponds to
+the variable vi+ and an index of the form 2i + 1, i < N
+corresponds to the variable vi− .
+△
+
+We introduce the · 7→ · operator on indices defined by ı̄ =
+i ⊕ 1—where ⊕ is the bit-wise exclusive or operator—so that,
+if i corresponds to vj+ , then ı̄ corresponds to vj− and if i
+corresponds to vj− , then ı̄ corresponds to vj+ .
+
+D. Coherence.
+Figure 5 shows that some constraints over V + can be
+represented by different potential constraints over V. A DBM
+m+ will be said to be coherent if two potential constraints
+over V corresponding to the same constraint over V + are either
+both represented in m+ , or both absent. Thanks to the · 7→ ·
+operator we introduced, coherence can be easily characterized:
++
+Theorem 1: m+ is coherent ⇐⇒ ∀i, j, m+
+ij = m̄ ı̄ .
+
+
+In the following, DBMs with a + superscript will be
+assumed to be coherent.
+
+E. V + -domain.
+As for the simple interval extension, the V-domain of a
+DBM m+ is not of interest: we need to get back in V + 7→
+I and take into account the fact that variables in V are not
+independent but related by vi+ = −vi− . Thus, we define the
+V + -domain of m+ and denote by D+ (m+ ) the set:
+
+
+(s0 , . . . , sN −1 ) ∈ IN |
++
++ △
+D (m ) =
+.
+(s0 , −s0 , . . . , sN −1 , −sN −1 ) ∈ D(m+ )
+We will call octagon any subset of V + 7→ I which is the
+V -domain of some coherent DBM m+ . As before, m+ P
+n+ =⇒ D+ (m+ ) ⊆ D+ (n+ ), but the converse is false.
++
+
+We saw in Figure 4 that two different DBMs can have the
+same V-domain. Fortunately, there exists a normal form for
+DBMs representing non-empty octagons.
+In this section, we first recall the normal form for classical
+DBMs m, and then show how it can be adapted to DBMs m+
+representing non-empty octagons. Unfortunately, our adaptation does not work very well with integers.
+The potential graph interpretation of DBMs will be very
+helpful to understand the algorithms presented.
+A. Emptiness Test.
+The following graph-oriented theorem allows us to perform
+emptiness testing for V-domains, V 0 -domains and octagons:
+Theorem 2:
+1) D(m) = ∅ ⇐⇒ G(m) has a cycle with a strictly
+negative weight.
+2) D(m0 ) = ∅ ⇐⇒ D0 (m0 ) = ∅.
+3) If I 6= Z, then D(m+ ) = ∅ ⇐⇒ D+ (m+ ) = ∅.
+If I = Z, then D(m+ ) = ∅ =⇒ D+ (m+ ) = ∅, but the
+converse is false (Figure 6).
+
+If I 6= Z, in order to check whether the V + -domain of
+a DBM m+ is empty, we simply have to check for cycles
+with a strictly negative weight in G(m+ ) using, for example,
+the well-known Bellman-Ford algorithm which runs in O(N 3 )
+time and is described in Cormen, Leiserson and Rivest’s
+classical algorithmic textbook [16, §25.3].
+Figure 6 gives an example where our algorithm fails when
+dealing with integers. Indeed, we have D(m+ ) = {(3 + x, 3 −
+x, 3 + y, 3 − y) | ∀x, y ∈ Z} which is not empty, but all these
+solutions over {v0+ , v0− , v1+ , v1− } correspond to the singleton
+{(3/2, 3/2)} when we get back to {v0 , v1 }, which is not
+an acceptable solution in Z2 , so D+ (m+ ) should be empty.
+The problem is that a DBM m+ with coefficients in Z can
+represent constraints that use not only integers, but also halfintegers constants—such as v1 ≥ 3/2 in Figure 6.
+B. Closure.
+Given a DBM m, the V-domain of which is not empty,
+G(m) has no strictly negative cycle, so its shortest-path
+
+5
+
+
+
+
+ m0
+
+△
+
+=
+
+mk+1
+
+
+ m∗
+
+△
+
+=
+△
+
+=
+
+m,
+Ck (mk )
+
+∀k, 0 ≤ k < N,
+
+mN ,
+
+where Ck is defined, ∀k, by:
+
+(
+
+△
+
+[Ck (n)]ii = 0,
+△
+
+[Ck (n)]ij = min(nij , nik + nkj ) ∀i 6= j .
+
+Fig. 7. Closure algorithm derived from the Floyd-Warshall shortest-path
+algorithm.
+
+closure—or simply closure—m∗ is well-defined by:
+
+△
+
+ m∗ii = 0,
+
+M−1
+X
+∗ △
+m
+=
+min
+mik ik+1
+if i 6= j .
+
+ij
+
+1≤M
+
+hi=i1 ,i2 ,...,iM =ji
+
+k=1
+
+The idea of closure relies on the fact that, if hi =
+i1 , i2 , . . . , iM = ji is a path from vi to vj , then the constraint
+PM−1
+vj − vi ≤ k=1 mik ik+1 can be derived from m by adding
+the potential constraints vik+1 − vik ≤ mik ik+1 , 1 ≤ k ≤
+M − 1. This is an implicit potential constraint as it does not
+appear directly in m. In the closure, we replace each potential
+constraint vj − vi ≤ mij by the tightest implicit constraint we
+can find by summation over paths of G(m) if i 6= j, or by 0
+if i = j (0 is indeed the smallest value taken by vi − vi ).
+We have the following theorem:
+Theorem 3:
+1) m = m∗ ⇐⇒ ∀i, j, k, mij ≤ mik + mkj and
+∀i, mii = 0 (Local Definition).
+2) ∀i, j, if m∗ij 6= +∞, then ∃(s0 , . . . , sN −1 ) ∈ D(m)
+such that sj − si = m∗ij (Saturation).
+3) m∗ = inf P {n | D(n) = D(m)} (Normal Form).
+
+Theorem 3.2 proves that the closure is indeed a normal
+form. Theorem 3.1 leads to a closure algorithm inspired by
+the Floyd-Warshall shortest-path algorithm. This algorithm is
+described in Figure 7 and runs in O(N 3 ) time. Theorem 3.2
+is crucial to analyze precision of some operators (such as
+projection and union).
+Remark 3: The closure is also a normal form for DBMs
+representing non-empty V 0 -domains:
+(m0 )∗ = inf P {n0 | D0 (n0 ) = D0 (m0 )}.
+C. Strong Closure.
+We now focus on finding a normal form for DBMs representing non-empty octagons. The solution presented above
+does not work because two different DBMs can have the
+same V + -domain but different V-domains, and so the closure
+(m+ )∗ of m+ is not the smallest DBM—with respect to the
+P order—that represents the octagon D+ (m+ ). The problem
+is that the set of implicit constraints gathered by summation
+of constraints over paths of G(m+ ) is not sufficient. Indeed,
+
+we would like to deduce (vi+ − vj− ≤ (c + d)/2) from
+(vi+ − vi− ≤ c) and (vj+ − vj− ≤ d), which is not possible
+because the set of edges {(vi− , vi+ ), (vj− , vj+ )} does not form
+a path (Figure 9).
+Here is a more formal description of a normal form, called
+the strong closure, adapted from the closure:
+Definition 1: m+ is strongly closed if and only if
++
++
++
+• m is coherent: ∀i, j, mij = m̄ ı̄ ;
++
++
++
++
+• m is closed: ∀i, mii = 0 and ∀i, j, k, mij ≤ mik +
++
+mkj ;
++
++
++
+• ∀i, j, mij ≤ (mi ı̄ + m̄j )/2.
+
+From this definition, we derive the strong closure algorithm
+m+ 7→ (m+ )• described in Figure 8. The algorithm looks a
+bit like the closure algorithm of Figure 7 and also runs in
+O(N 3 ) time. It uses two auxiliary functions Ck+ and S + . The
+Ck+ function looks like the Ck function used in the closure algorithm except it is designed to maintain coherence; each Ck+
+application is a step toward closure. The S + function ensures
+that ∀i, j, [S + (m+ )]ij ≤ ([S + (m+ )]i ı̄ + [S + (m+ )]̄j )/2
+while maintaining coherence.
+There is no simple explanation for the complexity of Ck+ ;
+the five terms in the min statement appear naturally when
+trying to prove that, when interleaving Ck+ and S + steps, what
+was gained before will not be destroyed in the next step.
+The following theorem holds for I 6= Z:
+Theorem 4:
+1) m+ = (m+ )• ⇐⇒ m+ is strongly closed.
+2) ∀i, j, if (m+ )•ij 6= +∞, then ∃(s0 , . . . , s2N −1 ) ∈
+D(m+ ) such that ∀k, s2k = −s2k+1 and sj − si =
+(m+ )•ij (Saturation).
+3) (m+ )• = inf P {n+ | D+ (n+ ) = D+ (m+ )} (Normal
+Form).
+
+This theorem is very similar to Theorem 3. It states that,
+when I 6= Z, the strong closure algorithm gives a strongly
+closed DBM (Theorem 4.1) which is indeed a normal form
+(Theorem 4.3). The nice saturation property of Theorem 4.2
+is useful to analyze the projection and union operators.
+D. Discussions about Z.
+Classical DBMs and the interval constraint extension work
+equally well on reals, rationals and integers. However, our
+extension does not handle integers properly.
+When I = Z, the strong closure algorithm does not lead to
+the smallest DBM with the same V + -domain. For example,
+knowing that x is an integer, the constraint 2x ≤ 2c should be
+deduced from 2x ≤ 2c+1, which the strong closure algorithm
+fails to do. More formally, Definition 1 is not sufficient;
+our normal form should also respect: ∀i, m+
+i ı̄ is even. One
+can imagine to simply add to the strong closure algorithm a
+rounding phase R+ defined by [R+ (m+ )]i ı̄ = 2⌊m+
+i ı̄ /2⌋ and
+[R+ (m+ )]ij = m+
+if
+i
+=
+6
+̄,
+but
+it
+is
+tricky
+to
+make
+R+
+ij
++
+and Ck interact correctly so we obtain a DBM which is both
+closed and rounded. We were unable, at the time of writing,
+to design such an algorithm and keep a O(N 3 ) time cost.
+
+6
+
+
++
+
+
+ m0
++
+
+=
+
+△
+
+m+ ,
+
+△
+
++
+S + (C2k
+(m+
+k ))
+
+=
+
+mk+1
+
+
+ (m+ )•
+
+△
+
+∀k, 0 ≤ k < N,
+
+m+
+N,
+
+=
+
+where Ck+ is defined, ∀k, by:
+
+ 
+ △
++
++
+
+
+ Ck (n )ii = 0,
+
+△
+
++
++
+
+ Ck+ (n+ ) ij = min( n+
+ij , (nik + nkj ),
++
++
+(nik̄ + nk̄j ),
+
+
++
++
+
+
+(n+
+
+ik + nkk̄ + nk̄j ),
+
+
+(n+
++ n+
++ n+
+kj ) )
+ik̄
+k̄k
+and S + is defined by:
+
++
+
+△
+
++
+
+[S (n )]ij =
+Fig. 8.
+
++
++
+min( n+
+ij , (ni ı̄ + n̄j )/2 )
+
+.
+
+build an analyzer. If our abstract numerical domain is used
+in a more complex analysis or in a parameterized abstract
+domain (backward and interprocedural analysis, such as in
+Bourdoncle’s S YNTOX analyzer, Deutsch’s pointer analysis
+[14], etc.), one may need to add some more operators.
+All the operators and transfer functions presented in this
+section obviously respect coherence and are adapted from our
+PADO-II article [1].
+A. Equality and Inclusion Testing.
+We distinguish two cases. If one or both V + -domains are
+empty, then the test is obvious. If none are empty, we use the
+following theorem which relies on the properties of the strong
+closure:
+Theorem 5:
+1) D+ (m+ ) ⊆ D+ (n+ ) ⇐⇒ (m+ )• P n+ ;
+2) D+ (m+ ) = D+ (n+ ) ⇐⇒ (m+ )• = (n+ )• .
+
+
+Strong Closure algorithm.
+
+v0+
+
+v1−
+
+2
+
+4
+
+v0−
+
+v1+
+(a)
+
+v0+
+=⇒
+
+3
+
+2
+
+v0−
+
+v1−
+4
+
+3
+
+v1+
+
+(b)
+
+Fig. 9. A DBM (a) and its strong closure (b). Note that (a) is closed, and
+that (a) and (b) have the same V + -domain but not the same V-domain. In
+(b), we deduced (v0 + v1 ≤ 3) from (2v0 ≤ 2) and (2v1 ≤ 4), so it is
+smaller than (a) with respect to P.
+
+B. Projection.
+Thanks to the saturation property of the strong closure, we
+can easily extract from a DBM m+ representing a non-empty
+octagon, the interval in which a variable vi ranges :
+Theorem 6:
+{ t | ∃(s0 , . . . , sN −1 ) ∈ D+ (m+ ) such that si = t }
+= [ −(m+ )•2i 2i+1 /2, (m+ )•2i+1 2i /2 ]
+(interval bounds are included only if finite).
+
+C. Union and Intersection.
+
+This problem was addressed by Harvey and Stuckey in
+their ACSC’97 article [9]. They propose a satisfiability algorithm mixing closure and tightening steps that can be
+used to test emptiness and build the normal form (m+ )• =
+inf P {n+ | D+ (n+ ) = D+ (m+ )} we need. Unfortunately,
+this algorithm has a O(N 4 ) time cost in the worst case. This
+algorithm has the advantage of being incremental—O(N 2 )
+time cost per constraint changed in the DBM—which is useful
+for CLP problems but does not seem interesting in static
+analysis because many operators are point-wise and change
+all (2N )2 constraints in a DBM at once.
+In practice, we suggest to analyze integer variables in Q or
+R, as it is commonly done for polyhedron analysis [6]. This
+method will add noise solutions, which is safe in the abstract
+interpretation framework because we are only interested in an
+upper approximation of program behaviors.
+VI. O PERATORS AND T RANSFER F UNCTIONS
+In this section, we describe how to implement the abstract
+operators and transfer functions needed for static analysis.
+These are the generic ones described in [5] for the interval
+domain, and in [6] for the polyhedron domain: assignments,
+tests, control flow junctions and loops. See Section VIII
+for an insight on how to use theses operators to actually
+
+The max and min operators on I lead to point-wise least
+upper bound ∨ and greatest lower bound ∧ (with respect to
+the P order) operators on DBMs:
+△
+
++
+[m+ ∧ n+ ]ij = min(m+
+ij , nij );
+△
+
++
+[m+ ∨ n+ ]ij = max(m+
+ij , nij ) .
+
+These operators are useful to compute intersections and
+unions of octagons:
+Theorem 7:
+1) D+ (m+ ∧ n+ ) = D+ (m+ ) ∩ D+ (n+ ).
+2) D+ (m+ ∨ n+ ) ⊇ D+ (m+ ) ∪ D+ (n+ ).
+3) If m+ and n+ represent non-empty octagons, then:
+((m+ )• ) ∨ ((n+ )• ) =
+inf P {o+ | D+ (o+ ) ⊇ D+ (m+ ) ∪ D+ (n+ )}.
+
+Remark that the intersection is always exact, but the union
+of two octagons is not always an octagon, so we compute
+an upper approximation. In order to get the best—smallest—
+approximation for the union, we need to use the strong closure
+algorithm, as stated in Theorem 7.3.
+Another consequence of Theorem 7.3 is that if the two
+arguments of ∨ are strongly closed, then the result is also
+strongly closed. Dually, the arguments of ∧ do not need to
+be strongly closed in order to get the best precision, but the
+
+7
+
+result is seldom strongly closed—even if the arguments are.
+This situation is similar to what is described in our PADOII article [1]. Shaham, Kolodner, and Sagiv fail to analyze
+this result in their CC2000 article [12] and perform a useless
+closure after the union operator.
+
+v0+
+
+0
+△
+
+n+
+0 =
+
+i
+
+△
+
+n+
+i =
+
+0
+
+v1+
+
+v2+
+
+1
+
+i
+
+v1+
+
+1
+
+D. Widening.
+Program semantics often use fixpoints to model arbitrary
+long computations such as loops. Fixpoints are not computable
+in the octagon domain—as it is often the case for abstract
+domains—because it is of infinite height. Thus, we define
+a widening operator, as introduced in P.Cousot’s thesis [17,
+§4.1.2.0.4], to compute
+W iteratively an upper approximation
+of the least fixpoint i∈N F i (m+ ) greater than m+ of an
+operator F :
+ +
++
+ + + △
+mij
+if n+
+ij ≤ mij ,
+m ▽n ij =
++∞
+elsewhere .
+The idea behind this widening is to remove in m+ the
+constraints that are not stable by union with n+ ; thus it is
+very similar to the standard widenings used on the domains
+of intervals [5] and polyhedra [6]. [12] proposes a similar
+widening on the set of DBMs representing V-domains.
+The following theorem proves that ▽ is a widening in the
+octagon domain:
+Theorem 8:
+1) D+ (m+ ▽n+ ) ⊇ D+ (m+ ) ∪ D+ (n+ ).
+2) For all chains (n+
+i )i∈N , the chain defined by induction:
+
+•
+△
+(n+
+if i = 0,
+0)
+m+
++
+•
+i =
+elsewhere,
+mi−1 ▽((n+
+i ) )
+is increasing,W ultimately stationary, and with a limit
+•
+greater than i∈N (n+
+i ) .
+
+As for the union operator, the precision of the ▽ operator is
+improved if its right argument is strongly closed; this is why
++
+we ensure the strong closure of n+
+i when computing mi in
+Theorem 8.2.
+One can be tempted to force the strong closure of the left
+argument of the widening by replacing the induction step in
++
++ • •
+Theorem 8.2 by: m+
+i = (mi−1 ▽((ni ) )) if i > 0. However,
+we cannot do this safely as Theorem 8.2 is no longer valid:
+one can build a strictly increasing infinite chain (m+
+i )i∈N (see
+Figure 10) which means that fixpoints using this induction
+may not be computable! This situation is similar to what is
+described in our PADO-II article [1]. Shaham, Kolodner, and
+Sagiv fail to analyze this problem in their CC2000 article
+[12] and pretend all their computation are performed with
+closed DBMs. If we want our analysis to terminate, it is
+very important not to close the (m+
+i )i∈N in the induction
+computation.
+E. Guard and Assignment.
+In order to analyze programs, we need to model the effect
+of tests and assignments.
+
+v0+
+2i
+
+v1+
+
+1
+
+i
+
+v2+
+
+1
+
+2i
+
+m+
+2i =
+
+v0+
+
+i
+
+2i+1
+
+2i+1
+
+2i+2
+
+m+
+2i+1 =
+
+v2+
+
+1
+
+v0+
+
+2i+2
+
+v1+
+
+1
+
+1
+
+2i+1
+
+2i+1
+
+v2+
+
+1
+
+Fig. 10. Example of an infinite strictly increasing chain defined by m+
+0 =
+• , m+ = (m+ ▽((n+ )• )• . Remark that the nodes {v − , v − , v − }
+(n+
+)
+0
+0
+1
+2
+i
+i−1
+i
+are not represented here due to lack of space; this part of the DBMs can be
+easily figured out by coherence.
+
+Given a DBM m+ that represents a set of possible values of
+the variables V + at a program point, an arithmetic comparison
+g, a variable vi ∈ V + , and an arithmetic expression e, we
++
+denote by m+
+(g) and m(vi ←e) DBMs representing respectively
+the set of possible values of V + if the test g succeeds and
+after the assignment vi ← e(v0 , . . . , vN −1 ). Since the exact
+representation of the resulting set is, in general, impossible,
+we will only try to compute an upper approximation:
+Property 1:
++
++
+1) D+ (m+
+(g) ) ⊇ {s ∈ D (m ) | s satisfies g}.
++
+2) D+ (m(vi ←e) ) ⊇ {s[si ← e(s)] | s ∈ D+ (m+ )}
+(where s[s ← x] means s with its ith component
+i
+
+changed into x).
+
+Here is an example definition:
+Definition
+2: i
+h
+△
++
+=
+1) m(vk +vl ≤c)
+ij
+
+min(m+
+ij , c) if (j, i) ∈ {(2k, 2l + 1); (2l, 2k + 1)},
+elsewhere,
+m+
+ij
++
+and similarly for m+
+(vk −vl ≤c) and m(−vk −vl ≤c) .
+△
+
++
+2) m+
+(vk ≤c) = m(vk +vk ≤2c) , and
+△
+
++
+m+
+(vk ≥c) = m(−vk −vk ≤−2c) .
+△
+
++
+3) m+
+(vk +vl =c) = (m(vk +vl ≤c) )(−vk −vl ≤−c) ,
+and similarly for m+
+(vk −vl =c) .
+
+4)
+
+i △
+h
+= m+
+m+
+ij + (αij + βij )c, with
+(vk ←vk +c)
+ij
+if j = 2k,
+ +1
+△
+−1
+if j = 2k + 1,
+αij =
+
+0
+elsewhere ,
+
+and
+if i = 2k,
+ −1
+△
++1
+if i = 2k + 1,
+βij =
+
+0
+elsewhere .
+
+8
+
+5)
+
+i △
+h
+m+
+=
+(vk ←vl +c)
+ij
+
+c
+
+
+
+−c
+(m+ )•ij
+
+
+
++∞
+for k 6= l.
+
+A. Coherent DBMs Lattice.
+
+if (j, i) ∈ {(2k, 2l); (2l + 1, 2k + 1)}, The set M+ of coherent DBMs, together with the order
+if (j, i) ∈ {(2l, 2k); (2k + 1, 2l + 1)},relation P and the point-wise least upper bound ∨ and greatest
+lower bound ∧, is almost a lattice. It only needs a least element
+if i, j ∈
+/ {2k, 2k + 1},
++
+⊥, so we extend P, ∨ and ∧ to M+
+elsewhere,
+⊥ = M ∪ {⊥} in an
+obvious way to get ⊑, ⊔ and ⊓. The greatest element ⊤ is the
+DBM with all its coefficients equal to +∞.
+6) In all other cases, we simply choose:
+△
+Theorem 9:
++
+m+
+(g) = m ,
+
+i △
+h
+1) (M+
+⊥ , ⊑, ⊓, ⊔, ⊥, ⊤) is a lattice.
+/ {2k, 2k + 1},
+(m+ )•ij if i, j ∈
+=
+m+
+2)
+This
+lattice is complete if (I, ≤) is complete (I = Z or
+(vk ←e)
++∞
+elsewhere .
+ij
+R,
+but
+not Q).
+
+
+Remark that the assignment destroys informations about
+There
+are,
+however,
+two
+problems
+with
+this
+lattice.
+First,
+vk and this could result in some implicit constraints about
+other variables being destroyed as well. To avoid precision this lattice is not isomorphic to a sub-lattice of P(V + 7→ I)
+degradation, we use constraints from the strongly closed form as two different DBMs can have the same V + -domain. Then,
+the least upper bound operator ⊔ is not the most precise upper
+(m+ )•ij in Definitions 2.5 and 2.6.
+Remark also that the guard and assignment transfer func- approximation of the union of two octagons because we do
+tions are exact, except in the last—general—case of Definition not force the arguments to be strongly closed.
+2. There exists certainly many ways to improve the precision
+of Definition 2.6. For example, in order to handle arbitrary
+B. Strongly Closed DBMs Lattice.
+assignment vk ← e, one can use the projection operator
+To overcome these difficulties, we build another lattice,
+to extract the interval where the variables range, then use
+•
+a simple interval arithmetic to compute an approximation based on strongly closed DBMs. First, consider the set M⊥
+•
+•
+of strongly closed DBMs M , with a least element ⊥ added.
+interval [−e− /2, e+ /2] where ranges the result
+Now, we define a greatest element ⊤• , a partial order relation
+[−e− , e+ ] ⊇ e( [−(m+ )•01 , (m+ )•10 ], . . . ,
+⊑• , a least upper bound ⊔• and a greatest lower bound ⊓• in
+[−(m+ )•2N −2 2N −1 , (m+ )•2N −1 2N −2 ] )
+M•⊥ as follows:
++
+
+and put back this information into m :
+△
+0
+if i = j,
+
+•
++ •
+⊤ ij =
+(m
+)
+if
+i,
+j
+∈
+/
+{2k,
+2k
++
+1},
+
+ij
++∞
+elsewhere,
+ +
+i △ 
+h
+e
+if (i, j) = (2k + 1, 2k),
+
++
+=
+m(vk ←e)
+△
+either m+ = ⊥• ,
+e−
+if (i, j) = (2k, 2k + 1),
+
+ij
+m+ ⊑• n+ ⇐⇒
+
+
+or
+m+ , n+ 6= ⊥• , m+ P n+ ,
++∞
+elsewhere .
+ +
+Finally, remark that we can extend easily the guard operator
+if n+ = ⊥• ,
+ m
+△
++
++
+•
++
+to boolean formulas with the following definition:
+n
+if m+ = ⊥• ,
+m ⊔ n =
+ +
++
+m ∨n
+elsewhere,
+Definition 3:
+
+△
++
++
+1) m+
+if ⊥• ∈ {m+ , n+ } or
+ ⊥•
+(g1 and g2 ) = m(g1 ) ∧ m(g2 ) ;
+△
++
+•
++
+△
++
++
+•
+•
+D+ (m+ ∧ n+ ) = ∅,
+m ⊓ n =
+2) m+
+
+(g1 or g2 ) = ((m(g1 ) ) ) ∨ ((m(g2 ) ) );
++
++ •
+(m ∧ n )
+elsewhere .
+3) m+
+(¬g1) is settled by the classical transformation:
+¬(g1 and g2 ) → (¬g1 ) or (¬g2 )
+Thanks to Theorem 5.2, every non-empty octagon has a
+¬(g1 or g2 )
+→ (¬g1 ) and (¬g2 ) .
+unique representation in M• ; ⊥• is the representation for
+ the empty set. We build a meaning function γ which is an
+VII. L ATTICE S TRUCTURES
+In this section, we design two lattice structures: one on the
+set of coherent DBMs and one on the set of strongly closed
+DBMs. The first one is useful to analyze fixpoint transfers
+between abstract and concrete semantics, and the second one
+allows us to design a meaning function—or even a Galois
+connection—linking the set of octagons to the concrete lattice
+P(V + 7→ I), following the abstract interpretation framework
+described in Cousot and Cousot’s POPL’79 article [4].
+Lattice structures and Galois connections can be used to
+simplify proofs of correctness of static analyses—see, for
+example, the author’s Master thesis [2] for a proof of the
+correctness of the analysis described in Section VIII.
+
+extension of · 7→ D+ (·) to M•⊥ :
+
+∅
++ △
+γ(m ) =
+D+ (m+ )
+
+if m+ = ⊥• ,
+elsewhere .
+
+Theorem 10:
+1) (M•⊥ , ⊑• , ⊓• , ⊔• , ⊥• , ⊤• ) is a lattice and γ is one-toone.
+2) If (I, ≤) is complete,
+T is complete and γ is
+d•this lattice
+meet-preserving: γ( X) = {γ(x) | x ∈ X}. We
+can—according to Cousot and Cousot [18, Prop. 7]—
+build a canonical Galois insertion:
+γ
+
+−−→
+−
+−− M•⊥
+P(V + 7→ I) ←
+−−
+−→
+α
+
+9
+
+where thedabstraction function α is defined by:
+•
+α(X) =
+{ x ∈ M•⊥ | X ⊆ γ(x) } .
+
+The M•⊥ lattice features a nice meaning function and a
+precise union approximation; thus, it is tempting to force all
+our operators and transfer functions to live in M•⊥ by forcing
+strong closure on their result. However, we saw this does
+not work for the widening, so fixpoint computations must be
+performed in the M+
+⊥ lattice.
+VIII. A PPLICATION TO P ROGRAM A NALYSIS
+In this section, we present the program analysis based on
+our new domain that enabled us to prove the correctness of
+the program in Figure 1.
+This is only one example application of our domain for
+program analysis purpose. It was chosen for its simplicity
+of presentation and implementation. A fully featured tool
+that can deal with real-life programs, taking care of pointers,
+procedures and objects is far beyond the scope of this work.
+However, current tools using the interval or the polyhedron
+domains could benefit from this new abstract domain.
+A. Presentation of the Analysis.
+Our analyzer is very similar to the one described in Cousot
+and Halbwachs’s POPL’78 article [6], except it uses our new
+abstract domain instead of the abstract domain of polyhedra.
+Here is a sketched description of this analysis—more informations, as well as proofs of its correctness can be found in
+the author’s Master thesis [2].
+We suppose that our program is procedure-free, has only
+numerical variables—no pointers or array—and is solely composed of assignments, if then else fi and while do done
+statements. Syntactic program locations li are placed to visualize the control flow: there are locations before and after
+statements, at the beginning and the end of then and else
+branches and inner loop blocks; the location at the program
+entry point is denoted by l0 .
+The analyzer associates to each program point li an element
++
+m+
+∈ M+
+i
+⊥ . At the beginning, all mi are ⊥ (meaning
+the control flow cannot pass there) except m+
+0 = ⊤. Then,
+informations are propagated through the control flow as if the
+program were executed:
++
++
+• For J(li ) vi ← e (li+1 )K, we set mi+1 = (mi )(vi ←e) .
+• For a test J(li ) if g then (li+1 ) · · · else (lj ) · · ·K, we
++
++
++
+set m+
+i+1 = (mi )(g) and mj = (mi )(¬g) .
+• When the control flow merges after a test Jthen · · · (li )
++ •
+else · · · (lj ) fi (lj+1 )K, we set m+
+j+1 = ((mi ) ) ⊔
++ •
+((mj ) ).
+• For a loop J (li ) while g do (lj ) · · · (lk ) done (lk+1 )K,
++
++
+we must solve the relation m+
+j = (mi ⊔ mk )(g) . We
+solve it iteratively using the widening: suppose m+
+i is
++
+known and we can deduce a m+
+from
+any
+m
+j by
+k
++
+propagation; we compute the limit mj of
+ +
+mj,0 = (m+
+i )(g)
++ •
++
+=
+m
+m+
+j,n ▽((mk,n )(g) )
+j,n+1
+
++
+then m+
+k is computed by propagation of mj and we set
++
++ •
++ •
+mk+1 = ((mi )(¬g) ) ⊔ ((mk )(¬g) )
+
+At the end of this process, each m+
+i is a valid invariant that
+holds at program location li . This method is called abstract
+execution.
+B. Practical Results.
+The analysis described above has been implemented in
+OCaml and used on a small set of rather simple algorithms.
+Figure 11 shows the detailed computation for the lines 5–9
+from Figure 1. Remark that the program has been adapted to
+the language described in the previous section, and program
+locations l0 ,. . . ,l9 have been added. Also, for the sake of
+brevity, DBMs are presented in equivalent constraint set form,
+and only the useful constraints are shown. Thanks to the
+widening, the fixpoint is reached after only two iterations:
+invariants m+
+k,0, k=2...8 only hold in the first iteration of
+the loop (i = 1); invariants m+
+k,1, k=2...8 hold for all loop
+iterations (1 ≤ i ≤ m). At the end of the analysis, we have
+•
+(−m ≤ a ≤ m) ∈ (m+
+9) .
+Our analyzer was also able to prove that the well-known
+Bubble sort and Heap sort do not perform out-of-bound error
+while accessing array elements and to prove that Lamport’s
+Bakery algorithm [19] for synchronizing two processes is
+correct—however, unlike the example in Figure 1, these analysis where already in the range of our PADO-II article [1].
+C. Precision and Cost.
+The computation speed in our abstract domain is limited
+by the cost of the strong closure algorithm because it is the
+most used and the most costly algorithm. Thus, most abstract
+operators have a O(N 3 ) worst case time cost. Because a fully
+featured tool using our domain is not yet available, we do not
+know how well this analysis scales up to large programs.
+The invariants computed are always more precise than the
+ones computed in [1], which gives itself always better results
+than the widespread intervals domain [5]; but they are less
+precise than the costly polyhedron analysis [6]. Possible loss of
+precision have three causes: non-exact union, non-exact guard
+and assignment transfer functions, and widening in loops. The
+first two causes can be worked out by refining Definition 2 and
+choosing to represent, as abstract state, any finite union of
+octagons instead of a single one. Promising representations
+are the Clock-Difference Diagrams (introduced in 1999 by
+Larsen, Weise, Yi, and Pearson [20]) and Difference Decision
+Diagrams (introduced in Møller, Lichtenberg, Andersen, and
+Hulgaard’s CSL’99 paper [21]), which are tree-based structures
+introduced by the model-checking community to efficiently
+represent finite unions of V 0 -domains, but they need adaptation
+in order to be used in the abstract interpretation framework and
+must be extended to octagons.
+IX. C ONCLUSION
+In this article, we presented a new numerical abstract
+domain that extends, without much performance degradation,
+the DBM-based abstract domain described in our PADO-II
+
+10
+
+(l0 ) a ← 0; i ← 1 (l1 )
+while i ≤ m do (l2 )
+7
+if ?
+8
+then (l3 ) a ← a + 1 (l4 )
+9
+else (l5 ) a ← a − 1 (l6 )
+fi (l7 )
+i ← i + 1 (l8 )
+11 done (l9 )
+m+
+0 =⊤
+m+
+1 = {i = 1; a = 0; 1 − i ≤ a ≤ i − 1}
+4
+
+First iteration of the loop
+m+
+2.0 = {i = 1; a = 0; 1 − i ≤ a ≤ i − 1; i ≤ m}
++
++
+m+
+3,0 = m5,0 = m2.0
++
+m4,0 = {i = 1; a = 1; 2 − i ≤ a ≤ i; i ≤ m}
+m+
+6,0 = {i = 1; a = −1; −i ≤ a ≤ i − 2; i ≤ m}
+m+
+7,0 = {i = 1; a ∈ [−1, 1]; −i ≤ a ≤ i; i ≤ m}
+m+
+8,0 = {i = 2; a ∈ [−1, 1]; 1 − i ≤ a ≤ i − 1; i ≤ m + 1}
+Second iteration of the loop
++
++
++
++
+m+
+2,1 = m3,1 = m5,1 = m2,0 ▽ (m8,0 )(i≤m)
+= {1 ≤ i ≤ m; 1 − i ≤ a ≤ i − 1}
+m+
+4,1 = {1 ≤ i ≤ m; 2 − i ≤ a ≤ i}
+m+
+6,1 = {1 ≤ i ≤ m; −i ≤ a ≤ i − 2}
+m+
+7,1 = {1 ≤ i ≤ m; −i ≤ a ≤ i}
+m+
+8,1 = {2 ≤ i ≤ m + 1; 1 − i ≤ a ≤ i − 1}
+Third iteration of the loop
++
+m+
+(fixpoint reached)
+2,2 = m2,1
++
++
+m+
+m+
+2 = m2,1
+8 = m8,1
+m+
+9 = {i = m + 1; 1 − i ≤ a ≤ i − 1}
+
+Fig. 11. Detailed analysis of lines 5–9 from Figure 1. For sake of conciseness
+DBMs are shown in their equivalent constraint set form and useless constraints
+are not shown.
+
+article [1]. This domain allows us to manipulate invariants of
+the form (±x ± y ≤ c) with a O(n2 ) worst case memory
+cost per abstract state and a O(n3 ) worst case time cost per
+abstract operation—where n is the number of variables in the
+program.
+We claim that our approach is fruitful since it allowed
+us to prove automatically the correctness of some non-trivial
+algorithms, beyond the scope of interval analysis, for a much
+smaller cost than polyhedron analysis. However, our prototype
+implementation did not allow us to test our domain on reallife programs and we still do not know if it will scale up. It
+is the author’s hope that this new domain will be integrated
+into currently existing static analyzers as an alternative to the
+intervals and polyhedra domains.
+R EFERENCES
+[1] A. Miné, “A new numerical abstract domain based on difference-bound
+matrices,” in PADO II, ser. LNCS, vol. 2053. Springer-Verlag, May
+2001, pp. 155–172.
+
+[2] ——, “Representation of two-variable difference or sum
+constraint
+set
+and
+application
+to
+automatic
+program
+analysis,” Master’s thesis, ENS-DI, Paris, France, 2000,
+http://www.eleves.ens.fr:8080/home/mine/stage_dea/.
+[3] P. Cousot and R. Cousot, “Abstract interpretation: a unified lattice model
+for static analysis of programs by construction or approximation of
+fixpoints,” in ACM POPL’77. ACM Press, 1977, pp. 238–252.
+[4] ——, “Systematic design of program analysis frameworks,” in ACM
+POPL’79. ACM Press, 1979, pp. 269–282.
+[5] ——, “Static determination of dynamic properties of programs,” in
+ISOP’76. Dunod, Paris, France, 1976, pp. 106–130.
+[6] P. Cousot and N. Halbwachs, “Automatic discovery of linear restraints
+among variables of a program,” in ACM POPL’78. ACM Press, 1978,
+pp. 84–97.
+[7] V. Pratt, “Two easy theories whose combination is hard,” Massachusetts
+Institute of Technology. Cambridge., Tech. Rep., September 1977.
+[8] R. Shostak, “Deciding linear inequalities by computing loop residues,”
+Journal of the ACM, vol. 28, no. 4, pp. 769–779, October 1981.
+[9] W. Harvey and P. Stuckey, “A unit two variable per inequality integer
+constraint solver for constraint logic programming,” in ACSC’97, vol. 19,
+February 1997, pp. 102–111.
+[10] S. Yovine, “Model-checking timed automata,” in Embedded Systems, ser.
+LNCS, no. 1494. Springer-Verlag, October 1998, pp. 114–152.
+[11] K. Larsen, F. Larsson, P. Pettersson, and W. Yi, “Efficient verification
+of real-time systems: Compact data structure and state-space reduction,”
+in IEEE RTSS’97. IEEE CS Press, December 1997, pp. 14–24.
+[12] R. Shaham, E. Kolodner, and M. Sagiv, “Automatic removal of array
+memory leaks in java,” in CC2000, ser. LNCS, vol. 1781, April 2000.
+[13] F. Bourdoncle, “Abstract debugging of higher-order imperative languages,” in ACM PLDI’93. ACM Press, June 1993, pp. 46–55.
+[14] A. Deutsch, “Interprocedural may-alias analysis for pointers: Beyond
+k-limiting,” in ACM PLDI’94. ACM Press, 1994, pp. 230–241.
+[15] N. Dor, M. Rodeh, and M. Sagiv, “Cleanness checking of string
+manipulations in C programs via integer analysis,” in SAS’01, ser. LNCS,
+no. 2126, July 2001.
+[16] T. Cormen, C. Leiserson, and R. Rivest, Introduction to Algorithms.
+The MIT Press, 1990.
+[17] P. Cousot, “Méthodes itératives de construction et d’approxima-tion de
+points fixes d’opérateurs monotones sur un treillis, analyse sémantique
+de programmes,” Thèse d’état ès sciences mathématiques, Université
+scientifique et médicale de Grenoble, France, 1978.
+[18] P. Cousot and R. Cousot, “Abstract interpretation and application to
+logic programs,” Journal of Logic Programming, vol. 13, no. 2–3, pp.
+103–179, 1992.
+[19] L. Lamport, “A new solution of Dijkstra’s concurrent programming
+problem,” Communications of the ACM, vol. 8, no. 17, pp. 453–455,
+August 1974.
+[20] K. Larsen, C. Weise, W. Yi, and J. Pearson, “Clock difference diagrams,”
+Nordic Journal of Computing, vol. 6, no. 3, pp. 271–298, October 1999.
+[21] J. Møller, J. Lichtenberg, R. Andersen, H., and H. Hulgaard, “Difference
+decision diagrams,” in CSL’99, ser. LNCS, vol. 1683. Springer-Verlag,
+September 1999, pp. 111–125.
+
+
