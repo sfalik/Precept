@@ -1,7 +1,9 @@
 ---
-status: Research — 2026-06-01
+status: Research — 2026-06-01; Reconciled with §0.7 — 2026-06-02
 sources-consulted:
   - "docs/philosophy.md — core commitments; checked the prevention/determinism/totality/static-completeness guarantees and the approximation-honesty line for what a field-reference bound must preserve."
+  - "docs/philosophy.md — the carry-a-constraint paragraph (\"When a calculation depends on a value supplied at runtime…\" / \"…not a second line of defense\"). POSTDATES this research: inserted 2026-06-02 with spec §0.7. Consulted only for the § Reconciliation section."
+  - "docs/language/precept-language-spec.md §0.7 — The Compile-Time and Runtime Guarantee Contract (fault prevention = compile-time prove-or-reject, \"no deferral\"; governance = every declared constraint enforced at runtime on external input, operation-blind; composition; the boundary). POSTDATES this research: locked 2026-06-02. Consulted only for the § Reconciliation section."
   - "docs/language/precept-language-spec.md §0.1 — the eleven Design Principles; checked 7 (compile-time-first), 9 (mandatory rationale), 10 (totality), 11 (static completeness) for the bound's compile-time obligations."
   - "docs/language/precept-language-spec.md §0.4 — Execution Model Properties; checked no-loops / no-reconverging-flow / expression-purity for whether a constraint can form an evaluation cycle."
   - "docs/language/precept-language-spec.md §0.6 — Proof Engine Design Contract; checked numeric interval reasoning, relational reasoning over multiple fields, soundness-over-completeness, and the unbounded-interval soundness gate."
@@ -182,6 +184,8 @@ The proof engine already performs *some* field-to-field relational reasoning (St
 
 **Conclusion:** §0.6's *contract* names the obligation a field-reference bound needs (relational reasoning between fields). The *current* `IntervalContainmentProofRequirement` shape stores only `decimal?` and cannot represent a field-reference bound; whether that `decimal?` shape is a locked rejection (Reading A) or an unshipped-feature snapshot (Reading B) is **not resolved by the canon** — see Contradictions/gaps and Open questions.
 
+> **Reconciliation (§0.7, 2026-06-02): SHARPENED.** §0.7 resolves the *Reading A vs Reading B* fork in favour of Reading B (the `decimal?` shape is an implementation snapshot, not a locked rejection — a field-reference bound is a legal declared constraint), but leaves the *data-model question* (Q2) genuinely open. See **§ Reconciliation with §0.7 → D3**.
+
 ### D4 — Soundness per principle, with the unbounded-interval case
 
 The decidability test from §2.4 line 1112 is the hinge: a relational constraint "is decidable only insofar as the referenced fields' own bounds make it so." Apply this to each affected principle.
@@ -205,6 +209,8 @@ Crucially, the *bound itself* (`Amount >= Floor`) remains a sound, enforceable r
 **Principle 9 (Mandatory rationale).** The generated-rationale mechanism (§0.1 line 107) supplies the reason. A field-reference bound's generated rationale would presumably read "Amount must be at least Floor" — the canon does not specify the generated wording for a non-literal bound, a small gap.
 
 **Conclusion:** No principle is *violated* by admitting a field-reference bound *as a runtime-enforceable constraint*. The single soundness-sensitive point is compile-time proof: when the referenced field is unbounded, the bound contributes no decidable range, and Principles 10/11 require the engine to leave dependent downstream obligations unresolved (emit obligation diagnostics), never to over-prove. Whether the bound is *admitted at all* when it cannot contribute a static range is the unresolved design question, not a soundness question the canon already answers.
+
+> **Reconciliation (§0.7, 2026-06-02): SETTLED.** §0.7's governance-vs-fault-prevention split confirms this conclusion and removes the "unresolved design question" in its last sentence: the bound IS admitted (governance enforces it operation-blind regardless of `Floor`'s bounds), and the unprovable case attaches to the *dependent internal operation* (fault prevention rejects it), not to the bound declaration. The "decline → obligation diagnostic" disposition here is exactly §0.7 fault prevention's "rejects the definition … there is no deferral." See **§ Reconciliation with §0.7 → D4** and **→ Q1**.
 
 ### D5 — Edge cases, with canon-grounded disposition
 
@@ -235,21 +241,109 @@ Crucially, the *bound itself* (`Amount >= Floor`) remains a sound, enforceable r
 
 These are for a `/lifecycle-2-design` pass, not for this research. Each is framed neutrally with the options the canon leaves open; no option is pre-ranked.
 
-**Q1 — Admission policy when the bound contributes no static range.** When a field-reference bound's referenced field is unbounded (no decidable range), should the bound be:
+**Q1 — Admission policy when the bound contributes no static range.** **→ SETTLED by §0.7 (2026-06-02). See § Reconciliation → Q1.** When a field-reference bound's referenced field is unbounded (no decidable range), should the bound be:
   - (a) **Admitted** as a runtime-enforceable constraint (sound at runtime; contributes no compile-time interval; downstream obligations that depended on it stay unresolved → obligation diagnostics) — consistent with §2.4 line 1112 treating decidability as governing *proof participation* only, not *legality*; or
   - (b) **Rejected / routed to longhand** — consistent with `business-domain-types.md` line 430 ("if the bound cannot participate in a proof, accepting it would silently weaken the governance guarantee"), which was written for the *qualifier-missing* case but states a general posture.
-  The canon supports a reading in both directions (D3 Reading A vs B; D4); this is the central decision.
+  The canon supports a reading in both directions (D3 Reading A vs B; D4); this is the central decision. **Reconciliation note:** §0.7's governance/fault-prevention split resolves the fork to (a) for the *bound* and rejection for the *dependent operation* — and the line-430 ground cited for (b) is now shown not to bear on this case (it addresses an *undefined* comparison, not a well-defined-but-unprovable one).
 
-**Q2 — Proof-obligation data model.** If field-reference bounds are admitted (Q1a), does `IntervalContainmentProofRequirement` gain a field-reference bound variant (e.g. a DU split between a constant bound and a field-reference bound), or do field-reference bounds discharge through the existing relational path (Strategy-4-style field-to-field reasoning) rather than interval-containment? Note the existing relational path is guard-driven and subtraction-only (`proof-engine.md` lines 1330, 1397) — extending it to modifier-declared bounds and to `>=`/`<=` comparisons would be new surface. Catalog-discipline (DU for varying shapes) is relevant here.
+**Q2 — Proof-obligation data model.** **→ STILL OPEN (§0.7 does not bear; see § Reconciliation → Q2).** If field-reference bounds are admitted (Q1a), does `IntervalContainmentProofRequirement` gain a field-reference bound variant (e.g. a DU split between a constant bound and a field-reference bound), or do field-reference bounds discharge through the existing relational path (Strategy-4-style field-to-field reasoning) rather than interval-containment? Note the existing relational path is guard-driven and subtraction-only (`proof-engine.md` lines 1330, 1397) — extending it to modifier-declared bounds and to `>=`/`<=` comparisons would be new surface. Catalog-discipline (DU for varying shapes) is relevant here.
 
-**Q3 — `InvalidModifierBounds` semantics for field-reference bounds** (gap 2). Skip / prove-from-declared-intervals / reject?
+**Q3 — `InvalidModifierBounds` semantics for field-reference bounds** (gap 2). **→ SHARPENED by §0.7 (see § Reconciliation → Q3).** Skip / prove-from-declared-intervals / reject?
 
-**Q4 — Vacuous and mutual-bound diagnostics** (gap 3). Does `min X` (vacuous) or `A min B` + `B min A` (⟹ `A == B`) emit any diagnostic, or are both silently accepted as §3.5 line 1326 currently implies?
+**Q4 — Vacuous and mutual-bound diagnostics** (gap 3). **→ STILL OPEN (§0.7 does not bear; see § Reconciliation → Q4).** Does `min X` (vacuous) or `A min B` + `B min A` (⟹ `A == B`) emit any diagnostic, or are both silently accepted as §3.5 line 1326 currently implies?
 
-**Q5 — Cross-type / cross-lane field-reference bounds** (D5, gap 5). Does a field-reference bound of a different numeric lane require the same explicit bridge a comparison requires (`primitive-types.md` line 424), and is that a type error or a coercion at the modifier-bound position?
+**Q5 — Cross-type / cross-lane field-reference bounds** (D5, gap 5). **→ STILL OPEN (§0.7 does not bear; lane rules in §3.2/§3.6 + `primitive-types.md` line 424 are the governing sections; see § Reconciliation → Q5).** Does a field-reference bound of a different numeric lane require the same explicit bridge a comparison requires (`primitive-types.md` line 424), and is that a type error or a coercion at the modifier-bound position?
 
-**Q6 — Qualifier-bearing field-reference bounds on `money`/`quantity`/`price`** (gap 5). Does `BoundsQualifierMismatch`/PRE0134 and the same-dimension conversion exception (`business-domain-types.md` line 428) extend to a field-reference bound, and what does the bound-interpretation rule (line 426) become when the bound is a field rather than a typed constant or literal?
+**Q6 — Qualifier-bearing field-reference bounds on `money`/`quantity`/`price`** (gap 5). **→ SHARPENED by §0.7 (see § Reconciliation → Q6).** Does `BoundsQualifierMismatch`/PRE0134 and the same-dimension conversion exception (`business-domain-types.md` line 428) extend to a field-reference bound, and what does the bound-interpretation rule (line 426) become when the bound is a field rather than a typed constant or literal?
 
-**Q7 — Computed field as a bound** (D5). Admit, and if so how is its interval inferred for decidability — or exclude?
+**Q7 — Computed field as a bound** (D5). **→ STILL OPEN (§0.7 does not bear; see § Reconciliation → Q7).** Admit, and if so how is its interval inferred for decidability — or exclude?
 
-**Q8 — Event-arg exclusion confirmation** (D2). Confirm that a modifier bound, inheriting rule scope, excludes event args (§3A.1 line 1838), so `min SomeEvent.Arg` is out of scope by the same reasoning that keeps rules event-arg-free.
+**Q8 — Event-arg exclusion confirmation** (D2). **→ SHARPENED by §0.7 (see § Reconciliation → Q8).** Confirm that a modifier bound, inheriting rule scope, excludes event args (§3A.1 line 1838), so `min SomeEvent.Arg` is out of scope by the same reasoning that keeps rules event-arg-free.
+
+## Reconciliation with §0.7 (locked 2026-06-02)
+
+This research was written 2026-06-01. On 2026-06-02, spec **§0.7 "The Compile-Time and Runtime Guarantee Contract"** and a companion paragraph in `philosophy.md` were locked. They postdate the `sources-consulted` above and bear on several of this doc's open points. This section records, for D3, D4, and Q1–Q8, one of **SETTLED** (§0.7 closes it — verbatim quote that settles it), **SHARPENED** (§0.7 narrows it, residue remains), or **STILL OPEN** (§0.7 does not bear; the governing section, if any, is named). Every verdict is grounded in a verbatim quote. The original derivations above are preserved; nothing is deleted.
+
+### The two §0.7 mechanisms (the lens for everything below)
+
+> **Fault prevention — established entirely at compile time.** "A precept that compiles without diagnostics cannot produce a runtime fault … The compiler delivers it by discharging, at every fault-prone operation, an obligation that each operand *carries* a sufficient constraint — a declared modifier or rule, an author guard, or a statically-known safe value. It proves a structural fact — that the operand carries its constraint — never the concrete runtime value. If it cannot, it **rejects the definition** and names what would make the operation provably safe. It never compiles a fault-prone operation in the hope a runtime check catches it; there is no deferral." (§0.7, spec line 262)
+
+> **Governance — enforced at runtime on external input.** "Every declared constraint is enforced on every value entering the entity from outside the definition … at the moment it enters, before any computation derives from it. This enforcement is **operation-blind**: it upholds the field's declared contract whether or not any fault-prone operation references the field. Because mutations execute on a working copy that is discarded if any constraint fails (§3A.4), an invalid configuration never persists — this is prevention, not detection." (§0.7, spec line 264)
+
+> **Composition.** "For a value supplied at runtime, the compiler's proof that the operation cannot fail rests on the structural fact that the value carries a declared constraint; governance makes that constraint true of the value at ingress. The proof is therefore complete at compile time and the fault never occurs — proven by the compiler, its precondition discharged by governance, nothing left to a runtime check." (§0.7, spec line 266)
+
+And the companion philosophy paragraph:
+
+> "When a calculation depends on a value supplied at runtime … the compiler does not guess at that value. It requires the value to *carry* a constraint sufficient to prove the calculation safe, and the engine enforces that constraint the moment the value enters. The compiler proves a structural fact — that the value carries its constraint — never the value itself; the runtime enforcement is what makes that carried constraint true, **not a second line of defense**." (`philosophy.md` line 55)
+
+§0.7 cleanly separates two questions this research had entangled:
+
+1. **Is the bound a legal, enforced constraint?** — answered by *governance*. Governance is operation-blind: a declared constraint is enforced on external input "whether or not any fault-prone operation references the field." `Amount >= Floor` is a well-defined comparison on concrete data, so governance enforces it at ingress. Decidability is irrelevant to *this* question.
+2. **Does the bound discharge a downstream operation's fault obligation?** — answered by *fault prevention*. An internal operation that needs `Amount`'s lower bound must prove its operand *carries* a sufficient constraint. `Amount >= Floor` carries one only insofar as `Floor` is itself bounded (the §2.4 decidability rule). If it doesn't, fault prevention *rejects the operation* — "there is no deferral."
+
+### Re-reading `business-domain-types.md` line 430 in light of its own surrounding paragraphs
+
+The research (D3 Reading A, Q1b) leaned on `business-domain-types.md` line 430 — "a bound that cannot be evaluated at compile time is an unprovable governance claim … accepting it would silently weaken the governance guarantee" — as canon supporting *rejection* of a field-reference bound that contributes no static range. Reading the surrounding paragraphs (lines 414–430) shows this was a **misapplication**:
+
+> "`field test as quantity max '5 kg'` parses cleanly, but with no `in`/`of` on the field, the field admits values like `'3 ft'` whose comparison to `'5 kg'` is **undefined** — different dimensions are not orderable. The bound is accepted but **never fires**." (line 424)
+
+> "comparing USD-bounded amounts against an EUR bound is **not a sound proof obligation**." (line 428, on `BoundsQualifierMismatch`)
+
+Line 430 is the *Why* for `BoundsRequireQualifier` (PRE0133) and `BoundsQualifierMismatch` (PRE0134) — both of which address a comparison that is **undefined / never fires even at runtime** (cross-dimension, cross-currency). "A bound that cannot be evaluated at compile time" there means *the comparison has no defined truth value at all*, so it is meaningless at runtime too — the compiler would be lying about a constraint that can never hold. That is categorically different from an **unbounded referenced field**: `Amount >= Floor` is a perfectly well-defined, always-firing comparison on concrete data; it is merely **not statically provable**. Line 430 therefore **does not bear on Q1** — it addresses *undefined* comparisons, not *well-defined-but-not-statically-provable* ones. The §0.7 governance mechanism (operation-blind enforcement of every well-defined declared constraint) is what governs the unbounded-`Floor` case, and it says: enforce it.
+
+### Verdicts
+
+**D3 (compile-time obligation; is the `decimal?`-only data model a locked rejection or a snapshot?) — SHARPENED.**
+§0.7 governance settles the *legality* half: a field-reference bound is a "declared constraint" and is enforced "whether or not any fault-prone operation references the field" (line 264) — i.e. it is a legal, runtime-enforced constraint independent of whether the proof engine can represent it as an interval. This resolves the **Reading A vs Reading B** fork toward **Reading B** (the `decimal?`-only `IntervalContainmentProofRequirement` is an implementation snapshot, not a locked rejection of field-reference bounds). What §0.7 does **not** settle is *how* the obligation is represented (a field-reference variant on `IntervalContainmentProofRequirement` vs. a relational-path discharge) — that residue is **Q2**, which stays open. Hence SHARPENED, not SETTLED.
+
+**D4 (soundness per principle; unbounded-`Floor` case) — SETTLED.**
+The research's own conclusion ("No principle is violated by admitting a field-reference bound as a runtime-enforceable constraint … the soundness-sensitive point is compile-time proof") is exactly §0.7's composition, now stated as canon. §0.7 fault prevention: an operation whose operand does not *carry* a sufficient constraint is rejected — "If it cannot, it rejects the definition … there is no deferral" (line 262). The research's "decline → unresolved → obligation diagnostic, never over-prove" is precisely this. §0.7 also **removes the residual "unresolved design question"** the research left in D4's last sentence ("whether the bound is admitted at all"): governance answers it — the bound is admitted and enforced; only the *dependent operation* is rejected. SETTLED.
+
+**Q1 (admit-runtime-only (a) vs reject (b)) — SETTLED.**
+Worked out from §0.7 + §2.4 as the task requires. The (a)/(b) fork dissolves once the *bound* and the *dependent operation* are separated:
+
+- **The bound itself is admitted and runtime-enforced (governance).** "Every declared constraint is enforced on every value entering … operation-blind … whether or not any fault-prone operation references the field" (§0.7 line 264). `Amount >= Floor` is well-defined on concrete data, so it is enforced at ingress against external input, and the working copy is discarded if it fails (§3A.4). The philosophy companion makes the posture explicit: the runtime enforcement of a carried constraint is "**not a second line of defense**" (`philosophy.md` line 55) — it is the primary, and only, enforcement of *that* constraint. This is **(a)** for the bound. Decidability does **not** gate the bound's legality; §2.4 (spec line 1129) says decidability governs "proof participation … not its syntactic form," never legality — and line-430's rejection ground is shown above not to apply to a well-defined-but-unprovable comparison.
+
+- **An internal operation that depends on the bound is rejected when the carried constraint is insufficient (fault prevention).** If a fault-prone operation needs `Amount`'s lower bound, it must prove `Amount` *carries* a sufficient constraint. `Amount >= Floor` carries one only insofar as `Floor` is itself bounded (§2.4 decidability rule, line 1129: "a relational constraint is decidable only insofar as the referenced fields' own bounds make it so"). If `Floor` is unbounded, the operand does not carry a sufficient constraint, and fault prevention "**rejects the definition** and names what would make the operation provably safe … there is no deferral" (§0.7 line 262). This is **(b)-like**, but the rejection attaches to the **operation**, not to the bound declaration.
+
+**Resolved behavior, precisely:**
+- *The bound* `Amount min Floor` is **always admitted** and is **enforced at runtime by governance** on every external value, regardless of whether `Floor` carries a bound. Self-standing, it never triggers a compile-time rejection on decidability grounds.
+- *A fault-prone internal operation that depends on `Amount`'s lower bound* is **proven safe iff `Floor` is itself sufficiently bounded** to make `Amount >= Floor` discharge the operation's obligation; otherwise the **operation (definition) is rejected** with a diagnostic naming what would make it provable. No fault-prone operation is ever compiled "in the hope a runtime check catches it."
+
+So the original (a) "admit-runtime-only" and (b) "reject" are **not exclusive** — (a) is correct for the bound, the rejection lands on the dependent operation. §0.7 is what makes that decomposition canonical; before it, the research could only record both readings as open. SETTLED.
+
+**Q2 (proof-obligation data model: DU variant vs relational-path discharge) — STILL OPEN.**
+§0.7 establishes *that* the bound is legal and *that* a dependent operation must discharge an obligation, but says nothing about the *representation* — whether `IntervalContainmentProofRequirement` gains a field-reference variant or field-reference bounds route through a relational path. §0.7's closing pointer is explicit that mechanism lives elsewhere: "Mechanism — how the pipeline discharges these obligations and where governance runs — is in `compiler-and-runtime-design.md`" (spec line 270). Governing material: `proof-engine.md` Strategy 4 / `GuardRelationImpliesObligation` and the catalog-discipline DU rule. STILL OPEN.
+
+**Q3 (`InvalidModifierBounds` for field-reference bounds: skip / prove-from-intervals / reject) — SHARPENED.**
+§0.7 does not name `InvalidModifierBounds` and does not directly settle the `min Floor max Ceiling` ordering check. But the same governance/fault-prevention lens that resolved Q1 narrows the option set: a `min Floor max Ceiling` pair is two well-defined declared constraints (`Amount >= Floor`, `Amount <= Ceiling`), both governance-enforced regardless of decidability — so "**skip**" (silently drop the pair) is in tension with governance's operation-blind enforcement, and outright "**reject because non-literal bounds can't be ordered**" is in tension with §0.7 admitting the bounds. What §0.7 does *not* decide is the residual choice between "fire `InvalidModifierBounds` only when *provably* `Floor > Ceiling` (from declared intervals), else accept" vs. "never fire it for field-reference pairs (the empty-interval impossibility is caught downstream)." That residue is a §3.8 / proof-engine question. SHARPENED.
+
+**Q4 (vacuous `min X` and mutual `A min B`+`B min A` diagnostics) — STILL OPEN.**
+§0.7 is about fault-prevention vs governance; it does not address vacuous-constraint or redundant-constraint *diagnostic policy*. The governing material is §3.5 line 1326 (which calls `min X` "vacuous" and mutual bounds "satisfiable") and the §0.6 item-8 / PRE0154 vacuous-rule detector. §0.7 does not bear. STILL OPEN.
+
+**Q5 (cross-lane field-reference bound: bridge required? type error or coercion?) — STILL OPEN.**
+§0.7 is mechanism-neutral about numeric-lane typing. The desugared form `Amount >= Floor` is a comparison, governed by the numeric-lane rules in §3.2/§3.6 and `primitive-types.md` line 424 (the "semantically dangerous" lane-cross requiring a bridge) — none of which §0.7 touches. §0.7 does not bear. STILL OPEN (governing sections: §3.2/§3.6, `primitive-types.md` line 424).
+
+**Q6 (qualifier-bearing field-reference bound: does PRE0134 / the same-dimension exception extend?) — SHARPENED.**
+§0.7 governance establishes that a *well-defined* declared constraint is enforced and a constraint that "is not a sound proof obligation" must not be silently accepted — which is exactly the principle behind `BoundsQualifierMismatch` (line 428) and `BoundsRequireQualifier` (line 424). Combined with the line-430 re-reading above, this clarifies the *test* a field-reference qualifier-bearing bound must meet: a cross-currency/cross-dimension field-reference bound is an **undefined comparison** (the line-424/428 family), so the same rejection rationale applies; a same-dimension UCUM field-reference bound is a **well-defined** comparison that governance should enforce (mirroring the existing same-dimension conversion exception). What §0.7 does *not* settle is the *mechanical* question the research flagged — what the `business-domain-types.md` line-426 "Bound expression interpretation" rule (currently enumerating only typed-constant and number-literal forms) *becomes* when the bound is a field reference, and exactly how PRE0134's axis-matching is computed against a referenced field's qualifier. That is a `business-domain-types.md` extension question. SHARPENED.
+
+**Q7 (computed field as a bound: admit + infer interval, or exclude?) — STILL OPEN.**
+§0.7 distinguishes external-input governance from compile-time fault prevention; a computed field is neither external input nor a fault-prone operation per se, and §0.7 says nothing about whether a *computed* field may serve as a constraint bound or how its interval is inferred. Governing material: §3.5's evaluation-model derivation (computed expressions vs constraints) and §0.6 interval reasoning. §0.7 does not bear. STILL OPEN.
+
+**Q8 (event-arg exclusion for a modifier bound) — SHARPENED.**
+§0.7 governance lists "event arguments, construction inputs, direct field edits" as the external inputs governance enforces *declared constraints against at ingress* (line 264) — it treats event args as *governed input*, confirming the broader model in which a *rule/constraint references fields*, not the transient event args, and event args are the thing being *checked*, not referenced by the constraint. This is consistent with §3A.1 line 1838 ("Rules … cannot reference event arguments") and reinforces D2's reasoning that a modifier bound, as rule shorthand, excludes event args. But §0.7 does not make the exclusion *verbatim* for the modifier-bound position — it is reinforcing, not dispositive; the authoritative statement remains §3A.1 line 1838, which a design pass should still cite to close the confirmation. SHARPENED.
+
+### Summary table
+
+| Item | Verdict | One-line reason |
+|---|---|---|
+| **D3** | SHARPENED | Governance settles the bound is a *legal* declared constraint (Reading B), but the obligation *representation* (Q2) stays open. |
+| **D4** | SETTLED | §0.7 composition is exactly D4's conclusion; governance removes D4's residual "admitted at all?" question. |
+| **Q1** | SETTLED | Fork dissolves: bound admitted+enforced (governance, operation-blind); dependent operation rejected if operand carries no sufficient constraint (fault prevention, "no deferral"); line-430 shown not to bear. |
+| **Q2** | STILL OPEN | §0.7 defers mechanism to `compiler-and-runtime-design.md`; DU-variant-vs-relational-path is unaddressed. |
+| **Q3** | SHARPENED | Governance rules out "silently skip"; residual interval-vs-never-fire ordering check is a §3.8 / proof-engine choice. |
+| **Q4** | STILL OPEN | §0.7 is fault/governance, not vacuous/redundant-diagnostic policy; §3.5 + PRE0154 govern. |
+| **Q5** | STILL OPEN | §0.7 mechanism-neutral on numeric lanes; §3.2/§3.6 + `primitive-types.md` line 424 govern. |
+| **Q6** | SHARPENED | Governance clarifies the *test* (undefined cross-dimension reject vs well-defined same-dimension enforce); the line-426 interpretation-rule extension stays open. |
+| **Q7** | STILL OPEN | §0.7 silent on computed-field-as-bound and interval inference; §3.5 + §0.6 govern. |
+| **Q8** | SHARPENED | §0.7 treats event args as *governed input*, reinforcing exclusion; §3A.1 line 1838 remains the dispositive statement. |
