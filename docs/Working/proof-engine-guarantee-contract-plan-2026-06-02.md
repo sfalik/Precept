@@ -23,8 +23,8 @@ Four-part statement, converged in conversation 2026-06-01/02:
 |---|---|---|---|---|---|
 | 1 | Lock the canonical contract statement + decide where it lives | contract §1–4; placement | D1 placement ✅; D2 philosophy ✅ | S–M (1–2d) | ✅ Landed (spec §0.7 + design §1.1) |
 | 2 | Empirical grounding: verify code prove-or-reject vs drift per fault class | divisor, overflow/bounds, sqrt, empty-access, count, maxplaces; ingress; Restore | none (read-only) | M (2–3d) | ✅ Done — `proof-engine-contract-grounding-2026-06-02.md`; D3 resolved (Restore re-validates); BUG-017 scoped + BUG-018/019 filed |
-| 3 | Propagate to canonical compiler/runtime docs | spec §0/§3A, proof-engine.md, fault-system.md, runtime-api.md, evaluator.md | D3 Restore truth (from Phase 2) ✅ | M–L (3–5d) | Next |
-| 4 | Consumer-facing docs (owner-authored) | philosophy.md, README.md | D2 (philosophy) | S (1d) | Stub |
+| 3 | Propagate to canonical compiler/runtime docs | spec §0/§3A, fault-system.md, runtime-api.md, evaluator.md | D3 Restore truth ✅; D4 restore semantics ✅ | M–L (3–5d) | ✅ Done (proof-engine.md left — no framing drift; breaches tracked as bugs) |
+| 4 | Consumer-facing docs (owner-authored) | philosophy.md (insertion + line-35 treatment), README.md | D2 (philosophy) | S (1d) | Next |
 
 ## Decisions captured (converged 2026-06-01/02)
 
@@ -34,6 +34,7 @@ Four-part statement, converged in conversation 2026-06-01/02:
 - **Prevention, not detection — holds.** Atomicity (§3A.4) means an invalid configuration never persists; rejecting before commit is prevention. (Rejects Frank A3.)
 - **A proof-engine gap is a bug, not defense-in-depth.** Out-of-contract data (cross-version Restore, external injection) is the *only* legitimate reason a `[StaticallyPreventable]` trap fires. (Rejects Frank MQ2 / the "within current proof coverage" softening.)
 - **The three-layer model is consistent with the contract** (Layer 1 = fault prevention, Layer 2 = governance, Layer 3 = redundant traps); it needs *sharpening*, not reversal.
+- **D4 — Restore semantics = trusted hydration (owner, 2026-06-02).** Hydration must be fast and trusts persisted data as valid at write time — analogous to a direct database read. Upholds locked evaluator Decision 5 (FromJson = pure hydration, no constraint validation); the next operation's post-mutation sweep (§3A.4) re-governs a stale value. This *corrects runtime-api* (which had drifted to "Restore re-validates" / `RestoreConstraintsFailed`) — flipping the Phase-2 reconciliation, which had named runtime-api as the target. Consequence: line 35 ("no code path bypasses the contract") now needs the trusted-hydration treatment in Phase 4 (philosophy). Follow-up: remove superseded `RestoreConstraintsFailed` at Restore-API finalization (`RestoreOutcome` may keep parse/state failures).
 
 ## Consolidated audit disposition
 
