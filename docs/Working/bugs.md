@@ -65,6 +65,20 @@ surfaced for proper fixing.
 - **Priority**: quality bar / soundness — a Principle-11 violation on length-bounded strings; pre-release.
 - **Repro**: `field Name as string maxlength 10` + `set Name = First + Last` with `First`/`Last` unbounded-length → expected `LengthBoundViolation`, actual clean.
 
+### BUG-020: A field-reference modifier bound (`min Floor`) is silently accepted, never bound, never enforced — and an undeclared reference is not caught
+
+- **Discovered**: 2026-06-02 (precept-author probe of the relational-rules-and-bounds design's worked example; verified via `precept_compile`, MCP reconnected).
+- **Affected**: the modifier-value slot for `min`/`max` (and likely the other value modifiers). The parser accepts an identifier as a bound value; the type checker/binder neither resolves nor enforces it. `TryGetComparableModifierValue` (`TypeChecker.Validation.Modifiers.cs:462-480`) returns `null` for an `IdentifierExpression`, and the null is dropped silently (`TypeChecker.cs:559-577`).
+- **Symptom** (all `precept_compile success: true`, zero diagnostics):
+  - `field Amount as number min Floor default 0` — clean (bound accepted but inert).
+  - `field Amount as number min Nonexistent default 0` (`Nonexistent` matches no field) — clean; **no undeclared-name error** (`PRE0029` not raised). The identifier is swallowed.
+  - `field Floor as number default 10` + `field Amount as number min Floor default 5` — clean, despite `5 < 10` plainly violating `Amount >= Floor`. (Contrast the literal `min 5 default 0`, which correctly emits `OutOfRange`/`PRE0079`.)
+- **Root cause**: a field-reference bound is a relational constraint (§2.4 — `min Floor` ≡ `rule Amount >= Floor`), but it is neither desugared, bound, nor proof-participated; it is parsed and discarded. Two distinct gaps: (1) *no enforcement* (the soundness gap the relational-rules-and-bounds design closes), and (2) *no undeclared-name diagnostic* — even a typo'd field name in a bound is silently ignored, which is a binder defect independent of the feature.
+- **Workaround used**: none.
+- **Fix complexity**: gap (1) is the relational-rules-and-bounds design (`relational-rules-and-bounds-design-2026-06-02.md`). Gap (2) (undeclared-name in a bound expression) is a smaller binder fix that should land regardless — a bound referencing a non-existent field must error today, not silently pass.
+- **Priority**: soundness (a declared bound that does nothing is a silent governance hole) + correctness (undeclared reference uncaught).
+- **Repro**: the three cases above.
+
 ## Fixed
 
 ### BUG-016: collection-mutation forward-propagation — guard facts not effect-adjusted across grow/shrink

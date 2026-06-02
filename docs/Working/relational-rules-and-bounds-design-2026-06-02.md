@@ -83,24 +83,28 @@ The broader field offers two relevant models:
 
 ## Audience and Teachability
 
-**Worked example** (inventory reorder — a plausible operations-domain entity):
+**Worked example** (inventory reorder — a plausible operations-domain entity; syntax verified against the live compiler):
 
 ```precept
 precept ReorderLine
-  field OnHand as integer min 0 because "stock cannot go negative"
-  field Reserved as integer min 0 because "reservations cannot go negative"
-  field Available as integer
 
-  rule Available >= Reserved because "you cannot reserve more than is available"
+field OnHand as integer nonnegative default 0
+field Reserved as integer nonnegative default 0
+field BatchCost as money in 'USD' nonnegative default '0 USD'
+field UnitCost as money in 'USD' nonnegative default '0 USD'
 
-  from Open on Allocate(qty as integer min 0)
-    -> set Available = OnHand - Reserved   // proves >= 0 from the rule above
-    -> transition Open
+rule OnHand > Reserved because "there must be unreserved stock on hand before a per-unit cost is meaningful"
 
-  state Open initial
+state Open initial
+in Open modify OnHand, Reserved, BatchCost editable
+
+event Recost
+from Open on Recost
+    -> set UnitCost = BatchCost / (OnHand - Reserved)
+    -> no transition
 ```
 
-Here `set Available = OnHand - Reserved` would, without relational narrowing, leave the subtraction's result-range unproven (could the result be negative and underflow a later op?). The rule `Available >= Reserved` plus `Reserved min 0` lets the engine narrow `Available`'s lower bound and discharge the downstream obligation — the same field-to-field reasoning Strategy 4 does for guards, now sourced from a declared rule.
+The division `BatchCost / (OnHand - Reserved)` must prove its divisor is non-zero. The relational rule `OnHand > Reserved` establishes `OnHand - Reserved ≥ 1`, making the division provably safe — a relation over two fields discharging a downstream obligation. This is the *target* this design enables: today the proof engine narrows a divisor only from a single field's own `positive`/`nonzero` modifier, not from a relation over a compound expression, so this currently emits `PRE0083` (divisor unsafe) and the author must add `when (OnHand - Reserved) != 0`; after this design the declared rule discharges it and the guard is unnecessary. (Note the §2.4 form: `because` is on the `rule`, never on a modifier — `nonnegative`, not `min 0 because …`.)
 
 **Error message** (the misuse: relying on a relation whose referenced field is unbounded). A domain expert writes `field Floor as number` (no bound) and `field Amount as number min Floor`, then divides by `Amount`:
 
@@ -111,7 +115,7 @@ PRE0xxx: Cannot prove 'Amount' stays away from zero for the division on line 9.
   Add a bound to 'Floor' (e.g. `min 1`), or guard the division with `when Amount != 0`.
 ```
 
-This serves the domain expert (not the compiler engineer) because it names the *business field* whose missing constraint is the real cause (`Floor`), states the relation in the author's own terms (`Amount >= Floor`), and offers two concrete repairs in DSL syntax — not "obligation unresolved at site". It reflects §0.7's "names what would make the operation provably safe".
+This serves the domain expert (not the compiler engineer) because it names the *business field* whose missing constraint is the real cause (`Floor`), states the relation in the author's own terms (`Amount >= Floor`), and offers two concrete repairs in DSL syntax — not "obligation unresolved at site". It reflects §0.7's "names what would make the operation provably safe". **This message is the target this design introduces.** Current state (verified `precept_compile`, MCP reconnected 2026-06-02): `field Amount as number min Floor` is *silently accepted and unenforced* — no diagnostic at all, and even `min <undeclared>` produces no error (see [[BUG-020]]). So the design closes two gaps here: it makes the field-ref bound *enforced*, and it makes an unprovable dependent operation *emit* this message instead of compiling clean.
 
 **10-minute teaching path** (competent domain expert):
 1. `docs/language/precept-language-spec.md §2.4` — constraint modifiers are rule shorthand (2 min).
