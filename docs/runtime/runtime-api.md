@@ -263,9 +263,11 @@ Version version = outcome switch
 };
 ```
 
-`Restore` reconstitutes a `Version` from persisted data. It accepts state name and field values separately, recomputes computed fields, and evaluates constraints against the restored state.
+`Restore` reconstitutes a `Version` from persisted data. It accepts state name and field values separately and recomputes computed fields. It does **not** re-validate constraints: restored state is trusted as valid at the time it was persisted — like a direct database read — and re-checking would block data written under an earlier definition (spec §0.7; evaluator.md Decision 5). Migration on schema change is the caller's responsibility; a stale value is re-governed by the next operation's post-mutation constraint sweep (spec §3A.4).
 
-> ⚠️ **Design note:** The implementation uses `Restore(string? state, JsonElement fields)` — taking state and fields as separate parameters — and returns a structured `RestoreOutcome` (including `RestoreConstraintsFailed` for schema drift) rather than returning `Version` directly and throwing on errors. See inbox item `newman-comprehensive-doc-review.md` for the full design divergence assessment.
+> ⚠️ **Design note:** The implementation uses `Restore(string? state, JsonElement fields)` — taking state and fields as separate parameters — and returns a structured `RestoreOutcome` rather than returning `Version` directly and throwing on errors. See inbox item `newman-comprehensive-doc-review.md` for the full design divergence assessment.
+>
+> **`RestoreConstraintsFailed` is superseded** by the trusted-hydration decision (spec §0.7): Restore does not re-validate, so a constraint-failure outcome on restore no longer applies. It should be removed when the Restore API is finalized (`RestoreOutcome` may still carry parse / state-resolution failures); the example above is left until that API cleanup lands.
 
 **Access modes are bypassed.** Fields that are `readonly` in the restored state were `editable` when previously written. `Restore` accepts all stored fields regardless of the current state's access declarations.
 
@@ -884,7 +886,7 @@ For stateless precepts (no `state` declarations), `CreateInitialVersion` returns
 - **No result type hierarchy.** Full `EventOutcome`, `UpdateOutcome`, and inspection type shapes are in `result-types.md`. This document covers when and why each operation produces outcomes; `result-types.md` covers the shape of each type.
 - **No evaluation logic.** The runtime API delegates all evaluation to the `Evaluator`. No pipeline mechanics live in `Precept.cs` or `Version.cs`.
 - **No build-time analysis.** Graph analysis, type checking, and compilation are owned by the compiler pipeline. `Precept.From()` accepts only an error-free `Compilation` — it does not re-analyze.
-- **No migration logic.** If the definition changed since data was stored, migration is the caller's responsibility. Restore evaluates constraints against the restored state — schema drift is detected via `RestoreConstraintsFailed`, not silently accepted.
+- **No migration logic.** If the definition changed since data was stored, migration is the caller's responsibility. Restore does **not** re-validate — restored state is trusted as valid at persistence time (spec §0.7), so schema drift is not detected on load. A stale value surfaces at the next operation, whose post-mutation constraint sweep (spec §3A.4) governs the resulting working copy.
 
 ---
 

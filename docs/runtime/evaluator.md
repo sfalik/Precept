@@ -1765,7 +1765,7 @@ The only exception paths are truly exceptional: out-of-memory, corrupted `Precep
 
 ### Decision 5: FromJson Bypasses Constraint Validation
 
-**Decision:** `FromJson` bypasses both access-mode checks and constraint validation. It is a pure hydration operation — the inverse of `ToJson`.
+**Decision:** `FromJson` bypasses both access-mode checks and constraint validation. It is a pure hydration operation — the inverse of `ToJson`. This is the trusted-hydration boundary of the guarantee contract (spec §0.7): restored state is trusted as valid at the time it was persisted, like a direct database read. Entity-level `Restore` (runtime-api.md) shares these semantics — it does not re-prove constraints.
 
 **Rationale:**
 - **Restoration is not a business transaction:** Data was committed when it satisfied the rules in effect at that time. The definition may have changed since. Constraint validation on restore would block all existing data on every schema change, making evolution impossible.
