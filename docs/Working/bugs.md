@@ -42,6 +42,7 @@ surfaced for proper fixing.
 - **Sibling breaches (same shape — obligation creation gated on provability, found in the same Phase-2 grounding)**: [[BUG-018]] (count containment never enforced) and [[BUG-019]] (length containment skipped on non-literal RHS). All three should be fixed under one principle: *unprovable bound ⇒ emit, never skip*.
 - **Priority**: quality bar / soundness — a Principle-11 violation, but on a specific shape (unbounded operands) and pre-release.
 - **Repro**: the three integer `A`/`C` cases above; the middle one (`A` unbounded, no `NumericOverflow`) is the bug.
+- **Status**: ✅ **Fixed 2026-06-02 (`9820b8c1`, Slice 2a)** — removed the `IsUnbounded` skip; the computed-field obligation is now created and emits when unprovable. Paired with the operand-interval flag-fold (`FlagLowerBound` in `ExtractFieldInterval`) so provably-safe computed fields still discharge. (Move to § Fixed in a cleanup pass.)
 
 ### BUG-018: `maxcount`/`mincount` are never enforced — count-containment proof is dead code (Principle-10/11 soundness hole)
 
