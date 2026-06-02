@@ -8,9 +8,11 @@
 
 | # | Goal | Items | Decisions required | Effort | Status |
 |---|---|---|---|---|---|
-| 1 | Bound-containment obligations are created unconditionally and discharge-or-emit; an undeclared field-ref bound errors | BUG-017, BUG-018, BUG-019, BUG-020 (undeclared-name half) | none (Decision 3 settled) | L (4–6d) | Active |
-| 2 | Relational rules narrow the subject's interval (rule-sourced, single-pass); field-ref bounds participate in proof as sugar | Decision 2 (B), Decision 4 (octagon-style), field-ref bounds (Decisions 5/6/7) | none (design Locked) | L–XL (5–8d) | Stub |
+| 1a | Undeclared field-ref bound errors (binder name-resolution) | BUG-020 (undeclared-name half) | none | S (0.5d) | ✅ Done — `e2b7c9c1` |
+| 2 (merged) | Relational narrowing (rule-sourced, octagon-style) **+ the emit-unconditionally breaches it lets discharge** | Decision 2/4 + BUG-017, BUG-018, BUG-019, BUG-021 + field-ref bounds (5/6/7) | BUG-021 lower-direction diagnostic code (PRE0078 vs PRE0079) | XL (7–10d) | Next |
 | Promote | Canonical doc-sync | business-domain-types:426, spec §3.8 | none | S (0.5d) | Stub |
+
+> **Re-sequenced 2026-06-02 (execution finding).** The original Slice 1 (the emit-unconditionally breaches) and Slice 2 (the narrowing) had to **merge**: the step-0 probe + the BUG-017 build showed emit-unconditionally *over-rejects genuinely-safe samples* without the narrowing/interval-propagation reach — BUG-017 turned `supplier-quality-management` red on a provably-safe `(Q+D)/2 ≤ 100` field (`IntervalOf` doesn't propagate through decimal `/`), and BUG-021's naive form rejected ~55 sample set-actions. This is the design's Falsifier #1 ("obviously-safe sample goes red ⇒ the *reach* must improve, not the emit decision"). Emit-unconditionally and narrowing-reach are two sides of one coin — they land together. **BUG-020 was the only cleanly-independent piece (binder name-resolution, no proof-reach dependency) — landed alone (1a).** Everything else is the merged slice. BUG-021 carries one focused decision into it: the lower-bound violation's diagnostic code (`OutOfRange`/PRE0079 is semantically right, but `IntervalContainmentProofRequirement` is catalog-mapped to `NumericOverflow`/PRE0078 — per-direction code selection needed).
 
 ## Decisions captured
 

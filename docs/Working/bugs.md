@@ -78,6 +78,7 @@ surfaced for proper fixing.
 - **Fix complexity**: gap (1) is the relational-rules-and-bounds design (`relational-rules-and-bounds-design-2026-06-02.md`). Gap (2) (undeclared-name in a bound expression) is a smaller binder fix that should land regardless — a bound referencing a non-existent field must error today, not silently pass.
 - **Priority**: soundness (a declared bound that does nothing is a silent governance hole) + correctness (undeclared reference uncaught).
 - **Repro**: the three cases above.
+- **Status (2026-06-02)**: undeclared-name half **fixed** (`e2b7c9c1` — `NameBinder` name-resolves `min`/`max` field-reference values → `UndeclaredField`). Enforcement half (the resolved bound actually participating in proof) is the merged relational-narrowing slice.
 
 ### BUG-021: Set-action assignment does not enforce a field's lower bound (`min`) when the field has no `max` — value provably below `min` compiles clean (Principle-10/11 soundness hole)
 
