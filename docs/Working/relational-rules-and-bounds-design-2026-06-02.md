@@ -1,5 +1,5 @@
 ---
-status: Externally-Grounded
+status: Locked 2026-06-02
 phase-target: Phase 7 (total language conformance sweep) — relational reasoning (§0.6 item 2) + the three bound-containment soundness breaches are conformance defects; couples to Phase 8/9 at the value-level-obligation emit seam
 comparable-systems-research-status: strong — grounded in `research/architecture/compiler/relational-constraint-representation-survey.md` (Stage-1 build-forward synthesis: octagon strong-closure / difference-logic / CUE with primary-source excerpts, octagon source mirrored) + the cited `proof-engine-interval-arithmetic-survey.md` and `constraint-composition.md`; Decision 2 (A vs B) externally grounded by `research/architecture/compiler/relational-constraint-representation-survey.md` (octagon strong closure = bounded O(n³); A-vs-B orthogonal to bounded-vs-fixpoint)
 sources-consulted:
@@ -38,7 +38,7 @@ When done, a relational rule that compares two fields (`rule X >= Y because "…
   - SMT / general fixpoint solving (§0.6 philosophy item 3; §14 No SMT Solver).
   - Runtime evaluation changes (governance already enforces these constraints at ingress per §0.7; the runtime fault traps for CountBoundViolation/LengthBoundViolation already exist).
 - **Deferred to future**:
-  - Q5 cross-lane field-reference bound typing, Q6 qualifier-bearing field-reference bound (`BoundsQualifierMismatch` extension), Q7 computed-field-as-bound — each marked `Stakes: exploratory` below; each has a governing canonical section but no current-pass resolution.
+  - None for the core feature. The cross-lane (5), qualifier-bearing (6), and computed-field (7) cases are resolved in-scope below — 5/6 spec-settled (§3.6 / §428), 7 in-scope (narrows from the computed field's inferred interval). The only carry-forward is two promote-stage *doc-sync* obligations (business-domain-types line 426; §3.8 `InvalidModifierBounds`), not deferred design work.
   - Vacuous/mutual-bound diagnostic policy (Q4) — relates to PRE0154/PRE0155, not to the soundness obligations this design ships.
   - The doc-sync to `business-domain-types.md` line 426 and §3.8 (enumerated in Doc-update enumeration; not edited this pass).
 
@@ -246,32 +246,36 @@ The architectural problem is: *how does a constraint language propagate a relati
 - **Sources consulted for this decision**: `docs/language/precept-language-spec.md §0.4` items 1/3 (no loops, no reconverging flow) + the closing paragraph "bounded relational closure … single-pass … absence of widening is a feature"; `docs/compiler/proof-engine.md` line 153 "If the six strategies prove insufficient … a seventh bounded strategy would be added — not a general solver"; CUE spec (accessed 2026-06-02). Grepped §0.4 — the no-fixpoint constraint is locked spec; single-pass is implementation against it.
 - **Strongest counter-evidence**: A depth-1 cap may under-prove common transitive chains, generating friction the author finds arbitrary. Response: the cap is a falsifier (below) — if samples need >1 hop, raise the bounded depth to a fixed small N (still not a fixpoint); the §0.4 line is the no-fixpoint guarantee, not a specific depth.
 
-### Decision 5: Cross-lane field-reference bounds (Q5) — disposition deferred
+### Decision 5: Cross-lane field-reference bounds inherit the comparison's §3.6 lane rules — RESOLVED (spec-settled)
 
-**Stakes**: exploratory
+**Stakes**: low (implementation against locked §3.6, not a fresh choice)
 
-- **Exploratory because**: §0.7 is mechanism-neutral on numeric lanes; the governing sections are §3.2/§3.6 + `primitive-types.md` line 424 (the "semantically dangerous" lane-cross requiring a bridge). Resolving it requires confirming whether a field-reference bound of a different numeric lane is a type error or a coercion *at the modifier-bound position* — not settled by the sections checked.
-- **Working hypothesis**: a field-reference bound inherits the comparison's lane rules — `decimal`-bounding-`number` requires the same explicit bridge a comparison requires; lane-cross without a bridge is a type error.
-- **Decision needed before**: any sample uses a cross-lane field-reference bound, or the relational-narrowing path ships discharge for cross-lane relations.
-- **Open questions**: Is the bridge required at the bound position the same `primitive-types.md` line 424 bridge, or does the modifier-bound position relax it?
+- **Rationale**: The bound desugars to the comparison `X op Y` (§2.4), governed by §3.6's numeric-lane rules: `integer` widens to `decimal`/`number`; `decimal`-vs-`number` is the "semantically dangerous" lane-cross requiring an explicit bridge (`primitive-types.md` line 424). A cross-lane field-reference bound is therefore a type error absent a bridge — exactly as the equivalent comparison is.
+- **Tradeoff accepted**: An author bounding a `number` field by a `decimal` field must add the same bridge a `number`-vs-`decimal` comparison requires — friction inherited from §3.6, not new.
+- **Alternatives considered**: relax the lane rule at the modifier-bound position — rejected: would make `min OtherField` behave differently from the `rule X >= OtherField` it desugars to, breaking §2.4 interchangeability.
+- **Precedent**: §3.6 lane rules; `primitive-types.md` line 424.
+- **Sources consulted for this decision**: `precept-language-spec.md §3.6` numeric-lane/widening rules; `primitive-types.md` line 424 "semantically dangerous" lane-cross; §2.4 line 1112 (modifier ≡ rule). Grepped §3.2/§3.6 — lane rules are locked; this is implementation against them.
 
-### Decision 6: Qualifier-bearing field-reference bounds on money/quantity/price (Q6) — disposition deferred
+### Decision 6: Qualifier-bearing field-reference bounds obey the comparison's qualifier-compatibility (PRE0133/0134); extend the bound-interpretation rule to field-references — RESOLVED (spec-settled + doc-sync)
 
-**Stakes**: exploratory
+**Stakes**: medium
 
-- **Exploratory because**: `business-domain-types.md` line 426 enumerates only typed-constant and number-literal bound forms; what the bound-interpretation rule *becomes* for a field reference, and how `BoundsQualifierMismatch` (PRE0134) axis-matching computes against a referenced field's qualifier, is undefined.
-- **Working hypothesis**: a cross-dimension/cross-currency field-reference bound is an *undefined comparison* (the PRE0133/PRE0134 family applies); a same-dimension UCUM field-reference bound is well-defined and governance enforces it (mirroring the existing same-dimension conversion exception).
-- **Decision needed before**: a `quantity`/`money`/`price` field is bounded by another such field in a sample, or the data-model decision (Decision 2) freezes the bound representation for qualified fields.
-- **Open questions**: Does line 426's "Bound expression interpretation" gain a field-reference clause? Is PRE0134 computed against the referenced field's declared qualifier?
+- **Rationale**: The desugared comparison `X op Y` on `money`/`quantity`/`price` is governed by the existing qualifier family: a cross-dimension/cross-currency relation is an *undefined comparison* (`BoundsRequireQualifier`/`BoundsQualifierMismatch`, PRE0133/0134, business-domain-types §428) — rejected, as for literal bounds; a same-dimension UCUM relation is well-defined and governance enforces it (the existing same-dimension conversion exception). The behavior follows from the comparison; only the documentation lags.
+- **Tradeoff accepted**: The bound-interpretation rule (business-domain-types line 426) and §428's axis-matching are written for literal/typed-constant bounds; they must be *extended* to field-references — a doc-sync obligation (Doc-update enumeration), not a new mechanism.
+- **Alternatives considered**: a separate qualifier rule for field-reference bounds — rejected: the comparison's qualifier rules already cover it; a separate rule would duplicate and risk divergence.
+- **Precedent**: business-domain-types §428 (PRE0134 + the same-dimension UCUM exception), applied to the desugared comparison.
+- **Sources consulted for this decision**: `business-domain-types.md` line 426 (bound-interpretation, literal-only today) + §428 (PRE0134 axis-matching + UCUM same-dimension exception); §2.4 line 1112. Grepped business-domain-types — no locked rejection of field-reference qualifier bounds; the rule is literal-phrased and needs extension.
 
-### Decision 7: Computed field as a bound (Q7) — disposition deferred
+### Decision 7: A computed field may be a bound; it narrows from its inferred interval via the same relational mechanism — RESOLVED (in-scope)
 
-**Stakes**: exploratory
+**Stakes**: medium
 
-- **Exploratory because**: §0.7 is silent on whether a *computed* field may serve as a constraint bound or how its interval is inferred for decidability; the governing material is §3.5's evaluation-model derivation + §0.6 interval reasoning, which do not settle it.
-- **Working hypothesis**: a computed field is in scope as a bound (§3.5 "All field names"), and its interval is the inferred result-range of its computed expression — but only if that range is decidable, else the bound contributes nothing (same as an unbounded plain field).
-- **Decision needed before**: a sample bounds a field by a computed field, or the relational path attempts to narrow from a computed-field reference.
-- **Open questions**: Is a computed field's inferred interval a sound narrowing source, given BUG-017 shows computed-field interval inference is itself the breached path?
+- **Rationale**: A computed field is in scope as a bound (§3.5 "all field names"). The relational mechanism (Decisions 2/4) narrows `X` from the *interval* of the referenced field; for a computed field that interval is `IntervalOf(its expression)` — a sound over-approximation, the unbounded case degrading to identity narrowing (sound). The earlier "wait for computed-field inference" concern is addressed here: BUG-017 is fixed in this same design (Decision 3), and is anyway a *distinct* concern (it gated the computed field's own containment-check emission, not the soundness of reading its interval as a narrowing source).
+- **Tradeoff accepted**: A computed-field bound is only as decidable as its expression's inferred interval; an unbounded computed expression contributes no static range (author bounds its operands) — the same decidability posture as a plain unbounded field (§2.4 line 1112).
+- **Alternatives considered**: exclude computed fields from the bound position — rejected: §3.5 puts them in scope, and reading their interval is the same operation as for any field; exclusion would be an artificial restriction.
+- **Precedent**: §3.5 (computed fields in scope); the existing `IntervalOf` computed-field interval inference; the bounded relational closure (Decision 4).
+- **Sources consulted for this decision**: `precept-language-spec.md §3.5` (all-field-names scope incl. computed) + §0.6 item 1 (interval reasoning); the BUG-017 disposition (Decision 3, this design).
+- **Build note (not a fork)**: the closure is single-pass/depth-bounded (Decision 4), so a computed-field bound is one hop reading an *already-inferred* interval — no fixpoint; the build confirms the computed field's interval is inferred before the relational closure reads it (ordering within the existing pass structure).
 
 ## Acceptance criteria
 
@@ -295,9 +299,9 @@ Per the CLAUDE.md routing table — obligations for `/lifecycle-5-promote`, **no
 - `docs/compiler/proof-engine.md` § Proof Strategies / Strategy 4 — document the rule-sourced relational narrowing and its single-pass bound; § Design Rationale — lift Decisions 2 and 4.
 - `docs/compiler/proof-engine.md` § Strategy 4 / relational discharge — document the rule-sourced relational narrowing (Decision 2 = B); no `IntervalContainmentProofRequirement` data-model change.
 - `docs/compiler/diagnostic-system.md` — `CountBoundViolation` is now live (was dead); the relational-unprovable diagnostic wording.
-- `docs/language/business-domain-types.md` line 426 — **doc-drift**: "Bound expression interpretation" enumerates only typed-constant and number-literal forms; must gain a field-reference clause (couples to Decision 6, deferred).
-- `docs/language/precept-language-spec.md §3.8` — `InvalidModifierBounds` is literal-framed ("`min` value exceeds `max` value"); must address field-reference-bound ordering (couples to Q3, sharpened-not-settled).
-- `docs/tooling/mcp.md` — if Decision 2 changes the obligation DTO, update the `precept_compile` projection note.
+- `docs/language/business-domain-types.md` line 426 — **doc-drift**: "Bound expression interpretation" enumerates only typed-constant and number-literal forms; must gain a field-reference clause (Decision 6 doc-sync — resolved decision; this is its promote-stage edit).
+- `docs/language/precept-language-spec.md §3.8` — `InvalidModifierBounds` is literal-framed ("`min` value exceeds `max` value"); state the field-reference-pair rule: fire only when the ordering is *provably* contradictory from declared intervals (§0.7 prove-or-reject + §0.6 soundness-over-completeness), else governance enforces at runtime. Doc-sync, not an open question.
+- `docs/tooling/mcp.md` — no change: Decision 2 = B (relational path) makes no obligation-DTO change, so the `precept_compile` projection note is unaffected.
 - `bugs.md` — flip BUG-017, BUG-018, BUG-019 to Fixed at execution.
 
 ## Operational dimensions
@@ -311,8 +315,8 @@ Per the CLAUDE.md routing table — obligations for `/lifecycle-5-promote`, **no
 - If closing BUG-017/018/019 forces explicit-constraint workarounds in **three or more** `samples/` precepts that a domain expert would consider obviously safe, the emit-unconditionally floor is too aggressive for current samples and the diagnostic wording / narrowing reach must improve before ship (not the emit decision — that is sound — but its ergonomics).
 - If the depth-1 closure cap (Decision 4) under-proves a transitive relation chain in two or more samples, raise the bounded depth to a fixed small N (still no fixpoint); if no fixed N suffices without a sample needing genuine fixpoint reasoning, the §0.4 envelope is being stretched and the feature scope is wrong.
 - If the relational-narrowing path ever discharges an obligation that a runtime trap then fires on (a false "proved safe"), the mechanism is unsound — immediate redesign; this is the Principle-1 falsifier and the most important one.
-- If Decision 2's chosen representation requires touching more than the enumerated consumer surfaces (Strategy 8, `TypedFieldRef` extraction, MCP DTO), the blast radius was mis-estimated and the other option should be reconsidered.
+- If Decision 2 = B's relational-path discharge turns out to require a data-model or DTO change after all (contradicting the no-churn rationale that was decisive for B over A), the A-vs-B call was wrong on its deciding ground and option A should be reconsidered.
 
 ## Open questions
 
-Decisions 1–4 are now settled: Decision 1 by canon (§0.7/§2.4); Decision 2 = **B** (relational path, locked 2026-06-02, grounded by `relational-constraint-representation-survey.md` — a field-ref bound is a relation, correctly modeled as a shared relational fact, not a per-field property); Decision 3 (emit-unconditionally) and Decision 4 (octagon-closure-minus-widening, single-pass) by §0.7/§0.4. The only remaining lock-blockers are the exploratory Decisions 5/6/7 (cross-lane, qualifier-bearing, computed-field bounds). Per the skill the doc stays `Externally-Grounded` until those three resolve or are removed; the **core mechanism is fully locked**.
+**No open questions remain — the design is Locked (2026-06-02).** Decisions 1–7 are all resolved: 1 by canon (§0.7/§2.4); 2 = **B** (relational path, grounded by `relational-constraint-representation-survey.md` — a field-ref bound is a relation, correctly modeled as a shared relational fact, not a per-field property); 3 (emit-unconditionally) and 4 (octagon-closure-minus-widening, single-pass) by §0.7/§0.4; 5 by §3.6 (cross-lane = the comparison's lane rules); 6 by §428 (qualifier-compatibility) plus a line-426 doc-sync; 7 in-scope (a computed field narrows from its inferred interval; BUG-017's fix lands in this same design). No exploratory decisions remain and no decision is `irreversible` (so no cooling-off applies). The two doc-sync items (business-domain-types line 426; §3.8 `InvalidModifierBounds`) are promote-stage obligations, not open design questions.
