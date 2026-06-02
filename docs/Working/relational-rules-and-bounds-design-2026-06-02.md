@@ -25,7 +25,7 @@ sources-consulted:
 
 ## Goal
 
-When done, a relational rule that compares two fields (`rule X >= Y because "…"`) contributes a provable interval to `X` so a downstream fault-prone operation can discharge against it — and the bound modifiers (`min`/`max`/`minlength`/`maxlength`/`mincount`/`maxcount`), being rule sugar (§2.4), inherit that treatment — while the three containment obligations that today are skippable (computed-field unbounded-operand BUG-017, `mincount`/`maxcount` BUG-018, non-literal length-RHS BUG-019) are emitted unconditionally and discharge-or-emit. Demonstrated by: a reorder precept where `rule Available >= Reserved` lets `Stock - Reserved` prove `>= 0`; and three regression precepts where the breached obligations now reject the unprovable case.
+When done, a relational rule that compares two fields (`rule X >= Y because "…"`) contributes a provable interval to `X` so a downstream fault-prone operation can discharge against it — and the bound modifiers (`min`/`max`/`minlength`/`maxlength`/`mincount`/`maxcount`), being rule sugar (§2.4), inherit that treatment — while the three containment obligations that today are skippable (computed-field unbounded-operand BUG-017, `mincount`/`maxcount` BUG-018, non-literal length-RHS BUG-019) are emitted unconditionally and discharge-or-emit. Demonstrated by: a reorder precept where `rule OnHand > Reserved` makes the divisor in `BatchCost / (OnHand - Reserved)` provably non-zero; and three regression precepts where the breached obligations now reject the unprovable case.
 
 ## Scope
 
@@ -275,7 +275,7 @@ The architectural problem is: *how does a constraint language propagate a relati
 
 ## Acceptance criteria
 
-- A precept with `rule X >= Y because "…"`, `Y min 0`, and `set X = A - Y` (or a divisor/sqrt on `X`) **compiles clean** — the relational narrowing discharges the downstream obligation. (`RelationalNarrowingTests`)
+- A precept whose downstream divisor/sqrt/range obligation is discharged by a relational rule — e.g. `rule X > Y because "…"` makes `Z / (X - Y)` provably safe — **compiles clean**. (`RelationalNarrowingTests`) *(A set-action subtraction **into** a bounded field is NOT a valid demonstrator: a precept-author probe found it emits no obligation, while the Phase-2 grounding called the set-action interval path sound — the obligation fires on division/sqrt/overflow/out-of-range. Reconcile the set-action subtraction interval-obligation coverage as a first build step; do not phrase acceptance on the subtraction case until confirmed.)*
 - The same precept with `Y` unbounded **fails to compile** with a diagnostic naming `Y` as the field whose missing bound blocks the proof, and offering a bound-or-guard repair. (`RelationalNarrowingTests`)
 - BUG-017: a computed field `field C as number min 0 max 100 <- Floor + 1` with `Floor` unbounded **emits an obligation and fails to compile** (today it silently passes via the `IsUnbounded` `continue`). (`Bug017ComputedBoundTests`)
 - BUG-018: a precept that grows a `mincount 2 maxcount 5` collection past its bound, or whose default violates `mincount`, **fails to compile** with `CountBoundViolation`-class diagnostic; `CountContainmentProofRequirement` appears in `precept_compile` proof obligations. (`Bug018CountBoundTests`)
