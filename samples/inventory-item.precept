@@ -129,7 +129,7 @@ on RecordShrinkage ensure RecordShrinkage.Qty <= QuantityOnHand because "Cannot 
 event UpdateListPrice(NewPrice as price in '{CatalogCurrency}' of '{SaleUnit.dimension}')
 on UpdateListPrice ensure UpdateListPrice.NewPrice > '0 {CatalogCurrency}/{SaleUnit}' because "List price must be positive — a zero-priced listing is not a sellable record"
 
-event Delist(Reason as string optional)
+event Delist(Reason as string optional maxlength 200)
 event Relist
 
 # ── Transitions ───────────────────────────────────────────────────────────────

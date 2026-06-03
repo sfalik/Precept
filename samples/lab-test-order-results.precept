@@ -49,9 +49,9 @@ in Verified modify StatusReason editable
 
 # Events
 event CreateOrder(
-    OrderId as string notempty,
-    PatientId as string notempty,
-    OrderingProvider as string notempty,
+    OrderId as string notempty maxlength 50,
+    PatientId as string notempty maxlength 50,
+    OrderingProvider as string notempty maxlength 200,
     Tests as set of string,
     SpecimenType as choice of string("Blood", "Urine", "Saliva", "Tissue", "Swab"),
     CollectionDueBy as instant) initial
@@ -72,7 +72,7 @@ event CollectSpecimen
 event StartProcessing
 event EnterResults(ResultText as string notempty, Ranges as string notempty)
 event FlagCritical(TestCode as string notempty, ValueDescription as string notempty)
-event VerifyResults(VerifiedByProvider as string notempty)
+event VerifyResults(VerifiedByProvider as string notempty maxlength 200)
 event ReviewResults(Outcome as choice of string("Accept", "Request Clarification", "Send For Retest"))
 
 # Transitions

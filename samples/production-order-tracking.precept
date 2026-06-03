@@ -84,11 +84,11 @@ in Scraped ensure ScrapReason is set because "A scrapped order must record the s
 
 # Events
 event Create(
-    OrderNumber as string notempty,
+    OrderNumber as string notempty maxlength 50,
     PlannedQty as integer positive,
-    ProductName as string optional,
-    ProductSku as string optional,
-    WorkCenter as string optional,
+    ProductName as string optional maxlength 200,
+    ProductSku as string optional maxlength 100,
+    WorkCenter as string optional maxlength 100,
     Priority as choice of string("Low", "Medium", "High", "Critical") default "Medium",
     LeadTime as duration optional,
     FirstStage as string notempty,

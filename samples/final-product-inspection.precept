@@ -74,9 +74,9 @@ in Scrapped ensure DispositionAfterQuarantine == "Scrapped" because "Scrapped ba
 
 # Constructor — production system delivers the batch with identity and quantity fixed.
 event ReceiveFromProduction(
-    Product as string notempty,
-    Batch as string notempty,
-    WorkOrder as string notempty,
+    Product as string notempty maxlength 50,
+    Batch as string notempty maxlength 50,
+    WorkOrder as string notempty maxlength 50,
     Quantity as integer positive,
     CompletedAt as instant) initial
 on ReceiveFromProduction ensure ReceiveFromProduction.Quantity > 0 because "Production quantity must be positive"
@@ -88,7 +88,7 @@ on ReceiveFromProduction
     -> set QuantityProduced = ReceiveFromProduction.Quantity
     -> set ProductionCompletedAt = ReceiveFromProduction.CompletedAt
 
-event BeginInspection(Inspector as string notempty, Sample as integer positive)
+event BeginInspection(Inspector as string notempty maxlength 100, Sample as integer positive)
 on BeginInspection ensure BeginInspection.Sample > 0 because "Sample size must be positive"
 
 event RecordVisualCheck(Passed as boolean, DefectCount as integer default 0)
@@ -100,10 +100,10 @@ event RecordFunctionalTests(Passed as boolean, DefectCount as integer default 0,
 on RecordFunctionalTests ensure RecordFunctionalTests.DefectCount >= 0 because "Defect count cannot be negative"
 
 event CompleteInspection
-event Certify(CertNumber as string notempty, Authority as string notempty)
+event Certify(CertNumber as string notempty maxlength 50, Authority as string notempty maxlength 100)
 event SendToQuarantine(Reason as string notempty)
 event Disposition(Decision as choice of string("ReleasedForRework","Scrapped","UseAsIsConcession"))
-event Ship(Destination as string notempty)
+event Ship(Destination as string notempty maxlength 200)
 
 # Transitions
 

@@ -84,24 +84,24 @@ in Rejected ensure RejectionReason is set because "A rejected refill must carry 
 
 # Events
 event CreateRefill(
-    PatientId as string notempty,
-    PatientName as string notempty,
+    PatientId as string notempty maxlength 50,
+    PatientName as string notempty maxlength 200,
     DateOfBirth as date,
-    Medication as string notempty,
-    Dosage as string notempty,
+    Medication as string notempty maxlength 200,
+    Dosage as string notempty maxlength 100,
     QuantityRequested as integer positive,
     DaysSupply as integer positive,
     RefillsRemaining as integer nonnegative,
     NextFillDate as date,
-    PrescribingPhysician as string notempty,
+    PrescribingPhysician as string notempty maxlength 200,
     Priority as choice of string("Routine", "Standard", "Urgent", "Stat") default "Standard",
-    InsuranceProvider as string notempty,
-    InsuranceBin as string optional,
-    InsurancePcn as string optional,
-    InsuranceGroup as string optional,
-    InsurancePolicyNumber as string optional,
-    FillLocation as string notempty,
-    FillPharmacyId as string notempty) initial
+    InsuranceProvider as string notempty maxlength 200,
+    InsuranceBin as string optional maxlength 10,
+    InsurancePcn as string optional maxlength 10,
+    InsuranceGroup as string optional maxlength 50,
+    InsurancePolicyNumber as string optional maxlength 50,
+    FillLocation as string notempty maxlength 200,
+    FillPharmacyId as string notempty maxlength 50) initial
 
 on CreateRefill ensure CreateRefill.QuantityRequested <= CreateRefill.DaysSupply because "Requested quantity {CreateRefill.QuantityRequested} cannot exceed prescribed days supply per fill ({CreateRefill.DaysSupply})"
 
@@ -128,15 +128,15 @@ on CreateRefill
 
 event SubmitForReview
 event FlagInteraction(
-    SourceMedication as string notempty,
-    TargetMedication as string notempty,
+    SourceMedication as string notempty maxlength 200,
+    TargetMedication as string notempty maxlength 200,
     Severity as choice of string("None", "Mild", "Moderate", "Severe"),
     Details as string notempty)
-event EscalateToPharmacist(PharmacistId as string notempty)
-event EscalateToPhysician(PhysicianId as string notempty)
+event EscalateToPharmacist(PharmacistId as string notempty maxlength 50)
+event EscalateToPhysician(PhysicianId as string notempty maxlength 50)
 event ApproveOverride(Reason as string notempty)
 event RejectRequest(Reason as string notempty)
-event ApproveRefill(ApproverId as string notempty)
+event ApproveRefill(ApproverId as string notempty maxlength 50)
 event PhysicianReviewDecision(Decision as choice of string("Override", "Reject", "Substitute"))
 
 # Transitions

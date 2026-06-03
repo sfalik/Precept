@@ -540,8 +540,8 @@ public static partial class ProofEngine
 
     /// <summary>
     /// Stamps a <see cref="LengthContainmentProofRequirement"/> for a bounded string default (literal
-    /// string), discharged literal-only by <see cref="TryLengthContainmentProof"/>. <c>notempty</c>
-    /// folds to a <c>minlength 1</c> lower bound (it sets no DeclaredMinLength).
+    /// string), discharged by <see cref="TryLengthContainmentProof"/> against the value's length
+    /// interval. <c>notempty</c> folds to a <c>minlength 1</c> lower bound (it sets no DeclaredMinLength).
     /// </summary>
     private static void CollectLengthDefaultObligation(
         TypeKind targetType,

@@ -23,7 +23,7 @@ field DateOfBirth as date
 field Gender as choice of string("Male", "Female", "Other")
 
 # Appeal identification
-field AppealId as string optional maxlength 50
+field AppealId as string optional maxlength 54
 field AppealType as choice of string("Internal", "External") ordered default "Internal"
 field AppealReason as choice of string(
     "Denied", "PartialDenial", "InsufficientAmount",
@@ -128,14 +128,14 @@ in ClinicalReview modify MedicalNecessityJustification, NewClinicalData editable
 
 # Events
 event FileAppeal(
-    OriginalAuthId as string notempty,
+    OriginalAuthId as string notempty maxlength 50,
     OriginalAuthDate as date,
-    OriginalProcedureCode as string notempty,
+    OriginalProcedureCode as string notempty maxlength 20,
     OriginalProcedureDescription as string notempty,
     OriginalAuthorizedUnits as integer nonnegative,
     OriginalAuthorizedAmount as money in 'USD',
-    PatientId as string notempty,
-    PatientName as string notempty,
+    PatientId as string notempty maxlength 50,
+    PatientName as string notempty maxlength 200,
     DateOfBirth as date,
     Gender as choice of string("Male", "Female", "Other"),
     AppealType as choice of string("Internal", "External"),
@@ -176,11 +176,11 @@ on FileAppeal
     -> set ReviewLevel = 1
 
 # Review progression
-event AssignReviewer(ReviewerName as string notempty)
-event StartClinicalReview(ReviewerName as string notempty)
+event AssignReviewer(ReviewerName as string notempty maxlength 200)
+event StartClinicalReview(ReviewerName as string notempty maxlength 200)
 event SubmitClinicalEvidence(ClinicalNotes as string notempty)
-event SchedulePeerToPeer(PhysicianNPI as string notempty, Specialty as string notempty)
-event CompletePeerToPeerReview(PhysicianName as string notempty, Notes as string notempty)
+event SchedulePeerToPeer(PhysicianNPI as string notempty maxlength 20, Specialty as string notempty maxlength 100)
+event CompletePeerToPeerReview(PhysicianName as string notempty maxlength 200, Notes as string notempty)
 
 # Information loop
 event RequestAdditionalInformation(InformationNeeded as string notempty)
@@ -211,7 +211,7 @@ event ProposeDeny(
 
 # Acceptance / IRO escalation from DecisionPending
 event AcceptDecision
-event EscalateToIRO(IROCaseNumber as string notempty)
+event EscalateToIRO(IROCaseNumber as string notempty maxlength 100)
 event RecordIRODecision(DecisionDate as instant, UpheldOriginalDecision as boolean)
 
 event WithdrawAppeal(Reason as string notempty)

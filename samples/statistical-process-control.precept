@@ -77,8 +77,8 @@ in Retired ensure RetirementReason is set because "A retired chart must record t
 
 # Constructor — engineering establishes the chart's geometry up front.
 event InitializeChart(
-    Process as string notempty,
-    Name as string notempty,
+    Process as string notempty maxlength 50,
+    Name as string notempty maxlength 100,
     Unit as unitofmeasure,
     Target as quantity in '{MeasurementUnit}',
     Ucl as quantity in '{MeasurementUnit}',
@@ -108,8 +108,8 @@ on InitializeChart
 # any caller trying to feed a different unit at compile time.
 event RecordSample(Value as quantity in '{MeasurementUnit}')
 
-event AcknowledgeAlert(Reason as string notempty)
-event OpenCorrectiveAction(Owner as string notempty, Action as string notempty)
+event AcknowledgeAlert(Reason as string notempty maxlength 200)
+event OpenCorrectiveAction(Owner as string notempty maxlength 100, Action as string notempty)
 event ResolveCorrectiveAction(ResolutionNote as string notempty)
 event RetireChart(Reason as string notempty)
 

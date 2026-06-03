@@ -189,33 +189,71 @@ from Draft on Complete -> set Code = ""AB"" -> transition Done";
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Critical regression: non-literal assignments produce NO obligation
+    //  Non-literal assignments: discharged against the source's static length
+    //  interval (§0.7 prove-or-reject). A source that carries a bound provably
+    //  within the target is clean; an unbounded source emits.
     // ════════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public void StringField_SetFromNonLiteralArg_NoObligationGenerated()
+    public void StringField_SetFromBoundedArg_WithinTarget_Clean()
     {
-        // Key regression test: event arg assignment to bounded field must not emit diagnostic
-        // This matches the FullPrecept pattern in TypeCheckerAssemblyTests
+        // The arg carries maxlength <= the target's maxlength, so the assignment is
+        // provably within bounds — governance enforces the arg bound at ingress (§0.7 Composition).
+        const string precept = @"
+precept BoundsTest
+field DecisionNote as string optional maxlength 500
+state Draft initial
+state Done terminal
+event Approve(Note as string maxlength 500)
+event Deny(Note as string maxlength 200)
+from Draft on Approve -> set DecisionNote = Approve.Note -> transition Done
+from Draft on Deny -> set DecisionNote = Deny.Note -> transition Done";
+
+        var result = Compiler.Compile(precept);
+        result.Diagnostics.Where(d => d.Code == DiagnosticCode.LengthBoundViolation.ToString())
+            .Should().BeEmpty("args bounded to <= the target's maxlength are provably within bounds");
+        result.HasErrors.Should().BeFalse("no errors expected when bounded args flow into a wider bounded field");
+    }
+
+    [Fact]
+    public void StringField_SetFromUnboundedArg_Emits()
+    {
+        // An unbounded arg flowing into a capped field cannot be proven within bounds — emit (§0.7).
         const string precept = @"
 precept BoundsTest
 field DecisionNote as string optional maxlength 500
 state Draft initial
 state Done terminal
 event Approve(Note as string)
-event Deny(Note as string)
-from Draft on Approve -> set DecisionNote = Approve.Note -> transition Done
-from Draft on Deny -> set DecisionNote = Deny.Note -> transition Done";
+from Draft on Approve -> set DecisionNote = Approve.Note -> transition Done";
 
         var result = Compiler.Compile(precept);
-        result.Diagnostics.Where(d => d.Code == DiagnosticCode.LengthBoundViolation.ToString())
-            .Should().BeEmpty("non-literal event arg assignments to bounded fields must not generate LengthBoundViolation");
-        result.HasErrors.Should().BeFalse("no errors expected when assigning event args to bounded string field");
+        result.Diagnostics.Should().Contain(d => d.Code == DiagnosticCode.LengthBoundViolation.ToString(),
+            "an unbounded arg can exceed the target's maxlength, so it cannot be proven within bounds");
     }
 
     [Fact]
-    public void StringField_SetFromFieldRef_NoObligationGenerated()
+    public void StringField_SetFromBoundedFieldRef_WithinTarget_Clean()
     {
+        // A source field bounded to maxlength <= the target's is provably within bounds.
+        const string precept = @"
+precept BoundsTest
+field Source as string optional maxlength 8
+field Target as string optional maxlength 10
+state Draft initial
+state Done terminal
+event Complete
+from Draft on Complete -> set Target = Source -> transition Done";
+
+        var result = Compiler.Compile(precept);
+        result.Diagnostics.Where(d => d.Code == DiagnosticCode.LengthBoundViolation.ToString())
+            .Should().BeEmpty("a field bounded to maxlength 8 is provably within the target's maxlength 10");
+    }
+
+    [Fact]
+    public void StringField_SetFromUnboundedFieldRef_Emits()
+    {
+        // An unbounded source field flowing into a capped target cannot be proven within bounds.
         const string precept = @"
 precept BoundsTest
 field Source as string optional
@@ -226,8 +264,8 @@ event Complete
 from Draft on Complete -> set Target = Source -> transition Done";
 
         var result = Compiler.Compile(precept);
-        result.Diagnostics.Where(d => d.Code == DiagnosticCode.LengthBoundViolation.ToString())
-            .Should().BeEmpty("field ref assignment to bounded field must not generate LengthBoundViolation");
+        result.Diagnostics.Should().Contain(d => d.Code == DiagnosticCode.LengthBoundViolation.ToString(),
+            "an unbounded source field can exceed the target's maxlength 10");
     }
 
     [Fact]

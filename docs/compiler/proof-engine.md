@@ -304,7 +304,7 @@ public enum ProofStrategy
     QualifierCompatibility = 5,  // qualifier values are provably compatible
     CompositionalConstraint = 6, // field assignments satisfy modifiers via compositional sign inference
     IntervalContainment = 7,     // assigned value provably within declared min/max interval
-    LengthContainment = 8,       // string literal length within declared minlength/maxlength
+    LengthContainment = 8,       // string-length interval (literal, ref, concat, conditional, interpolation, member-access, string fns) within declared minlength/maxlength
     CountContainment = 9,        // collection size within declared bounds
     DimensionalProduct = 10,     // quantity × quantity lands in the curated business-domain dimension set
     CollectionGrowth = 11        // a prior grow in the chain establishes `count > 0` (forward-propagation)
@@ -461,7 +461,7 @@ The proof engine operates in two sequential passes:
 │    6. DimensionalProduct       — quantity × quantity in curated set   │
 │    7. CompositionalConstraint  — multi-field constraint composition   │
 │    8. IntervalContainment      — narrowed interval fits target bounds │
-│    9. LengthContainment        — string literal length fits min/max   │
+│    9. LengthContainment        — string-length interval fits min/max  │
 │   10. CountContainment         — collection size fits min/max         │
 │   (requirement-dispatched: KeyPresence and IndexBounds use            │
 │    guard-derived bounds, both reported under ProofStrategy.GuardInPath)│
@@ -1688,9 +1688,21 @@ The strategy is sound under all numeric domains. The cross-row sibling-reject ne
 
 #### Strategy 9: Length Containment Proof
 
-**When it applies:** An obligation of kind `LengthContainmentProofRequirement` — produced when a string literal is assigned to a field declared with `minlength` / `maxlength` modifiers, or stamped on a **string field/arg default** that is a string literal (a `notempty`-on-string default folds to a `minlength 1` lower bound).
+**When it applies:** An obligation of kind `LengthContainmentProofRequirement` — produced when **any** string-typed expression is assigned to a field declared with `minlength` / `maxlength` modifiers, or stamped on a **string field/arg default** (a `notempty`-on-string default folds to a `minlength 1` lower bound).
 
-**How it works:** A direct character-count check on the literal's value against the field's declared bounds. Literal-only by design: a field-to-field string assignment cannot establish length statically (the source field's value is dynamic), so the strategy returns `false` on non-literal sites and the obligation flows to `LengthBoundViolation` (PRE0135) only when the literal length actually exceeds the declared bound. Lives in `ProofEngine.Lengths.cs:TryLengthContainmentProof`.
+**How it works:** The strategy computes a static **string-length interval** `(min, max)` for the assigned expression and checks it against the declared bounds (`max == null` means the upper bound is not statically knowable). Per §0.7 prove-or-reject, the obligation discharges only when the interval is provably within `[declaredMin .. declaredMax]`; a provable violation **or** an unprovable (unbounded) interval both flow to `LengthBoundViolation` (PRE0135). The proof works by the operand *carrying* a declared constraint (§0.7 Composition): an arg/field bounded to `maxlength N` is provable into a destination of `maxlength ≥ N`; an unbounded source into a capped field is a genuine gap, closed by declaring the bound on the source.
+
+The length-interval domain (`StringLengthIntervalOf`) is a sound over-approximation covering:
+
+- **string literal** — exact length (point interval);
+- **field / arg reference** — its declared `minlength`/`maxlength`; `notempty` ⇒ `min ≥ 1`;
+- **concatenation** (`a + b`) — sum of operand intervals (unbounded if either operand is unbounded);
+- **conditional** (`if c then a else b`) — `(min(minₐ,minₑ), max(maxₐ,maxₑ))`, unbounded unless both branches are bounded;
+- **interpolation** (`'lit {hole} lit'`) — sum of literal-segment char counts plus each hole's length interval; a string hole contributes its own interval, a numeric hole with a statically-known integer range contributes its maximum decimal digit count (plus a sign char when the range reaches negative), and any hole with no static bound makes the whole result unbounded;
+- **member access** (e.g. queue `.peek`, list `.first`/`.last`) — the element type's declared length bounds when present, else unbounded (element-type length modifiers are not yet expressible — PRE0033 — so this is currently always unbounded);
+- **length-stable string functions** — `trim` → `(0, maxₓ)`; `toLower`/`toUpper` → length-preserving; `left`/`right`/`mid` with a literal count → `(0, min(count, maxₓ))`.
+
+When in any doubt the domain returns unbounded (emit) — it never under-estimates a length (that would be unsound). Lives in `ProofEngine.Lengths.cs:TryLengthContainmentProof` / `StringLengthIntervalOf`.
 
 #### Strategy 10: Count Containment Proof
 

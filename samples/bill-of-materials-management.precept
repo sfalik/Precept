@@ -83,10 +83,10 @@ event RemoveComponent(PartNumber as string notempty)
 event AddSubAssembly(SubBomId as string notempty)
 event RemoveSubAssembly(SubBomId as string notempty)
 event Submit
-event Approve(Approver as string notempty)
+event Approve(Approver as string notempty maxlength 100)
 event RequestRevisions(Reason as string notempty)
 event Activate
-event Supersede(SuccessorBomId as string notempty)
+event Supersede(SuccessorBomId as string notempty maxlength 50)
 event Obsolete(Reason as string notempty)
 
 on Submit ensure BomId is set because "BOM ID is required before submission"

@@ -88,11 +88,11 @@ in Shipped ensure TrackingNumber is set because "A shipped order must carry a tr
 
 # Events
 event Create(
-    CustomerId as string notempty,
-    SessionId as string notempty,
+    CustomerId as string notempty maxlength 100,
+    SessionId as string notempty maxlength 100,
     BaseCurrency as currency,
     CatalogItems as set of string notempty,
-    CatalogName as string optional) initial
+    CatalogName as string optional maxlength 200) initial
 
 event AddItem(ItemId as string notempty, Quantity as integer positive max 100)
 event RemoveItem(ItemId as string notempty)
@@ -107,7 +107,7 @@ event AddGiftMessage(Message as string notempty)
 
 event CheckOut(Reason as string notempty)
 event Pay
-event Ship(Address as string notempty, TrackingNumber as string notempty)
+event Ship(Address as string notempty maxlength 500, TrackingNumber as string notempty maxlength 100)
 event Deliver
 event Cancel(Reason as string notempty)
 

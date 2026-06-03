@@ -143,10 +143,10 @@ in InspectionPending modify InspectionStationId editable
 # Events
 event IssueNotice(BaseFee as money in 'USD', WeightFee as money in 'USD', EmissionsFee as money in 'USD', PlatesFee as money in 'USD', PaymentDue as date)
 event RecordPayment(Amount as money in 'USD')
-event SubmitInsurance(Carrier as string notempty, PolicyNumber as string notempty, EffectiveDate as date, ExpirationDate as date)
+event SubmitInsurance(Carrier as string notempty maxlength 200, PolicyNumber as string notempty maxlength 100, EffectiveDate as date, ExpirationDate as date)
 event VerifyInsurance
 event RejectInsurance(Reason as string notempty)
-event ScheduleInspection(StationId as string notempty)
+event ScheduleInspection(StationId as string notempty maxlength 50)
 event PassEmissions
 event PassSafetyInspection
 event FailInspection(Reason as string notempty)

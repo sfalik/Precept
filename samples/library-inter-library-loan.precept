@@ -148,8 +148,8 @@ in SourceLibraryReview modify SourceLibrarian, LoanPeriod, LoanRenewable, MaxRen
 event AddCandidateSource(LibraryCode as string notempty, Note as string optional)
 event RemoveCandidateSource(LibraryCode as string notempty)
 event SubmitRequest
-event RouteToSource(LibraryCode as string notempty)
-event AcceptBySource(SourceLibrarian as string notempty, AllowRenewal as boolean, MaxRenew as integer nonnegative max 5, LoanFeeAmt as money in 'USD')
+event RouteToSource(LibraryCode as string notempty maxlength 100)
+event AcceptBySource(SourceLibrarian as string notempty maxlength 100, AllowRenewal as boolean, MaxRenew as integer nonnegative max 5, LoanFeeAmt as money in 'USD')
 event RejectBySource(Reason as string notempty)
 event ShipToBorrower(ShippedOn as date)
 event ReceiveAtBorrower(ReceivedOn as date)

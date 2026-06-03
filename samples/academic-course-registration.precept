@@ -91,8 +91,8 @@ in Submitted modify AdvisorNote editable
 event AddCourse(CourseNumber as string notempty, Credits as integer positive)
 event DropCourse(CourseNumber as string notempty)
 event Submit
-event Approve(Advisor as string notempty, Note as string optional)
-event Reject(Advisor as string notempty, Reason as string notempty)
+event Approve(Advisor as string notempty maxlength 100, Note as string optional)
+event Reject(Advisor as string notempty maxlength 100, Reason as string notempty)
 event Enroll
 event WithdrawCourse(CourseNumber as string notempty)
 event CloseAddDropWindow

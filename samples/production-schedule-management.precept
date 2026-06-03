@@ -67,7 +67,7 @@ in Draft modify ScheduleId, ProductionLine, PlannerName, PlanningWindowStart, Pl
 event AddJob(JobName as string notempty, Hours as quantity in 'h' positive, HighPriority as boolean default false)
 event RemoveJob(JobName as string notempty, Hours as quantity in 'h' positive, HighPriority as boolean default false)
 event Submit
-event Approve(Approver as string notempty)
+event Approve(Approver as string notempty maxlength 100)
 event RequestChanges(Reason as string notempty)
 event Activate
 event Complete

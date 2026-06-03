@@ -275,10 +275,10 @@ public static class SyntaxReference
             # from the equipment's preventive-maintenance plan. All fields are derivable at
             # creation time from the plan + equipment record — no user form-filling involved.
             event Schedule(
-                EquipmentId as string notempty,
+                EquipmentId as string notempty maxlength 50,
                 Type as choice of string("Inspection", "Lubrication", "PartReplacement", "Calibration"),
                 ScheduledFor as date,
-                Technician as string notempty,
+                Technician as string notempty maxlength 100,
                 Priority as choice of string("Routine", "High", "Critical")
             ) initial
 
@@ -290,7 +290,7 @@ public static class SyntaxReference
                 -> set Priority = Schedule.Priority
 
             event Start
-            event Complete(Note as string optional)
+            event Complete(Note as string optional maxlength 500)
             event Cancel(Reason as string notempty)
 
             from Scheduled on Start

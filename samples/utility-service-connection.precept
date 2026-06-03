@@ -137,7 +137,7 @@ event RecordCreditScore(Score as integer min 300 max 850)
 event AcceptApplication(Deposit as money in 'USD', BaseCharge as money in 'USD', Fee as money in 'USD')
 event RejectApplication(Reason as string notempty)
 event PayDeposit
-event ScheduleInspection(Technician as string notempty, ScheduledOn as date)
+event ScheduleInspection(Technician as string notempty maxlength 100, ScheduledOn as date)
 event PassInspection(ConnectedOn as date)
 event FailInspection(Reason as string notempty)
 event Remediate

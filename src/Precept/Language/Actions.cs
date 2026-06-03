@@ -303,12 +303,14 @@ public static class Actions
                 null));
         }
 
-        // String length containment (string fields with minlength/maxlength)
-        // Only generate for literal string assignments — non-literal assignments leave the
-        // runtime to enforce bounds. This avoids false positives for dynamically-provided values.
+        // String length containment (string fields with minlength/maxlength).
+        // Generated unconditionally for ANY string RHS assigned into a length-bounded field (§0.7
+        // prove-or-reject) — the proof engine discharges it against the RHS's static length interval
+        // (literal, reference, concat, conditional, length-stable function) and emits when the
+        // interval cannot be proven within bounds.
         if (targetField.ResolvedType == TypeKind.String
             && (targetField.DeclaredMinLength.HasValue || targetField.DeclaredMaxLength.HasValue)
-            && inputAction.InputExpression is TypedLiteral { ResultType: TypeKind.String })
+            && inputAction.InputExpression.ResultType == TypeKind.String)
         {
             var lengthReq = new LengthContainmentProofRequirement(
                 new SelfSubject(),

@@ -762,13 +762,15 @@ public static partial class ProofEngine
         if (TryIntervalContainmentProofNarrowed(obligation, semantics, out _))
             return (ProofDisposition.Proved, ProofStrategy.IntervalContainment);
 
-        // Length containment: string literal assigned to a bounded string field
+        // Length containment: a string RHS (literal, reference, concat, conditional, or length-stable
+        // function) assigned to a bounded string field, discharged against its static length interval.
         if (obligation.Requirement is LengthContainmentProofRequirement lengthReq)
         {
-            var result = TryLengthContainmentProof(lengthReq, obligation.Site);
+            var result = TryLengthContainmentProof(lengthReq, obligation.Site, semantics);
             if (result == true)
                 return (ProofDisposition.Proved, ProofStrategy.LengthContainment);
-            // result == false means violation; leave Unresolved so Diagnostics emits the error
+            // result == false (provable violation) or null (not provable) both leave the obligation
+            // Unresolved so Diagnostics emits the error (§0.7 prove-or-reject — unbounded ⇒ emit).
         }
 
         // Count containment: V1 always unresolved (set on collections rejected by type checker)

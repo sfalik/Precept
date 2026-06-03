@@ -60,11 +60,11 @@ on ConfirmReceipt ensure PurchaseOrderNumber is set because "Purchase order numb
 on ConfirmReceipt ensure QuantityReceived is set because "Received quantity is required to confirm receipt"
 
 event SendToQuarantine
-event BeginInspection(Inspector as string notempty, Sample as quantity in 'kg' positive)
+event BeginInspection(Inspector as string notempty maxlength 100, Sample as quantity in 'kg' positive)
 event RecordChecks(Visual as boolean, Dimensional as boolean, Chemistry as boolean)
 event Approve
 event Reject(Reason as string notempty)
-event AuthorizeRelease(Authorizer as string notempty, FinalDisposition as choice of string("ReturnToSupplier","Scrap","UseAsIs","ReleasedToProduction"))
+event AuthorizeRelease(Authorizer as string notempty maxlength 100, FinalDisposition as choice of string("ReturnToSupplier","Scrap","UseAsIs","ReleasedToProduction"))
 
 on BeginInspection ensure BeginInspection.Sample > '0 kg' because "Sample size must be positive"
 

@@ -127,19 +127,19 @@ in Escalated ensure EscalationReason is set because "An escalated case must carr
 
 # Events
 event Submit(
-    PatientId as string notempty,
-    PatientName as string notempty,
+    PatientId as string notempty maxlength 50,
+    PatientName as string notempty maxlength 200,
     DateOfBirth as date,
-    Gender as string optional,
-    ServiceRequestId as string notempty,
-    ProcedureCode as string notempty,
+    Gender as string optional maxlength 20,
+    ServiceRequestId as string notempty maxlength 50,
+    ProcedureCode as string notempty maxlength 20,
     ProcedureDescription as string notempty,
-    RequestingProviderNpi as string notempty,
-    PrimaryDiagnosisCode as string notempty,
+    RequestingProviderNpi as string notempty maxlength 10,
+    PrimaryDiagnosisCode as string notempty maxlength 7,
     SecondaryDiagnosisCodes as set of string,
-    CoverageId as string notempty,
-    PayerName as string notempty,
-    PlanType as string optional,
+    CoverageId as string notempty maxlength 50,
+    PayerName as string notempty maxlength 200,
+    PlanType as string optional maxlength 100,
     CoverageStartDate as date,
     CoverageEndDate as date optional,
     CoverageLimit as money in 'USD',
@@ -151,9 +151,9 @@ event Submit(
     ValidUntil as date,
     ResponseDeadline as instant,
     UrgencyLevel as choice of string("Critical", "Urgent", "Standard", "Routine"),
-    AttendingProviderNpi as string optional,
-    PlaceOfService as string optional,
-    ServiceFrequency as string optional) initial
+    AttendingProviderNpi as string optional maxlength 20,
+    PlaceOfService as string optional maxlength 50,
+    ServiceFrequency as string optional maxlength 50) initial
 
 on Submit ensure Submit.ValidFrom <= Submit.ValidUntil because "Authorization validity start {Submit.ValidFrom} cannot fall after the end date {Submit.ValidUntil}"
 on Submit ensure Submit.ServiceDate >= Submit.CoverageStartDate because "Service date {Submit.ServiceDate} cannot precede coverage start date {Submit.CoverageStartDate}"
@@ -192,16 +192,16 @@ on Submit
     -> set SubmittedAt = now()
     -> set AuthorizationStatus = "Submitted"
 
-event StartReview(CaseManager as string notempty)
-event StartClinicalReview(Reviewer as string notempty)
-event SchedulePeerToPeerReview(PhysicianName as string notempty)
-event CompletePeerToPeerReview(Outcome as string notempty, Notes as string notempty)
+event StartReview(CaseManager as string notempty maxlength 200)
+event StartClinicalReview(Reviewer as string notempty maxlength 200)
+event SchedulePeerToPeerReview(PhysicianName as string notempty maxlength 200)
+event CompletePeerToPeerReview(Outcome as string notempty maxlength 50, Notes as string notempty)
 event RequestAdditionalInformation(InformationNeeded as string notempty)
 event ReceiveAdditionalInformation(InformationReceived as string notempty)
 event StartPayerReview
 event SubmitClinicalEvidence(ClinicalNotes as string notempty)
-event MakeClinicalDecision(Decision as string notempty)
-event Approve(AuthorizationNumber as string notempty, ApprovedUnits as integer positive, ApprovedAmount as money in 'USD')
+event MakeClinicalDecision(Decision as string notempty maxlength 50)
+event Approve(AuthorizationNumber as string notempty maxlength 50, ApprovedUnits as integer positive, ApprovedAmount as money in 'USD')
 event Denial(Reason as string notempty, Code as choice of string("MN01", "IC01", "NC01", "ST01", "FR01", "ED01", "DU01", "PR01"))
 event Escalate(Reason as string notempty)
 event Withdraw

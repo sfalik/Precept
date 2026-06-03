@@ -17,8 +17,14 @@
 ## Execution progress
 
 - **2a ✅ `9820b8c1`** — BUG-017 (emit computed-field bound obligations unconditionally) + `FlagLowerBound` folded into `ExtractFieldInterval` (operand reach) + a `GuardConstraint.IsArg` discriminator in the satisfiability scans (a real false-`TautologicalGuard` the flag-fold surfaced). Adversarial review flagged a candidate discharge-path soundness blocker; **probe-verified as a false positive** (bare divisors bind to the event arg via D20, so the discharge matches arg-to-arg correctly). Suite green 6680/417/67/291; supplier sample green.
-- **2b — next** — BUG-018 (collection-count interval + prover, revive `CountBoundViolation`), BUG-019 (string-length interval + non-literal RHS).
+- **2b-i ✅** — BUG-019 (string-length containment, non-literal RHS). Emit-unconditionally + a sound `StringLengthIntervalOf` domain (literal, field/arg-ref, concat, conditional, interpolation-with-bounded-holes, member-access hook, length-stable functions); 20 corpus samples updated to carry the matching source `maxlength` (§0.7 Composition); doc-sync (proof-engine.md / diagnostic-system.md / spec §0.6). **4 samples left red on two genuine residual gaps → Slices 3 and 4 below** (committed with the failures per owner direction).
+- **2b-ii — next** — BUG-018 (collection-count interval + prover, revive `CountBoundViolation`).
 - **2c** — relational narrowing (D2/D4) + field-ref bounds (5/6/7) + BUG-021 (flag-fold into the set-action path, gated on the narrowing reach for the ~55 samples).
+
+### New slices (residual gaps surfaced by 2b-i — both go through design)
+
+- **Slice 3 — collection element-type length (design + build).** A string read out of a collection (`Queue.peek`, accessors) into a length-capped field can't be proven: the grammar's `CollectionInnerType` (spec:1099-1105) carries only a type-qualifier, no length/value modifier, so element lengths are unexpressible. **New language surface → `/lifecycle-2-design` (consultation gate).** Candidate shapes (neutral, for the design): a declared inner-type length modifier (`queue of string maxlength N`) vs. inferring element bounds from write-sites (enqueue/add args). Unblocks it-helpdesk-ticket, restaurant-waitlist, utility-outage-report.
+- **Slice 4 — open-ended interpolation into a capped string (ruling + build).** `statistical-process-control` `CurrentAlertReason maxlength 200` is built by interpolating open-ended `quantity` values → genuinely unbounded length. Ruling: can such a field carry an enforceable `maxlength`? Likely the cap is dropped (free-form alert), but may touch interpolation typing / a per-type render-width bound. Small design / ruling.
 
 ### Discovered during execution
 

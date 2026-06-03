@@ -93,8 +93,8 @@ on Submit ensure RequestedRent > '0.00 USD' because "Requested rent must be prov
 on Submit ensure PropertyUnit is set because "Property unit is required before submitting"
 
 event RequestAdditionalInfo(Notes as string notempty)
-event Approve(Reviewer as string notempty, Note as string optional)
-event Decline(Reviewer as string notempty, Reason as string notempty)
+event Approve(Reviewer as string notempty maxlength 200, Note as string optional)
+event Decline(Reviewer as string notempty maxlength 200, Reason as string notempty)
 event PayDeposit(Amount as money in 'USD' positive)
 event SignLease
 event CancelLease(Reason as string notempty)

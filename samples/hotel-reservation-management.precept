@@ -100,7 +100,7 @@ in Confirmed modify SpecialRequest, AssignedRoomNumber editable
 event Book(NightsCount as integer positive, LeadTime as integer nonnegative, Subtotal as money in 'USD', Taxes as money in 'USD', Deposit as money in 'USD')
 event Confirm
 event PayDeposit
-event AssignRoom(RoomNumber as string notempty)
+event AssignRoom(RoomNumber as string notempty maxlength 20)
 event CheckIn
 event CheckOut
 event Close

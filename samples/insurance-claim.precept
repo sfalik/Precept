@@ -79,7 +79,7 @@ on Submit ensure ClaimantName is set because "Claimant name is required before s
 on Submit ensure ClaimAmount > '0.00 USD' because "Claim amount must be positive before submission"
 on Submit ensure PolicyNumber is set because "Policy number is required before submission"
 
-event AssignAdjuster(Name as string notempty)
+event AssignAdjuster(Name as string notempty maxlength 200)
 event RequestDocument(Name as string notempty)
 event ReceiveDocument(Name as string notempty)
 event Approve(Amount as money in 'USD' positive, Note as string optional)

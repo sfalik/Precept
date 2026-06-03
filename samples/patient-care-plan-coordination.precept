@@ -56,17 +56,17 @@ in Discontinued ensure CarePlanReason is set because "A discontinued care plan m
 
 # Events
 event CreateCarePlan(
-    PatientId as string notempty,
-    PatientName as string notempty,
+    PatientId as string notempty maxlength 50,
+    PatientName as string notempty maxlength 200,
     DateOfBirth as date,
-    Gender as string,
-    CarePlanId as string notempty,
-    CarePlanTitle as string notempty,
+    Gender as string maxlength 20,
+    CarePlanId as string notempty maxlength 50,
+    CarePlanTitle as string notempty maxlength 200,
     CarePlanDescription as string optional,
-    PrimaryCareProvider as string notempty,
+    PrimaryCareProvider as string notempty maxlength 200,
     GoalStartDate as date,
     CreatedDate as date,
-    CreatedBy as string optional) initial
+    CreatedBy as string optional maxlength 200) initial
 
 on CreateCarePlan ensure CreateCarePlan.GoalStartDate >= CreateCarePlan.CreatedDate because "Goal start date {CreateCarePlan.GoalStartDate} cannot precede care plan creation date {CreateCarePlan.CreatedDate}"
 

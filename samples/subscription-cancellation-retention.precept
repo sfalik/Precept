@@ -31,8 +31,8 @@ in RetentionReview modify LastAgentNote editable
 
 # Events
 event Create(
-    Subscriber as string notempty,
-    Plan as string notempty,
+    Subscriber as string notempty maxlength 200,
+    Plan as string notempty maxlength 100,
     Price as money in 'USD' positive) initial
 
 # Customer-initiated cancellation request.
