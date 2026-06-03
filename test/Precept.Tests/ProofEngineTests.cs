@@ -3545,7 +3545,7 @@ public class ProofEngineTests
                 field Total as number default 0 nonnegative
                 state Draft initial
                 event Submit(SubmittedAmount as number)
-                on Submit ensure SubmittedAmount >= 0 because "Submitted amount must be nonneg"
+                on Submit ensure Submit.SubmittedAmount >= 0 because "Submitted amount must be nonneg"
                 """);
 
             var entry = ledger.ConstraintInfluence.Should().ContainSingle().Which;
@@ -4268,7 +4268,7 @@ public class ProofEngineTests
                 field Ratio as decimal default 1 editable
                 state Active initial
                 event Pay(Amount as number nonzero, Code as currency)
-                from Active on Pay -> set Balance = '{Amount} {Code}' -> set Ratio = Total / Balance -> no transition
+                from Active on Pay -> set Balance = '{Pay.Amount} {Pay.Code}' -> set Ratio = Total / Balance -> no transition
                 """);
 
             var obligation = ledger.Obligations.FirstOrDefault(o =>
@@ -4293,8 +4293,8 @@ public class ProofEngineTests
                 state Review
                 event Pay(Amount as number nonzero, Code as currency)
                 event Adjust(Amount as number nonzero, Code as currency)
-                from Active on Pay -> set Balance = '{Amount} {Code}' -> set Ratio = Total / Balance -> transition Review
-                from Review on Adjust -> set Balance = '{Amount} {Code}' -> set Ratio = Total / Balance -> transition Active
+                from Active on Pay -> set Balance = '{Pay.Amount} {Pay.Code}' -> set Ratio = Total / Balance -> transition Review
+                from Review on Adjust -> set Balance = '{Adjust.Amount} {Adjust.Code}' -> set Ratio = Total / Balance -> transition Active
                 """);
 
             var obligations = ledger.Obligations.Where(o =>
@@ -4320,8 +4320,8 @@ public class ProofEngineTests
                 state Review
                 event Pay(Amount as number nonzero, Code as currency)
                 event Adjust(Code as currency)
-                from Active on Pay -> set Balance = '{Amount} {Code}' -> set Ratio = Total / Balance -> transition Review
-                from Review on Adjust -> set Balance = '{Amount2} {Code}' -> set Ratio = Total / Balance -> transition Active
+                from Active on Pay -> set Balance = '{Pay.Amount} {Pay.Code}' -> set Ratio = Total / Balance -> transition Review
+                from Review on Adjust -> set Balance = '{Amount2} {Adjust.Code}' -> set Ratio = Total / Balance -> transition Active
                 """);
 
             var obligations = ledger.Obligations.Where(o =>
@@ -4346,7 +4346,7 @@ public class ProofEngineTests
                 state Review
                 event Pay(Amount as number nonzero, Code as currency)
                 event Reset
-                from Active on Pay -> set Balance = '{Amount} {Code}' -> set Ratio = Total / Balance -> transition Review
+                from Active on Pay -> set Balance = '{Pay.Amount} {Pay.Code}' -> set Ratio = Total / Balance -> transition Review
                 from Review on Reset -> set Balance = Total -> set Ratio = Total / Balance -> transition Active
                 """);
 
@@ -4416,7 +4416,7 @@ public class ProofEngineTests
                 field Ratio as decimal default 1 editable
                 state Active initial
                 event Pay(Amount as number positive, Code as currency)
-                from Active on Pay -> set Balance = '{Amount} {Code}' -> set Ratio = Total / Balance -> no transition
+                from Active on Pay -> set Balance = '{Pay.Amount} {Pay.Code}' -> set Ratio = Total / Balance -> no transition
                 """);
 
             var obligation = ledger.Obligations.FirstOrDefault(o =>
@@ -4439,7 +4439,7 @@ public class ProofEngineTests
                 field Ratio as decimal default 1 editable
                 state Active initial
                 event Pay(Amount as number nonnegative, Code as currency)
-                from Active on Pay -> set Balance = '{Amount} {Code}' -> set Ratio = Total / Balance -> no transition
+                from Active on Pay -> set Balance = '{Pay.Amount} {Pay.Code}' -> set Ratio = Total / Balance -> no transition
                 """);
 
             var obligation = ledger.Obligations.FirstOrDefault(o =>
@@ -4460,7 +4460,7 @@ public class ProofEngineTests
                 field Desc as string optional editable
                 state Active initial
                 event Pay(Amount as number nonzero, Code as currency)
-                from Active on Pay -> set Balance = '{Amount} {Code}' -> no transition
+                from Active on Pay -> set Balance = '{Pay.Amount} {Pay.Code}' -> no transition
                 rule Desc is set because "must have description"
                 """);
 
@@ -4484,7 +4484,7 @@ public class ProofEngineTests
                 field Ratio as decimal default 1 editable
                 state Active initial
                 event Pay(Amount as number nonzero, Code as currency)
-                from Active on Pay -> set Balance = '{Amount} {Code}' -> set Ratio = Total / Balance -> no transition
+                from Active on Pay -> set Balance = '{Pay.Amount} {Pay.Code}' -> set Ratio = Total / Balance -> no transition
                 """);
 
             var obligation = ledger.Obligations.FirstOrDefault(o =>

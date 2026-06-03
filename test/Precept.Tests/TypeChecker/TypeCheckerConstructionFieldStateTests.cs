@@ -15,7 +15,7 @@ public class TypeCheckerConstructionFieldStateTests
             field Total as integer
             state Draft initial terminal
             event Start(Amount as integer) initial
-            on Start -> set Total = Amount
+            on Start -> set Total = Start.Amount
             """;
 
         TypeCheckerTestHelpers.CheckExpectingClean(precept);
@@ -30,7 +30,7 @@ public class TypeCheckerConstructionFieldStateTests
             field Note as string optional
             state Draft initial terminal
             event Start(Amount as integer, IsLarge as boolean) initial
-            on Start when IsLarge -> set Total = Amount
+            on Start when Start.IsLarge -> set Total = Start.Amount
             on Start -> set Note = "small"
             """);
 
@@ -45,7 +45,7 @@ public class TypeCheckerConstructionFieldStateTests
             field Total as integer optional
             state Draft initial terminal
             event Start(Amount as integer) initial
-            on Start when Total > 0 -> set Total = Amount
+            on Start when Total > 0 -> set Total = Start.Amount
             """);
 
         diagnostic.Message.Should().Be("Construction guard on initial event 'Start' reads field 'Total' before the entity exists — only event payload values are available here");
@@ -59,7 +59,7 @@ public class TypeCheckerConstructionFieldStateTests
             field Total as integer optional
             state Draft initial terminal
             event Start(Amount as integer) initial
-            on Start when Amount > 0 -> set Total = Amount
+            on Start when Start.Amount > 0 -> set Total = Start.Amount
             """;
 
         AssertNoD148(precept);
@@ -73,7 +73,7 @@ public class TypeCheckerConstructionFieldStateTests
             field Total as integer optional
             state Draft initial terminal
             event Start(Amount as integer) initial
-            on Start -> set Total = Amount
+            on Start -> set Total = Start.Amount
             """;
 
         AssertNoD148(precept);

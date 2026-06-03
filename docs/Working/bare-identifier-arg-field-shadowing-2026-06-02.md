@@ -1,6 +1,6 @@
 ---
 title: "Bare identifier resolution — arg-shadows-field"
-status: Draft investigation — 2026-06-02
+status: Resolved — Option C (dotted-only event-arg access) — 2026-06-02
 kind: decision-support
 purpose: >
   Investigate how a bare identifier that is both a declared field name and an in-scope
@@ -54,6 +54,36 @@ sources-consulted:
 ---
 
 # Bare identifier resolution — arg-shadows-field
+
+## Resolution (2026-06-02) — Option C, on drift-cleanup grounds
+
+The owner chose **Option C** (event args are accessed only via dotted `EventName.ArgName`;
+a bare identifier always names a field/binding). This came after a **provenance follow-up**
+that reframed C and supersedes this doc's original recommendation of Option B:
+
+- **The spec already mandated dotted-only.** §3.5 "Event arg access" states plainly: *"Event
+  args are accessed via dotted notation: `EventName.ArgName`."* The bare→arg resolution in
+  `ResolveIdentifier` was never specified there — it only surfaced obliquely in the
+  `UndeclaredField` parenthetical.
+- **The bare→arg path was scaffold drift, not a decision.** Git provenance: the dotted-only
+  spec prose predates the bare→arg code, which was ported from v1 during a scaffold commit
+  ("port 190 LS tests from v1"). Decision 20 is a one-line table entry ("Not addressed"
+  before) that bundled event args into the bare-resolution chain without engaging the spec's
+  dotted-only statement.
+- **Reframing.** This reframes C from "most disruptive / discards innermost-wins ergonomics"
+  (as analyzed in `## Per-option analysis` below) to **aligning the implementation with the
+  spec as already written** — drift cleanup, not a new language change. Under C the entire
+  A-vs-B shadowing question dissolves: there is no field/arg collision to diagnose because a
+  bare name is never an arg. Corpus impact is ~zero (authors already use dotted form
+  universally; see Finding 5).
+- **Implementation.** A bare reference to an in-scope arg is rejected with the new
+  `UnqualifiedEventArgReference` (PRE0163); a bare name colliding with a field resolves to the
+  field. The out-of-scope case stays `EventArgOutOfScope` (PRE0050). Spec §3.4/§3.5,
+  `type-checker.md` D20, and `diagnostic-system.md` updated to match.
+
+The Findings and per-option analysis below are preserved as the investigation record; where
+they frame Option C as the most disruptive choice, read them against this Resolution — the
+provenance finding (not available when the body was written) is what inverted that judgment.
 
 ## Problem statement
 

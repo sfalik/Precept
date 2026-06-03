@@ -20,7 +20,7 @@ public sealed class ParserSlice8Tests
             state Draft initial
             state Done terminal
             event Submit(amount as number default 1)
-            from Draft on Submit -> set Total = amount -> transition Done
+            from Draft on Submit -> set Total = Submit.amount -> transition Done
             """);
 
         compilation.HasErrors.Should().BeFalse();

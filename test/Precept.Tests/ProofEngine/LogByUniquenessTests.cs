@@ -31,8 +31,8 @@ public class LogByUniquenessTests
 
             event Record(Entry as string, Seq as integer)
             from Open on Record
-                when not (AuditLog contains Seq)
-                -> append AuditLog Entry by Seq
+                when not (AuditLog contains Record.Seq)
+                -> append AuditLog Record.Entry by Record.Seq
                 -> no transition
             """);
 

@@ -86,7 +86,7 @@ public class TypeCheckerAssignmentQualifierTests
             state Closed
             event E(p as money in 'EUR')
             from Open on E
-                -> set m = p
+                -> set m = E.p
                 -> transition Closed
             """;
         TypeCheckerTestHelpers.CheckExpectingError(currencyPrecept, DiagnosticCode.QualifierMismatch);
@@ -233,7 +233,7 @@ public class TypeCheckerAssignmentQualifierTests
             state Closed
             event Update(n as decimal)
             from Open on Update
-                -> set Qty = '{n} kg'
+                -> set Qty = '{Update.n} kg'
                 -> transition Closed
             """;
 
@@ -251,7 +251,7 @@ public class TypeCheckerAssignmentQualifierTests
             state Closed
             event Update(n as decimal)
             from Open on Update
-                -> set Qty = '{n} g'
+                -> set Qty = '{Update.n} g'
                 -> transition Closed
             """;
 
@@ -269,7 +269,7 @@ public class TypeCheckerAssignmentQualifierTests
             state Closed
             event Update(n as decimal)
             from Open on Update
-                -> set Total = '{n} USD'
+                -> set Total = '{Update.n} USD'
                 -> transition Closed
             """;
 
@@ -287,7 +287,7 @@ public class TypeCheckerAssignmentQualifierTests
             state Closed
             event Update(n as decimal)
             from Open on Update
-                -> set Total = '{n} EUR'
+                -> set Total = '{Update.n} EUR'
                 -> transition Closed
             """;
 
@@ -308,7 +308,7 @@ public class TypeCheckerAssignmentQualifierTests
             state Closed
             event Update(n as decimal)
             from Open on Update
-                -> set Cost = '{n} EUR/g'
+                -> set Cost = '{Update.n} EUR/g'
                 -> transition Closed
             """;
 
@@ -715,7 +715,7 @@ public class TypeCheckerAssignmentQualifierTests
             state Done terminal
             event Apply(source as money)
             from Draft on Apply
-                -> set target = source
+                -> set target = Apply.source
                 -> transition Done
             """;
 

@@ -383,12 +383,20 @@ public enum DiagnosticCode
     // ── Proof (rule self-impossibility) ──────────────────
     UnsatisfiableRule                   = 159,
 
+    // ── Type (composite period basis well-formedness) ────
+    DuplicateCompositeBasisComponent    = 160,
+    UnknownCompositeBasisComponent      = 161,
+    EmptyCompositeBasisComponent        = 162,
+
+    // ── Type (event-arg access) ──────────────────────────
+    UnqualifiedEventArgReference        = 163,
+
     // ── NameBinder ───────────────────────────────────────
     UndeclaredArg                   = 107,
 }
 ```
 
-**162 active diagnostic codes** across the diagnostic stages. `McpToolInternalError = 149` is a tooling-side code emitted by the MCP-tool wrapper, not the compile pipeline — see the note in § DiagnosticStage above. PRE0150–PRE0152 cover currency-qualifier precision; PRE0153/PRE0154/PRE0155 are emitted by the proof engine's satisfiability scan (TautologicalGuard, VacuousRule, ContradictoryRule); PRE0156 catches degenerate period literal comparisons; PRE0157 fires when `quantity × quantity` produces a dimension outside the curated business-domain set; PRE0158 fires when a field declaration has no discoverable write site; PRE0159 fires when a single rule's predicate is unsatisfiable under its field-declared bounds (distinct from PRE0155 which requires a pair-wise contradiction); PRE0160/PRE0161/PRE0162 validate composite period basis well-formedness (DuplicateCompositeBasisComponent, UnknownCompositeBasisComponent, EmptyCompositeBasisComponent — emitted by the type checker when a `period in '...'` `+`-separated basis list repeats a component, names an unknown atom, or has an empty segment).
+**163 active diagnostic codes** across the diagnostic stages. `McpToolInternalError = 149` is a tooling-side code emitted by the MCP-tool wrapper, not the compile pipeline — see the note in § DiagnosticStage above. PRE0150–PRE0152 cover currency-qualifier precision; PRE0153/PRE0154/PRE0155 are emitted by the proof engine's satisfiability scan (TautologicalGuard, VacuousRule, ContradictoryRule); PRE0156 catches degenerate period literal comparisons; PRE0157 fires when `quantity × quantity` produces a dimension outside the curated business-domain set; PRE0158 fires when a field declaration has no discoverable write site; PRE0159 fires when a single rule's predicate is unsatisfiable under its field-declared bounds (distinct from PRE0155 which requires a pair-wise contradiction); PRE0160/PRE0161/PRE0162 validate composite period basis well-formedness (DuplicateCompositeBasisComponent, UnknownCompositeBasisComponent, EmptyCompositeBasisComponent — emitted by the type checker when a `period in '...'` `+`-separated basis list repeats a component, names an unknown atom, or has an empty segment); PRE0163 (UnqualifiedEventArgReference) fires when an event arg is referenced by its bare name — event args are accessed only via dotted `EventName.ArgName` (spec §3.5), so a bare identifier always names a field (distinct from PRE0050 EventArgOutOfScope, which is a reference to an arg of a *different* event than the one in scope).
 
 The enum **is** the complete set of diagnostic rules. It is a closed set — you cannot produce a diagnostic that is not a member. Adding a member without completing the catalog chain causes a build failure (see the FaultCode → DiagnosticCode Chain section below).
 

@@ -15,7 +15,7 @@ public class TypeCheckerInitialEventStructuralTests
             field Count as integer default 0
             state Draft initial terminal
             event Start(InputCount as integer) initial
-            on Start -> set Count = InputCount
+            on Start -> set Count = Start.InputCount
             """;
 
         TypeCheckerTestHelpers.CheckExpectingClean(precept);
@@ -150,8 +150,8 @@ public class TypeCheckerInitialEventStructuralTests
             field Count as integer default 0
             state Draft initial terminal
             event Start(InputCount as integer) initial
-            on Start when InputCount > 0 -> set Count = InputCount
-            on Start when InputCount <= 0 -> set Count = 0
+            on Start when Start.InputCount > 0 -> set Count = Start.InputCount
+            on Start when Start.InputCount <= 0 -> set Count = 0
             """;
 
         TypeCheckerTestHelpers.CheckExpectingClean(precept);
@@ -179,7 +179,7 @@ public class TypeCheckerInitialEventStructuralTests
             field Count as integer default 0
             state Draft initial terminal
             event Start(InputCount as integer) initial
-            on Start when InputCount > 0 -> set Count = InputCount
+            on Start when Start.InputCount > 0 -> set Count = Start.InputCount
             """;
 
         TypeCheckerTestHelpers.CheckExpectingClean(precept);

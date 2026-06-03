@@ -423,4 +423,13 @@ public enum DiagnosticCode
     /// <c>'+ months'</c>, <c>'years + + days'</c>). The basis string is malformed.
     /// </summary>
     EmptyCompositeBasisComponent = 162,
+
+    /// <summary>
+    /// PRE0163 — An event argument is referenced by its bare name. Event arguments
+    /// are accessed only via dotted notation (<c>EventName.ArgName</c>, spec §3.5);
+    /// a bare identifier names a field. Distinct from <c>EventArgOutOfScope</c>
+    /// (PRE0050), which fires when the named arg belongs to a different event than
+    /// the one in scope — here the arg IS in scope, it just must be qualified.
+    /// </summary>
+    UnqualifiedEventArgReference = 163,
 }

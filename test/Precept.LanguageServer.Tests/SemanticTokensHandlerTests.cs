@@ -316,7 +316,7 @@ public sealed class SemanticTokensHandlerTests
             event JoinWaitlist(PartyName as string notempty, PartySize as number)
             on JoinWaitlist ensure JoinWaitlist.PartyName != "" because "Party name is required"
             from Accepting on JoinWaitlist when JoinWaitlist.PartyName != ""
-                -> set CurrentParty = PartyName
+                -> set CurrentParty = JoinWaitlist.PartyName
                 -> transition Joined
             """);
 
@@ -336,7 +336,7 @@ public sealed class SemanticTokensHandlerTests
             event JoinWaitlist(PartyName as string notempty, PartySize as number)
             on JoinWaitlist ensure JoinWaitlist.PartyName != "" because "Party name is required"
             from Accepting on JoinWaitlist when JoinWaitlist.PartyName != ""
-                -> set CurrentParty = PartyName
+                -> set CurrentParty = JoinWaitlist.PartyName
                 -> transition Joined
             """);
         var after = Compiler.Compile("""
@@ -347,7 +347,7 @@ public sealed class SemanticTokensHandlerTests
             event JoinWaitlist(GuestName as string notempty, PartySize as number)
             on JoinWaitlist ensure JoinWaitlist.GuestName != "" because "Party name is required"
             from Accepting on JoinWaitlist when JoinWaitlist.GuestName != ""
-                -> set CurrentParty = GuestName
+                -> set CurrentParty = JoinWaitlist.GuestName
                 -> transition Joined
             """);
         before.HasErrors.Should().BeFalse();
@@ -916,7 +916,7 @@ public sealed class SemanticTokensHandlerTests
             state Active initial
             event Deposit(Amount as decimal)
             from Active on Deposit
-                -> set Balance = '{Amount} USD'
+                -> set Balance = '{Deposit.Amount} USD'
             """);
         var argRef = compilation.Semantics.ArgReferences.Single(r => r.Arg.Name == "Amount");
         var expected = SemanticTokenTypes.GetMeta(SemanticTokenTypeKind.ArgName).CustomType;
@@ -965,7 +965,7 @@ public sealed class SemanticTokensHandlerTests
             state Active initial
             event Start(Hours as decimal)
             from Active on Start
-                -> set Timeout = '{round(Hours)} hours'
+                -> set Timeout = '{round(Start.Hours)} hours'
             """);
         var slots = compilation.Semantics.TransitionRows
             .OfType<TypedTransitionRowSuccess>()

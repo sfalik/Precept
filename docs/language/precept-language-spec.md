@@ -1314,7 +1314,7 @@ All names are registered in the first pass. The checking pass validates every re
 | Duplicate state name | Two state entries have the same name | `DuplicateStateName` |
 | Duplicate event name | Two `event` declarations share a name | `DuplicateEventName` |
 | Duplicate event arg | Two args in the same event have the same name | `DuplicateArgName` |
-| Undeclared field reference | `IdentifierExpression` in expression context does not match a field name (or in-scope event arg) | `UndeclaredField` |
+| Undeclared field reference | `IdentifierExpression` in expression context resolves to no field name or quantifier binding (a bare reference to an in-scope event arg is `UnqualifiedEventArgReference`, not this) | `UndeclaredField` |
 | Undeclared state reference | State name in `from`/`to`/`in` target or `transition` outcome does not match a declared state | `UndeclaredState` |
 | Undeclared event reference | Event name in `from ... on`, `on` ensure, or event handler does not match a declared event | `UndeclaredEvent` |
 | Multiple initial states | More than one state entry has `initial` | `MultipleInitialStates` |
@@ -1335,9 +1335,9 @@ Fields, states, and events are all declared at the top level. They are visible e
 | Rule condition / guard | All field names |
 | Ensure condition / guard | All field names |
 | Transition row guard | All field names + current event's args (via `EventName.ArgName`) |
-| Transition row actions (RHS of `set`, value of `add`/`enqueue`/`push`) | All field names + current event's args |
+| Transition row actions (RHS of `set`, value of `add`/`enqueue`/`push`) | All field names + current event's args (via `EventName.ArgName`) |
 | State action guard / actions | All field names |
-| Event handler actions | All field names + current event's args |
+| Event handler actions | All field names + current event's args (via `EventName.ArgName`) |
 | Default value expression | Field names declared **before** this field (no self-reference, no forward reference) |
 | Computed expression (`field X as T <- Expr`) | All field names except those that would form a dependency cycle (no self-reference, no mutual cycles) |
 | Modifier value expressions (`min N`, `max N`, etc.) | All field names — a constraint modifier is rule shorthand (§2.4), so its value expression has the same scope as a rule condition: it may reference any field regardless of declaration order, including fields declared later in the precept. Self-reference is vacuous (`min X` ⟹ `X >= X`) and mutual reference is satisfiable (`A min B` + `B min A` ⟹ `A == B`), not a cycle — unlike a computed expression (row above), a constraint cannot form an evaluation cycle. |
@@ -1365,6 +1365,8 @@ Event args are accessed via dotted notation: `EventName.ArgName`. The type check
 1. Checking if the object of a `MemberAccessExpression` is an `IdentifierExpression` that matches a declared event name.
 2. If so, the member is resolved against the event's arg declarations.
 3. Event arg access is only valid in contexts where an event is in scope (transition rows, event ensures, event handlers).
+
+Dotted notation is the **only** way to reach an event arg. A bare identifier always names a field (or quantifier binding) — never an arg — so an arg whose name collides with a field is reachable only as `EventName.ArgName`, and a bare reference to an in-scope arg is rejected with `UnqualifiedEventArgReference` (PRE0163). This keeps a bare name's meaning unambiguous: it is always the field. (Referencing an arg of a *different* event than the one in scope is the distinct `EventArgOutOfScope`, PRE0050.)
 
 ### 3.6 Expression Typing Rules
 

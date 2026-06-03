@@ -247,7 +247,7 @@ public class TypeCheckerExpressionTests
     }
 
     [Fact]
-    public void EventArgReference_ResolvesToTypedArgRef()
+    public void BareEventArgReference_EmitsUnqualifiedDiagnostic()
     {
         var ctx = BuildContext("""
             precept Widget
@@ -272,15 +272,15 @@ public class TypeCheckerExpressionTests
         var expr = new IdentifierExpression("Reason", TestSpan);
         var result = Resolve(expr, ctx);
 
-        result.Should().BeOfType<TypedArgRef>();
-        var argRef = (TypedArgRef)result;
-        argRef.ResultType.Should().Be(TypeKind.String);
-        argRef.EventName.Should().Be("Submit");
-        argRef.ArgName.Should().Be("Reason");
+        // Spec §3.5: event args are accessed only via dotted EventName.ArgName.
+        // A bare reference to an in-scope arg (with no same-name field) is rejected.
+        result.Should().BeOfType<TypedErrorExpression>();
+        ctx.Diagnostics.Should().Contain(d => d.Code == nameof(DiagnosticCode.UnqualifiedEventArgReference),
+            because: "a bare in-scope event-arg reference must be qualified (PRE0163)");
     }
 
     [Fact]
-    public void EventArgShadowsField_WhenBothInScope()
+    public void FieldWins_WhenBareNameMatchesBothFieldAndEventArg()
     {
         var ctx = BuildContext("""
             precept Widget
@@ -305,9 +305,13 @@ public class TypeCheckerExpressionTests
         var expr = new IdentifierExpression("Reason", TestSpan);
         var result = Resolve(expr, ctx);
 
-        result.Should().BeOfType<TypedArgRef>(
-            because: "event args have higher priority than fields (D20)");
-        result.ResultType.Should().Be(TypeKind.String);
+        // Spec §3.5: a bare identifier names a field; the same-named arg is reachable
+        // only as Submit.Reason. There is no collision diagnostic — the field wins.
+        result.Should().BeOfType<TypedFieldRef>(
+            because: "a bare identifier names a field; event args are dotted-only (spec §3.5)");
+        result.ResultType.Should().Be(TypeKind.Integer);
+        ctx.Diagnostics.Should().NotContain(d => d.Code == nameof(DiagnosticCode.UnqualifiedEventArgReference),
+            because: "the bare name resolved to the field, so there is nothing to qualify");
     }
 
     [Fact]
@@ -1204,7 +1208,7 @@ public class TypeCheckerExpressionTests
             state Closed
             event E(qq as quantity of 'mass')
             from Open on E
-                -> set q = qq
+                -> set q = E.qq
                 -> transition Closed
             """;
 
@@ -1221,7 +1225,7 @@ public class TypeCheckerExpressionTests
             state Closed
             event E(qq as quantity of 'mass')
             from Open on E
-                -> set q = qq
+                -> set q = E.qq
                 -> transition Closed
             """;
 
@@ -1374,7 +1378,7 @@ public class TypeCheckerExpressionTests
             state Closed
             event E(p as money in 'EUR')
             from Open on E
-                -> set m = p
+                -> set m = E.p
                 -> transition Closed
             """;
 

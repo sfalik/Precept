@@ -884,10 +884,12 @@ internal static partial class TypeChecker
     }
 
     /// <summary>
-    /// Resolve an identifier to a field reference, event arg reference, or quantifier binding.
-    /// Priority (D20): quantifier bindings > event args > fields.
-    /// Forward-reference prohibition (D8) applies when <see cref="CheckContext.CurrentScope"/>
-    /// is <see cref="FieldScopeMode.PriorFieldsOnly"/>.
+    /// Resolve a bare identifier to a field reference or quantifier binding. A bare
+    /// identifier names a field; event args are reachable only via dotted notation
+    /// (<c>EventName.ArgName</c>, spec §3.5), so a bare reference to an in-scope arg is
+    /// rejected with <see cref="DiagnosticCode.UnqualifiedEventArgReference"/>. Priority:
+    /// quantifier bindings &gt; fields. Forward-reference prohibition applies when
+    /// <see cref="CheckContext.CurrentScope"/> is <see cref="FieldScopeMode.PriorFieldsOnly"/>.
     /// </summary>
     private static TypedExpression ResolveIdentifier(IdentifierExpression id, CheckContext ctx)
     {
@@ -900,18 +902,12 @@ internal static partial class TypeChecker
                 return new TypedFieldRef(binding.ValueType, name, binding.IsCaseInsensitive, null, id.Span, binding.KeyType);
         }
 
-        // 2. Event args (second priority)
-        if (ctx.CurrentEventArgs is not null &&
-            ctx.CurrentEventArgs.TryGetValue(name, out var arg))
-        {
-            ctx.ArgReferences.Add(new ArgReference(arg, id.Span));
-            return new TypedArgRef(arg.ResolvedType, arg.EventName, arg.Name, arg.DeclaredQualifiers, id.Span);
-        }
-
-        // 3. Fields (lowest priority)
+        // 2. Fields. A bare identifier names a field; event args are dotted-only
+        //    (EventName.ArgName, spec §3.5), so a bare name that collides with an
+        //    in-scope arg resolves to the field — resolved here, before the arg check.
         if (ctx.FieldLookup.TryGetValue(name, out var field))
         {
-            // D8: Forward-reference prohibition in PriorFieldsOnly scope
+            // Forward-reference prohibition in default-value (PriorFieldsOnly) scope
             if (ctx.CurrentScope == FieldScopeMode.PriorFieldsOnly)
             {
                 int fieldIndex = ctx.Fields.IndexOf(field);
@@ -931,7 +927,18 @@ internal static partial class TypeChecker
                 ctx.CIFields.Contains(field.Name), field.DeclaredQualifiers, id.Span);
         }
 
-        // Unknown identifier — check if it matches an event arg out of scope (PRE0050)
+        // 3. A bare reference to an in-scope event arg (no same-name field) must be
+        //    qualified: event args are accessed only as EventName.ArgName (spec §3.5).
+        if (ctx.CurrentEventArgs is not null &&
+            ctx.CurrentEventArgs.TryGetValue(name, out var inScopeArg))
+        {
+            ctx.Diagnostics.Add(
+                Diagnostics.Create(DiagnosticCode.UnqualifiedEventArgReference, id.Span,
+                    inScopeArg.Name, inScopeArg.EventName));
+            return new TypedErrorExpression(id.Span);
+        }
+
+        // 4. Unknown identifier — a name matching another event's arg is out of scope (PRE0050)
         foreach (var evt in ctx.Events)
         {
             foreach (var evtArg in evt.Args)

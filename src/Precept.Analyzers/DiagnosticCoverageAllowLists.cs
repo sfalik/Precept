@@ -107,6 +107,7 @@ internal static class DiagnosticCoverageAllowLists
         "DimensionCategoryMismatch",
         "DimensionMismatchInUnitSlot",
         "UnprovedAssignmentQualifierCompatibility",
+        "UnqualifiedEventArgReference",
         "DuplicateArgName",
         "DuplicateChoiceValue",
         "DuplicateEventName",

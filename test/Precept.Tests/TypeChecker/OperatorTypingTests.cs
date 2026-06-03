@@ -30,7 +30,7 @@ public class OperatorTypingTests
             field Tags as set of string
             state Draft initial
             event Remove(Tag as string)
-            from Draft on Remove when Tags contains Tag -> no transition
+            from Draft on Remove when Tags contains Remove.Tag -> no transition
             """);
 
         index.TransitionRows.Should().ContainSingle();

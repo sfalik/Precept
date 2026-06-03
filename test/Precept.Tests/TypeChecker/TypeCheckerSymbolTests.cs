@@ -326,7 +326,7 @@ public class TypeCheckerSymbolTests
             precept Widget
             field Weight as quantity of 'mass' default '1 kg'
             event Measure(a as quantity of 'mass')
-            on Measure -> set Weight = a
+            on Measure -> set Weight = Measure.a
             """;
 
         var index = TypeCheckerTestHelpers.CheckExpectingClean(precept);
@@ -417,7 +417,7 @@ public class TypeCheckerSymbolTests
             precept Widget
             field Count as integer default 0
             event SetCount(n as integer)
-            on SetCount -> set Count = n
+            on SetCount -> set Count = SetCount.n
             """;
 
         var index = TypeCheckerTestHelpers.CheckExpectingClean(precept);

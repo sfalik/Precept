@@ -73,7 +73,7 @@ public class RuntimeConstructionTests
             field Count as integer default 0
             state Draft initial terminal
             event Create(InputCount as integer) initial
-            on Create when InputCount > 0 -> set Count = InputCount
+            on Create when Create.InputCount > 0 -> set Count = Create.InputCount
             on Create -> reject "construction not allowed"
             """);
 
