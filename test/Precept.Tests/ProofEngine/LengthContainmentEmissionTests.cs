@@ -223,4 +223,25 @@ public class LengthContainmentEmissionTests
         HasLengthViolation(diagnostics).Should().BeTrue(
             because: "literal of 20 chars exceeds maxlength 10 (existing literal path)");
     }
+
+    [Fact]
+    public void Interpolation_UnboundedQuantityHole_EmitsLengthViolation()
+    {
+        // The statistical-process-control shape: a maxlength field assembled by
+        // interpolating an open-ended quantity measurement (no magnitude bound) →
+        // unbounded length → cannot be proven within the cap, so Precept rejects.
+        var diagnostics = Compile("""
+            precept T
+            field Reason as string maxlength 20 optional
+            state Open initial
+            state Done terminal
+            event Record(Value as quantity of 'mass')
+            from Open on Record
+                -> set Reason = "Sample {Record.Value} is out of range"
+                -> transition Done
+            """);
+
+        HasLengthViolation(diagnostics).Should().BeTrue(
+            because: "an open-ended quantity interpolated into a maxlength field cannot be proven within the cap");
+    }
 }
