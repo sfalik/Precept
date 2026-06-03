@@ -92,6 +92,7 @@ internal static partial class TypeChecker
         {
             SimpleTypeReference simple       => (simple.Type.Kind, null, null),
             QualifiedTypeReference qualified => ResolveTypeKind(qualified.InnerType),
+            ElementValueModifiedTypeReference modified => ResolveTypeKind(modified.InnerType),
             CollectionTypeReference coll => (
                 ResolveCollectionTypeKind(coll),
                 ResolveTypeKind(coll.ElementType).Type,
@@ -135,19 +136,89 @@ internal static partial class TypeChecker
 
         if (fieldType is CollectionTypeReference coll)
         {
-            if (coll.ElementType is QualifiedTypeReference qualifiedInner)
+            // The element type may carry a trailing value-modifier list
+            // (queue of string maxlength 200). Unwrap it, build the base element type
+            // from the underlying inner reference, then attach the validated bounds.
+            var innerRef = coll.ElementType;
+            DeclaredValueBounds? valueBounds = null;
+            if (coll.ElementType is ElementValueModifiedTypeReference modified)
             {
-                var innerQualifiers = ExtractQualifiers(qualifiedInner, ctx);
-                return new TypedQualifiedElement(elementTypeKind.Value, innerQualifiers);
+                innerRef = modified.InnerType;
+                valueBounds = BuildElementValueBounds(modified, elementTypeKind.Value, ctx);
             }
 
-            if (coll.ElementType is ChoiceTypeReference choiceInner)
+            TypedElementType baseElement = innerRef switch
             {
-                return new TypedChoiceElement(elementTypeKind.Value, choiceInner.Ordered);
-            }
+                QualifiedTypeReference qualifiedInner =>
+                    new TypedQualifiedElement(elementTypeKind.Value, ExtractQualifiers(qualifiedInner, ctx)),
+                ChoiceTypeReference choiceInner =>
+                    new TypedChoiceElement(elementTypeKind.Value, choiceInner.Ordered),
+                _ => new TypedScalarElement(elementTypeKind.Value),
+            };
+
+            return valueBounds is null ? baseElement : baseElement with { ValueBounds = valueBounds };
         }
 
         return new TypedScalarElement(elementTypeKind.Value);
+    }
+
+    /// <summary>
+    /// Validates a collection inner type's value modifiers per-element and projects the
+    /// length bounds into a <see cref="DeclaredValueBounds"/>. Validation reuses
+    /// <see cref="ValidateValueModifiers"/> with the element's <see cref="TypeKind"/> as
+    /// subject — the same compatibility table a field declaration consults, so
+    /// <c>set of integer maxlength 5</c> emits PRE0033 per element exactly as a string-only
+    /// modifier on an integer field would. Currently projects only the string-length bounds.
+    /// </summary>
+    private static DeclaredValueBounds BuildElementValueBounds(
+        ElementValueModifiedTypeReference modified,
+        TypeKind elementTypeKind,
+        CheckContext ctx)
+    {
+        // Per-element modifier validation — applicability, duplicates, conflicts, value
+        // checks — through the same path as a field/arg declaration (no parallel validator).
+        ValidateValueModifiers(
+            modified.Modifiers,
+            elementTypeKind,
+            ImmutableArray<ModifierKind>.Empty,
+            ImmutableArray<DeclaredQualifierMeta>.Empty,
+            isComputed: false,
+            modified.Span,
+            declarationName: string.Empty,
+            isEventArg: false,
+            ctx);
+
+        // Only the string-length modifiers are projected today; the parser admits no other
+        // value modifier into element position, so only these arms are reachable.
+        int? minLength = null;
+        int? maxLength = null;
+        foreach (var modifier in modified.Modifiers)
+        {
+            switch (modifier.Kind)
+            {
+                case ModifierKind.Minlength when TryReadLengthLiteral(modifier.Value, out var mn):
+                    minLength = mn;
+                    break;
+                case ModifierKind.Maxlength when TryReadLengthLiteral(modifier.Value, out var mx):
+                    maxLength = mx;
+                    break;
+            }
+        }
+
+        return new DeclaredValueBounds(minLength, maxLength);
+    }
+
+    private static bool TryReadLengthLiteral(ParsedExpression? value, out int length)
+    {
+        if (value is LiteralExpression { LiteralKind: TokenKind.NumberLiteral, Text: var text }
+            && int.TryParse(text, System.Globalization.NumberStyles.Integer,
+                System.Globalization.CultureInfo.InvariantCulture, out length)
+            && length >= 0)
+        {
+            return true;
+        }
+        length = 0;
+        return false;
     }
 
     /// <summary>

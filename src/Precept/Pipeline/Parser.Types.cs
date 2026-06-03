@@ -214,8 +214,23 @@ public static partial class Parser
         /// via the same <see cref="TryParseQualifiers"/> helper used at top-level type
         /// position; the type checker resolves the qualifier metadata into a
         /// <see cref="TypedQualifiedElement"/> on the typed field.
+        ///
+        /// After the (optional) qualifier, a trailing value-modifier list binds to the
+        /// element type rather than the collection field — <c>queue of string maxlength 200</c>
+        /// caps each element's length, not the queue. The modifiers are wrapped in an
+        /// <see cref="ElementValueModifiedTypeReference"/>; the type checker validates them
+        /// per-element via the same compatibility table as a field declaration. The inner-type
+        /// <c>ValueModifier</c> production currently admits the string-length modifiers
+        /// (<c>maxlength</c>/<c>minlength</c>); other value modifiers stay at field-modifier
+        /// position until they are wired in element position.
         /// </summary>
         private ParsedTypeReference ParseInnerTypeReference()
+        {
+            var innerRef = ParseInnerTypeReferenceCore();
+            return TryParseElementValueModifiers(innerRef);
+        }
+
+        private ParsedTypeReference ParseInnerTypeReferenceCore()
         {
             var peekToken = Peek();
 
@@ -249,6 +264,50 @@ public static partial class Parser
             }
 
             return new MissingTypeReference(peekToken.Span);
+        }
+
+        /// <summary>
+        /// Consumes a trailing element value-modifier list on a collection inner type and
+        /// wraps the inner reference in an <see cref="ElementValueModifiedTypeReference"/>.
+        /// Currently admits only the string-length modifiers (<c>maxlength</c>/<c>minlength</c>):
+        /// they are the modifiers whose read-reach/write-obligation half is wired.
+        /// Any other modifier keyword is left for the field-level modifier slot (its prior
+        /// binding), so this is strictly additive — a non-length modifier after the inner
+        /// type behaves exactly as before. Disambiguation: the inner-type position is the
+        /// only place these tokens can sit between the element type and the field-modifier
+        /// list, so consuming them here moves a length bound that today binds (and is
+        /// rejected) on the collection field onto the element instead.
+        /// </summary>
+        private ParsedTypeReference TryParseElementValueModifiers(ParsedTypeReference innerRef)
+        {
+            var modifiers = ImmutableArray.CreateBuilder<ParsedModifier>();
+            var lastSpan = innerRef.Span;
+
+            while (Peek().Kind is TokenKind.Maxlength or TokenKind.Minlength
+                && Modifiers.ByValueToken.TryGetValue(Peek().Kind, out var modMeta))
+            {
+                var modToken = Advance();
+                ParsedExpression? valueExpr = null;
+                if (modMeta.HasValue && ExpressionStartTokens.Contains(Peek().Kind))
+                {
+                    valueExpr = ParseExpression(0, () =>
+                        Peek().Kind is TokenKind.Maxlength or TokenKind.Minlength
+                        || ValueModifierTokens.Contains(Peek().Kind)
+                        || FieldDeclarationAccessModifierTokens.Contains(Peek().Kind)
+                        || IsAtConstructBoundary());
+                }
+
+                var modSpan = valueExpr is null ? modToken.Span : SourceSpan.Covering(modToken.Span, valueExpr.Span);
+                modifiers.Add(new ParsedModifier(modMeta.Kind, valueExpr, modSpan));
+                lastSpan = modSpan;
+            }
+
+            if (modifiers.Count == 0)
+                return innerRef;
+
+            return new ElementValueModifiedTypeReference(
+                innerRef, modifiers.ToImmutable(),
+                SourceSpan.Covering(innerRef.Span, lastSpan));
         }
 
         /// <summary>

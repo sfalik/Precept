@@ -55,18 +55,6 @@ surfaced for proper fixing.
 - **Priority**: quality bar / soundness — a Principle-11 violation on count-bounded collections; pre-release.
 - **Repro**: `field C as set of integer maxcount 1` + an action adding two distinct elements → expected `CountBoundViolation`, actual clean.
 
-### BUG-019: Length containment skipped on non-literal RHS — obligation generated only for literal assignments (Principle-10/11 soundness hole)
-
-- **Discovered**: 2026-06-02 during Phase-2 contract grounding.
-- **Affected**: `set`-action string assignment vs a field's declared `maxlength`/`minlength`. The length-containment obligation is generated **only for literal RHS** (`Actions.cs:309–311`); a non-literal RHS (concatenation, field reference) is not checked.
-- **Symptom**: `field Name as string maxlength 10` + `set Name = First + Last` (whose result can exceed 10) compiles clean. The literal case (`set Name = "<11 chars>"`) correctly emits `LengthBoundViolation`.
-- **Root cause**: same shape as [[BUG-017]] / [[BUG-018]] — obligation creation is gated (here, on the RHS being a literal) rather than emitted-or-proven for every assignment. A non-literal whose length interval can't be bounded under the declared `maxlength` must reject, not skip.
-- **Workaround used**: none.
-- **Fix complexity**: extend length-containment obligation generation to non-literal RHS, discharging against the string-length interval (mirrors the numeric OutOfRange path from Slice 3b); unprovable length ⇒ emit.
-- **Priority**: quality bar / soundness — a Principle-11 violation on length-bounded strings; pre-release.
-- **Repro**: `field Name as string maxlength 10` + `set Name = First + Last` with `First`/`Last` unbounded-length → expected `LengthBoundViolation`, actual clean.
-- **Status**: ✅ **Fixed 2026-06-02 (Slice 2b-i)** — literal gate dropped; length-containment obligation generated for any string RHS into a length-bounded field; discharged against a sound string-length interval (`StringLengthIntervalOf`: literal, field/arg-ref, concat, conditional, interpolation with bounded holes, member-access hook, length-stable functions); unprovable ⇒ emit `LengthBoundViolation` (§0.7, no deferral). 20 corpus samples updated to declare the matching `maxlength` on the source args/fields the proof requires (the §0.7 Composition fix). **Two residual gaps surfaced (genuine, not false positives — see the readiness/plan doc's new slices):** (1) collection **element-type length** is unexpressible (`queue of string maxlength N` doesn't parse), so a string read via `.peek`/accessor into a capped field can't be proven — 3 samples (it-helpdesk-ticket, restaurant-waitlist, utility-outage-report) left red pending the element-type-length language-surface design; (2) ✅ **resolved 2026-06-02** — an interpolation of an open-ended quantity into a capped string is genuinely unbounded; ruling = the field is free-form, so `statistical-process-control` `CurrentAlertReason` had its `maxlength` dropped (Precept correctly rejects a cap there). Only gap (1) remains. (Move to § Fixed in a cleanup pass once gap (1) closes.)
-
 ### BUG-020: A field-reference modifier bound (`min Floor`) is silently accepted, never bound, never enforced — and an undeclared reference is not caught
 
 - **Discovered**: 2026-06-02 (precept-author probe of the relational-rules-and-bounds design's worked example; verified via `precept_compile`, MCP reconnected).
@@ -96,6 +84,15 @@ surfaced for proper fixing.
 - **Repro**: SubProbe1 (emits) vs SubProbe3 (clean) above.
 
 ## Fixed
+
+### BUG-019: Length containment skipped on non-literal RHS — obligation generated only for literal assignments (Principle-10/11 soundness hole)
+
+- **Discovered**: 2026-06-02 during Phase-2 contract grounding.
+- **Affected**: `set`-action string assignment vs a field's declared `maxlength`/`minlength`. The length-containment obligation was generated **only for literal RHS**; a non-literal RHS (concatenation, field reference) was not checked.
+- **Symptom**: `field Name as string maxlength 10` + `set Name = First + Last` (whose result can exceed 10) compiled clean. The literal case (`set Name = "<11 chars>"`) correctly emitted `LengthBoundViolation`.
+- **Root cause**: same shape as [[BUG-017]] / [[BUG-018]] — obligation creation was gated (here, on the RHS being a literal) rather than emitted-or-proven for every assignment.
+- **Workaround used**: none.
+- **Status**: ✅ **Fixed 2026-06-02** — literal gate dropped; length-containment obligation generated for any string RHS into a length-bounded field; discharged against a sound string-length interval (`StringLengthIntervalOf`: literal, field/arg-ref, concat, conditional, interpolation with bounded holes, member-access hook, length-stable functions); unprovable ⇒ emit `LengthBoundViolation` (§0.7, no deferral). 20 corpus samples updated to declare the matching `maxlength` on the source args/fields the proof requires (the §0.7 Composition fix). **Both residual gaps now closed:** (1) ✅ collection **string element-type length** is now expressible (`queue of string maxlength 200`) — the modifier binds to the element, write-sites prove the source within the bound, and `.peek`/accessor reads carry the bound into a capped destination; the 3 samples (it-helpdesk-ticket, restaurant-waitlist, utility-outage-report) are green; (2) ✅ **resolved 2026-06-02** — an interpolation of an open-ended quantity into a capped string is genuinely unbounded; ruling = the field is free-form, so `statistical-process-control` `CurrentAlertReason` had its `maxlength` dropped (Precept correctly rejects a cap there).
 
 ### BUG-016: collection-mutation forward-propagation — guard facts not effect-adjusted across grow/shrink
 

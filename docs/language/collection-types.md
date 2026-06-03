@@ -609,6 +609,25 @@ Adding a value of the wrong denomination is a type error at the `add` site:
 add Charges $50 EUR     # TypeMismatch — expected money in 'USD', got money in 'EUR'
 ```
 
+### Element value modifiers
+
+A collection's scalar inner type may carry a value modifier, after any qualifier — the per-element analogue of the same modifier on a scalar field. This is a **distinct axis** from cardinality: `maxcount` bounds *how many* elements the collection holds; an element value modifier bounds *what each element is*. (This is why the `capacity`-modifier rejection below — a redundant spelling of `maxcount` — does not apply here: there is no existing spelling for a per-element value bound.)
+
+For a string inner type, the length modifiers `minlength`/`maxlength` apply:
+
+```precept
+field AgentQueue as queue of string maxlength 200    # each element ≤ 200 characters
+```
+
+The element bound participates in proof identically to the equivalent scalar-field modifier:
+
+- **Write-site (compile-time).** A value introduced into the collection (`enqueue`/`add`/`push`/`append`/`insert`/`put` and the `*-by` variants) must be provably within the element bound, the same containment obligation a `set` into a `maxlength` field carries. `enqueue AgentQueue E.Name` discharges when `E.Name` is declared `maxlength 200` (or narrower); an unbounded source rejects (`LengthBoundViolation`).
+- **Read-site (compile-time).** An element read (`.peek`/`.first`/`.last`) carries the element bound as its value interval, so reading into a same-or-wider-bounded destination field discharges with no per-access guard — `set LastCalledParty = PartyQueue.peek` proves into a `maxlength 200` field.
+
+Per-element modifier legality is checked against the same modifier↔type compatibility table as a scalar field (precept-language-spec.md §2.4), with the **element** type as subject: `set of integer maxlength 5` emits `InvalidModifierForType` because `maxlength` does not apply to `integer`.
+
+*(The element-value-modifier surface currently admits the string-length modifiers `minlength`/`maxlength`; the numeric, flag, and qualified value modifiers attach in element position as the surface fills out — the validation, write-proof, and read-reach machinery generalizes to them.)*
+
 ### Token vocabulary
 
 | Token | Keyword | Role |
@@ -767,9 +786,9 @@ For `lookup of K to V`, the analogous pattern is key-presence: `F contains K` in
 | `mincount`/`maxcount` on scalar field | `InvalidModifierForType` |
 | `min`/`max`/`nonnegative`/`minlength`/`maxlength`/`maxplaces` on collection field | `InvalidModifierForType` |
 
-**Scalar constraints do not apply to collections.** `min`, `max`, `minlength`, `maxlength`, `maxplaces`, `nonnegative`, `positive`, `nonzero`, and `ordered` are all type errors when applied as field-level modifiers on collection fields (e.g., `field Tags as set of string ordered` is invalid). Collections have their own constraint vocabulary: `notempty`, `mincount`, and `maxcount`. Note that `ordered` on the *inner `choice of T(...)` type* is valid — `field Priorities as set of choice of string("low", "medium", "high") ordered` declares an ordered-choice inner type, not a collection-level modifier.
+**Scalar constraints do not apply to collections.** `min`, `max`, `minlength`, `maxlength`, `maxplaces`, `nonnegative`, `positive`, `nonzero`, and `ordered` are all type errors when applied as field-level modifiers on collection fields (e.g., `field Tags as set of string ordered` is invalid). Collections have their own constraint vocabulary: `notempty`, `mincount`, and `maxcount`. Note that a scalar value modifier on the *inner type* is valid and binds to the element, not the field — `field AgentQueue as queue of string maxlength 200` caps each element's length (see [§ Element value modifiers](#element-value-modifiers)). Likewise `ordered` on the *inner `choice of T(...)` type* is valid — `field Priorities as set of choice of string("low", "medium", "high") ordered` declares an ordered-choice inner type, not a collection-level modifier.
 
-> **Element-level constraints:** `notempty`, `mincount`, and `maxcount` constrain the collection as a whole. To constrain individual elements (e.g., "all items must be positive" or "no items may be empty"), use a quantifier predicate *(see [§ Quantifier Predicates](#quantifier-predicates) for syntax)*.
+> **Element-level constraints:** `notempty`, `mincount`, and `maxcount` constrain the collection as a whole (cardinality). To constrain each individual element's *value*, two paths exist: (1) an **inner-type value modifier** — `queue of string maxlength 200` — declares a static per-element type bound the proof engine reads at write- and read-sites (see [§ Element value modifiers](#element-value-modifiers)); (2) a **quantifier predicate** — `rule each x in C (x > 0)` — is a runtime governance rule over the current elements *(see [§ Quantifier Predicates](#quantifier-predicates) for syntax)*. The two are complementary: the inner-type modifier carries a bound back to a read-site (so `.peek` proves into a capped field); a quantifier does not.
 
 ---
 

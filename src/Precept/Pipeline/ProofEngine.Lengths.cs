@@ -209,16 +209,21 @@ public static partial class ProofEngine
 
     /// <summary>
     /// Length interval for a collection element read via member access (e.g. <c>.peek</c>,
-    /// <c>.first</c>, <c>.last</c>). The element's length interval is the collection field's
-    /// element-type declared length bounds when present; otherwise unbounded. Element-type length
-    /// modifiers are not yet expressible in the grammar, so the bounded path is currently dead but
-    /// kept as the single sound place to read them.
+    /// <c>.first</c>, <c>.last</c>). The element's length interval is the receiver collection
+    /// field's element-type declared length bounds when present; otherwise unbounded. This makes
+    /// a <c>maxlength</c>-bounded string element read provable into a same-or-wider-capped field
+    /// (the read-site reach that closes the element-bound length gap). A collection with no
+    /// element bound stays unbounded — the prior behavior is preserved exactly.
     /// </summary>
     private static (int min, int? max) MemberAccessStringLengthInterval(TypedMemberAccess access, SemanticIndex semantics)
     {
-        // TypedElementType carries no declared length bounds today (element-type length modifiers
-        // are rejected by PRE0033), so a string element read is always unbounded. When element-type
-        // length is added, read it from the receiver field's element type here.
+        if (access.Object is TypedFieldRef fieldRef
+            && semantics.FieldsByName.TryGetValue(fieldRef.FieldName, out var field)
+            && field.ElementType?.ValueBounds is { IsEmpty: false } bounds)
+        {
+            return LengthIntervalFromModifiers(bounds.DeclaredMinLength, bounds.DeclaredMaxLength, bounds.NotEmpty);
+        }
+
         return (0, null);
     }
 

@@ -246,7 +246,7 @@ The proof-engine obligations enumerated above describe the full language-level c
 
 All other obligations (numeric intervals, relational reasoning, divisor safety, non-negative obligations, unit-aware comparison, assignment-range impossibility, default-violation enforcement, proof attribution) are implemented and exercised by the proof-engine test suite. Authors who depend on the specification-only obligations today must supply the equivalent hand-written constraints (an explicit `rule` or `ensure`) until Phase 5 ships them.
 
-**Assignment-range impossibility (item 6) — string-length dimension.** Length containment for `minlength`/`maxlength`-bounded string fields now covers **non-literal** assignment RHS, not only string literals. The proof engine computes a static string-length interval for the assigned expression (literal, field/arg reference, concatenation, conditional, interpolation, member access, and the length-stable string functions) and discharges the obligation only when that interval is provably within the declared bounds; an unbounded source flowing into a capped field is a genuine gap that the author closes by declaring the matching bound on the source (§0.7 Composition). One residual gap: collection **element-type** length modifiers are not yet expressible, so a string read via a collection accessor (`.peek`/`.first`/…) is always unbounded and cannot be proven into a capped field today.
+**Assignment-range impossibility (item 6) — string-length dimension.** Length containment for `minlength`/`maxlength`-bounded string fields now covers **non-literal** assignment RHS, not only string literals. The proof engine computes a static string-length interval for the assigned expression (literal, field/arg reference, concatenation, conditional, interpolation, member access, and the length-stable string functions) and discharges the obligation only when that interval is provably within the declared bounds; an unbounded source flowing into a capped field is a genuine gap that the author closes by declaring the matching bound on the source (§0.7 Composition). A collection's string inner type may carry the same `minlength`/`maxlength` bound (`queue of string maxlength 200` — §2.3): an element read via a collection accessor (`.peek`/`.first`/`.last`) then carries that bound and proves into a capped destination, and an element write-site must prove its source within the bound.
 
 **Sequential proof flow (item 7) — implemented (corrected 2026-05-28, completed 2026-05-29).** A prior version of this table claimed item 7 was implemented; a probe disproved it (a guard fact survived a reassignment, proving a divide-by-zero "safe"). It is now genuinely implemented across both clauses, classified catalog-side by `ActionMeta.Effect` (`ActionEffectClass`):
 
@@ -1096,15 +1096,16 @@ ScalarType  :=  ~string | string | number | integer | decimal | boolean
              |  money | currency | quantity | unitofmeasure
              |  dimension | price | exchangerate
 
-CollectionType  :=  (set | queue | stack) of CollectionInnerType TypeQualifier?
-                |   bag of CollectionInnerType TypeQualifier?
-                |   list of CollectionInnerType TypeQualifier?
-                |   log of CollectionInnerType TypeQualifier?
-                |   log of CollectionInnerType by CollectionInnerType TypeQualifier?
+CollectionType  :=  (set | queue | stack) of CollectionInnerType
+                |   bag of CollectionInnerType
+                |   list of CollectionInnerType
+                |   log of CollectionInnerType
+                |   log of CollectionInnerType by CollectionInnerType
                 |   queue of CollectionInnerType by CollectionInnerType DirectionModifier?
                 |   lookup of CollectionInnerType to CollectionInnerType
-CollectionInnerType  :=  ScalarType | ChoiceType
+CollectionInnerType  :=  ScalarType TypeQualifier? ValueModifier* | ChoiceType
 DirectionModifier  :=  ascending | descending
+ValueModifier      :=  minlength Expr | maxlength Expr
 ChoiceType        :=  choice "of" ChoiceElementType "(" ChoiceValueExpr ("," ChoiceValueExpr)* ")" ordered?
 ChoiceElementType :=  string | integer | decimal | number | boolean
 ChoiceValueExpr   :=  StringLiteral | NumberLiteral | true | false
@@ -1114,6 +1115,8 @@ TypeQualifier   :=  (in | of | to) Expr
 > **`~string` is not a valid `ChoiceElementType`.** The `choice` type guarantees the stored value IS the canonical declared string; `~string`'s storage-preserving model cannot be reconciled with this guarantee without new surface. Use `toLower()` normalization at the ingestion boundary before assigning to a choice field. Attempting `choice of ~string(...)` produces an `ExpectedToken` parse error — `~string` is not in the `ChoiceElementType` grammar production.
 
 Type qualifiers narrow the value domain: `in '<unit>'` pins to a specific unit or currency, `of '<family>'` constrains to a dimension family. A field may use `in` or `of`, not both.
+
+**Value modifiers in inner-type position.** A collection's scalar inner type may carry a trailing value-modifier list, after any type qualifier — `queue of string maxlength 200`, `set of money in 'USD' nonnegative`. The qualifier *and* the value modifiers both bind to the **inner type** (the element), not the collection field: `maxlength 200` caps each element's length, not the number of elements (`maxcount` is the separate cardinality axis). An inner-type value modifier is the per-element analogue of the same modifier on a scalar field — it desugars to a per-element rule (§2.4) and participates in proof identically: an element write-site must prove its source within the bound, and an element read (`.peek`/`.first`/`.last`) carries the bound as its value interval so it discharges into a same-or-wider-bounded destination. The modifier↔type compatibility table (§2.4) is consulted with the **element** type as subject — `set of integer maxlength 5` emits `InvalidModifierForType` exactly as `maxlength` on an integer field would. *(Currently the inner-type `ValueModifier` production admits the string-length modifiers `minlength`/`maxlength`; the numeric, flag, and qualified value modifiers attach in element position as the surface fills out — the per-element validation, write-proof, and read-reach machinery generalizes to them.)*
 
 **`~string` in `ScalarType` position.** `~string` is valid in field declarations (`field Email as ~string`) and event argument declarations (`event Foo(Email as ~string)`). It is not valid in `ChoiceElementType` position (see note above). The parser recognizes `~string` via a new additive `Tilde`-handling path in `ParseTypeRef()` — the existing collection inner type path is unchanged. `~string` is `TypeKind.String` with `CaseInsensitive = true` on the type reference node; it is not a new `TypeKind`.
 
@@ -1668,6 +1671,8 @@ Modifiers are constraints on field/arg values. The type checker validates applic
 | `maxplaces` | `decimal` | `integer`, `number`, `string`, `boolean`, collections |
 | `ordered` | `choice` | all non-choice types |
 | `optional` | any field type | — (always valid) |
+
+> **Per-element consultation (collection inner types).** When a value modifier sits in collection inner-type position (`queue of string maxlength 200` — §2.3), this same table is consulted with the **element** scalar type as subject. `set of integer maxlength 5` emits `InvalidModifierForType` because `maxlength` does not apply to `integer`, exactly as it would on an `integer` field. No second compatibility axis exists — the element type is a scalar type, and a scalar type's modifier set is already defined here.
 
 > **`notempty` on collections:** On collection fields, `notempty` is equivalent to `mincount 1`. It statically discharges `.min`/`.max`/`.peek`/`.peekby`/`.first`/`.last`/`.at` access obligations on the kinds that surface those accessors — no per-access `.count > 0` guard is needed when the field is declared `notempty`. On `lookup of K to V`, `notempty` asserts cardinality only (the kind does not surface element-returning accessors).
 

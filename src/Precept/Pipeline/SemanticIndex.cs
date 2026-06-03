@@ -346,8 +346,34 @@ public sealed record TypedBindingAction(
 //  the subtype.
 // ════════════════════════════════════════════════════════════════════════════
 
-/// <summary>Base of the resolved element-type DU for collection inner types.</summary>
-public abstract record TypedElementType(TypeKind ResolvedTypeKind);
+/// <summary>
+/// Declared value bounds carried by a collection inner type's value modifiers
+/// (e.g. <c>queue of string maxlength 200</c>). Reuses <see cref="TypedField"/>'s
+/// length-bound vocabulary (<c>DeclaredMinLength</c>/<c>DeclaredMaxLength</c>) so the
+/// proof engine's existing length-containment machinery reads element bounds and field
+/// bounds through one shape. Currently carries only the string-length bounds; numeric /
+/// flag bounds attach to this same companion as they are wired (DU companion, not a parallel carrier).
+/// </summary>
+public sealed record DeclaredValueBounds(
+    int? DeclaredMinLength = null,
+    int? DeclaredMaxLength = null,
+    bool NotEmpty = false)
+{
+    /// <summary>True when no bound is actually declared (the common no-modifier case).</summary>
+    public bool IsEmpty => DeclaredMinLength is null && DeclaredMaxLength is null && !NotEmpty;
+}
+
+/// <summary>
+/// Base of the resolved element-type DU for collection inner types.
+/// <see cref="ValueBounds"/> carries any value modifiers declared on the inner type
+/// (<c>queue of string maxlength 200</c>); <c>null</c> when the element type is
+/// unmodified. Read-sites consult it to seed the element read's value interval and
+/// write-sites consult it to generate the per-element containment obligation.
+/// </summary>
+public abstract record TypedElementType(TypeKind ResolvedTypeKind)
+{
+    public DeclaredValueBounds? ValueBounds { get; init; }
+}
 
 /// <summary>Plain scalar/business/temporal element type — no qualifier or trait metadata.</summary>
 public sealed record TypedScalarElement(TypeKind ResolvedTypeKind)

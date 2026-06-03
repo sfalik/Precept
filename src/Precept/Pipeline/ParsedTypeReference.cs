@@ -22,12 +22,13 @@ public abstract record ParsedTypeReference(SourceSpan Span)
     /// </summary>
     public TypeKind ResolvedKind => this switch
     {
-        SimpleTypeReference s      => s.Type.Kind,
-        QualifiedTypeReference q   => q.InnerType.ResolvedKind,
-        CollectionTypeReference c  => c.CollectionType.Kind,
-        ChoiceTypeReference ch     => ch.Type.Kind,
-        CITypeReference ci         => ci.Type.Kind,
-        _                          => TypeKind.Error,
+        SimpleTypeReference s              => s.Type.Kind,
+        QualifiedTypeReference q           => q.InnerType.ResolvedKind,
+        ElementValueModifiedTypeReference m => m.InnerType.ResolvedKind,
+        CollectionTypeReference c          => c.CollectionType.Kind,
+        ChoiceTypeReference ch             => ch.Type.Kind,
+        CITypeReference ci                 => ci.Type.Kind,
+        _                                  => TypeKind.Error,
     };
 }
 
@@ -87,6 +88,21 @@ public sealed record MissingTypeReference(SourceSpan Span)
 public sealed record QualifiedTypeReference(
     ParsedTypeReference InnerType,
     ImmutableArray<ParsedQualifier> Qualifiers,
+    SourceSpan Span)
+    : ParsedTypeReference(Span);
+
+/// <summary>
+/// A collection inner type carrying trailing value modifiers (e.g.
+/// <c>queue of string maxlength 200</c>, <c>set of money in 'USD' nonnegative</c>).
+/// The modifiers attach to the element type — they are the same
+/// <see cref="ParsedModifier"/> values a field declaration carries, validated per
+/// element against the same modifier↔type compatibility table. Wraps the underlying
+/// (possibly qualified) inner type so the qualifier and the value modifiers both
+/// bind to the element.
+/// </summary>
+public sealed record ElementValueModifiedTypeReference(
+    ParsedTypeReference InnerType,
+    ImmutableArray<ParsedModifier> Modifiers,
     SourceSpan Span)
     : ParsedTypeReference(Span);
 

@@ -39,7 +39,7 @@ field ResolutionNote as string optional
 field ReopenCount as integer default 0 nonnegative
 
 # Shared on-call queue — agents register themselves; Assign dequeues the next.
-field AgentQueue as queue of string
+field AgentQueue as queue of string maxlength 200
 
 # States
 state New initial

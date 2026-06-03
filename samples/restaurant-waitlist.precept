@@ -19,7 +19,7 @@ field EstimatedWaitMinutes as integer default 0 nonnegative
 field WalkInOpen as boolean default true
 
 # The waiting queue itself — FIFO of party names.
-field PartyQueue as queue of string
+field PartyQueue as queue of string maxlength 200
 
 # States
 state Accepting initial

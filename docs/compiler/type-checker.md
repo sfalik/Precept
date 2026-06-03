@@ -359,6 +359,8 @@ The `ElementType` slot is the resolved element-type **DU** (Phase 4 W-C, F-LANG-
 
 Consumers that only need the resolved kind read `.ResolvedTypeKind` on the base. Consumers that need qualifier or ordering metadata pattern-match on the subtype.
 
+**Element value bounds.** The base `TypedElementType` carries an optional `DeclaredValueBounds? ValueBounds` companion (a DU-subtype extension, not a nullable-flattened bound representation) holding the value modifiers declared on the inner type — `queue of string maxlength 200` resolves to a `TypedScalarElement(String) with { ValueBounds = DeclaredValueBounds(DeclaredMaxLength: 200) }`. `DeclaredValueBounds` reuses `TypedField`'s length-bound vocabulary (`DeclaredMinLength`/`DeclaredMaxLength`) so the proof engine's length-containment machinery reads field bounds and element bounds through one shape. `BuildTypedElementType` unwraps the parser's `ElementValueModifiedTypeReference`, builds the base element type from the underlying inner reference, then attaches the validated bounds. Validation runs through `BuildElementValueBounds`, which calls the **same** `ValidateValueModifiers` path as a field/arg declaration with the element's `TypeKind` as subject — so `set of integer maxlength 5` emits `InvalidModifierForType` (PRE0033) per element exactly as `maxlength` on an `integer` field would, with no parallel validator and no second compatibility table. The surface currently projects the string-length bounds (`minlength`/`maxlength`); numeric/flag bounds attach to the same companion in later phases.
+
 
 
 ```csharp

@@ -424,6 +424,50 @@ public static partial class ProofEngine
             CollectLengthDefaultObligation(
                 field.ResolvedType, field.Modifiers, field.DeclaredMinLength, field.DeclaredMaxLength,
                 field.Name, field.DefaultExpression, context, obligations);
+
+            CollectElementLengthDefaultObligations(field, context, obligations);
+        }
+    }
+
+    /// <summary>
+    /// A <c>default [...]</c> literal on a collection whose string inner type declares a length
+    /// bound is an element-entry path: each element must satisfy the element bound, exactly as a
+    /// write-site element source must (<see cref="Actions.GenerateElementLengthContainmentObligation"/>).
+    /// Without this, the read-site reach would carry a bound a default element could violate
+    /// (matched-pair soundness, design § Semantic Rule 5). Reuses the shared
+    /// <see cref="LengthContainmentProofRequirement"/> + <c>TryLengthContainmentProof</c> prover;
+    /// the default elements are literals, so the obligation discharges statically.
+    /// </summary>
+    private static void CollectElementLengthDefaultObligations(
+        TypedField field, ObligationContext context, List<ProofObligation> obligations)
+    {
+        if (field.ElementType?.ValueBounds is not { IsEmpty: false } bounds)
+            return;
+        if (field.DefaultExpression is not TypedListLiteral list)
+            return;
+
+        var minLength = bounds.DeclaredMinLength;
+        if (bounds.NotEmpty)
+            minLength = Math.Max(minLength ?? 0, 1); // notempty ⇒ length ≥ 1
+        if (!minLength.HasValue && !bounds.DeclaredMaxLength.HasValue)
+            return;
+
+        foreach (var element in list.Elements)
+        {
+            if (element.ResultType != TypeKind.String)
+                continue;
+            obligations.Add(new ProofObligation(
+                new LengthContainmentProofRequirement(
+                    new SelfSubject(),
+                    field.Name,
+                    minLength,
+                    bounds.DeclaredMaxLength,
+                    $"Length containment: each default element of '{field.Name}' must have length in [{minLength?.ToString() ?? "0"} .. {bounds.DeclaredMaxLength?.ToString() ?? "∞"}]"),
+                element,
+                context,
+                ProofDisposition.Unresolved,
+                null,
+                null));
         }
     }
 

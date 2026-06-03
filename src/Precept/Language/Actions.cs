@@ -312,20 +312,13 @@ public static class Actions
             && (targetField.DeclaredMinLength.HasValue || targetField.DeclaredMaxLength.HasValue)
             && inputAction.InputExpression.ResultType == TypeKind.String)
         {
-            var lengthReq = new LengthContainmentProofRequirement(
-                new SelfSubject(),
+            var lengthObligation = BuildLengthContainmentObligation(
                 inputAction.FieldName,
-                targetField.DeclaredMinLength,
-                targetField.DeclaredMaxLength,
-                $"Length containment: {inputAction.FieldName} must have length in [{targetField.DeclaredMinLength?.ToString() ?? "0"} .. {targetField.DeclaredMaxLength?.ToString() ?? "∞"}]");
-
-            obligations.Add(new ProofObligation(
-                lengthReq,
                 inputAction.InputExpression,
-                null!, // Will be replaced with proper context in ProofEngine.WalkActions()
-                ProofDisposition.Unresolved,
-                null,
-                null));
+                targetField.DeclaredMinLength,
+                targetField.DeclaredMaxLength);
+            if (lengthObligation is not null)
+                obligations.Add(lengthObligation);
         }
 
         // NOTE: open-field assignment-qualifier obligations are NOT generated here. They are stamped
@@ -334,6 +327,74 @@ public static class Actions
         // docs/compiler/proof-engine.md (type checker stamps, proof engine discharges).
 
         return obligations.ToImmutable();
+    }
+
+    /// <summary>
+    /// Builds a per-element string length-containment obligation for an element-introducing
+    /// action whose target collection declares a string element length bound
+    /// (<c>queue of string maxlength 200</c>). Shares <see cref="BuildLengthContainmentObligation"/>
+    /// with the scalar <c>set</c> path — the only difference is the bound source (the receiver
+    /// field's <c>ElementType.ValueBounds</c> instead of the field's own length modifiers). The
+    /// governed-action set is derived from <see cref="ActionMeta"/> (a value-establishing growing
+    /// action), so <c>enqueue</c>/<c>add</c>/<c>push</c>/<c>append</c>/<c>insert</c>/<c>put</c> and
+    /// their by-keyed variants are covered without a hand-maintained list.
+    /// </summary>
+    internal static ProofObligation? GenerateElementLengthContainmentObligation(
+        TypedInputAction inputAction,
+        ActionMeta actionMeta,
+        SemanticIndex semantics)
+    {
+        // Only value-introducing growing actions establish a new element value; shrink/clear/
+        // replace actions do not. This is the catalog-declared effect, not an action-kind list.
+        if (actionMeta.Effect != ActionEffectClass.Grows
+            || actionMeta.WriteSemantics != ActionWriteSemantics.EstablishesValue)
+            return null;
+
+        if (inputAction.InputExpression.ResultType != TypeKind.String)
+            return null;
+
+        if (!semantics.FieldsByName.TryGetValue(inputAction.FieldName, out var targetField))
+            return null;
+
+        if (targetField.ElementType?.ValueBounds is not { IsEmpty: false } bounds)
+            return null;
+
+        if (!bounds.DeclaredMinLength.HasValue && !bounds.DeclaredMaxLength.HasValue)
+            return null;
+
+        return BuildLengthContainmentObligation(
+            inputAction.FieldName,
+            inputAction.InputExpression,
+            bounds.DeclaredMinLength,
+            bounds.DeclaredMaxLength);
+    }
+
+    /// <summary>
+    /// Constructs a <see cref="LengthContainmentProofRequirement"/> obligation against the given
+    /// declared length band. Shared by the scalar <c>set</c> path and the collection element
+    /// write-site path; the band is the only parameter that differs (field bound vs element bound).
+    /// The context is filled in by <see cref="ProofEngine"/> when the obligation is walked.
+    /// </summary>
+    private static ProofObligation? BuildLengthContainmentObligation(
+        string fieldName,
+        TypedExpression site,
+        int? declaredMinLength,
+        int? declaredMaxLength)
+    {
+        var lengthReq = new LengthContainmentProofRequirement(
+            new SelfSubject(),
+            fieldName,
+            declaredMinLength,
+            declaredMaxLength,
+            $"Length containment: {fieldName} must have length in [{declaredMinLength?.ToString() ?? "0"} .. {declaredMaxLength?.ToString() ?? "∞"}]");
+
+        return new ProofObligation(
+            lengthReq,
+            site,
+            null!, // Replaced with the real context in ProofEngine.WalkActions().
+            ProofDisposition.Unresolved,
+            null,
+            null);
     }
 
     // ════════════════════════════════════════════════════════════════════════════

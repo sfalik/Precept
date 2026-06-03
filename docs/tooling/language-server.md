@@ -648,6 +648,8 @@ Interval hover answers: **is this value's range safe?** It uses the existing bad
 
 **Origin labelling.** When origin is the proof-relevant question, label it: `declared: min 0 max 1 000` (from field annotation) vs. `inferred from arithmetic` (derived by the solver).
 
+**Collection element bound origin.** A collection's string inner type may declare a length bound (`queue of string maxlength 200`), carried on `TypedField.ElementType.ValueBounds` and consumed by the length-containment proof at element write- and read-sites. The bound is part of the field's declared type (`FormatType` renders `queue of string`), and a read-site that discharges through it (`.peek` into a capped field) attributes the interval to the element's declared length — origin `declared` on the element type, the read-site analogue of a scalar field's declared length bound. (A dedicated hover line surfacing the element bound on the collection-field card itself is a follow-on, tracked with the numeric/qualified element-bound projection.)
+
 **Gap taxonomy.** Three gap kinds, each with a distinct line-3 repair hint:
 
 | Gap type | Cause | Line-3 repair hint |

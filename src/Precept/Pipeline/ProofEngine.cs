@@ -452,6 +452,16 @@ public static partial class ProofEngine
 
             if (action is TypedInputAction inputAction)
             {
+                // Per-element write-site obligation: an element-introducing action (enqueue/add/
+                // push/append/insert/put and by-keyed variants — derived from the catalog's
+                // growing/establishes-value effect, not an action-kind list) into a collection
+                // whose string element type declares a length bound carries the same
+                // length-containment obligation as a scalar set into a length-bounded field
+                // (shared generator).
+                var elementObligation = Actions.GenerateElementLengthContainmentObligation(inputAction, actionMeta, semantics);
+                if (elementObligation is not null)
+                    obligations.Add(elementObligation with { Context = ctx });
+
                 WalkExpression(inputAction.InputExpression, ctx, obligations, semantics);
                 if (inputAction.SecondaryExpression is not null)
                     WalkExpression(inputAction.SecondaryExpression, ctx, obligations, semantics);

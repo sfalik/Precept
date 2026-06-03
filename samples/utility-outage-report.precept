@@ -25,7 +25,7 @@ field DispatchRound as integer default 0 nonnegative
 field AffectedBlocks as set of string
 
 # Shared on-call crew pool — crews register themselves; Dispatch dequeues the next.
-field CrewQueue as queue of string
+field CrewQueue as queue of string maxlength 200
 
 # States
 state Filed initial

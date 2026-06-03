@@ -10,9 +10,11 @@ Spike-branch mode: commits land directly on `spike/Precept-V2-Radical`; this doc
 
 | # | Goal | Items | Decisions required | Effort | Status |
 |---|---|---|---|---|---|
-| 1 | String-length element bounds end-to-end (grammar → typing → carrier → string read-reach → string write-obligation → 3 samples green) | Design Acceptance 1–4, 8; closes BUG-019 residual gap 1 | none (design Locked) | M (3–4d) | Next |
+| 1 | String-length element bounds end-to-end (grammar → typing → carrier → string read-reach → string write-obligation → 3 samples green) | Design Acceptance 1–4, 8; closes BUG-019 residual gap 1 | none (design Locked) | M (3–4d) | ✅ Done (working tree — spike, uncommitted) |
 | 2 | Numeric / quantifier / qualified parity (the rest of full-parity) | Design Acceptance 5–6; Falsifier-2 watch-cell | none (design Locked); build-confirm: qualified normalization | M (2–3d) | Stub |
 | — | Deferred (grammar slot reserved): two-axis bounds on `P`/`K`/`V` | Design § Out-of-scope | — | — | Deferred |
+
+> **Phase 1 executed 2026-06-02.** Adversarial `precept-reviewer` pass confirmed the reuse bar clean (no parallel validator / carrier / generator; DU-subtype dispatch; the write-obligation generator is shared with the scalar `set` path) and found one real soundness hole: the `default [...]` collection-literal element-entry path was unchecked while the read-reach claimed the bound. **Fixed** — `CollectElementLengthDefaultObligations` reuses the existing `LengthContainmentProofRequirement` + prover to check each default element against the element bound (over-bound default element now rejects; design § "Resolved at lock" item 3 is now actually realized). Forward watch (Phase 2 / when runtime governance ships): a single enumerated coverage check over the *whole* element-entry-path family, so a future entry path can't silently bypass the read-reach (reviewer's strongest objection; design Falsifier 4).
 
 ## Decisions captured
 
