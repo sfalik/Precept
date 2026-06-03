@@ -269,21 +269,22 @@ public static partial class Parser
         /// <summary>
         /// Consumes a trailing element value-modifier list on a collection inner type and
         /// wraps the inner reference in an <see cref="ElementValueModifiedTypeReference"/>.
-        /// Currently admits only the string-length modifiers (<c>maxlength</c>/<c>minlength</c>):
-        /// they are the modifiers whose read-reach/write-obligation half is wired.
-        /// Any other modifier keyword is left for the field-level modifier slot (its prior
-        /// binding), so this is strictly additive — a non-length modifier after the inner
-        /// type behaves exactly as before. Disambiguation: the inner-type position is the
-        /// only place these tokens can sit between the element type and the field-modifier
-        /// list, so consuming them here moves a length bound that today binds (and is
-        /// rejected) on the collection field onto the element instead.
+        /// Admits the scalar-only value modifiers (length <c>maxlength</c>/<c>minlength</c>,
+        /// numeric range <c>min</c>/<c>max</c>, sign flags <c>nonnegative</c>/<c>positive</c>/<c>nonzero</c>,
+        /// <c>maxplaces</c>) — the catalog-derived <see cref="Modifiers.ElementPositionValueTokens"/> set,
+        /// which excludes collection-applicable modifiers (<c>notempty</c>/<c>mincount</c>/<c>maxcount</c>)
+        /// so there is no collision with the field-level modifier slot. Any other modifier keyword is
+        /// left for the field-level slot (its prior binding), so this is strictly additive. Disambiguation:
+        /// the inner-type position is the only place these tokens can sit between the element type and the
+        /// field-modifier list, so consuming them here moves a bound that today binds (and is rejected)
+        /// on the collection field onto the element instead.
         /// </summary>
         private ParsedTypeReference TryParseElementValueModifiers(ParsedTypeReference innerRef)
         {
             var modifiers = ImmutableArray.CreateBuilder<ParsedModifier>();
             var lastSpan = innerRef.Span;
 
-            while (Peek().Kind is TokenKind.Maxlength or TokenKind.Minlength
+            while (Modifiers.ElementPositionValueTokens.Contains(Peek().Kind)
                 && Modifiers.ByValueToken.TryGetValue(Peek().Kind, out var modMeta))
             {
                 var modToken = Advance();
@@ -291,7 +292,7 @@ public static partial class Parser
                 if (modMeta.HasValue && ExpressionStartTokens.Contains(Peek().Kind))
                 {
                     valueExpr = ParseExpression(0, () =>
-                        Peek().Kind is TokenKind.Maxlength or TokenKind.Minlength
+                        Modifiers.ElementPositionValueTokens.Contains(Peek().Kind)
                         || ValueModifierTokens.Contains(Peek().Kind)
                         || FieldDeclarationAccessModifierTokens.Contains(Peek().Kind)
                         || IsAtConstructBoundary());

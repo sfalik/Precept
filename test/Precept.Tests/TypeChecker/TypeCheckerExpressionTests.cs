@@ -338,7 +338,7 @@ public class TypeCheckerExpressionTests
         ctx.CurrentEventArgs = new Dictionary<string, TypedArg> { ["Reason"] = arg };
 
         // Push a quantifier binding that shadows the event arg
-        ctx.QuantifierBindings.Push(("Reason", TypeKind.Decimal, (TypeKind?)null, false));
+        ctx.QuantifierBindings.Push(("Reason", TypeKind.Decimal, (TypeKind?)null, false, null));
 
         var expr = new IdentifierExpression("Reason", TestSpan);
         var result = Resolve(expr, ctx);

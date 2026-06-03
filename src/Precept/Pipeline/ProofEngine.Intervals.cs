@@ -67,7 +67,34 @@ public static partial class ProofEngine
             case TypedFieldRef fieldRef:
                 if (narrowed is not null && narrowed.TryGetValue(fieldRef.FieldName, out var narrowedInterval))
                     return narrowedInterval;
+                // A quantifier binding identifier (`x` in `no x in S (x > 100)`) surfaces as a
+                // TypedFieldRef carrying the collection element type's bounds; the binding ranges
+                // over governed elements, so it carries band(m) — sound because ingress governs
+                // every element into the bound (design § Semantic Rule 4 / 5, matched pair).
+                if (fieldRef.ElementBounds is { HasNumericBound: true } bindingBounds)
+                    return ElementNumericInterval(bindingBounds);
                 return ExtractFieldInterval(fieldRef.FieldName, semantics);
+
+            // A collection element read (.min/.max/.peek/.first/.last/.at) whose receiver field's
+            // inner type declares a numeric bound carries that bound as its value interval — the
+            // numeric half of the read-site reach (design § Semantic Rule 4). Feeds the existing
+            // interval/OutOfRange assignment-range path unchanged. A receiver with no numeric
+            // element bound falls through to Unbounded, preserving prior behavior exactly.
+            //
+            // Element-returning gate: the band is the ELEMENT's value band, so it may only be
+            // carried by an accessor that returns an element. Element accessors are plain
+            // TypeAccessor (return type = the element type); a FixedReturnAccessor returns a
+            // fixed type independent of the element (collection `.count` returns the cardinality,
+            // an Integer in [0, count] — NOT an element, so it must not inherit the element band).
+            // The positive allowlist (NOT FixedReturnAccessor) also keeps any future numeric
+            // collection accessor (`.sum`/`.average`, also FixedReturnAccessor) from silently
+            // leaking the band — a `count`-name blocklist would not.
+            case TypedMemberAccess access
+                when access.ResolvedAccessor is not FixedReturnAccessor
+                    && access.Object is TypedFieldRef receiver
+                    && semantics.FieldsByName.TryGetValue(receiver.FieldName, out var receiverField)
+                    && receiverField.ElementType?.ValueBounds is { HasNumericBound: true } elementBounds:
+                return ElementNumericInterval(elementBounds);
 
             case TypedArgRef argRef:
                 return ExtractArgInterval(argRef.ArgName, argRef.EventName, semantics);
@@ -209,20 +236,77 @@ public static partial class ProofEngine
             if (!ModifierAppliesToField(modifierMeta, field))
                 continue;
 
-            foreach (var satisfaction in modifierMeta.ProofSatisfactions.OfType<ProofSatisfaction.Numeric>())
-            {
-                if (satisfaction.Projection is not SatisfactionProjection.SelfValue)
-                    continue;
-                if (satisfaction.Comparison is not (OperatorKind.GreaterThanOrEqual or OperatorKind.GreaterThan))
-                    continue;
-                if (satisfaction.Bound is not NumericBoundSource.Constant constant)
-                    continue;
-
-                lower = lower.HasValue ? Math.Max(lower.Value, constant.Value) : constant.Value;
-            }
+            var fromMeta = FlagLowerBoundFromMeta(modifierMeta);
+            if (fromMeta.HasValue)
+                lower = lower.HasValue ? Math.Max(lower.Value, fromMeta.Value) : fromMeta.Value;
         }
 
         return lower;
+    }
+
+    /// <summary>
+    /// The constant lower bound implied by a single value-modifier's catalog metadata: the tightest
+    /// SelfValue ≥ / &gt; comparison against a Constant bound (e.g. <c>nonnegative</c>/<c>positive</c> ⇒ 0).
+    /// Shared by the field flag-lower-bound path and the collection element band path so the
+    /// flag→bound mapping lives in one place, catalog-driven.
+    /// </summary>
+    private static decimal? FlagLowerBoundFromMeta(ValueModifierMeta modifierMeta)
+    {
+        decimal? lower = null;
+        foreach (var satisfaction in modifierMeta.ProofSatisfactions.OfType<ProofSatisfaction.Numeric>())
+        {
+            if (satisfaction.Projection is not SatisfactionProjection.SelfValue)
+                continue;
+            if (satisfaction.Comparison is not (OperatorKind.GreaterThanOrEqual or OperatorKind.GreaterThan))
+                continue;
+            if (satisfaction.Bound is not NumericBoundSource.Constant constant)
+                continue;
+            lower = lower.HasValue ? Math.Max(lower.Value, constant.Value) : constant.Value;
+        }
+        return lower;
+    }
+
+    /// <summary>
+    /// The numeric band <c>(min, max)</c> declared on a collection inner type
+    /// (<c>set of integer min 0 max 100</c>, <c>set of money in 'USD' nonnegative</c>).
+    /// Mirrors <see cref="ExtractFieldInterval"/>'s composition: declared <c>min</c>/<c>max</c>
+    /// (normalized to UCUM base units for qualified elements, matching the scalar field path),
+    /// then the flag-implied constant lower bound (<c>nonnegative</c>/<c>positive</c> ⇒ ≥ 0) folded
+    /// in via the same catalog metadata. The element typing already validated applicability, so no
+    /// per-element applicability re-check is needed. Returns <c>(null, null)</c> when the element
+    /// declares no numeric bound.
+    /// </summary>
+    internal static (decimal? min, decimal? max) GetElementNumericBounds(DeclaredValueBounds bounds)
+    {
+        decimal? min = bounds.NormalizedDeclaredMin ?? bounds.DeclaredMin;
+        decimal? max = bounds.NormalizedDeclaredMax ?? bounds.DeclaredMax;
+
+        if (!bounds.NumericFlags.IsDefaultOrEmpty)
+        {
+            foreach (var flag in bounds.NumericFlags)
+            {
+                if (Modifiers.GetMeta(flag) is not ValueModifierMeta meta)
+                    continue;
+                var flagMin = FlagLowerBoundFromMeta(meta);
+                if (flagMin.HasValue)
+                    min = min.HasValue ? Math.Max(min.Value, flagMin.Value) : flagMin.Value;
+            }
+        }
+
+        return (min, max);
+    }
+
+    /// <summary>
+    /// The numeric interval of a collection element read (<c>.min</c>/<c>.max</c>/<c>.peek</c>/…) whose
+    /// inner type declares a numeric bound, as a closed <see cref="NumericInterval"/>. Returns
+    /// <see cref="NumericInterval.Unbounded"/> when no numeric bound is declared (prior behavior).
+    /// </summary>
+    private static NumericInterval ElementNumericInterval(DeclaredValueBounds bounds)
+    {
+        var (min, max) = GetElementNumericBounds(bounds);
+        if (!min.HasValue && !max.HasValue)
+            return NumericInterval.Unbounded;
+        return new NumericInterval(min ?? decimal.MinValue, max ?? decimal.MaxValue);
     }
 
     private static NumericInterval ExtractArgInterval(string argName, string eventName, SemanticIndex semantics)

@@ -82,7 +82,7 @@ internal sealed class CheckContext
     /// resolved type, and whether the binding carries the case-insensitive string qualifier.
     /// Innermost binding is on top — shadows event args and fields.
     /// </summary>
-    public Stack<(string Name, TypeKind ValueType, TypeKind? KeyType, bool IsCaseInsensitive)> QuantifierBindings { get; } = new();
+    public Stack<(string Name, TypeKind ValueType, TypeKind? KeyType, bool IsCaseInsensitive, DeclaredValueBounds? ElementBounds)> QuantifierBindings { get; } = new();
 
     // ── Normalized declaration accumulators (Pass 2 output) ───────────────
 

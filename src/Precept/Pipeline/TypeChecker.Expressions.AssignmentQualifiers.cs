@@ -259,6 +259,14 @@ internal static partial class TypeChecker
             case TypedBinaryOp { ResultQualifier: { } } binary:
                 return ResolveBinaryQualifierAxis(binary, axis);
 
+            // A collection element read (.min/.max/.peek/.first/.last/.at) produces the
+            // element value, which carries the element type's qualifier (the qualifier half
+            // of the read-site reach, symmetric with the numeric band in ProofEngine.Intervals).
+            // ElementQualifiers is populated only for element-returning accessors, so a
+            // fixed-return accessor (.count) carries none and resolves like any unqualified value.
+            case TypedMemberAccess { ElementQualifiers: { IsDefaultOrEmpty: false } } memberAccess:
+                return ResolveDirectQualifierAxis(memberAccess.ResultType, memberAccess.ElementQualifiers, axis);
+
             default:
                 return new(axis, QualifierResolutionKind.Absent, null);
         }

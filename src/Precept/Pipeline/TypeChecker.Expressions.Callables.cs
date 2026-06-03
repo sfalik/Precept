@@ -492,12 +492,18 @@ internal static partial class TypeChecker
         // For `queue of T by P` / `log of T by P`, also capture the ordering key type
         // so the binding identifier exposes `.value: T` and `.by: P` member accessors.
         var isCaseInsensitiveBinding = IsCaseInsensitiveCollectionElement(collection, ctx);
-        TypeKind? keyType = collection is TypedFieldRef bindingFieldRef
-            && ctx.FieldLookup.TryGetValue(bindingFieldRef.FieldName, out var bindingField)
-            && (bindingField.ResolvedType == TypeKind.QueueBy || bindingField.ResolvedType == TypeKind.LogBy)
-            ? bindingField.KeyType
-            : null;
-        ctx.QuantifierBindings.Push((expr.BindingName, elementType.Value, keyType, isCaseInsensitiveBinding));
+        TypeKind? keyType = null;
+        DeclaredValueBounds? elementBounds = null;
+        if (collection is TypedFieldRef bindingFieldRef
+            && ctx.FieldLookup.TryGetValue(bindingFieldRef.FieldName, out var bindingField))
+        {
+            if (bindingField.ResolvedType == TypeKind.QueueBy || bindingField.ResolvedType == TypeKind.LogBy)
+                keyType = bindingField.KeyType;
+            // The binding ranges over governed elements, so it carries the element type's
+            // declared value bounds into the predicate's value-interval context (read-site reach).
+            elementBounds = bindingField.ElementType?.ValueBounds;
+        }
+        ctx.QuantifierBindings.Push((expr.BindingName, elementType.Value, keyType, isCaseInsensitiveBinding, elementBounds));
 
         // 4. Resolve predicate with binding in scope
         var predicate = Resolve(expr.Predicate, ctx);
@@ -1045,7 +1051,8 @@ internal static partial class TypeChecker
             accessor,
             accessor.ProofRequirements.ToImmutableArray(),
             expr.Span,
-            ResolveAccessorChoiceMetadata(accessor, receiver, ctx));
+            ResolveAccessorChoiceMetadata(accessor, receiver, ctx),
+            ElementQualifiers: ResolveAccessorElementQualifiers(accessor, receiver, ctx));
     }
 
     /// <summary>
@@ -1142,7 +1149,8 @@ internal static partial class TypeChecker
             accessor.ProofRequirements.ToImmutableArray(),
             expr.Span,
             ResolveAccessorChoiceMetadata(accessor, receiver, ctx),
-            resolvedArgs);
+            resolvedArgs,
+            ResolveAccessorElementQualifiers(accessor, receiver, ctx));
     }
 
     /// <summary>
@@ -1180,6 +1188,26 @@ internal static partial class TypeChecker
             return null;
 
         return GetElementTypeRef(receiver, ctx) as TypedChoiceElement;
+    }
+
+    /// <summary>
+    /// When the accessor returns the receiver's element type and that element carries
+    /// qualifier metadata (<c>set of money in 'EUR'</c>), propagate the element's
+    /// <see cref="DeclaredQualifierMeta"/> onto the resulting <see cref="TypedMemberAccess"/>
+    /// so the assignment-qualifier resolver can compare the produced value's currency/unit
+    /// against the destination without re-resolving the receiver's element type. Symmetric
+    /// with <see cref="ResolveAccessorChoiceMetadata"/>. Empty for fixed-return accessors
+    /// (e.g. <c>.count</c>) and element types that declare no qualifier.
+    /// </summary>
+    private static ImmutableArray<DeclaredQualifierMeta> ResolveAccessorElementQualifiers(
+        TypeAccessor accessor, TypedExpression receiver, CheckContext ctx)
+    {
+        if (accessor is FixedReturnAccessor or ElementParameterAccessor)
+            return default;
+
+        return GetElementTypeRef(receiver, ctx) is TypedQualifiedElement qualified
+            ? qualified.DeclaredQualifiers
+            : default;
     }
 
     /// <summary>

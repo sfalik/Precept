@@ -899,7 +899,7 @@ internal static partial class TypeChecker
         foreach (var binding in ctx.QuantifierBindings)
         {
             if (string.Equals(binding.Name, name, StringComparison.Ordinal))
-                return new TypedFieldRef(binding.ValueType, name, binding.IsCaseInsensitive, null, id.Span, binding.KeyType);
+                return new TypedFieldRef(binding.ValueType, name, binding.IsCaseInsensitive, null, id.Span, binding.KeyType, binding.ElementBounds);
         }
 
         // 2. Fields. A bare identifier names a field; event args are dotted-only

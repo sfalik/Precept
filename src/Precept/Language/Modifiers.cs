@@ -356,6 +356,27 @@ public static class Modifiers
         All.OfType<ValueModifierMeta>()
            .ToFrozenDictionary(m => m.Token.Kind);
 
+    private static readonly FrozenSet<TypeKind> CollectionTypeKinds =
+        CollectionTypes.Select(t => t.Kind!.Value).ToFrozenSet();
+
+    /// <summary>
+    /// Value-modifier token kinds that bind to a collection's inner (element) type rather than to
+    /// the collection field — <c>queue of string maxlength 200</c>, <c>set of integer min 0 max 100</c>,
+    /// <c>set of money in 'USD' nonnegative</c>. Catalog-derived: a modifier is element-routable when
+    /// it is type-restricted (a non-empty <see cref="ValueModifierMeta.ApplicableTo"/>) and applies to
+    /// <em>no</em> collection type, so it is scalar-only and cannot collide with a collection-level
+    /// modifier (<c>notempty</c>/<c>mincount</c>/<c>maxcount</c> all apply to collections and are
+    /// therefore excluded; <c>optional</c>/<c>default</c> apply to any type and are excluded). The
+    /// parser consumes these tokens after the element type into the element-modifier list; everything
+    /// else stays at the field-modifier slot, so the routing is strictly additive and unambiguous.
+    /// </summary>
+    public static FrozenSet<TokenKind> ElementPositionValueTokens { get; } =
+        All.OfType<ValueModifierMeta>()
+           .Where(m => m.ApplicableTo.Length > 0
+                && !m.ApplicableTo.Any(t => t.Kind is { } k && CollectionTypeKinds.Contains(k)))
+           .Select(m => m.Token.Kind)
+           .ToFrozenSet();
+
     /// <summary>
     /// O(1) lookup from token kind to state modifier metadata.
     /// Used by <c>ParseStateEntryList</c> to resolve a modifier token to its

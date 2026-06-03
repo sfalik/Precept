@@ -613,20 +613,22 @@ add Charges $50 EUR     # TypeMismatch — expected money in 'USD', got money in
 
 A collection's scalar inner type may carry a value modifier, after any qualifier — the per-element analogue of the same modifier on a scalar field. This is a **distinct axis** from cardinality: `maxcount` bounds *how many* elements the collection holds; an element value modifier bounds *what each element is*. (This is why the `capacity`-modifier rejection below — a redundant spelling of `maxcount` — does not apply here: there is no existing spelling for a per-element value bound.)
 
-For a string inner type, the length modifiers `minlength`/`maxlength` apply:
+The available element value modifiers mirror the scalar field surface: string length (`minlength`/`maxlength`), numeric range (`min`/`max`), numeric sign flags (`nonnegative`/`positive`/`nonzero`), and `maxplaces` — and they compose with the inner type's qualifier:
 
 ```precept
-field AgentQueue as queue of string maxlength 200    # each element ≤ 200 characters
+field AgentQueue as queue of string maxlength 200            # each element ≤ 200 characters
+field Scores     as set of integer min 0 max 100             # each element in [0, 100]
+field Charges    as set of money in 'USD' nonnegative        # each element ≥ 0 USD, currency-pinned
 ```
 
 The element bound participates in proof identically to the equivalent scalar-field modifier:
 
-- **Write-site (compile-time).** A value introduced into the collection (`enqueue`/`add`/`push`/`append`/`insert`/`put` and the `*-by` variants) must be provably within the element bound, the same containment obligation a `set` into a `maxlength` field carries. `enqueue AgentQueue E.Name` discharges when `E.Name` is declared `maxlength 200` (or narrower); an unbounded source rejects (`LengthBoundViolation`).
-- **Read-site (compile-time).** An element read (`.peek`/`.first`/`.last`) carries the element bound as its value interval, so reading into a same-or-wider-bounded destination field discharges with no per-access guard — `set LastCalledParty = PartyQueue.peek` proves into a `maxlength 200` field.
+- **Write-site (compile-time).** A value introduced into the collection (`enqueue`/`add`/`push`/`append`/`insert`/`put` and the `*-by` variants) must be provably within the element bound, the same containment obligation a `set` into a bounded field carries. `enqueue AgentQueue E.Name` discharges when `E.Name` is declared `maxlength 200` (or narrower); an unbounded or wider source rejects (`LengthBoundViolation` for length, `NumericOverflow`/`OutOfRange` for numeric). A `default [...]` literal's elements are checked the same way — an out-of-range default element rejects.
+- **Read-site (compile-time).** An element read (`.peek`/`.first`/`.last`/`.min`/`.max`/`.at`) carries the element bound as its value interval, so reading into a same-or-wider-bounded destination field discharges with no per-access guard — `set LastCalledParty = PartyQueue.peek` proves into a `maxlength 200` field, and `set HighestScore = Scores.max` proves into an `integer min 0 max 100` field. A quantifier binding (`each x in C` / `any x in C` / `no x in C`) likewise carries the element bound on `x` inside the predicate. For a qualified element (`money`/`quantity`), the bound normalizes to the same UCUM/currency base units as a qualified field, so `.min`/`.max` into a same-currency-and-unit destination discharges and a narrower one rejects.
 
-Per-element modifier legality is checked against the same modifier↔type compatibility table as a scalar field (precept-language-spec.md §2.4), with the **element** type as subject: `set of integer maxlength 5` emits `InvalidModifierForType` because `maxlength` does not apply to `integer`.
+Per-element modifier legality is checked against the same modifier↔type compatibility table as a scalar field (precept-language-spec.md §2.4), with the **element** type as subject: `set of integer maxlength 5` emits `InvalidModifierForType` because `maxlength` does not apply to `integer`, and `set of string min 0` emits it because `min` does not apply to `string`.
 
-*(The element-value-modifier surface currently admits the string-length modifiers `minlength`/`maxlength`; the numeric, flag, and qualified value modifiers attach in element position as the surface fills out — the validation, write-proof, and read-reach machinery generalizes to them.)*
+*(`notempty` is not yet routed to element position — it is also a collection modifier (`set of string notempty` means the collection is non-empty), so a per-element `notempty` awaits a disambiguator; use `minlength 1` for a per-element non-empty string. The scalar value modifiers above are scalar-only and route unambiguously.)*
 
 ### Token vocabulary
 

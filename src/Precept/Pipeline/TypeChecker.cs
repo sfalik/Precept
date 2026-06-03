@@ -164,34 +164,45 @@ internal static partial class TypeChecker
 
     /// <summary>
     /// Validates a collection inner type's value modifiers per-element and projects the
-    /// length bounds into a <see cref="DeclaredValueBounds"/>. Validation reuses
+    /// declared bounds into a <see cref="DeclaredValueBounds"/>. Validation reuses
     /// <see cref="ValidateValueModifiers"/> with the element's <see cref="TypeKind"/> as
     /// subject — the same compatibility table a field declaration consults, so
     /// <c>set of integer maxlength 5</c> emits PRE0033 per element exactly as a string-only
-    /// modifier on an integer field would. Currently projects only the string-length bounds.
+    /// modifier on an integer field would. Projects string-length, numeric range
+    /// (<c>min</c>/<c>max</c>, normalized for qualified <c>money</c>/<c>quantity</c> elements via
+    /// the same <see cref="TryGetComparableModifierValue"/> path as a field), and numeric sign
+    /// flags (<c>nonnegative</c>/<c>positive</c>/<c>nonzero</c>) — the inner-type analogue of the
+    /// scalar field bound vocabulary.
     /// </summary>
     private static DeclaredValueBounds BuildElementValueBounds(
         ElementValueModifiedTypeReference modified,
         TypeKind elementTypeKind,
         CheckContext ctx)
     {
+        // The element's declared qualifiers (e.g. `money in 'USD'`, `quantity of 'length'`) drive
+        // numeric-bound normalization to UCUM base units — the same resolution a qualified field uses.
+        var elementQualifiers = ExtractQualifiers(modified.InnerType, ctx);
+
         // Per-element modifier validation — applicability, duplicates, conflicts, value
         // checks — through the same path as a field/arg declaration (no parallel validator).
         ValidateValueModifiers(
             modified.Modifiers,
             elementTypeKind,
             ImmutableArray<ModifierKind>.Empty,
-            ImmutableArray<DeclaredQualifierMeta>.Empty,
+            elementQualifiers,
             isComputed: false,
             modified.Span,
             declarationName: string.Empty,
             isEventArg: false,
             ctx);
 
-        // Only the string-length modifiers are projected today; the parser admits no other
-        // value modifier into element position, so only these arms are reachable.
         int? minLength = null;
         int? maxLength = null;
+        decimal? declaredMin = null;
+        decimal? declaredMax = null;
+        decimal? normalizedMin = null;
+        decimal? normalizedMax = null;
+        var numericFlags = ImmutableArray.CreateBuilder<ModifierKind>();
         foreach (var modifier in modified.Modifiers)
         {
             switch (modifier.Kind)
@@ -202,10 +213,25 @@ internal static partial class TypeChecker
                 case ModifierKind.Maxlength when TryReadLengthLiteral(modifier.Value, out var mx):
                     maxLength = mx;
                     break;
+                case ModifierKind.Min when TryGetComparableModifierValue(modifier.Value, elementTypeKind, elementQualifiers) is { } lo:
+                    declaredMin = lo.DeclaredMagnitude;
+                    normalizedMin = lo.NormalizedMagnitude;
+                    break;
+                case ModifierKind.Max when TryGetComparableModifierValue(modifier.Value, elementTypeKind, elementQualifiers) is { } hi:
+                    declaredMax = hi.DeclaredMagnitude;
+                    normalizedMax = hi.NormalizedMagnitude;
+                    break;
+                case ModifierKind.Nonnegative or ModifierKind.Positive or ModifierKind.Nonzero:
+                    numericFlags.Add(modifier.Kind);
+                    break;
             }
         }
 
-        return new DeclaredValueBounds(minLength, maxLength);
+        return new DeclaredValueBounds(
+            minLength, maxLength, NotEmpty: false,
+            DeclaredMin: declaredMin, DeclaredMax: declaredMax,
+            NormalizedDeclaredMin: normalizedMin, NormalizedDeclaredMax: normalizedMax,
+            NumericFlags: numericFlags.ToImmutable());
     }
 
     private static bool TryReadLengthLiteral(ParsedExpression? value, out int length)

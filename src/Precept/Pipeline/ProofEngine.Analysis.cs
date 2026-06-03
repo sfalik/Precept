@@ -426,6 +426,8 @@ public static partial class ProofEngine
                 field.Name, field.DefaultExpression, context, obligations);
 
             CollectElementLengthDefaultObligations(field, context, obligations);
+
+            CollectElementIntervalDefaultObligations(field, context, obligations);
         }
     }
 
@@ -463,6 +465,43 @@ public static partial class ProofEngine
                     minLength,
                     bounds.DeclaredMaxLength,
                     $"Length containment: each default element of '{field.Name}' must have length in [{minLength?.ToString() ?? "0"} .. {bounds.DeclaredMaxLength?.ToString() ?? "∞"}]"),
+                element,
+                context,
+                ProofDisposition.Unresolved,
+                null,
+                null));
+        }
+    }
+
+    /// <summary>
+    /// The numeric sibling of <see cref="CollectElementLengthDefaultObligations"/>: a <c>default [...]</c>
+    /// literal on a collection whose numeric inner type declares a bound is an element-entry path, so each
+    /// numeric default element must be proven within the element band — the matched pair to the read-site
+    /// reach (design § Semantic Rule 5). Reuses the same <see cref="IntervalContainmentProofRequirement"/>
+    /// + <c>TryIntervalContainmentProofNarrowed</c> prover the write-site numeric path uses; the default
+    /// elements are literals, so the obligation discharges statically.
+    /// </summary>
+    private static void CollectElementIntervalDefaultObligations(
+        TypedField field, ObligationContext context, List<ProofObligation> obligations)
+    {
+        if (field.ElementType?.ValueBounds is not { HasNumericBound: true } bounds)
+            return;
+        if (field.DefaultExpression is not TypedListLiteral list)
+            return;
+
+        var (min, max) = GetElementNumericBounds(bounds);
+        if (!min.HasValue && !max.HasValue)
+            return;
+
+        foreach (var element in list.Elements)
+        {
+            obligations.Add(new ProofObligation(
+                new IntervalContainmentProofRequirement(
+                    new SelfSubject(),
+                    field.Name,
+                    min, max,
+                    bounds.DeclaredMin, bounds.DeclaredMax,
+                    $"Interval containment: each default element of '{field.Name}' must stay within declared bounds [{(bounds.DeclaredMin ?? min)?.ToString() ?? "−∞"} .. {(bounds.DeclaredMax ?? max)?.ToString() ?? "+∞"}]"),
                 element,
                 context,
                 ProofDisposition.Unresolved,

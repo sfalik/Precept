@@ -10,8 +10,8 @@ Spike-branch mode: commits land directly on `spike/Precept-V2-Radical`; this doc
 
 | # | Goal | Items | Decisions required | Effort | Status |
 |---|---|---|---|---|---|
-| 1 | String-length element bounds end-to-end (grammar → typing → carrier → string read-reach → string write-obligation → 3 samples green) | Design Acceptance 1–4, 8; closes BUG-019 residual gap 1 | none (design Locked) | M (3–4d) | ✅ Done (working tree — spike, uncommitted) |
-| 2 | Numeric / quantifier / qualified parity (the rest of full-parity) | Design Acceptance 5–6; Falsifier-2 watch-cell | none (design Locked); build-confirm: qualified normalization | M (2–3d) | Stub |
+| 1 | String-length element bounds end-to-end (grammar → typing → carrier → string read-reach → string write-obligation → 3 samples green) | Design Acceptance 1–4, 8; closes BUG-019 residual gap 1 | none (design Locked) | M (3–4d) | ✅ Done `4a003b64` |
+| 2 | Numeric / quantifier / qualified parity (the rest of full-parity) | Design Acceptance 5–6; Falsifier-2 watch-cell | none (design Locked); build-confirm: qualified normalization | M (2–3d) | ✅ Implemented (working tree — uncommitted spike review) |
 | — | Deferred (grammar slot reserved): two-axis bounds on `P`/`K`/`V` | Design § Out-of-scope | — | — | Deferred |
 
 > **Phase 1 executed 2026-06-02.** Adversarial `precept-reviewer` pass confirmed the reuse bar clean (no parallel validator / carrier / generator; DU-subtype dispatch; the write-obligation generator is shared with the scalar `set` path) and found one real soundness hole: the `default [...]` collection-literal element-entry path was unchecked while the read-reach claimed the bound. **Fixed** — `CollectElementLengthDefaultObligations` reuses the existing `LengthContainmentProofRequirement` + prover to check each default element against the element bound (over-bound default element now rejects; design § "Resolved at lock" item 3 is now actually realized). Forward watch (Phase 2 / when runtime governance ships): a single enumerated coverage check over the *whole* element-entry-path family, so a future entry path can't silently bypass the read-reach (reviewer's strongest objection; design Falsifier 4).
@@ -76,13 +76,37 @@ All from the Locked design — none re-litigated here:
 - `docs/Working/bugs.md` — close BUG-019 residual gap 1; BUG-019 → Fixed.
 - NOT in this phase: numeric/quantifier/qualified projection (Phase 2); `diagnostic-system.md` (only if a new code lands).
 
-## Lightweight phase stub — Phase 2 (next): numeric / quantifier / qualified parity
+## Heavyweight phase block — Phase 2 (current): numeric / quantifier / qualified parity
 
-**Goal**: complete full scalar parity — numeric (`min`/`max`/`nonnegative`/…), quantifier-binding, and qualified (`money`/`quantity`) element bounds participate in typing, write-proof, and read-reach.
-**Scope**: numeric read-reach (new `TypedMemberAccess` arm in `ProofEngine.Intervals.cs:IntervalOfNarrowed`); quantifier-binding interval seeding (`x` carries `band(m)` in the predicate); numeric/flag write-site obligations (shared generator); the money/quantity normalization watch-cell (Design Falsifier 2); Design Acceptance 5 (numeric parity read) + 6 (quantifier binding carries bound). Acceptance 7 (runtime element governance) is **gated on the runtime stub** — contract-only until the runtime lands; note, don't block.
-**Decisions required**: none (design Locked); build-confirm the qualified-normalization cell (if it misbehaves, it was already de-risked by shipping string-first).
-**Effort**: M (2–3d).
-**Status**: Stub — TBD pending Phase 1 completion (the grammar/carrier/typing foundation and the shared write-obligation generator are prerequisites).
+**Goal**: complete full scalar parity — numeric (`min`/`max`/`nonnegative`/`positive`/`nonzero`/`maxplaces`) and qualified (`money`/`quantity`) element bounds, plus quantifier-binding reach, participate in typing, write-proof, and read-reach.
+
+**Items in scope**: Design Acceptance 5 (numeric parity read), 6 (quantifier binding carries the bound). The numeric/qualified analogues of every Phase-1 path.
+
+**Step-by-step execution** (same cadence; reuse is the bar):
+1. **Grammar/typing** — route numeric/flag/qualified value modifiers (scalar-only, so unambiguous) into element position alongside the Phase-1 length modifiers; per-element validation already reuses `ValidateValueModifiers` (no change to the validator — just widen the routed token set). `set of string min 0` → PRE0033.
+2. **Carrier** — extend `DeclaredValueBounds` to carry numeric bounds (reuse `TypedField`'s `DeclaredMin`/`DeclaredMax`/numeric-flag vocabulary), alongside the length fields already there.
+3. **Write-site obligation (numeric)** — generate the per-element `IntervalContainment` obligation at the same catalog-derived grow/establish actions, **sharing the scalar set-action numeric generator** (parameterized on bound-source) exactly as Phase 1 shared the length generator. Extend `CollectElementLengthDefaultObligations` (or a sibling) so **numeric default-literal elements** are checked too (the Phase-1 fix covered string; mirror it for numeric — same matched-pair).
+4. **Read-reach (numeric)** — new `TypedMemberAccess` arm in `ProofEngine.Intervals.cs:IntervalOfNarrowed` returning `band(m)` for an element-returning accessor (`.min`/`.max`/`.peek`/`.first`/`.last`/`.at`) on a field whose `ElementType.ValueBounds` carries numeric bounds; feeds the existing OutOfRange/assignment-range path.
+5. **Quantifier-binding reach** — seed the binding variable's interval from `band(m)` in the predicate's narrowing context (`each`/`any`/`no x in C`).
+6. **Qualified watch-cell** — `money`/`quantity` element bound read via `.min`/`.max` into a qualified destination: verify currency/unit normalization (`IntervalOfNarrowed`’s normalization path). If it misbehaves, the string-first split already shipped the corpus value — scope-gate the qualified cell and surface it, don't force it.
+7. **Adversarial diff review** (soundness-critical) — re-verify the matched pair over the *whole* element-entry-path family (the Phase-1 reviewer's strongest objection): write-sites + default literals, now numeric too.
+
+**Deferred (surfaced during Phase 1, not blocking parity):** `notempty` in element position (Design Decision 3) — `notempty` is *also* a collection modifier (`set of string notempty` already means collection-non-empty), so routing it per-element is a breaking reinterpretation, not an unambiguous add like the numeric modifiers. **Open Decision** → route to `/lifecycle-2-design` (disambiguator syntax vs. keep `notempty` collection-only and use `minlength 1` for per-element). Not required for full numeric/qualified parity.
+
+**Dependencies**: Phase 1 (grammar/carrier/typing foundation + shared generators) — landed (`4a003b64`).
+
+**Exit criteria** (testable):
+- Numeric: `set of integer min 0 max 100` typing-validates per element; an out-of-range write-site rejects; `.max` into a same-or-wider-bounded numeric field discharges, a narrowed field re-emits; an out-of-range numeric default-literal element rejects.
+- Quantifier: inside `rule no x in S (x > 100)` with `S` element `max 100`, the binding carries `[…,100]` and a proof depending on it discharges.
+- `set of string min 0` → PRE0033.
+- Full `dotnet test` green; numeric golden snapshots byte-identical; monotone.
+- The qualified `money`/`quantity` cell either discharges correctly or is scope-gated + surfaced.
+
+**Estimated effort**: M (2–3d).
+
+**Doc-update obligations**: spec §2.4 (numeric/flag/qualified modifiers in inner-type position); `collection-types.md` (element value modifiers — numeric/qualified); `proof-engine.md` (numeric member-access read-reach + element write-site); `type-checker.md` (numeric per-element validation).
+
+> **Phase 2 executed (working tree, uncommitted spike review).** Full scalar parity landed: numeric range (`min`/`max`), sign flags (`nonnegative`/`positive`/`nonzero`), `maxplaces`, and qualified (`money`/`quantity`) value modifiers route into element position via the catalog-derived `Modifiers.ElementPositionValueTokens` (scalar value modifiers applying to no collection type — `notempty` stays excluded, still deferred). The carrier extends `DeclaredValueBounds` with numeric/normalized fields + a `NumericFlags` list; the write-site numeric obligation shares `BuildIntervalContainmentObligation` with the scalar `set` path (parameterized on bound-source); the numeric default-literal path is the matched-pair sibling `CollectElementIntervalDefaultObligations`; read-reach adds a `TypedMemberAccess` arm in `IntervalOfNarrowed` + binding-interval seeding via `TypedFieldRef.ElementBounds`. **Qualified watch-cell outcome: works, not scope-gated.** A `money in 'USD'` element bound read via `.max` into a same-currency `[0,100] USD` field discharges clean, and a narrower `[0,50] USD` field re-emits `NumericOverflow` — currency normalization is sound (Falsifier 2 holds). `quantity of 'mass'` likewise. The string-first de-risk was therefore not needed. Full solution green (7499). **Build note (not a behavior gap):** the seeded numeric write-site tests used a bare event-arg reference (`add S V`); bare arg refs are an `UnqualifiedEventArgReference` error (args are dotted-only, spec §3.5) that taints the source, so the seed was corrected to the qualified `add S Add.V` form (matching Phase 1's `enqueue Q Add.Name`). Note: an *unbounded* numeric source rejects only when the reference is well-formed — the engine's existing IntervalContainment policy (unbounded source → unprovable → emit) is unchanged and now applies per-element. **Sign-set caveat:** the binding-interval seeding feeds the *interval* (IntervalContainment/overflow/OutOfRange) path; sign-set-based proofs (division-by-zero, index lower-bound) over a quantifier binding still read field modifiers, not element bounds — out of this slice's scope (design Rule 4 targets the interval reach). Acceptance 6 is verified white-box (the resolved binding ref carries the band) since the interval-consuming obligations are not readily generated over a rule-predicate binding.
 
 ## Definition of done
 

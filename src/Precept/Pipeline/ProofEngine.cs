@@ -462,6 +462,14 @@ public static partial class ProofEngine
                 if (elementObligation is not null)
                     obligations.Add(elementObligation with { Context = ctx });
 
+                // Numeric sibling: an element-introducing action into a collection whose numeric
+                // element type declares a bound (min/max/sign-flag) carries the same
+                // interval-containment obligation as a scalar set into a bounded numeric field
+                // (shared generator).
+                var elementIntervalObligation = Actions.GenerateElementIntervalContainmentObligation(inputAction, actionMeta, semantics);
+                if (elementIntervalObligation is not null)
+                    obligations.Add(elementIntervalObligation with { Context = ctx });
+
                 WalkExpression(inputAction.InputExpression, ctx, obligations, semantics);
                 if (inputAction.SecondaryExpression is not null)
                     WalkExpression(inputAction.SecondaryExpression, ctx, obligations, semantics);

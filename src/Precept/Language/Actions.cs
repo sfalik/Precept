@@ -285,22 +285,14 @@ public static class Actions
         var (min, max) = ProofEngine.GetFieldBounds(targetField);
         if (min.HasValue || max.HasValue)
         {
-            var authoredMin = targetField.DeclaredMin;
-            var authoredMax = targetField.DeclaredMax;
-            var intervalReq = new IntervalContainmentProofRequirement(
-                new SelfSubject(),
+            var intervalObligation = BuildIntervalContainmentObligation(
                 inputAction.FieldName,
-                min, max,
-                authoredMin, authoredMax,
-                $"Interval containment: {inputAction.FieldName} must stay within declared bounds [{(authoredMin ?? min)?.ToString() ?? "−∞"} .. {(authoredMax ?? max)?.ToString() ?? "+∞"}]");
-
-            obligations.Add(new ProofObligation(
-                intervalReq,
                 inputAction.InputExpression,
-                null!, // Will be replaced with proper context in ProofEngine.WalkActions()
-                ProofDisposition.Unresolved,
-                null,
-                null));
+                min, max,
+                authoredMin: targetField.DeclaredMin,
+                authoredMax: targetField.DeclaredMax);
+            if (intervalObligation is not null)
+                obligations.Add(intervalObligation);
         }
 
         // String length containment (string fields with minlength/maxlength).
@@ -370,6 +362,43 @@ public static class Actions
     }
 
     /// <summary>
+    /// Builds a per-element numeric interval-containment obligation for an element-introducing action
+    /// whose target collection declares a numeric element bound (<c>set of integer min 0 max 100</c>,
+    /// <c>set of money in 'USD' nonnegative</c>). Shares <see cref="BuildIntervalContainmentObligation"/>
+    /// with the scalar <c>set</c> path — the only difference is the bound source (the receiver field's
+    /// <c>ElementType.ValueBounds</c> band instead of the field's own numeric modifiers). The
+    /// governed-action set is derived from <see cref="ActionMeta"/> identically to the length sibling,
+    /// so <c>add</c>/<c>enqueue</c>/<c>push</c>/<c>append</c>/<c>insert</c>/<c>put</c> and their
+    /// by-keyed variants are covered without a hand-maintained list.
+    /// </summary>
+    internal static ProofObligation? GenerateElementIntervalContainmentObligation(
+        TypedInputAction inputAction,
+        ActionMeta actionMeta,
+        SemanticIndex semantics)
+    {
+        if (actionMeta.Effect != ActionEffectClass.Grows
+            || actionMeta.WriteSemantics != ActionWriteSemantics.EstablishesValue)
+            return null;
+
+        if (!semantics.FieldsByName.TryGetValue(inputAction.FieldName, out var targetField))
+            return null;
+
+        if (targetField.ElementType?.ValueBounds is not { HasNumericBound: true } bounds)
+            return null;
+
+        var (min, max) = ProofEngine.GetElementNumericBounds(bounds);
+        if (!min.HasValue && !max.HasValue)
+            return null;
+
+        return BuildIntervalContainmentObligation(
+            inputAction.FieldName,
+            inputAction.InputExpression,
+            min, max,
+            authoredMin: bounds.DeclaredMin,
+            authoredMax: bounds.DeclaredMax);
+    }
+
+    /// <summary>
     /// Constructs a <see cref="LengthContainmentProofRequirement"/> obligation against the given
     /// declared length band. Shared by the scalar <c>set</c> path and the collection element
     /// write-site path; the band is the only parameter that differs (field bound vs element bound).
@@ -390,6 +419,37 @@ public static class Actions
 
         return new ProofObligation(
             lengthReq,
+            site,
+            null!, // Replaced with the real context in ProofEngine.WalkActions().
+            ProofDisposition.Unresolved,
+            null,
+            null);
+    }
+
+    /// <summary>
+    /// Constructs an <see cref="IntervalContainmentProofRequirement"/> obligation against the given
+    /// numeric band. Shared by the scalar <c>set</c> path and the collection element write-site path;
+    /// the band (normalized min/max) and authored values are the only parameters that differ
+    /// (field bound vs element bound). The context is filled in by <see cref="ProofEngine"/> when the
+    /// obligation is walked.
+    /// </summary>
+    private static ProofObligation? BuildIntervalContainmentObligation(
+        string fieldName,
+        TypedExpression site,
+        decimal? declaredMin,
+        decimal? declaredMax,
+        decimal? authoredMin,
+        decimal? authoredMax)
+    {
+        var intervalReq = new IntervalContainmentProofRequirement(
+            new SelfSubject(),
+            fieldName,
+            declaredMin, declaredMax,
+            authoredMin, authoredMax,
+            $"Interval containment: {fieldName} must stay within declared bounds [{(authoredMin ?? declaredMin)?.ToString() ?? "−∞"} .. {(authoredMax ?? declaredMax)?.ToString() ?? "+∞"}]");
+
+        return new ProofObligation(
+            intervalReq,
             site,
             null!, // Replaced with the real context in ProofEngine.WalkActions().
             ProofDisposition.Unresolved,

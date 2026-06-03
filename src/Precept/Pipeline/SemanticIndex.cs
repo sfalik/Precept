@@ -21,6 +21,11 @@ public abstract record TypedExpression(TypeKind ResultType, SourceSpan Span);
 /// quantifier-binding identifiers; when the binding is over a <c>queue of T by P</c>
 /// or <c>log of T by P</c>, <see cref="KeyType"/> carries the ordering type so that
 /// <c>binding.value</c> and <c>binding.by</c> member accesses can dispatch correctly.
+/// <see cref="ElementBounds"/> is populated only for a quantifier-binding identifier over a
+/// collection whose inner type declares value bounds (<c>no x in S (x &gt; 100)</c> with
+/// <c>S</c> element <c>max 100</c>); it carries the element's <c>band(m)</c> so the proof
+/// engine seeds the binding's value interval from the inner-type bound. <c>null</c> for an
+/// ordinary field reference.
 /// </summary>
 public sealed record TypedFieldRef(
     TypeKind ResultType,
@@ -28,7 +33,8 @@ public sealed record TypedFieldRef(
     bool IsCaseInsensitive,
     ImmutableArray<DeclaredQualifierMeta>? DeclaredQualifiers,
     SourceSpan Span,
-    TypeKind? KeyType = null
+    TypeKind? KeyType = null,
+    DeclaredValueBounds? ElementBounds = null
 ) : TypedExpression(ResultType, Span);
 
 /// <summary>A resolved reference to an event argument.</summary>
@@ -89,6 +95,13 @@ public sealed record TypedFunctionCall(
 /// (e.g., <c>.at(N)</c> index bounds) can resolve their <c>ParamSubject</c> via
 /// the standard <c>ResolveParamInMemberAccess</c> path. Default empty preserves
 /// existing zero-arg accessor call sites unchanged.
+/// <see cref="ElementQualifiers"/> carries the receiver's element-type qualifiers
+/// when the accessor returns an element (a <c>set of money in 'EUR'</c> read via
+/// <c>.max</c> yields a value with the element's <c>Currency(EUR)</c>). Like
+/// <see cref="ChoiceMetadata"/>, it lets the assignment-qualifier resolver read the
+/// produced value's qualifier directly instead of walking the receiver field's
+/// element type through the symbol table. Default empty for fixed-return accessors
+/// (e.g. <c>.count</c>), whose result carries no element qualifier.
 /// </summary>
 public sealed record TypedMemberAccess(
     TypeKind ResultType,
@@ -97,7 +110,8 @@ public sealed record TypedMemberAccess(
     ImmutableArray<ProofRequirement> ProofRequirements,
     SourceSpan Span,
     TypedChoiceElement? ChoiceMetadata = null,
-    ImmutableArray<TypedExpression> Arguments = default
+    ImmutableArray<TypedExpression> Arguments = default,
+    ImmutableArray<DeclaredQualifierMeta> ElementQualifiers = default
 ) : TypedExpression(ResultType, Span);
 
 /// <summary>
@@ -348,19 +362,36 @@ public sealed record TypedBindingAction(
 
 /// <summary>
 /// Declared value bounds carried by a collection inner type's value modifiers
-/// (e.g. <c>queue of string maxlength 200</c>). Reuses <see cref="TypedField"/>'s
-/// length-bound vocabulary (<c>DeclaredMinLength</c>/<c>DeclaredMaxLength</c>) so the
-/// proof engine's existing length-containment machinery reads element bounds and field
-/// bounds through one shape. Currently carries only the string-length bounds; numeric /
-/// flag bounds attach to this same companion as they are wired (DU companion, not a parallel carrier).
+/// (e.g. <c>queue of string maxlength 200</c>, <c>set of integer min 0 max 100</c>,
+/// <c>set of money in 'USD' nonnegative</c>). Reuses <see cref="TypedField"/>'s bound
+/// vocabulary — length (<c>DeclaredMinLength</c>/<c>DeclaredMaxLength</c>), numeric
+/// (<c>DeclaredMin</c>/<c>DeclaredMax</c> + their normalized/UCUM-base variants), and the
+/// numeric sign flags (<c>nonnegative</c>/<c>positive</c>/<c>nonzero</c>) — so the proof
+/// engine's existing length- and interval-containment machinery reads element bounds and
+/// field bounds through one shape (DU companion, not a parallel carrier).
+/// <see cref="NormalizedDeclaredMin"/>/<see cref="NormalizedDeclaredMax"/> carry the
+/// UCUM-base-unit values for qualified (<c>money</c>/<c>quantity</c>) elements; for
+/// non-qualified numeric elements they equal the declared values.
 /// </summary>
 public sealed record DeclaredValueBounds(
     int? DeclaredMinLength = null,
     int? DeclaredMaxLength = null,
-    bool NotEmpty = false)
+    bool NotEmpty = false,
+    decimal? DeclaredMin = null,
+    decimal? DeclaredMax = null,
+    decimal? NormalizedDeclaredMin = null,
+    decimal? NormalizedDeclaredMax = null,
+    ImmutableArray<ModifierKind> NumericFlags = default)
 {
     /// <summary>True when no bound is actually declared (the common no-modifier case).</summary>
-    public bool IsEmpty => DeclaredMinLength is null && DeclaredMaxLength is null && !NotEmpty;
+    public bool IsEmpty =>
+        DeclaredMinLength is null && DeclaredMaxLength is null && !NotEmpty
+        && DeclaredMin is null && DeclaredMax is null
+        && (NumericFlags.IsDefaultOrEmpty);
+
+    /// <summary>True when a numeric (range or sign-flag) bound is declared.</summary>
+    public bool HasNumericBound =>
+        DeclaredMin is not null || DeclaredMax is not null || !NumericFlags.IsDefaultOrEmpty;
 }
 
 /// <summary>
