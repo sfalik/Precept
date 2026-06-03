@@ -778,7 +778,7 @@ For an `AssignmentQualifierProofRequirement` on the **period basis** (`TemporalU
 | `positive` | `Numeric(SelfValue, GreaterThan, Constant(0))` |
 | `nonnegative` | `Numeric(SelfValue, GreaterThanOrEqual, Constant(0))` |
 | `nonzero` | `Numeric(SelfValue, NotEquals, Constant(0))` |
-| `notempty` | `Numeric(Accessor("length"), GreaterThan, Constant(0))`, `Numeric(Accessor("count"), GreaterThan, Constant(0))` |
+| `notempty` | `Numeric(Accessor("length"), GreaterThan, Constant(0))` |
 | `min(N)` | `Numeric(SelfValue, GreaterThanOrEqual, DeclarationValue)` |
 | `max(N)` | `Numeric(SelfValue, LessThanOrEqual, DeclarationValue)` |
 | `minlength(N)` | `Numeric(Accessor("length"), GreaterThanOrEqual, DeclarationValue)` |
@@ -1011,7 +1011,7 @@ A DU with 8 subtypes representing all qualifier axes:
 
 | Modifier | ProofSatisfaction entries |
 |---|---|
-| `notempty` | `Numeric(Accessor("length"), GreaterThan, Constant(0))`, `Numeric(Accessor("count"), GreaterThan, Constant(0))` |
+| `notempty` | `Numeric(Accessor("length"), GreaterThan, Constant(0))` |
 | `min(N)` | `Numeric(SelfValue, GreaterThanOrEqual, DeclarationValue)` |
 | `max(N)` | `Numeric(SelfValue, LessThanOrEqual, DeclarationValue)` |
 | `positive` | `Numeric(SelfValue, GreaterThan, Constant(0))` |
@@ -2092,7 +2092,7 @@ Collection non-empty obligations arise from several sources:
 
 If the obligation is unresolved after all strategies, the proof-site shape determines the projected failure surface: `TypedMemberAccess` sites emit `UnguardedCollectionAccess` and map to `FaultCode.CollectionEmptyOnAccess`; field-target action sites (`dequeue`, `pop`) emit `UnguardedCollectionMutation` and map to `FaultCode.CollectionEmptyOnMutation`.
 
-**Modifier-proof strategy:** The `notempty` modifier discharges collection non-empty requirements.
+**Modifier-proof strategy:** A statically-literal `mincount N` (`N ≥ 1`) discharges collection non-empty requirements. `mincount`'s `count >= DeclarationValue` satisfaction resolves conservatively to null in `SatisfactionCovers` (no runtime value), so the discharge instead reads the field's resolved `TypedField.DeclaredMinCount` and discharges `count > 0` when it is `≥ 1`; `mincount 0` / no `mincount` does not discharge. (`notempty` is string-only and no longer carries a `count > 0` satisfaction — it does not discharge collection non-emptiness; in inner-type position it constrains each element.)
 
 **Guard-in-path strategy:** `count(collection) > 0` or `collection.count > 0` guards discharge the requirement.
 
@@ -2478,7 +2478,7 @@ public abstract record ProofSatisfaction(ProofRequirementKind RequirementKind)
 | `positive` | `[Numeric(SelfValue, >, 0)]` |
 | `nonnegative` | `[Numeric(SelfValue, >=, 0)]` |
 | `nonzero` | `[Numeric(SelfValue, !=, 0)]` |
-| `notempty` | `[Numeric(Accessor("length"), >, 0), Numeric(Accessor("count"), >, 0)]` |
+| `notempty` | `[Numeric(Accessor("length"), >, 0)]` |
 | `min(N)` | `[Numeric(SelfValue, >=, DeclarationValue)]` |
 | `max(N)` | `[Numeric(SelfValue, <=, DeclarationValue)]` |
 | `minlength(N)` | `[Numeric(Accessor("length"), >=, DeclarationValue)]` |

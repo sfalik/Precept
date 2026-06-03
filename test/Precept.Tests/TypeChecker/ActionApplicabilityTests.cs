@@ -152,10 +152,31 @@ public class ActionApplicabilityTests
     [InlineData("lookup of string to integer")]
     [InlineData("lookup of string to string")]
     [InlineData("lookup of integer to integer")]
-    public void Notempty_OnLookup_CompilesClean(string fieldType)
+    public void Mincount_OnLookup_CompilesClean(string fieldType)
     {
-        // `notempty` on lookup is semantically equivalent to `mincount 1` — author chooses
-        // by style. All other collection kinds accept both forms; lookup matches the rest.
+        // Collection cardinality ("the lookup has ≥1 entry") is `mincount 1`, valid on every
+        // collection kind including lookup. (`notempty` is now string-only — it constrains the
+        // value element, not the collection; see Notempty_OnLookup_ValueType below.)
+        var precept = $$"""
+            precept Widget
+            field MyMap as {{fieldType}} mincount 1
+            state Open initial
+            """;
+
+        var (_, diagnostics) = Check(precept);
+        diagnostics.Should().NotContain(
+            d => d.Code == nameof(DiagnosticCode.InvalidModifierForType),
+            because: $"mincount applies to every collection kind, including {fieldType}");
+    }
+
+    [Theory]
+    [InlineData("lookup of string to string", false)]   // value is string → notempty applies
+    [InlineData("lookup of string to integer", true)]   // value is integer → type mismatch
+    [InlineData("lookup of integer to integer", true)]  // value is integer → type mismatch
+    public void Notempty_OnLookup_AppliesToValueType(string fieldType, bool expectMismatch)
+    {
+        // `notempty` is string-only; on a lookup it constrains the value element. A non-string
+        // value type is therefore an InvalidModifierForType mismatch.
         var precept = $$"""
             precept Widget
             field MyMap as {{fieldType}} notempty
@@ -163,9 +184,14 @@ public class ActionApplicabilityTests
             """;
 
         var (_, diagnostics) = Check(precept);
-        diagnostics.Should().NotContain(
-            d => d.Code == nameof(DiagnosticCode.InvalidModifierForType),
-            because: $"notempty applies to {fieldType}");
+        if (expectMismatch)
+            diagnostics.Should().Contain(
+                d => d.Code == nameof(DiagnosticCode.InvalidModifierForType),
+                because: $"notempty on {fieldType} mismatches the non-string value type");
+        else
+            diagnostics.Should().NotContain(
+                d => d.Code == nameof(DiagnosticCode.InvalidModifierForType),
+                because: $"notempty on {fieldType} applies to the string value type");
     }
 
     [Theory]

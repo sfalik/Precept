@@ -183,6 +183,24 @@ public static partial class ProofEngine
             return true;
         }
 
+        // mincount discharge: a statically-literal `mincount N` (N ≥ 1) guarantees the collection
+        // is non-empty, so it discharges the `count > 0` access-safety obligation for
+        // .peek/.first/.last/.min/.max. This is the discharge collection-`notempty` used to provide
+        // before it became string-only; mincount's own `count >= DeclarationValue` satisfaction
+        // resolves conservatively to null in SatisfactionCovers (no runtime value), so it is read
+        // here from the field's resolved declared magnitude instead.
+        if (reqSubject is SelfSubject { Accessor: { Name: "count" } }
+            && obligation.Requirement is NumericProofRequirement
+            {
+                Comparison: OperatorKind.GreaterThan,
+                Threshold: 0m,
+            }
+            && attributeField.DeclaredMinCount is { } minCount
+            && minCount >= 1)
+        {
+            return true;
+        }
+
         // Walk declared + implied modifiers
         foreach (var modifier in attributeField.Modifiers.Concat(attributeField.ImpliedModifiers))
         {

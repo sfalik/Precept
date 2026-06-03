@@ -133,10 +133,10 @@ public class MemberAccessTests
         // BUG-039: 'list.at(N)' rejected — 'at' ambiguity.
         // Updated per Phase 4 W-E (F-LANG-COLL-04): .at(N) now requires an explicit
         // bounds guard. The original test verified the 'at' keyword parsed cleanly
-        // even on a notempty-typed list; the bounds guard ships alongside.
+        // even on a non-empty (mincount 1) list; the bounds guard ships alongside.
         var compilation = Compiler.Compile("""
             precept ListAt
-            field Steps as list of string notempty
+            field Steps as list of string mincount 1
             field LastStep as string optional
             state Active initial
             state Done terminal
@@ -173,7 +173,7 @@ public class MemberAccessTests
         // BUG-025: keyword-named accessors rejected; 'peekby' is a keyword token
         var compilation = Compiler.Compile("""
             precept PeekByAccessor
-            field Tasks as queue of string by integer notempty
+            field Tasks as queue of string by integer mincount 1
             field NextPriority as integer <- Tasks.peekby
             """);
 
@@ -187,7 +187,7 @@ public class MemberAccessTests
         // BUG-025: 'min' is a keyword (Min = 55) that is also a set element accessor
         var compilation = Compiler.Compile("""
             precept SetMin
-            field Scores as set of integer notempty
+            field Scores as set of integer mincount 1
             field LowestScore as integer <- Scores.min
             """);
 
@@ -200,7 +200,7 @@ public class MemberAccessTests
     {
         var compilation = Compiler.Compile("""
             precept SetMax
-            field Scores as set of integer notempty
+            field Scores as set of integer mincount 1
             field HighestScore as integer <- Scores.max
             """);
 

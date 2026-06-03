@@ -48,11 +48,13 @@ public sealed class CollectionMutationProofTests
     }
 
     [Fact]
-    public void Pop_WithNotempty_CompilesClean()
+    public void Pop_WithMincount1_CompilesClean()
     {
+        // mincount 1 marks the collection non-empty (the cardinality axis), discharging the
+        // pop access-safety obligation — the discharge collection-`notempty` used to provide.
         var compilation = Compile("""
             precept PopNotempty
-            field Steps as stack of string notempty
+            field Steps as stack of string mincount 1
             field LastStep as string optional
             state Active initial
             event Undo

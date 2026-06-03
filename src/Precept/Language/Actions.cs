@@ -351,13 +351,20 @@ public static class Actions
         if (targetField.ElementType?.ValueBounds is not { IsEmpty: false } bounds)
             return null;
 
-        if (!bounds.DeclaredMinLength.HasValue && !bounds.DeclaredMaxLength.HasValue)
+        // notempty on the element folds to a minlength ≥ 1 lower bound (it sets NotEmpty, not
+        // DeclaredMinLength) — the same fold the element-default obligation path applies, so a
+        // `set of string notempty` rejects an empty-string element introduced by add/enqueue/etc.
+        var minLength = bounds.DeclaredMinLength;
+        if (bounds.NotEmpty)
+            minLength = Math.Max(minLength ?? 0, 1);
+
+        if (!minLength.HasValue && !bounds.DeclaredMaxLength.HasValue)
             return null;
 
         return BuildLengthContainmentObligation(
             inputAction.FieldName,
             inputAction.InputExpression,
-            bounds.DeclaredMinLength,
+            minLength,
             bounds.DeclaredMaxLength);
     }
 

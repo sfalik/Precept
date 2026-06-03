@@ -370,6 +370,8 @@ The inner type may carry **any** value modifier its scalar type could carry as a
 
 ### Supporting Decision 3 — `notempty` in inner-type position means per-element non-empty, distinct from collection `notempty`/`mincount` *(medium stakes — surfaced by this pass)*
 
+> **Retargeted by `modifier-name-axis-overlap-2026-06-03.md` (Locked 2026-06-03).** The collection-coexistence half of this decision is **reversed** under owner authorization (Direction A): `notempty` is now `StringOnly` — it has no collection meaning, so there is no longer a collection-level `notempty` to coexist with; "the collection has ≥1 element" is `mincount 1` only. The element half is **resolved**: per-element `notempty` is achieved by the retarget plus generic satisfaction-shape binding in `BuildElementValueBounds` (no per-modifier arm), not by positional overloading of a both-axes modifier. The text below is retained as the original framing; read it through that retarget.
+
 `set of string notempty` means **each element is a non-empty string** (per-element `string` `notempty`), which is *different* from `set of string` with a collection-level `notempty`/`mincount 1` (the collection has ≥1 element).
 
 - **Rationale.** `notempty` is overloaded by position: on a *string field* it means "the string has content"; on a *collection field* it means "the collection has ≥1 element" (spec §2.4: "String is non-empty; collection contains at least one element"). In inner-type position the subject is the element's scalar type, so `notempty` takes its **scalar** meaning (string content). The position disambiguates — exactly as `ordered` on an inner `choice` (valid) differs from `ordered` as a collection field modifier (invalid).
@@ -434,7 +436,7 @@ A claim is wrong if any of these is observed by an external author:
 2. **A `.peek`/`.first`/`.min` read of a bounded element into a same-bound field still emits `LengthBoundViolation`/OutOfRange** — falsifies the read-site reach (Rule 4), the feature's reason to exist.
 3. **An over-bound write-site compiles clean** (e.g. `enqueue Q E.Name` with `E.Name` unbounded into `queue of string maxlength 5` produces no diagnostic) — falsifies Rule 3 / Principle 7 (deferral).
 4. **An out-of-bound element persists at runtime** (an element longer than the inner `maxlength` survives an ingress and is observable on a later read) — falsifies Rule 2 / Principle 1 (governance).
-5. **`set of string notempty` is interpreted as collection `mincount 1`** (an empty string element is admitted while an empty collection is rejected) — falsifies Supporting Decision 3.
+5. ~~**`set of string notempty` is interpreted as collection `mincount 1`** (an empty string element is admitted while an empty collection is rejected) — falsifies Supporting Decision 3.~~ **Risk removed by `modifier-name-axis-overlap-2026-06-03.md` (Locked 2026-06-03):** `notempty` is now `StringOnly` with no collection meaning, so `set of string notempty` can *only* mean the per-element bind — there is no longer a collection-`notempty` reading to be confused with. Collection cardinality is `mincount 1`.
 
 ---
 

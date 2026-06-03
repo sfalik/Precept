@@ -91,7 +91,7 @@ event Create(
     CustomerId as string notempty maxlength 100,
     SessionId as string notempty maxlength 100,
     BaseCurrency as currency,
-    CatalogItems as set of string notempty,
+    CatalogItems as set of string notempty mincount 1,
     CatalogName as string optional maxlength 200) initial
 
 event AddItem(ItemId as string notempty, Quantity as integer positive max 100)

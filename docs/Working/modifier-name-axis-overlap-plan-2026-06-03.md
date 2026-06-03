@@ -10,8 +10,10 @@ Spike-branch mode: commits land directly on `spike/Precept-V2-Radical`; this doc
 
 | # | Goal | Items | Decisions required | Effort | Status |
 |---|---|---|---|---|---|
-| 1 | The semantic change end-to-end: `notempty` → string-only, generic element-bound binding, `mincount 1` discharge, sample migration, doc-sync — corpus green | Design items 1,2,3,5,6 | migration-rewrite (build-confirm) | M (2–3d) | Next |
-| 2 | No-overlap Roslyn analyzer (structural guardrail) | Design item 4 / Decision 2 | none | S (0.5–1d) | Stub |
+| 1 | The semantic change end-to-end: `notempty` → string-only, generic element-bound binding, `mincount 1` discharge, sample migration, doc-sync — corpus green | Design items 1,2,3,5,6 | resolved (migration = stronger) | M (2–3d) | ✅ Done |
+| 2 | No-overlap Roslyn analyzer (structural guardrail) | Design item 4 / Decision 2 | none | S (0.5–1d) | Next |
+
+> **Slice 1 executed 2026-06-03.** Adversarial `precept-reviewer` pass returned commit-ready: reuse bar held (no `switch (modifier.Kind)` in `BuildElementValueBounds` — replaced by the satisfaction-shape loop, mirroring `FlagLowerBoundFromMeta`); the genericization is behavior-preserving (every element modifier maps to the right slot, arms disjoint on the `Bound` discriminator) and binds `notempty` for free; the `mincount 1` discharge is sound + literal-N-gated (an `optional mincount 1` unset collection is still caught by the separate presence obligation, not masked). Two latent gaps the retarget exposed were closed in-scope (element write-site `NotEmpty ⇒ minlength 1` fold; CI-element unwrap for `set of ~string notempty`). **Migration: owner chose the stronger `notempty mincount 1`** (per-element non-empty + ≥1) for `shopping-cart` `CatalogItems` — a deliberate tightening over the faithful `mincount 1`, harmless (`Catalog` never element-read). `.at` dropped from the `mincount 1` discharge doc note (it needs an index-bounds guard). **Forward watch → Slice 2:** the generic binding silently binds any future modifier whose satisfaction-shape matches an arm — the no-overlap analyzer should also consider asserting the element-routable set maps to exactly the expected slots (arm-shape coverage), not only the collection/scalar axis.
 
 ## Decisions captured
 

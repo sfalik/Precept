@@ -132,16 +132,13 @@ public class ModifiersTests
     }
 
     [Fact]
-    public void Notempty_AppliesToStringAndCollectionTypes()
+    public void Notempty_AppliesToStringOnly()
     {
         var meta = ValueModifierTestAccess.GetMeta(ModifierKind.Notempty);
         meta.ApplicableTo.Select(t => t.Kind).Should().BeEquivalentTo(
         [
             TypeKind.String,
-            TypeKind.Set, TypeKind.Queue, TypeKind.Stack,
-            TypeKind.Log, TypeKind.LogBy, TypeKind.Bag,
-            TypeKind.List, TypeKind.QueueBy, TypeKind.Lookup,
-        ], "notempty applies to strings and all collection kinds");
+        ], "notempty is a string-only value modifier; collection cardinality is mincount 1");
     }
 
     [Theory]
@@ -229,17 +226,18 @@ public class ModifiersTests
     }
 
     [Fact]
-    public void Notempty_HasTwoProofSatisfactions_LengthAndCount()
+    public void Notempty_HasSingleLengthProofSatisfaction()
     {
         var proofs = ValueModifierTestAccess.GetMeta(ModifierKind.Notempty).ProofSatisfactions
             .Select(p => p.Should().BeOfType<ProofSatisfaction.Numeric>().Subject)
             .ToList();
 
-        proofs.Should().HaveCount(2);
-        proofs.Select(p => ((SatisfactionProjection.Accessor)p.Projection).Name)
-            .Should().BeEquivalentTo(["length", "count"]);
-        proofs.Should().OnlyContain(p => p.Comparison == OperatorKind.GreaterThan);
-        proofs.Should().OnlyContain(p => p.Bound.Equals(new NumericBoundSource.Constant(0m)));
+        // String-only after the axis retarget: the collection `count > 0` satisfaction is
+        // dropped (collection cardinality is mincount 1), the `length > 0` one is kept.
+        proofs.Should().HaveCount(1);
+        ((SatisfactionProjection.Accessor)proofs[0].Projection).Name.Should().Be("length");
+        proofs[0].Comparison.Should().Be(OperatorKind.GreaterThan);
+        proofs[0].Bound.Should().BeEquivalentTo(new NumericBoundSource.Constant(0m));
     }
 
     [Fact]

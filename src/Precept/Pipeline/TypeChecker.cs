@@ -198,37 +198,75 @@ internal static partial class TypeChecker
 
         int? minLength = null;
         int? maxLength = null;
+        bool notEmpty = false;
         decimal? declaredMin = null;
         decimal? declaredMax = null;
         decimal? normalizedMin = null;
         decimal? normalizedMax = null;
         var numericFlags = ImmutableArray.CreateBuilder<ModifierKind>();
+
+        // Catalog-generic element-bound binding: project each modifier's declared meaning off its
+        // `ProofSatisfactions` shape `(Projection, Comparison, Bound)` rather than switching on
+        // `modifier.Kind` — mirrors `FlagLowerBoundFromMeta` (ProofEngine.Intervals.cs). A new
+        // value modifier carrying the right satisfaction shape binds with no per-modifier arm; a
+        // modifier with no matching Numeric satisfaction (maxplaces/optional/default/ordered)
+        // contributes nothing. `notempty` (length > 0) sets NotEmpty here for free.
         foreach (var modifier in modified.Modifiers)
         {
-            switch (modifier.Kind)
+            var meta = Modifiers.GetMeta(modifier.Kind);
+            if (meta is not ValueModifierMeta valueMeta)
+                continue;
+
+            foreach (var satisfaction in valueMeta.ProofSatisfactions.OfType<ProofSatisfaction.Numeric>())
             {
-                case ModifierKind.Minlength when TryReadLengthLiteral(modifier.Value, out var mn):
-                    minLength = mn;
-                    break;
-                case ModifierKind.Maxlength when TryReadLengthLiteral(modifier.Value, out var mx):
-                    maxLength = mx;
-                    break;
-                case ModifierKind.Min when TryGetComparableModifierValue(modifier.Value, elementTypeKind, elementQualifiers) is { } lo:
-                    declaredMin = lo.DeclaredMagnitude;
-                    normalizedMin = lo.NormalizedMagnitude;
-                    break;
-                case ModifierKind.Max when TryGetComparableModifierValue(modifier.Value, elementTypeKind, elementQualifiers) is { } hi:
-                    declaredMax = hi.DeclaredMagnitude;
-                    normalizedMax = hi.NormalizedMagnitude;
-                    break;
-                case ModifierKind.Nonnegative or ModifierKind.Positive or ModifierKind.Nonzero:
-                    numericFlags.Add(modifier.Kind);
-                    break;
+                switch (satisfaction.Projection, satisfaction.Bound)
+                {
+                    // Length slot: `Accessor("length") <comparison> DeclarationValue` →
+                    // minlength (>=) / maxlength (<=), read from the modifier's literal value.
+                    case (SatisfactionProjection.Accessor { Name: "length" }, NumericBoundSource.DeclarationValue)
+                        when TryReadLengthLiteral(modifier.Value, out var len):
+                        if (satisfaction.Comparison is OperatorKind.GreaterThanOrEqual)
+                            minLength = len;
+                        else if (satisfaction.Comparison is OperatorKind.LessThanOrEqual)
+                            maxLength = len;
+                        break;
+
+                    // Numeric slot: `SelfValue <comparison> DeclarationValue` → declared
+                    // min (>=) / max (<=), preserving the UCUM Declared/Normalized split.
+                    case (SatisfactionProjection.SelfValue, NumericBoundSource.DeclarationValue)
+                        when TryGetComparableModifierValue(modifier.Value, elementTypeKind, elementQualifiers) is { } v:
+                        if (satisfaction.Comparison is OperatorKind.GreaterThanOrEqual)
+                        {
+                            declaredMin = v.DeclaredMagnitude;
+                            normalizedMin = v.NormalizedMagnitude;
+                        }
+                        else if (satisfaction.Comparison is OperatorKind.LessThanOrEqual)
+                        {
+                            declaredMax = v.DeclaredMagnitude;
+                            normalizedMax = v.NormalizedMagnitude;
+                        }
+                        break;
+
+                    // Non-empty: `Accessor("length"|"count") > Constant(0)` → NotEmpty.
+                    case (SatisfactionProjection.Accessor { Name: "length" or "count" }, NumericBoundSource.Constant { Value: 0m })
+                        when satisfaction.Comparison is OperatorKind.GreaterThan:
+                        notEmpty = true;
+                        break;
+
+                    // Sign flag: `SelfValue >=/> Constant` (nonnegative/positive/nonzero) → flag set.
+                    case (SatisfactionProjection.SelfValue, NumericBoundSource.Constant)
+                        when satisfaction.Comparison is OperatorKind.GreaterThanOrEqual
+                                                     or OperatorKind.GreaterThan
+                                                     or OperatorKind.NotEquals:
+                        if (!numericFlags.Contains(modifier.Kind))
+                            numericFlags.Add(modifier.Kind);
+                        break;
+                }
             }
         }
 
         return new DeclaredValueBounds(
-            minLength, maxLength, NotEmpty: false,
+            minLength, maxLength, NotEmpty: notEmpty,
             DeclaredMin: declaredMin, DeclaredMax: declaredMax,
             NormalizedDeclaredMin: normalizedMin, NormalizedDeclaredMax: normalizedMax,
             NumericFlags: numericFlags.ToImmutable());
@@ -712,10 +750,14 @@ internal static partial class TypeChecker
             ctx.Fields.Add(typedField);
             ctx.FieldLookup[declared.Name] = typedField;
 
-            // CI tracking: record ~string fields and ~string-element collections
+            // CI tracking: record ~string fields and ~string-element collections.
+            // The element ref may be wrapped in an ElementValueModifiedTypeReference when the
+            // element carries value modifiers (e.g. `set of ~string notempty`), so unwrap it.
             if (declared.Type is CITypeReference)
                 ctx.CIFields.Add(declared.Name);
-            else if (declared.Type is CollectionTypeReference { ElementType: CITypeReference })
+            else if (declared.Type is CollectionTypeReference coll
+                && (coll.ElementType is CITypeReference
+                    || coll.ElementType is ElementValueModifiedTypeReference { InnerType: CITypeReference }))
                 ctx.CIElementCollections.Add(declared.Name);
 
             // Choice domain validation: empty domain and duplicate values

@@ -44,14 +44,6 @@ public static class Modifiers
         new(TypeKind.List), new(TypeKind.QueueBy), new(TypeKind.Lookup),
     ];
 
-    private static readonly TypeTarget[] StringAndCollectionTypes =
-    [
-        new(TypeKind.String),
-        new(TypeKind.Set), new(TypeKind.Queue), new(TypeKind.Stack),
-        new(TypeKind.Log), new(TypeKind.LogBy), new(TypeKind.Bag),
-        new(TypeKind.List), new(TypeKind.QueueBy), new(TypeKind.Lookup),
-    ];
-
     private static readonly TypeTarget[] AnyType = []; // empty = applies to all types
 
     // ════════════════════════════════════════════════════════════════════════════
@@ -121,20 +113,16 @@ public static class Modifiers
 
         ModifierKind.Notempty => new ValueModifierMeta(
             kind, Tokens.GetMeta(TokenKind.Notempty),
-            "String or collection is non-empty",
-            ModifierCategory.Structural, StringAndCollectionTypes,
+            "String is non-empty",
+            ModifierCategory.Structural, StringOnly,
             ProofSatisfactions:
             [
                 new ProofSatisfaction.Numeric(
                     new SatisfactionProjection.Accessor("length"),
                     OperatorKind.GreaterThan,
                     new NumericBoundSource.Constant(0m)),
-                new ProofSatisfaction.Numeric(
-                    new SatisfactionProjection.Accessor("count"),
-                    OperatorKind.GreaterThan,
-                    new NumericBoundSource.Constant(0m)),
             ],
-            HoverDescription: "The field must not be empty. For text fields, the string must have at least one character. For collection fields, the collection must have at least one element. Not applicable to lookup fields — lookup entries are defined at design time.",
+            HoverDescription: "The text field must have at least one character. In a collection's inner-type position (e.g. 'set of string notempty') it constrains each element. To require a collection to have at least one element, use 'mincount 1'.",
             DesugarsToRule: true,
             MutuallyExclusiveWith: [ModifierKind.Optional]),
 

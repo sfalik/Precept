@@ -50,12 +50,12 @@ public sealed class ActionSecondaryDispatchRegressionTests
     [Fact]
     public void RemoveAt_Form_CompilesCleanly()
     {
-        // Per Phase 4 W-E (F-LANG-COLL-09), remove-at-N requires an explicit
-        // bounds guard `when N >= 0 and N < F.count`. Prior to W-E this passed
-        // with only the non-empty proof from the notempty modifier.
+        // remove-at-N requires an explicit bounds guard `when N >= 0 and N < F.count`.
+        // mincount 1 marks the collection non-empty (the cardinality axis; notempty is
+        // now string-only / per-element).
         var compilation = Compiler.Compile("""
             precept RemoveAtRegression
-            field Steps as list of string notempty editable
+            field Steps as list of string mincount 1 editable
             state Active initial
             state Done terminal
             event RemoveStep(Index as integer)
@@ -96,12 +96,13 @@ public sealed class ActionSecondaryDispatchRegressionTests
     }
 
     [Fact]
-    public void Insert_WithNotemptyField_CompilesClean()
+    public void Insert_WithNonEmptyCollectionField_CompilesClean()
     {
-        // Same bounds-guard requirement as the plain-list variant.
+        // Same bounds-guard requirement as the plain-list variant. mincount 1 is the
+        // collection-cardinality axis (notempty is now string-only / per-element).
         var compilation = Compiler.Compile("""
             precept TaskQueue
-            field Steps as list of string notempty editable
+            field Steps as list of string mincount 1 editable
             field Position as integer default 0 nonnegative editable
             state Active initial
             state Done terminal

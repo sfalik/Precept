@@ -331,8 +331,8 @@ from InReview on AddNote
 | Member | Returns | Proof requirement | Notes |
 |--------|---------|-------------------|-------|
 | `.count` | `integer` | None | Always safe — returns 0 for empty log. |
-| `.first` | `T` | `.count > 0` guard required | First (oldest) element. Obligation: `UnguardedCollectionAccess`. Discharged statically by `notempty`. |
-| `.last` | `T` | `.count > 0` guard required | Last (most recent) element. Obligation: `UnguardedCollectionAccess`. Discharged statically by `notempty`. |
+| `.first` | `T` | `.count > 0` guard required | First (oldest) element. Obligation: `UnguardedCollectionAccess`. Discharged statically by a non-empty guarantee (`mincount 1`). |
+| `.last` | `T` | `.count > 0` guard required | Last (most recent) element. Obligation: `UnguardedCollectionAccess`. Discharged statically by a non-empty guarantee (`mincount 1`). |
 | `.at(N)` | `T` | `N >= 0 and N < F.count` | Element at zero-based position `N`. Obligation: `UnguardedCollectionAccess`. |
 
 ```precept
@@ -350,7 +350,7 @@ from Audit on GetEntry when AuditTrail.count > GetEntry.Index and GetEntry.Index
     -> no transition
 ```
 
-**Constraints:** `notempty`, `mincount N`, `maxcount N`, `optional`, `default [...]`. `notempty` statically discharges `.first` and `.last` access safety — no per-access `.count > 0` guard needed when the field is declared `notempty`.
+**Constraints:** `mincount N`, `maxcount N`, `optional`, `default [...]`, plus per-element inner-type value modifiers (e.g. `set of string notempty` constrains each element). A statically-literal `mincount 1` discharges `.first`/`.last` access safety — no per-access `.count > 0` guard needed.
 
 **Proof engine implications:** `append` is always safe. `.first`/`.last` require `.count > 0` (same obligation as `.peek` on queue/stack). `.at(N)` requires an index-bounds guard: `N >= 0 and N < F.count`. The append-only invariant lets the proof engine conclude `.count > 0` after any `append` — subsequent `.first`/`.last` accesses in the same action block are safe without a separate guard.
 
@@ -423,7 +423,7 @@ from Audit on GetOldest
     -> reject "Compliance log is empty"
 ```
 
-**Constraints:** `notempty`, `mincount N`, `maxcount N`, `optional`. `notempty` statically discharges `.first`/`.last` access safety. No `default [...]` — list literals do not carry ordering keys.
+**Constraints:** `mincount N`, `maxcount N`, `optional`, plus per-element inner-type value modifiers. A statically-literal `mincount 1` discharges `.first`/`.last` access safety. No `default [...]` — list literals do not carry ordering keys.
 
 **Backing type:** Custom immutable sorted linked list with P-order insertion and cached head + tail pointers. O(1) in-order append (new `P` > current max — the overwhelmingly common case for timestamps), O(k) near-tail out-of-order insertion, O(n) worst-case. O(1) `.first`/`.last`, O(n) `.at(index)`. Structural sharing: in-order append shares entire prefix.
 
@@ -628,7 +628,7 @@ The element bound participates in proof identically to the equivalent scalar-fie
 
 Per-element modifier legality is checked against the same modifier↔type compatibility table as a scalar field (precept-language-spec.md §2.4), with the **element** type as subject: `set of integer maxlength 5` emits `InvalidModifierForType` because `maxlength` does not apply to `integer`, and `set of string min 0` emits it because `min` does not apply to `string`.
 
-*(`notempty` is not yet routed to element position — it is also a collection modifier (`set of string notempty` means the collection is non-empty), so a per-element `notempty` awaits a disambiguator; use `minlength 1` for a per-element non-empty string. The scalar value modifiers above are scalar-only and route unambiguously.)*
+*(`notempty` is string-only, so it routes to element position like the other scalar value modifiers: `set of string notempty` means each element is a non-empty string, identical to `set of string minlength 1`. Collection cardinality — "the collection has at least one element" — is the separate `mincount 1`.)*
 
 ### Token vocabulary
 
@@ -772,7 +772,7 @@ For `lookup of K to V`, the analogous pattern is key-presence: `F contains K` in
 
 | Constraint | Applicable to | Meaning |
 |---|---|---|
-| `notempty` | `set`, `queue`, `stack`, `log`, `bag`, `list`, `queue of T by P`, `lookup` | Collection must contain at least one element. Statically discharges `.min`/`.max`/`.peek`/`.peekby`/`.first`/`.last` access safety on the kinds that surface those accessors. Equivalent to `mincount 1`. |
+| `mincount 1` | every collection kind | Collection must contain at least one element. A statically-literal `mincount 1` discharges `.min`/`.max`/`.peek`/`.peekby`/`.first`/`.last` access safety on the kinds that surface those accessors. (`notempty` is string-only — in inner-type position it constrains each element, not collection cardinality.) |
 | `mincount N` | `set`, `queue`, `stack`, `log`, `bag`, `list`, `queue of T by P`, `lookup` | Collection must contain at least N elements |
 | `maxcount N` | `set`, `queue`, `stack`, `log`, `bag`, `list`, `queue of T by P`, `lookup` | Collection must contain at most N elements |
 | `optional` | any field type (including collections) | Field may be unset; requires `is set` guard before use |
@@ -788,9 +788,9 @@ For `lookup of K to V`, the analogous pattern is key-presence: `F contains K` in
 | `mincount`/`maxcount` on scalar field | `InvalidModifierForType` |
 | `min`/`max`/`nonnegative`/`minlength`/`maxlength`/`maxplaces` on collection field | `InvalidModifierForType` |
 
-**Scalar constraints do not apply to collections.** `min`, `max`, `minlength`, `maxlength`, `maxplaces`, `nonnegative`, `positive`, `nonzero`, and `ordered` are all type errors when applied as field-level modifiers on collection fields (e.g., `field Tags as set of string ordered` is invalid). Collections have their own constraint vocabulary: `notempty`, `mincount`, and `maxcount`. Note that a scalar value modifier on the *inner type* is valid and binds to the element, not the field — `field AgentQueue as queue of string maxlength 200` caps each element's length (see [§ Element value modifiers](#element-value-modifiers)). Likewise `ordered` on the *inner `choice of T(...)` type* is valid — `field Priorities as set of choice of string("low", "medium", "high") ordered` declares an ordered-choice inner type, not a collection-level modifier.
+**Scalar constraints do not apply to collections.** `min`, `max`, `minlength`, `maxlength`, `maxplaces`, `nonnegative`, `positive`, `nonzero`, and `ordered` are all type errors when applied as field-level modifiers on collection fields (e.g., `field Tags as set of string ordered` is invalid). `notempty` is string-only — in a collection's inner-type position it constrains each element (`set of string notempty`), not the collection. Collections' own cardinality vocabulary is `mincount` and `maxcount`. Note that a scalar value modifier on the *inner type* is valid and binds to the element, not the field — `field AgentQueue as queue of string maxlength 200` caps each element's length (see [§ Element value modifiers](#element-value-modifiers)). Likewise `ordered` on the *inner `choice of T(...)` type* is valid — `field Priorities as set of choice of string("low", "medium", "high") ordered` declares an ordered-choice inner type, not a collection-level modifier.
 
-> **Element-level constraints:** `notempty`, `mincount`, and `maxcount` constrain the collection as a whole (cardinality). To constrain each individual element's *value*, two paths exist: (1) an **inner-type value modifier** — `queue of string maxlength 200` — declares a static per-element type bound the proof engine reads at write- and read-sites (see [§ Element value modifiers](#element-value-modifiers)); (2) a **quantifier predicate** — `rule each x in C (x > 0)` — is a runtime governance rule over the current elements *(see [§ Quantifier Predicates](#quantifier-predicates) for syntax)*. The two are complementary: the inner-type modifier carries a bound back to a read-site (so `.peek` proves into a capped field); a quantifier does not.
+> **Element-level constraints:** `mincount` and `maxcount` constrain the collection as a whole (cardinality). To constrain each individual element's *value*, two paths exist: (1) an **inner-type value modifier** — `queue of string maxlength 200` — declares a static per-element type bound the proof engine reads at write- and read-sites (see [§ Element value modifiers](#element-value-modifiers)); (2) a **quantifier predicate** — `rule each x in C (x > 0)` — is a runtime governance rule over the current elements *(see [§ Quantifier Predicates](#quantifier-predicates) for syntax)*. The two are complementary: the inner-type modifier carries a bound back to a read-site (so `.peek` proves into a capped field); a quantifier does not.
 
 ---
 
@@ -989,7 +989,7 @@ from Reviewing on CheckHazmat when CartItems.countof("hazmat-item") > 0
     -> no transition
 ```
 
-**Constraints:** `notempty`, `mincount N`, `maxcount N`, `optional`, `default [T, T, ...]`. `notempty` enforces `.count >= 1` (state-entry constraint). No `.first`/`.last`/`.peek` — bag is unordered, no positional accessors.
+**Constraints:** `mincount N`, `maxcount N`, `optional`, `default [T, T, ...]`, plus per-element inner-type value modifiers. `mincount 1` enforces `.count >= 1` (state-entry constraint). No `.first`/`.last`/`.peek` — bag is unordered, no positional accessors.
 
 **Proof engine implications:** No new proof obligations beyond count-based. `.countof(Expr)` is always safe (returns 0 if absent). The proof engine must understand `remove` decrements rather than unconditionally deletes — element persists until count reaches 0. Sequential action tracking: proof engine tracks how `add`/`remove` changes `.count` within a transition row.
 
@@ -1048,8 +1048,8 @@ from Active on GetNextReviewer when ApprovalChain.count > 0
 | Member | Returns | Proof requirement | Notes |
 |--------|---------|-------------------|-------|
 | `.count` | `integer` | None | Always safe. |
-| `.first` | `T` | `.count > 0` guard required | First element. Obligation: `UnguardedCollectionAccess`. Discharged statically by `notempty`. |
-| `.last` | `T` | `.count > 0` guard required | Last element. Obligation: `UnguardedCollectionAccess`. Discharged statically by `notempty`. |
+| `.first` | `T` | `.count > 0` guard required | First element. Obligation: `UnguardedCollectionAccess`. Discharged statically by a non-empty guarantee (`mincount 1`). |
+| `.last` | `T` | `.count > 0` guard required | Last element. Obligation: `UnguardedCollectionAccess`. Discharged statically by a non-empty guarantee (`mincount 1`). |
 | `.at(N)` | `T` | `N >= 0 and N < F.count` | Element at zero-based position `N`. Obligation: `UnguardedCollectionAccess`. |
 
 ```precept
@@ -1063,7 +1063,7 @@ from Active on GetReviewer when ApprovalChain.count > GetReviewer.Index and GetR
     -> no transition
 ```
 
-**Constraints:** `notempty`, `mincount N`, `maxcount N`, `optional`, `default [T, T, ...]`. `notempty` statically discharges `.first`/`.last` access obligations.
+**Constraints:** `mincount N`, `maxcount N`, `optional`, `default [T, T, ...]`, plus per-element inner-type value modifiers. A statically-literal `mincount 1` discharges `.first`/`.last` access obligations.
 
 **Proof engine implications:** Index-bounds obligations (`UnguardedCollectionAccess`) for `.at(N)`, `insert F Expr at N`, and `remove F at N`. Author writes `when N >= 0 and N < F.count` (or `N <= F.count` for `insert`) guard; proof engine raises `UnguardedCollectionAccess` if absent. Sequential action tracking: proof engine tracks count changes from `insert`, `remove`, `remove at N`, and `clear` within a transition row and re-verifies subsequent access guards against updated count. Positional stability across mutations (e.g., after `remove Items at 0`, positions shift) is the author's responsibility — the proof engine proves access safety, not value-level positional invariants.
 
@@ -1141,7 +1141,7 @@ from Triage on Inspect
     -> reject "No claims in queue"
 ```
 
-**Constraints:** `notempty`, `mincount N`, `maxcount N`, `optional`. No `default [...]` — elements have two axes (T and P); list literal syntax would be ambiguous. `notempty` statically discharges `.peek`/`.peekby` access obligations.
+**Constraints:** `mincount N`, `maxcount N`, `optional`, plus per-element inner-type value modifiers. No `default [...]` — elements have two axes (T and P); list literal syntax would be ambiguous. A statically-literal `mincount 1` discharges `.peek`/`.peekby` access obligations.
 
 **Proof engine implications:** Emptiness obligations identical to `queue`. The ordering value introduces a secondary type requirement — the `by` argument on `enqueue` must match the declared ordering type `P`, and `P` must satisfy `TypeTrait.Orderable`. The proof engine must understand that dequeue order is by ordering value (respecting direction), not insertion, which affects reasoning about which element `.peek` and `.peekby` return. The direction modifier is a static property of the field declaration.
 
@@ -1351,7 +1351,7 @@ from Active on ApplyFee
     -> reject "No fee defined for this transaction type"
 ```
 
-**Constraints:** `notempty`, `mincount N`, `maxcount N`, `optional`. No `default [...]` — key-value pairs require explicit key syntax not supported in list-literal form.
+**Constraints:** `mincount N`, `maxcount N`, `optional`, plus per-element (value-type) inner-type value modifiers. No `default [...]` — key-value pairs require explicit key syntax not supported in list-literal form.
 
 **Proof engine implications:** New obligation category: **key-presence safety** (`KeyPresenceSafety`). `F for K` is guarded by `F contains K` in a `when` clause — same structural pattern as emptiness-guarded accessors but keyed rather than count-based. The proof engine must track key-presence from `contains` guards in `when` clauses and propagate that information to `for` access in the same transition row's actions. `put` and `remove` are always safe.
 
@@ -1487,9 +1487,9 @@ when DepartmentMembers["engineering"] contains "alice"
 
 ### Rejected: `sortedset of T`
 
-**Motivation:** Like `set` but maintains elements in sorted order by the inner type's natural ordering. `.min` and `.max` were claimed to be "always-safe" when combined with `notempty`, and iteration order would be deterministic.
+**Motivation:** Like `set` but maintains elements in sorted order by the inner type's natural ordering. `.min` and `.max` were claimed to be "always-safe" when combined with a non-empty guarantee (`mincount 1`), and iteration order would be deterministic.
 
-**Why rejected:** No Precept construct can observe sorted iteration order. Quantifiers (`each`, `any`, `no`) are boolean predicates — order-independent by definition. `.min`/`.max` return the minimum and maximum value regardless of storage order; the proof obligation for safe access is discharged by `notempty` alone. `set of T notempty` is proof-identical to `sortedset of T notempty` — the sorted storage contributes nothing to the safety guarantee. The action surface (`add`, `remove`, `clear`) is identical to `set`.
+**Why rejected:** No Precept construct can observe sorted iteration order. Quantifiers (`each`, `any`, `no`) are boolean predicates — order-independent by definition. `.min`/`.max` return the minimum and maximum value regardless of storage order; the proof obligation for safe access is discharged by a non-empty guarantee (`mincount 1`) alone. `set of T mincount 1` is proof-identical to a hypothetical `sortedset of T mincount 1` — the sorted storage contributes nothing to the safety guarantee. The action surface (`add`, `remove`, `clear`) is identical to `set`.
 
 The sole difference between `sortedset` and `set` that is visible at the language surface is the type name. A type whose behavior is indistinguishable from another type by any language construct is not a type — it is an implementation detail wearing a type costume. Tree-backed storage with O(log n) inserts buys no benefit in a DSL governing business contracts where collections are small.
 
@@ -1500,7 +1500,7 @@ If Precept ever adds ordered-iteration constructs that make sorted order observa
 | Candidate | Status | Rationale |
 |---|---|---|
 | `deque of T` | **Deferred** | Rare in business-rule domains; escalation covered by `queue of T by P`; re-evaluate after priority queuing ships |
-| `sortedset of T` | **Rejected** | No Precept construct observes iteration order; `set of T notempty` is proof-identical |
+| `sortedset of T` | **Rejected** | No Precept construct observes iteration order; `set of T mincount 1` is proof-identical |
 | `ringbuffer of T` | **Rejected** | Silent eviction violates inspectability — implicit mutation the proof engine cannot track |
 | `capacity` modifier | **Rejected** | Synonym for `maxcount` — language surface cost with no capability gain |
 | `multimap of K to V` | **Rejected** | Nested collection semantics Precept explicitly excludes |
@@ -1526,7 +1526,7 @@ If Precept ever adds ordered-iteration constructs that make sorted order observa
 | **Key-value map** | `Dictionary<K,V>` | `HashMap` | `dict` | `HashMap` | — | `map` | `Map<'K,'V>` | `lookup of K to V` ✓ | — |
 | **Ring buffer** | — | `CircularFifoQueue`* | `deque(maxlen=N)` | — | — | — | — | — | Rejected† |
 | **Multimap** | `ILookup<K,V>` | `Multimap` (Guava) | — | — | — | — | `Map[K, List[V]]`‡ | — | Rejected§ |
-| **Non-empty guarantee** | — | — | — | — | `NOT NULL` | — | `NonEmpty` | `notempty`/`mincount 1` ✓ | — |
+| **Non-empty guarantee** | — | — | — | — | `NOT NULL` | — | `NonEmpty` | `mincount 1` ✓ | — |
 | **Element uniqueness** | inherent in sets | inherent in sets | inherent in sets | inherent in sets | `UNIQUE` | — | inherent in sets | inherent in `set` ✓ | — |
 | **Cardinality constraints** | — | — | — | — | `CHECK` | `.size()` | — | `mincount`/`maxcount` ✓ | — |
 | **Element predicates** | LINQ `.All`/`.Any` | Streams | comprehensions | `.iter().all()`/`.any()` | `ALL`/`ANY`/`EXISTS` | `.all()`/`.exists()` | `forall`/`exists` | `each`/`any`/`no` (approved, spike/Precept-V2) | — |
@@ -1536,7 +1536,7 @@ If Precept ever adds ordered-iteration constructs that make sorted order observa
 † Ring buffer rejected: silent eviction on full `enqueue` violates inspectability — use `queue` + `maxcount` + explicit `dequeue`.
 ‡ Scala `Map[K, List[V]]` is the idiomatic multimap encoding, not a dedicated type.
 § Multimap rejected: nested collection semantics Precept explicitly excludes. `subset`/`disjoint` keywords rejected: quantifier predicates (`each`/`any`/`no`) already express subset and disjoint constraints as rules.
-¶ Sorted unique set rejected: no Precept construct observes sorted iteration order; `.min`/`.max` safety is owned by `notempty` alone; `set of T notempty` is proof-identical.
+¶ Sorted unique set rejected: no Precept construct observes sorted iteration order; `.min`/`.max` safety is owned by a non-empty guarantee (`mincount 1`) alone; `set of T mincount 1` is proof-identical.
 †† Insertion-order sets conflate two concerns (uniqueness + temporal ordering) in a way that makes proof-engine reasoning ambiguous — the "order" has no semantic meaning the engine can verify. Precept's `queue` (explicit FIFO) and `set` (explicit uniqueness) are the correct decomposition.
 
 ---
