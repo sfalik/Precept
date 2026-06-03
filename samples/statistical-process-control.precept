@@ -40,7 +40,10 @@ field LastSampleAt as instant optional
 field ConsecutiveOutOfControl as integer default 0 nonnegative
 field ConsecutiveWarnings as integer default 0 nonnegative
 
-field CurrentAlertReason as string optional maxlength 200
+# Free-form: assembled by interpolating measured `quantity` values (open-ended
+# magnitude + runtime unit), so no enforceable maxlength — the proof engine
+# correctly rejects a length cap here (§0.7: no result outside a declared bound).
+field CurrentAlertReason as string optional
 field CorrectiveActionNote as string optional
 field CorrectiveActionOwner as string optional maxlength 100
 field CorrectiveActionStartedAt as instant optional
