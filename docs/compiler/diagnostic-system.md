@@ -79,7 +79,7 @@ The Precept compiler pipeline produces diagnostics at six stages: lexing, parsin
 - LSP-level filtering, range conversion (0-based), and severity mapping — owned by the Language Server
 - MCP serialization format — owned by the MCP tool layer
 - Fix application — Precept has no code-fix providers
-- Roslyn rules PRECEPT0001–PRECEPT0026 — owned by the analyzer project (`src/Precept.Analyzers/`)
+- Roslyn rules PRECEPT0001–PRECEPT0031 — owned by the analyzer project (`src/Precept.Analyzers/`); `PRECEPT0031` (`Precept0029ModifierAxisDisjoint`) forbids a value modifier's `ApplicableTo` from spanning both a collection and a scalar kind (the no-overlap guardrail)
 
 ---
 
