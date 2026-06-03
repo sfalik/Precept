@@ -1663,14 +1663,14 @@ Modifiers are constraints on field/arg values. The type checker validates applic
 | Modifier | Applicable to | Error when applied to |
 |----------|---------------|----------------------|
 | `editable` (access modifier) | any non-computed field type at field-declaration site AND per-state `modify F editable` site | computed fields (`ComputedFieldNotWritable`); event arguments (`EditableOnEventArg`) |
-| `nonnegative` | `integer`, `decimal`, `number` | `string`, `boolean`, `choice`, collections, temporal, domain |
-| `positive` | `integer`, `decimal`, `number` | (same as above) |
-| `nonzero` | `integer`, `decimal`, `number` | (same as above) |
+| `nonnegative` | `integer`, `decimal`, `number`, `money`, `quantity`, `price`, `exchangerate`, `duration`, `period` | `string`, `boolean`, `choice`, collections, non-magnitude temporals (`date`/`time`/`instant`/`datetime`) |
+| `positive` | (same as `nonnegative`) | (same as above) |
+| `nonzero` | (same as `nonnegative`) | (same as above) |
 | `notempty` | `string`, `set`, `queue`, `stack`, `log`, `log of T by P`, `bag`, `list`, `queue of T by P`, `lookup of K to V` | `integer`, `decimal`, `number`, `boolean`, `choice` |
-| `min` / `max` | `integer`, `decimal`, `number` | `string`, `boolean`, collections |
+| `min` / `max` | `integer`, `decimal`, `number`, `money`, `quantity`, `price` | `string`, `boolean`, `choice`, collections, `exchangerate`, temporals |
 | `minlength` / `maxlength` | `string` | `number`, `integer`, `decimal`, `boolean`, collections |
 | `mincount` / `maxcount` | `set`, `queue`, `stack`, `log`, `log of T by P`, `bag`, `list`, `queue of T by P`, `lookup of K to V` | scalars |
-| `maxplaces` | `decimal` | `integer`, `number`, `string`, `boolean`, collections |
+| `maxplaces` | `decimal`, `money`, `quantity`, `price`, `exchangerate` | `integer`, `number`, `string`, `boolean`, `choice`, collections |
 | `ordered` | `choice` | all non-choice types |
 | `optional` | any field type | — (always valid) |
 
