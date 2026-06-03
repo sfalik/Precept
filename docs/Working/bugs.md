@@ -83,6 +83,17 @@ surfaced for proper fixing.
 - **Priority**: soundness — a declared `min` silently unenforced on assignment; pre-release.
 - **Repro**: SubProbe1 (emits) vs SubProbe3 (clean) above.
 
+### BUG-022: Consumer-side `switch (catalog *Kind)` dispatch is not enforced exhaustive — a missing arm is a silent gap (catalog-discipline hole)
+
+- **Discovered**: 2026-06-03 during the `notempty` axis-overlap work — `BuildElementValueBounds` had a `switch (modifier.Kind)` with no `notempty` arm, so a routed `notempty` silently bound no element value. Caught by adversarial review, not an analyzer.
+- **Affected**: pipeline code that dispatches per-member on a catalog `*Kind` enum via a `switch`, in a class **not** decorated `[HandlesCatalogExhaustively(typeof(T))]`. `Precept0019` only enforces member coverage for *already-enrolled* classes; nothing forces a switch's class to enroll. So an unenrolled consumer switch can silently miss a member. Known instances (verified by grep 2026-06-03): `TypeChecker.Validation.Modifiers.cs:350` (`switch (modifier.Kind)` — min/max-presence → bound-qualifier validation) and `:538` (`maxplaces` value validation); candidates also at `NameBinder.cs:63` (`construct.Meta.Kind`) and `TypeChecker.Expressions.AssignmentQualifiers.cs:189` (`resolution.Kind`). (`BuildElementValueBounds` itself was the worst case and is **already fixed** — genericized off `ProofSatisfactions` in `c3209ad2`.)
+- **Symptom**: adding a new catalog member (e.g. a new modifier) compiles clean even though a consumer switch silently doesn't handle it — a behavior gap with no diagnostic. This is the `*Kind`-enum-dispatch anti-pattern CLAUDE.md forbids ("behavior belongs in catalog metadata"), unenforced at build time.
+- **Root cause**: `Precept0019PipelineCoverageExhaustiveness` is opt-in (it analyzes class symbols + their `[HandlesCatalogExhaustively]` attributes; it never inspects switch operations). There is no rule that a `switch` on a catalog `*Kind` enum *requires* the attribute.
+- **Workaround used**: none. (The `notempty`-retarget arm-shape guard test `ModifierCatalogCapabilityTests.EveryElementRoutableModifier_MatchesAKnownElementBoundShape` covers the *element-bound binding* shape specifically, but not the general switch class.)
+- **Fix complexity**: small-to-medium analyzer change + remediation. Add a rule to `Precept0019` (register on switch operations): a `switch` whose matched type is a catalog `*Kind` enum, in a class lacking `[HandlesCatalogExhaustively(typeof(ThatEnum))]`, is an error — forcing enroll-or-genericize. **Exemptions** (scope decision, owner-aligned 2026-06-03): the catalog `GetMeta(XKind)` definition switches (the metadata's home, already `*CrossRef`-checked) and lexer/parser `switch (token.Kind)` token-dispatch. Then enroll-or-genericize each flagged consumer switch. Needs a small `/lifecycle-2-design` for the exemption model before building (see the conversation 2026-06-03 for the agreed shape).
+- **Priority**: quality bar / catalog-discipline — not a current soundness hole (the known switches are validation/classification, not silent value-drops like `BuildElementValueBounds` was), but the *class* of gap is the kind that already bit once. Pre-release.
+- **Repro**: add a new `ModifierKind` member with no arm in `TypeChecker.Validation.Modifiers.cs:350`/`:538` → compiles clean, no diagnostic.
+
 ## Fixed
 
 ### BUG-019: Length containment skipped on non-literal RHS — obligation generated only for literal assignments (Principle-10/11 soundness hole)
