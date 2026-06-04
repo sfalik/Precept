@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using Precept.Language;
 
@@ -418,6 +420,22 @@ public static partial class ProofEngine
         var countEstablished = ImmutableArray<string>.Empty;
         var countInvalidated = ImmutableArray<string>.Empty;
 
+        // Sequential count-interval tracking for mincount/maxcount fields (count-bound containment).
+        // Mirrors the boolean count facts above, but carries a numeric interval [lo, hi] per
+        // count-bounded field: seeded once (on first touch by EITHER a grow or a shrink) from the
+        // governed band [mincount ?? 0, maxcount ?? ∞] (a maxcount-N field is governed ≤ N entering the
+        // chain), narrowed by any same-context count-comparison guard or routed reject-row sibling, then
+        // advanced by each mutation's SOUND per-kind/per-action delta (a possible no-op never moves the
+        // bound that tightens toward the cap — see AdvanceCount). Both directions update the SAME
+        // interval — see CountContainmentObligation. Each mutation emits a
+        // CountContainmentProofRequirement carrying the post-mutation interval; the prover is
+        // prove-or-reject (clean iff provably in-band, else emit — §0.7 no deferral).
+        var guard = GuardOfContext(ctx, semantics);
+        var siblingCountCaps = ctx is TransitionRowContext countTrc
+            ? BuildSiblingCountExclusions(countTrc.Row, semantics)
+            : null;
+        var countIntervals = new Dictionary<string, (int lo, int? hi)>(StringComparer.Ordinal);
+
         foreach (var action in actions)
         {
             var reassignedBefore = writtenSoFar;
@@ -475,6 +493,19 @@ public static partial class ProofEngine
                     WalkExpression(inputAction.SecondaryExpression, ctx, obligations, semantics);
             }
 
+            // Count containment: any mutation of a mincount/maxcount field advances the single
+            // per-field count interval by its SOUND per-kind/per-action delta (a grow into a dedup set
+            // leaves the lower bound unchanged; a remove-by-value leaves the upper bound unchanged;
+            // clear → [0,0]; set/default to a literal → the literal's exact count) and carries a
+            // CountContainmentProofRequirement against the declared band. Both directions update the
+            // SAME interval — seeded once on first touch — so a shrink-before-grow nets correctly.
+            // Runs for every action shape (TypedInputAction/TypedBindingAction/base TypedAction), so
+            // clear/remove/pop/dequeue participate, not just value-establishing grows. The prover is
+            // prove-or-reject: clean iff the post-mutation interval is provably in-band, otherwise emit.
+            var countObligation = CountContainmentObligation(action, actionMeta, semantics, guard, siblingCountCaps, countIntervals);
+            if (countObligation is not null)
+                obligations.Add(countObligation with { Context = ctx });
+
             // Stamp every obligation generated for THIS action (static + dynamic + RHS
             // expression walk, all appended to [start..Count)) with the prefix-state from PRIOR
             // actions. The action's OWN effect is recorded afterward, so an obligation that reads a
@@ -517,6 +548,283 @@ public static partial class ProofEngine
                         break;
                 }
         }
+    }
+
+    /// <summary>
+    /// Builds the count-containment obligation for a mutation of a mincount/maxcount field, advancing
+    /// the SINGLE per-field count interval by the action's SOUND per-kind/per-action delta and storing
+    /// the post-mutation interval back into <paramref name="countIntervals"/>. Every delta input is
+    /// derived from catalog metadata — NOT an action-kind list — so the proof engine never restates the
+    /// classification. The guiding principle: <em>a mutation that MIGHT be a no-op must not move the
+    /// bound that tightens toward the cap</em> (the post-mutation interval must contain every possible
+    /// true count):
+    /// <list type="bullet">
+    /// <item><c>Grows</c> (value-establishing add/append/enqueue/push/put/insert + by-keyed variants):
+    /// upper <c>+1</c> always; lower <c>+0</c> for a dedup kind (<see cref="TypeMeta.DeduplicatesElements"/>
+    /// — set/lookup, the add may be a duplicate), else <c>+1</c> (ordered/multiset always append).</item>
+    /// <item><c>Shrinks</c> (remove/removeAt/pop/dequeue + by-keyed): lower <c>−1</c> (floored 0) always;
+    /// upper <c>−1</c> for a definite decrement (positional pop/dequeue), <c>+0</c> for a possible no-op
+    /// (<see cref="ActionMeta.EffectIsConditional"/> — remove/removeAt by value/index may find it absent).</item>
+    /// <item><c>Empties</c> (clear): the interval resets to the exact point <c>[0,0]</c>.</item>
+    /// <item><c>ReplacesValue</c> (set): a valid set to a collection field is always a non-literal
+    /// (a list-literal RHS is type-rejected — list literals are legal only in <c>default</c>), so its
+    /// count is unknown; the tracked interval is dropped (a later grow re-seeds from the declared
+    /// band) and NO obligation is emitted.</item>
+    /// </list>
+    /// Returns <c>null</c> when the field declares no count bound, or for a set-to-non-literal (the
+    /// re-seed has no statically-known count). The pre-mutation interval is seeded once from the governed
+    /// band <c>[mincount ?? 0, maxcount ?? ∞]</c> (narrowed by the row guard and routed reject-row
+    /// siblings) on first touch by either direction. The prover is prove-or-reject.
+    /// </summary>
+    private static ProofObligation? CountContainmentObligation(
+        TypedAction action,
+        ActionMeta actionMeta,
+        SemanticIndex semantics,
+        TypedExpression? guard,
+        Dictionary<string, (int lo, int? hi)>? siblingCountCaps,
+        Dictionary<string, (int lo, int? hi)> countIntervals)
+    {
+        if (string.IsNullOrEmpty(action.FieldName))
+            return null;
+        if (!semantics.FieldsByName.TryGetValue(action.FieldName, out var field))
+            return null;
+        if (!field.DeclaredMinCount.HasValue && !field.DeclaredMaxCount.HasValue)
+            return null;
+
+        // Compute the post-mutation interval from the action's catalog effect. A set whose RHS count
+        // is not statically known drops the tracked interval and emits nothing (re-seed on next grow).
+        (int lo, int? hi) post;
+        TypedExpression site;
+        switch (actionMeta.Effect)
+        {
+            case ActionEffectClass.Empties:
+                // clear → exactly empty.
+                post = (0, 0);
+                site = SiteForCountObligation(action);
+                break;
+
+            case ActionEffectClass.ReplacesValue:
+                // A valid `set` to a collection field is always a non-literal (a list literal RHS is
+                // type-rejected: list literals are legal only in `default`). It re-seeds to an unknown
+                // count → drop the tracked interval, no obligation (a later grow re-seeds the band).
+                countIntervals.Remove(field.Name);
+                return null;
+
+            case ActionEffectClass.Grows:
+                // Only value-introducing grows establish a new element (catalog effect, shared predicate
+                // with the element-write generators). Upper always +1; lower +0 for a dedup kind (the
+                // add may be a duplicate / no-op), else +1.
+                if (actionMeta.WriteSemantics != ActionWriteSemantics.EstablishesValue)
+                    return null;
+                bool dedup = Types.GetMeta(field.ResolvedType).DeduplicatesElements;
+                post = AdvanceCount(field, guard, siblingCountCaps, countIntervals,
+                    loDelta: dedup ? 0 : +1, hiDelta: +1);
+                site = SiteForCountObligation(action);
+                break;
+
+            case ActionEffectClass.Shrinks:
+                // Lower always −1 (floored 0). Upper −1 for a definite decrement (positional pop/dequeue),
+                // +0 for a possible no-op (remove/removeAt by value/index may not find the element).
+                int shrinkHiDelta = actionMeta.EffectIsConditional ? 0 : -1;
+                post = AdvanceCount(field, guard, siblingCountCaps, countIntervals,
+                    loDelta: -1, hiDelta: shrinkHiDelta);
+                site = SiteForCountObligation(action);
+                break;
+
+            default:
+                return null;
+        }
+
+        countIntervals[field.Name] = post;
+
+        return new ProofObligation(
+            new CountContainmentProofRequirement(
+                new SelfSubject(),
+                field.Name,
+                field.DeclaredMinCount,
+                field.DeclaredMaxCount,
+                CountLower: post.lo,
+                CountUpper: post.hi,
+                $"Count containment: '{field.Name}' must keep its count in [{field.DeclaredMinCount?.ToString() ?? "0"} .. {field.DeclaredMaxCount?.ToString() ?? "∞"}]"),
+            site,
+            null!, // Replaced with the real context by the caller (mirrors the element-write generators).
+            ProofDisposition.Unresolved,
+            null,
+            null);
+    }
+
+    /// <summary>
+    /// Advances the single tracked count interval for <paramref name="field"/> by separate lower/upper
+    /// deltas (lower bound floored at 0; a possible no-op passes a 0 delta on the bound that tightens
+    /// toward the cap), seeding it once from the governed band (narrowed by <paramref name="guard"/> and
+    /// reject-row siblings) on first touch by either direction.
+    /// </summary>
+    private static (int lo, int? hi) AdvanceCount(
+        TypedField field, TypedExpression? guard,
+        Dictionary<string, (int lo, int? hi)>? siblingCountCaps,
+        Dictionary<string, (int lo, int? hi)> countIntervals, int loDelta, int hiDelta)
+    {
+        if (!countIntervals.TryGetValue(field.Name, out var pre))
+            pre = SeedCountInterval(field, guard, siblingCountCaps);
+        return (Math.Max(0, pre.lo + loDelta),
+            pre.hi.HasValue ? Math.Max(0, pre.hi.Value + hiDelta) : (int?)null);
+    }
+
+    /// <summary>The diagnostic site for a count-containment obligation — the literal field reference at the action's span.</summary>
+    private static TypedExpression SiteForCountObligation(TypedAction action)
+        => new TypedFieldRef(action.FieldType, action.FieldName, false, null, action.Span);
+
+    /// <summary>
+    /// Seeds a count-bounded field's pre-mutation count interval from its governed band
+    /// <c>[mincount ?? 0, maxcount ?? ∞]</c> (a maxcount-N field is governed ≤ N entering the chain),
+    /// then narrows it by any <c>F.count op literal</c> constraint in the row guard AND by routed
+    /// reject-row siblings (a <c>when C.count &gt;= N -&gt; reject</c> sibling above the current row means
+    /// the current row only fires when <c>C.count &lt; N</c>, capping the seed upper at <c>N−1</c>).
+    /// Narrowing only ever tightens — it never widens the governed band — so it cannot manufacture a
+    /// false violation; it makes the post-mutation interval more precise (e.g. <c>when C.count &lt; 5</c>
+    /// caps the upper-before at 4). The count is an integer quantity, so guard/sibling narrowing is done
+    /// in the integer domain directly (<paramref name="siblingCountCaps"/> is pre-computed in the
+    /// integer count domain by <see cref="BuildSiblingCountExclusions"/>).
+    /// </summary>
+    private static (int lo, int? hi) SeedCountInterval(
+        TypedField field, TypedExpression? guard, Dictionary<string, (int lo, int? hi)>? siblingCountCaps)
+    {
+        int lo = field.DeclaredMinCount ?? 0;
+        int? hi = field.DeclaredMaxCount;
+
+        if (guard is not null)
+        {
+            // Every disjunctive branch must independently establish a narrowing for it to hold; take the
+            // weakest (union) so an OR guard does not over-narrow. A single (no-OR) guard is one branch.
+            var branches = ExtractGuardBranches(guard);
+            int? branchLoTightest = null;   // max lower bound that holds in every branch
+            int? branchHiTightest = null;   // min upper bound that holds in every branch
+            foreach (var branch in branches)
+            {
+                int branchLo = lo;
+                int? branchHi = hi;
+                foreach (var gc in branch)
+                {
+                    if (gc.IsArg || gc.Field != field.Name || !gc.Value.HasValue) continue;
+                    var v = gc.Value.Value;
+                    if (v != decimal.Truncate(v)) continue;
+                    int n = (int)v;
+                    switch (gc.Comparison)
+                    {
+                        case OperatorKind.LessThan: branchHi = Min(branchHi, n - 1); break;
+                        case OperatorKind.LessThanOrEqual: branchHi = Min(branchHi, n); break;
+                        case OperatorKind.GreaterThan: branchLo = Math.Max(branchLo, n + 1); break;
+                        case OperatorKind.GreaterThanOrEqual: branchLo = Math.Max(branchLo, n); break;
+                        case OperatorKind.Equals: branchLo = Math.Max(branchLo, n); branchHi = Min(branchHi, n); break;
+                    }
+                }
+                // Union across branches (weakest bound wins) so an OR guard is not treated as conjunctive.
+                branchLoTightest = branchLoTightest is null ? branchLo : Math.Min(branchLoTightest.Value, branchLo);
+                branchHiTightest = WidestUpper(branchHiTightest, branchHi);
+            }
+
+            if (branchLoTightest.HasValue) lo = branchLoTightest.Value;
+            if (branchHiTightest.HasValue) hi = branchHiTightest;
+        }
+
+        // Routed reject-row siblings: a reject row above the current row whose guard is `C.count op N`
+        // means the current (fall-through) row only fires when that guard is FALSE — its count negation
+        // narrows this row's seed (pre-computed in the integer count domain by BuildSiblingCountExclusions).
+        if (siblingCountCaps is not null && siblingCountCaps.TryGetValue(field.Name, out var cap))
+        {
+            lo = Math.Max(lo, cap.lo);
+            if (cap.hi.HasValue)
+                hi = Min(hi, cap.hi.Value);
+        }
+
+        // Narrowing must not invert the interval; if it would, fall back to the declared seed.
+        if (hi.HasValue && hi.Value < lo)
+            return (field.DeclaredMinCount ?? 0, field.DeclaredMaxCount);
+        return (lo, hi);
+
+        static int? Min(int? a, int b) => a.HasValue ? Math.Min(a.Value, b) : b;
+        static int? WidestUpper(int? acc, int? branch)
+            => acc is null ? branch : (acc.Value is var a && branch is { } b ? Math.Max(a, b) : (int?)null);
+    }
+
+    /// <summary>
+    /// Builds the per-field integer count-domain narrowing the current transition row inherits from
+    /// routed reject-row siblings declared ABOVE it on the same (state, event). A sibling
+    /// <c>when C.count op N -&gt; reject</c> intercepts those cases first, so the current fall-through row
+    /// fires only when the sibling guard is FALSE; the integer negation of <c>count op N</c> caps this
+    /// row's count seed (e.g. <c>count &gt;= 1 -&gt; reject</c> ⇒ current row fires with <c>count ≤ 0</c>,
+    /// capping the seed upper at 0). Mirrors the first-match discipline + FromState compatibility of the
+    /// numeric <see cref="BuildSiblingRejectExclusions"/>, but works in the integer count domain (count
+    /// is integer; the collection field's own value domain is not) so negation is exact. Multiple sibling
+    /// caps compose by intersection (the current row fires only when ALL sibling guards failed).
+    /// </summary>
+    private static Dictionary<string, (int lo, int? hi)>? BuildSiblingCountExclusions(
+        TypedTransitionRow currentRow, SemanticIndex semantics)
+    {
+        if (currentRow is not TypedTransitionRowSuccess) return null;
+
+        Dictionary<string, (int lo, int? hi)>? result = null;
+
+        foreach (var sibling in semantics.TransitionRows)
+        {
+            if (ReferenceEquals(sibling, currentRow)) continue;
+            if (sibling is not TypedTransitionRowReject) continue;
+            if (sibling.Guard is null) continue;
+            if (!string.Equals(sibling.EventName, currentRow.EventName, StringComparison.Ordinal)) continue;
+            // First-match discipline: a reject row positioned at/below the current row never intercepts.
+            if (sibling.RowSpan.Offset >= currentRow.RowSpan.Offset) continue;
+            // FromState compatibility (same as BuildSiblingRejectExclusions).
+            if (sibling.FromState is not null && currentRow.FromState is null) continue;
+            if (sibling.FromState is not null && currentRow.FromState is not null
+                && !string.Equals(sibling.FromState, currentRow.FromState, StringComparison.Ordinal))
+                continue;
+
+            // Single-branch reject guard only (a multi-branch OR can't soundly narrow per-field).
+            var branches = ExtractGuardBranches(sibling.Guard);
+            if (branches.Length != 1) continue;
+            var branch = branches[0];
+
+            // A single-leaf `C.count op N` branch yields a sound per-field count narrowing; any companion
+            // leaf forfeits it (the negation becomes a disjunction).
+            GuardConstraint? leaf = null;
+            bool multi = false;
+            foreach (var gc in branch)
+            {
+                if (gc.IsArg || gc.IsPresenceCheck || !gc.Value.HasValue) { multi = true; break; }
+                if (leaf is null) leaf = gc; else { multi = true; break; }
+            }
+            if (multi || leaf is null) continue;
+            if (!semantics.FieldsByName.ContainsKey(leaf.Field)) continue;
+
+            var v = leaf.Value!.Value;
+            if (v != decimal.Truncate(v)) continue;
+            int n = (int)v;
+
+            // Integer negation of the reject guard `count op n` ⇒ the surviving count band for this row.
+            (int lo, int? hi)? neg = leaf.Comparison switch
+            {
+                OperatorKind.GreaterThanOrEqual => (0, n - 1),     // ¬(count ≥ n) ⇒ count ≤ n−1
+                OperatorKind.GreaterThan        => (0, n),         // ¬(count > n) ⇒ count ≤ n
+                OperatorKind.LessThanOrEqual    => (n + 1, (int?)null), // ¬(count ≤ n) ⇒ count ≥ n+1
+                OperatorKind.LessThan           => (n, (int?)null),     // ¬(count < n) ⇒ count ≥ n
+                _ => null,
+            };
+            if (neg is not { } band) continue;
+            // Floor a negative upper at 0 (a count is never negative; an upper < 0 means unreachable, but
+            // the seed-inversion guard in SeedCountInterval handles the degenerate case).
+            int loFloor = Math.Max(0, band.lo);
+
+            result ??= new Dictionary<string, (int lo, int? hi)>(StringComparer.Ordinal);
+            if (result.TryGetValue(leaf.Field, out var existing))
+                result[leaf.Field] = (Math.Max(existing.lo, loFloor),
+                    existing.hi.HasValue
+                        ? (band.hi.HasValue ? Math.Min(existing.hi.Value, band.hi.Value) : existing.hi)
+                        : band.hi);
+            else
+                result[leaf.Field] = (loFloor, band.hi);
+        }
+
+        return result;
     }
 
     // ════════════════════════════════════════════════════════════════════════════
@@ -791,7 +1099,13 @@ public static partial class ProofEngine
             // Unresolved so Diagnostics emits the error (§0.7 prove-or-reject — unbounded ⇒ emit).
         }
 
-        // Count containment: V1 always unresolved (set on collections rejected by type checker)
+        // Count containment: discharge the post-mutation count interval the obligation carries
+        // (seeded from the declared [mincount, maxcount] ∩ guard, advanced by grow/shrink/clear
+        // deltas) against the band. The obligation discharges (Proved) ONLY when the post-mutation
+        // interval is provably in-band; both a provable violation AND a merely-unprovable case leave
+        // it Unresolved so Diagnostics emits CountBoundViolation, naming the guard. There is no
+        // deferral to a runtime check (§0.7 prove-or-reject) — the runtime count trap is a
+        // defense-in-depth backstop, not the boundary enforcer. Mirrors the length sibling above.
         if (obligation.Requirement is CountContainmentProofRequirement countReq)
         {
             var result = TryCountContainmentProof(countReq, obligation.Site);

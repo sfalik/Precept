@@ -51,14 +51,17 @@ public sealed class CollectionMutationProofTests
     public void Pop_WithMincount1_CompilesClean()
     {
         // mincount 1 marks the collection non-empty (the cardinality axis), discharging the
-        // pop access-safety obligation — the discharge collection-`notempty` used to provide.
+        // pop access-safety (count > 0) obligation — the discharge collection-`notempty` used to
+        // provide. The `when Steps.count > 1` guard additionally discharges the count-containment
+        // obligation (count-bound-discharge / Reading A): an unguarded pop could drop the count to 0,
+        // below mincount 1, so the floor must be proven via a guard — the same carrier shape.
         var compilation = Compile("""
             precept PopNotempty
             field Steps as stack of string mincount 1
             field LastStep as string optional
             state Active initial
             event Undo
-            from Active on Undo
+            from Active on Undo when Steps.count > 1
                 -> pop Steps into LastStep
                 -> no transition
             """);

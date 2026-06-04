@@ -326,7 +326,18 @@ public record TypeMeta(
     /// Qualifier axes required when <c>min</c>/<c>max</c> bounds are declared on this type.
     /// Empty means bounds do not require qualifier context.
     /// </summary>
-    IReadOnlyList<QualifierAxis>? RequiredBoundQualifierAxes = null
+    IReadOnlyList<QualifierAxis>? RequiredBoundQualifierAxes = null,
+    /// <summary>
+    /// True for collection kinds that deduplicate by element identity, so a grow (<c>add</c>/<c>put</c>)
+    /// of an already-present element is a no-op (<c>set</c>, <c>lookup</c>). The proof engine's
+    /// count-containment delta derives the grow's <em>lower-bound</em> advance from this property: a
+    /// dedup grow may not increase the count, so it must not move the lower bound
+    /// (lower <c>+0</c>, upper <c>+1</c>). Ordered/multiset kinds (<c>list</c>/<c>queue</c>/<c>stack</c>/
+    /// <c>log</c>/<c>bag</c> + <c>*-by</c>) always append (lower <c>+1</c>, upper <c>+1</c>).
+    /// Catalog-driven so the proof engine never restates the dedup classification by switching on
+    /// <see cref="TypeKind"/>.
+    /// </summary>
+    bool                         DeduplicatesElements = false
 )
 {
     /// <summary>Lossless implicit widening targets. Empty for most types.</summary>

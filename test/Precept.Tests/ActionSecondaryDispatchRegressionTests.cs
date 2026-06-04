@@ -52,7 +52,9 @@ public sealed class ActionSecondaryDispatchRegressionTests
     {
         // remove-at-N requires an explicit bounds guard `when N >= 0 and N < F.count`.
         // mincount 1 marks the collection non-empty (the cardinality axis; notempty is
-        // now string-only / per-element).
+        // now string-only / per-element). The `Steps.count > 1` conjunct additionally discharges
+        // the count-containment obligation (count-bound-discharge / Reading A): a removeAt from a
+        // mincount-1 list could drop the count to 0, below the floor, so the bound is proven via a guard.
         var compilation = Compiler.Compile("""
             precept RemoveAtRegression
             field Steps as list of string mincount 1 editable
@@ -61,7 +63,7 @@ public sealed class ActionSecondaryDispatchRegressionTests
             event RemoveStep(Index as integer)
             event Finish
             from Active on RemoveStep
-                when RemoveStep.Index >= 0 and RemoveStep.Index < Steps.count
+                when RemoveStep.Index >= 0 and RemoveStep.Index < Steps.count and Steps.count > 1
                 -> remove Steps at RemoveStep.Index
                 -> no transition
             from Active on Finish -> transition Done

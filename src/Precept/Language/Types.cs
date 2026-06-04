@@ -693,7 +693,8 @@ public static class Types
             Accessors: SetAccessors,
             DisplayName: "set",
             HoverDescription: "An unordered collection of unique elements. Use add and remove actions. Supports .count, .min, and .max accessors.",
-            UsageExample: "field PendingInterviewers as set of string"
+            UsageExample: "field PendingInterviewers as set of string",
+            DeduplicatesElements: true
         ),
 
         TypeKind.Queue => new(
@@ -777,7 +778,8 @@ public static class Types
             TypeCategory.Collection,
             Accessors: LookupAccessors,
             DisplayName: "lookup",
-            HoverDescription: "A key-value map with unique keys. Use put and remove actions. Access values with 'F for K'. Supports .count accessor."
+            HoverDescription: "A key-value map with unique keys. Use put and remove actions. Access values with 'F for K'. Supports .count accessor.",
+            DeduplicatesElements: true
         ),
 
         // ── Special ────────────────────────────────────────────────────

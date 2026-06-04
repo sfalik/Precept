@@ -312,10 +312,40 @@ public static partial class ProofEngine
     }
 
     /// <summary>
-    /// Attempts to prove a <see cref="CountContainmentProofRequirement"/> obligation.
-    /// V1: always returns <c>null</c> (unresolved) because collection set assignments
-    /// are rejected by the type checker, and add/remove actions do not yet generate obligations.
+    /// Attempts to prove a <see cref="CountContainmentProofRequirement"/> obligation against the
+    /// post-mutation count interval the obligation carries (seeded from the declared
+    /// <c>[mincount, maxcount]</c> ∩ guard, advanced by the sound per-kind/per-action delta). Mirrors
+    /// <see cref="TryLengthContainmentProof"/> exactly — count is the same shape on <c>count</c> instead
+    /// of <c>length</c>, with the same <b>prove-or-reject</b> line: the obligation discharges clean
+    /// <em>only</em> when the interval is provably within the band; both a provable violation and a
+    /// merely-unprovable case leave it unresolved so the diagnostic emits (§0.7 prove-or-reject — there
+    /// is no deferral to a runtime check). The carrier that discharges an otherwise-unprovable grow/shrink
+    /// is an author <c>when C.count …</c> guard (or a routed reject row), which narrows the seed.
     /// </summary>
-    internal static bool? TryCountContainmentProof(CountContainmentProofRequirement _, TypedExpression __)
-        => null;
+    /// <returns>
+    /// <c>true</c> when the post-mutation interval is provably within <c>[mincount .. maxcount]</c>
+    /// (<c>lower ≥ mincount</c> <b>and</b> <c>upper ≤ maxcount</c>); <c>false</c> when it provably
+    /// violates (lower above maxcount, or upper below mincount); <c>null</c> (unresolved) when the
+    /// interval cannot establish containment — e.g. an unbounded upper (<c>∞</c>) against a declared
+    /// maxcount, the unguarded-grow case. Per §0.7 prove-or-reject, both <c>false</c> and <c>null</c>
+    /// leave the obligation unresolved so <see cref="DiagnosticCode.CountBoundViolation"/> is emitted.
+    /// </returns>
+    internal static bool? TryCountContainmentProof(CountContainmentProofRequirement req, TypedExpression _)
+    {
+        // Provably violating: the whole interval lies outside the declared band.
+        if (req.DeclaredMaxCount.HasValue && req.CountLower > req.DeclaredMaxCount.Value)
+            return false; // smallest possible count already exceeds maxcount
+        if (req.DeclaredMinCount.HasValue && req.CountUpper.HasValue && req.CountUpper.Value < req.DeclaredMinCount.Value)
+            return false; // largest possible count is still below mincount
+
+        // Provably contained: interval fully inside the declared band.
+        bool minOk = !req.DeclaredMinCount.HasValue || req.CountLower >= req.DeclaredMinCount.Value;
+        bool maxOk = !req.DeclaredMaxCount.HasValue
+            || (req.CountUpper.HasValue && req.CountUpper.Value <= req.DeclaredMaxCount.Value);
+        if (minOk && maxOk)
+            return true;
+
+        // Not provable (e.g. unbounded upper ∞ vs a declared maxcount — the unguarded grow): unresolved ⇒ emit.
+        return null;
+    }
 }

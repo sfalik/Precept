@@ -212,15 +212,25 @@ public sealed record LengthContainmentProofRequirement(
 ) : ProofRequirement(ProofRequirementKind.LengthContainment, Description);
 
 /// <summary>
-/// Count containment proof: a collection's element count must stay within
-/// the field's declared mincount/maxcount bounds. Static proof is limited
-/// to cases where the element count is statically knowable (e.g., literal lists).
+/// Count containment proof: a collection's element count must stay within the field's declared
+/// mincount/maxcount bounds. The obligation carries the <em>post-mutation count interval</em>
+/// <c>[<see cref="CountLower"/> .. <see cref="CountUpper"/>]</c> — the count-before interval (seeded
+/// from the declared <c>[mincount, maxcount]</c>, narrowed by any same-context <c>count</c>-comparison
+/// guard or routed reject-row sibling) advanced by the sequential mutation's sound per-kind/per-action
+/// delta. Discharge is <b>prove-or-reject</b> (mirrors the length sibling <c>TryLengthContainmentProof</c>):
+/// the obligation compiles clean <b>iff</b> the interval is provably within the band
+/// (<c>lower ≥ mincount</c> <b>and</b> <c>upper ≤ maxcount</c>); otherwise — a provable violation
+/// <b>or</b> a merely-unprovable case — it stays unresolved and <see cref="DiagnosticCode.CountBoundViolation"/>
+/// emits, naming the guard. There is no deferral to a runtime check (§0.7 prove-or-reject).
+/// <see cref="CountUpper"/> is <c>null</c> when the upper bound is unbounded (no maxcount → ∞).
 /// </summary>
 public sealed record CountContainmentProofRequirement(
     ProofSubject Subject,
     string TargetField,
     int? DeclaredMinCount,
     int? DeclaredMaxCount,
+    int CountLower,
+    int? CountUpper,
     string Description
 ) : ProofRequirement(ProofRequirementKind.CountContainment, Description);
 

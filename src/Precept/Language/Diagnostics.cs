@@ -1282,12 +1282,15 @@ public static class Diagnostics
         DiagnosticCode.CountBoundViolation => new(
             nameof(DiagnosticCode.CountBoundViolation),
             DiagnosticStage.Proof, Severity.Error,
-            "Collection count {0} is outside the declared bounds [{1}..{2}] on field '{3}'",
+            // Obligation-shaped, guard-naming message ({0} carries the direction-specific detail built in
+            // ProofEngine.Diagnostics.cs): overflow names `when F.count < N`, underflow names
+            // `when F.count > M` — the carrier that discharges the count obligation (§0.7 prove-or-reject).
+            "{0}",
             DiagnosticCategory.Proof,
-            FixHint: "Ensure the collection element count satisfies the field's mincount/maxcount constraints, or adjust the bounds on the field declaration",
+            FixHint: "Guard the mutation with a 'when F.count …' clause so the bound is provable, or adjust the field's mincount/maxcount",
             PreventsFault: FaultCode.CountBoundViolation,
-            TriggerCondition: "A collection field assignment or mutation results in an element count outside the declared mincount/maxcount range.",
-            RecoverySteps: ["Ensure the collection count is within the declared bounds", "Or adjust the mincount/maxcount modifiers on the field declaration"]),
+            TriggerCondition: "A collection field mutation cannot be proven to keep the element count within the declared mincount/maxcount range; the obligation is unresolved (a provable violation, or merely unprovable) so the bound is not statically guaranteed.",
+            RecoverySteps: ["Guard the grow with 'when F.count < maxcount' (or the shrink with 'when F.count > mincount')", "Route the at-capacity case to a reject row", "Or adjust the mincount/maxcount modifiers on the field declaration"]),
 
         DiagnosticCode.CrossCountingUnitOperation => new(
             nameof(DiagnosticCode.CrossCountingUnitOperation),

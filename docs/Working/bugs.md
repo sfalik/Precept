@@ -44,17 +44,6 @@ surfaced for proper fixing.
 - **Repro**: the three integer `A`/`C` cases above; the middle one (`A` unbounded, no `NumericOverflow`) is the bug.
 - **Status**: ✅ **Fixed 2026-06-02 (`9820b8c1`, Slice 2a)** — removed the `IsUnbounded` skip; the computed-field obligation is now created and emits when unprovable. Paired with the operand-interval flag-fold (`FlagLowerBound` in `ExtractFieldInterval`) so provably-safe computed fields still discharge. (Move to § Fixed in a cleanup pass.)
 
-### BUG-018: `maxcount`/`mincount` are never enforced — count-containment proof is dead code (Principle-10/11 soundness hole)
-
-- **Discovered**: 2026-06-02 during Phase-2 contract grounding.
-- **Affected**: collection `add`/`remove` mutations vs a field's declared `mincount`/`maxcount`. `CountBoundViolation` (Diag 136, `[StaticallyPreventable]` Fault 15) is **dead code** — no obligation generator constructs a count-containment requirement, and the prover `TryCountContainmentProof` is a `=> null` stub (`Lengths.cs:41–42`).
-- **Symptom**: a mutation that provably exceeds a declared count bound compiles clean. Probe-confirmed (full pipeline): `field C as set of integer maxcount 1` + an `add C` action that grows it past 1 → **no diagnostic**.
-- **Root cause**: same shape as [[BUG-017]] — the obligation is never *created*, so the bound is never enforced. A declared `maxcount`/`mincount` is a constraint the runtime must uphold; an `add`/`remove` whose result can violate it must be proven safe or rejected.
-- **Workaround used**: none.
-- **Fix complexity**: build the count-containment obligation generator + implement `TryCountContainmentProof` (revives the dead `CountBoundViolation`). This is the previously-scoped Slice 3b-count work, now confirmed as a live soundness breach rather than a deferred build.
-- **Priority**: quality bar / soundness — a Principle-11 violation on count-bounded collections; pre-release.
-- **Repro**: `field C as set of integer maxcount 1` + an action adding two distinct elements → expected `CountBoundViolation`, actual clean.
-
 ### BUG-020: A field-reference modifier bound (`min Floor`) is silently accepted, never bound, never enforced — and an undeclared reference is not caught
 
 - **Discovered**: 2026-06-02 (precept-author probe of the relational-rules-and-bounds design's worked example; verified via `precept_compile`, MCP reconnected).
@@ -95,6 +84,15 @@ surfaced for proper fixing.
 - **Repro**: add a new `ModifierKind` member with no arm in `TypeChecker.Validation.Modifiers.cs:350`/`:538` → compiles clean, no diagnostic.
 
 ## Fixed
+
+### BUG-018: `maxcount`/`mincount` are never enforced — count-containment proof is dead code (Principle-10/11 soundness hole)
+
+- **Discovered**: 2026-06-02 during Phase-2 contract grounding.
+- **Affected**: collection growing **and** shrinking mutations and `default [...]` literals vs a field's declared `mincount`/`maxcount`. `CountBoundViolation` (Diag 136, `[StaticallyPreventable]` Fault 15) was **dead code** — no obligation generator constructed a count-containment requirement, and the prover `TryCountContainmentProof` was a `=> null` stub.
+- **Symptom**: a mutation that provably exceeded (or underflowed) a declared count bound compiled clean. Probe-confirmed (full pipeline): `field C as set of integer maxcount 1` + two `add C` actions growing it past 1 → no diagnostic; symmetrically a `remove`/`clear` dropping a fully-determined collection below `mincount` emitted nothing.
+- **Root cause**: same shape as [[BUG-017]] — the obligation was never *created*, so the bound was never enforced. The first partial fix wired only the grow/maxcount direction (plus `default [...]`), leaving the shrink/mincount direction as a remaining under-reject hole.
+- **Workaround used**: none.
+- **Status**: ✅ **Fixed** (reworked to the locked **Reading A — obligation / prove-or-reject** discharge; design `count-bound-discharge-semantics`, Locked 2026-06-03). Count-containment obligation is created in **both** directions on every mutation of a `mincount`/`maxcount` field: growing (`add`/`append`/`enqueue`/`push`/`put`/`insert` + by-variants, `Effect == Grows && WriteSemantics == EstablishesValue`), shrinking (`remove`/`removeAt`/`pop`/`dequeue`, `Effect == Shrinks`) and `clear` (`Effect == Empties`) — all derived from `ActionMeta`, no hand-list — plus a `default [...]` literal (statically-exact count). A `set` to a collection is not a literal-count site: a list-literal RHS is type-rejected (list literals are legal only in `default`), so a valid `set` is always a non-literal whose count is unknown and drops the tracked interval. A **single** count interval is tracked **sequentially** in `WalkActions` (reusing the per-effect `ActionEffectClass` classification): seeded **once** on first touch from the governed band `[mincount ?? 0, maxcount ?? ∞]`, narrowed by a `count`-comparison guard and by routed reject-row siblings (integer count domain), then advanced by each mutation's **sound per-kind/per-action delta**. The delta inputs are catalog-derived: dedup-ness from `TypeMeta.DeduplicatesElements` (set/lookup → grow leaves lower bound unchanged, possible duplicate no-op; ordered/multiset → exact `+1`), might-no-op-ness from `ActionMeta.EffectIsConditional` (remove/removeAt → upper unchanged, possible no-op; positional pop/dequeue → definite `−1` on both). `TryCountContainmentProof` discharges on the **prove-or-reject** line, identical to the length sibling: clean **iff** the post-mutation interval is provably in-band (`lo ≥ mincount` AND `hi ≤ maxcount`), otherwise — a provable violation **or** a merely-unprovable case (an unguarded grow whose `hi` is `∞`-seeded) — the obligation is unresolved and `CountBoundViolation` (PRE0136) emits, naming the guard (overflow → `when C.count < N`; underflow → `when C.count > M`, locked OQ2). No deferral to a runtime check (§0.7); the runtime trap is a defense-in-depth backstop. The disputed `CountLowerAfter`/`CountUpperAfter` requirement fields and the emit-on-provable-violation discharge are gone; the obligation carries `[CountLower, CountUpper]` and the prover is two-way. `CountBoundViolation` is off the Gate-1 (no-emission) list — it sits in Gate-2 (emitted, test-referenced in `CountContainmentEmissionTests`, alongside `LengthBoundViolation`). All `CountContainmentEmissionTests` green; corpus stays clean.
 
 ### BUG-019: Length containment skipped on non-literal RHS — obligation generated only for literal assignments (Principle-10/11 soundness hole)
 

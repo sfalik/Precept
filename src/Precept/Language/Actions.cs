@@ -89,6 +89,9 @@ public static class Actions
             "Remove an element from a set",
             [new(TypeKind.Set), new(TypeKind.Bag), new(TypeKind.List), new(TypeKind.Lookup)], ActionSyntaxShape.CollectionValue, ActionWriteSemantics.ClearsContents,
             Effect: ActionEffectClass.Shrinks,
+            // remove-by-value may find the element absent: a possible no-op, so the count-containment
+            // delta leaves the upper bound unchanged (definite lower −1, upper +0).
+            EffectIsConditional: true,
             ValueRequired: true, AllowedIn: AllActionContexts,
             HoverDescription: "Removes an element from a set, bag, list, or lookup field. Has no effect if the element is not present.",
             SnippetTemplate: "remove ${1:Field} ${2:value}"),
@@ -204,6 +207,12 @@ public static class Actions
             [new(TypeKind.List)],
             ActionSyntaxShape.RemoveAtIndex, ActionWriteSemantics.ClearsContents,
             Effect: ActionEffectClass.Shrinks,
+            // removeAt is guarded by a strict index-bounds obligation, so for the *count* delta it is a
+            // definite single decrement once that obligation discharges. But the index expression may be
+            // out of range pending its own obligation; treat the count effect as conditional (upper +0)
+            // so the count bound never relies on the removal having happened — the same conservative
+            // posture as remove-by-value.
+            EffectIsConditional: true,
             ProofRequirements:
             [
                 new NumericProofRequirement(new SelfSubject(Types.CollectionCountAccessor), OperatorKind.GreaterThan, 0m,

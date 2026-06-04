@@ -1,0 +1,2490 @@
+Logical Methods in Computer Science
+Vol. 14(4:12)2018, pp. 1–31
+https://lmcs.episciences.org/
+
+Submitted
+Published
+
+Feb. 22, 2017
+Nov. 01, 2018
+
+REASONING WITH FINITE SETS AND
+CARDINALITY CONSTRAINTS IN SMT
+KSHITIJ BANSAL a , CLARK BARRETT b , ANDREW REYNOLDS c , AND CESARE TINELLI c
+a
+
+Google, Inc.
+e-mail address: kbk@google.com
+
+b
+
+Department of Computer Science, Stanford University
+e-mail address: barrett@cs.stanford.edu
+
+c
+
+Department of Computer Science, The University of Iowa
+e-mail address: andrew-reynolds@uiowa.edu
+e-mail address: cesare-tinelli@uiowa.edu
+Abstract. We consider the problem of deciding the satisfiability of quantifier-free formulas
+in the theory of finite sets with cardinality constraints. Sets are a common high-level
+data structure used in programming; thus, such a theory is useful for modeling program
+constructs directly. More importantly, sets are a basic construct of mathematics and thus
+natural to use when formalizing the properties of computational systems. We develop a
+calculus describing a modular combination of a procedure for reasoning about membership
+constraints with a procedure for reasoning about cardinality constraints. Cardinality
+reasoning involves tracking how different sets overlap. For efficiency, we avoid considering
+Venn regions directly, as done in previous work. Instead, we develop a novel technique
+wherein potentially overlapping regions are considered incrementally as needed, using a
+graph to track the interaction among the different regions. The calculus has been designed
+to facilitate its implementation within SMT solvers based on the DPLL(T ) architecture.
+Our experimental results demonstrate that the new techniques are competitive with previous
+techniques and can scale much better on certain classes of problems.
+
+1. Introduction
+Satisfiability modulo theories (SMT) solvers are at the heart of many formal methods
+tools. One of the reasons for their popularity is that fast, dedicated decision procedures for
+fragments of first-order logic that SMT solvers implement are extremely useful for reasoning
+about constructs common in hardware and software verification. In particular, they provide
+a good balance between speed and expressiveness. Common fragments include theories such
+Key words and phrases: Satisfiability modulo theories, Finite sets, Decision procedures.
+This article extends [BRBT16] with additional calculus rules and a full proof of correctness.
+This work was partially supported by NSF grants 1228765, 1228768, and 1320583. The first author was at
+New York University when this work was completed.
+
+l
+
+LOGICAL METHODS
+IN COMPUTER SCIENCE
+
+c
+DOI:10.23638/LMCS-14(4:12)2018
+
+CC
+
+Bansal et al.
+Creative Commons
+
+2
+
+BANSAL ET AL.
+
+as bitvectors, arithmetic, and arrays, which are useful for modeling basic constructs as well
+as for performing general reasoning.
+As the use of SMT solvers has spread, there has been a corresponding demand for
+SMT solvers to support additional useful theories. Although it is possible to encode finitely
+axiomatizable theories using quantifiers, the performance and robustness gap between a
+custom decision procedure and an encoding using quantifiers can be quite significant.
+In this paper, we present a new decision procedure for a fragment of finite set theory.
+Our main motivation is that sets are a common abstraction used in programming. As with
+other general-purpose SMT theories such as the theories of arrays and bitvectors, the theory
+of finite sets is useful for modeling a variety of program constructs. Sets are also used directly
+in high-level programming languages such as SETL [SDSD86] and in specification languages
+such as Alloy [Jac12], B [AA05] and Z [ASM80]. More generally, sets are a basic construct
+in mathematics and come up quite naturally when trying to express properties of systems.
+While the full language of set theory is undecidable, many interesting fragments are
+known to be decidable. We present a calculus for the theory of finite sets which can handle
+basic set operations, such as membership, union, intersection, and difference, and which can
+also reason efficiently about set cardinalities and linear constraints involving them. The
+calculus is explicitly designed for easy integration into the DPLL(T ) framework [NOT06].
+We briefly describe our implementation in the DPLL(T )-based SMT solver cvc4 and an
+initial experimental evaluation of this implementation.
+1.1. Related work. In the SMT community, the desire to support a theory of finite sets
+with cardinality goes at least as far back as a proposal by Kröning et al. [KRW09]. That
+article focuses on formalizing the semantics and representation of the theory within the
+context of the SMT-LIB standard, rather than on a decision procedure for deciding it.
+There is a stream of research on exploring decidable fragments of set theory (often
+referred to in the literature as syllogistics) [COP01]. One such subfragment is MLSS,
+more precisely, the ground set-theoretic fragment with basic Boolean set operators (union,
+intersection, set difference), singleton operator and membership predicate. A tableau-based
+procedure for this fragment was introduced by Cantone and Zarba [CZ98]. The part of our
+calculus covering this fragment builds on their work. De Moura and Bjørner presented an
+extension of the theory of arrays [DMB09] that can be used to encode the MLSS fragment.
+However, this approach cannot be used to encode cardinality constraints.
+In this paper, we consider an extension of the MLSS fragment with set cardinality
+operations, whose decidability was established by Zarba [Zar02, Zar05]. The decision
+procedure described by Zarba involves making an upfront guess that is exponential in the
+number of set variables, making it non-incremental and highly impractical. That said, the
+focus of that work is on establishing decidability and not on providing an efficient procedure.
+Another closely related logical fragment is the Boolean Algebra and Presburger Arithmetic (BAPA) fragment, for which several algorithms have been proposed [KNR06, KR07,
+SSK11]. Though BAPA does not have the membership predicate or the singleton operator
+in its language, Suter et al. [SSK11, Section 4] show how one can generalize their algorithm
+for such reasoning. Intuitively, singleton sets can be simulated by imposing a cardinality constraint card(X) = 1. Similarly, membership constraints of the form x @
+− S can be encoded as
+X v S by introducing a singleton subset X. This reduction can lead to significant inefficiencies, however. Consider the following simple example: x @
+− S1 t (S2 t (. . . t (S99 t S100 ))).
+In our calculus, a straightforward repeated application of one of the rules for set unions can
+
+REASONING WITH FINITE SETS AND CARDINALITY
+
+3
+
+determine the satisfiability of this constraint. In contrast, in a reduction to BAPA, membership reasoning is reduced to reasoning about cardinalities of different sets. For example, the
+algorithm in [SSK11] will reduce the problem to an arithmetic problem involving variables
+for 2101 Venn regions derived from S1 , S2 , . . ., S100 , and the singleton set introduced for x.
+The broader point is that reasoning about the cardinalities of Venn regions is the main
+bottleneck for this fragment. As we show in our calculus, it is possible to avoid using Venn
+regions for membership predicates by instead reasoning about them directly. For explicit
+cardinality constraints, our calculus minimizes the number of Venn regions that need to be
+considered by reasoning about only a limited number of relevant regions introduced lazily.
+A procedure for cardinality constraints over multisets is considered in [PK08]. A recent
+procedure for reasoning about sets and measure functions is given by Bender et al [BS17],
+which also relies on a reduction from set reasoning to arithmetic reasoning. Reasoning
+about sets with cardinality constraints in the context of invariant checking for bounded
+model checking is considered by Alberti et al. [AGP16], and in the context of invariant
+synthesis by von Gleissenthall et el. [vGBR16]. These works too rely on reductions to
+arithmetic and do not involve the use of dedicated decision procedures for sets in SMT
+solvers. Other procedures for reasoning about sets include a unification-based approach by
+Cristiá et al. [CR16].
+The theory we consider in this paper can be seen as the combination of Presburger
+arithmetic with the theory of finite sets, with the cardinality operator acting as a bridging
+function between the two theories. Decision procedures for non-disjoint combinations of
+theories with bridging functions have been studied by Sofronie-Stokkermans [SS09] and
+Chocron et al. [CFR15]. Their main contribution is the identification of restrictions on the
+theories and the development of combination methods that allow one to construct a decision
+procedure for the combined theory as a modular combination of the decision procedures for
+the component theories. That work is mostly limited to cases of bridging functions from
+the theory of algebraic datatypes to other theories, where the bridging function is definable
+by recursion over constructor terms. It does not apply to our setting because neither our
+source theory nor the bridging function match those requirements. Our approach is similar
+though in that it tries to separate as much as possible the reasoning about sets proper from
+the reasoning about their cardinality, so as to leverage off-the-shelf linear integer arithmetic
+solvers in order to reason about cardinalities.
+1.2. Formal Preliminaries. We work in the context of many-sorted first-order logic with
+equality. We assume the reader is familiar with the following notions: signature, term, literal,
+formula, free variable, interpretation, and satisfiability of a formula in an interpretation (see,
+e.g., [BSST09] for more details). Let Σ be a many-sorted signature. We use ≈ as the (infix)
+logical symbol for equality for all sorts in Σ and always interpret it as the identity relation.
+If e is a term or a formula, we denote by V(e) the set of e’s free variables, extending the
+notation to tuples and sets of terms or formulas as expected.
+If ϕ is a Σ-formula and I a Σ-interpretation, we write I |= ϕ if I satisfies ϕ. If t is
+a term, we denote by tI the value of t in I. A theory is a pair T = (Σ, I), where Σ is a
+signature and I is a class of Σ-interpretations that is closed under variable reassignment (i.e.,
+every Σ-interpretation that differs from one in I only in how it interprets the variables is also
+in I). We refer to I as the models of T . A Σ-formula ϕ is satisfiable (resp., unsatisfiable) in
+T if it is satisfied by some (resp., no) interpretation in I. A set Γ of Σ-formulas entails in
+T a Σ-formula ϕ, written Γ |=T ϕ, if every interpretation in I that satisfies all formulas in
+
+4
+
+BANSAL ET AL.
+
+Constant and function symbols:
+n : Card for all n ∈ N
+
+- : Card → Card
+
++ : Card × Card → Card
+
+∅ : Set
+
+{·} : Element → Set
+
+t, u, \ : Set × Set → Set
+
+card : Set → Card
+
+Predicate symbols:
+< : Card × Card
+
+>= : Card × Card
+
+v : Set × Set
+
+− : Element × Set
+@
+
+Figure 1. The signature of TS .
+Γ satisfies ϕ as well. We write |=T ϕ as an abbreviation for ∅ |=T ϕ. We write Γ |= ϕ to
+denote that Γ entails ϕ in the class of all Σ-interpretations. The set Γ is satisfiable in T
+if Γ 6|=T ⊥ where ⊥ is the universally false atom. Two Σ-formulas are equisatisfiable in T
+if for every model I of T that satisfies one, there is a model of T that satisfies the other
+and differs from I at most over the free variables not shared by the two formulas. When
+convenient, we will tacitly treat a finite set of formulas as the conjunction of its elements
+and vice versa.
+2. A Theory of Finite Sets with Cardinality
+We are interested in a typed theory TS of finite sets with cardinality. In a more general logical
+setting, this theory would be equipped with a parametric set type, with a type parameter
+for the set’s elements, and a corresponding collection of polymorphic set operations.1 For
+simplicity here, we will describe instead a many-sorted theory of sets of sort Set whose
+elements are all of sort Element. The theory TS can be combined with any other theory T
+in a standard way, i.e., Nelson-Oppen-style, by identifying the Element sort with a sort in
+T but with the restriction that the sort must be interpreted in T as an infinite set.2 Note
+that the many-sorted setting limits us to sets of elements of the same type (so sets such as
+{1, {2, 3}, {{5}}} are not representable). Also, we limit our language to consider only flat
+sets (i.e., no sets of sets of integers, say) although this restriction can be lifted by combining
+T with (copies of) itself using Nelson-Oppen combination. More generally, an input having
+set constraints over multiple element types T1 , . . . , Tn can be handled by invoking n copies
+of our procedure for these sorts and combining them in the standard way. The theory TS
+has also a sort Card for terms denoting set cardinalities. Since we consider only finite sets,
+all cardinalities will be natural numbers.
+Atomic formulas in TS are built over a signature with these three sorts, and an infinite
+set of variables for each sort. Modulo isomorphism, TS is the theory of a single many-sorted
+structure, and its models differ in essence only on how they interpret the variables. Each
+model of TS interprets Element as some countably infinite set E, Set as the set of finite
+subsets of E, and Card as N. The signature of TS has the following predicate and function
+symbols, summarized in Figure 1: the usual symbols of linear integer arithmetic, the usual
+set composition operators, an empty set (∅) and a singleton set ({·}) constructor,3 and
+1In fact, this is the setting supported in our implementation in cvc4.
+2An extension that allows the sort to be interpreted as finite by relying on polite combination [JB10] is
+
+left to future work.
+3We will use ∅, {, and } also to denote sets at the meta level. The difference between their two uses should
+be clear from context.
+
+REASONING WITH FINITE SETS AND CARDINALITY
+
+5
+
+a cardinality operator (card(·)), all interpreted as expected. The signature includes also
+symbols for the cardinality comparison (< , >= ), subset (v) and membership (@
+−) predicates.
+We call set term any term of sort Set, and cardinality term any term of sort Card with
+no occurrences of card(·). A set constraint is an atomic formula of the form s ≈ t, s v t,
+e@
+− s or their negation, with s and t set terms or of the form card(s), and e a term of
+sort Element. A cardinality constraint is a [dis]equality [¬]c ≈ d or an inequality c < d or
+c >= d where c and d are cardinality terms. An element constraint is a [dis]equality [¬]x ≈ y
+where x and y are variables of sort Element. A TS -constraint is a set, cardinality or element
+constraint. We write u 6≈ v and e 6@
+− t respectively as an abbreviation of ¬u ≈ v and ¬e @
+− t.
+We use x, y for variables of sort Element; S, T , U for variables of sort Set; s, t, u,
+v for terms of sort Set; and c with subscripts for variables of sort Card. Given C, a set
+of constraints, Vars (C) (respectively, Terms(C)) denotes the set of variables (respectively,
+terms) in C. For notational convenience, we fix an injective mapping from terms of sort Set
+to variables of sort Card that allows us to associate to each set term s a unique cardinality
+variable cs .
+We are interested in checking the satisfiability in TS of conjunctions of TS -constraints.
+While this problem is decidable, it has high worst-case time complexity [Zar02]. So our
+efforts are in the direction of producing a solver for TS -constraints that is efficient in practice,
+in addition to being correct and terminating. Our solver relies on the modular combination
+of a solver for set constraints and an off-the-shelf solver for linear integer arithmetic, which
+handles arithmetic reasoning over set cardinalities.
+3. A Calculus for the Theory
+In this section, we describe a tableaux-style calculus capturing the essence of our combined
+solver for TS . As we describe in the next section, that calculus admits a proof procedure
+that decides the satisfiability of TS -constraints.
+Restriction 3.1 . For simplicity, we consider as input to the calculus only finite sets C of
+constraints whose set constraints are in flat form. The latter are (well-sorted) set constraints
+of the form S ≈ T , S 6≈ T , S ≈ ∅, S ≈ {x}, S ≈ T t U , S ≈ T u U , S ≈ T \ U , x @
+− S, x 6@
+− S,
+or cS ≈ card(S), where S, T , U , cS , and x are variables of the expected sort. We also assume
+that any set variable S of C appears in at most one union, intersection or set difference term.
+Thanks to common equisatisfiability-preserving transformations all of these assumptions
+can be made without loss of generality [COP01, Chapter 10]. These transformations include
+intermediate steps that replace constraints of the form s v t with s ≈ (s u t). They also
+include steps that replace each occurrence i of the same term t in union, intersection or set
+difference terms by a fresh variable Ti while adding the equality constraint Ti ≈ t.
+The calculus is described as a set of derivation rules which modify a state data structure.
+A state is either the special state unsat or a tuple of the form hS, M, A, Gi, where
+• S is a set of set constraints,
+• M is a set of element constraints,
+• A is a set of cardinality constraints, and
+• G is a directed graph over set terms with nodes V (G) and edges E(G).
+Initial states have the form hS0 , M0 , A0 , G0 i where G0 is the empty graph and (S0 , M0 , A0 )
+is a partition of a given set of constraints C satisfying Restriction 3.1.
+
+6
+
+BANSAL ET AL.
+
+Since cardinality constraints can be processed by a standard arithmetic solver, and
+element constraints by a simple equality solver,4 we present and discuss only rules that deal
+with set constraints.
+The derivation rules are provided in Figures 2 through 9 in guarded assignment form.
+In such form, the premises of a rule refer to the current state and the conclusion describes
+how each state component is changed, if at all, by the rule’s application. A derivation rule
+applies to a state σ if all the conditions in the rule’s premises hold for σ and the resulting
+state is different from σ. In the rules, we write S, t as an abbreviation for S ∪ {t}. Rules
+with two or more conclusions separated by the symbol k are non-deterministic branching
+rules.
+The rules are such that it is possible to generate a closed tableau (or derivation tree)
+from an initial state hS0 , M0 , A0 , G0 i, where S0 , M0 , and A0 satisfy Restriction 3.1 and G0
+is an empty graph, if and only if S0 ∪ M0 ∪ A0 is unsatisfiable in TS . Broadly speaking,
+the derivation rules can be divided into three categories. First are those that reason about
+membership constraints (of form x @
+− S). These rules only update the components S and
+M of the current state, although their premises may depend on other parts of the state, in
+particular, the nodes of the graph G. Second are rules that handle constraints of the form
+cS ≈ card(S). The graph incrementally built by the calculus is central to satisfying these
+constraints. Third are rules for propagating element and cardinality constraints, respectively
+to M and A.
+3.1. Set reasoning rules. Figures 2 and 3 focus on sets without cardinality. They are
+based on the MLSS decision procedure by Cantone and Zarba [CZ98], though with some
+key differences. First, the rules operate over a set T of terms with sort Set which may be
+larger than just the terms in S. This generalization is required because of additional terms
+that may be introduced when reasoning about cardinalities. Second, the reasoning is done
+modulo equality. A final, technical difference is that we work with sets of ur-elements rather
+than untyped sets.
+These rules rely on the following additional notation. For any set C of constraints, let
+Termsσ (C) refer to terms of sort σ in C, with Terms(C) denoting all terms in C. We define
+the binary relation ≈∗C ⊆ Terms(C) × Terms(C) to be the reflexive, symmetric, and transitive
+closure of the relation on terms induced by the equality constraints in C. Now, we define the
+following closures on the components M and S of a state hS, M, A, Gi:
+
+M∗ = {x ≈ y | x ≈∗M y} ∪ x 6≈ y ∃x0 , y 0 . x ≈∗M x0 , y ≈∗M y 0 , x0 6≈ y 0 ∈ M
+
+S∗ = S ∪ x @
+− s ∃x0 , s0 . x ≈∗M x0 , s ≈∗S s0 , x0 @
+− s0 ∈ S
+
+∪ x 6@
+− s ∃x0 , s0 . x ≈∗M x0 , s ≈∗S s0 , x0 6@
+− s0 ∈ S
+where x, y, x0 , y 0 in TermsElement (M ∪ S), and s, s0 in TermsSet (S). Next, we define a
+left-associative binary operator / that takes as input a set C of constraints and a single
+constraint l. Intuitively, C / (l) adds l to C only if l is not in C’s closure. More precisely,
+(
+C
+if l ∈ C ∗
+(3.1)
+C / (l) =
+C ∪ {l} otherwise
+4 Recall that T
+
+S has no terms of sort Element besides variables.
+
+REASONING WITH FINITE SETS AND CARDINALITY
+
+Union Down I
+
+x 6@
+− s t t ∈ S∗
+S := S / (x 6@
+− s) / (x 6@
+− t)
+
+Union Down II
+
+x@
+− s t t ∈ S∗
+
+Union Up I
+
+x 6@
+− s ∈ S∗
+x 6@
+− t ∈ S∗
+stt∈T
+S := S / (x 6@
+− s t t)
+Inter Down I
+
+x@
+− s u t ∈ S∗
+S := S / (x @
+− s) / (x @
+− t)
+
+x@
+− u ∈ S∗
+u ∈ {s, t}
+stt∈T
+S := S / (x @
+− s t t)
+
+x 6@
+− s u t ∈ S∗
+
+x@
+− s ∈ S∗
+x@
+− t ∈ S∗
+sut∈T
+S := S / (x @
+− s u t)
+
+x 6@
+− u ∈ S∗
+
+Union Up II
+
+Inter Down II
+
+Inter Up I
+
+{u, v} = {s, t}
+S := S / (x @
+− v)
+
+7
+
+{u, v} = {s, t}
+S := S / (x 6@
+− v)
+
+x@
+− u ∈ S∗
+
+Inter Up II
+
+x 6@
+− u ∈ S∗
+u ∈ {s, t}
+sut∈T
+S := S / (x 6@
+− s u t)
+
+Union split
+
+x@
+− s t t ∈ S∗
+x@
+− s, x @
+− t 6∈ S ∗
+S := S / (x @
+− s) k S := S / (x @
+− t)
+
+Inter split
+
+sut∈T
+
+{u, v} = {s, t}
+x@
+− u ∈ S∗
+x@
+− v, x 6@
+− v 6∈ S ∗
+S := S / (x @
+− v) k S := S / (x 6@
+− v)
+
+Set difference Down 1
+
+Set difference Down 2
+
+x@
+− s \ t ∈ S∗
+S := S / (x @
+− s) / (x 6@
+− t)
+
+Set difference Down 3
+
+x 6@
+− s \ t ∈ S∗
+x 6@
+− t ∈ S∗
+S := S / (x 6@
+− s)
+Set difference Up 2
+
+x 6@
+− s \ t ∈ S∗
+x@
+− s ∈ S∗
+S := S / (x @
+− t)
+
+Set difference Up 1
+
+x@
+− s ∈ S∗
+x 6@
+− t ∈ S∗
+s\t∈T
+S := S / (x @
+− s \ t)
+
+x 6@
+− s ∈ S∗
+s\t∈T
+S := S / (x 6@
+− s \ t)
+
+Set difference Up 3
+
+x@
+− t ∈ S∗
+s\t∈T
+S := S / (x 6@
+− s \ t)
+
+Set difference split
+
+s\t∈T
+
+x@
+− s ∈ S∗
+x@
+− t 6∈ S ∗
+x 6@
+− t 6∈ S ∗
+S := S / (x @
+− t) k S := S / (x 6@
+− t)
+
+Figure 2. Union, intersection, and set difference rules.
+The set of relevant terms, denoted by T , for a state hS, M, A, Gi consists of all terms
+from S and G, namely: Terms(S) ∪ V (G).
+Figure 2 shows the rules for reasoning about membership in unions, intersections, and
+differences. Each rule covers one case in which a new membership (or non-membership)
+constraint can be deduced. The justification for these rules is straightforward based on the
+semantics of the set operations. The restriction {u, v} = {s, t} in the premise of some of the
+rules cover all the various cases where s, say, is the same as t, different from t, the same as
+
+8
+
+BANSAL ET AL.
+
+Singleton
+
+{x} ∈ T
+S := S / (x @
+− {x})
+
+Single Member
+
+x@
+− {y} ∈ S ∗
+M := M / (x ≈ y)
+
+Single Non-member
+
+x 6@
+− {y} ∈ S ∗
+M := M / (x 6≈ y)
+
+Set Disequality
+
+s 6≈ t ∈ S
+
+{x ∈ T | x @
+− s, x 6@
+− t ∈ S ∗} = ∅
+{x ∈ T | x 6@
+− s, x @
+− t ∈ S ∗} = ∅
+S := S / (y @
+− s) / (y 6@
+− t) k S := S / (y 6@
+− s) / (y @
+− t)
+
+Eq Unsat
+
+(x 6≈ x) ∈ M∗
+unsat
+
+Set Unsat
+
+(x @
+− s) ∈ S ∗
+(x 6@
+− s) ∈ S ∗
+unsat
+
+Empty Unsat
+
+(x @
+− ∅) ∈ S ∗
+unsat
+
+Figure 3. Singleton, disequality and contradiction rules. Here, y is a fresh
+variable.
+T tU
+T
+
+T tU
+
+U
+
+T \U
+
+T uU
+
+U \T
+
+T \U T uU U \T
+
+T
+
+U
+
+Figure 4. Venn regions for
+T and U .
+
+Figure 5. The same structure as a graph.
+
+u, and the same as v. Figure 3 shows rules for singletons, disequalities, and contradictions.
+Note in particular that the Set Disequality rule introduces a fresh variable y, denoting
+an element that is in one set but not in the other.
+Example 3.2. Let
+S = {S ≈ A t B, S ≈ C u D, x @
+− C, x 6@
+− D, y 6@
+− S, y @
+− D}.
+Using the rules in Figure 2, we can directly deduce the additional constraints: x 6@
+−C uD
+(by Inter Up II), x 6@
+− A, x 6@
+− B, y 6@
+− A, y 6@
+− B (by Union Down I), and y 6@
+− C (by Inter
+Down II). This gives a complete picture, modulo equality, of exactly which sets contain x
+and y.
+3.2. Cardinality of sets. The next set of rules, described in Figure 6 and Figure 7, operate
+on the graph component of the current state. Their purpose is to modify the graph so as to
+capture the mutual dependencies between set and cardinality constraints. They are based
+on the observation that (i) the cardinality of two sets, and that of their union, intersection
+and set difference are interrelated; and (ii) if two set terms are asserted to be equal, their
+cardinalities must match.
+Figure 4 shows the Venn regions for two sets, T and U . The fact that T \ U , T u U and
+U \ T are disjoint imposes the following relationships between their cardinalities and those
+
+REASONING WITH FINITE SETS AND CARDINALITY
+
+9
+
+of T , U and T t U :
+card(T ) ≈ card(T \ U ) + card(T u U )
+card(T t U ) ≈ card(T \ U ) + card(T u U ) + card(U \ T )
+card(U ) ≈ card(U \ T ) + card(T u U ) .
+We can represent these same relationships using the graph in Figure 5. The nodes of
+the graph are set terms, and each node has the property of being the disjoint union of its
+children in the graph. Our calculus incrementally constructs a similar graph containing
+all nodes whose cardinality is implicitly or explicitly constrained by the current state. Set
+terms with implicit cardinality constraints include (i) union, intersection, and set difference
+terms appearing in S, for which one of the operands is already in the graph; and (ii) terms
+occurring in an equality whose other member is already in the graph. A careful analysis5
+reveals that we can actually avoid adding intersection terms t u u unless both t and u are
+already in the graph, and set difference terms t \ u unless t is already in the graph.
+The rules in Figure 6 make use of a function add which takes a graph G and a term s
+and returns the graph G 0 defined as follows:
+(1) For s = T or s = ∅ or s = {x}:
+V (G 0 ) = V (G) ∪ {s}
+E(G 0 ) = E(G)
+(2) For s = T u U or s = T \ U :
+V (G 0 ) = V2 = V (G) ∪ {T, U, T \ U, T u U, U \ T }
+E(G 0 ) = E2 = E(G) ∪ {(T, T \ U ), (T, T u U ), (U, T u U ), (U, U \ T )}
+(3) For s = T t U and V2 and E2 as above:
+V (G 0 ) = V2 ∪ {T t U }
+E(G 0 ) = E2 ∪ {(T t U, T \ U ), (T t U, T u U ), (T t U, U \ T )}
+Recall that, by assumption, each set variable participates in at most one union, intersection,
+or set difference in the input set of constraints. It is not difficult to see that this property is
+preserved by every rule. This ensures that edges from a set variable node are added to the
+graph only once, maintaining the invariant that its children in the graph are disjoint. The
+only other rule which adds edges to the graph is the Merge Equality IIrule, but it only
+adds nodes from the leaves of the graph, creating a new set of disjoint leaves.
+Terms with explicit constraints on their cardinality are added to the graph by rule
+Introduce Card. Terms that have implicit constraints on their cardinality, specifically,
+singletons and the empty set, are added by rules Introduce Singleton and Introduce
+Empty Set.
+If two nodes s and t in the graph are explicitly asserted to be equal (that is, s ≈ t ∈ S
+or t ≈ s ∈ S), we can ensure they have the same cardinality by systematically modifying
+the graph as follows. Let L(n) denote the set of leaf nodes for the subtree rooted at node n
+which are not known to be empty. Formally,
+
+L(n) = n0 ∈ Leaves (n) n0 ≈ ∅ 6∈ S ∗ ,
+(3.2)
+where Leaves (v) = {w ∈ V (G) | C(w) = ∅, w is reachable from v} and C(w) denotes the
+children of w. We call two nodes n and n0 merged if they have the same set of nonempty
+leaves, that is if L(n) = L(n0 ).
+5See completeness proof in [Ban16, Chapter 2] for further details.
+
+10
+
+BANSAL ET AL.
+
+Introduce Eq Right
+
+S≈t∈S
+
+Introduce Eq Left
+
+S ∈ V (G)
+G := add(G, t)
+
+t 6∈ V (G)
+
+Introduce Union
+
+S ≈T tU ∈S
+
+Introduce Inter
+
+S ≈T uU ∈S
+
+S≈t∈S
+
+S 6∈ V (G)
+G := add(G, S)
+
+t ∈ V (G)
+
+T t U 6∈ V (G)
+T ∈ V (G) or U ∈ V (G)
+G := add(G, T t U )
+T u U 6∈ V (G)
+T ∈ V (G)
+G := add(G, T u U )
+
+U ∈ V (G)
+
+Introduce Set difference
+
+S ≈T \U ∈S
+T ∈ V (G)
+T \ U 6∈ V (G)
+G := add(G, T \ U )
+
+Introduce Card
+
+cs ≈ card(S) ∈ S
+G := add(G, S)
+
+Introduce Singleton
+
+{x} ∈ Terms(S)
+G := add(G, {x})
+
+Introduce Empty Set
+
+G := add(G, ∅)
+
+Figure 6. Graph extension rules.
+Merge Equality I
+
+s≈t∈S
+
+s, t, ∅ ∈ V (G)
+{u, v} = {s, t}
+L(u) ( L(v)
+ 0
+0
+S := s ≈ ∅ s ∈ L(v) \ L(u) ∪ S
+
+Merge Equality II
+
+s≈t∈S
+
+s, t ∈ V (G)
+L(s) * L(t)
+G := merge(G, s, t)
+
+L(t) * L(s)
+
+Figure 7. Merge rules.
+The rules in Figure 7 ensure that for all equalities over set terms, the corresponding
+nodes in the graph are merged. Consider an equality s ≈ t. Rule Merge Equality I
+handles the case when either L(s) or L(t) is a proper subset of the other by constraining the
+extra leaves in the superset to be empty. Rule Merge Equality II handles the remaining
+case where neither is a subset of the other. The graph G 0 = merge(G, s, t) is defined as
+follows, where L1 = L(s) \ L(t) and L2 = L(t) \ L(s):
+V (G 0 ) = V (G) ∪ {l1 u l2 | l1 ∈ L1 , l2 ∈ L2 }
+E(G 0 ) = E(G) ∪ {(l1 , l1 u l2 ), (l2 , l1 u l2 ) | l1 ∈ L1 , l2 ∈ L2 }
+Merge Equality II introduces a quadratic number of leaves (|L1 | · |L2 |). To reduce the
+impact of merge operations, a useful rule to apply early on is the (optional) Guess Empty
+Set rule in Figure 8. It guesses if a leaf node is equal to the empty set or not. The use of this
+rule is illustrated in Example 3.3. Here and in Figure 9, Leaves (G) = {v ∈ V (G) | C(v) = ∅}.
+In Figure 8 we denote by Ĝ the collection of all of the following cardinality constraints
+imposed by graph G:
+
+REASONING WITH FINITE SETS AND CARDINALITY
+
+Arithmetic contradiction
+
+11
+
+Guess Empty Set
+
+A ∪ Ĝ |=TA ⊥
+unsat
+
+t ∈ Leaves (G)
+S := S / (t ≈ ∅) k S := S / (t 6≈ ∅)
+
+Figure 8. Additional graph rules.
+Members Arrangement
+
+t ∈ Leaves (G)
+
+AV
+6 ct ≥ |tS | [x]E , [y]E ∈ tS [x]E 6= [y]E
+M := M / (x ≈ y) k M := M / (x 6≈ y)
+
+x 6≈ y 6∈ M∗
+
+Guess Lower Bound
+
+t ∈ Leaves (G)
+AV
+6 ct ≥ |tS |
+ct < |tS | 6∈ A
+A := ct >= |tS | , A k A := ct < |tS | , A
+
+Propagate Minsize
+
+x1 @
+− s, . . . , xn @
+− s ∈ S∗
+
+AV
+6 cs ≥ n
+xi 6≈ xj ∈ M∗ for all 1 ≤ i < j ≤ n
+A := cs >= n, A
+
+Figure 9. Cardinality and membership interaction rules.
+(1) For each set term s ∈ V (G), its cardinality (denoted by its corresponding cardinality
+variable cs ) is the sum of the cardinalities of its non-empty leaf nodes:
+
+
+
+
+X
+cs ≈
+ct s ∈ V (G)
+
+
+t∈L(s)
+
+(2) Each cardinality is non-negative:
+{cs >= 0 | s ∈ V (G)}
+(3) Every singleton set has cardinality 1:
+{cs ≈ 1 | s ∈ V (G), s = {x}}
+(4) The empty set has cardinality 0:
+{cs ≈ 0 | s ∈ V (G), s = ∅}
+Rule Arithmetic contradiction relies on the arithmetic solver to check whether the
+constraints in Ĝ are inconsistent with the input cardinality constraints.
+3.3. Cardinality and membership interaction. The rules in Figure 9 propagate consequences of set membership constraints to the state components M and A. Let E denote the
+set of equalities in M, and let [x]E denote the equivalence class of x with respect to E. In
+the rules, for term t of sort Set, tS denotes the set {[x]E | x @
+− t ∈ S ∗ } of equivalence classes
+of elements known to be in t. The notation A V ct ≥ n means that ct >= k ∈ A for some
+concrete constant k ≥ n.
+Rule Members Arrangement is used to decide which element variables constrained to
+be in the same set t should be identified and which should not. Once applied to completion,
+Rule Propagate Minsize can then be used to determine a lower bound for the cardinality
+of that set. The (optional) rule Guess Lower Bound can be used to short-circuit this
+
+12
+
+BANSAL ET AL.
+
+process by guessing a conservative lower bound based on the number of distinct equivalence
+classes of elements known to be members of a set. If this does not lead to a contradiction, a
+model can be found without resorting to an extensive use of Members Arrangement.
+Example 3.3. Consider again the constraints from Example 3.2, but now augmented with
+cardinality constraints:
+S = {S ≈ A t B, S ≈ C u D, x @
+− C, x 6@
+− D, y 6@
+− S, y @
+− D}
+A = {cS ≈ card(S), cC ≈ card(C), cD ≈ card(D), cS >= 4, cC + cD < 10}
+Using the rules in Figure 6, the following nodes get added to the graph: S, C, D (by
+Introduce Card), A t B, C u D (by Introduce Eq Right). Node A t B is added
+with children A \ B, A u B, and B \ A; and by adding C u D, we also get C \ D and
+D \ C, with the corresponding edges from C and D. Now, using two applications of Merge
+Equality II, we force the sets S, A t B and C u D to have the same set of 3 leaves, labeled
+S u (A \ B) u (C u D), S u (A u B) u (C u D), and S u (B \ A) u (C u D). Let us call the
+latter nodes respectively l1 , l2 , and l3 , for convenience. Let us also designate l4 = C \ D and
+l5 = D \ C. Notice that the induced cardinality constraints now include cS ≈ cl1 + cl2 + cl3 ,
+cC ≈ cl1 + cl2 + cl3 + cl4 , and cD ≈ cl1 + cl2 + cl3 + cl5 . With the addition of C \ D and D \ C
+to the graph, these are also added to T . We can then deduce x @
+− C \ D and y @
+− D\C
+using the rules for set difference. Finally, we can use Propagate Minsize to deduce cl4 >= 1
+and cl5 >= 1. It is now not hard to see that using pure arithmetic reasoning, we can deduce
+that cC + cD >= 10 which leads to unsat using Arithmetic contradiction.
+4. Calculus Correctness
+Our calculus is terminating and sound for any derivation strategy, that is, regardless of
+how the rules are applied. It is also refutation complete for any fair strategy, defined as a
+strategy that does not delay indefinitely the application of an applicable derivation rule.
+To prove these properties it is convenient to partition the derivation rules of the calculus
+in the following subsets.
+R1 , membership predicate reasoning rules, from Figures 2 and 3.
+R2 , graph rules to reason about cardinality, from Figures 6, 7 and 8.
+R3 , rules from Figure 9 other than Rule Guess Lower Bound.
+R4 , rule Guess Lower Bound.
+The rules are used to construct derivation trees. A derivation tree is a tree over states,
+with a root of the form hS0 , M0 , A0 , (∅, ∅)i where S0 ∪ M0 ∪ A0 satisfies Restriction 3.1 and
+the children of each non-root node are obtained by applying one of the derivation rules of
+the calculus to that node. Let R be a subset of the derivation rules of the calculus. A state
+is saturated with respect to R if no rules in R apply to it. A branch of a derivation tree is
+closed if it ends with unsat; it is saturated with respect to R if so is its leaf. A derivation
+tree is closed if all of its branches are closed. A derivation tree derives from a derivation
+tree T if it is obtained from T by the application of exactly one of the derivation rules to
+one of T ’s leaves.
+Definition 4.1 (Derivations). Let C be a set of TS -constraints. A derivation (of C) is a
+sequence (Ti )0≤i≤κ of derivation trees, with κ finite or countably infinite, such that Ti+1
+derives from Ti for all i, and T0 is a one-node tree whose root is a state hS0 , M0 , A0 , (∅, ∅)i
+
+REASONING WITH FINITE SETS AND CARDINALITY
+
+13
+
+where S0 ∪ M0 ∪ A0 = C. A refutation (of C) is a (finite) derivation of C that ends with a
+closed tree.
+Remark 4.2. In the proofs below we implicitly rely on the fact that, for every state
+hS, M, A, Gi in a derivation tree, the constraints in S ∪ M ∪ A satisfy Restriction 3.1. This
+is the case because the restriction is imposed on root states and is preserved by all of its
+rules, as one can easily verify.
+4.1. Termination.
+Proposition 4.3 (Termination). Let R collect all rules in our calculus except for (the
+optional) rule Guess Lower Bound. Every derivation using only rules from R is finite.
+Proof. Let hS0 , M0 , A0 , (∅, ∅)i be the initial state of the derivation. We first define a wellfounded relation  over states. Next, we show that application of any rule in R to a leaf
+of a derivation tree gives smaller states with respect to this relation. As the relation is
+well-founded, it will follow that the derivation cannot be infinite.
+In order to define , we define fi for i ∈ {1, 2, . . . , 9}, each of which maps a state
+σ = hS, M, A, Gi to a natural number (non-negative integer). We denote the set of natural
+numbers by N.
+• f1 (σ): number of equalities t1 ≈ t2 in S such that either t1 6∈ V (G), t2 6∈ V (G), or
+L(t1 ) 6= L(t2 ).
+• f2 (σ): size of (TermsSet (S) ∪ {∅}) \ V (G).
+• f3 (σ): size of {t ∈ Leaves (G) | t ≈ ∅ 6∈ S ∗ , t 6≈ ∅ 6∈ S ∗ }.
+• f4 (σ): number of disequalities t1 6≈ t2 in S such that the premise of Set Disequality
+holds.
+• f5 (σ): size of TermsSet (S) ∪ {∅} ∪ V (G).
+• f6 (σ): size of TermsElement (S ∪ M).
+• f7 (σ): size of M∗ subtracted from 2 · (f6 (σ))2 . As all constraints in M∗ are either x ≈ y
+or x 6≈ y with x and y in TermsElement (S ∪ M), the size of M∗ can be at most 2 · (f6 (σ))2 .
+Thus, f7 (·) is well-defined as a map into N.
+• f8 (σ): size of S ∗ subtracted from 2·(f5 (σ))2 +2·f5 (σ)·f6 (σ). There are at most 2·(f5 (σ))2
+constraints of the form s ≈ t or s 6≈ t in S ∗ as s and t are in TermsSet (S) ∪ {∅} ∪ V (G).
+There are at most 2 · f5 (σ) · f6 (σ) constraints of the form x @
+− s or x 6@
+− s in S ∗ as x and
+s are in TermsElement (S ∪ M) and TermsSet (S) ∪ {∅} ∪ V (G) respectively. Thus, f8 (·) is
+well-defined as a map into N.
+• f9 (σ): size of (TermsSet (S) ∪ {∅} ∪ V (G)) \ {t ∈ Leaves (G) | A 6V ct ≥ card(tS )}.
+Then, we define the order  over states as follows:
+• σ  σ 0 if σ 6= unsat and σ 0 = unsat.
+• σ  σ 0 if σ 6= unsat, σ 0 6= unsat, and
+
+(f1 (σ), . . . , f9 (σ)) >9lex f1 (σ 0 ), . . . , f9 (σ 0 )
+
+where N9 , >9lex is the 9-fold lexicographic product of ordering over natural numbers
+(N, >).
+• σ 6 σ 0 otherwise.
+
+14
+
+BANSAL ET AL.
+
+
+The well-foundedness of  over states follows from the well-foundedness of N9 , >9lex [BN98,
+Section 2.4].
+Let r ∈ R be a rule applicable at state σ, and let σ 0 be the state after the application of
+the rule (if there are multiple conclusions, denote the state on first branch as σ10 , second
+branch as σ20 and so on). We note below for each rule r ∈ R the relation between f1 (σ), . . .,
+f9 (σ) and f1 (σ 0 ), . . ., f9 (σ 0 ) which establishes that σ  σ 0 .
+• First, we consider Rules for intersection (Figure 2), union (Figure 2), set difference (Figure
+2) and Rule Singleton for singleton. None of these rules introduce equalities of set
+terms, nor do they affect the graph G; thus f1 (σ) ≥ f1 (σ 0 ). The only terms introduced
+to S are from V (G), thus f2 (σ) = f2 (σ 0 ). None of these rules update G or introduce
+equalities or disequalities of set terms, thus f3 (σ) = f3 (σ 0 ). None of these rules introduce
+disequalities between set terms, thus f4 (σ) ≥ f4 (σ 0 ). None of these rules introduce set
+terms not already in S or V (G), thus f5 (σ) = f5 (σ 0 ). None of the rules introduce Element
+variables not already in S or M, thus f6 (σ) = f6 (σ 0 ). None of these rules update M, thus
+f7 (σ) = f7 (σ 0 ).
+Each of these rules updates S. Recall that for a rule to be applicable at σ, the resulting
+state must be different from σ. From the definition of /, we can conclude that the size of
+S ∗ has increased. As f5 (σ) = f5 (σ 0 ) and f6 (σ) = f6 (σ 0 ), it follows that f8 (σ) > f8 (σ 0 ).
+• Next, we consider Rules Single Member, Single Non-member and Members Arrangement. None of these rules introduce equalities of set terms, thus f1 (σ) ≥ f1 (σ 0 ).
+None of these rules introduce set terms to S or V (G), thus f2 (σ) = f2 (σ 0 ). None of these
+rules update G or introduce equalities or disequality of set terms, thus f3 (σ) = f3 (σ 0 ).
+None of these rules introduce disequalities of set terms, thus f4 (σ) ≥ f4 (σ 0 ). None of these
+rules introduce set terms to S or V (G), thus f5 (σ) = f5 (σ 0 ). None of the rules introduce
+Element variables not already in S or M, thus f6 (σ) = f6 (σ 0 ).
+Each of these rules updates M. From the definition of /, we can conclude that the size
+of M∗ has increased. As f6 (σ) = f6 (σ 0 ), we can conclude that f7 (σ) > f7 (σ 0 ).
+• Next, we consider Rule Set Disequality. The rule does not introduce any equality of
+set terms, thus f1 (σ) ≥ f1 (σi0 ) for i ∈ {1, 2}. The rule does not introduce set terms to S or
+V (G), thus f2 (σ) = f2 (σi0 ) for i ∈ {1, 2}. The rule does not update G, thus f3 (σ) ≥ f3 (σi0 )
+for i ∈ {1, 2}. The premise of the rule does not hold after application of the rule on either
+of the branches. It follows that f4 (σ) > f4 (σi0 ) for i ∈ {1, 2}.
+• Next, we consider Introduce Rules (Figure 6). Note that none of these rules introduce
+equalities of set terms. Also note that if t1 ∈ V (G), t2 ∈ V (G) and t1 ≈ t2 in S then
+L(t1 ) = L(t2 ) (see Proposition 4.6, property 1). Thus, f1 (σ) ≥ f1 (σ 0 ).
+Each of the rules adds at least one new node to G which is in TermsSet (S) ∪ {∅}. At
+the same time, S is unchanged. It follows that f2 (σ) > f2 (σ 0 ).
+• Rules Merge Equality I and Merge Equality II. Though these rules add equalities of
+the form u ≈ ∅ to S, the equalities are such that u ∈ V (G), ∅ ∈ V (G) and L(u) = ∅ = L(∅).
+It follows that f1 (σ) ≥ f1 (σ 0 ).
+Now, observe that for Rule Merge Equality I or Rule Merge Equality II to be
+applicable, there must exist s ≈ t ∈ S such that L(s) 6= L(t). After the application of the
+rule, L(s) = L(t). This shows that f1 (σ) > f1 (σ 0 ).
+• Rule Merge Equality III. For the rule to be applicable, there must exist s ≈ t ∈ S
+such that L(s) 6= L(t). After the application of the rule, L(s) = L(t). Thus, necessarily
+f1 (σ) > f1 (σ 0 ).
+
+REASONING WITH FINITE SETS AND CARDINALITY
+
+15
+
+• Rule Guess Empty Set. Note that though this rule may add an equality of the form
+t ≈ ∅ on the first branch, using the same reasoning as for Rules Merge Equality I and
+Merge Equality II above, we can conclude that f1 (σ) ≥ f1 (σ10 ). On the second branch,
+as no disequality is added, we get that f1 (σ) ≥ f1 (σ20 ). Only terms introduced to S are
+from V (G), thus f2 (σ) = f2 (σ10 ) for i ∈ {1, 2}.
+In order to apply the rule, we pick a t ∈ Leaves (G) such that t ≈ ∅ 6∈ S ∗ and t 6≈ ∅ 6∈ S ∗ .
+On the first branch, t ≈ ∅ ∈ S ∗ , thus f3 (σ) > f3 (σ10 ). On the second branch, t 6≈ ∅ ∈ S ∗ ,
+thus f3 (σ) > f3 (σ20 ).
+• Rule Propagate Minsize. The rule does not update S, M, or G, thus f1 (σ) = f1 (σ 0 ),
+f2 (σ) = f2 (σ 0 ), f3 (σ) = f3 (σ 0 ), f4 (σ) = f4 (σ 0 ), f5 (σ) = f5 (σ 0 ), f6 (σ) = f6 (σ 0 ), f7 (σ) =
+f7 (σ 0 ), and f8 (σ) = f8 (σ 0 ). But, f9 (σ) > f9 (σ 0 ).
+• Rules Eq Unsat, Set Unsat, Empty Unsat, and Arithmetic contradiction. For
+each of these rules to be applicable, σ 6= unsat. On the other hand, σ 0 = unsat after the
+application of the rule. By definition, σ  σ 0 .
+Remark 4.4. It is easy to extend the termination proof above to include the optional rule
+Guess Lower Bound. It would involve tracking sizes of additional objects—a strategy
+similar to the one adopted for Rule Guess Empty Set in our proof would suffice.
+4.2. Completeness. We prove properties about different subsets of rules, developing the
+completeness proof in stages. We start with a proposition about rule set R1 .
+Proposition 4.5. Let hS, M, A, Gi be a derivation tree leaf that is saturated with respect to
+R1 . There is a model S of TS that satisfies the constraints S and M and has the following
+properties.
+(1) For all x, y ∈ Vars (M) ∪ Vars (S) of sort Element,
+xS = y S if and only if x ≈ y ∈ M∗ . 
+(2) For all S ∈ Vars (S) of sort Set, S S = xS x @
+− S ∈ S∗ .
+S
+(3) For all cS ∈ Vars (S) of sort Card, cS
+S = S .
+Proof. Since the models of TS are closed under variable reassignment, we pick an arbitrary
+model S of TS and show that we can change its interpretation of the variables of S ∪ M to
+satisfy the properties above.
+We start by interpreting all variables of Element sort in S ∪ M so that, for all x and y
+in Vars (M) ∪ Vars (S) of Element sort,
+xS = y S if and only x ≈ y ∈ M∗ .
+It follows that S satisfies M. Next, let S interpret each variable S of Set sort in Vars (S)
+as:
+n
+o
+S S = xS x @
+− S ∈ S∗
+and each variable cS of Card sort in Vars (S) as:
+S
+cS
+.
+S = S
+
+For any set term s, define
+n
+Elements(s) = xS
+
+x@
+− s ∈ S∗
+
+o
+
+.
+
+(4.1)
+
+16
+
+BANSAL ET AL.
+
+Let T be an arbitrary set of set terms which includes all set terms in S. Using the assumption
+that the given state is saturated, we show by structural induction on set terms that for any
+set term s ∈ T :
+Elements(s) = sS
+(4.2)
+Case 1 (s is a variable). The definition of Elements(s) is identical to that of sS .
+Case 2 (s is ∅). Rule Empty Unsat would apply to the state if there was a constraint of
+the form x @
+− ∅ in S ∗ . It follows that Elements(∅) = ∅.
+
+
+Case 3 (s is {x}). As sS = xS , it is sufficient to show that Elements(s) = xS .
+Sincerule Singleton is not applicable, we can conclude thatx @
+− s ∈ S ∗ . It follows
+S
+S
+that x
+⊆ Elements(s). The other direction, Elements(s) ⊆ x , follows because of
+saturation with respect to rule Single Member:
+e ∈ Elements({x})
+e = y S for some y with y @
+− {x} ∈ S ∗
+
+(definition)
+
+∗
+
+y≈x∈M
+S
+
+Rule Single Member
+
+S
+
+(S satisfies M)
+
+y =x
+n o
+e ∈ xS
+
+(e = y S )
+
+Case 4 (s is t u u). We need to show Elements(t u u) = tS ∩ uS . The proof of the left-to-right
+inclusion depends on rule Inter Down I:
+e ∈ Elements(t u u)
+e = xS for some x with x @
+− t u u ∈ S∗
+∗
+
+x@
+− t ∈ S and x @
+−u∈S
+S
+
+(definition)
+
+∗
+
+(Rule Inter Down I)
+
+S
+
+x ∈ Elements(t) and x ∈ Elements(u)
+S
+
+S
+
+S
+
+S
+
+x ∈ t and x ∈ u
+
+(definition)
+(induction)
+
+e ∈ tS ∩ uS
+For the other direction, tS ∩ uS ⊆ Elements(t u u), we rely on rule Inter Up I:
+e ∈ tS ∩ uS
+e ∈ tS and e ∈ uS
+e ∈ Elements(t) and e ∈ Elements(u)
+
+(induction)
+
+x@
+− t ∈ S ∗ and y @
+− u ∈ S ∗ with xI = y I = e
+∗
+
+∗
+
+∗
+
+∗
+
+∗
+
+x@
+− t ∈ S and y @
+− u ∈ S with x ≈ y ∈ M
+x@
+− t ∈ S and x @
+−u∈S
+x@
+− t u u ∈ S∗
+e ∈ Elements(t u u)
+
+(definition)
+(by construction)
+(t u u ∈ T , Rule Inter Up I)
+
+REASONING WITH FINITE SETS AND CARDINALITY
+
+17
+
+Case 5 (s is t t u). First we show that Elements(t t u) ⊆ tS ∩ uS :
+e ∈ Elements(t t u)
+e = xS for some x with x @
+− t t u ∈ S∗
+∗
+
+x@
+− t ∈ S or x @
+−u∈S
+
+∗
+
+(definition)
+(Rule Union split)
+
+xS ∈ Elements(t) or xS ∈ Elements(u)
+S
+
+S
+
+S
+
+(definition)
+
+S
+
+x ∈ t or x ∈ u
+
+(induction)
+
+e ∈ tS ∪ uS
+Then we show that tS ∪ uS ⊆ Elements(t t u):
+e ∈ tS ∪ uS
+e ∈ tS or e ∈ uS
+e ∈ Elements(t) or e ∈ Elements(u)
+
+(induction)
+
+x@
+− t ∈ S ∗ or x @
+− u ∈ S ∗ where xI = e
+
+(definition)
+
+x@
+−ttu∈S
+
+∗
+
+(t t u ∈ T , Rule Union Up II)
+
+e ∈ Elements(t u u)
+Case 6 (s is t \ u). First we show that Elements(t \ u) ⊆ tS \ uS :
+e ∈ Elements(t \ u)
+e = xS for some x with x @
+− t \ u ∈ S∗
+∗
+
+x@
+− t ∈ S and x 6@
+−u∈S
+
+∗
+
+(definition)
+(Rule Set difference Down 1)
+
+From x 6@
+− u ∈ S ∗ we can conclude that xS ∈ Elements(u). In fact, if we assume otherwise,
+we have that y @
+− u ∈ S ∗ for some y with xS = y S . But then x ≈ y ∈ M∗ which implies
+∗
+that x @
+− u ∈ S . This, however, make rules Set Unsat applicable. Then we have:
+xS ∈ Elements(t) and xS 6∈ Elements(u)
+xS ∈ tS and xS 6∈ uS
+
+(induction)
+
+e ∈ tS \ uS
+We now show that tS \ uS ⊆ Elements(t \ u):
+e ∈ tS \ uS
+e ∈ tS and e 6∈ uS
+e ∈ Elements(t) and e 6∈ Elements(u)
+
+(induction)
+
+x@
+− t ∈ S ∗ and x @
+− u 6∈ S ∗ for some x with xI = e
+
+(definition)
+
+We show by contradiction that x 6@
+− u ∈ S ∗.
+
+Assume the otherwise. Since x @
+− u 6∈ S ∗
+and t \ u ∈ T , the premise of rule Set difference split is satisfied. As we had neither
+
+18
+
+BANSAL ET AL.
+
+x@
+− u ∈ S ∗ nor x 6@
+− u ∈ S ∗ , we get a contradiction.
+x@
+− t ∈ S ∗ and x 6@
+− u ∈ S∗
+x@
+−t\u∈S
+
+∗
+
+(Rule Set difference split)
+(t \ u ∈ T , Rule Set difference Up 1)
+
+e ∈ Elements(t \ u)
+Having established the property of Elements(·), showing that each constraint in S is
+satisfied by S is straightforward:
+(1) Let x @
+− s ∈ S. Then, xS ∈ Elements(s) by (4.1) and xS ∈ sS by (4.2).
+(2) Let x 6@
+− s ∈ S. We show xS 6∈ sS by contradiction.
+xS ∈ sS
+
+(assume)
+
+xS ∈ Elements(s)
+S
+
+x =y
+
+S
+
+for some y with y @
+−s∈S
+
+(proved above)
+∗
+
+(definition)
+
+x ≈ y ∈ M∗
+
+(xS = y S iff x ≈ y ∈ M∗ )
+
+x@
+− s ∈ S∗
+
+(definition of S ∗ )
+
+Tableau is closed, contradiction.
+
+(Rule Set Unsat)
+
+From the definition of S ∗ it follows that Elements(s) = Elements(t).
+
+(3) Let s ≈ t ∈ S.
+Since sS = Elements(s) and tS = Elements(t), it follows that sS = tS .
+(4) Let s 6≈ t ∈ S. From rule Set Disequality, it follows that there exists x such that
+either x @
+− s ∈ S ∗ and x 6@
+− t ∈ S ∗ , or x 6@
+− s ∈ S ∗ and x @
+− t ∈ S ∗ . It follows that either
+S
+S
+S
+S
+S
+S
+S
+S
+x ∈ s and x 6∈ t , or x 6∈ s and x ∈ t . In either case, we can conclude that
+sS 6= tS .
+S = card(S)S .
+(5) Let cS ≈ card(S) ∈ S. By definition, both cS
+S = S
+For the next two results, let hS, M, A, Gi be a derivation tree leaf saturated with respect
+to rules R1 ∪ R2 ∪ R3 in a derivation tree. The first result is about the effects of the rules
+in R2 . The second is about the rules in R3 .
+Proposition 4.6. For every s ∈ V (G) the following holds.
+(1) If s ≈ t ∈ S or t ≈ s ∈ S for some t, then L(s) = L(t).
+(2) If s = T t U , then L(T t U ) = L(T ) ∪ L(U ).
+(3) If s = T u U , then L(T u U ) = L(T ) ∩ L(U ).
+(4) If s = T \ U , then L(T \ U ) = L(T ) \ L(U ).
+(5) For all distinct t, u ∈ Leaves (s),
+F |=TS t u u ≈ ∅.
+(6) {t ≈ u | t ≈ u ∈ S ∗ } |=TS s ≈ t∈L(s) t.6
+
+Proof (Proposition 4.6, property 1). Let s ≈ t ∈ S, with s ∈ V (G) or t ∈ V (G). From rule
+Introduce Eq Right and rule Introduce Eq Left it follows that both s ∈ V (G) and
+t ∈ V (G). For each of the Rules Merge Equality I, Merge Equality II, and Merge
+Equality III; we show that after the application of the rule, L(s) and L(t) are equal.
+Consider rule Merge Equality I. Let Ls and Lt denote L(s) and L(t) respectively
+before application of the rule. Let L0s and L0t denote L(s) and L(t) after application of
+the rule. For the rule to be applicable Ls ( Lt . The rule adds constraints to S so that
+L0t = Lt \ (Lt \ Ls ). Equivalently, L0t = Lt ∩ Ls = Ls . Since L0s = Ls , we get L0s = Ls = L0t .
+6Technically, F
+
+... is ambiguous. However, since t is associative in TS , bracketing does not matter in this
+
+context.
+
+REASONING WITH FINITE SETS AND CARDINALITY
+
+19
+
+The case for rule Merge Equality II is analogous to rule Merge Equality I.
+Consider rule Merge Equality III. Let Ls and Lt denote L(s) and L(t) respectively
+before application of the rule. Let L0s and L0t denote L(s) and L(t) after application of the
+rule. Let n ∈ L0s . Note that the merge operation only adds nodes and vertices. Thus, n is
+one of the following:
+• l1 u l2 with l1 ∈ Ls and l2 ∈ Lt : Since (l1 , l1 u l2 ) as well as (l2 , l1 u l2 ) is an edge, it follows
+that n ∈ L0t .
+• l1 ∈ Ls . Since nodes in Ls \ Lt have an outgoing edge, it must be the case that l1 ∈ Ls ∩ Lt .
+It follows that n ∈ L0t .
+This shows that L0s ⊆ L0t . The reasoning for L0t ⊆ L0s is symmetrical.
+As s ≈ t, s ∈ V (G), and t ∈ V (G), the premise of at least once of the rules (Merge
+Equality I), (Merge Equality II), and (Merge Equality III) must be satisfied
+whenever L(s) 6= L(t). As the branch is saturated, L(s) = L(t) follows.
+Proof (Proposition 4.6, properties 2, 3, 4). As D is obtained from a derivation starting with
+a state with an empty graph, it is sufficient to show the properties hold for the empty graph,
+and that they are preserved each time the graph is modified by one of the rules.
+The properties hold trivially for the empty graph. The interesting cases are when edges
+are added to the graph: i) add of a union, intersection, or set minus term, and ii) merge
+operation.
+Observe that when we introduce T t U , T u U , and T \ U to the graph, the following
+holds:
+• Leaves (T ) = {T \ U, T u U },
+• Leaves (U ) = {T u U, U \ T },
+• Leaves (T t U ) = {T \ U, T u U, U \ T },
+• Leaves (T u U ) = {T u U },
+• Leaves (T \ U ) = {T \ U }, and
+• Leaves (U \ T ) = {U \ T }.
+We conclude that:
+• Leaves (T t U ) = Leaves (T ) ∪ Leaves (U )
+• Leaves (T u U ) = Leaves (T ) ∩ Leaves (U )
+• Leaves (T \ U ) = Leaves (T ) \ Leaves (U )
+• Leaves (U \ T ) = Leaves (U ) \ Leaves (T )
+when an introduce rule is applied. Note that the merge operation only adds edges from
+existing leaf nodes, ensuring that the property is maintained by any application of merge.
+L(·), as defined in (3.2), can also be defined as:
+L(n) = Leaves (n) \ E
+
+(4.3)
+
+where E = {n0 ∈ V (G) | n0 ≈ ∅ ∈ S ∗ } does not depend on n. The properties in the proposition about L(·) follow from the corresponding property of Leaves (·) just established, and
+above formulation of L(·).
+Proof (Proposition 4.6, properties 5,6). The properties holds trivially for the empty graph.
+Let G be the graph constraints. Let s ∈ V (G). Let s0 ≈ ∅ be a new constraint such
+that s0 ∈ L(s). Then, this modifies L(s), and we need to verify the Property 6 still holds.
+Note that for any structure in TS , if s0 is interpreted as empty set, the interpretation of
+
+20
+
+F
+
+BANSAL ET AL.
+
+t∈L(s)\{s0 } t will be same as
+
+F
+
+t∈L(s) t. Thus, if s
+
+|=TS
+
+
+
+
+
+!
+^
+
+0 ∈ L(s) and
+
+⇒ s ≈
+
+P
+
+P ∈E
+
+!
+|=TS
+
+s0 ≈ ∅ ∧
+
+t
+
+,
+
+t∈L(s)
+
+then
+^
+
+G
+
+P
+
+
+
+
+G
+
+⇒ s ≈
+
+P ∈E
+
+t
+
+.
+
+t∈L(s)\{s0 }
+
+It follows if s0 ≈ ∅ is added to S ∗ by a rule, the property 6 continue to hold. Also note that
+an equality is not removed by any rule (if there was such a rule, we would need to check the
+property continues to hold when the left side of the implication is weakened).
+The only other rules which affect the properties are those which modify the graph
+directly, i.e. the add and merge operations.
+We show that if G satisfies the properties, then so does add(G, s):
+• s is ∅, S or {x}: trivially, as no edges are added.
+• s is T u U : Note that because of the assumptions on the normal form, either T u U already
+in the graph and add operation does not modify the graph, or it will add the nodes T , U ,
+T \ U , T u U , and U \ T to the graph, and edges between them. It is easy to see that the
+property 5 follows from:
+|=TS ((T \ U ) u (T u U )) ≈ ∅
+|=TS ((U \ T ) u (T u U )) ≈ ∅
+Property 6 follows from:
+|=TS T ≈ ((T \ U ) t (T u U ))
+|=TS U ≈ ((U \ T ) t (T u U ))
+|=TS (T u U ) ≈ (T u U )
+|=TS (U \ T ) ≈ (U \ T )
+|=TS (T \ U ) ≈ (T \ U )
+and reasoning as earlier that any constraint of the form s0 ≈ ∅ does not affect the property.
+• s is T \ U or U \ T : reasoning same as for T u U .
+• s is T t U . If not already present, T , U , T \ U , T u U are added to the graph as for T u U .
+In addition, add for union also adds T t U , and three edges. The properties follows from
+the following tautologies in TS in addition to those listed in analysis for T u U :
+|=TS ((T \ U ) u ((U \ T ))) ≈ ∅
+|=TS (T t U ) ≈ ((T \ U ) t (T u U ) t (U \ T ))
+Finally, we show that if G satisfies the properties, then so does merge(G, s, t) if s ∈ V (G),
+t ∈ V (G), L(s) * L(t) and L(t) * L(s).
+Let Ls denote L(s) in G, and L0s denote L(s) in merge(G, s0 , t0 ) (likewise for t, u etc.).
+In order to show property 5 holds, let s0 ∈ V (G), t0 ∈ L0s0 and u0 ∈ L0s0 . We need to
+show: |=TS t0 u u0 ≈ ∅.
+• Let t0 ∈ Ls0 and u0 ∈ Ls0 , i.e. both are also leaf nodes in G. Then, the property for
+merge(G, s, t) follows from that of G.
+
+REASONING WITH FINITE SETS AND CARDINALITY
+
+21
+
+• Let t0 be one of the newly introduced leaf nodes and u0 ∈ Ls0 a leaf node in G. Without
+loss of generality, let t0 be t1 u t2 with t1 ∈ Ls \ Lt and t2 ∈ Lt \ Ls . For t0 to be in L0s0 ,
+given the way the edges are added, either t1 ∈ Ls0 or t2 ∈ Ls0 . Thus, we know that either
+|=TS t1 u u0 ≈ ∅ or |=TS t2 u u0 ≈ ∅. In either case, it follows that |=TS (t1 u t2 ) u u0 ≈ ∅,
+i.e. |=TS t0 u u0 ≈ ∅.
+• The analysis for the case where both are newly introduced leaf nodes is similar.
+To show property 6 holds, the main observation is that each node no longer a leaf node,
+say s0 ∈ Ls \ L0s , is union of a new set of leaf nodes in L0s (assuming the equalities).
+G
+s0 ≈ s0 u s
+(s0 ∈ Ls , s ≈
+s00 )
+s00 ∈Ls
+0
+
+≈s ut
+
+≈ s0 u 
+G
+
+≈
+
+(s ≈ t ∈ E)
+
+G
+
+t0 
+
+(t ≈
+
+G
+
+t0 )
+
+t0 ∈Lt
+
+t0 ∈Lt
+
+s0 u t0
+
+(distribute)
+
+t0 ∈Lt
+
+But by property 5, s0 u t0 ≈ ∅ for s0 , t0 ∈ Ls . Thus,
+G
+s0 ≈
+s0 u t0
+t0 ∈Lt \Ls
+
+Note that {s0 u t0 | t0 ∈ Lt \ Ls } are precisely the nodes in L0s to which edges are added from
+s0 . The proof for a node in Lt but not in L0t is similar.
+Since all the new leaf nodes are of the form s0 u t0 with s0 ∈ Ls \ Lt and t0 ∈ Lt \ Ls , it
+follows that property 6 holds for merge(G, s, t) if it holds for G assuming s ≈ t ∈ E.
+Proposition 4.7. Let hS, M, A, Gi be a state such that none of the rules in our calculus
+are applicable. Let S be an interpretation defined in Proposition 4.5 satisfying constraints in
+S and M. To recall, for x and y of Element sort,
+xS = y S if and only if x ≈ y ∈ M∗
+and for s of Set sort,
+n
+s S = xS
+
+o
+x@
+− s ∈ S∗ .
+
+Let A be an interpretation satisfying A. Then, for all t ∈ L(G),
+S
+cA
+.
+t ≥ t
+
+Proof. Let t ∈ L(G). First we show that if A ⇒ ct ≥ |tS |, then the proposition follows. That
+is there exists n ≥ |tS | such that ct >= n ∈ A. Let Elements(·) be as in (4.1).
+A
+cA
+t ≥n
+
+=n
+≥ |tS |
+= |Elements(t)|
+= tS
+
+(ct >= n ∈ A)
+(constant symbol)
+(definition)
+(xS = y S iff x ≈ y ∈ M∗ )
+(using (4.2))
+
+22
+
+BANSAL ET AL.
+
+It remains to show that A ⇒ ct ≥ |tS |. Because of rule Members Arrangement, either
+A ⇒ ct ≥ |tS | or Rule Members Arrangement is applicable until the premise of rule
+Propagate Minsize holds. If Rule Propagate Minsize is applicable, ct >= |tS | must have
+been added to A. In either case, A ⇒ ct ≥ |tS |.
+Completeness is a direct consequence of the following result.
+Proposition 4.8. Let S0 , M0 , A0 be set, element and cardinality constraints respectively,
+satisfying Restriction 3.1. Let D be a derivation with respect to rules R1 ∪ R2 ∪ R3 from
+state hS0 , M0 , A0 , (∅, ∅)i. If D is finite, and the final derivation tree, say D, in D is open
+and saturated with respect to the rules R1 ∪ R2 ∪ R3 ; then there exists an interpretation I
+that satisfies S0 , M0 and A0 .
+Proof. Proof outline: We build a model of the leaf nodes in the graph by modifying as
+needed the model obtained from Proposition 4.5. We add additional elements to these sets
+to make the cardinalities match the model satisfying the cardinality constraints and the
+constraints induced by the graph. Propositions 4.6 and 4.7 ensure that it is always possible
+to do so without violating the set constraints.
+As D is open, there exists a branch that does not end in the state unsat. Let hS, M, A, Gi
+be the final state on such a branch.
+Let A ∪ Ĝ be the cardinality constraints, and the cardinality constraints induced by
+the graph. These constraints fall in the theory TA . Let A be the structure satisfying these
+constraints. Such a structure exists because rule Arithmetic contradiction would have
+closed the branch if the constraints were inconsistent. From Proposition 4.5, we obtain
+a structure S satisfying S and M. Without loss of generality, assume that ElementS is
+infinite.
+The I we build satisfying S0 ∪ M0 ∪ A0 will be as follows. It coincides with the structure
+S on terms of Element sort. It coincides with the structure A on terms of Card sort. In
+order to define the value of set variables, for each leaf node t ∈ Leaves (G) we create the
+following sets:
+Bt = {et,1 , et,2 . . . et,cI −|tS | }
+t
+
+S
+
+where et,i ∈ Element are distinct from each other and from any e such that e = xS for x in
+S or M. From Proposition 4.7, we know that cIt ≥ tS . Thus, for a leaf node t,
+tS + |Bt | = cIt .
+
+(4.4)
+
+For a set variable not in the graph, S 6∈ V (G), define S I = S S . For a set variable in the
+graph, S ∈ V (G), define:
+[
+SI =
+(tS ∪ Bt )
+(4.5)
+t∈L(S)
+
+From Proposition 4.6, it follows that:
+[
+
+tS = S S
+
+(4.6)
+
+t∈L(S)
+
+So an equivalent way to define S I is as follows:
+SI = SS ∪
+
+[
+t∈L(S)
+
+We verify that each constraint in S0 is satisfied:
+
+Bt
+
+(4.7)
+
+REASONING WITH FINITE SETS AND CARDINALITY
+
+23
+
+(1) S ≈ T , S 6≈ T .
+For S ≈ T , we need to show S I = T I . If neither S ∈ V (G) nor T ∈ V (G), then
+this follows from Proposition 4.5. If either S ∈ V (G) or T ∈ V (G), then due to rule
+Introduce Eq Right and rule Introduce Eq Left both S ∈ V (G) and T ∈ V (G).
+From Proposition 4.6, property 1, we know that L(S) = L(T ). From the definition of
+S I and T I in (4.5), it follows that S I = T I .
+I
+I
+S
+For S 6≈ T , we need to show S I 6=
+S T . Let us write S = S ∪ BS , where BS = ∅
+if S 6∈ V (G), otherwise let BS = t∈L(S) Bt (from (4.7)). Similarly we may write
+T I = T S ∪ BT . From Proposition 4.5 we know that S S 6= T S . Without loss of generality
+assume e ∈ S S and e 6∈ T S . By definition, BT is disjoint from S S , thus e 6∈ BT . Thus,
+e ∈ S I and e 6∈ T I . S I 6= T I follows.
+(2) S ≈ ∅.
+We need to show S I = ∅I = ∅. It will follow from rule Introduce Empty Set and
+rule Introduce Eq Left.
+∅ ∈ V (G) and S ∈ V (G)
+
+(Rules Introduce Empty Set, Introduce Eq Left)
+
+L(S) = L(∅)
+
+(Proposition 4.6, property 1)
+
+L(S) = ∅
+
+(L(∅) = ∅)
+
+I
+
+S =∅
+
+(S ∈ V (G), (4.5))
+
+(3) S ≈ {x}.
+
+We need to show that S I = xI . From rule Introduce Singleton we conclude
+that {x} ∈ V (G) Then, from rule Introduce Eq Left, S ∈ V (G).
+From Ĝ, we know that:
+X
+cIS =
+cIt
+(constraint in Ĝ for cS )
+t∈L(S)
+
+X
+
+=
+
+cIt
+
+(Proposition 4.6, property 1)
+
+t∈L({x})
+
+= cI{x}
+
+(constraint in Ĝ for c{x} )
+(constraint in Ĝ for singletons)
+
+=1
+
+We can conclude that S I = 1 as S I = cIS (for proof of S I = cIS , see reasoning later
+in this proof for |S| ≈ cS – the same reasoning works for all nodes S ∈ V (G))
+From, Singleton, we know xS ∈ S S . By Proposition 4.5, xS ∈ S S . As
+[
+SI = SS ∪
+Bt
+t∈L(S)
+
+
+
+and S I = 1, we conclude that S I = xS = xI .
+(4) S ≈ T t U . We need to show S I = T I ∪ U I .
+Let S 6∈ V (G), T 6∈ V (G), and U 6∈ V (G). Then,
+SI = SS
+
+(S 6∈ V (G))
+
+= TS ∪ US
+I
+
+=T ∪U
+
+I
+
+(Proposition 4.5)
+(T 6∈ V (G), U 6∈ V (G))
+
+24
+
+BANSAL ET AL.
+
+Otherwise, let S ∈ V (G), or T ∈ V (G), or U ∈ V (G). Then, from Rules Introduce
+Eq Right, Introduce Eq Left, Introduce Union and definition of add, we know
+S, T , and U in V (G). Then,
+[
+SI =
+(tS ∪ Bt )
+(S ∈ V (G))
+t∈L(S)
+
+[
+
+=
+
+(tS ∪ Bt )
+
+(Proposition 4.6)
+
+t∈L(T tU )
+
+
+
+
+[
+
+=
+
+(tS ∪ Bt ) ∪ 
+
+t∈L(T )
+I
+
+=T ∪U
+
+
+
+
+[
+
+(tS ∪ Bt )
+
+(Proposition 4.6)
+
+t∈L(U )
+
+I
+
+(T ∈ V (G), U ∈ V (G))
+
+(5) S ≈ T u U . We need to show S I = T I ∩ U I .
+Let S 6∈ V (G), T 6∈ V (G), and U 6∈ V (G). Then,
+SI = SS
+
+(S 6∈ V (G))
+S
+
+(Proposition 4.5)
+
+= TI ∩ UI
+
+(T 6∈ V (G), U 6∈ V (G))
+
+=T
+
+S
+
+∩U
+
+Let S 6∈ V (G) and T 6∈ V (G), but U ∈ V (G). Then,
+TI ∩ UI = TS ∩ UI
+
+= T S ∩ U S ∪
+
+(T 6∈ V (G))
+
+[
+
+Bt 
+
+(U ∈ V (G))
+
+t∈L(U )
+
+= TS ∩ US
+
+(T S ∩ Bt = ∅)
+
+= SS
+
+(Proposition 4.5)
+
+= SI
+
+(S 6∈ V (G))
+
+If S 6∈ V (G) and U 6∈ V (G), but T ∈ V (G); the reasoning is same as above.
+Otherwise, either S ∈ V (G) or both T ∈ V (G) and U ∈ V (G). Then, from Rules
+Introduce Eq Right, Introduce Eq Left, Introduce Inter and definition of
+add, we know S, T , and U in V (G). Then,
+
+ 
+
+[
+[
+T I ∩ U I = T S ∪
+Bt  ∩ U S ∪
+Bt 
+(T , U in V (G))
+t∈L(T )
+
+t∈L(U )
+
+As each Bt is disjoint from all other sets, the above expression simplifies to:
+
+
+[
+= TS ∩ US ∪
+Bt
+t∈L(T )∩L(U )
+S
+
+=S ∪
+
+[
+
+Bt
+
+(Propositions 4.5 and 4.6)
+
+t∈L(S)
+
+=S
+
+I
+
+(S ∈ V (G))
+
+REASONING WITH FINITE SETS AND CARDINALITY
+
+25
+
+(6) S ≈ T \ U . We need to show S I = T I \ U I .
+Let S 6∈ V (G), T 6∈ V (G), and U 6∈ V (G). Then,
+SI = SS
+
+(S 6∈ V (G))
+S
+
+(Proposition 4.5)
+
+= TI \ UI
+
+(T 6∈ V (G), U 6∈ V (G))
+
+=T
+
+S
+
+\U
+
+Let S 6∈ V (G) and T 6∈ V (G), but U ∈ V (G). Then,
+TI \ UI = TS \ UI
+
+= T S \ U S ∪
+
+(T 6∈ V (G))
+
+[
+
+Bt 
+
+(U ∈ V (G))
+
+t∈L(U )
+
+= TS \ US
+
+(T S \ Bt = T S )
+
+= SS
+
+(Proposition 4.5)
+
+= SI
+
+(S 6∈ V (G))
+
+Note that in contrast to intersection, if S 6∈ V (G), T ∈ V (G), and U 6∈ V (G), the above
+analysis does not apply. We do need to introduce and reason about the equality in the
+graph.
+Let S ∈ V (G) or T ∈ V (G). From Rules Introduce Eq Right, Introduce Eq
+Left, Introduce Set difference and definition of add we know S, T , and U in
+V (G). Then,
+
+ 
+
+[
+[
+T I \ U I = T S ∪
+Bt  \ U S ∪
+Bt 
+(T , U in V (G))
+t∈L(T )
+
+t∈L(U )
+
+As each Bt is disjoint from all other sets, the above expression simplifies to:
+
+
+[
+Bt
+= TS \ US ∪
+t∈L(T )\L(U )
+
+= SS ∪
+
+[
+
+Bt
+
+(Propositions 4.5 and 4.6)
+
+t∈L(S)
+
+= SI
+
+(S 6∈ V (G))
+
+(7) x @
+− S, x 6@
+− S.
+Note that irrespective of whether S ∈ V (G) or S 6∈ V (G), S S ⊆ S I . Thus, from
+Proposition 4.5, xI ∈ S I if x @
+− S is a constraint.
+It remains to show that if x 6@
+− S is a constraint then xI 6∈ S I . If S 6∈ V (G), then
+I
+I
+again Sx 6∈ S follows from Proposition 4.5. If S ∈ V (G), then observe S
+that S I is
+S
+I
+S
+I
+S ∪ t∈L(U ) Bt . We already know x 6∈ S . It remains to show that x 6∈ t∈L(U ) Bt .
+This follows from the definition of Bt .
+(8) cS ≈ card(S).
+From Proposition 4.6, we know that for t, u in L(S):
+|=TS t u u ≈ ∅
+
+26
+
+BANSAL ET AL.
+
+and also,
+!
+|=TS
+
+^
+
+t≈∅
+
+
+
+
+⇒ S ≈
+
+t∈E
+
+G
+
+t
+
+t∈L(S)
+
+where E = {t ∈ V (G) | t ≈ ∅ ∈ S ∗ }.
+In I, as for each t ∈ E, tI = ∅, it follows that:
+[
+tI .
+SI =
+t∈L(S)
+
+Also, for t, u in L(S):
+tI ∩ uI = ∅ .
+In other words, S I is a disjoint union of tI where t ∈ L(S). It follows that,
+X
+SI =
+tI
+t∈L(S)
+
+For a leaf node t ∈ L(S), from (4.4) we know that tI = tS + |Bt | = cIt . We may thus
+conclude,
+X
+SI =
+cIt
+t∈L(S)
+
+From the constraint on cardinality
+for S induced by the graph, i.e the constraint on cS
+P
+in Ĝ, we know that cIS = t∈L(S) cIt . The result follows:
+S I = cIS
+Proposition 4.9 (Completeness). Under any fair derivation strategy, every derivation of a
+set C of TS -unsatisfiable constraints extends to a refutation.
+Proof. Contrapositively, suppose that C has a derivation D that cannot be extended to a
+refutation. By Proposition 4.3, D must be extensible to one that ends with a tree with a
+saturated branch. By Proposition 4.8, C is satisfiable in TS .
+4.3. Soundness. We start by showing that every rule preserves constraint satisfiability.
+Lemma 4.10. For every rule of the calculus, the premise state is satisfied by a model Ip of
+TS iff one of its conclusion configurations is satisfied by a model Ic of TS where Ip and Ic
+agree on the variables shared by the two states.
+Sketch. Soundness of the rules in Figure 2 and Figure 3 follows trivially from the semantics
+of set operators and the definition of S ∗ . Soundness of Merge Equality I follows from
+properties of the graph (see Proposition 4.6, in particular the property that leaf terms are
+disjoint). The rules in Figure 6 and rule Merge Equality II do not modify the constraints,
+but we need them to establish properties of the graph. Soundness of the induced graph
+constraints in Arithmetic contradiction follows from Proposition 4.6 (in particular
+properties 5 and 6). Soundness of Propagate Minsize follows from the semantics of
+cardinality. Soundness of Guess Empty Set, Members Arrangement and Guess
+Lower Bound is trivial.
+
+REASONING WITH FINITE SETS AND CARDINALITY
+
+27
+
+Proposition 4.11 (Soundness). Every set of TS -constraints that has a refutation is TS unsatisfiable.
+Sketch. Given Lemma 4.10, one can show by structural induction on derivation trees that
+the root of any closed derivation tree is TS -unsatisfiable. The claim then follows from the
+fact that every refutation of a set C of TS -constraints starts with a state TS -equisatisfiable
+with C.
+
+5. Evaluation
+We have implemented a decision procedure based on the calculus above in the SMT solver
+cvc4 [BCD+ 11]. We describe a high-level, non-deterministic version of it here, followed by
+an experimental evaluation on benchmarks from program analysis.
+5.1. Derivation strategy. The decision procedure can be thought of as a specific strategy
+for applying the rules given in Section 3, divided into the sets R1 , . . . , R4 introduced in
+Section 4.
+Our derivation strategy can be summarized as follows. We start the derivation from the
+initial state hS0 , M0 , A0 , G0 i with G0 the empty graph, as described in Section 3, and apply
+the steps listed below, in the given order. The steps are described as rules being applied to
+a current branch of the derivation tree being constructed. Initially, the current branch is
+the only branch in the tree. On application of a rule with more than one conclusion, we
+select one of the branches (say, the left branch) as the current branch.
+(1) If a rule that derives unsat is applicable to the current branch, we apply one and close
+the branch. We then pick another open branch as the current branch and repeat Step 1.
+If no open branch exists, we stop and output unsat.
+(2) If a propagation rule (those with one conclusion) in R1 is applicable, apply one and go
+to Step 1.
+(3) If a split rule (those with more than one conclusion) in R1 is applicable, apply one and
+go to Step 1.
+(4) If Guess Empty Set rule is applicable, apply it and go to Step 1.
+(5) If an introduce or merge rule in R2 is applicable, apply it and go to Step 1.
+(6) If any of the remaining rules are applicable, apply one and go to Step 1.
+(7) At this point, the current branch is saturated. Stop and output sat.
+Note that if there are no constraints involving the cardinality operator, then steps 1 to 3
+above are sufficient for completeness.
+5.2. Experimental evaluation. We evaluated our procedure on benchmarks obtained
+from a software verification applications. The experiments were run on a machine with
+3.40GHz Intel i7 CPU with a memory limit of 3 GB and timeout of 300 seconds. We used a
+development version of cvc4 for this evaluation.7 Benchmarks are available on the cvc4
+website.8
+The first set of benchmarks consists of single query benchmarks obtained from verifying
+programs manipulating pointer-based data structures. These were generated by the Jahob
+7https://github.com/kbansal/CVC4/tree/37f6117
+8
+
+http://cvc4.cs.stanford.edu/papers/LMCS-2018/
+
+28
+
+BANSAL ET AL.
+
+Table 1. Performance of our calculus on benchmarks derived from verification of programs
+file
+cade07-vc1.smt2
+cade07-vc2a.smt2
+cade07-vc2b.smt2
+cade07-vc2.smt2
+cade07-vc3a.smt2
+cade07-vc3b.smt2
+cade07-vc3.smt2
+cade07-vc4b.smt2
+cade07-vc4.smt2
+cade07-vc5b.smt2
+cade07-vc5.smt2
+cade07-vc6a.smt2
+cade07-vc6b.smt2
+cade07-vc6c.smt2
+cade07-vc6.smt2
+cvc4-card.scala-10.smt2
+cvc4-card.scala-12.smt2
+cvc4-card.scala-14.smt2
+cvc4-card.scala-15.smt2
+cvc4-card.scala-16.smt2
+cvc4-card.scala-17.smt2
+cvc4-card.scala-18.smt2
+cvc4-card.scala-21.smt2
+cvc4-card.scala-6.smt2
+cvc4-card.scala-8.smt2
+
+output
+time (s.) # vertices # leaves
+unsat
+0.00
+3
+3
+unsat
+0.00
+6
+3
+sat
+0.01
+15
+5
+unsat
+0.01
+6
+3
+unsat
+0.00
+6
+0
+sat
+0.02
+15
+6
+unsat
+0.01
+6
+0
+sat
+0.16
+44
+12
+unsat
+0.17
+51
+16
+sat
+0.39
+63
+21
+unsat
+0.38
+77
+25
+unsat
+0.02
+32
+12
+sat
+0.04
+32
+12
+sat
+0.06
+32
+12
+unsat
+0.32
+36
+16
+2 sat/2 unsat
+0.10
+48
+19
+1 sat/3 unsat
+0.03
+0
+0
+2 sat/2 unsat
+0.09
+25
+11
+1 sat/3 unsat
+0.01
+0
+0
+2 sat/4 unsat
+0.26
+39
+18
+1 sat/3 unsat
+0.02
+19
+8
+2 sat/2 unsat
+0.10
+39
+20
+2 sat/2 unsat
+1.69
+134
+35
+1 sat/4 unsat
+0.02
+8
+5
+1 sat/3 unsat
+0.06
+21
+12
+
+system, and have been used to evaluate earlier work on decision procedures for finite sets and
+cardinality [KNR06, KR07, SSK11]. The results from running cvc4 on these benchmarks
+are provided in the top half of Table 1. The output reported by cvc4 is in the second
+column. The third column shows the solving time. The fourth and fifth columns give the
+maximum number of vertices (# V) and leaves9 (# L) in the graph at any point during the
+run of the algorithm. Keeping the number of leaves low is important to avoid a blowup from
+the Merge Equality II rule.
+Although we have not rerun the systems described in [KNR06, KR07, SSK11], we report
+here the experimental results as stated in the respective papers.10 Since the experiments
+were run on different machines the comparison is only indicative, but it does suggest that
+our solver has comparable performance.
+9
+The # L statistic is updated only when explicitly computed, so the numbers are approximate. For the
+same reason, # L is 0 on certain benchmarks even though # V is not. This is because cvc4 was able to
+report unsat before the need for computing the set of leaves arose.
+10
+One reason we were unable to do a more thorough comparison with previous work is that those
+implementations are no longer being maintained.
+
+REASONING WITH FINITE SETS AND CARDINALITY
+
+29
+
+In [KR07], the procedure from [KNR06] is reported to solve 12 of the 15 benchmarks
+with a timeout of 100 seconds, while the novel procedure in [KR07] is reported to solve
+11 of the 15 benchmarks with the same timeout. The best-performing previous procedure
+([SSK11]) can solve all 15 benchmarks in under a second.11 As another point of comparison,
+we tested the procedure from [SSK11] on a benchmark of the type mentioned in Section 1.1:
+a single constraint of the form x @
+− A1 t . . . t A21 . As expected, the solver failed (it ran out
+of memory after 85 seconds). In contrast, cvc4 solves this problem instantaneously.
+Finally, another important difference compared to earlier work is that our implementation
+is completely integrated in an actively developed and maintained solver, cvc4.
+To highlight the usefulness of an implementation in a full-featured SMT solver, we did
+a second evaluation on a set of incremental (i.e., multiple-query) benchmarks obtained from
+the Leon verification system [BKKS13]. These contain a mix of membership and cardinality
+constraints combined with constraints over the theories of datatypes and bitvectors. The
+results of this evaluation are shown in the bottom half of Table 1. The output column
+reports the number of sat and unsat queries in each benchmark. cvc4 successfully solves all
+of the queries in these benchmarks in under one second. To the best of our knowledge, no
+other SMT solver can handle this combination of theories.
+6. Conclusion
+We presented a new decision procedure for deciding finite sets with cardinality constraints
+and proved its correctness. A novel feature of the procedure is that it can reason directly
+and efficiently about both membership constraints and cardinality constraints. We have
+implemented the procedure in the SMT solver cvc4, and demonstrated the feasibility as
+well as some advantages of our approach. We hope this work will enable the use of sets
+and cardinality constraints in many new applications that rely on SMT solvers. We also
+expect to use it to drive the development of a standard theory of sets under the SMT-LIB
+initiative [BFT].
+We expect to pursue several directions of future work. We will investigate relaxing
+Restriction 3.1 by doing more reasoning modulo equality. We will also experiment with
+different strategies to attempt to find the most efficient ones. We will also look into efficient
+means of combining sets with other theories and investigate extensions to relations and
+relational operators.
+Acknowledgement
+The authors wish to acknowledge fruitful discussions with Viktor Kuncak and Etienne
+Kneuss and for providing the Leon benchmarks. We thank Philippe Suter for his help
+running the algorithm from [SSK11].
+11
+[SSK11] includes a second set of benchmarks, but we were unable to evaluate our procedure on these,
+as they were only made available in a non-standard format and were missing crucial datatype declarations.
+
+30
+
+BANSAL ET AL.
+
+References
+[AA05]
+
+Jean-Raymond Abrial and Jean-Raymond Abrial. The B-book: assigning programs to meanings.
+Cambridge University Press, 2005.
+[AGP16] Francesco Alberti, Silvio Ghilardi, and Elena Pagani. Counting constraints in flat array fragments.
+In Automated Reasoning - 8th International Joint Conference, IJCAR 2016, Coimbra, Portugal,
+June 27 - July 2, 2016, Proceedings, pages 65–81, 2016.
+[ASM80] Jean-Raymond Abrial, Stephen A. Schuman, and Bertrand Meyer. Specification language. In On
+the Construction of Programs, pages 343–410. Cambridge University Press, 1980.
+[Ban16]
+Kshitij Bansal. Decision Procedures for Finite Sets with Cardinality and Local Theory Extensions.
+PhD thesis, New York University, January 2016.
+[BCD+ 11] Clark Barrett, Christopher Conway, Morgan Deters, Liana Hadarean, Dejan Jovanovic, Tim King,
+Andrew Reynolds, and Cesare Tinelli. CVC4. In 23rd International Conference on Computer
+Aided Verification (CAV’11), volume 6806 of Lecture Notes in Computer Science, pages 171–177.
+Springer, 2011.
+Clark Barrett, Pascal Fontaine, and Cesare Tinelli. The Satisfiability Modulo Theories Library
+[BFT]
+(SMT-LIB). http://www.SMT-LIB.org.
+[BKKS13] Régis William Blanc, Etienne Kneuss, Viktor Kuncak, and Philippe Suter. An overview of the
+Leon verification system: Verification by translation to recursive functions. In Scala Workshop,
+2013.
+[BN98]
+Franz Baader and Tobias Nipkow. Term Rewriting and All That. Cambridge University Press,
+1998.
+[BRBT16] Kshitij Bansal, Andrew Reynolds, Clark Barrett, and Cesare Tinelli. A new decision procedure
+for finite sets and cardinality constraints in SMT. In Nicola Olivetti and Ashish Tiwari, editors,
+Proceedings of the 8th International Joint Conference on Automated Reasoning (IJCAR ’16),
+volume 9706 of Lecture Notes in Computer Science, pages 82–98. Springer International Publishing,
+June 2016. Coimbra, Portugal.
+[BS17]
+Markus Bender and Viorica Sofronie-Stokkermans. Decision procedures for theories of sets with
+measures. In Automated Deduction - CADE 26 - 26th International Conference on Automated
+Deduction, Gothenburg, Sweden, August 6-11, 2017, Proceedings, pages 166–184, 2017.
+[BSST09] Clark Barrett, Roberto Sebastiani, Sanjit Seshia, and Cesare Tinelli. Satisfiability modulo theories.
+In Armin Biere, Marijn J. H. Heule, Hans van Maaren, and Toby Walsh, editors, Handbook of
+Satisfiability, volume 185, chapter 26, pages 825–885. IOS Press, February 2009.
+[CFR15] Paula Chocron, Pascal Fontaine, and Christophe Ringeissen. A polite non-disjoint combination
+method: Theories with bridging functions revisited. In Automated Deduction - CADE-25 25th International Conference on Automated Deduction, Berlin, Germany, August 1-7, 2015,
+Proceedings, pages 419–433, 2015.
+[COP01] Domenico Cantone, Eugenio Omodeo, and Alberto Policriti. Set Theory for Computing. From
+Decision Procedures to Logic Programming with Sets. Monographs in Computer Science. Springer,
+2001.
+[CR16]
+Maximiliano Cristiá and Gianfranco Rossi. A decision procedure for sets, binary relations and
+partial functions. In Computer Aided Verification - 28th International Conference, CAV 2016,
+Toronto, ON, Canada, July 17-23, 2016, Proceedings, Part I, pages 179–198, 2016.
+[CZ98]
+Domenico Cantone and Calogero G Zarba. A new fast tableau-based decision procedure for an
+unquantified fragment of set theory. In Int. Workshop on First-Order Theorem Proving (FTP98),
+1998.
+[DMB09] Leonardo De Moura and Nikolaj Bjørner. Generalized, efficient array decision procedures. In
+Formal Methods in Computer-Aided Design (FMCAD 2009), pages 45–52. IEEE, 2009.
+[Jac12]
+Daniel Jackson. Software Abstractions: logic, language, and analysis. MIT press, 2012.
+Dejan Jovanović and Clark Barrett. Polite theories revisited. In Proceedings of the 17th Interna[JB10]
+tional Conference on Logic for Programming, Artificial Intelligence, and Reasoning (LPAR ’10),
+volume 6397 of LNCS, pages 402–416. Springer, October 2010.
+[KNR06] Viktor Kuncak, HuuHai Nguyen, and Martin Rinard. Deciding Boolean algebra with Presburger
+arithmetic. Journal of Automated Reasoning, 36(3):213–239, 2006.
+
+REASONING WITH FINITE SETS AND CARDINALITY
+
+31
+
+Viktor Kuncak and Martin Rinard. Towards efficient satisfiability checking for Boolean Algebra
+with Presburger Arithmetic. In Conference on Automated Deduction (CADE-21), volume 4603 of
+Lecture Notes in Computer Science. Springer, 2007.
+[KRW09] Daniel Kröning, Philipp Rümmer, and Georg Weissenbacher. A proposal for a theory of finite sets,
+lists, and maps for the SMT-LIB standard. In Proceedings of the 7t h International Workshop on
+Satisfiability Modulo Theories (SMT ’09), August 2009.
+[NOT06] Robert Nieuwenhuis, Albert Oliveras, and Cesare Tinelli. Solving SAT and SAT Modulo Theories:
+from an Abstract Davis-Putnam-Logemann-Loveland Procedure to DPLL(T). Journal of the
+ACM, 53(6):937–977, November 2006.
+[PK08]
+Ruzica Piskac and Viktor Kuncak. Decision procedures for multisets with cardinality constraints. In
+Verification, Model Checking, and Abstract Interpretation, 9th International Conference, VMCAI
+2008, San Francisco, USA, January 7-9, 2008, Proceedings, pages 218–232, 2008.
+[SDSD86] Jacob T. Schwartz, Robert B. K. Dewar, Edmond Schonberg, and Ed Dubinsky. Programming
+with Sets; an Introduction to SETL. Springer-Verlag New York, Inc., New York, NY, USA, 1986.
+[SS09]
+Viorica Sofronie-Stokkermans. Locality results for certain extensions of theories with bridging
+functions. In Proceedings of the 22Nd International Conference on Automated Deduction, CADE-22,
+pages 67–83, Berlin, Heidelberg, 2009. Springer-Verlag.
+[SSK11]
+Philippe Suter, Robin Steiger, and Viktor Kuncak. Sets with cardinality constraints in Satisfiability
+Modulo Theories. In Verification, Model Checking, and Abstract Interpretation (VMCAI), 2011.
+[vGBR16] Klaus von Gleissenthall, Nikolaj Bjørner, and Andrey Rybalchenko. Cardinalities and universal
+quantifiers for verifying parameterized systems. In Proceedings of the 37th ACM SIGPLAN
+Conference on Programming Language Design and Implementation, PLDI 2016, Santa Barbara,
+CA, USA, June 13-17, 2016, pages 599–613, 2016.
+[Zar02]
+Calogero G. Zarba. Combining sets with integers. In Frontiers of Combining Systems, 4th
+International Workshop, FroCoS 2002, pages 103–116, 2002.
+[Zar05]
+Calogero G. Zarba. Combining sets with cardinals. Journal of Automated Reasoning, 34(1):1–29,
+Jan 2005.
+[KR07]
+
+This work is licensed under the Creative Commons Attribution License. To view a copy of this
+license, visit https://creativecommons.org/licenses/by/4.0/ or send a letter to Creative
+Commons, 171 Second St, Suite 300, San Francisco, CA 94105, USA, or Eisenacher Strasse
+2, 10777 Berlin, Germany
+
+

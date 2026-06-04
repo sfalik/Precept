@@ -425,6 +425,8 @@ public static partial class ProofEngine
                 field.ResolvedType, field.Modifiers, field.DeclaredMinLength, field.DeclaredMaxLength,
                 field.Name, field.DefaultExpression, context, obligations);
 
+            CollectCountDefaultObligation(field, context, obligations);
+
             CollectElementLengthDefaultObligations(field, context, obligations);
 
             CollectElementIntervalDefaultObligations(field, context, obligations);
@@ -656,6 +658,40 @@ public static partial class ProofEngine
                 declaredMaxLength,
                 $"Length containment: default of '{targetName}' must have length in [{minLength?.ToString() ?? "0"} .. {declaredMaxLength?.ToString() ?? "∞"}]"),
             defaultExpr,
+            context,
+            ProofDisposition.Unresolved,
+            null,
+            null));
+    }
+
+    /// <summary>
+    /// Stamps a <see cref="CountContainmentProofRequirement"/> for a collection field whose
+    /// <c>default [...]</c> literal has a statically-known element count, against the field's declared
+    /// mincount/maxcount. The default count is exact (the literal's element count), so the post-mutation
+    /// interval is the point <c>[n, n]</c> — prove-or-reject discharges clean iff that point is in-band,
+    /// otherwise <see cref="DiagnosticCode.CountBoundViolation"/> emits (Obligation Generation Contract:
+    /// every count-bounded field's default participates). Reuses the shared
+    /// <see cref="CountContainmentProofRequirement"/> + <c>TryCountContainmentProof</c> prover.
+    /// </summary>
+    private static void CollectCountDefaultObligation(
+        TypedField field, ObligationContext context, List<ProofObligation> obligations)
+    {
+        if (!field.DeclaredMinCount.HasValue && !field.DeclaredMaxCount.HasValue)
+            return;
+        if (field.DefaultExpression is not TypedListLiteral list)
+            return;
+
+        var count = list.Elements.Length;
+        obligations.Add(new ProofObligation(
+            new CountContainmentProofRequirement(
+                new SelfSubject(),
+                field.Name,
+                field.DeclaredMinCount,
+                field.DeclaredMaxCount,
+                CountLower: count,
+                CountUpper: count,
+                $"Count containment: default of '{field.Name}' has {count} element(s), must be in [{field.DeclaredMinCount?.ToString() ?? "0"} .. {field.DeclaredMaxCount?.ToString() ?? "∞"}]"),
+            field.DefaultExpression,
             context,
             ProofDisposition.Unresolved,
             null,

@@ -140,13 +140,42 @@ public static partial class ProofEngine
 
             case CountContainmentProofRequirement countReq:
             {
-                var minStr = countReq.DeclaredMinCount?.ToString() ?? "0";
-                var maxStr = countReq.DeclaredMaxCount?.ToString() ?? "∞";
-                return Diagnostics.Create(MetaCode(), obligation.Site.Span,
-                    "?",
-                    minStr,
-                    maxStr,
-                    countReq.TargetField);
+                // Obligation-shaped, guard-naming message (locked OQ2). The obligation reaches emission
+                // when its post-mutation interval [CountLower, CountUpper] is NOT provably in-band — a
+                // provable violation OR a merely-unprovable case (an unguarded grow whose upper is ∞).
+                // Direction: a maxcount overflow (the upper exceeds, or is unbounded against, maxcount)
+                // names the `when F.count < N` guard; a mincount underflow (the lower falls below
+                // mincount) names the `when F.count > M` guard. Overflow is preferred when both could
+                // apply (the grow is the more common unguarded shape).
+                // Mirror the prove-or-reject discharge directions (TryCountContainmentProof): the maxcount
+                // side is unproven when the upper bound is unbounded (∞) or exceeds maxcount; the mincount
+                // side is unproven when the lower bound falls below mincount.
+                string field = countReq.TargetField;
+                bool overflowsMax = countReq.DeclaredMaxCount is { } max
+                    && (!countReq.CountUpper.HasValue || countReq.CountUpper.Value > max);
+                bool underflowsMin = countReq.DeclaredMinCount is { } min
+                    && countReq.CountLower < min;
+
+                string detail;
+                if (overflowsMax)
+                {
+                    int n = countReq.DeclaredMaxCount!.Value;
+                    detail = $"Cannot prove `{field}` stays within `maxcount {n}` after this add — guard with `when {field}.count < {n}`.";
+                }
+                else if (underflowsMin)
+                {
+                    int m = countReq.DeclaredMinCount!.Value;
+                    detail = $"Cannot prove `{field}` stays at or above `mincount {m}` — guard with `when {field}.count > {m}`.";
+                }
+                else
+                {
+                    // Defensive fallback (should not arise — emission implies one direction is unproven).
+                    var minStr = countReq.DeclaredMinCount?.ToString() ?? "0";
+                    var maxStr = countReq.DeclaredMaxCount?.ToString() ?? "∞";
+                    detail = $"Cannot prove `{field}` keeps its count within [{minStr} .. {maxStr}].";
+                }
+
+                return Diagnostics.Create(MetaCode(), obligation.Site.Span, detail);
             }
 
             case KeyPresenceProofRequirement keyReq:

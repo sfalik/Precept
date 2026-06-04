@@ -29,7 +29,8 @@ public sealed record ActionMeta(
     ActionKind?  PrimaryActionKind = null,
     Func<TypedAction, SemanticIndex, ImmutableArray<ProofObligation>>? DynamicObligationGenerator = null,
     ParameterMeta[]? Parameters = null,
-    ActionSlotRole? InputSlotRole = null)
+    ActionSlotRole? InputSlotRole = null,
+    bool EffectIsConditional = false)
 {
     /// <summary>Proof obligations the type checker must verify at call sites.</summary>
     public ProofRequirement[] ProofRequirements { get; } = ProofRequirements ?? [];
@@ -71,6 +72,18 @@ public sealed record ActionMeta(
     /// forward-propagation concern (see <see cref="ActionEffectClass.Grows"/> / <see cref="ActionEffectClass.Shrinks"/>).
     /// </summary>
     public bool ReplacesEntireValue => Effect is ActionEffectClass.ReplacesValue or ActionEffectClass.Empties;
+
+    /// <summary>
+    /// True when the action's count effect <em>may not occur</em> — the mutation can be a no-op for some
+    /// inputs, so it does not definitely move the count by its nominal delta. The count-containment delta
+    /// model uses this to keep the bound that tightens toward a cap from moving on a possible no-op:
+    /// a <c>remove</c>/<c>removeAt</c> by value/index may find the element absent (definite lower
+    /// <c>−1</c>, but upper <c>+0</c> — the remove might not have happened); a positional
+    /// <c>dequeue</c>/<c>pop</c> removes exactly one element given its non-empty precondition (definite
+    /// both bounds, <c>EffectIsConditional = false</c>). Catalog-driven so the proof engine never
+    /// restates the might-no-op classification by switching on <see cref="ActionKind"/>.
+    /// </summary>
+    public bool EffectIsConditional { get; } = EffectIsConditional;
 }
 
 /// <summary>
