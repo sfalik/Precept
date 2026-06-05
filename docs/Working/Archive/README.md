@@ -73,6 +73,7 @@ Archived design docs from `docs/Working/`. Each was either **promoted** (durable
 | Doc | Status | Promoted to / outcome |
 |---|---|---|
 | [constraint-refs-proof-plan.md](constraint-refs-proof-plan.md) | Implementation plan (approved) | ConstraintRefs population + SemanticSubjects removal |
+| [count-bound-discharge-semantics-2026-06-03.md](count-bound-discharge-semantics-2026-06-03.md) | Promoted 2026-06-04 | `compiler/proof-engine.md § Strategy 10 / § Sequential proof flow / § Obligation Generation Contract` + `precept-language-spec.md §0.6 item 7` + `compiler/diagnostic-system.md` (PRE0136) + `collection-types.md § Constraint Catalog` (BUG-018 count-bound: Reading-A prove-or-reject, guard carrier, dedup floor) |
 | [interval-proof-engine-design.md](interval-proof-engine-design.md) | Design + implementation plan | Interval proof engine + Slice 7 obligation generation |
 | [overflow-prevention-design-analysis.md](overflow-prevention-design-analysis.md) | Analysis | Numeric overflow prevention |
 | [pipeline-audit-fix-plan.md](pipeline-audit-fix-plan.md) | Fix plan | Pipeline-audit-driven fixes |

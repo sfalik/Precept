@@ -19,6 +19,8 @@ sources-consulted:
   - "git show HEAD:docs/compiler/diagnostic-system.md — LengthBoundViolation (PRE0135) 'an unbounded source flowing into a capped field emits'; CountBoundViolation = 136; proof-stage obligation codes."
 ---
 
+**Promoted to:** 2026-06-04 — `docs/compiler/proof-engine.md` (§ Strategy 10: Count Containment Proof; § Sequential proof flow — count-band tracking; § Obligation Generation Contract item 2), `docs/language/precept-language-spec.md` (§ 0.6 item 7 — count-interval alongside the boolean non-empty model), `docs/compiler/diagnostic-system.md` (PRE0136 `CountBoundViolation` obligation entry, off the Gate-1 allow-list), `docs/language/collection-types.md` (§ Constraint Catalog — `mincount`/`maxcount` proof participation). BUG-018 in `docs/Working/bugs.md` reconciled to the Reading-A prove-or-reject line. (Shipped commit `c27a382b`.)
+
 # Count-bound discharge semantics for collection `mincount`/`maxcount` on mutations
 
 ## Goal
