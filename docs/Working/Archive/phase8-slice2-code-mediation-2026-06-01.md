@@ -11,6 +11,8 @@ sources-consulted:
   - src/Precept/Language/ProofRequirement.cs:264-266: ProofRequirementMeta.DiagnosticCode (the catalog-mediated proof code, the template)
 ---
 
+**Promoted to:** `compiler/diagnostic-system.md § Emission shapes` (the literal-vs-catalog-mediated convention + the `DiagnosticCoverageScanner` Pattern 1/2/3 pointer) and `§ The [StaticallyPreventable]-derived fault map`; `compiler/proof-engine.md § ProofLedger Construction` (`CreateDiagnostic` reads `ProofRequirementMeta.DiagnosticCode`; the genuinely-context residue). **Archived 2026-06-04 — canon synced in ship commit `59fe2666` (same-pass doc-sync); no canonical edit needed at promotion, archival only.**
+
 # Slice 2 — Diagnostic-Code Selection Standardization (precursor to Slice 3)
 
 *(A no-behavior-change refactor that lands before Slice 3 (the ownership architecture). It makes every diagnostic emission source its code in one of two uniform ways — a literal, or a single catalog-meta `DiagnosticCode` field — and explicitly marks the irreducible context-determined residue. Slice 3's ownership analyzer then reads a uniform surface instead of coping with three ad-hoc dispatch shapes.)*

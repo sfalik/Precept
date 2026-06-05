@@ -26,6 +26,8 @@ sources-consulted:
   - src/Precept/Language/ProofRequirementKind.cs:4 — stale "eleven" doc-comment (13 kinds)
 ---
 
+**Promoted to:** `compiler/proof-engine.md § Strategy 8 IntervalContainment / § Strategy 9 LengthContainment / § Strategy 10 CountContainment` (numeric default→OutOfRange arm, computed-field bound containment, length/count default stamping, the count prover, the family partition) and `§ Computed-field bound containment` (the corrected BUG-017 behavior — unbounded result stays Unresolved → NumericOverflow); `compiler/diagnostic-system.md § DiagnosticStage` (NumericOverflow/OutOfRange Type→Proof, the per-family partition, CountBoundViolation/LengthBoundViolation now live); `tooling/mcp.md § Per-stage diagnostic counts`. **Archived 2026-06-04 — canon synced in ship commits `ecce5d51` (Slice 3b) and `9820b8c1` (Slice 2a / BUG-017 close, which superseded this doc's partial D4); no canonical edit needed at promotion, archival only.** *(Note: this doc carries a ⚠️ Correction header — its original Principle-11-completeness claims were a rewrite and are not load-bearing; BUG-017 was the open hole and is now closed in the ship commit above.)*
+
 # Declared-Bound Obligation Ownership — Numeric, String-Length & Collection-Count (+ Qualifier Residual)
 
 Supersedes and expands **Slice 3 Decision 3**; resolves **Slice 3 Decision 5** (OutOfRange) toward *keep*; reaffirms **Slice 3 Decision 6** (MaxPlacesExceeded stays Type). Locked design for **Phase 8 Slice 3b**, with the collection-count proof-strategy build sequenced as sub-slice **3b-count**.
