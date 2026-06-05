@@ -82,6 +82,18 @@ Archived design docs from `docs/Working/`. Each was either **promoted** (durable
 | [quantity-normalization-design.md](quantity-normalization-design.md) | Design | Quantity normalization |
 | [typed-constants-and-proof-coverage-plan.md](typed-constants-and-proof-coverage-plan.md) | Coverage plan | Typed constants + proof coverage |
 
+### Compiler / proof engine — relational reasoning (Slice 2c-i)
+
+| Doc | Status | Promoted to / outcome |
+|---|---|---|
+| [relational-rules-and-bounds-design-2026-06-02.md](relational-rules-and-bounds-design-2026-06-02.md) | Promoted 2026-06-04 | `compiler/proof-engine.md § Strategy 4 / § Design Rationale Decision 6` + `precept-language-spec.md §0.6` (relation-as-fact, single-pass/no-fixpoint) |
+| [relational-narrowing-core-design-2026-06-03.md](relational-narrowing-core-design-2026-06-03.md) | Promoted 2026-06-04 | `compiler/proof-engine.md § Strategy 4 / § Design Rationale Decision 6 / § Satisfiability` + `precept-language-spec.md §0.6` (FieldToFieldConstraint reuse, guarded-rule drop, depth-1 Intersect, satisfiability isolation) |
+| [relational-subject-resolution-discharge-2026-06-04.md](relational-subject-resolution-discharge-2026-06-04.md) | Promoted 2026-06-04 | `compiler/proof-engine.md § Strategy 4` (subject resolution; the §1343/§1356 division-coverage correction) |
+| [relational-contradiction-reject-2026-06-04.md](relational-contradiction-reject-2026-06-04.md) | Promoted 2026-06-04 | `compiler/proof-engine.md § Strategy 4 contradiction guard` + `compiler/diagnostic-system.md § Severity` (empty-intersection contradiction; severity sourced from dependent op's Error) |
+| [relational-contradiction-discharge-guard-2026-06-04.md](relational-contradiction-discharge-guard-2026-06-04.md) | Historical — superseded | by `relational-contradiction-reject-2026-06-04.md` (settled its three open questions) |
+| [relational-fact-representation-2026-06-03.md](relational-fact-representation-2026-06-03.md) | Historical — superseded | by `relational-narrowing-core-design-2026-06-03.md` (scoped too narrowly) |
+| [relational-narrowing-core-INDEPENDENT-2026-06-03.md](relational-narrowing-core-INDEPENDENT-2026-06-03.md) | Historical — superseded | by `relational-narrowing-core-design-2026-06-03.md` (merged: blind + review-informed) |
+
 ### Tooling — language server, MCP, completions
 
 | Doc | Status | Promoted to / outcome |

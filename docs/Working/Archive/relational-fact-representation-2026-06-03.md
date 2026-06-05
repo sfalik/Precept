@@ -18,6 +18,8 @@ sources-consulted:
   - "research/architecture/compiler/relational-constraint-representation-survey.md — octagon strong closure (Miné) and difference-bound-matrix as the canonical relation-as-fact (B) pair-representation; the DBM is a set of ±x±y≤c facts and the closed form 'is a rule list'; witness should carry the contributing relation as a named fact."
 ---
 
+> **Status:** Historical — superseded by [relational-narrowing-core-design-2026-06-03.md](relational-narrowing-core-design-2026-06-03.md) (Locked, promoted to canonical). Prior-art record only; do not update.
+
 # Relational fact representation in the proof engine
 
 ## Goal

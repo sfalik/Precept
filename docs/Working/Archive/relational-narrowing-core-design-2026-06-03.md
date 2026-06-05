@@ -30,6 +30,8 @@ sources-consulted:
   - "tools/Precept.Mcp/Dtos/CompileToolDtos.cs + Tools/CompileTool.cs — the MCP obligation DTO reads only IntervalContainmentProofRequirement.DeclaredMin/Max; the fact records are private to ProofEngine and never serialized."
 ---
 
+> **Promoted to:** docs/compiler/proof-engine.md (§ Strategy 4, § Design Rationale Decision 6, § Satisfiability), docs/language/precept-language-spec.md §0.6 — 2026-06-04. Decisions 1 (FieldToFieldConstraint reuse), 2 (guarded-rule drop filter), 3 (Intersect-into-narrowed depth-1), 4 (satisfiability isolation) lifted; archived as historical record.
+
 # Relational narrowing core (Slice 2c-i) — the field-to-field rule → provable interval/sign engine
 
 > **Merge provenance.** This doc is the authoritative merge of two independently-derived designs — A (review-informed, `relational-narrowing-core-design-2026-06-03.md`, this path) and B (blind/clean-room, `…-INDEPENDENT-…`). They converged on the soundness core; that convergent core is kept as corroborated. The two divergences (injection mechanism; fact-record shape) were decided **on the merits against source ground truth** (`Compiler.Compile`-level reads, MCP treated as stale), not by defaulting to either author. The decisions and the source facts that drove them are in § Decisions.

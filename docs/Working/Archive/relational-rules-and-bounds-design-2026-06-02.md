@@ -21,6 +21,8 @@ sources-consulted:
   - "docs/Working/dynamic-modifier-bounds-research-2026-06-01.md — the reconciled research; §0.7 settlement of admission (Q1 SETTLED), D3/D4, and the open inventory Q2/Q5/Q6/Q7."
 ---
 
+> **Promoted to:** docs/compiler/proof-engine.md (§ Strategy 4, § Design Rationale Decision 6, § Satisfiability), docs/language/precept-language-spec.md §0.6 — 2026-06-04. Decisions 2 (relation-as-fact) and 4 (single-pass / no-fixpoint) lifted; archived as historical record.
+
 # Relational rules and their bound-modifier sugar in compile-time proof
 
 ## Goal

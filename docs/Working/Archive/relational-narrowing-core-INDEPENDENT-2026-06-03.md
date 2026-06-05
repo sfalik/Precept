@@ -21,6 +21,8 @@ sources-consulted:
   - "src/Precept/Language/NumericInterval.cs — closed [Min,Max] struct; Intersect/Union/Subtract; sentinel ±∞ as decimal.MinValue/MaxValue; IsUnbounded."
 ---
 
+> **Status:** Historical — superseded by [relational-narrowing-core-design-2026-06-03.md](relational-narrowing-core-design-2026-06-03.md) (Locked, promoted to canonical), the authoritative merge of this blind derivation and the review-informed design. Prior-art record only; do not update.
+
 # Relational narrowing core (Slice 2c-i): independent derivation
 
 ## Goal

@@ -177,6 +177,8 @@ public enum Severity
 
 Three levels. No `Hidden` (unlike Roslyn) — Precept's diagnostic surface is small enough that every diagnostic is meaningful. No `Fatal` — the pipeline never halts; it always runs to completion (Model A).
 
+**Fault-prevention obligations block; structural-soundness diagnostics report.** The severity split tracks the spec's own verb asymmetry (§0.6): an *assignment-range impossibility* "is a compile-time **error**" and a divisor/overflow/non-negative obligation "**rejects the definition**" (§0.7), so `DivisionByZero`, `OutOfRange`, `NumericOverflow`, `SqrtOfNegative` are `Severity.Error` — they make `HasErrors == true`, so no engine is produced. By contrast a *contradictory*, *vacuous*, or *unsatisfiable* rule the compiler "**reports**" (§0.6 items 7/8) — these are structural rule-hygiene diagnostics and stay `Severity.Warning`. The consequence for a relational/magnitude contradiction that defeats a fault-prone operation: the build is blocked by the **dependent operation's own fault-prevention Error**, not by re-severitying the structural-soundness diagnostic and not by introducing a new code. Re-severitying a structural diagnostic for one case would make a single `DiagnosticCode` carry two severities — and Precept has no per-instance severity mechanism (see Departures from Roslyn).
+
 ---
 
 ## DiagnosticCode Registry
