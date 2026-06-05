@@ -209,6 +209,7 @@ internal static class DiagnosticCoverageAllowLists
         "FieldNeverSet",
         "IncompatibleDimensionalProduct",
         "ContradictoryRule",
+        "DefaultViolatesRule",
         "TautologicalGuard",
         "UnsatisfiableGuard",
         "VacuousRule",

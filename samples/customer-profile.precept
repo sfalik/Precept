@@ -10,13 +10,18 @@ precept CustomerProfile
 # responsible for editing them. The rules below enforce the cross-field
 # invariants that must hold at every read: marketing consent and preferred
 # channel both require a stored, reachable address of the corresponding kind.
+#
+# PreferredContactMethod is optional with no default: a freshly created profile
+# has no stated preference, so the preference-reachability rules below are
+# vacuously satisfied until a channel is chosen. Once a preference is set, the
+# rules enforce at every read that a matching contact address is stored.
 
 field Name as string optional maxlength 200 editable
 field Email as string optional maxlength 320 editable  # RFC 5321: 64-char local-part + "@" + 255-char domain
 field Phone as string optional maxlength 32 editable
-field PreferredContactMethod as choice of string("email","phone","sms") default "email" editable
+field PreferredContactMethod as choice of string("email","phone","sms") optional editable
 field MarketingOptIn as boolean default false editable
 
 rule MarketingOptIn == false or Email is set because "A profile cannot opt in to marketing without a stored email address — the host has no reachable channel for the promised communications"
-rule PreferredContactMethod != "email" or Email is set because "Preferred contact method is email but no email address is stored — the preference is unreachable as written"
-rule PreferredContactMethod == "email" or Phone is set because "Preferred contact method is {PreferredContactMethod} but no phone number is stored — the preference is unreachable as written"
+rule PreferredContactMethod != "email" or Email is set when PreferredContactMethod is set because "Preferred contact method is email but no email address is stored — the preference is unreachable as written"
+rule PreferredContactMethod == "email" or Phone is set when PreferredContactMethod is set because "Preferred contact method is {PreferredContactMethod} but no phone number is stored — the preference is unreachable as written"

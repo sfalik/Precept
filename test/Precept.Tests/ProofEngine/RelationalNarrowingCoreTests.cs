@@ -66,7 +66,7 @@ public class RelationalNarrowingCoreTests
         var ledger = Prove("""
             precept ReorderLine
 
-            field OnHand as integer nonnegative default 0
+            field OnHand as integer nonnegative default 1
             field Reserved as integer nonnegative default 0
             field BatchCost as money in 'USD' nonnegative default '0 USD'
             field UnitCost as money in 'USD' nonnegative default '0 USD'
@@ -111,7 +111,7 @@ public class RelationalNarrowingCoreTests
         var ledger = Prove("""
             precept Cell2
 
-            field OnHand as integer nonnegative default 0 editable
+            field OnHand as integer nonnegative default 1 editable
             field Reserved as integer default 0 editable
             field BatchCost as money in 'USD' nonnegative default '0 USD' editable
             field UnitCost as money in 'USD' nonnegative default '0 USD'
@@ -390,7 +390,7 @@ public class RelationalNarrowingCoreTests
             precept Cell8b
 
             field X as integer nonnegative default 0 editable
-            field Y as integer nonnegative max 10 default 0 editable
+            field Y as integer nonnegative max 10 default 1 editable
             field C as integer max 10 <- X
 
             rule X < Y because "X strictly below Y (Y max 10)"
@@ -551,7 +551,7 @@ public class RelationalNarrowingCoreTests
         var ledger = Prove("""
             precept Bug023Control
 
-            field X as integer nonnegative default 1 editable
+            field X as integer nonnegative default 5 editable
             field Q as integer <- 100 / X
 
             rule X >= 5 because "unguarded magnitude"
@@ -766,7 +766,7 @@ public class RelationalNarrowingCoreTests
         var ledger = Prove("""
             precept TightenNonEmpty
 
-            field OnHand as integer nonnegative default 0
+            field OnHand as integer nonnegative default 1
             field Reserved as integer nonnegative default 0
             field BatchCost as money in 'USD' nonnegative default '0 USD'
             field UnitCost as money in 'USD' nonnegative default '0 USD'

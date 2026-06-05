@@ -210,7 +210,7 @@ The proof layer must be able to support the language's proof-bearing claims. Tha
 8. **Vacuous rule detection.** When a rule is provably always true given field constraints, the compiler reports it as tautological.
 9. **Dead guard detection.** A guard provably always false means the row or block can never execute.
 10. **Tautological guard detection.** A guard provably always true means the `when` clause has no effect.
-11. **Compile-time rule enforcement against defaults.** Rules and initial-state ensures are checked against default field values at compile time. A definition where default values violate a declared rule is rejected before any instance exists.
+11. **Compile-time rule enforcement against defaults.** Rules and initial-state ensures are checked against default field values at compile time. A definition where default values violate a declared rule is rejected before any instance exists. Both halves are implemented: initial-state ensures fold against defaults (`UnsatisfiableInitialState`), and unguarded global rules fold against defaults (`DefaultViolatesRule`), sharing one default environment and one constant-fold evaluator. Only a provably-false fold rejects; an unknown/unfoldable default never rejects (per Proof philosophy #1–2).
 12. **Sharpening of reachability and routing diagnostics** from proven-dead guards.
 13. **Structured proof attribution** suitable for hover, diagnostics, and agent consumption — every proven range carries the constraints and rules that contributed to it.
 

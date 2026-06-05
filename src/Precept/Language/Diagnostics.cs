@@ -812,7 +812,7 @@ public static class Diagnostics
         // the rule is impossible on its own, distinct from a pair-wise
         // contradiction.
         DiagnosticCode.UnsatisfiableRule              => new(nameof(DiagnosticCode.UnsatisfiableRule),              DiagnosticStage.Proof, Severity.Warning, "Rule '{0}' is unsatisfiable under the declared bounds on field '{1}' — no valid value can satisfy it",                                                       DiagnosticCategory.Proof,
-            RelatedCodes: [DiagnosticCode.UnsatisfiableGuard, DiagnosticCode.TautologicalGuard, DiagnosticCode.VacuousRule, DiagnosticCode.ContradictoryRule],
+            RelatedCodes: [DiagnosticCode.UnsatisfiableGuard, DiagnosticCode.TautologicalGuard, DiagnosticCode.VacuousRule, DiagnosticCode.ContradictoryRule, DiagnosticCode.DefaultViolatesRule],
             FixHint: "Rewrite the rule predicate to admit values inside the field's declared bounds, or widen the field's bounds if the rule reflects the true business intent.",
             TriggerCondition: "The proof engine's satisfiability scan composes the rule's predicate with the field's declared interval bounds (and the rule's own `when` guard, if any) and finds the intersection empty on at least one field — no concrete value can satisfy the rule.",
             RecoverySteps: ["Rewrite the predicate to fit within the field's bounds", "Or widen the field's `min`/`max` modifiers if the rule's stated intent is correct"],
@@ -874,6 +874,17 @@ public static class Diagnostics
             RecoverySteps: ["Adjust field default values to satisfy the initial state's constraints", "Or relax the constraint to allow the default field values", "Inspect the default values for every field referenced by the failing ensure."],
             ExampleBefore: "precept Example\nfield Amount as number default 0\nstate Draft initial\nstate Done terminal\nevent Complete\nin Draft ensure Amount > 0 because \"must start positive\"\nfrom Draft on Complete -> transition Done",
             ExampleAfter: "precept Example\nfield Amount as number default 1\nstate Draft initial\nstate Done terminal\nevent Complete\nin Draft ensure Amount > 0 because \"must be positive\"\nfrom Draft on Complete -> transition Done"),
+        DiagnosticCode.DefaultViolatesRule => new(
+            nameof(DiagnosticCode.DefaultViolatesRule),
+            DiagnosticStage.Proof, Severity.Error,
+            "Rule '{0}' is violated by the default field values ({1}). Adjust the defaults or the rule so the definition is valid at creation.",
+            DiagnosticCategory.Proof,
+            RelatedCodes: [DiagnosticCode.UnsatisfiableInitialState, DiagnosticCode.UnsatisfiableRule, DiagnosticCode.ContradictoryRule, DiagnosticCode.VacuousRule],
+            FixHint: "Adjust the field defaults or the rule predicate so the rule holds for the entity's default field values.",
+            TriggerCondition: "The proof engine's satisfiability scan folds an unguarded global rule's condition against the field default values and finds it provably false — the entity would be invalid the moment it is created.",
+            RecoverySteps: ["Adjust the field default values so the rule holds at creation", "Or relax the rule predicate to admit the default configuration", "Inspect the default values for every field referenced by the failing rule"],
+            ExampleBefore: "precept Example\nfield Amount as number default 5\nfield Floor as number default 10\nrule Amount >= Floor because \"Amount must reach the floor\"\nstate Active initial",
+            ExampleAfter: "precept Example\nfield Amount as number default 10\nfield Floor as number default 5\nrule Amount >= Floor because \"Amount must reach the floor\"\nstate Active initial"),
         DiagnosticCode.UnprovedPresenceRequirement => new(
             nameof(DiagnosticCode.UnprovedPresenceRequirement),
             DiagnosticStage.Proof, Severity.Error,

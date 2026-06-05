@@ -85,7 +85,7 @@ public class RelationalNarrowingCoreSatisfiabilityTests
         var withRelation = Prove("""
             precept Cell11With
 
-            field X as integer min 0 max 100 default 0 editable
+            field X as integer min 0 max 100 default 5 editable
             field Y as integer min 5 max 100 default 5 editable
 
             rule X >= 5 because "magnitude floor"
@@ -98,7 +98,7 @@ public class RelationalNarrowingCoreSatisfiabilityTests
         var withoutRelation = Prove("""
             precept Cell11Without
 
-            field X as integer min 0 max 100 default 0 editable
+            field X as integer min 0 max 100 default 5 editable
             field Y as integer min 5 max 100 default 5 editable
 
             rule X >= 5 because "magnitude floor"
@@ -137,7 +137,7 @@ public class RelationalNarrowingCoreSatisfiabilityTests
         var withRelation = Prove("""
             precept TightenWith
 
-            field X as integer min 0 max 100 default 0 editable
+            field X as integer min 0 max 100 default 3 editable
             field Y as integer min 5 max 100 default 5 editable
 
             rule X >= 3 because "magnitude floor"
@@ -149,7 +149,7 @@ public class RelationalNarrowingCoreSatisfiabilityTests
         var withoutRelation = Prove("""
             precept TightenWithout
 
-            field X as integer min 0 max 100 default 0 editable
+            field X as integer min 0 max 100 default 3 editable
             field Y as integer min 5 max 100 default 5 editable
 
             rule X >= 3 because "magnitude floor"

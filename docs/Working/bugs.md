@@ -27,6 +27,34 @@ surfaced for proper fixing.
 
 ## Active
 
+### BUG-028: The default-satisfiability fold misses some provable violations (completeness gap — construction-handler coarseness + compound short-circuit; safe under-emit)
+
+- **Discovered**: 2026-06-05, via the adversarial review of the BUG-027 fix (the Slice 2c-ii prerequisite).
+- **Affected**: the compile-time default-satisfiability fold — both the new `ScanRulesAgainstDefaults` (global rules, BUG-027) and the pre-existing `CheckInitialStateSatisfiability` (initial-state ensures), plus the shared `ConstantFold`/`FoldValue` evaluator (`ProofEngine.Analysis.cs`).
+- **Symptom** (two facets, **both the safe under-emit direction** — a *provable* default-violation is not rejected; never an over-reject):
+  - **(a) Construction-handler coarseness**: when a precept has an `initial` construction event, the fold is skipped **entirely** (`if (HasConstructionHandler(semantics)) return`). A rule/ensure over a field the construction event does **not** assign — whose `default` is therefore the real initial value — is not folded, so a default that violates it is missed. The BUG-027 fix deliberately **matched the ensure path's existing behavior** here (parity, not a new regression).
+  - **(b) Compound short-circuit**: `ConstantFold` returns `unknown` whenever *either* operand is unknown, so `false and <unknown>` folds to `unknown` rather than `false` — a conjunction rule that is provably false (`false AND anything = false`) is not rejected.
+- **Scope**: completeness only. **Never over-rejects** (the safe direction); no invalid instance is admitted that a runtime trap would then catch (governance still enforces at every operation). Affects both the rule and ensure default-folds (shared evaluator + default-env).
+- **Root cause**: (a) the coarse whole-precept construction-handler skip rather than per-field suppression of only the fields the construction chain provably assigns; (b) the evaluator returns `unknown` on any unknown operand rather than short-circuiting `false AND _ → false` / `true OR _ → true`.
+- **Workaround used**: none needed — under-emit is sound; runtime governance enforces.
+- **Fix complexity**: medium — (a) suppress per-field (only construction-assigned fields) and fold rules/ensures over un-assigned fields against their defaults; (b) short-circuit the boolean evaluator. Both improve the **rule and ensure** paths at once (shared machinery). Soundness-critical area → adversarial review (must stay never-over-reject).
+- **Priority**: completeness / quality — **not** a soundness hole (safe under-emit). Pre-release.
+- **Repro**: (a) `event Create initial` seeds `A` but not `B`; `field B as integer default 0` + `rule B >= 5` → compiles clean (should reject — `B`'s default 0 is its initial value and violates the rule); (b) `field A integer default 5` + `field B integer default 10` + `field C as integer <- A * 2` + `rule A >= B and C >= 0` → `A >= B` is false on defaults but the conjunction folds `unknown` (C unfoldable) → not rejected.
+- **Status**: Active — deferred follow-on from BUG-027 (the BUG-027 fix matched the ensure path's pre-existing coarseness; this closes both).
+
+### BUG-029: Satisfiability diagnostics render the raw `TypedExpression` AST in user-facing messages (diagnostic-quality)
+
+- **Discovered**: 2026-06-05, via the adversarial review of the BUG-027 fix.
+- **Affected**: `FormatGuardText` (`ProofEngine.Satisfiability.cs:~497`, `expr.ToString() ?? "<guard>"`), used by `UnsatisfiableRule` (PRE0159) and the other satisfiability diagnostics that name a rule/guard condition. The message renders the internal `TypedBinaryOp { ResultType = …, Span = …, ResolvedOp = … }` record graph instead of readable text like `Amount >= Floor`.
+- **Symptom**: an author hitting e.g. `UnsatisfiableRule` sees the compiler's AST dump, not their rule — violates spec §0.7 (domain-expert authoring audience) and §0.1 "no opaque proof."
+- **Scope**: the pre-existing `FormatGuardText` callers. The **new** `DefaultViolatesRule` (PRE0164) was already fixed in the BUG-027 slice to render readably via `DescribeExpression` (`ProofEngine.cs:986`); this bug is the **shared defect in the siblings** that was out of scope for that slice.
+- **Root cause**: `FormatGuardText` uses `expr.ToString()` instead of the readable `DescribeExpression` renderer.
+- **Workaround used**: none.
+- **Fix complexity**: small — switch the `FormatGuardText` callers to `DescribeExpression` (the same readable renderer `DefaultViolatesRule` now uses, stripping the redundant outer paren pair). Fixes all affected satisfiability messages at once.
+- **Priority**: quality / diagnostics UX — not a soundness issue. Pre-release.
+- **Repro**: `field X as integer max 5` + `rule X >= 10` → the `UnsatisfiableRule` message embeds the AST dump of the rule condition instead of `X >= 10`.
+- **Status**: Active — deferred follow-on from BUG-027.
+
 ### BUG-026 (design/policy question): Should a provably-unsatisfiable rule or guard block compilation (Error), or only warn? — current behavior is Warning-only, genuinely unspecified in canon
 
 - **Discovered**: 2026-06-04, during the Slice 2c-i severity investigation (the "read the design" pass). Distinct from the BUG-024 over-prove, which is fixed — this is the *leftover policy question* about the case where a contradiction is NOT consumed by a fault-prone op.
@@ -150,6 +178,13 @@ surfaced for proper fixing.
 - **Repro**: add a new `ModifierKind` member with no arm in `TypeChecker.Validation.Modifiers.cs:350`/`:538` → compiles clean, no diagnostic.
 
 ## Fixed
+
+### BUG-027: Global rules are not folded against default field values — a default-violating rule compiles clean (Principle-11 gap; prerequisite for BUG-020 enforcement)
+
+- **Discovered**: 2026-06-05, via the adversarial review of the Slice 2c-ii field-reference-bound-enforcement design; verified against a fresh `Compiler.Compile`.
+- **Affected**: the compile-time check that default field values satisfy declared rules. `CheckInitialStateSatisfiability` (`ProofEngine.Analysis.cs`) folded only initial-state **ensures** against defaults; global **rules** (`semantics.Rules`) were walked for sub-expression obligations but their *truth* was never evaluated against the default environment. Spec §0.1 **Principle 11**: *"Rules and initial-state ensures are checked against default field values at compile time. A definition where default values violate a declared rule is rejected."*
+- **Symptom** (probe-confirmed): `field Amount as number default 5` + `field Floor as number default 10` + `rule Amount >= Floor` → compiled **clean**, despite the default configuration (5 < 10) violating the rule.
+- **Status**: ✅ **Fixed 2026-06-05** — added `ScanRulesAgainstDefaults` to the proof-engine satisfiability scan (`ProofEngine.Satisfiability.cs`), wired alongside `ScanRules`. It folds each **unguarded** global rule's condition against the field default environment using the **same** `ConstantFold`/`FoldValue` evaluator the initial-state ensure path uses, and emits the new `DefaultViolatesRule` (PRE0164, Proof/**Error**) **only** on a provably-`false` fold — an unknown/unfoldable default (computed field, non-constant default) folds to `null` and never rejects (soundness over completeness, §0.6 #1); guarded rules are skipped (they hold only under their `when`). The default-environment builder was extracted from `CheckInitialStateSatisfiability` into a shared `BuildDefaultEnvironment` helper so the ensure path and the new rule path share one environment and one evaluator — the ensure fold (PRE0115) is byte-identical. A construction (`initial`) event suppresses the rule-vs-default fold (the defaults are placeholders the construction handler overwrites), mirroring the ensure path's `HasConstructionHandler` early-return; the residual coarseness — a rule over a field the construction event does not assign — matches the ensure path's existing behavior (the safe under-emit direction; per-field precision is a future refinement). The generic repro: `field Amount as number default 5` + `field Floor as number default 10` + `rule Amount >= Floor` → `5 >= 10` folds false → `DefaultViolatesRule`. The fold surfaced genuine Principle-11 latent violations in fixtures, remediated two ways: where the defaults should satisfy the rule, the default was corrected (e.g. `RelationalNarrowingCoreTests` `rule OnHand > Reserved` with both `default 0` → `0 > 0` false → `OnHand default 1`); where the rule should hold only once an optional field has a stated value, the rule was guarded and the field's default dropped (sample `customer-profile.precept` — `PreferredContactMethod` made `optional` with no default, its reachability rules guarded `when PreferredContactMethod is set`, so a freshly created profile satisfies them vacuously). Fold confirmed sound (every reject is a provable `false`) — surfaced to the owner, not silently patched.
 
 ### BUG-018: `maxcount`/`mincount` are never enforced — count-containment proof is dead code (Principle-10/11 soundness hole)
 

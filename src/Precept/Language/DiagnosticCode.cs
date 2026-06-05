@@ -432,4 +432,16 @@ public enum DiagnosticCode
     /// the one in scope — here the arg IS in scope, it just must be qualified.
     /// </summary>
     UnqualifiedEventArgReference = 163,
+
+    /// <summary>
+    /// PRE0164 — A global, unguarded <c>rule</c> is provably violated by the
+    /// field default values. The rule is an invariant the entity must hold at
+    /// creation, so a definition whose defaults fold the rule's condition to
+    /// false is invalid at creation. Distinct from <c>UnsatisfiableInitialState</c>
+    /// (PRE0115), which folds an initial-state <c>ensure</c> against the defaults;
+    /// this folds a global <c>rule</c> (which holds in every state) instead.
+    /// Emitted as an Error by the proof engine's satisfiability scan, only on a
+    /// proven-false fold — an unknown/unfoldable default never rejects.
+    /// </summary>
+    DefaultViolatesRule = 164,
 }

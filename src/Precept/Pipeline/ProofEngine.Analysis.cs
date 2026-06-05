@@ -69,8 +69,49 @@ public static partial class ProofEngine
         }
 
         // Build default value environment
+        var defaults = BuildDefaultEnvironment(semantics, out var unfoldable);
+
+        var violations = new List<UnsatisfiedConstraint>();
+
+        for (int i = 0; i < initialEnsures.Count; i++)
+        {
+            var ensure = initialEnsures[i];
+            if (ensure.Guard is not null)
+                continue; // guarded ensures skipped
+
+            var foldResult = ConstantFold(ensure.Condition, defaults, unfoldable);
+
+            if (foldResult is false)
+            {
+                violations.Add(new UnsatisfiedConstraint(
+                    new EnsureIdentity(ensure.Kind, ensure.AnchorState ?? ensure.AnchorEvent, i),
+                    FormatViolationReason(ensure, defaults)));
+            }
+        }
+
+        return
+        [
+            new InitialStateSatisfiabilityResult(
+                initialState.Name,
+                violations.Count == 0,
+                violations.ToImmutableArray())
+        ];
+    }
+
+    /// <summary>
+    /// Builds the field default-value environment used by every default-fold scan
+    /// (initial-state ensures and global rules). Literal defaults bind their value;
+    /// foldable single-slot interpolated defaults bind their folded value; computed
+    /// (<c>&lt;-</c>) fields and non-foldable defaults are marked unfoldable so a
+    /// fold over them returns unknown. Both <see cref="CheckInitialStateSatisfiability"/>
+    /// and <see cref="ScanRulesAgainstDefaults"/> call this — there is one default
+    /// environment and one fold evaluator, never a fork.
+    /// </summary>
+    private static Dictionary<string, object?> BuildDefaultEnvironment(
+        SemanticIndex semantics, out HashSet<string> unfoldable)
+    {
         var defaults = new Dictionary<string, object?>(StringComparer.Ordinal);
-        var unfoldable = new HashSet<string>(StringComparer.Ordinal);
+        unfoldable = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var field in semantics.Fields)
         {
@@ -102,31 +143,7 @@ public static partial class ProofEngine
                 defaults[field.Name] = GetTypeDefault(field.ResolvedType, unfoldable, field.Name);
         }
 
-        var violations = new List<UnsatisfiedConstraint>();
-
-        for (int i = 0; i < initialEnsures.Count; i++)
-        {
-            var ensure = initialEnsures[i];
-            if (ensure.Guard is not null)
-                continue; // guarded ensures skipped
-
-            var foldResult = ConstantFold(ensure.Condition, defaults, unfoldable);
-
-            if (foldResult is false)
-            {
-                violations.Add(new UnsatisfiedConstraint(
-                    new EnsureIdentity(ensure.Kind, ensure.AnchorState ?? ensure.AnchorEvent, i),
-                    FormatViolationReason(ensure, defaults)));
-            }
-        }
-
-        return
-        [
-            new InitialStateSatisfiabilityResult(
-                initialState.Name,
-                violations.Count == 0,
-                violations.ToImmutableArray())
-        ];
+        return defaults;
     }
 
     private static bool HasConstructionHandler(SemanticIndex semantics)
@@ -769,10 +786,13 @@ public static partial class ProofEngine
         }
     }
 
-    private static string FormatViolationReason(TypedEnsure ensure, Dictionary<string, object?> defaults)
+    private static string FormatViolationReason(TypedEnsure ensure, Dictionary<string, object?> defaults) =>
+        FormatViolationReason(ensure.Condition, defaults);
+
+    private static string FormatViolationReason(TypedExpression condition, Dictionary<string, object?> defaults)
     {
         var fields = new List<string>();
-        CollectFieldRefs(ensure.Condition, fields);
+        CollectFieldRefs(condition, fields);
         if (fields.Count == 0)
             return "constraint fails with default values";
 

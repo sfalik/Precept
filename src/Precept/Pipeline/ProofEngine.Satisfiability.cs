@@ -36,6 +36,55 @@ public static partial class ProofEngine
     {
         ScanTransitionRowGuards(semantics, diagnostics, producedFacts);
         ScanRules(semantics, diagnostics);
+        ScanRulesAgainstDefaults(semantics, diagnostics);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  DefaultViolatesRule
+    //
+    //  A global, unguarded `rule` is an invariant the entity must hold at
+    //  creation. If the field default values provably fold the rule's condition
+    //  to false, the definition is invalid at creation — a structural
+    //  impossibility, reported up front. This mirrors the initial-state ensure
+    //  fold (CheckInitialStateSatisfiability → UnsatisfiableInitialState),
+    //  reusing the same default environment and the same ConstantFold evaluator.
+    //  Prove-or-reject: only a proven `false` fold rejects — an unknown/unfoldable
+    //  default (computed field, non-constant default) yields `null` and never
+    //  rejects (soundness over completeness, spec § 0.6 #1).
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private static void ScanRulesAgainstDefaults(SemanticIndex semantics, List<Diagnostic> diagnostics)
+    {
+        if (semantics.Rules.Length == 0)
+            return;
+
+        // When a construction (`initial`) event exists, the field defaults are
+        // placeholders — the construction handler sets the real initial values,
+        // so the defaults are NOT the initial state and folding rules against
+        // them would over-reject. The ensure-fold path makes the identical skip
+        // (CheckInitialStateSatisfiability early-returns clean here); mirror it.
+        if (HasConstructionHandler(semantics))
+            return;
+
+        var defaults = BuildDefaultEnvironment(semantics, out var unfoldable);
+
+        foreach (var rule in semantics.Rules)
+        {
+            // A guarded rule only holds under its `when` guard, so it is not an
+            // unconditional invariant of the defaults — skip it (mirrors the
+            // guarded-ensure skip in CheckInitialStateSatisfiability).
+            if (rule.Guard is not null)
+                continue;
+
+            if (ConstantFold(rule.Condition, defaults, unfoldable) is false)
+            {
+                diagnostics.Add(Diagnostics.Create(
+                    DiagnosticCode.DefaultViolatesRule,
+                    rule.Condition.Span,
+                    DescribeRuleCondition(rule.Condition),
+                    FormatViolationReason(rule.Condition, defaults)));
+            }
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -454,4 +503,37 @@ public static partial class ProofEngine
         Dictionary<string, NumericInterval> PerField);
 
     private static string FormatGuardText(TypedExpression expr) => expr.ToString() ?? "<guard>";
+
+    /// <summary>
+    /// Renders a rule's condition as readable domain text for the
+    /// <c>DefaultViolatesRule</c> message, reusing the proof engine's existing
+    /// <see cref="DescribeExpression"/> renderer (the same one other proof
+    /// diagnostics use). <c>DescribeExpression</c> parenthesizes every binary
+    /// op; for a rule condition the outermost pair is redundant noise
+    /// (<c>(Amount &gt;= Floor)</c> → <c>Amount &gt;= Floor</c>), so a single
+    /// outer paren pair is stripped when it wraps the whole expression.
+    /// </summary>
+    private static string DescribeRuleCondition(TypedExpression condition)
+    {
+        var text = DescribeExpression(condition);
+        if (text.Length >= 2 && text[0] == '(' && text[^1] == ')')
+        {
+            // Strip the outer pair only if it actually encloses the whole
+            // expression (balanced at the outermost level), so a condition like
+            // `(a) + (b)` is left untouched.
+            int depth = 0;
+            for (int i = 0; i < text.Length; i++)
+            {
+                if (text[i] == '(') depth++;
+                else if (text[i] == ')')
+                {
+                    depth--;
+                    if (depth == 0 && i != text.Length - 1)
+                        return text; // outer pair closes before the end — not enclosing
+                }
+            }
+            return text[1..^1];
+        }
+        return text;
+    }
 }
