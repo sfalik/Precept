@@ -503,6 +503,11 @@ public static partial class ProofEngine
 
         if (resultInterval.IsUnbounded) return false;
 
+        // An empty result interval is infeasible (⊥), not a vacuously-contained value — guarding
+        // here backstops the Contains(⊥) => true over-prove vector even if a narrowing path admits
+        // an empty interval. An empty interval is unprovable, never a passing containment.
+        if (resultInterval.IsEmpty) return false;
+
         if (intervalReq.DeclaredMin.HasValue && resultInterval.Min < intervalReq.DeclaredMin.Value)
             return false;
         if (intervalReq.DeclaredMax.HasValue && resultInterval.Max > intervalReq.DeclaredMax.Value)
@@ -531,7 +536,11 @@ public static partial class ProofEngine
             ? BuildSiblingRejectExclusions(trc.Row, semantics)
             : null;
 
-        if (guard is null && siblingExclusions is null) return null;
+        // Unconditional field-to-field relations contribute a half-line bound even when there is
+        // no guard and no sibling-reject narrowing — so a relation alone can populate the dict.
+        var relationalFacts = CollectUnconditionalRelationalFacts(semantics).ToList();
+
+        if (guard is null && siblingExclusions is null && relationalFacts.Count == 0) return null;
 
         var builder = ImmutableDictionary.CreateBuilder<string, NumericInterval>(StringComparer.Ordinal);
 
@@ -617,7 +626,80 @@ public static partial class ProofEngine
             }
         }
 
+        // Unconditional field-to-field relations: for each `rule X op Y`, intersect X's narrowed
+        // interval with the half-line the relation licenses, reading Y's bound ONE HOP via the bare
+        // non-relational ExtractFieldInterval (never the dict being built). An unbounded Y edge makes
+        // the half-line ±∞ on the relevant side, so Intersect is the identity — no false bound.
+        foreach (var relation in relationalFacts)
+        {
+            var relatedInterval = ExtractFieldInterval(relation.RightField, semantics);
+            var halfLine = RelationalHalfLine(relation.Comparison, relatedInterval, GetFieldType(relation.LeftField, semantics));
+            if (halfLine is not { } hl)
+                continue;
+
+            var seed = builder.TryGetValue(relation.LeftField, out var existing)
+                ? existing
+                : ExtractFieldInterval(relation.LeftField, semantics);
+            if (seed.IsUnbounded)
+                seed = new NumericInterval(decimal.MinValue, decimal.MaxValue);
+
+            // An empty intersection is a proven contradiction (the relation cannot hold given the
+            // subject's declared bounds), NOT a vacuously-safe narrowing — writing ⊥ here would let
+            // the containment reader discharge every obligation via Contains(⊥) => true. Suppress the
+            // contribution so the dependent fault-prone op falls back to its real proof state.
+            var narrowedInterval = seed.Intersect(hl);
+            if (narrowedInterval.IsEmpty)
+                continue;
+            builder[relation.LeftField] = narrowedInterval;
+        }
+
         return builder.Count > 0 ? builder.ToImmutable() : null;
+    }
+
+    /// <summary>
+    /// The half-line a relation <c>X op Y</c> contributes to <c>X</c>'s interval, sourced from
+    /// <c>Y</c>'s non-relational interval <paramref name="relatedInterval"/>:
+    /// <c>&gt;=</c>/<c>&gt;</c> ⇒ <c>[ylo, +∞)</c>; <c>&lt;=</c>/<c>&lt;</c> ⇒ <c>(−∞, yhi]</c>. The
+    /// closed <c>ylo</c>/<c>yhi</c> floor is a sound over-approximation of the strict relation on
+    /// decimals (it can only fail to discharge, never over-discharge); for an INTEGER subject the
+    /// strict <c>&gt;</c>/<c>&lt;</c> floors to <c>ylo + 1</c> / <c>yhi − 1</c>. When the relevant
+    /// edge of <paramref name="relatedInterval"/> is the ±∞ sentinel, the half-line bound is that
+    /// sentinel and the subsequent Intersect is the identity. Returns <c>null</c> for an operator
+    /// that contributes no half-line.
+    /// </summary>
+    private static NumericInterval? RelationalHalfLine(
+        OperatorKind comparison,
+        NumericInterval relatedInterval,
+        TypeKind subjectType)
+    {
+        if (relatedInterval.IsUnbounded)
+            relatedInterval = new NumericInterval(decimal.MinValue, decimal.MaxValue);
+
+        bool isIntegerSubject = subjectType == TypeKind.Integer;
+
+        switch (comparison)
+        {
+            case OperatorKind.GreaterThanOrEqual:
+                return new NumericInterval(relatedInterval.Min, decimal.MaxValue);
+            case OperatorKind.GreaterThan:
+            {
+                decimal lo = isIntegerSubject && relatedInterval.Min < decimal.MaxValue
+                    ? relatedInterval.Min + 1m
+                    : relatedInterval.Min;
+                return new NumericInterval(lo, decimal.MaxValue);
+            }
+            case OperatorKind.LessThanOrEqual:
+                return new NumericInterval(decimal.MinValue, relatedInterval.Max);
+            case OperatorKind.LessThan:
+            {
+                decimal hi = isIntegerSubject && relatedInterval.Max > decimal.MinValue
+                    ? relatedInterval.Max - 1m
+                    : relatedInterval.Max;
+                return new NumericInterval(decimal.MinValue, hi);
+            }
+            default:
+                return null;
+        }
     }
 
     /// <summary>

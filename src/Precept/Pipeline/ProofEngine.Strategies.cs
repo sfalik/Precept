@@ -1077,6 +1077,35 @@ public static partial class ProofEngine
 
     private static bool TryFlowNarrowingProof(ProofObligation obligation, SemanticIndex semantics)
     {
+        if (obligation.Requirement is not NumericProofRequirement numeric) return false;
+
+        // Resolve the obligation's catalog-declared subject to the discharge-relevant expression
+        // before gating on shape: a fault-prone operator's obligation targets a parameter (the
+        // divisor of `Z / (X − Y)`, the operand of `sqrt(X − Y)`), and that operand is recovered via
+        // the same ResolveSubject bridge every other numeric strategy uses. Without it, a divisor
+        // obligation's raw Site is the Divide node — not a subtraction — and never reaches the
+        // relation. The resolved subject is used when it is itself a subtraction; otherwise the raw
+        // Site is used when IT is the subtraction (the obligation sits directly on the difference).
+        // A subject that is neither (a bare field, a function call) declines.
+        var resolved = ResolveSubject(numeric.Subject, obligation.Site);
+        var binaryOp =
+            resolved is TypedBinaryOp resolvedBin && IsSubtractionOp(resolvedBin.ResolvedOp) ? resolvedBin
+            : obligation.Site is TypedBinaryOp siteBin && IsSubtractionOp(siteBin.ResolvedOp) ? siteBin
+            : null;
+        if (binaryOp is null) return false;
+
+        var leftField = GetFieldName(binaryOp.Left);
+        var rightField = GetFieldName(binaryOp.Right);
+        if (leftField is null || rightField is null) return false;
+
+        // Sequential proof flow: the narrowing relies on a relation between the two operands
+        // (e.g. `A >= B` discharges `A - B >= 0`). If either operand was reassigned earlier in
+        // this chain, that relation is stale and must not discharge — for BOTH a guard-sourced and a
+        // rule-sourced relation.
+        if (obligation.ReassignedBefore.Contains(leftField)
+            || obligation.ReassignedBefore.Contains(rightField))
+            return false;
+
         var guard = obligation.Context switch
         {
             TransitionRowContext t => t.Row.Guard,
@@ -1090,25 +1119,14 @@ public static partial class ProofEngine
             },
             _ => null
         };
-        if (guard is null) return false;
 
-        if (obligation.Site is not TypedBinaryOp binaryOp) return false;
-        if (obligation.Requirement is not NumericProofRequirement numeric) return false;
-
-        if (!IsSubtractionOp(binaryOp.ResolvedOp)) return false;
-
-        var leftField = GetFieldName(binaryOp.Left);
-        var rightField = GetFieldName(binaryOp.Right);
-        if (leftField is null || rightField is null) return false;
-
-        // Sequential proof flow: the narrowing relies on a guard relating the two operands
-        // (e.g. `A >= B` discharges `A - B >= 0`). If either operand was reassigned earlier in
-        // this chain, that relation is stale and must not discharge.
-        if (obligation.ReassignedBefore.Contains(leftField)
-            || obligation.ReassignedBefore.Contains(rightField))
-            return false;
-
-        var branches = ExtractFieldToFieldBranches(guard);
+        // The relation is sourced from the obligation's OWN context guard when there is one; when
+        // there is no context guard, fall through to declared UNCONDITIONAL rules (guarded rules
+        // contribute no global relation — they are dropped at collection). Both sources feed the
+        // SAME per-branch operator truth-table below.
+        var branches = guard is not null
+            ? ExtractFieldToFieldBranches(guard)
+            : RuleSourcedFieldToFieldBranches(semantics);
         if (branches.IsEmpty) return false;
 
         // Every OR branch must independently prove the flow-narrowing obligation.
@@ -1128,6 +1146,25 @@ public static partial class ProofEngine
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// The unconditional rule-sourced field-to-field relations, shaped as the single-conjunction
+    /// branch set the guard-sourced path produces — so guard-sourced and rule-sourced relations feed
+    /// one shared resolution tail. Each unconditional relation is independently available (no guard
+    /// gating it), so they all sit in one AND-branch; the per-branch loop then matches the operand
+    /// pair against any of them. Returns empty when no unconditional relation is declared (the caller
+    /// declines, leaving the obligation Unresolved).
+    /// </summary>
+    private static ImmutableArray<ImmutableArray<FieldToFieldConstraint>> RuleSourcedFieldToFieldBranches(
+        SemanticIndex semantics)
+    {
+        var builder = ImmutableArray.CreateBuilder<FieldToFieldConstraint>();
+        foreach (var relation in CollectUnconditionalRelationalFacts(semantics))
+            builder.Add(relation);
+        return builder.Count == 0
+            ? ImmutableArray<ImmutableArray<FieldToFieldConstraint>>.Empty
+            : ImmutableArray.Create(builder.ToImmutable());
     }
 
     /// <summary>

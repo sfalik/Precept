@@ -111,7 +111,21 @@ public static partial class ProofEngine
         }
     }
 
-    private static List<ScopedNumericFact> CollectTrustedNumericFacts(
+    /// <summary>
+    /// The rule/ensure indices that must NOT contribute a trusted fact, for two reasons:
+    /// (1) a rule or ensure whose own proof obligation is still Unresolved is itself unproven, so
+    /// deriving a fact from its condition would be circular; and (2) a rule whose own predicate is
+    /// self-unsatisfiable against its field's declared bounds (<c>⟦field⟧₀ ⊓ predicate-narrowing =
+    /// ∅</c>) cannot hold for any value of the field, so folding it as a discharge fact would falsely
+    /// "prove safe" a dependent fault-prone op. Blocking the self-unsatisfiable rule removes BOTH its
+    /// magnitude <see cref="ScopedNumericFact"/> and its relational <see cref="FieldToFieldConstraint"/>
+    /// at the shared collection point — the single mechanism that converges the magnitude and
+    /// relational contradiction arms. The self-unsatisfiability judgment reuses the same
+    /// predicate-vs-bounds emptiness computation the satisfiability self-unsat pre-pass uses
+    /// (<c>ComposeRulePredicateWithFieldBounds</c>), so the block and that scan agree. Shared by the
+    /// magnitude-fact and relational-fact collectors so both honor the same discipline.
+    /// </summary>
+    private static (HashSet<int> Rules, HashSet<int> Ensures) CollectBlockedConstraints(
         List<ProofObligation> obligations,
         bool[] suppressDiagnostics,
         SemanticIndex semantics)
@@ -141,10 +155,109 @@ public static partial class ProofEngine
             }
         }
 
+        // A rule whose own predicate is self-unsatisfiable against its field's declared bounds
+        // contributes no discharge fact, regardless of its own obligation disposition.
+        for (int i = 0; i < semantics.Rules.Length; i++)
+        {
+            if (blockedRules.Contains(i))
+                continue;
+            if (RulePredicateSelfUnsatisfiable(semantics.Rules[i], semantics))
+                blockedRules.Add(i);
+        }
+
+        return (blockedRules, blockedEnsures);
+    }
+
+    /// <summary>
+    /// Whether a rule's own predicate (and its <c>when</c> guard, if any) is unsatisfiable against
+    /// its field's declared bounds — any field whose composed interval is empty. Reuses the
+    /// satisfiability pre-pass's predicate-vs-bounds composition so the discharge-side block and the
+    /// PRE0159 scan agree on "self-unsatisfiable".
+    /// </summary>
+    private static bool RulePredicateSelfUnsatisfiable(TypedRule rule, SemanticIndex semantics)
+    {
+        foreach (var (_, interval) in ComposeRulePredicateWithFieldBounds(rule, semantics))
+        {
+            if (interval.IsEmpty)
+                return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Extracts the unconditional field-to-field relational facts declared by rules of shape
+    /// <c>fieldRef op fieldRef</c> (<c>&gt;=</c>/<c>&gt;</c>/<c>&lt;=</c>/<c>&lt;</c>). A guarded
+    /// rule holds only under its guard, so it contributes no global relational fact (it is dropped;
+    /// its in-scope discharge stays on the guard-sourced flow-narrowing path). A self-relation
+    /// (<c>X op X</c>) is vacuous and dropped. A rule whose own obligation is unresolved is blocked
+    /// (same self-consistency discipline as the magnitude facts). The result feeds the discharge-time
+    /// narrowed-interval builder and the sign-set fold — never the bare <see cref="ExtractFieldInterval"/>
+    /// the satisfiability scans read.
+    /// </summary>
+    private static List<FieldToFieldConstraint> CollectRelationalFacts(
+        List<ProofObligation> obligations,
+        bool[] suppressDiagnostics,
+        SemanticIndex semantics)
+    {
+        var (blockedRules, _) = CollectBlockedConstraints(obligations, suppressDiagnostics, semantics);
+
+        var facts = new List<FieldToFieldConstraint>();
+        for (int i = 0; i < semantics.Rules.Length; i++)
+        {
+            if (blockedRules.Contains(i))
+                continue;
+            if (semantics.Rules[i].Guard is not null)
+                continue;
+            if (TryGetRelationalFact(semantics.Rules[i].Condition, out var fact))
+                facts.Add(fact);
+        }
+
+        return facts;
+    }
+
+    /// <summary>
+    /// Recognizes a rule condition of shape <c>fieldRef op fieldRef</c> with
+    /// <c>op ∈ {&gt;=, &gt;, &lt;=, &lt;}</c> over two DISTINCT fields, yielding the relation as a
+    /// <see cref="FieldToFieldConstraint"/> — the same record the guard-sourced path produces. A
+    /// self-relation (same field both sides) is rejected as vacuous.
+    /// </summary>
+    private static bool TryGetRelationalFact(TypedExpression condition, out FieldToFieldConstraint fact)
+    {
+        fact = default!;
+        if (condition is not TypedBinaryOp comparison)
+            return false;
+        if (comparison.Left is not TypedFieldRef leftRef || comparison.Right is not TypedFieldRef rightRef)
+            return false;
+        if (string.Equals(leftRef.FieldName, rightRef.FieldName, StringComparison.Ordinal))
+            return false;
+
+        var op = Operations.GetMeta(comparison.ResolvedOp).Op;
+        if (op is not (OperatorKind.GreaterThan or OperatorKind.GreaterThanOrEqual
+            or OperatorKind.LessThan or OperatorKind.LessThanOrEqual))
+            return false;
+
+        fact = new FieldToFieldConstraint(leftRef.FieldName, op, rightRef.FieldName);
+        return true;
+    }
+
+    private static List<ScopedNumericFact> CollectTrustedNumericFacts(
+        List<ProofObligation> obligations,
+        bool[] suppressDiagnostics,
+        SemanticIndex semantics)
+    {
+        var (blockedRules, blockedEnsures) = CollectBlockedConstraints(obligations, suppressDiagnostics, semantics);
+
         var facts = new List<ScopedNumericFact>();
         for (int i = 0; i < semantics.Rules.Length; i++)
         {
             if (blockedRules.Contains(i))
+                continue;
+            // A guarded rule holds only under its guard — it is NOT an unconditional fact
+            // about the field's global interval/sign. Folding it as a global magnitude fact
+            // would discharge an obligation on a guard-false path (a false "safe"). Mirror the
+            // ensure-path filter (TryGetNumericEnsureFact) so a guarded rule contributes no
+            // global magnitude fact; its in-scope discharge stays on the guard-sourced path.
+            if (semantics.Rules[i].Guard is not null)
                 continue;
             if (TryGetNumericConstraintFact(semantics.Rules[i].Condition, null, null, out var fact))
                 facts.Add(fact);
@@ -393,9 +506,162 @@ public static partial class ProofEngine
             constrained = true;
         }
 
+        // An unconditional field-to-field relation gives the subject a sign when the related
+        // field's NON-relational interval has a decidable-sign bound: e.g. `X > Y` with ⟦Y⟧₀'s
+        // lower bound ≥ 0 establishes X positive. The related field is read one hop, via the bare
+        // ExtractFieldInterval — never the discharge-time narrowed dict — so this cannot chase a
+        // third field transitively. Field-only relations apply to fields only.
+        if (subject.Kind == NumericSubjectKind.Field)
+        {
+            foreach (var relation in CollectUnconditionalRelationalFacts(semantics))
+            {
+                if (TryRelationalSignForField(relation, subject.Name, semantics, out var relSigns))
+                {
+                    signSet &= relSigns;
+                    constrained = true;
+                }
+            }
+        }
+
         return constrained && signSet != NumericSignSet.None
             ? signSet
             : NumericSignSet.Unknown;
+    }
+
+    /// <summary>
+    /// The unconditional field-to-field relations declared by rules, derived directly from
+    /// <see cref="SemanticIndex.Rules"/> with the guard-null + distinct-fields filter. Used by the
+    /// sign-set fold, which runs deep inside the discharge recursion where the per-obligation
+    /// blocked-rule set is not threaded; circularity is structurally impossible here because a
+    /// relation gives the subject a sign from the RELATED field's declared interval, never from the
+    /// subject's own unproven obligation.
+    /// </summary>
+    private static IEnumerable<FieldToFieldConstraint> CollectUnconditionalRelationalFacts(SemanticIndex semantics)
+    {
+        for (int i = 0; i < semantics.Rules.Length; i++)
+        {
+            if (semantics.Rules[i].Guard is not null)
+                continue;
+            if (TryGetRelationalFact(semantics.Rules[i].Condition, out var fact))
+                yield return fact;
+        }
+    }
+
+    /// <summary>
+    /// Whether a relation <c>subject op related</c> contradicts the subject's OWN declared bounds:
+    /// the half-line the relation licenses for the subject, intersected with the subject's
+    /// non-relational interval, is empty (⊥). An empty intersection is a proof the relation cannot
+    /// hold for any value of the subject in its declared range — the octagon/DBM "empty zone =
+    /// infeasible" signal — so the relation must contribute NO discharge fact (neither a narrowed
+    /// interval nor a sign). The orientation is normalized so <paramref name="field"/> is the subject;
+    /// the related field is read ONE HOP via the bare non-relational interval. Shared by the interval
+    /// fold, the sign fold, and the reader backstop so they cannot diverge on what counts as a
+    /// contradiction. An unbounded related operand makes the half-line ±∞ on the relevant side, so the
+    /// intersection is the subject's own interval — never empty from the relation alone.
+    /// </summary>
+    private static bool RelationContradictsSubjectBounds(
+        FieldToFieldConstraint relation,
+        string field,
+        SemanticIndex semantics)
+    {
+        string relatedField;
+        OperatorKind op;
+        if (string.Equals(relation.LeftField, field, StringComparison.Ordinal))
+        {
+            relatedField = relation.RightField;
+            op = relation.Comparison;
+        }
+        else if (string.Equals(relation.RightField, field, StringComparison.Ordinal))
+        {
+            relatedField = relation.LeftField;
+            op = InvertOp(relation.Comparison);
+        }
+        else
+        {
+            return false;
+        }
+
+        var subjectInterval = ExtractFieldInterval(field, semantics);
+        if (subjectInterval.IsUnbounded)
+            subjectInterval = new NumericInterval(decimal.MinValue, decimal.MaxValue);
+
+        var halfLine = RelationalHalfLine(op, ExtractFieldInterval(relatedField, semantics), GetFieldType(field, semantics));
+        if (halfLine is not { } hl)
+            return false;
+
+        return subjectInterval.Intersect(hl).IsEmpty;
+    }
+
+    /// <summary>
+    /// Maps a relation that names <paramref name="field"/> on one side to the sign it implies for
+    /// that field, sourced from the OTHER field's non-relational interval. Only a relation whose
+    /// related-field bound has a decidable sign yields a sign; an unbounded related operand yields
+    /// nothing (identity). Orientation is normalized so the subject sits on the left.
+    /// </summary>
+    private static bool TryRelationalSignForField(
+        FieldToFieldConstraint relation,
+        string field,
+        SemanticIndex semantics,
+        out NumericSignSet signSet)
+    {
+        signSet = NumericSignSet.Unknown;
+
+        // A relation that contradicts the subject's own declared bounds (empty intersection) is a
+        // proven infeasibility, not a sign carrier — withhold the sign so the dependent op falls
+        // back to its real (failing) proof. Same emptiness computation as the interval fold.
+        if (RelationContradictsSubjectBounds(relation, field, semantics))
+            return false;
+
+        string relatedField;
+        OperatorKind op;
+        if (string.Equals(relation.LeftField, field, StringComparison.Ordinal))
+        {
+            relatedField = relation.RightField;
+            op = relation.Comparison;
+        }
+        else if (string.Equals(relation.RightField, field, StringComparison.Ordinal))
+        {
+            relatedField = relation.LeftField;
+            op = InvertOp(relation.Comparison);
+        }
+        else
+        {
+            return false;
+        }
+
+        // Read the related field ONE HOP, via the bare non-relational interval.
+        var relatedInterval = ExtractFieldInterval(relatedField, semantics);
+        if (relatedInterval.IsUnbounded)
+            return false;
+
+        // X op Y where the relevant bound of ⟦Y⟧₀ decides X's sign:
+        //   X >  Y, Y's lower bound ≥ 0  ⇒ X positive
+        //   X >= Y, Y's lower bound > 0  ⇒ X positive;  Y's lower bound == 0 ⇒ X nonnegative
+        //   X <  Y, Y's upper bound ≤ 0  ⇒ X negative
+        //   X <= Y, Y's upper bound < 0  ⇒ X negative;  Y's upper bound == 0 ⇒ X nonpositive
+        switch (op)
+        {
+            case OperatorKind.GreaterThan when relatedInterval.Min >= 0m:
+                signSet = NumericSignSet.Positive;
+                return true;
+            case OperatorKind.GreaterThanOrEqual when relatedInterval.Min > 0m:
+                signSet = NumericSignSet.Positive;
+                return true;
+            case OperatorKind.GreaterThanOrEqual when relatedInterval.Min == 0m:
+                signSet = NumericSignSet.Nonnegative;
+                return true;
+            case OperatorKind.LessThan when relatedInterval.Max <= 0m:
+                signSet = NumericSignSet.Negative;
+                return true;
+            case OperatorKind.LessThanOrEqual when relatedInterval.Max < 0m:
+                signSet = NumericSignSet.Negative;
+                return true;
+            case OperatorKind.LessThanOrEqual when relatedInterval.Max == 0m:
+                signSet = NumericSignSet.Nonpositive;
+                return true;
+            default:
+                return false;
+        }
     }
 
     private static ImmutableArray<ModifierKind> ResolveNumericSubjectModifiers(

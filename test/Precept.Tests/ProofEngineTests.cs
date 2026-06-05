@@ -1209,10 +1209,9 @@ public class ProofEngineTests
         [Fact]
         public void Strategy4_AGreaterThanB_SubtractionSqrtProved()
         {
-            // FlowNarrowing (Strategy 4) requires obligation.Site to be a binary subtraction op.
-            // For sqrt(A-B), the site is a TypedFunctionCall — Strategy 4 cannot fire.
-            // The A > B guard is field-vs-field so Strategy 3 also cannot prove it.
-            // The obligation is therefore Unresolved.
+            // FlowNarrowing resolves the obligation's catalog Subject to the discharge-relevant
+            // operand: for sqrt(A-B), the sqrt argument is the subtraction (A-B). The A > B guard
+            // gives A - B > 0 >= 0, so the non-negativity obligation discharges via FlowNarrowing.
             var ledger = Prove("""
                 precept Widget
                 field X as number default 0 editable
@@ -1226,21 +1225,18 @@ public class ProofEngineTests
             var obligation = ledger.Obligations.FirstOrDefault(o =>
                 o.Requirement is NumericProofRequirement { Comparison: OperatorKind.GreaterThanOrEqual, Threshold: 0m });
 
-            if (obligation is not null)
-            {
-                obligation.Disposition.Should().Be(ProofDisposition.Unresolved,
-                    because: "FlowNarrowing requires a binary subtraction site; sqrt(A-B) site is TypedFunctionCall");
-                obligation.Strategy.Should().NotBe(ProofStrategy.FlowNarrowing);
-            }
+            obligation.Should().NotBeNull();
+            obligation!.Disposition.Should().Be(ProofDisposition.Proved,
+                because: "the resolved subject (A-B) under A > B discharges the sqrt non-negativity obligation");
+            obligation.Strategy.Should().Be(ProofStrategy.FlowNarrowing);
         }
 
         [Fact]
         public void Strategy4_AGreaterThanB_SubtractionNotEqualsZeroProved()
         {
-            // FlowNarrowing requires obligation.Site to be a binary subtraction op.
-            // For Y / (A-B), the site is the division op (not subtraction) so Strategy 4 cannot fire.
-            // The divisor A-B is a binary expression; GetFieldName returns null for it so
-            // Strategies 2 and 3 also cannot prove it. The obligation is Unresolved.
+            // FlowNarrowing resolves the divisor obligation's catalog Subject (the Divide's right
+            // operand) to the subtraction (A-B). The A > B guard gives A - B > 0 != 0, so the
+            // subtraction divisor discharges via FlowNarrowing.
             // Y is integer so IntegerDivideNumber correctly identifies A-B (number) as divisor subject.
             var ledger = Prove("""
                 precept Widget
@@ -1256,22 +1252,19 @@ public class ProofEngineTests
             var obligation = ledger.Obligations.FirstOrDefault(o =>
                 o.Requirement is NumericProofRequirement { Comparison: OperatorKind.NotEquals, Threshold: 0m });
 
-            if (obligation is not null)
-            {
-                obligation.Disposition.Should().Be(ProofDisposition.Unresolved,
-                    because: "divisor is A-B (a binary expression); no strategy handles binary-expression divisors");
-                obligation.Strategy.Should().NotBe(ProofStrategy.FlowNarrowing,
-                    because: "FlowNarrowing requires the site to be a subtraction op, not a division op");
-            }
+            obligation.Should().NotBeNull();
+            obligation!.Disposition.Should().Be(ProofDisposition.Proved,
+                because: "the resolved divisor subject (A-B) under A > B discharges the != 0 obligation");
+            obligation.Strategy.Should().Be(ProofStrategy.FlowNarrowing);
         }
 
         [Fact]
         public void Strategy4_AGreaterOrEqualB_SubtractionSqrtProved()
         {
-            // FlowNarrowing (Strategy 4) requires obligation.Site to be a binary subtraction op.
-            // For sqrt(A-B), the site is a TypedFunctionCall — Strategy 4 cannot fire.
-            // The A >= B guard is field-vs-field so Strategy 3 also cannot prove it.
-            // The obligation is therefore Unresolved.
+            // FlowNarrowing resolves the sqrt argument Subject to the subtraction (A-B). The A >= B
+            // guard gives A - B >= 0, which satisfies the sqrt non-negativity (>= 0) obligation, so it
+            // discharges via FlowNarrowing. (Note: >= would NOT discharge a strict != 0 / > 0 — see
+            // Strategy4_AGreaterOrEqualB_DoesNotDischargeNotEqualsZero — but >= 0 is exactly licensed.)
             var ledger = Prove("""
                 precept Widget
                 field X as number default 0 editable
@@ -1285,12 +1278,10 @@ public class ProofEngineTests
             var obligation = ledger.Obligations.FirstOrDefault(o =>
                 o.Requirement is NumericProofRequirement { Comparison: OperatorKind.GreaterThanOrEqual, Threshold: 0m });
 
-            if (obligation is not null)
-            {
-                obligation.Disposition.Should().Be(ProofDisposition.Unresolved,
-                    because: "FlowNarrowing requires a binary subtraction site; sqrt(A-B) site is TypedFunctionCall");
-                obligation.Strategy.Should().NotBe(ProofStrategy.FlowNarrowing);
-            }
+            obligation.Should().NotBeNull();
+            obligation!.Disposition.Should().Be(ProofDisposition.Proved,
+                because: "A >= B gives A - B >= 0, satisfying the sqrt non-negativity obligation");
+            obligation.Strategy.Should().Be(ProofStrategy.FlowNarrowing);
         }
 
         [Fact]
@@ -3186,7 +3177,8 @@ public class ProofEngineTests
         public void Strategy4_AGreaterThanB_SubtractionResultGreaterThanZero()
         {
             // cf. Strategy4_AGreaterThanB_SubtractionSqrtProved
-            // sqrt(A-B) with A > B guard; site is TypedFunctionCall → strategy 4 cannot fire.
+            // sqrt(A-B) with A > B guard: the sqrt argument Subject resolves to (A-B); A > B gives
+            // A - B > 0 >= 0, so the non-negativity obligation discharges via FlowNarrowing.
             var ledger = Prove("""
                 precept Widget
                 field X as number default 0 editable
@@ -3200,19 +3192,18 @@ public class ProofEngineTests
             var obligation = ledger.Obligations.FirstOrDefault(o =>
                 o.Requirement is NumericProofRequirement { Comparison: OperatorKind.GreaterThanOrEqual, Threshold: 0m });
 
-            if (obligation is not null)
-            {
-                obligation.Disposition.Should().Be(ProofDisposition.Unresolved,
-                    because: "FlowNarrowing requires a subtraction site; sqrt(A-B) site is TypedFunctionCall");
-                obligation.Strategy.Should().NotBe(ProofStrategy.FlowNarrowing);
-            }
+            obligation.Should().NotBeNull();
+            obligation!.Disposition.Should().Be(ProofDisposition.Proved,
+                because: "the resolved subject (A-B) under A > B discharges the sqrt non-negativity obligation");
+            obligation.Strategy.Should().Be(ProofStrategy.FlowNarrowing);
         }
 
         [Fact]
         public void Strategy4_AGreaterThanB_SubtractionResultNotEqualsZero()
         {
             // cf. Strategy4_AGreaterThanB_SubtractionNotEqualsZeroProved
-            // Y / (A-B) with A > B guard; divisor is binary expression → no strategy handles it.
+            // Y / (A-B) with A > B guard: the divisor Subject resolves to (A-B); A > B gives
+            // A - B > 0 != 0, so the subtraction divisor discharges via FlowNarrowing.
             var ledger = Prove("""
                 precept Widget
                 field X as number default 0 editable
@@ -3227,19 +3218,18 @@ public class ProofEngineTests
             var obligation = ledger.Obligations.FirstOrDefault(o =>
                 o.Requirement is NumericProofRequirement { Comparison: OperatorKind.NotEquals, Threshold: 0m });
 
-            if (obligation is not null)
-            {
-                obligation.Disposition.Should().Be(ProofDisposition.Unresolved,
-                    because: "binary-expression divisor; GetFieldName returns null; no strategy applies");
-                obligation.Strategy.Should().NotBe(ProofStrategy.FlowNarrowing);
-            }
+            obligation.Should().NotBeNull();
+            obligation!.Disposition.Should().Be(ProofDisposition.Proved,
+                because: "the resolved divisor subject (A-B) under A > B discharges the != 0 obligation");
+            obligation.Strategy.Should().Be(ProofStrategy.FlowNarrowing);
         }
 
         [Fact]
         public void Strategy4_AGreaterOrEqualB_SubtractionResultGreaterOrEqualZero()
         {
             // cf. Strategy4_AGreaterOrEqualB_SubtractionSqrtProved
-            // A >= B and sqrt(A-B); site is TypedFunctionCall → strategy 4 cannot fire.
+            // A >= B and sqrt(A-B): the sqrt argument Subject resolves to (A-B); A >= B gives
+            // A - B >= 0, which satisfies the sqrt non-negativity (>= 0) obligation via FlowNarrowing.
             var ledger = Prove("""
                 precept Widget
                 field X as number default 0 editable
@@ -3253,9 +3243,10 @@ public class ProofEngineTests
             var obligation = ledger.Obligations.FirstOrDefault(o =>
                 o.Requirement is NumericProofRequirement { Comparison: OperatorKind.GreaterThanOrEqual, Threshold: 0m });
 
-            if (obligation is not null)
-                obligation.Strategy.Should().NotBe(ProofStrategy.FlowNarrowing,
-                    because: "sqrt site is not a subtraction op; strategy 4 cannot fire");
+            obligation.Should().NotBeNull();
+            obligation!.Disposition.Should().Be(ProofDisposition.Proved,
+                because: "A >= B gives A - B >= 0, satisfying the sqrt non-negativity obligation");
+            obligation.Strategy.Should().Be(ProofStrategy.FlowNarrowing);
         }
 
         [Fact]
