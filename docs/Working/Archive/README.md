@@ -41,6 +41,8 @@ Archived design docs from `docs/Working/`. Each was either **promoted** (durable
 | [frank-initial-event-semantics.md](frank-initial-event-semantics.md) | Semantics doc | Initial-event reasoning record |
 | [hover-design.md](hover-design.md) | Design doc | Hover content design |
 | [interval-hover-design.md](interval-hover-design.md) | Design doc | Interval-aware hover surface |
+| [modifier-name-axis-overlap-2026-06-03.md](modifier-name-axis-overlap-2026-06-03.md) | Promoted 2026-06-04 (canon synced in ship commits `c3209ad2`, `eeb9a9c6`) | `precept-language-spec.md §2.3/§2.4` + `collection-types.md` (Constraint Catalog, discharge lines, `sortedset` rationale) + `compiler/proof-engine.md` + `compiler/type-checker.md` + `compiler/diagnostic-system.md` (`notempty` → string-only; generic element-bound binding; `mincount 1` access discharge; PRECEPT0031 no-overlap analyzer) |
+| [bare-identifier-arg-field-shadowing-2026-06-02.md](bare-identifier-arg-field-shadowing-2026-06-02.md) | Promoted 2026-06-04 (canon synced in ship commit `d6ee8778`) | `precept-language-spec.md §3.4/§3.5` + `compiler/type-checker.md` (D20) + `compiler/diagnostic-system.md` (Option C — event args dotted-only; bare in-scope arg ref → PRE0163 `UnqualifiedEventArgReference`) |
 
 ### Language surface — field & state guarantees
 

@@ -55,6 +55,8 @@ sources-consulted:
 
 # Bare identifier resolution — arg-shadows-field
 
+> **Promoted to:** 2026-06-04 — `docs/language/precept-language-spec.md` (§3.4 Name Resolution `UndeclaredField` row, §3.5 Scope Rules / event-arg dotted-only access), `docs/compiler/type-checker.md` (Decision 20 — bare-name resolution priority, event args dotted-only), `docs/compiler/diagnostic-system.md` (PRE0163 `UnqualifiedEventArgReference` vs PRE0050 `EventArgOutOfScope`). **Canon synced in ship commit `d6ee8778` (event args dotted-only; bare in-scope arg ref rejected with PRE0163).** Archival-only: no rationale required lifting at promotion time. The Findings / per-option analysis below are the investigation record; the Option-C resolution at the top supersedes the body's Option-B recommendation on the provenance/drift-cleanup grounds stated there.
+
 ## Resolution (2026-06-02) — Option C, on drift-cleanup grounds
 
 The owner chose **Option C** (event args are accessed only via dotted `EventName.ArgName`;
