@@ -26,7 +26,7 @@ Two poles are live, and this survey pre-favors neither:
 - **(A) The implicit-by-applicability rule may be fine.** Only `notempty` collides, and it is redundant both ways (`mincount 1` for the collection, `minlength 1` for the element). It could simply be disallowed in element position permanently, closing the one ambiguity — and the implicit rule stands.
 - **(B) An explicit syntax that visibly scopes a modifier to element vs. collection may be worth the surface cost.**
 
-This is **horizon groundwork**: the owner flagged the clarity concern and authorized the survey to ground a future `/lifecycle-2-design`. It does not authorize a design; the consuming design pass is the gate for any syntax decision.
+This is **horizon groundwork**: the owner flagged the clarity concern and authorized the survey to ground a future `/design`. It does not authorize a design; the consuming design pass is the gate for any syntax decision.
 
 ## Methodology
 
@@ -202,7 +202,7 @@ Five candidates, neutrally. Each notes its disambiguation mechanism, comparator 
 
 ## Conclusions
 
-This research is **horizon groundwork** feeding a future `/lifecycle-2-design`; it proposes **no locked conclusion**. The four-leg rationale is deferred to the consuming design pass. One **clearly-flagged tentative lean**, offered as a starting frame, not a decision:
+This research is **horizon groundwork** feeding a future `/design`; it proposes **no locked conclusion**. The four-leg rationale is deferred to the consuming design pass. One **clearly-flagged tentative lean**, offered as a starting frame, not a decision:
 
 - **Tentative lean (flagged, not locked):** The comparator consensus (explicit structural separation) is strong, but it is *answering a problem Precept partly designed around* — Precept's vocabulary already separates most axes (`maxlength` vs `maxcount`), and the inner-type-decoration precedent (`~string`, `money in 'USD'`) gives "trailing tokens decorate the inner type" a coherent mental model. The *acute* problem is narrow: exactly one modifier (`notempty`) genuinely collides, and it is redundant both ways. That makes **Candidate 1 / Candidate 4** (close `notempty`, lean on vocabulary asymmetry, invest in LS-hover/diagnostic scope-naming) the cheapest *structurally-complete* fix — the ambiguity goes away. The *residual* concern is pure readability for a reader who does not know the vocabulary, which is real under §0.8 but is the kind of friction tooling (hover, diagnostics) and docs can carry without new grammar. **Candidate 2 (`each`)** is the strongest *if the design pass concludes the readability friction warrants visible surface* — it reuses an existing keyword and reads in domain vocabulary. The honest tension: (A)-family wins on small-surface, (B)/Candidate-2 wins on read-without-prior-knowledge. The design pass should decide which principle dominates *for this specific axis*, with the owner — not this survey.
 

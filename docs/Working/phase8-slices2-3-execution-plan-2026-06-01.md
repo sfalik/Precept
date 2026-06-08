@@ -32,7 +32,7 @@ All decisions are **Locked** in the two design docs (2026-06-01) — nothing to 
   - **(b) Split the diagnostic code** — a distinct code for the static type-stage qualifier check (bounds, and possibly the `TypedConditional` case), leaving PRE0141 proof-only. Pro: each code single-stage, honest about static-vs-narrowable. Con: a new author-visible diagnostic code for what reads as the same problem.
   - **(c) Accept a carve-out** — the 3c analyzer allow-lists the type-stage PRE0141 bound (and conditional) emissions. Pro: zero new work. Con: the analyzer isn't pure one-code-one-stage.
   - **(d) Tighten bounds to static** — if dynamic field-ref bounds (`min SomeField`) aren't a wanted feature, require static bounds → the open-qualifier bound case can't arise → no carve-out. Larger language decision.
-  - **Recommended process**: a focused `/lifecycle-2-design` touch-up on D5 (it touches a public diagnostic code and/or proof-engine architecture) with owner direction — NOT settled inside an execute pass. **Resolve before 3c.**
+  - **Recommended process**: a focused `/design` touch-up on D5 (it touches a public diagnostic code and/or proof-engine architecture) with owner direction — NOT settled inside an execute pass. **Resolve before 3c.**
 - *`OutOfRange` consolidate-or-retire* — owned by **Phase 9 / F-LANG-SPEC-12** (emit-or-retire). Slice 3b keeps `OutOfRange` proof-owned; whether it later merges with `NumericOverflow`/`UnprovedModifierRequirement` is a Phase-9 catalog-completeness call. Does not block Slice 3b or 3c. Land the answer in the Phase 9 finding register, not here.
 
 ## Completed slices
@@ -89,7 +89,7 @@ Converged every diagnostic-code selection onto two shapes (literal `DiagnosticCo
 
 **Decisions required before kicking off**: none (design Locked + reviewed; D1–D10 approved).
 
-**Step-by-step** (enumerate → failing-test matrix first, per `/lifecycle-4-execute`):
+**Step-by-step** (enumerate → failing-test matrix first, per `/execute`):
 1. **Stage relabels (D3)** — `Diagnostics.cs`: `NumericOverflow` + `OutOfRange` meta `Type → Proof`; update `DiagnosticsTests` stage assertions.
 2. **OutOfRange dispatch arm (D2)** — `ProofEngine.Diagnostics.cs` `GetNumericRequirementDiagnosticCode`: add an arm returning `OutOfRange` when `obligation.Context` is `FieldDefaultContext`/`ArgDefaultContext` (Context-axis, non-overlapping with the existing Site-shape arms).
 3. **Numeric default stamping (D2)** — `TypeChecker.cs:799-815`/`:985-1004`: replace `ValidateDefaultAgainstNumericModifiers` with stamping `NumericProofRequirement(SelfValue,⊕,bound)` per applicable modifier (preserve field implied-modifiers + reuse the magnitude/normalization helpers from `Modifiers.cs:524-614`). `ProofEngine.Analysis.cs` collectors: drop the IntervalContainment-for-numeric-defaults usage; route numeric defaults through the stamped Numeric obligation.
@@ -148,4 +148,4 @@ Slice 3b/3b-count derive from `phase8-value-level-obligation-ownership-2026-06-0
 - On slice completion: flip its row to ✅ in the Build-slice summary; promote the next stub to heavyweight; update the readiness-plan Phase 8 slice log.
 - If a behavior-preservation diff appears in Slice 2 (or Slice 3b constants), **stop** — it means a step changed semantics; treat as a design-falsifier hit, not a test to update.
 - If new work surfaces, add it to the appropriate slice or a new stub; if it touches a surface neither design cited, re-lock the affected design (don't silently absorb).
-- Execution rigor (failing-test-first, fresh-context agent, adversarial diff review, vertical slices) is `/lifecycle-4-execute`'s domain — this plan only sequences.
+- Execution rigor (failing-test-first, fresh-context agent, adversarial diff review, vertical slices) is `/execute`'s domain — this plan only sequences.

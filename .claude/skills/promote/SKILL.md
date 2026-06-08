@@ -1,5 +1,5 @@
 ---
-name: lifecycle-5-promote
+name: promote
 description: Stage 5 of the engineering lifecycle — lift "why" content from a design doc to its canonical home, archive the design with cross-link, verify doc-touch obligations completed. Triggers on — promote, canonicalize, "this shipped, update the docs", archive this design, "where does this go in canonical", lift to canonical, "the spec needs updating now". Takes an implementation-complete design doc and one or more target canonical docs; extracts decisions and rationale; produces a diff for owner review.
 ---
 
@@ -16,14 +16,25 @@ Stage 5 of the engineering lifecycle. The transition that fails today. Each inst
 
 ## When NOT to use
 
-- Design is still being iterated (use `/lifecycle-2-design`)
+- Design is still being iterated (use `/design`)
 - Design was abandoned — move to Archive with `**Status:** Historical — design dropped, no canonical replacement` header (no promotion needed); skill helps add the header
 - Concept was superseded by a different design that already shipped — header `**Status:** Historical — superseded by [link]`
+
+## High & Ultra Modes
+
+**Trigger:** `/promote high <args>` or `/promote ultra <args>` (also recognise "high-rigour"/"ultra" phrasing in the request). **Opt-in only** — these spend many sub-agents and tokens; they are never the default. Reach for them on high-stakes, hard-to-reverse, or easy-to-get-subtly-wrong work where a single pass is not enough.
+
+Both modes run this skill as a multi-agent `Workflow` instead of a single inline pass, and add independent multiplicity + adversarial verification *on top of* this skill's normal discipline — which still fully applies (nothing below replaces the required structure, gates, or checks). Every spawned agent works fluency-first and verifies its claims against source.
+
+- **high** — ≥2 independent agents verify the promotion is faithful (the canonical doc matches the source; nothing canonical was dropped or drifted), plus one adversarial "what claim is now false / what was lost" pass.
+- **ultra** — **replicate the faithfulness check** from independent vantages, and loop a completeness critic over the full doc-update routing (every obligated canonical doc discharged) until dry.
+
+---
 
 ## Required workflow
 
 ```
-/lifecycle-5-promote <design-doc> --to <canonical-doc> [--to <additional-canonical-doc>]
+/promote <design-doc> --to <canonical-doc> [--to <additional-canonical-doc>]
 ```
 
 The skill:
@@ -76,7 +87,7 @@ The skill enforces:
 - **Input**: `--from <design-doc> --to <canonical>` (one or more `--to`)
 - **Output**: updated canonical doc(s) + archived design doc with header + verification report
 
-Pairs with `/lifecycle-7-audit` (when shipped, Phase 9): audit periodically verifies canonical docs retain their why; if a canonical doc has been edited away from what was lifted, audit surfaces the regression.
+Pairs with `/audit` (when shipped, Phase 9): audit periodically verifies canonical docs retain their why; if a canonical doc has been edited away from what was lifted, audit surfaces the regression.
 
 ## Anti-patterns to refuse
 
@@ -100,7 +111,7 @@ Pairs with `/lifecycle-7-audit` (when shipped, Phase 9): audit periodically veri
 For Archive files already moved without headers (today's situation — 4+ Stage-4 failures found):
 
 ```
-/lifecycle-5-promote --backfill <archive-doc> --to <canonical-doc>
+/promote --backfill <archive-doc> --to <canonical-doc>
 ```
 
 Same workflow but skips the "move to Archive" step (file is already there). Extracts, lifts, applies header, verifies. This is what Phase 1 will use to clear the existing backlog.

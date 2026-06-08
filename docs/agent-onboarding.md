@@ -42,7 +42,7 @@ Source text flows through a six-stage compiler pipeline (Lexer → Parser → Na
 
 ### Concept 3: Lifecycle-driven design
 
-Precept work flows through a 7-stage engineering lifecycle, each backed by a skill (`/lifecycle-1-research` through `/lifecycle-7-audit`). Research feeds Design; Design feeds Plan; Plan feeds Execute; Execute feeds Promote; Promote feeds Review; Review feeds Audit. Each stage has explicit artifacts and discipline:
+Precept work flows through a 7-stage engineering lifecycle, each backed by a skill (`/research` through `/audit`). Research feeds Design; Design feeds Plan; Plan feeds Execute; Execute feeds Promote; Promote feeds Review; Review feeds Audit. Each stage has explicit artifacts and discipline:
 
 - **Stage 1 (Research)** — produces a doc in `research/` with comparable systems, prior art, citations
 - **Stage 2 (Design)** — locks a design in `docs/Working/<topic>.md` with **four-leg rationale** (Rationale, Alternatives, Precedent, Tradeoff) per decision, **citation-with-excerpt** for every source, Philosophy Alignment + Language Design Grounding + Architecture Grounding sections
@@ -52,7 +52,7 @@ Precept work flows through a 7-stage engineering lifecycle, each backed by a ski
 - **Stage 6 (Review)** — end-of-lifecycle verification a work item passed all 5 earlier stages
 - **Stage 7 (Audit)** — periodic drift detection (deferred)
 
-**Implication for agents:** Never propose a specific language-surface design in direct chat. Route to `/lifecycle-2-design`. Casual chat suggestions are brainstorming; they must not harden into "the" design without the four-leg rationale + grounding sections + citation discipline that the skill enforces. The risk the skill exists to prevent: the first thing written down becomes "the" answer.
+**Implication for agents:** Never propose a specific language-surface design in direct chat. Route to `/design`. Casual chat suggestions are brainstorming; they must not harden into "the" design without the four-leg rationale + grounding sections + citation discipline that the skill enforces. The risk the skill exists to prevent: the first thing written down becomes "the" answer.
 
 **Read next:** [`CONTRIBUTING.md`](../CONTRIBUTING.md) for the workflow, and the relevant skill in [`.claude/skills/`](../.claude/skills/) when you start a stage.
 
@@ -92,7 +92,7 @@ When unsure: grep the glossary, then grep the canonical doc the glossary points 
 
 ## What an agent looks like working poorly
 
-You don't read philosophy.md and propose features that violate "prevention not detection." You skip catalog-system.md and write a parser that hardcodes a token set the catalog already encodes. You discuss a new syntax in chat and let the suggestion harden into a design without going through `/lifecycle-2-design`. You change code without updating the doc that describes it. You read every doc in the corpus before starting any work and exhaust your context budget on background. You assume an `Implemented` status means the code matches without verifying.
+You don't read philosophy.md and propose features that violate "prevention not detection." You skip catalog-system.md and write a parser that hardcodes a token set the catalog already encodes. You discuss a new syntax in chat and let the suggestion harden into a design without going through `/design`. You change code without updating the doc that describes it. You read every doc in the corpus before starting any work and exhaust your context budget on background. You assume an `Implemented` status means the code matches without verifying.
 
 All of these are recoverable. The discipline is "notice when you're doing one of them, and stop."
 
@@ -103,7 +103,7 @@ All of these are recoverable. The discipline is "notice when you're doing one of
 - New to the codebase entirely → read [`philosophy.md`](philosophy.md), then [`docs/README.md`](README.md), then [`docs/language/README.md`](language/README.md), then come back here.
 - Starting a specific task → identify the area in [`docs/README.md`](README.md)'s navigation table → open the sub-area README → drill from there.
 - Confused about a term → grep [`docs/glossary.md`](glossary.md), then follow the canonical pointer.
-- Doing design work → start with [`/lifecycle-2-design`](../.claude/skills/lifecycle-2-design/SKILL.md).
+- Doing design work → start with [`/design`](../.claude/skills/design/SKILL.md).
 - Doing review work → start with the [`precept-reviewer`](../.claude/agents/precept-reviewer.md) agent.
 
 The corpus is dense but navigable. Trust the README system; it routes you to depth on demand.

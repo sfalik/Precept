@@ -1,6 +1,6 @@
 ---
-name: lifecycle-3-plan
-description: Stage 3 of the engineering lifecycle — produce a phased execution plan from a locked design or audit. Triggers on — plan, execution plan, phases, "how do we ship this", roadmap, sequencing, "what's the plan to get this done". Takes a design doc (`/lifecycle-2-design` output) or an audit doc and produces a phased plan with heavyweight current+next phases, lightweight stubs for later phases, decisions-required-per-phase, exit criteria, and doc-touch obligations enumerated per phase.
+name: plan
+description: Stage 3 of the engineering lifecycle — produce a phased execution plan from a locked design or audit. Triggers on — plan, execution plan, phases, "how do we ship this", roadmap, sequencing, "what's the plan to get this done". Takes a design doc (`/design` output) or an audit doc and produces a phased plan with heavyweight current+next phases, lightweight stubs for later phases, decisions-required-per-phase, exit criteria, and doc-touch obligations enumerated per phase.
 ---
 
 # Precept Execution Planning
@@ -9,7 +9,7 @@ Stage 3 of the engineering lifecycle. Bridges design (Stage 2) and execution (St
 
 ## When to use
 
-- A locked design (`/lifecycle-2-design` output) needs phasing for execution
+- A locked design (`/design` output) needs phasing for execution
 - An audit doc (e.g., compiler-readiness review) has findings that need phased remediation
 - Multiple work items need sequencing based on dependencies + decisions
 
@@ -17,6 +17,17 @@ Stage 3 of the engineering lifecycle. Bridges design (Stage 2) and execution (St
 
 - Single-step task with no phasing needed (just execute)
 - Plan already exists and is current — extend or update it, don't replace
+
+## High & Ultra Modes
+
+**Trigger:** `/plan high <args>` or `/plan ultra <args>` (also recognise "high-rigour"/"ultra" phrasing in the request). **Opt-in only** — these spend many sub-agents and tokens; they are never the default. Reach for them on high-stakes, hard-to-reverse, or easy-to-get-subtly-wrong work where a single pass is not enough.
+
+Both modes run this skill as a multi-agent `Workflow` instead of a single inline pass, and add independent multiplicity + adversarial verification *on top of* this skill's normal discipline — which still fully applies (nothing below replaces the required structure, gates, or checks). Every spawned agent works fluency-first and verifies its claims against source.
+
+- **high** — ≥3 independent plan candidates from different sequencing vantages → a judge panel (sequencing-soundness / completeness / executability) → synthesis → one sequencing red-team (does any phase ship before its dependency or backstop?).
+- **ultra** — more candidates, **replicate the dependency-graph derivation**, and loop the sequencing red-team + completeness critic until dry.
+
+---
 
 ## Required output structure
 
@@ -83,7 +94,7 @@ The skill enforces:
 ## Composability
 
 - **Input**: `--from <design-or-audit-doc>` — extracts findings, locked decisions, and acceptance criteria; pre-populates phase scope and exit criteria.
-- **Output**: phased plan at `docs/Working/<topic>-plan-YYYY-MM-DD.md` — consumed by execution work in Stage 4, then by `/lifecycle-5-promote` when each phase completes.
+- **Output**: phased plan at `docs/Working/<topic>-plan-YYYY-MM-DD.md` — consumed by execution work in Stage 4, then by `/promote` when each phase completes.
 
 ## Anti-patterns to refuse
 

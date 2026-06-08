@@ -8,13 +8,15 @@ Every meaningful design or implementation decision moves through seven stages. T
 
 | Stage | Activity | Skill | Where work lives |
 |---|---|---|---|
-| 1 | Research / explore | `/lifecycle-1-research` | `research/` |
-| 2 | Lock a design | `/lifecycle-2-design` | `docs/Working/` |
-| 3 | Plan execution | `/lifecycle-3-plan` | `docs/Working/` (plan doc) |
-| 4 | Execute the plan | `/lifecycle-4-execute` | code + tests + PR-body Implementation Plan |
-| 5 | Promote to canonical | `/lifecycle-5-promote` | canonical `docs/` updated; design moved to `docs/Working/Archive/` with cross-link |
-| 6 | End-of-lifecycle review | `/lifecycle-6-review` | one-shot completion check per work item |
-| 7 | Maintain | `/lifecycle-7-audit` (deferred to Phase 9) | canonical `docs/` |
+| 1 | Research / explore | `/research` | `research/` |
+| 2 | Lock a design | `/design` | `docs/Working/` |
+| 3 | Plan execution | `/plan` | `docs/Working/` (plan doc) |
+| 4 | Execute the plan | `/execute` | code + tests + PR-body Implementation Plan |
+| 5 | Promote to canonical | `/promote` | canonical `docs/` updated; design moved to `docs/Working/Archive/` with cross-link |
+| 6 | Review any stage artifact | `/review` | umbrella reviewer: any stage artifact (research / design / plan / code / promotion) or whole-item completion check |
+| 7 | Maintain | `/audit` (deferred to Phase 9) | canonical `docs/` |
+
+`/review` is the engineering-lifecycle umbrella reviewer: it dispatches a stage artifact (research / design / plan / code / promotion) to the discipline that owns it, or runs the whole-item completion check on a bare `/review <work-item>`. Its **code branch does the built-in `/review`'s PR-review job** via `/code-review` + `precept-reviewer` and intentionally **subsumes (does not invoke)** the built-in. Its **promote branch is the per-artifact reviewer for the Stage 4 → 5 transition** this section names as the most common failure mode — it verifies a single promotion landed faithfully (every enumerated canonical doc touched, `**Promoted to:**` link and archive cross-link resolve) without needing a finished work item.
 
 ### Stage 5 is mandatory
 
@@ -25,7 +27,7 @@ The most common failure mode is **Stage 4 → 5 transition skipped**: implementa
 - `**Status:** Historical — superseded by <link>` — concept evolved into a different design
 - `**Status:** Historical — design dropped, no canonical replacement` — design abandoned
 
-The `/lifecycle-5-promote` skill enforces this — it refuses to archive a design doc without the header. Manual archive moves (via `mv`) bypass the skill, which is allowed but reviewer-checked.
+The `/promote` skill enforces this — it refuses to archive a design doc without the header. Manual archive moves (via `mv`) bypass the skill, which is allowed but reviewer-checked.
 
 ### Pointer-philosophy applies to canonical content
 
@@ -46,9 +48,9 @@ Per the "Per-Decision Rationale (Non-Negotiable)" section in `CLAUDE.md`, locked
 
 **Scope of the rule**:
 
-- **New decisions** going through `/lifecycle-2-design`: **required**. The skill refuses to mark a design "Locked" without all four legs on every decision. Author can answer "no precedent — novel choice" or "no tradeoff identified — flag for review" honestly, but cannot skip.
-- **Decisions backed by Archive design docs** (Stage 4 → 5 promotion): the `/lifecycle-5-promote` skill lifts whatever depth the source provides. Pre-policy designs with Decision + Rationale only get lifted as-is with a "no further rationale recorded in source" note. **No fabrication.**
-- **Existing canonical doc § Design Rationale entries** without four legs: **grandfather**. No required backfill. `/lifecycle-7-audit` may flag these as gaps, but they don't block promotion of new work.
+- **New decisions** going through `/design`: **required**. The skill refuses to mark a design "Locked" without all four legs on every decision. Author can answer "no precedent — novel choice" or "no tradeoff identified — flag for review" honestly, but cannot skip.
+- **Decisions backed by Archive design docs** (Stage 4 → 5 promotion): the `/promote` skill lifts whatever depth the source provides. Pre-policy designs with Decision + Rationale only get lifted as-is with a "no further rationale recorded in source" note. **No fabrication.**
+- **Existing canonical doc § Design Rationale entries** without four legs: **grandfather**. No required backfill. `/audit` may flag these as gaps, but they don't block promotion of new work.
 
 The rule's purpose is to prevent future ambiguity at decision time, not to retroactively annotate shipped code. Honest grandfathering beats fabricated four-leg structure.
 
@@ -68,7 +70,7 @@ When implementation work touches code, the canonical docs that may need updates 
 | Doc status changing (Stub → Design → Implemented) | The doc's own Status field AND any cross-referencing tables |
 | README claim invalidated | `README.md` |
 
-`/lifecycle-2-design` consults this table when populating a design doc's "Doc-update enumeration" section. `/lifecycle-3-plan` uses that enumeration to populate per-phase doc-touch obligations. `/lifecycle-5-promote` verifies those obligations at promotion time.
+`/design` consults this table when populating a design doc's "Doc-update enumeration" section. `/plan` uses that enumeration to populate per-phase doc-touch obligations. `/promote` verifies those obligations at promotion time.
 
 The skills make routing automatic — authors don't need to memorize the table, but should understand it exists so they can override when the heuristic gets a case wrong.
 
@@ -79,7 +81,7 @@ When PR-and-issue workflow is in use (main branch development), the proposal lif
 - Stage 2 (Lock a design) corresponds to "Design Review" below + the design doc in Track B
 - Stage 3 (Plan execution) corresponds to "Implementation plan" in the PR body
 
-On spike branches without PRs (current `spike/Precept-V2-Radical` workflow), the lifecycle skills (`/lifecycle-1-research`, `/lifecycle-2-design`, `/lifecycle-3-plan`, `/lifecycle-4-execute`) handle the same transitions without the GitHub gates. The discipline is the same; the enforcement mechanism differs.
+On spike branches without PRs (current `spike/Precept-V2-Radical` workflow), the lifecycle skills (`/research`, `/design`, `/plan`, `/execute`) handle the same transitions without the GitHub gates. The discipline is the same; the enforcement mechanism differs.
 
 Stages 4-7 (execute, promote, review, maintain) are the same on both workflows.
 
@@ -321,14 +323,14 @@ A spike is NOT a slow-moving feature branch. If the work is ready for review, it
 
 The doc lifecycle (Stages 1-7) applies in full on spike branches. Without GitHub PRs as enforcement gates, the lifecycle skills become the primary discipline:
 
-- `/lifecycle-1-research` — exploration in `research/`
-- `/lifecycle-2-design` — lock the design with four-leg rationale; refuses to lock without
-- `/lifecycle-3-plan` — phased execution plan with decisions surfaced as gates
-- `/lifecycle-4-execute` — vertical-slice discipline, PR-body update protocol, doc-sync per slice, catalog-first
-- `/lifecycle-5-promote` — lift "why" to canonical, archive with header. **Mandatory** — design docs cannot reach Archive without it (or the explicit historical-status header).
-- `/lifecycle-6-review` — one-shot end-of-lifecycle completion check before declaring a work item closed
+- `/research` — exploration in `research/`
+- `/design` — lock the design with four-leg rationale; refuses to lock without
+- `/plan` — phased execution plan with decisions surfaced as gates
+- `/execute` — vertical-slice discipline, PR-body update protocol, doc-sync per slice, catalog-first
+- `/promote` — lift "why" to canonical, archive with header. **Mandatory** — design docs cannot reach Archive without it (or the explicit historical-status header).
+- `/review` — umbrella reviewer: reviews any stage artifact (research / design / plan / code / promotion) by dispatching to the discipline that owns it, or runs the whole-item completion check on a bare `/review <work-item>` before declaring a work item closed. The code branch does the built-in `/review`'s PR-review job via `/code-review` + `precept-reviewer` and intentionally subsumes (does not invoke) the built-in.
 
-Reviewer prompts (the GitHub PR template equivalent) are folded into `/lifecycle-3-plan` (doc-touch obligations enumerated upfront) and `/lifecycle-5-promote` (obligations verified at promotion). The discipline lives in the skills the agent invokes, not in a manual checklist.
+Reviewer prompts (the GitHub PR template equivalent) are folded into `/plan` (doc-touch obligations enumerated upfront) and `/promote` (obligations verified at promotion). The discipline lives in the skills the agent invokes, not in a manual checklist.
 
 #### 7. Merge and Close
 

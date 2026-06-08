@@ -1,6 +1,6 @@
 # Phase 8 Slice 1 — Diagnostic-Emission Inventory & Classification — 2026-05-31
 
-**Status**: **Phase 8 Slice 1** — read-only emission inventory & classification, complete 2026-05-31. Grounds the Slice 3 `/lifecycle-2-design` pass on a dedicated diagnostic-emission phase. No code changed. This is the inventory that defines Slice 3's scope.
+**Status**: **Phase 8 Slice 1** — read-only emission inventory & classification, complete 2026-05-31. Grounds the Slice 3 `/design` pass on a dedicated diagnostic-emission phase. No code changed. This is the inventory that defines Slice 3's scope.
 
 **What this is**: every diagnostic-emission site in the compiler, enumerated from source (not inferred), classified as *legitimately-immediate* vs *obligation-in-disguise* vs *flow-sensitive-but-stage-correct*, plus the spec/implementation gap (declared-but-unwired codes) that bounds the *future* emission surface Slice 3 must design for.
 

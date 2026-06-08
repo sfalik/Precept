@@ -239,7 +239,7 @@ Crucially, the *bound itself* (`Amount >= Floor`) remains a sound, enforceable r
 
 ## Open questions for design
 
-These are for a `/lifecycle-2-design` pass, not for this research. Each is framed neutrally with the options the canon leaves open; no option is pre-ranked.
+These are for a `/design` pass, not for this research. Each is framed neutrally with the options the canon leaves open; no option is pre-ranked.
 
 **Q1 — Admission policy when the bound contributes no static range.** **→ SETTLED by §0.7 (2026-06-02). See § Reconciliation → Q1.** When a field-reference bound's referenced field is unbounded (no decidable range), should the bound be:
   - (a) **Admitted** as a runtime-enforceable constraint (sound at runtime; contributes no compile-time interval; downstream obligations that depended on it stay unresolved → obligation diagnostics) — consistent with §2.4 line 1112 treating decidability as governing *proof participation* only, not *legality*; or

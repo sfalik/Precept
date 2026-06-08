@@ -30,7 +30,7 @@ consumed-by: docs/Working/field-never-set-diagnostic.md § Decision 5 (keyword u
 
 The Precept design at [`docs/Working/field-never-set-diagnostic.md`](../../../docs/Working/field-never-set-diagnostic.md) (F-LANG-GRAPH-04) was demoted from `Locked` to `Externally-Grounded` during a Phase 8 retrofit because its **Decision 5** precedent leg — unifying the `writable` (field-declaration) and `editable` (per-state `modify`) keywords into a single `editable` Access Modifier — cited four comparable languages, two of which (Rust, SQL) the retrofit flagged as precision issues. The design now requires a survey-grounded precedent leg with verbatim excerpts and stable identifiers before it can re-Lock for Phase 5 implementation.
 
-The decision is `Stakes: irreversible`: once `writable` is removed from the language surface and consumer `.precept` files write `editable`, restoring `writable` would break every consumer. Per the `/lifecycle-2-design` skill's irreversible-decision discipline, the precedent leg must rest on more than two verified comparators.
+The decision is `Stakes: irreversible`: once `writable` is removed from the language surface and consumer `.precept` files write `editable`, restoring `writable` would break every consumer. Per the `/design` skill's irreversible-decision discipline, the precedent leg must rest on more than two verified comparators.
 
 **Research question (singular, falsifiable):** Does the same access-modifier / mutability keyword appear at both (a) field / property / member declaration position AND (b) some other per-instance, per-method, per-pattern, or per-binding modify position — in production languages?
 

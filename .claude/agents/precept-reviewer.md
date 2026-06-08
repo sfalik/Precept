@@ -94,7 +94,7 @@ Enforce these:
 
 ### 9. Per-Decision Rationale and Stakes-Based Rigor
 - Every decision declares `Stakes: low | medium | high | irreversible`. Missing or implausible stakes classification is a CONCERN (the author may have misjudged the stakes — surface for human judgment).
-- Required legs scale with stakes (see `lifecycle-2-design/SKILL.md § Decisions § Required legs by stakes`):
+- Required legs scale with stakes (see `design/SKILL.md § Decisions § Required legs by stakes`):
   - **low**: Rationale + Tradeoff
   - **medium**: + Alternatives, Precedent, Sources consulted (with excerpt)
   - **high**: + Strongest counter-evidence, Reversibility, Blast radius
@@ -184,7 +184,7 @@ Check specifically:
 - Does the external comparator citation match Precept's actual architectural problem (not a superficially-similar but architecturally-distant comparison)?
 
 ### 13. Source Verification (design-doc reviews)
-When the review target is a locked design doc (from `/lifecycle-2-design`):
+When the review target is a locked design doc (from `/design`):
 - The design's frontmatter MUST carry `sources-consulted`. If absent or empty when decision prose references external state, that's a BLOCKER.
 - For every source listed in `sources-consulted` (or cited inline in a decision's `Sources consulted` leg), **open the source and read it**. Verify the cited excerpt exists and the design's claim about the source is accurate.
 - The review report MUST emit its own `sources-verified` frontmatter listing every source actually opened, with a one-line note on what was checked. The lint: `sources-verified ⊇ sources-consulted`. If the design cited a source the reviewer didn't open, that's a process violation (reviewer skipped a citation) — report it as a CONCERN against the review process, not against the design.
@@ -216,7 +216,7 @@ The reviewer reports its checks in `sources-mandatorily-checked` frontmatter (al
 
 ### 14. Stage-1 Research-Doc Review Path (Phase 9 addition)
 
-When the review target is a research file (`research/*.md` rather than `docs/Working/*.md`), the reviewer applies the `lifecycle-1-research` behavioral guards mechanically. The research skill has 10 numbered guards; the reviewer's job is to check each. Use grep before reading prose:
+When the review target is a research file (`research/*.md` rather than `docs/Working/*.md`), the reviewer applies the `research` behavioral guards mechanically. The research skill has 10 numbered guards; the reviewer's job is to check each. Use grep before reading prose:
 
 **Frontmatter checks (BLOCKER if missing):**
 
@@ -266,7 +266,7 @@ Look for inbound citations to this research file from `docs/` or from other `res
 
 **Sub-folder taxonomy check:**
 
-Compare the file's actual folder location against the topic-to-folder table in `lifecycle-1-research/SKILL.md § Step 2`. Mis-filed research (e.g., compiler-architecture research in `research/language/` instead of `research/architecture/compiler/`) is a CONCERN.
+Compare the file's actual folder location against the topic-to-folder table in `research/SKILL.md § Step 2`. Mis-filed research (e.g., compiler-architecture research in `research/language/` instead of `research/architecture/compiler/`) is a CONCERN.
 
 ## Independent re-statement (preamble — required before findings)
 
@@ -307,7 +307,7 @@ The reviewer reports the mandatorily-checked sources in its `sources-mandatorily
 
 ## Mandatory comparator-checking by topic (Phase 11 addition — irreversible-decision designs)
 
-When reviewing a design with any `Stakes: irreversible` decision (per `lifecycle-2-design` § Research-adequacy gate), the reviewer always checks the design covers the expected external comparators for each topic its prose touches. This is parallel to "Mandatory source-checking by change category" above, but the unit is **comparator system** rather than **in-tree file** — the comparators are the prior art the design must engage with to defend an irreversible choice.
+When reviewing a design with any `Stakes: irreversible` decision (per `design` § Research-adequacy gate), the reviewer always checks the design covers the expected external comparators for each topic its prose touches. This is parallel to "Mandatory source-checking by change category" above, but the unit is **comparator system** rather than **in-tree file** — the comparators are the prior art the design must engage with to defend an irreversible choice.
 
 The design clears this check by one of three exits (per the design skill's `comparable-systems-research-status` frontmatter field):
 
@@ -335,9 +335,9 @@ The design clears this check by one of three exits (per the design skill's `comp
 3. Missing comparators on an irreversible decision → BLOCKER. Missing comparators on a high-stakes (non-irreversible) decision → CONCERN. Missing comparators where the design's prose names the comparator but no citation exists → CONCERN regardless of stakes.
 4. Report findings in `comparators-checked` frontmatter (alongside `sources-verified` and `sources-mandatorily-checked`): list each row of the table the design touched, and the resolution (cited via research / inline survey / not-applicable / missing).
 
-**Honest limitation**: this table will become stale as Precept's scope evolves. Maintenance obligation: `/lifecycle-7-audit` (when shipped) periodically reviews the table against the current scope. Until then, the table is updated opportunistically when a design surfaces a new topic that doesn't have a row.
+**Honest limitation**: this table will become stale as Precept's scope evolves. Maintenance obligation: `/audit` (when shipped) periodically reviews the table against the current scope. Until then, the table is updated opportunistically when a design surfaces a new topic that doesn't have a row.
 
-**Cross-link**: the design-side enforcement lives in `.claude/skills/lifecycle-2-design/SKILL.md § Staged advancement § Research-adequacy gate` and Behavioral Guard 16.
+**Cross-link**: the design-side enforcement lives in `.claude/skills/design/SKILL.md § Staged advancement § Research-adequacy gate` and Behavioral Guard 16.
 
 ## How to report findings
 

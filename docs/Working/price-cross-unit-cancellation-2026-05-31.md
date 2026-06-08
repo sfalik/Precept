@@ -20,7 +20,7 @@
 
 **What is genuinely carved out: absolute positions.** An absolute *reading* — a thermostat temperature, an absolute level (`dBm`, relative to a reference), absolute pH — is a *point* relative to a reference/origin: the measurement analog of `instant`. A point can't be multiplied (combining a level with a gain has offset/log structure), so it needs separate offset/reference-aware arithmetic. Precept's `quantity` does not model absolute positions and does not need to for pricing. **Tracked as Phase 7 Slice 4** (a new point-type construct) — out of scope for this cancellation decision.
 
-**Design consequences for `/lifecycle-2-design`:**
+**Design consequences for `/design`:**
 - Auto-convert across ratio-of-scale factors for `quantity` amounts of any dimension — °C↔°F amounts (×1.8, exact rational) included; dB-gain prices same-unit (factor 1) and dB cross-scale (irrational factor) is **allowed and surfaced approximate**, not excluded.
 - The catalog must carry, per temperature/log unit, the **amount-conversion scale factor** (distinct from any absolute-conversion function).
 - No exactness gate: all commensurable conversions are allowed; the conversion's exact-vs-approximate status is **surfaced in inspection** (exact for rational factors, approximate for irrational), riding the standard `decimal`/`maxplaces` rounding discipline.
@@ -99,8 +99,8 @@ Before Slice 1, both the exact-unit case (the spec's headline `each × each`) an
 
 - The "no conversion factor in the cancellation path" claim is from a **scoped** grep, not an exhaustive trace. Confirm by reading the `CompoundUnitCancellation` result-qualifier resolution end-to-end.
 - Whether the bounds-path UCUM base-unit normalization (`:428`, proof-engine §5) is **reusable** for cancellation (relevant to Option 2's feasibility) is unconfirmed.
-- **No comparable-systems survey done** — deliberately deferred to the decision pass. A `/lifecycle-2-design` on this will need the broader field (how unit libraries — F#/UoM, Frink, boost::units, Haskell `dimensional`, UCUM tooling — handle multiplying a per-kg rate by a gram quantity; most normalize to base units automatically).
+- **No comparable-systems survey done** — deliberately deferred to the decision pass. A `/design` on this will need the broader field (how unit libraries — F#/UoM, Frink, boost::units, Haskell `dimensional`, UCUM tooling — handle multiplying a per-kg rate by a gram quantity; most normalize to base units automatically).
 
 ## Next step
 
-When we return to decide: run `/lifecycle-2-design` on "price × quantity cross-unit cancellation policy," using this doc as the evidence base, with the three options above as the decision's alternatives and the comparable-systems survey filled in.
+When we return to decide: run `/design` on "price × quantity cross-unit cancellation policy," using this doc as the evidence base, with the three options above as the decision's alternatives and the comparable-systems survey filled in.

@@ -66,9 +66,9 @@ If a doc says "Implemented" but the code disagrees, that's drift — fix the doc
 
 `research/` houses evidence and precedent that grounds the design decisions in `docs/`. Always check before fresh investigation — much of the comparator and feasibility work is already done. Subfolders: `language/`, `architecture/`, `philosophy/`, `product/`, `security/`, `archive/`.
 
-Brand research lives in `design/brand/lifecycle-1-research/`; UX/design-system research in `design/system/lifecycle-1-research/`.
+Brand research lives in `design/brand/research/`; UX/design-system research in `design/system/research/`.
 
-**Use the `/lifecycle-1-research` skill for new investigations** — it enforces folder discipline, citation requirements, and the promote-or-cite rule. See `research/README.md` for the canonical map.
+**Use the `/research` skill for new investigations** — it enforces folder discipline, citation requirements, and the promote-or-cite rule. See `research/README.md` for the canonical map.
 
 ### Ignore: `.squad/`
 
@@ -122,7 +122,7 @@ If the runtime can do something the philosophy doesn't describe, or the philosop
 
 ## Documentation Sync (Non-Negotiable)
 
-**See also**: `CONTRIBUTING.md` § Doc Lifecycle — the 7-stage lifecycle and the lifecycle skills (`/lifecycle-1-research` through `/lifecycle-7-audit`) that automate doc-sync at each transition. The routing table below is consumed by `/lifecycle-2-design` (populates doc-update enumeration in design docs) and `/lifecycle-5-promote` (verifies obligations at promotion).
+**See also**: `CONTRIBUTING.md` § Doc Lifecycle — the 7-stage lifecycle and the lifecycle skills (`/research` through `/audit`) that automate doc-sync at each transition. The routing table below is consumed by `/design` (populates doc-update enumeration in design docs) and `/promote` (verifies obligations at promotion).
 
 When making any code, interface, test, or behavior change, keep documentation in sync in the same edit pass. Unless explicitly told not to, include documentation synchronization as part of every relevant code change. Keep updates focused and factual; if uncertain whether a claim is implemented, verify from code/tests first.
 
@@ -143,7 +143,7 @@ When making any code, interface, test, or behavior change, keep documentation in
 
 - `README.md` — public project narrative and usage guide; must track real implementation. Never leave aspirational claims as if implemented.
 - `docs/` — canonical technical design decision records, architecture notes, project philosophy. Per-area READMEs are the canonical maps.
-- `research/` — evidence and precedent; cite, don't duplicate. See `/lifecycle-1-research` skill.
+- `research/` — evidence and precedent; cite, don't duplicate. See `/research` skill.
 - `design/brand/` — brand identity and brand-level semantic meaning.
 - `design/system/` — reusable product-facing visual-system guidance and surface specs.
 - `design/prototypes/` — durable design prototypes. Hot, code-near prototypes may live near their owning tool surface but should be promoted here when durable.
@@ -184,7 +184,7 @@ This rule supplements the generic "don't reference the current task" comment-dis
 When locking a decision that started as research:
 - Reference the research file from the consuming proposal/decision/spec.
 - Update the issue map in `research/language/README.md` (or the relevant subfolder README) so the research connects forward.
-- **Do not let research stand alone as policy.** Promote conclusions to a spec or decision; archive what didn't ship. (See `/lifecycle-1-research` skill — Promote-or-Cite rule.)
+- **Do not let research stand alone as policy.** Promote conclusions to a spec or decision; archive what didn't ship. (See `/research` skill — Promote-or-Cite rule.)
 
 ## DSL Authoring (Non-Negotiable)
 
@@ -194,7 +194,7 @@ For inline snippets (a single line in an explanation, a short example in a comme
 
 ## Pre-Design Owner Consultation (Non-Negotiable)
 
-A language-surface proposal must surface to the owner for **conversation** before any of: invoking `/lifecycle-1-research`, `/lifecycle-2-design`, or `/lifecycle-3-plan` on it; expanding a readiness-plan phase row from stub to populated workstreams; or spawning a sub-agent on language-surface work.
+A language-surface proposal must surface to the owner for **conversation** before any of: invoking `/research`, `/design`, or `/plan` on it; expanding a readiness-plan phase row from stub to populated workstreams; or spawning a sub-agent on language-surface work.
 
 The gate scales with risk. The *purpose* is to bring the owner into the **what should we do** question — not to bottleneck on yes/no approval. Push-back, redirection, "let's sketch a different shape," "is this even the right problem," "let's defer" are all expected responses. The fast path through the gate is **alignment, not approval**.
 
@@ -240,11 +240,11 @@ Broad delegation ("research, design, and plan Phase N") authorizes proceeding *a
 
 ## Language Surface Design (Non-Negotiable)
 
-New language surface — syntax, keywords, types, operators, modifiers, constructs, expression forms — must go through `/lifecycle-2-design`. Never propose or settle on a specific syntax approach in direct chat.
+New language surface — syntax, keywords, types, operators, modifiers, constructs, expression forms — must go through `/design`. Never propose or settle on a specific syntax approach in direct chat.
 
-If a user asks about syntax options, discuss tradeoffs briefly but **do not propose a specific design inline**. Route to the skill: "Let's run `/lifecycle-2-design` to work through this properly." A suggestion made in chat is brainstorming; it must not harden into a decision without the four-leg rationale, Language Design Grounding (broader field, not just Precept-internal), and Architecture Grounding the skill enforces.
+If a user asks about syntax options, discuss tradeoffs briefly but **do not propose a specific design inline**. Route to the skill: "Let's run `/design` to work through this properly." A suggestion made in chat is brainstorming; it must not harden into a decision without the four-leg rationale, Language Design Grounding (broader field, not just Precept-internal), and Architecture Grounding the skill enforces.
 
-The risk: a casual inline suggestion — made without reading the spec, comparable systems, or the catalog — can become "the" design simply by being the first thing written down. The `/lifecycle-2-design` skill exists precisely to prevent this.
+The risk: a casual inline suggestion — made without reading the spec, comparable systems, or the catalog — can become "the" design simply by being the first thing written down. The `/design` skill exists precisely to prevent this.
 
 ## Per-Decision Rationale (Non-Negotiable)
 
@@ -257,7 +257,7 @@ Locked design decisions — in proposals, design docs, or research conclusions �
 
 A decision that states WHAT without WHY is incomplete. Flag it before it advances.
 
-For research that grounds decisions, use the `/lifecycle-1-research` skill — it codifies the methodology, folder discipline, and promote-or-cite rule. See `CONTRIBUTING.md` for the proposal lifecycle (research → issue → decision → spec).
+For research that grounds decisions, use the `/research` skill — it codifies the methodology, folder discipline, and promote-or-cite rule. See `CONTRIBUTING.md` for the proposal lifecycle (research → issue → decision → spec).
 
 ## Build & Test
 

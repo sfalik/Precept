@@ -11,7 +11,7 @@
 
 ## Enumeration findings & re-scope (2026-05-31)
 
-The `/lifecycle-4-execute` enumerate-step probed the **full UCUM** behavior (not just the Tier-1 curated catalog) and found the original Phase-1 scope was wrong in both directions. Facts (probed via `Compiler.Compile` / MCP on the current build; mapped against `src/Precept/Language/Ucum/`):
+The `/execute` enumerate-step probed the **full UCUM** behavior (not just the Tier-1 curated catalog) and found the original Phase-1 scope was wrong in both directions. Facts (probed via `Compiler.Compile` / MCP on the current build; mapped against `src/Precept/Language/Ucum/`):
 
 - **Cross-unit cancellation already works (Slice 1).** `USD/[ft_i] × [in_i]`, `USD/kg × g`, `USD/Cel × Cel`, `USD/dB × dB` all already cancel (`QualifierChain: Proved`). The proof decides by **dimension-NAME string match** (`ProofEngine.Qualifiers.cs:105`) — **it computes no conversion factor at all.** So `Proved` today means "same dimension name," not "correct factor applied."
 - **`ScaleToBaseFactor` already exists** — every UCUM atom carries `.Scale: UcumExactFactor` (exact rational). Net-new is only the *exactness flag* + the surfacing.
@@ -58,7 +58,7 @@ The `/lifecycle-4-execute` enumerate-step probed the **full UCUM** behavior (not
 
 **Decisions required before kicking off**: none (design locked).
 
-**Step-by-step execution** (per `/lifecycle-4-execute` rigor — enumerate + failing-tests-first, catalog-first, doc-sync in-commit):
+**Step-by-step execution** (per `/execute` rigor — enumerate + failing-tests-first, catalog-first, doc-sync in-commit):
 1. **Enumerate + write failing tests FIRST** (correct UCUM codes — `[in_i]`/`[ft_i]`, not `'in'`/`'ft'`):
    - `price in 'USD/[ft_i]' × quantity in '[in_i]'` → cancels (already `Proved` post-Slice-1); **hover surfaces `[in_i]→[ft_i] ×1/12 (exact)`**. *(hover assertion red now)*
    - `price in 'USD/kg' × quantity in 'g'` → cancels; hover surfaces `g→kg ×1/1000 (exact)`. Un-skip `CrossUnit_SameDimension_MustNotSilentlyCancel` → assert clean cancellation (no `PRE0114`) **+ the exact hover surfacing**.

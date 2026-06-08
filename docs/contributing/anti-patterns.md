@@ -313,17 +313,17 @@ The catalog-driven checklist's "Red flags" section ([`docs/contributing/catalog-
 
 ### PROC-1. Designing language surface inline in chat
 
-**Pattern.** An agent (or human) proposes a specific syntax — "let's make this `field X maxplaces iso`" — in direct conversation, and the suggestion hardens into "the" design without going through `/lifecycle-2-design`.
+**Pattern.** An agent (or human) proposes a specific syntax — "let's make this `field X maxplaces iso`" — in direct conversation, and the suggestion hardens into "the" design without going through `/design`.
 
 **Why it's wrong.** A casual chat suggestion lacks the four-leg rationale, Philosophy Alignment matrix, Language Design Grounding (broader field, not just Precept-internal), Authoring Audience check, and Semantic Rules that the design skill enforces. The first thing written down tends to harden into the answer. See `CLAUDE.md § Language Surface Design`.
 
-**Correct alternative.** When syntax options come up in chat, discuss tradeoffs briefly but route to `/lifecycle-2-design`. A suggestion made in chat is brainstorming; it must not harden into a decision without the skill.
+**Correct alternative.** When syntax options come up in chat, discuss tradeoffs briefly but route to `/design`. A suggestion made in chat is brainstorming; it must not harden into a decision without the skill.
 
 ### PROC-2. Implementation-plan markdown file alongside the PR
 
 **Pattern.** A separate `implementation-plan.md` file in the branch or PR alongside actual code changes.
 
-**Why it's wrong.** The PR body IS the implementation plan. A separate file duplicates and drifts. See `CONTRIBUTING.md` and [`.claude/skills/lifecycle-4-execute`](../../.claude/skills/lifecycle-4-execute/SKILL.md).
+**Why it's wrong.** The PR body IS the implementation plan. A separate file duplicates and drifts. See `CONTRIBUTING.md` and [`.claude/skills/execute`](../../.claude/skills/execute/SKILL.md).
 
 **Correct alternative.** Implementation Plan lives in the PR body. Slice list lives there. Check off slices as they land.
 

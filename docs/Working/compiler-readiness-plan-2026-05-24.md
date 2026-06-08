@@ -18,15 +18,15 @@
 | 1 | Doc foundation truthful + lifecycle skills + 16 Archive promotions | ~55 | 8 (✅ all settled 2026-05-24) | XL (~5-7 days) | ✅ **Complete 2026-05-24** (all 6 workstreams shipped; verification report at [`lifecycle-review-phase-1-2026-05-24.md`](lifecycle-review-phase-1-2026-05-24.md)) |
 | 2 | Green baseline + no crashes + Operations.Resolve + MCP-crash family | **12+** | 2 | **L (~4-5 days)** | ✅ **Complete 2026-05-25** (all 7 steps shipped: 2.1–2.7; MCP wrapper backstop + temporal-literal verified clean + LS URI-case fix + Operations.Resolve + generic SyntaxReference test; 6107/6108 Precept.Tests pass with the 1 failure as new BUG-013; 411/411 LS tests pass; 67/67 Mcp tests pass; 291/291 analyzer tests pass) |
 | 3 | Type system completeness | ~13 (F-LANG-BIZ-02 dropped → doc-only retire D10 + Frank's case-9 absorbed) | 4 (✅ all settled 2026-05-25, incl. F-LANG-BIZ-02 Position 3 post-research) | **M (~4-6 days)** | ✅ **Complete 2026-05-26** (catalog shape shipped 2026-05-25; runtime enforcement shipped 2026-05-26 in followup commit after `precept-reviewer` philosophy-first re-review surfaced three closures had landed catalog metadata without runtime enforcement — F-LANG-BIZ-06 ExchangeRate Positive, F-LANG-TEMP-03 Duration/Period nonnegative, F-LANG-BIZ-02 Position 3 maxplaces opt-in. Single architectural fix: magnitude-projection helper + `ValidateDefaultAgainstNumericModifiers` + `OutOfRange` (PRE0079) promoted from deferred. 6175/6176 Precept.Tests pass (1 pre-existing BUG-013); 23 new falsifier tests; F-LANG-BIZ-11 filed for Phase 4+ (boundary-precision; renumbered from BIZ-09 due to ID collision).) |
-| 4 | Collection completeness + BUG-002 + F-LANG-BIZ-10 | **~16** | 7 (D1-D7 — all settled) | **L+ (~2.5-3 weeks)** | ✅ **Complete 2026-05-26** (all 10 workstreams W-A through W-J shipped across ~42 commits across 2 sessions; 6281/6282 Precept.Tests pass — only pre-existing BUG-013; 411/411 LS, 67/67 MCP, 291/291 analyzer; 8 precept-reviewer rounds caught real BLOCKERs each time; 3 locked design docs via `/lifecycle-2-design` — W-G choice-inner, W-E index-bounds, W-H currency.minorUnit; bugs.md flipped BUG-002, BUG-005, BUG-012, F-LANG-COLL-13 to Fixed; W-H canonical sample `insurance-claim-adjudication.precept` uses `maxplaces currency.minorUnit`. Final phase-close audit (`1e865ac1`) swept 2 stale BUG-002 sample workarounds, 8 transient finding-ID refs, and shipped W-H sample uplift.) |
-| 5 | Proof engine satisfiability + BUG-004 + BUG-006 + FieldNeverSet/unification + BIZ operator extensions | **14** | 2 | XL (~3 sessions) | ✅ **Complete 2026-05-27** (all 6 workstreams W-A through W-F shipped across 20 commits; 7136/7136 tests pass across all 4 projects; 2 precept-reviewer rounds + remediations; 3 locked designs via `/lifecycle-2-design` — W-B FieldNeverSet, W-C satisfiability cluster, W-D BIZ operator extensions. **Workstream summary**: W-A BUG-004 event-ensure narrowing (`034a5976`); W-B F-LANG-GRAPH-04 FieldNeverSet + writable→editable unification — 8 slices, 4 commits, 27 sample fixes (`0d61f792` `12d7c422` `0feb135a` `2ac416b5`); W-C satisfiability cluster — SPEC-02 UnsatisfiableGuard wire-up + SPEC-03 ContradictoryRule + SPEC-04 VacuousRule + SPEC-05 TautologicalGuard + SPEC-12 UnreachableRowFact + BUG-006 cross-row interval composition (`a6c35e36` `ffb7288b` `c16be77b` `42cee783`); W-D BIZ operator extensions — BIZ-01 `money / price → quantity` + BIZ-05 `DimensionalProductProofRequirement` + PRE0157 + BIZ-08 discrete equality narrowing (`5d945711` `e71e09d2` `08fae0ef` `fdf33095`); W-E F-LANG-TEMP-04 always-false period comparison (`27dfe325`); W-F BUG-013 sample fixture restore (`766637c0`). Phase-close audit (`34d11e61` + `ed1f4193`) addressed 1 BLOCKER + 5 CONCERNs + 2 NITs from the reviewer punch list; pre-existing proof-engine.md strategy-chain doc gap closed in (`6a35369c`). 6 new diagnostic codes (PRE0153–PRE0158); 1 new ProofRequirementKind (DimensionalProduct); 1 new ProofForwardingFact variant (UnreachableRowFact); 1 new ResultQualifierPolicy (InheritPriceDenominatorUnit); 1 new ActionMeta property (WriteSemantics); 1 new ProofStrategy (DimensionalProduct); 1 retired ModifierKind (Writable) + TokenKind; NumericInterval gains Empty/Intersect/Difference; Integer arithmetic ops gain IntervalTransfer functions. Five §0.6 obligations move from Specification-only to Implemented.) |
-| Phase 5 post-review remediation | 15 code-review findings + 3 surfaced soundness defects + cleanup | 22 | 2 (Slice 2 qualifier + dimensionless-product; Slice 4 satisfiability-attribution + reachability) | M (~1 session) | ✅ **Complete 2026-05-28** (commit `11599944` + sample-restore `332f76ac` + post-regression Slices 6–7 still local). Extra-high-effort `/code-review` on the Phase 5 spike branch surfaced 15 findings; remediated across Slice 1 (1a/1b/1c/1d direct bug fixes), Slice 3 (`PriceDenominatorInherited` `QualifierBinding` subtype wired across 5 consumer sites + PRE0137 lift from `!opComposesDimensions` gate), and Slice 5 (PRE0159 `UnsatisfiableRule` pre-pass + reachability-gated `FieldNeverSet`). Two locked designs via `/lifecycle-2-design`, now archived in `docs/Working/Archive/`. Three precept-reviewer audits cleared with remediations. A regression `/code-review` pass against the cumulative diff confirmed 0 of 15 originals survived and surfaced 3 NEW soundness defects (`BuildSiblingRejectExclusions` source-order + wildcard-row gate; `ScanRules` pair-sweep ignoring `when` guards) — fixed in Slice 6 with the guard mutual-exclusion pre-check and the source-order/wildcard checks. Slice 7 collapsed four duplicate fold-constraint sites onto a shared `FoldConstraintsInto` helper, removed dead code, cleaned doc-comment drift, downgraded `bugs.md` BUG-006 scope notes (literal-comparison sibling rejects only), and swept 6 stale narrative `# BUG-NNN` refs in samples. **7167/7167 tests pass** (was 7136 at Phase 5 close; +31 net new tests across the remediation slices). Two designs archived; `bugs.md` updated. |
+| 4 | Collection completeness + BUG-002 + F-LANG-BIZ-10 | **~16** | 7 (D1-D7 — all settled) | **L+ (~2.5-3 weeks)** | ✅ **Complete 2026-05-26** (all 10 workstreams W-A through W-J shipped across ~42 commits across 2 sessions; 6281/6282 Precept.Tests pass — only pre-existing BUG-013; 411/411 LS, 67/67 MCP, 291/291 analyzer; 8 precept-reviewer rounds caught real BLOCKERs each time; 3 locked design docs via `/design` — W-G choice-inner, W-E index-bounds, W-H currency.minorUnit; bugs.md flipped BUG-002, BUG-005, BUG-012, F-LANG-COLL-13 to Fixed; W-H canonical sample `insurance-claim-adjudication.precept` uses `maxplaces currency.minorUnit`. Final phase-close audit (`1e865ac1`) swept 2 stale BUG-002 sample workarounds, 8 transient finding-ID refs, and shipped W-H sample uplift.) |
+| 5 | Proof engine satisfiability + BUG-004 + BUG-006 + FieldNeverSet/unification + BIZ operator extensions | **14** | 2 | XL (~3 sessions) | ✅ **Complete 2026-05-27** (all 6 workstreams W-A through W-F shipped across 20 commits; 7136/7136 tests pass across all 4 projects; 2 precept-reviewer rounds + remediations; 3 locked designs via `/design` — W-B FieldNeverSet, W-C satisfiability cluster, W-D BIZ operator extensions. **Workstream summary**: W-A BUG-004 event-ensure narrowing (`034a5976`); W-B F-LANG-GRAPH-04 FieldNeverSet + writable→editable unification — 8 slices, 4 commits, 27 sample fixes (`0d61f792` `12d7c422` `0feb135a` `2ac416b5`); W-C satisfiability cluster — SPEC-02 UnsatisfiableGuard wire-up + SPEC-03 ContradictoryRule + SPEC-04 VacuousRule + SPEC-05 TautologicalGuard + SPEC-12 UnreachableRowFact + BUG-006 cross-row interval composition (`a6c35e36` `ffb7288b` `c16be77b` `42cee783`); W-D BIZ operator extensions — BIZ-01 `money / price → quantity` + BIZ-05 `DimensionalProductProofRequirement` + PRE0157 + BIZ-08 discrete equality narrowing (`5d945711` `e71e09d2` `08fae0ef` `fdf33095`); W-E F-LANG-TEMP-04 always-false period comparison (`27dfe325`); W-F BUG-013 sample fixture restore (`766637c0`). Phase-close audit (`34d11e61` + `ed1f4193`) addressed 1 BLOCKER + 5 CONCERNs + 2 NITs from the reviewer punch list; pre-existing proof-engine.md strategy-chain doc gap closed in (`6a35369c`). 6 new diagnostic codes (PRE0153–PRE0158); 1 new ProofRequirementKind (DimensionalProduct); 1 new ProofForwardingFact variant (UnreachableRowFact); 1 new ResultQualifierPolicy (InheritPriceDenominatorUnit); 1 new ActionMeta property (WriteSemantics); 1 new ProofStrategy (DimensionalProduct); 1 retired ModifierKind (Writable) + TokenKind; NumericInterval gains Empty/Intersect/Difference; Integer arithmetic ops gain IntervalTransfer functions. Five §0.6 obligations move from Specification-only to Implemented.) |
+| Phase 5 post-review remediation | 15 code-review findings + 3 surfaced soundness defects + cleanup | 22 | 2 (Slice 2 qualifier + dimensionless-product; Slice 4 satisfiability-attribution + reachability) | M (~1 session) | ✅ **Complete 2026-05-28** (commit `11599944` + sample-restore `332f76ac` + post-regression Slices 6–7 still local). Extra-high-effort `/code-review` on the Phase 5 spike branch surfaced 15 findings; remediated across Slice 1 (1a/1b/1c/1d direct bug fixes), Slice 3 (`PriceDenominatorInherited` `QualifierBinding` subtype wired across 5 consumer sites + PRE0137 lift from `!opComposesDimensions` gate), and Slice 5 (PRE0159 `UnsatisfiableRule` pre-pass + reachability-gated `FieldNeverSet`). Two locked designs via `/design`, now archived in `docs/Working/Archive/`. Three precept-reviewer audits cleared with remediations. A regression `/code-review` pass against the cumulative diff confirmed 0 of 15 originals survived and surfaced 3 NEW soundness defects (`BuildSiblingRejectExclusions` source-order + wildcard-row gate; `ScanRules` pair-sweep ignoring `when` guards) — fixed in Slice 6 with the guard mutual-exclusion pre-check and the source-order/wildcard checks. Slice 7 collapsed four duplicate fold-constraint sites onto a shared `FoldConstraintsInto` helper, removed dead code, cleaned doc-comment drift, downgraded `bugs.md` BUG-006 scope notes (literal-comparison sibling rejects only), and swept 6 stale narrative `# BUG-NNN` refs in samples. **7167/7167 tests pass** (was 7136 at Phase 5 close; +31 net new tests across the remediation slices). Two designs archived; `bugs.md` updated. |
 | 6 | composite period basis (F-LANG-BIZ-07) | 1 (F-LANG-BIZ-09 closed) | 2 (D6.1 sample? D6.2 runtime-lowering deferral — both resolved in the plan) | M (~2.5–3.5d) | ✅ **Complete 2026-05-30.** All 4 workstreams shipped (W-A/W-B prior; W-C `fd147dc2`/`a42134e3`/`d2946dc0`; W-D scenario-test matrix + lease sample `31faa2ba` + single-basis whitespace-trim fix `02a1e44f`). Composite period basis (`period in 'hours + minutes'`) parses/validates/canonicalizes; `.basis`/`.dimension` accessors return composite/derived values; composite bases do not cancel single-unit denominators (D15); legal-basis-by-operation + D14 subset enforced. Full suite green (Precept.Tests 6597 + LS/MCP/Analyzers). Runtime `Period.Between` lowering deferred to the runtime phase (D6.2). Spec-conformance gaps surfaced during W-D (price×quantity resolver, exchangerate slash, PRE0073 — all *outside* composite-period scope) tracked in `spec-conformance-audit-2026-05-30.md` for a remediation phase. |
 | 7 | **Total language conformance sweep** — every spec/catalog construct, type, operator, modifier, and diagnostic probed against the implementation; every confirmed spec↔impl gap fixed | open-ended / exploration-driven (audit is one seed — A1–A4 / B1–B9 / C1–C4 / D1–D4 from `spec-conformance-audit-2026-05-30.md`; also commissioned audits, probing, conformance tests; count grows as discovery continues) | per-row owner rulings (spec-internal contradictions; A1↔C1 shared-root grouping; Phase 9 diagnostic-completeness seam) | XL | **Active — kicking off 2026-05-30** |
 | 8 | **Diagnostic-emission architecture** (Slice 1 inventory ✅ / Slice 2 code-mediation standardization ✅ `59fe2666` / Slice 3 ownership architecture — 3a taxonomy+consolidation ✅ `f7e5dee6`, 3b declared-bound ownership (numeric+length+qualifier) ✅ `ecce5d51` **but D4's Principle-11 claim only partial — unbounded computed/assigned results still silently skip = BUG-017, open**, 3b-count (count prover) next, 3c analyzer / Slice 4 counterexample witnesses / Slice 5 `maxplaces` precision proof — from the 2026-05-29 type↔proof-contract survey) | 5 slices | 2 | M→L | **Active — taken up 2026-05-31** |
 | 9 | Diagnostic completeness (every declared `DiagnosticCode` emits-or-retires; bidirectional CI) | ~7 | 3 | M | Stub — TBD |
 | 10 | API surface solidity (typed descriptors) | ~6 | 1 | M-L | Stub — TBD |
-| 11 | Polish + cleanup + `/lifecycle-7-audit` skill | ~20 | 4 | M | Stub — TBD |
+| 11 | Polish + cleanup + `/audit` skill | ~20 | 4 | M | Stub — TBD |
 | 12 | Runtime gate verification | — | 0 | S | Stub — TBD |
 
 **Overall estimate**: 7-11 weeks of focused work (was 6-10; Phase 2 grew). Phase 1 includes (a) 5 lifecycle skill builds + rename, (b) 16 Archive promotion obligations, (c) CONTRIBUTING.md lifecycle updates. Phase 2 grew from ~2-3 days to ~4-5 days after integrating 10 active bugs from `bugs.md` (sample-remediation work, 2026-05-24): 6 MCP-crash family bugs (BUG-003 period, -005 symptom, -007 domains, -008 duration, -010 now()+duration, -011 timezone+time), 1 MCP transport bug (BUG-009 payload limit), plus the original F-LANG-SPEC-10. Coordinated MCP-layer instrumentation pass catches the whole family in one fix. Phase 5 (proof engine satisfiability) remains the highest variance. **Phase 7 (total language conformance sweep, inserted 2026-05-30) is open-ended by design** — it runs slice after slice until the owner is satisfied the compiler is fully implemented and accurate to the spec; its size is bounded by what the probe matrix surfaces, not a week estimate, so the overall total is no longer a meaningful single number while Phase 7 is active.
@@ -61,9 +61,9 @@ From 2026-05-24 triage — **all 8 Phase-1-gating decisions settled**:
 - **MVP scope** = all 98 findings except graph-analyzer modifier extensions
 - **Graph-analyzer modifiers (F-LANG-SPEC-08)** = defer 10, drop `milestone` entirely
 - **Drop `milestone`** from spec § 0.5 #5 — undocumented synonym of shipped `required`
-- **Doc lifecycle framework adopted**: 7-stage lifecycle (Research, Design, Plan, Execute, Promote, Review, Maintain) with 5 lifecycle skills (`/lifecycle-1-research` through `/lifecycle-7-audit`)
+- **Doc lifecycle framework adopted**: 7-stage lifecycle (Research, Design, Plan, Execute, Promote, Review, Maintain) with 5 lifecycle skills (`/research` through `/audit`)
 - **Pointer-philosophy for canonical docs**: enumerable content goes to pointers + code; only conceptual why-content is hand-written in canonical
-- **`precept-reviewer` agent stays as agent**, spawned by lifecycle skills at key transitions; `/lifecycle-6-review` is the user-explicit end-of-lifecycle completion check
+- **`precept-reviewer` agent stays as agent**, spawned by lifecycle skills at key transitions; `/review` is the user-explicit end-of-lifecycle completion check
 
 **Phase 1 decisions** (full per-decision rationale in `compiler-readiness-review-2026-05-24.md § 1a`):
 1. F-LANG-CAT-01 (HoverDescription) — Rewrite CC#19: shipped to 5 catalogs, deliberately not Token; promote hover-design + interval-hover-design to language-server.md
@@ -73,7 +73,7 @@ From 2026-05-24 triage — **all 8 Phase-1-gating decisions settled**:
 5. F-LANG-CAT-06 (Construct Slot Model) — Pointer-philosophy rewrite; point to grammar-generator.md
 6. F-LANG-CAT-23 (Roslyn rules) — Categorized table (10 rows) + lift why from diagnostic-enforcement.md
 7. F-LANG-CAT-26 (SemanticTokenTypes) — **14th catalog**; add § + resolve 13-vs-14 inconsistency
-8. F-LEX-02 (Four-leg rationale) — Prospective only via `/lifecycle-2-design`; grandfather existing; no required backfill
+8. F-LEX-02 (Four-leg rationale) — Prospective only via `/design`; grandfather existing; no required backfill
 
 ### Resolved in Phase 2 (2026-05-25)
 
@@ -137,7 +137,7 @@ All three Phase-3-gating decisions are settled. Each carries the four-leg ration
   - File F-LANG-BIZ-11 (boundary-precision enforcement) for Phase 4+
   - Lift research artifact to `research/architecture/compiler/currency-precision-coupling-survey.md`
   - Sample-corpus tidy: one canonical sample uses explicit `maxplaces 2` idiom
-- **Settled by**: Conversation 2026-05-25 + external research via `/lifecycle-1-research` skill mid-planning. Recorded in heavyweight Phase 3 plan (commit follows).
+- **Settled by**: Conversation 2026-05-25 + external research via `/research` skill mid-planning. Recorded in heavyweight Phase 3 plan (commit follows).
 
 ### Still open — gating Phase 4+
 
@@ -163,8 +163,8 @@ This phase is doc-only (with the exception of any CC# items the owner decides to
 | B | Catalog-system.md rewrite (Decisions 1, 2, 3, 5, 6, 7 + F-LANG-CAT-AGGREGATE) | ✅ Complete (this session; 15-catalog convention adopted) |
 | C | Stage doc Status truth-ups (parser, type-checker, lexer, tooling-surface, primitive/business/temporal types) | ✅ Complete (this session) |
 | D | Spec § 0.5 rewrite + graph-analyzer-roadmap.md + § 1.1/§ 1.5/§ 2.1 BackArrow + grammar doc enumeration | ✅ Complete (this session) |
-| E | 16 Archive promotions via `/lifecycle-5-promote --backfill` | ✅ Complete (this session; 13 ✅ Promoted, 2 📌 Header-only, 1 🔄 Relocated) |
-| F | `/lifecycle-6-review --strict` verification | ✅ Complete (this session) — report at [`lifecycle-review-phase-1-2026-05-24.md`](lifecycle-review-phase-1-2026-05-24.md) |
+| E | 16 Archive promotions via `/promote --backfill` | ✅ Complete (this session; 13 ✅ Promoted, 2 📌 Header-only, 1 🔄 Relocated) |
+| F | `/review --strict` verification | ✅ Complete (this session) — report at [`lifecycle-review-phase-1-2026-05-24.md`](lifecycle-review-phase-1-2026-05-24.md) |
 
 ## Findings in scope (~40)
 
@@ -253,32 +253,32 @@ Phase 1 has 6 parallelizable workstreams. Skills enable later workstreams (build
 
 **Effort**: ~2-3 days (build sequence + CONTRIBUTING)
 
-#### Step A.1 — Rename `/research` → `/lifecycle-1-research` (~30 min)
-- Rename directory: `.claude/skills/research/` → `.claude/skills/lifecycle-1-research/`
+#### Step A.1 — Rename `/research` → `/research` (~30 min)
+- Rename directory: `.claude/skills/research/` → `.claude/skills/research/`
 - Update `SKILL.md` frontmatter `name:` field
 - Sweep references: `grep -rn "/research" CLAUDE.md docs/ .claude/ tools/`
 - Update description per `docs/Working/lifecycle-skill-drafts.md`
 
-#### Step A.2 — Build `/lifecycle-5-promote` (~3-4 hr, LOAD-BEARING)
-- Create `.claude/skills/lifecycle-5-promote/SKILL.md` from `docs/Working/lifecycle-skill-drafts.md` § `/lifecycle-5-promote`
+#### Step A.2 — Build `/promote` (~3-4 hr, LOAD-BEARING)
+- Create `.claude/skills/promote/SKILL.md` from `docs/Working/lifecycle-skill-drafts.md` § `/promote`
 - Implement `--backfill` mode (used for Archive promotion in Workstream E)
 - Implement archive-header enforcement
 - Test against one trivial Archive doc (e.g., one of the simpler promotions like `frank-bounds-qualifier-audit.md`)
 
-#### Step A.3 — Build `/lifecycle-2-design` (~3-4 hr)
-- Create `.claude/skills/lifecycle-2-design/SKILL.md` from draft
+#### Step A.3 — Build `/design` (~3-4 hr)
+- Create `.claude/skills/design/SKILL.md` from draft
 - Implement four-leg enforcement
 - Implement doc-touch enumeration auto-fill from CLAUDE.md routing table
 - Internally spawns `precept-reviewer` at lock-time
 
-#### Step A.4 — Build `/lifecycle-3-plan` (~3-4 hr)
-- Create `.claude/skills/lifecycle-3-plan/SKILL.md` from draft
+#### Step A.4 — Build `/plan` (~3-4 hr)
+- Create `.claude/skills/plan/SKILL.md` from draft
 - Implement heavyweight-current+next / lightweight-stubs-later structure enforcement
 - Implement decisions-as-gates surfacing
 - Internally spawns `precept-reviewer` against plan
 
-#### Step A.5 — Build `/lifecycle-6-review` (~3-4 hr)
-- Create `.claude/skills/lifecycle-6-review/SKILL.md` from draft
+#### Step A.5 — Build `/review` (~3-4 hr)
+- Create `.claude/skills/review/SKILL.md` from draft
 - Implement 7-step verification workflow
 - Implement `--strict` and `--accept-debt` flags
 - Used to verify Phase 1 itself at end (meta-consistent)
@@ -321,7 +321,7 @@ Files: `parser.md` (F-PAR-01, -02, -03), `type-checker.md` (F-TC-01), `lexer.md`
 
 **Effort**: ~3-4 days if parallelized; ~5-7 days sequential
 
-After `/lifecycle-5-promote` is built (Workstream A.2), use `--backfill` mode for each:
+After `/promote` is built (Workstream A.2), use `--backfill` mode for each:
 
 **4 already-known promotions** (from Decisions 1, 2, 6, 7):
 1. `hover-design.md` + `interval-hover-design.md` → `docs/tooling/language-server.md § 7.4` (M)
@@ -349,7 +349,7 @@ Partially-promoted (5):
 
 ### Workstream F — Verification (~½ day, runs last)
 
-Run `/lifecycle-6-review --strict` against Phase 1 deliverables:
+Run `/review --strict` against Phase 1 deliverables:
 - All 16 Archive docs have `**Promoted to:** ...` headers
 - All 8 Phase 1 decisions reflected in canonical docs
 - All catalog-system.md count claims match `grep -c` of corresponding `*Kind.cs` files
@@ -366,7 +366,7 @@ Output: completion report. If clean: Phase 1 complete. If 🔴: remediate before
 
 ## Dependencies
 - Sample-edit constraint: lifted (2026-05-30) — samples may be edited directly; historical sample-side bugs tracked in `bugs.md`.
-- Workstream A.2 (`/lifecycle-5-promote`) is the critical-path dependency for Workstream E. Build A.2 first; B/C/D can run in parallel after.
+- Workstream A.2 (`/promote`) is the critical-path dependency for Workstream E. Build A.2 first; B/C/D can run in parallel after.
 - All 8 Phase-1 gating decisions are settled (see plan-level "Decisions captured so far"). No pre-execution triage required.
 
 ## Exit criteria
@@ -393,7 +393,7 @@ By workstream:
 
 **Phase 1 total**: ~5-7 days if Workstreams B, C, D, E run in parallel after Workstream A completes the skills; ~7-10 days if more sequential.
 
-Workstream A.2 (`/lifecycle-5-promote`) is the critical-path dependency for Workstream E. Build it first, then E can start in parallel with B/C/D.
+Workstream A.2 (`/promote`) is the critical-path dependency for Workstream E. Build it first, then E can start in parallel with B/C/D.
 
 ---
 
@@ -669,7 +669,7 @@ Plus, since Phase 1's F-LANG-CAT-15 decision was "implement," `Operations.Resolv
 ## Discovered during planning
 
 1. **Frank's case-9 currency-member-access interpolation gap** absorbed into Step 3.3c (was case 9 of `frank-price-qualifier-full-analysis.md`). Adding currency accessors without extending interpolation-slot resolution would compound the silent gap. Step 3.3c grew ¼ day → 1-1.5 days; mirrors existing unit-slot resolution pattern.
-2. **F-LANG-BIZ-02 implicit-precision premise was wrong** — dropped via external research (`/lifecycle-1-research` skill, full survey in research artifact). Position 3 ratified; D10 retires doc-only; F-LANG-BIZ-11 filed for Phase 4+ boundary enforcement. Phase 3 effort drops L→M.
+2. **F-LANG-BIZ-02 implicit-precision premise was wrong** — dropped via external research (`/research` skill, full survey in research artifact). Position 3 ratified; D10 retires doc-only; F-LANG-BIZ-11 filed for Phase 4+ boundary enforcement. Phase 3 effort drops L→M.
 3. **F-LANG-BIZ-08 narrowing is design-required for Phase 5** — confirmed proof engine has no choice-equality narrowing strategy today. Step 3.3f verify-then-file rather than absorbing into Phase 3.
 4. **5 additional research follow-ups** from the currency-precision survey's Open Questions (multi-currency arithmetic safety, hyperinflationary drift, core-banking comparator gap, crypto, opt-in discoverability) — to be filed alongside the F-LANG-BIZ-11 lift.
 
@@ -681,7 +681,7 @@ Planning artifact: `/home/sfalik/.claude/plans/refactored-yawning-fern.md` (heav
 
 **Goal**: Every documented capability of the 9 collection types works as specified. The catalog's action-applicability metadata is actually enforced. Two-field quantifier bindings for ordered collections work. Qualified inner types parse. The grammar doc's vocabulary matches code. Plus: BUG-002 (lookup-remove key dispatch) and F-LANG-BIZ-10 (currency-derived `maxplaces`).
 
-**Status**: ✅ Complete 2026-05-26. All 10 workstreams (W-A through W-J) shipped across ~42 commits across 2 sessions. 6281/6282 Precept.Tests (only pre-existing BUG-013); 411/411 LS, 67/67 MCP, 291/291 analyzer. 8 precept-reviewer rounds caught real BLOCKERs each time. 3 locked design docs went through `/lifecycle-2-design`.
+**Status**: ✅ Complete 2026-05-26. All 10 workstreams (W-A through W-J) shipped across ~42 commits across 2 sessions. 6281/6282 Precept.Tests (only pre-existing BUG-013); 411/411 LS, 67/67 MCP, 291/291 analyzer. 8 precept-reviewer rounds caught real BLOCKERs each time. 3 locked design docs went through `/design`.
 
 **Findings closed** (16 + bundled bugs):
 - F-LANG-COLL-02 (choice inner in collections) — shipped W-G as feature (was scoped as targeted diagnostic; promoted)
@@ -695,11 +695,11 @@ Planning artifact: `/home/sfalik/.claude/plans/refactored-yawning-fern.md` (heav
 - F-LANG-COLL-10 (`notempty` on lookup) — shipped W-F (doc-only) then lifted as feature in W-J
 - F-LANG-COLL-11 (MissingOrderingKey rename) — shipped W-F: PRE0104 renamed to `RequiredTraitViolation`; new PRE0151 reserved for missing-`by`
 - F-LANG-COLL-12 (Countof/Peekby tokens) — **closed as audit error** in W-F: tokens are live keyword tokens (Types.cs:245,281); no code change
-- F-LANG-COLL-13 (clear + notempty lift on lookup) — shipped W-J after `/lifecycle-2-design` survey of comparator languages (Java/C#/Python/Rust/Swift/Kotlin/F#/Go all allow bulk clear)
-- F-LANG-GRAM-01/02/03/04/05 + InitialEvent rename — shipped W-I after `/lifecycle-2-design` taxonomy reorganization
+- F-LANG-COLL-13 (clear + notempty lift on lookup) — shipped W-J after `/design` survey of comparator languages (Java/C#/Python/Rust/Swift/Kotlin/F#/Go all allow bulk clear)
+- F-LANG-GRAM-01/02/03/04/05 + InitialEvent rename — shipped W-I after `/design` taxonomy reorganization
 - F-LANG-CAT-08 (ProofRequirementKind catalog completeness) — shipped W-E: catalog count now 11 (IndexBounds = 11)
 - F-LANG-SPEC-01 (mandatory `because`) — shipped W-F as cleanup (folded in mid-phase; was originally framed as "enforce or amend Principle 9" but investigation showed Principle 9 is locked spec text and the optional slot was an AI-co-authored departure)
-- F-LANG-BIZ-10 (currency-derived `maxplaces currency.minorUnit`) — shipped W-H after `/lifecycle-2-design` + two precept-reviewer rounds; F-UP-BIZ-10-B (`UseInModifierValueContext` catalog flag) landed early per reviewer
+- F-LANG-BIZ-10 (currency-derived `maxplaces currency.minorUnit`) — shipped W-H after `/design` + two precept-reviewer rounds; F-UP-BIZ-10-B (`UseInModifierValueContext` catalog flag) landed early per reviewer
 - **BUG-002** — shipped W-B: new `RemoveByKey` ActionSyntaxShape; lookup-remove dispatches on key type
 - **BUG-005** — fully closed by W-C's F-LANG-COLL-06 ship (was symptom-fixed in Phase 2)
 - **BUG-012** — pulled forward from Phase 5 into W-G: typed-literal inference in `TryDeclarationAttributeProof` lifts modifier from binary-op sibling
@@ -708,12 +708,12 @@ Planning artifact: `/home/sfalik/.claude/plans/refactored-yawning-fern.md` (heav
 - **D1** — Bundle collection proof obligations (COLL-04/05/09) into Phase 4 alongside the features. **Settled**: bundle (the obligations are the safety story for the features).
 - **D2** — F-LANG-COLL-11 PRE0104 rename. **Settled**: rename + fresh code (PRE0151 reserved for missing-`by`).
 - **D3** — F-LANG-COLL-12. **Settled**: closed as audit error; no code change.
-- **D4** — F-LANG-BIZ-10 inclusion in Phase 4 W-H. **Settled**: include, gated on `/lifecycle-2-design` + precept-reviewer pass.
+- **D4** — F-LANG-BIZ-10 inclusion in Phase 4 W-H. **Settled**: include, gated on `/design` + precept-reviewer pass.
 - **D5** — F-LANG-SPEC-01 (`because` on ensures). **Settled**: remove the optional slot (AI-slop cleanup; Principle 9 is locked spec text).
 - **D6** — Catalog-strict `Add` (no widening to Log/List). **Settled**: catalog-strict; sample/test cleanup migrated to `append` verb.
-- **D7** — Revert Lookup from `ClearApplicable` (W-A initial patch was a spec violation). **Settled**: revert; W-J then lifts via proper `/lifecycle-2-design` pass.
+- **D7** — Revert Lookup from `ClearApplicable` (W-A initial patch was a spec violation). **Settled**: revert; W-J then lifts via proper `/design` pass.
 
-**Designs locked via `/lifecycle-2-design`**:
+**Designs locked via `/design`**:
 - `docs/Working/choice-inner-and-ordered-propagation-design.md` (W-G — F-LANG-COLL-02/03 + BUG-012)
 - `docs/Working/index-bounds-proof-design.md` (W-E — F-LANG-COLL-04/09; pulls forward W-E's structural reshape that emerged mid-phase)
 - `docs/Working/f-lang-biz-10-currency-derived-maxplaces.md` (W-H — currency-derived `maxplaces`)
@@ -728,7 +728,7 @@ Planning artifact: `/home/sfalik/.claude/plans/refactored-yawning-fern.md` (heav
 - `844b10b4` — W-G (choice inner + ordered + BUG-012); `11b020a9` — W-G remediation (D-1 reshape + D-3 Option A + grammar sync)
 - W-A + W-B + W-F (action applicability + BUG-002 + hygiene — earlier session)
 - `44739a8b` — W-E F-LANG-COLL-05 + IndexBounds scaffolding
-- `d91ac091` — W-E design lock (after `/lifecycle-2-design` proper pass replaced an earlier ungrounded draft)
+- `d91ac091` — W-E design lock (after `/design` proper pass replaced an earlier ungrounded draft)
 - `12c670ac` — W-E slice 1 (Arguments slot on TypedMemberAccess); `c34359b1` — W-E slices 2-6 (catalog parameters, guard extension, discharge strategy, catalog wiring, diagnostic refinement); `a91ed96c` — W-E remediation (catalog-driven action dispatch)
 - `b5107e09` — W-H design remediation (verbatim citations + meta-pattern falsifier + early catalog-flag landing); `df5c4cff` — W-H implementation
 - `1e865ac1` — Phase 4 close-out audit remediation (BUG-002 sample sweep + transient ref scrub + W-H sample uplift)
@@ -737,7 +737,7 @@ Planning artifact: `/home/sfalik/.claude/plans/refactored-yawning-fern.md` (heav
 
 **Calibration for Phase 5** (from the phase-close audit):
 - BUG repros that name "field-vs-literal" vs "field-vs-field" as separate symptoms ARE separate fixes from the start. W-G's BUG-012 fix had to ship the literal-side strategy alongside the F-LANG-COLL-03 accessor work; treating them as one decision held.
-- precept-reviewer + `/lifecycle-2-design` cadence works. 8 rounds caught real BLOCKERs each time; treating it as overhead rather than discipline would have produced shippable-looking work that failed close-out audit.
+- precept-reviewer + `/design` cadence works. 8 rounds caught real BLOCKERs each time; treating it as overhead rather than discipline would have produced shippable-looking work that failed close-out audit.
 
 ---
 
@@ -783,7 +783,7 @@ Design: [`field-never-set-diagnostic.md`](field-never-set-diagnostic.md) v2 (Loc
 | 5 | `FieldWriteSiteAnalyzer` implementation | 1, 3, 4 | M (~1-1.5d) | No |
 | 6 | Sample corpus `FieldNeverSet` trip sweep | 2, 5 | M (~1-2d, high variance) | No |
 | 7 | Doc updates (full enumeration from design § Doc-update enumeration) | 1, 3, 4, 5 | M (~1d) | Yes (with 6) |
-| 8 | Verification + `/lifecycle-6-review --strict` | 6, 7 | S (~½d) | No |
+| 8 | Verification + `/review --strict` | 6, 7 | S (~½d) | No |
 
 ### Slice 1: Access-modifier unification
 
@@ -883,14 +883,14 @@ For the analyzer / catalog property:
 - `docs/language/catalog-system.md` § Action Catalog — document `WriteSemantics`
 - `docs/compiler/type-checker.md` — note `ActionMeta.WriteSemantics` if doc enumerates `ActionMeta` fields
 
-Exit: `/lifecycle-6-review --strict` reports no doc-update gaps.
+Exit: `/review --strict` reports no doc-update gaps.
 
 ### Slice 8: Verification
 
 - `dotnet test` all suites green
 - `precept_compile` across `samples/` — zero `FieldNeverSet` warnings
 - `precept_diagnostic("FieldNeverSet")` — full metadata; `precept_diagnostic("WritableOnEventArg")` — not-found
-- `/lifecycle-6-review --strict` clean on PR
+- `/review --strict` clean on PR
 - Spot-check regenerated `tmLanguage.json`
 - Manual smoke in VS Code: `field X as string editable` works; `field X as string writable` is a parser error
 
@@ -1033,7 +1033,7 @@ All four projects green (Precept.Tests 6593 / LS 413 / MCP 67 / Analyzers 291). 
 
 ## Discovered during planning
 
-The D4 amendment is an in-place spec edit (not a `/lifecycle-2-design` doc with `sources-consulted` frontmatter), so the code surface was mapped during this planning pass rather than enumerated at design time. Files the build will touch, none a design oversight:
+The D4 amendment is an in-place spec edit (not a `/design` doc with `sources-consulted` frontmatter), so the code surface was mapped during this planning pass rather than enumerated at design time. Files the build will touch, none a design oversight:
 - `src/Precept/Language/ProofRequirement.cs` — add `PeriodDimension.Datetime` (return/comparison value; pre-existing specced-but-unbuilt gap)
 - `src/Precept/Language/DeclaredQualifierMeta.cs` — `TemporalUnit` shape extension
 - `src/Precept/Pipeline/TypeChecker.cs` — `MapTemporalUnitQualifier` (composite parse + combined dimension); `MapTemporalDimensionQualifier` is **not** touched (`of 'datetime'` stays rejected)
@@ -1114,7 +1114,7 @@ Every slice, whatever its content, follows the same rigor: enumerate/probe → f
 | 3 | `exchangerate` slash syntax — parse `'USD/EUR'` into from/to, remove the `to`-form, sweep the `to` form out of the type docs, the catalog example, and the old tests. (Owner ruled slash canonical 2026-05-30.) | Planned |
 | 4 | **Absolute measurement positions — the `instant` analog for units.** Model absolute readings on affine/log scales — an absolute temperature (thermostat reading), an absolute level (`dBm`), pH — as a distinct *point* type with offset/reference-aware arithmetic, separate from `quantity` (which is always an *amount*). Surfaced from Slice 2: `quantity` amounts multiply and convert cleanly (kg, °C-of-change, dB-gain — scale-only); absolute positions can't be multiplied and need their own mechanism. **New language surface** (new type/construct) → full lifecycle (owner consultation → research → design) when taken up. Edge case business-wise; low priority. | Parked — new surface, not started |
 | 5 | **Angle-unit cross-unit cancellation** (split from Slice 2). Angle units (`deg`/`rad`/`gon`/`'`/`''`) are rejected today (`PRE0114`) — classified to an empty dimension name (`UnitDimensionHelper.cs:48`), which **diverges from the locked design** (allow + surface). Fix: give angle a dimension identity so same- and cross-angle cancel; their scale is a rational approximation of π → surfaced **approximate** (via the `ScaleIsRational` flag added in Slice 2). | Planned (split from Slice 2) |
-| 6 | **Log cross-unit cancellation policy** (split from Slice 2). `dB`/`Np`/`B` cancel today, but the UCUM log function is **stripped** (`UcumAtomCatalog.cs:466`) — the catalog holds *no real `dB↔Np` factor*, and the field's libraries *forbid* multiplying log units. The locked Decision 2 said "allow + surface," but there's no multiplicative scale to surface. **Needs a design ruling** (allow-with-what vs. restrict cross-log) before execution — a small `/lifecycle-2-design` amendment or owner ruling. | Parked — design ruling needed |
+| 6 | **Log cross-unit cancellation policy** (split from Slice 2). `dB`/`Np`/`B` cancel today, but the UCUM log function is **stripped** (`UcumAtomCatalog.cs:466`) — the catalog holds *no real `dB↔Np` factor*, and the field's libraries *forbid* multiplying log units. The locked Decision 2 said "allow + surface," but there's no multiplicative scale to surface. **Needs a design ruling** (allow-with-what vs. restrict cross-log) before execution — a small `/design` amendment or owner ruling. | Parked — design ruling needed |
 
 *(Append a row per slice as we go. This log is the running record of the phase.)*
 
@@ -1160,16 +1160,16 @@ Grounded in `research/architecture/compiler/type-proof-stage-contract-survey.md`
 
 **Slice 1 — Emission inventory & classification** ✅ **done 2026-05-31** (read-only, no code changed). Full audit at [`phase8-slice1-emission-inventory-2026-05-31.md`](phase8-slice1-emission-inventory-2026-05-31.md). Every compiler diagnostic is born through one factory (`Diagnostics.Create`, 239 calls, 18 pipeline files) — wired-site enumeration provably complete. ~240 emission sites across 6 stages, 3 value classes. **Obligation-in-disguise (Class O) population = exactly 3** (`OutOfRange`, `MaxPlacesExceeded`, the `UnprovedAssignmentQualifierCompatibility` type-stage residual), one root cause: the proof engine doesn't stamp value-level obligations for defaults/bounds/computed contexts. Qualifier/unit families already correctly split (resolved→immediate, open→stamped). 3 verified cross-stage dual-emissions (one with an ad-hoc dedup guard) = the concrete symptom Slice 3 fixes. **Spec-gap**: 162 declared codes, ~18 genuinely unimplemented; spec-grounded triage confirms **only 1 future Class-O** (`NullInNonNullableContext` — guard-discharged presence). Eventual obligation surface ≈ 3 wired + 1 future ≈ **4**; couples Phase 8 ↔ Phase 9 at the emit-or-retire seam. *(This slice also closes the discovery half of the "regularization audit" finding — the inline checks that are really obligations in disguise are now enumerated.)*
 
-**Slice 2 — Code-mediation standardization** (precursor; **Locked + ✅ executed 2026-06-01, commit `59fe2666`**, no behavior change verified — suite green 6624/417/291/67, adversarial diff review clean): [`phase8-slice2-code-mediation-2026-06-01.md`](phase8-slice2-code-mediation-2026-06-01.md), grounded by the deep dive [`phase8-slice2-dispatch-deepdive-2026-06-01.md`](phase8-slice2-dispatch-deepdive-2026-06-01.md) on the dynamically-dispatched emission families. Finding: most dynamic dispatch IS catalog-mediation (the architecture, not a smell); the real debt is the typed-constant stringly-typed `DiagnosticCode.ToString()`↔`Enum.TryParse` round-trip, the proof `CreateDiagnostic` dual-surface re-hardcoding (it re-hardcodes the 10 codes `CreateFaultSiteLink` reads from catalog), and the `DiagnosticCode→FaultCode` switch (`:412`) partially duplicating `[StaticallyPreventable]` (declared on 16 FaultCodes but never read). Converge code selection on "literal or single catalog-field," derive the bijective fault rows from the attribute, document the bounded residue. Makes Slice 3's "zero allow-list, fully enforced" true *by construction* (the analyzer reads a uniform surface). Open questions resolved at lock — validators carry a typed `DiagnosticCode?` (null ⇒ catalog Format/Semantic mapping; no string round-trip); CI field-pair collapsed to one nullable field. **Locked 2026-06-01 via `/lifecycle-2-design`; ready for `/lifecycle-3-plan`.**
+**Slice 2 — Code-mediation standardization** (precursor; **Locked + ✅ executed 2026-06-01, commit `59fe2666`**, no behavior change verified — suite green 6624/417/291/67, adversarial diff review clean): [`phase8-slice2-code-mediation-2026-06-01.md`](phase8-slice2-code-mediation-2026-06-01.md), grounded by the deep dive [`phase8-slice2-dispatch-deepdive-2026-06-01.md`](phase8-slice2-dispatch-deepdive-2026-06-01.md) on the dynamically-dispatched emission families. Finding: most dynamic dispatch IS catalog-mediation (the architecture, not a smell); the real debt is the typed-constant stringly-typed `DiagnosticCode.ToString()`↔`Enum.TryParse` round-trip, the proof `CreateDiagnostic` dual-surface re-hardcoding (it re-hardcodes the 10 codes `CreateFaultSiteLink` reads from catalog), and the `DiagnosticCode→FaultCode` switch (`:412`) partially duplicating `[StaticallyPreventable]` (declared on 16 FaultCodes but never read). Converge code selection on "literal or single catalog-field," derive the bijective fault rows from the attribute, document the bounded residue. Makes Slice 3's "zero allow-list, fully enforced" true *by construction* (the analyzer reads a uniform surface). Open questions resolved at lock — validators carry a typed `DiagnosticCode?` (null ⇒ catalog Format/Semantic mapping; no string round-trip); CI field-pair collapsed to one nullable field. **Locked 2026-06-01 via `/design`; ready for `/plan`.**
 
-**Slice 3 — Diagnostic-emission ownership architecture** (**Locked 2026-06-01**, design-reviewed): [`phase8-slice3-emission-ownership-2026-05-31.md`](phase8-slice3-emission-ownership-2026-05-31.md). Answers `research/architecture/README.md` open-question #2; subsumes the former `DiagnosticStage`-taxonomy work. Every `DiagnosticCode` is owned by exactly one stage, declared in `DiagnosticMeta.Stage` and enforced by a Roslyn analyzer — wrong-stage emission is a build error. Evolution: a hybrid + runtime reconciliation/dedup step was proposed and **rejected as a design smell** in favor of catalog-declared single-stage ownership; owner chose **option (a), no shortcuts** — extend the proof-engine default/computed walk so the 3 wired Class-O checks become proof-owned stamped obligations (no allow-list). Decisions: D1 ownership+analyzer (no dedup), D2 honest taxonomy (`Bind`/`Tooling`, drop the `NameBinder→Type`/`Mcp→Lex` mislabels), D3 proof-walk extension (value-level → proof-owned), D4 dual-emission consolidation (`NoInitialState`→Graph, `CircularComputedField`→one owner; delete the `GraphAnalyzer.cs:85` dedup guard), D5 `OutOfRange` identity (keep-proof-owned vs retire → Phase 9). **Design review done 2026-06-01** (`precept-reviewer`, adversarial): 1 BLOCKER + 4 CONCERN + 1 NIT, all source-verified and resolved into the Draft (BLOCKER — analyzer blind to dynamic dispatch — resolved by Slice 2 standardizing the surface). Open questions resolved at lock — analyzer stage-detection = containing-type; `CircularComputedField` owner = **Bind** (falsifier-guarded); `OutOfRange` **kept, proof-owned**, with consolidate-or-retire deferred to Phase 9 / F-LANG-SPEC-12. None needed an owner decision (all execution-placement or downstream). **Locked 2026-06-01 via `/lifecycle-2-design`; ready for `/lifecycle-3-plan` (Slice 2 → Slice 3).**
+**Slice 3 — Diagnostic-emission ownership architecture** (**Locked 2026-06-01**, design-reviewed): [`phase8-slice3-emission-ownership-2026-05-31.md`](phase8-slice3-emission-ownership-2026-05-31.md). Answers `research/architecture/README.md` open-question #2; subsumes the former `DiagnosticStage`-taxonomy work. Every `DiagnosticCode` is owned by exactly one stage, declared in `DiagnosticMeta.Stage` and enforced by a Roslyn analyzer — wrong-stage emission is a build error. Evolution: a hybrid + runtime reconciliation/dedup step was proposed and **rejected as a design smell** in favor of catalog-declared single-stage ownership; owner chose **option (a), no shortcuts** — extend the proof-engine default/computed walk so the 3 wired Class-O checks become proof-owned stamped obligations (no allow-list). Decisions: D1 ownership+analyzer (no dedup), D2 honest taxonomy (`Bind`/`Tooling`, drop the `NameBinder→Type`/`Mcp→Lex` mislabels), D3 proof-walk extension (value-level → proof-owned), D4 dual-emission consolidation (`NoInitialState`→Graph, `CircularComputedField`→one owner; delete the `GraphAnalyzer.cs:85` dedup guard), D5 `OutOfRange` identity (keep-proof-owned vs retire → Phase 9). **Design review done 2026-06-01** (`precept-reviewer`, adversarial): 1 BLOCKER + 4 CONCERN + 1 NIT, all source-verified and resolved into the Draft (BLOCKER — analyzer blind to dynamic dispatch — resolved by Slice 2 standardizing the surface). Open questions resolved at lock — analyzer stage-detection = containing-type; `CircularComputedField` owner = **Bind** (falsifier-guarded); `OutOfRange` **kept, proof-owned**, with consolidate-or-retire deferred to Phase 9 / F-LANG-SPEC-12. None needed an owner decision (all execution-placement or downstream). **Locked 2026-06-01 via `/design`; ready for `/plan` (Slice 2 → Slice 3).**
 
 **Slice 4 — Counterexample / witness richness** (not started). Dafny/CBMC hand the author a concrete counterexample on a failed proof; Precept emits the diagnostic but not the witness. Surface "X could be 0 here" for an unproved obligation — squarely the inspectability commitment, without an external solver. **Decision open**: scope and shape (which obligation kinds; structured-data shape for tooling). Aligns with `proof-engine.md` proof-attribution. Builds on the unified proof emission point Slice 3 produces.
 
-**Slice 5 — `maxplaces` compile-time precision proof** (not started; **supersedes Slice 3 Decision 6**). Make `maxplaces` proof-engine-verified at compile time instead of "type-stage static + runtime author-`round()`" (the current spec model, `business-domain-types.md:1581-1590`). Mechanism: a **decimal-scale abstract domain** parallel to the existing value-interval analysis (`ProofEngine.Intervals.cs`) — scale composes deterministically over the `decimal` backing (D12): `+`/`−` → `max`, `×` → sum, `÷` → unbounded, `round(x,n)` → `n`, field → declared `maxplaces` else ⊤. A new `PrecisionContainmentProofRequirement` (the candidate "sixth strategy" already flagged in `proof-engine.md` § Open Questions — *"Precision propagation awareness… if `ProofRequirement.PrecisionWarning` is added… whether this warrants a sixth proof strategy"*) stamps "assigned-expr max-scale ≤ target `maxplaces N`"; unprovable cases (division, unconstrained operands) → a diagnostic requiring `round(…, N)`. This makes `maxplaces` prevention-not-detection (compile-time-proven) and flips D6 — `MaxPlacesExceeded` gains a proof obligation and relocates to `Proof` (like `OutOfRange`). **Spec evolution** (author-visible: compile error vs runtime fault on the non-static case) — owner-authorized, not a locked-rejection override (the spec leaves the non-static case author-managed, not rejected). Grounded by `research/architecture/compiler/exact-decimal-arithmetic-survey.md` (scale-accumulation behavior) + the `proof-engine.md:2550` roadmap note. **Depends on Slice 3** (the proof-owned value-level model + the ownership analyzer). **Decision open**: pursue now vs. defer (medium priority per the proof-engine roadmap); the scale domain's exact transfer-function set. **Status: Stub — needs `/lifecycle-1-research` (extend the exact-decimal survey toward the scale-domain design) → `/lifecycle-2-design` (the obligation kind + transfer functions + the spec change) before execution.** **Effort: M–L** (~3–5d — new abstract domain + obligation kind + proof strategy + spec update).
+**Slice 5 — `maxplaces` compile-time precision proof** (not started; **supersedes Slice 3 Decision 6**). Make `maxplaces` proof-engine-verified at compile time instead of "type-stage static + runtime author-`round()`" (the current spec model, `business-domain-types.md:1581-1590`). Mechanism: a **decimal-scale abstract domain** parallel to the existing value-interval analysis (`ProofEngine.Intervals.cs`) — scale composes deterministically over the `decimal` backing (D12): `+`/`−` → `max`, `×` → sum, `÷` → unbounded, `round(x,n)` → `n`, field → declared `maxplaces` else ⊤. A new `PrecisionContainmentProofRequirement` (the candidate "sixth strategy" already flagged in `proof-engine.md` § Open Questions — *"Precision propagation awareness… if `ProofRequirement.PrecisionWarning` is added… whether this warrants a sixth proof strategy"*) stamps "assigned-expr max-scale ≤ target `maxplaces N`"; unprovable cases (division, unconstrained operands) → a diagnostic requiring `round(…, N)`. This makes `maxplaces` prevention-not-detection (compile-time-proven) and flips D6 — `MaxPlacesExceeded` gains a proof obligation and relocates to `Proof` (like `OutOfRange`). **Spec evolution** (author-visible: compile error vs runtime fault on the non-static case) — owner-authorized, not a locked-rejection override (the spec leaves the non-static case author-managed, not rejected). Grounded by `research/architecture/compiler/exact-decimal-arithmetic-survey.md` (scale-accumulation behavior) + the `proof-engine.md:2550` roadmap note. **Depends on Slice 3** (the proof-owned value-level model + the ownership analyzer). **Decision open**: pursue now vs. defer (medium priority per the proof-engine roadmap); the scale domain's exact transfer-function set. **Status: Stub — needs `/research` (extend the exact-decimal survey toward the scale-domain design) → `/design` (the obligation kind + transfer functions + the spec change) before execution.** **Effort: M–L** (~3–5d — new abstract domain + obligation kind + proof strategy + spec update).
 
 **Status**: **Active — taken up 2026-05-31**, ahead of the Phase 9 completeness sweep and while Phase 7 continues. Independent of the in-flight Phase 7 work (the C-class diagnostic-identity / PRE0114 items are a conformance + completeness concern, not an emission-architecture one, and stay with Phase 7 / Phase 9).
-**Estimated effort**: M→L (Slice 1 ✅ done; Slice 2 small, no-behavior-change refactor; Slice 3 medium + the `/lifecycle-2-design` pass done; Slice 4 medium).
+**Estimated effort**: M→L (Slice 1 ✅ done; Slice 2 small, no-behavior-change refactor; Slice 3 medium + the `/design` pass done; Slice 4 medium).
 
 ---
 
@@ -1293,8 +1293,8 @@ The compiler is declared production-ready when **all** of the following hold:
 - [`phase8-slice3-emission-ownership-2026-05-31.md`](phase8-slice3-emission-ownership-2026-05-31.md) — Phase 8 Slice 3: diagnostic-emission ownership architecture (Draft; subsumes the former `DiagnosticStage`-taxonomy work).
 - [`phase8-slice2-dispatch-deepdive-2026-06-01.md`](phase8-slice2-dispatch-deepdive-2026-06-01.md) — deep dive on the dynamically-dispatched emission families (what/why/worth-it/standardize), grounding Slice 2.
 - [`phase8-slice2-code-mediation-2026-06-01.md`](phase8-slice2-code-mediation-2026-06-01.md) — Phase 8 Slice 2: no-behavior-change standardization of diagnostic-code selection (catalog-mediation) so Slice 3's analyzer reads a uniform surface.
-- [`phase8-slices2-3-execution-plan-2026-06-01.md`](phase8-slices2-3-execution-plan-2026-06-01.md) — `/lifecycle-3-plan` output: build sequence Slice 2 (✅ `59fe2666`) → Slice 3a (✅ `f7e5dee6`) → Slice 3b + 3b-count (declared-bound ownership) → Slice 3c (ownership analyzer).
-- [`phase8-value-level-obligation-ownership-2026-06-01.md`](phase8-value-level-obligation-ownership-2026-06-01.md) — Slice 3b's dedicated `/lifecycle-2-design` (Locked, 3 review rounds; **carries a ⚠️ Correction header — its Principle-11-completeness claims were overstated; do not trust "closes the P11 gaps"**): D1 keep-both-codes partition, D2 OutOfRange via stamped Numeric, D4 computed-field gap (**bounded-result only; unbounded = BUG-017, open**), D8 length defaults, D9 revive dead `CountBoundViolation`, D10 no-collision. Expands Slice 3 D3, resolves D5.
+- [`phase8-slices2-3-execution-plan-2026-06-01.md`](phase8-slices2-3-execution-plan-2026-06-01.md) — `/plan` output: build sequence Slice 2 (✅ `59fe2666`) → Slice 3a (✅ `f7e5dee6`) → Slice 3b + 3b-count (declared-bound ownership) → Slice 3c (ownership analyzer).
+- [`phase8-value-level-obligation-ownership-2026-06-01.md`](phase8-value-level-obligation-ownership-2026-06-01.md) — Slice 3b's dedicated `/design` (Locked, 3 review rounds; **carries a ⚠️ Correction header — its Principle-11-completeness claims were overstated; do not trust "closes the P11 gaps"**): D1 keep-both-codes partition, D2 OutOfRange via stamped Numeric, D4 computed-field gap (**bounded-result only; unbounded = BUG-017, open**), D8 length defaults, D9 revive dead `CountBoundViolation`, D10 no-collision. Expands Slice 3 D3, resolves D5.
 
 ---
 

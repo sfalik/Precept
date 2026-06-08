@@ -1,24 +1,35 @@
 ---
-name: lifecycle-2-design
+name: design
 description: Stage 2 of the engineering lifecycle — lock a design with required structure (four-leg rationale per decision, acceptance criteria, doc-update enumeration). Triggers on — design, lock a design, propose, spec out, specification, "let's design X", design doc, formalize this approach. Takes a topic (and optional research source) and produces a locked design doc in `docs/Working/`. Refuses to mark designs "locked" without four-leg rationale on every decision.
 ---
 
 # Precept Design Lock
 
-Stage 2 of the engineering lifecycle. Produces a locked design doc in `docs/Working/` that downstream `/lifecycle-3-plan` and `/lifecycle-5-promote` skills can consume reliably.
+Stage 2 of the engineering lifecycle. Produces a locked design doc in `docs/Working/` that downstream `/plan` and `/promote` skills can consume reliably.
 
 ## When to use
 
 - Idea or research conclusion is ready to commit to a specific approach
 - Implementation can't start until the design is locked (alternatives still in play; acceptance unclear)
 - User says "let's design X" / "let's spec this out" / "lock this in"
-- After `/lifecycle-1-research` produces conclusions that need to advance to a design
+- After `/research` produces conclusions that need to advance to a design
 
 ## When NOT to use
 
-- Idea is too early — still need research (use `/lifecycle-1-research`)
-- Already implementing — use `/lifecycle-5-promote` afterward to canonicalize
+- Idea is too early — still need research (use `/research`)
+- Already implementing — use `/promote` afterward to canonicalize
 - Pure bug-fix or polish work — designs not warranted
+
+## High & Ultra Modes
+
+**Trigger:** `/design high <args>` or `/design ultra <args>` (also recognise "high-rigour"/"ultra" phrasing in the request). **Opt-in only** — these spend many sub-agents and tokens; they are never the default. Reach for them on high-stakes, hard-to-reverse, or easy-to-get-subtly-wrong work where a single pass is not enough.
+
+Both modes run this skill as a multi-agent `Workflow` instead of a single inline pass, and add independent multiplicity + adversarial verification *on top of* this skill's normal discipline — which still fully applies (nothing below replaces the required structure, gates, or checks). Every spawned agent works fluency-first and verifies its claims against source.
+
+- **high** — ≥3 independent design candidates from different framings → an adversarial judge panel (soundness / completeness / buildability) ranks them and names the must-graft ideas → synthesis from the strongest spine grafting the best → one completeness-critic + red-team pass.
+- **ultra** — more candidates, **independent re-derivation of the load-bearing decisions** (convergence is the evidence), and the critic + red-team **loop-until-dry**, with a final red-team before lock.
+
+---
 
 ## Pre-design gate (Non-Negotiable)
 
@@ -318,11 +329,11 @@ Format: 2-5 specific observations that, if seen post-ship, would force a redesig
 - "If `precept_compile` p99 latency exceeds 50ms on the median sample after this construct ships, the parser strategy is wrong and should be reconsidered."
 - "If a single domain expert in a usability test cannot author a working example using this feature within 10 minutes, the audience-fit claim is falsified."
 
-Falsifiers are paired with `/lifecycle-7-audit` for revisit discipline — periodic checks against the falsifier list catch designs that aged badly.
+Falsifiers are paired with `/audit` for revisit discipline — periodic checks against the falsifier list catch designs that aged badly.
 
 ## Acceptance criteria
 Test-shaped. "This passes" / "this fails as expected" / "this is documented in Y."
-Specific enough that `/lifecycle-3-plan` can derive Phase exit criteria from them.
+Specific enough that `/plan` can derive Phase exit criteria from them.
 
 ## Dependencies
 - Upstream: what must be in place first (other locked designs, shipped code, owner decisions)
@@ -330,8 +341,8 @@ Specific enough that `/lifecycle-3-plan` can derive Phase exit criteria from the
 
 ## Doc-update enumeration
 Per the CLAUDE.md routing table, which canonical docs will need updates when this
-design ships. Listed upfront so `/lifecycle-3-plan` can include them as Phase
-sub-tasks and `/lifecycle-5-promote` can verify them at promotion time.
+design ships. Listed upfront so `/plan` can include them as Phase
+sub-tasks and `/promote` can verify them at promotion time.
 
 Example:
 - `docs/language/precept-language-spec.md` § N — feature definition
@@ -381,7 +392,7 @@ Cooling-off requirement: a design with any `Stakes: irreversible` decision must 
 
 Designs with at least one `Stakes: irreversible` decision must clear a research-adequacy check before advancing to `Locked`. The gate has four honest exits, exactly one of which must apply:
 
-- **(a) Research-cited**: the design cites a research file in `research/` that surveyed the relevant comparable systems with verbatim excerpts and meets `/lifecycle-1-research` Stage-1 quality. The cited file must appear in `sources-consulted` and in at least one per-decision `Sources consulted for this decision:` leg. Frontmatter declares `comparable-systems-research-status: strong`.
+- **(a) Research-cited**: the design cites a research file in `research/` that surveyed the relevant comparable systems with verbatim excerpts and meets `/research` Stage-1 quality. The cited file must appear in `sources-consulted` and in at least one per-decision `Sources consulted for this decision:` leg. Frontmatter declares `comparable-systems-research-status: strong`.
 - **(b) Inline-survey**: per-decision comparable-systems survey is carried inline — for each external system named in the decision's prose, the leg supplies a verbatim excerpt, an access date, and a stable identifier (file path, RFC#, DOI, paper title + venue + year, or live URL with mirror). The inline survey meets the same discipline as a Stage-1 research artifact; the cumulative legs across decisions cover every comparator named. Frontmatter declares `comparable-systems-research-status: partial`.
 - **(c) Not-applicable**: the design genuinely makes no comparable-systems claims. The frontmatter declares `comparable-systems-research-status: not-applicable — <one-line justification>` (e.g., "purely Precept-internal placement decision; no language-surface or architectural-precedent claim"). Reviewer treats this exit as a CONCERN if the design's prose nonetheless names external systems.
 - **(d) Novel-verified**: the author looked for comparators, found none that apply to the decision's problem, and is locking the decision as honestly novel. The frontmatter declares `comparable-systems-research-status: novel-verified`. The design must include a `## Novel-verified declaration` section listing (1) **the obvious comparators checked** — at minimum 3, drawn from the reviewer's `Mandatory comparator-checking by topic` table for the relevant surface; (2) **a one-line "doesn't apply because <reason>" for each**; (3) **a one-paragraph defense of why the novelty is warranted** given the gap. The exit is for designs that are genuinely first-of-their-kind, not for designs where the author didn't want to do the survey. Reviewer treats this exit as a CONCERN if (a) any comparator on the reviewer's topic table is missing from the checked-list without justification, or (b) the design's prose nonetheless names a system that DOES solve the decision's problem and the doesn't-apply line is unconvincing.
@@ -440,7 +451,7 @@ The skill enforces:
 ## Composability
 
 - **Input**: human-discipline obligation — if a `research/` file exists for the design's topic, the author must read it before locking, cite it in `sources-consulted`, and copy verbatim excerpts into per-decision `Sources consulted for this decision:` legs for any claim the research grounds. The historical `--from <research-doc>` flag was a rhetorical claim — no implementation; designs that cited it produced no operational difference. Removed in Phase 8 (2026-05-25) along with the empirical finding that no in-tree design had ever used it.
-- **Output**: locked design at `docs/Working/<slug>.md` — consumed by `/lifecycle-3-plan` for phase planning, and later by `/lifecycle-5-promote` for canonical doc updates.
+- **Output**: locked design at `docs/Working/<slug>.md` — consumed by `/plan` for phase planning, and later by `/promote` for canonical doc updates.
 
 ## Anti-patterns to refuse
 

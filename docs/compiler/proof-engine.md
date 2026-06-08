@@ -2421,7 +2421,7 @@ static bool ContainsErrorExpression(TypedExpression expr) => expr switch
 
 ### Decision 1: Bounded Strategy Set vs. SMT Solver
 
-**Decision:** The proof engine uses a bounded set of proof strategies — no general SMT solver. The set has grown by one strategy at a time as the language surface has expanded (currently a handful of catalog-driven strategies plus several requirement-dispatched ones); each addition has gone through `/lifecycle-2-design` review against this same rationale.
+**Decision:** The proof engine uses a bounded set of proof strategies — no general SMT solver. The set has grown by one strategy at a time as the language surface has expanded (currently a handful of catalog-driven strategies plus several requirement-dispatched ones); each addition has gone through `/design` review against this same rationale.
 
 **Rationale:**
 - **Predictability:** Every proof attempt completes in bounded, deterministic time. No solver timeouts, no "unknown" results, no resource exhaustion.

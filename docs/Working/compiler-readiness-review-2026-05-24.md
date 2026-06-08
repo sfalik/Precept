@@ -429,9 +429,9 @@ Sequential, single-session review carrying full upstream context. Each stage exa
 1. `typed-constants-and-proof-coverage-plan.md` (L) — Type-Grammar Slot Classification architecture; touches 4 canonical docs; single largest stranded design surface
 2. `catalog-compliance-audit.md` (M) — Pattern A-H taxonomy + Missing Catalog Fields master list; rosetta stone for why catalog-system.md is shaped the way it is
 3. `quantity-normalization-design.md` (L) — Two-layer value architecture + UCUM scale table + runtime intake-boundary normalization
-**Recommended fix**: Phase 1 includes all 16 promotions as sub-tasks. Use `/lifecycle-5-promote --backfill` (once skill is built) to clear them systematically. Some can be parallelized. Aggregate effort: ~3-4 days for all 16 if parallelized, ~5-7 days sequentially.
+**Recommended fix**: Phase 1 includes all 16 promotions as sub-tasks. Use `/promote --backfill` (once skill is built) to clear them systematically. Some can be parallelized. Aggregate effort: ~3-4 days for all 16 if parallelized, ~5-7 days sequentially.
 **Effort**: L (aggregate)
-**Depends on**: `/lifecycle-5-promote` skill (build first in Phase 1)
+**Depends on**: `/promote` skill (build first in Phase 1)
 
 #### F-X-04 — Cross-stage sample regression: 7 samples fail to compile clean
 **Severity**: P1 (cross-references parallel-session work)

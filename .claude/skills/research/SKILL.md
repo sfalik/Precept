@@ -1,13 +1,24 @@
 ---
-name: lifecycle-1-research
-description: Stage 1 of the engineering lifecycle — research and exploration that feeds /lifecycle-2-design. Conduct technical, cross-domain, or feasibility research that informs Precept's language design, architecture, tooling, or product positioning. Triggers on — research, investigate, survey, compare alternatives, evaluate feasibility, prior art, precedent, landscape, "how do other tools handle X". Use this for any task whose output is a markdown document in `research/` (or a domain-owned research folder), not code. Excludes: brand identity research (use `design/brand/research/`) and UX research (use `design/system/research/`).
+name: research
+description: Stage 1 of the engineering lifecycle — research and exploration that feeds /design. Conduct technical, cross-domain, or feasibility research that informs Precept's language design, architecture, tooling, or product positioning. Triggers on — research, investigate, survey, compare alternatives, evaluate feasibility, prior art, precedent, landscape, "how do other tools handle X". Use this for any task whose output is a markdown document in `research/` (or a domain-owned research folder), not code. Excludes: brand identity research (use `design/brand/research/`) and UX research (use `design/system/research/`).
 ---
 
 # Precept Research (Lifecycle Stage 1)
 
-Stage 1 of the engineering lifecycle. Conclusions that lock decisions feed forward to `/lifecycle-2-design`.
+Stage 1 of the engineering lifecycle. Conclusions that lock decisions feed forward to `/design`.
 
 Research in this repo informs language design, architecture, tooling, and policy. The discipline matters as much as the findings — evidence-oriented, citation-rich, and never shadow policy.
+
+## High & Ultra Modes
+
+**Trigger:** `/research high <args>` or `/research ultra <args>` (also recognise "high-rigour"/"ultra" phrasing in the request). **Opt-in only** — these spend many sub-agents and tokens; they are never the default. Reach for them on high-stakes, hard-to-reverse, or easy-to-get-subtly-wrong work where a single pass is not enough.
+
+Both modes run this skill as a multi-agent `Workflow` instead of a single inline pass, and add independent multiplicity + adversarial verification *on top of* this skill's normal discipline — which still fully applies (nothing below replaces the required structure, gates, or checks). Every spawned agent works fluency-first and verifies its claims against source.
+
+- **high** — ≥3 independent investigations from different search strategies / source sets / framings (each citation-disciplined per this skill), cross-validated (convergent findings corroborate; divergent ones are flagged), then one adversarial "what's missing / what would change this conclusion" pass.
+- **ultra** — more independent investigations, **replicate the load-bearing citations** (two agents extract the same source independently, so a fabricated or misread quote cannot survive), and loop the completeness critic until it finds nothing new.
+
+---
 
 ## Pre-research gate (Non-Negotiable)
 
@@ -186,7 +197,7 @@ A conclusion that states WHAT without WHY is incomplete. Flag it as draft.
 
 **Required when the research proposes conclusions.** 2-3 observations or
 evidence-shapes that, if encountered, would force re-investigation. Parallel
-to the `## Falsifiers` section in `lifecycle-2-design` — Hillel Wayne's
+to the `## Falsifiers` section in `design` — Hillel Wayne's
 "what would change my mind" school.
 
 Examples:

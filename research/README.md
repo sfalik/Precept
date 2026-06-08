@@ -56,7 +56,7 @@ Every research file declares a `status:` field in YAML frontmatter. Values:
 | `Superseded by: <link>` | A specific later document replaces this one. |
 | `Archived` | Moved to `research/archive/` with `archived: YYYY-MM-DD — <reason>` in frontmatter. |
 
-The status field is the **inbound signal for the promote-or-cite rule** in `.claude/skills/lifecycle-1-research/SKILL.md § Step 7`. Research with `Active` status that lacks both the `horizon groundwork` qualifier and inbound citations is shadow policy and will be flagged by `precept-reviewer` § 14 (Stage-1 Research-Doc Review Path).
+The status field is the **inbound signal for the promote-or-cite rule** in `.claude/skills/research/SKILL.md § Step 7`. Research with `Active` status that lacks both the `horizon groundwork` qualifier and inbound citations is shadow policy and will be flagged by `precept-reviewer` § 14 (Stage-1 Research-Doc Review Path).
 
 **Other frontmatter conventions** (per the skill's Document Structure):
 

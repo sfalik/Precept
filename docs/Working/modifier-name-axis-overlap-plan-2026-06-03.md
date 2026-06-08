@@ -40,7 +40,7 @@ All from the Locked design — none re-litigated:
 
 **Decisions required before kicking off**: none (the migration-rewrite is a build-confirm, above).
 
-**Step-by-step execution** (enumerate → failing-test matrix first → gate → delegate to a fresh agent → adversarial review → integrate, per `/lifecycle-4-execute`):
+**Step-by-step execution** (enumerate → failing-test matrix first → gate → delegate to a fresh agent → adversarial review → integrate, per `/execute`):
 
 1. **Failing-test matrix first (TDD)** in `test/Precept.Tests/`:
    - `set of string notempty` + an empty-string element (`default [""]` or an ingress) → element-bound rejection (per-element non-empty).
@@ -105,4 +105,4 @@ None requires design re-lock — the design's Inventory scopes each surface.
 
 ## Plan update protocol
 
-After each slice: check off in this doc, mark the phase row ✅ with the commit hash, pause for review at the slice boundary (no auto-advance). When Slice 1 lands, promote Slice 2 from stub to heavyweight. Surface any mid-build design gap as an Open Decision routed to `/lifecycle-2-design` — do not patch the Locked design inline.
+After each slice: check off in this doc, mark the phase row ✅ with the commit hash, pause for review at the slice boundary (no auto-advance). When Slice 1 lands, promote Slice 2 from stub to heavyweight. Surface any mid-build design gap as an Open Decision routed to `/design` — do not patch the Locked design inline.

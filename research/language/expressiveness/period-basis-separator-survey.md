@@ -290,7 +290,7 @@ The case for keeping `&` is weak after this investigation: no load-bearing reaso
 
 ## Open Questions
 
-- **Should the amendment also formalize the same separator at the value level for non-period quantity composition?** I.e., is there any future type-level qualifier composition that could land later (e.g., currency baskets `money in 'USD+EUR+GBP'` for a future "any of these" qualifier) where `+` would carry "OR" semantics rather than "AND"? Out of scope for this research; would be its own design conversation if/when such a qualifier is proposed. Surface for future `/lifecycle-2-design` if relevant.
+- **Should the amendment also formalize the same separator at the value level for non-period quantity composition?** I.e., is there any future type-level qualifier composition that could land later (e.g., currency baskets `money in 'USD+EUR+GBP'` for a future "any of these" qualifier) where `+` would carry "OR" semantics rather than "AND"? Out of scope for this research; would be its own design conversation if/when such a qualifier is proposed. Surface for future `/design` if relevant.
 - **What is the diagnostic message at the qualifier-value parser when the author types the wrong separator?** Implementation question — covered in F-LANG-BIZ-07 build work, not by this research.
 - **D9's narrowing marker surface (`$eq:X.basis:hours&minutes` → `$eq:X.basis:hours+minutes`) — is the marker string stable across compilation runs and visible in any externalized artifact (LSP hover, MCP diagnostic, etc.)?** Implementation question for the amendment PR.
 

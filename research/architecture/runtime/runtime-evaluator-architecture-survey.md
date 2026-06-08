@@ -8,6 +8,8 @@ External research: how different rule engines, expression evaluators, configurat
 
 **Research angle:** Eight dimensions of runtime evaluator design — (1) runtime object architecture, (2) evaluator design, (3) fault/error representation, (4) compile-time to runtime fault correspondence, (5) entity/activation versioning, (6) inspect/preview architecture, (7) result type design, (8) constraint evaluation model.
 
+**See also:** [`../compiler/static-vs-runtime-expression-evaluation-survey.md`](../compiler/static-vs-runtime-expression-evaluation-survey.md) builds forward from this survey to the specific question of whether Precept's *compile-time proof-engine fold* and this *runtime evaluator* should share a single expression-evaluation core (dimension 4 — compile-time↔runtime correspondence — taken to its soundness conclusion: identical-engine vs subset vs abstract vs conformance-tested, with the GCC/Liquid-Haskell drift evidence).
+
 ---
 
 ## CEL (Common Expression Language) — cel-go

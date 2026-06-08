@@ -1,6 +1,6 @@
 ---
-name: lifecycle-4-execute
-description: Stage 4 of the engineering lifecycle — execute against a locked design and phased plan. Triggers on — implement, execute, ship, build this, start the work, "implement phase N", "do the next slice", "open the PR for X". Captures the execution rigor (enumerate the input space + test-first before coding, delegate well-specified work to a fresh worktree agent, adversarial diff review before commit) and the execution cadence (vertical-slice discipline, PR-body update protocol, commit conventions, post-slice doc-touch verification). Does NOT design (use /lifecycle-2-design) or plan (use /lifecycle-3-plan).
+name: execute
+description: Stage 4 of the engineering lifecycle — execute against a locked design and phased plan. Triggers on — implement, execute, ship, build this, start the work, "implement phase N", "do the next slice", "open the PR for X". Captures the execution rigor (enumerate the input space + test-first before coding, delegate well-specified work to a fresh worktree agent, adversarial diff review before commit) and the execution cadence (vertical-slice discipline, PR-body update protocol, commit conventions, post-slice doc-touch verification). Does NOT design (use /design) or plan (use /plan).
 ---
 
 # Precept Execution
@@ -12,21 +12,32 @@ Stage 4 of the engineering lifecycle. Bridges plan (Stage 3) and promotion (Stag
 - A locked design and a phased plan are in place; ready to write code
 - Starting the next vertical slice of an in-flight phase
 - Opening the PR for a design / executing against a plan
-- After `/lifecycle-3-plan` produces phases that need execution
+- After `/plan` produces phases that need execution
 
 ## When NOT to use
 
-- Design isn't locked yet → use `/lifecycle-2-design`
-- No plan exists for non-trivial work → use `/lifecycle-3-plan` first
+- Design isn't locked yet → use `/design`
+- No plan exists for non-trivial work → use `/plan` first
 - The work is a small bug fix or polish with no design-and-plan upstream — just commit directly per the standard workflow in CONTRIBUTING.md
-- Promoting design content to canonical docs → use `/lifecycle-5-promote`
+- Promoting design content to canonical docs → use `/promote`
+
+## High & Ultra Modes
+
+**Trigger:** `/execute high <args>` or `/execute ultra <args>` (also recognise "high-rigour"/"ultra" phrasing in the request). **Opt-in only** — these spend many sub-agents and tokens; they are never the default. Reach for them on high-stakes, hard-to-reverse, or easy-to-get-subtly-wrong work where a single pass is not enough.
+
+Both modes run this skill as a multi-agent `Workflow` instead of a single inline pass, and add independent multiplicity + adversarial verification *on top of* this skill's normal discipline — which still fully applies (nothing below replaces the required structure, gates, or checks). Every spawned agent works fluency-first and verifies its claims against source.
+
+- **high** — per slice: a faithful builder, then ≥2 independent adversarial verifiers each try to break the slice against its acceptance before integrate, plus mutation-test the slice's tests.
+- **ultra** — per slice, **N-version**: multiple independent builders of the same slice (converge, or investigate divergence), a perspective-diverse adversarial-verifier panel, 100% mutation-kill on the slice, and the standing trust harness.
+
+---
 
 ## Execution mode: PR mode vs. spike-branch mode
 
 The cadence below has two modes. They differ **only** in the execution-hub artifact — the rigor, vertical-slice discipline, doc-sync, commit conventions, and review gates are identical in both.
 
 - **PR mode (default).** Issue → feature branch → draft PR → merge to `main`. The **draft PR body is the execution hub and the plan artifact** (`Closes #N`, Implementation Plan checklist). This is the `CONTRIBUTING.md` flow; use it for any branch destined to merge to `main`.
-- **Spike-branch mode.** Work on a long-lived `spike/*` branch where **no PR is opened** and commits land directly on the branch. There is no PR body, no `Closes #N`, no merge ceremony. The **execution hub and plan artifact is the plan doc** (`docs/Working/<topic>-plan-YYYY-MM-DD.md`) produced by `/lifecycle-3-plan` — its slice list is the checklist, its phase rows are the progress tracker. A GitHub issue is optional.
+- **Spike-branch mode.** Work on a long-lived `spike/*` branch where **no PR is opened** and commits land directly on the branch. There is no PR body, no `Closes #N`, no merge ceremony. The **execution hub and plan artifact is the plan doc** (`docs/Working/<topic>-plan-YYYY-MM-DD.md`) produced by `/plan` — its slice list is the checklist, its phase rows are the progress tracker. A GitHub issue is optional.
 
 **Detecting the mode:** if the current branch matches `spike/*` (or the owner has said "no PR on this branch"), you are in spike-branch mode — read every "PR body" instruction below as "plan doc," skip the draft-PR step, and commit directly on the spike branch. When in doubt, ask which mode applies; don't open a PR on a spike branch without confirmation.
 
@@ -53,7 +64,7 @@ The numbered workflow below is the execution *cadence* — slices, commits, doc-
 
 1. **Enumerate the full input/obligation space.** List every shape the change must handle — every source-expression form, every obligation/requirement kind, every soundness rule — and **probe real behavior** on each, not just the examples in the design. Under-enumeration is the most common cause of a mid-build regression pile.
 2. **Write the failing test matrix FIRST (test-first / TDD).** Turn the enumerated space into failing tests *before* implementation — one per shape, plus one per soundness/acceptance rule. Anthropic: *"write a failing test that reproduces the issue, then fix it"*; *"provide verification criteria with example test cases."* Writing the matrix first *forces* the enumeration, so a missing shape fails loudly up front. (This sharpens § 5 Tests below: tests come *before* the code, not alongside it.)
-3. **The gate (the repeat-preventer).** Code only when the slice is specified *and* tested tightly enough to brief a fresh agent **without judgment calls**. If it isn't, that's the signal to enumerate/design more — a slice needing a genuinely new mechanism gets a focused `/lifecycle-2-design` first, not a code-first attempt.
+3. **The gate (the repeat-preventer).** Code only when the slice is specified *and* tested tightly enough to brief a fresh agent **without judgment calls**. If it isn't, that's the signal to enumerate/design more — a slice needing a genuinely new mechanism gets a focused `/design` first, not a code-first attempt.
 
 > **⚠️ Fresh-build check before trusting `precept_compile`.** The precept MCP server serves the build from when it **last spawned** (`start-precept-mcp.js` rebuilds on spawn, then runs a frozen snapshot). If `src/Precept` or `tools/Precept.Mcp` changed this session, `precept_compile` / `precept_diagnostic` are **stale** — they reflect old compiler behavior. Ask the owner to run **`/mcp reconnect precept`** (rebuilds on reconnect — no session restart needed), *then* probe. When an MCP result disagrees with a freshly-built unit test (`dotnet test`), trust the test and suspect a stale server first — don't root-cause a phantom bug. For ground-truth that's never stale, compile directly against the freshly-built core (`Compiler.Compile(source).Diagnostics`) via the test project rather than the MCP wrapper.
 
@@ -99,7 +110,7 @@ Each slice is a single coherent commit; the list is also the execution checklist
 
 **Anti-patterns:**
 
-- A separate `implementation-plan.md` file. The hub artifact (PR body in PR mode; the `/lifecycle-3-plan` plan doc in spike mode) is the plan — never duplicate it into a throwaway file.
+- A separate `implementation-plan.md` file. The hub artifact (PR body in PR mode; the `/plan` plan doc in spike mode) is the plan — never duplicate it into a throwaway file.
 - An empty Implementation Plan post-design-review-clear. The plan is execution discipline; the section being empty signals execution has no scaffolding.
 - A PR opened before the design is locked. Open the draft PR after Stage 2 completes, not before. (Spike mode opens no PR at all — don't open one on a `spike/*` branch without owner confirmation.)
 
@@ -176,7 +187,7 @@ A phase is complete when:
 
 The skill enforces:
 
-1. **The hub artifact IS the implementation plan.** PR body in PR mode; the `/lifecycle-3-plan` plan doc in spike-branch mode. Either way, no separate implementation-plan.md file. Refused.
+1. **The hub artifact IS the implementation plan.** PR body in PR mode; the `/plan` plan doc in spike-branch mode. Either way, no separate implementation-plan.md file. Refused.
 2. **No PR on a spike branch.** On a `spike/*` branch, commits land directly on the branch and the plan doc is the hub — opening a draft PR (or adding `Closes #N`) without owner confirmation is refused.
 3. **Pending design review until the gate clears.** Implementation Plan section says "Pending design review" until Track A or Track B (per CONTRIBUTING.md § 3) signs off. Plans written before the gate are refused.
 4. **Slices are coherent and incremental.** A slice that leaves tests red, mixes unrelated features, or skips doc-touch is refused.
@@ -189,8 +200,8 @@ The skill enforces:
 
 ## Composability
 
-- **Input**: a locked design doc (`/lifecycle-2-design` output) + a phased plan (`/lifecycle-3-plan` output) + (PR mode) a GitHub issue.
-- **Output**: vertical-slice commits, updated docs, green tests, and a checkable plan — landed as a merged PR (PR mode) or directly on the `spike/*` branch with the plan doc as the live tracker (spike mode). Feeds `/lifecycle-5-promote` for canonicalizing the design's content into reference docs.
+- **Input**: a locked design doc (`/design` output) + a phased plan (`/plan` output) + (PR mode) a GitHub issue.
+- **Output**: vertical-slice commits, updated docs, green tests, and a checkable plan — landed as a merged PR (PR mode) or directly on the `spike/*` branch with the plan doc as the live tracker (spike mode). Feeds `/promote` for canonicalizing the design's content into reference docs.
 
 ## Anti-patterns to refuse
 
