@@ -1,0 +1,2335 @@
+The Parma Polyhedra Library:
+Toward a Complete Set of Numerical
+Abstractions for the Analysis and Verification
+of Hardware and Software Systems ⋆
+
+Roberto Bagnara a , Patricia M. Hill b , Enea Zaffanella a
+a Department of Mathematics, University of Parma, Italy
+b School of Computing, University of Leeds, UK
+
+Received April 28, 2006; revised July 2, 2007
+
+Abstract
+Since its inception as a student project in 2001, initially just for the handling (as
+the name implies) of convex polyhedra, the Parma Polyhedra Library has been continuously improved and extended by joining scrupulous research on the theoretical
+foundations of (possibly non-convex) numerical abstractions to a total adherence
+to the best available practices in software development. Even though it is still not
+fully mature and functionally complete, the Parma Polyhedra Library already offers a combination of functionality, reliability, usability and performance that is not
+matched by similar, freely available libraries. In this paper, we present the main
+features of the current version of the library, emphasizing those that distinguish it
+from other similar libraries and those that are important for applications in the field
+of analysis and verification of hardware and software systems.
+Key words: Formal methods, static analysis, computer-aided verification, abstract
+interpretation, numerical properties.
+
+⋆ This work has been partly supported by PRIN project “AIDA: Abstract Interpretation Design and Applications.”
+Email addresses: bagnara@cs.unipr.it (Roberto Bagnara),
+hill@comp.leeds.ac.uk (Patricia M. Hill), zaffanella@cs.unipr.it (Enea
+Zaffanella).
+
+Preprint submitted to Science of Computer Programming
+
+1
+
+Introduction
+
+The Parma Polyhedra Library (PPL) is a collaborative project started in January 2001 at the Department of Mathematics of the University of Parma,
+Italy. Since 2002, the library is actively being developed also at the School of
+Computing of the University of Leeds, United Kingdom. The PPL, that was
+initially limited —as the name implies— to the handling of (not necessarily
+topologically closed) convex polyhedra [18], is now aimed at becoming a truly
+professional, functionally complete library for the handling of numeric approximations targeted at abstract interpretation and computer-aided verification
+of hardware and software systems.
+In this paper we describe the main features of the PPL. Unless otherwise
+stated, the description refers to version 0.9 of the library, released on March
+12, 2006. In other cases the described features have not yet been included into
+an official release, but are still available from the PPL’s public CVS repository
+(since development of the library takes place on that repository, the PPL is
+always in a state of continuous release).
+In the sequel we will compare the PPL with other libraries for the manipulation
+of convex polyhedra. These are: 1
+• PolyLib (version 5.22.1), originally designed by D. K. Wilde [86], based on
+an efficient C implementation of N. V. Chernikova’s algorithm [27,28,29]
+written by H. Le Verge [66], and further developed and maintained by
+V. Loechner [67]; 2
+• New Polka (version 2.1.0a), by B. Jeannet [63]; 3
+• the polyhedra library that comes with the HyTech tool (version 1.04f) [60]; 4
+• the Octagon Abstract Domain Library (version 0.9.8), by A. Miné [69,70]. 5
+For reasons of space and opportunity, the paper concentrates on introducing the library to prospective users. As a consequence, we assume the reader
+has some familiarity with the applications of numerical abstractions in formal
+analysis and verification methods [17] and that she is not immediately concerned by the theory that lies behind those abstractions. However, the paper
+provides a complete set of references that enable any interested reader to reconstruct every detail concerning the library, the applications and the relevant
+theory.
+1
+
+We restrict ourselves to those libraries that are freely available and provide the
+services required by applications in static analysis and computer-aided verification.
+2 http://icps.u-strasbg.fr/ loechner/polylib/.
+~
+3 http://pop-art.inrialpes.fr/people/bjeannet/newpolka/index.html.
+4 http://embedded.eecs.berkeley.edu/research/hytech/.
+5 http://www.di.ens.fr/ mine/oct/.
+~
+
+2
+
+The paper is structured as follows: Section 2 introduces the numerical abstractions currently supported by the Parma Polyhedra Library; Section 3
+describes, also by means of examples, some of the most important features of
+the library; Section 4 gives some indications concerning efficiency; Section 5
+illustrates the current development plans for the library; Section 6 reviews
+some of the applications using the PPL and concludes.
+
+2
+
+Currently Supported Abstractions
+
+The numerical abstractions currently supported by the Parma Polyhedra Library are the domains of polyhedra, bounded difference shapes, octagonal
+shapes and grids; powersets of these using the generic powerset construction;
+and linear programming problems. For each of the supported abstractions, the
+library features all the operators required by semantic constructions based on
+abstract interpretation [32,33]; these are summarized in the following paragraphs.
+
+Construction The domain elements can be initialized by means of a variety of constructors; in particular, they can be defined to be a vector space for a
+specified number of dimensions —each dimension representing some concrete
+entity relevant for the particular analysis— indicating that at this stage nothing is known about the entities, or the empty abstraction (again for a given
+number of dimensions), describing an inconsistent (unreachable) state. An element can also be initialized by means of constraints, specifying conditions its
+points must satisfy; alternatively, it can be described by generators, that are
+meant to be parametrically combined so as to describe all of its points. New
+elements can also be constructed by copying an existing element in the same
+abstraction.
+
+Refinement and Expansion Any domain element can be refined by the
+addition of further constraints its points must satisfy, thereby improving the
+precision of the description: a typical application of refinement is to model
+the effect of conditional guards in if-then-else and while-loop statements. The
+expansion operators allow users to add new generators so as to expand the set
+of points the element must contain; these may be used, for instance, to “forget”
+some information regarding a space dimension, so as to model arbitrary input
+by the user.
+
+Upper and Lower Bounds It is often useful to compute an upper or
+lower bound of two domain elements so as to obtain a correct approximation
+3
+
+of their union or intersection. For example, an analyzer could use an upper
+bound operator to combine approximations that have been computed along
+the alternative branches of an if-then-else statement while lower bound operators are needed, in combination with conversion operators (see below), when
+conjunctively merging different approximations computed along the same set
+of computation paths.
+
+Affine Images and Preimages A common form of statement in an imperative language is the assignment of an affine expression to a program variable.
+Their semantics can be modeled by images (in a forward analysis) and/or
+preimages (in a backward analysis) of affine transformations on domain elements. All domains fully support the efficient (and possibly approximate)
+computation of affine images and preimages. Also available are generalizations of these operators, useful for approximating more complex assignment
+statements (e.g., to model constrained nondeterministic assignments or when
+a non-linear expression can be bounded from below and/or above by affine
+expressions).
+
+Changing Dimensions An analyzer needs to be able to add, remove,
+and more generally reorganize the space dimensions that are associated with
+the values of the concrete entities it is approximating. The simple addition
+and removal of dimensions is often needed at the entry and exit points of
+various kinds of programming contexts, such as declaration blocks where concrete entities (modeled by some of the space dimensions) may be local to the
+block. More complex operators are useful to support the integration of the
+results computed using different abstractions, that typically provide information about different sets of concrete entities. In the simplest case, when the
+abstractions are of the same kind but provide information about disjoint sets
+of concrete entities, it is enough to concatenate the two abstract elements into
+a new one. In more complex cases, when the described sets of concrete entities
+have an overlap, the space dimensions of one of the abstract elements need
+to be reconciled with those of the other, allowing for a correct integration of
+the information. This can be obtained by efficiently mapping the space dimensions according to a (partial) injective function. The library also supports
+the folding (and unfolding) of space dimensions, which is needed to correctly
+and efficiently summarize the information regarding collections of concrete
+entities [49].
+
+Conversion Non-trivial analyses are typically based on a combination of
+domains. It is therefore important to be able to safely and efficiently convert between different abstractions. These conversions enable, for instance, the
+combination of domain elements representing different kinds of information,
+4
+
+implementing so-called reduction operators. Another important application is
+the dynamic control of the precision/efficiency ratio: in order to gain efficiency
+in the analysis of a specific context, an element of a relatively precise domain
+can temporarily be converted into an element of a weaker domain and then
+back to the stronger abstraction on exit from that context.
+
+Comparison The analysis of a program fragment is implemented by computing an over-approximation of its semantics. Since the latter is usually modeled as the least fixpoint of a continuous operator, a safe analysis typically
+needs to iteratively compute an over-approximation of this fixpoint. Therefore, a suitable lattice-theoretic comparison operator is needed so as to check
+for the convergence of the analysis. Comparison operators are also useful in
+selected contexts so as to efficiently predict whether or not some precision
+improving techniques (e.g., reductions, widening variants and so on) are applicable. For all of the reasons above, each domain provides three different
+comparison operators checking, respectively, equality, containment and strict
+containment.
+
+Widening Most of the domains supported by the library admit infinite
+ascending chains. These are infinite sequences of domain elements such that
+every element in the sequence is contained in the element that follows it.
+With these characteristics, the fixpoint computations upon which abstract interpretation analysis techniques are based could be non-terminating. For this
+reason, the domains can be so employed only in conjunction with appropriate mechanisms for enforcing and/or accelerating the convergence of fixpoint
+computations: widening operators [31,32,34,35] provide a simple and general
+characterization for such mechanisms. 6 The PPL offers also several variations
+of the available widenings: 7 widening “with tokens” (an improvement to the
+widening delay technique proposed in [30]); and widening “up to” [54,58] (a
+technique whereby constraints that are judged to be important by the application can be preserved from the action of the widening).
+
+Other Operators The library offers many other operators for use in a variety of more specialized contexts. For instance, before performing a non-trivial
+domain combination, an analyzer may need information about a particular
+domain element (such as, checking whether it denotes the empty set or the
+whole vector space; the dimension of the vector space; the affine dimension of
+6
+
+Operators that do not provide a strict convergence guarantee are more properly
+called extrapolation operators.
+7 Some of these variations are extrapolation operators, as the guarantee of convergence is conditional on the way they are used.
+
+5
+
+the element; its relation with respect to a given constraint or generator, and
+so on). Another operator supported by the library is the difference operator,
+which computes the smallest domain element that contains the set difference
+of two elements; this is exploited in the implementation of the finite powerset
+widening operator proposed in [16]. The library also provides the time-elapse
+operator used to model hybrid systems [58].
+The following sections briefly describe each of the supported domains. The
+emphasis here is on the features that are unique to the PPL. The reader is
+referred to the cited literature and to the library’s documentation [14,15] for
+all the details.
+2.1 Closed and Not Necessarily Closed Polyhedra
+The Parma Polyhedra Library supports computations on the abstract domain
+of convex polyhedra [37,53]. The PPL implements both the abstract domain
+of topologically closed convex polyhedra (C polyhedra for short, implemented
+by class C_Polyhedron) and the abstract domain of not necessarily closed
+convex polyhedra (NNC polyhedra for short, class NNC_Polyhedron). In both
+cases, polyhedra are represented and manipulated using the Double Description (DD) method of Motzkin et al. [71]. In this approach, a closed convex
+polyhedron can be specified in two ways, using a constraint system (class
+Constraint_System) or a generator system (class Generator_System): the
+constraint system is a finite set of linear equality or inequality constraints
+(class Constraint); the generator system is a finite set of different kinds of
+vectors, collectively called generators, which are rays and points of the polyhedron (class Generator). An example of double description is depicted in
+Figure 1: the polyhedron represented by the shaded region can be represented
+by the set of vectors satisfying the constraints or, equivalently, by the set
+{ π1 p1 + π2 p2 + ρ1 r1 + ρ2 r2 ∈ R2 | π1 , π2 , ρ1 , ρ2 ∈ R+ , π1 + π2 = 1 },
+where p1 = ( 41 ), p2 = ( 14 ), r1 = ( 12 ), r2 = ( 21 ), and R+ is the set of nonnegative real numbers. In words, each vector can be obtained by adding a
+non-negative combination of the rays and a convex combination of the points.
+Implementation of convex polyhedra using the DD method offer some important advantages to analysis and verification applications. The first one is
+due to the “mix” of operations such applications require: some of them are
+more efficiently performed on the representation with constraints. This is the
+case for the addition of constraints and for the intersection, which is simply
+implemented as the union of constraint systems, and for deciding whether a
+generator is subsumed or not by a polyhedron (e.g., to decide whether a point
+is inside or outside). Some operations are instead more efficiently performed
+6
+
+y
+
+
+
+x + y ≥ 5
+
+x − 2y ≤ 2
+y − 2x ≤ 2
+
+
+
+
+
+
+n
+o
+points: (4, 1), (1, 4)
+r
+
+r
+
+x
+
+rays: {(1, 2), (2, 1)}
+
+Figure 1. The double description method for polyhedra
+
+on generators: computing the convex polyhedral hull (just by taking the union
+of generator systems), adding individual generators (e.g., the addition of the
+rays r = ( 10 ) and −r to the set of rays for the polyhedron in Figure 1 is the
+easiest way to “forget” all the information concerning the space dimension x),
+projection onto designated dimensions, deciding whether the space defined
+by a constraint is disjoint, intersects or includes a given polyhedron, finiteness/boundedness tests (a polyhedron is finite/bounded if and only if it has
+no rays among its generators), and the time-elapse operator of [57,58]. There
+are also important operations, such as the inclusion and equality tests and the
+widenings, that are more efficiently performed when both representations are
+available. Systems of constraints and generators enjoy a quite strong and useful
+duality property. Very roughly speaking, the constraints of a polyhedron are
+(almost) the generators of the polar [74,83] of the polyhedron, the generators
+of a polyhedron are (almost) the constraints of the polar of the polyhedron,
+and the polar of the polar of a polyhedron is the polyhedron itself. This implies
+that computing constraints from generators is the same problem as computing generators from constraints. The algorithm of N. V. Chernikova [27,28,29]
+(later improved by H. Le Verge [66] and by K. Fukuda and A. Prodon [48])
+solves both problems yielding a minimized system and can be implemented
+so that the source system is also minimized in the process. This is basically
+the algorithm employed by PolyLib, New Polka and the Parma Polyhedra
+Library. It is worth noticing that it is not restrictive to express the coefficients of constraints and rays by integer numbers, as using rational numbers
+would not result in increased expressivity (but would have a negative impact
+on efficiency). For points, a common integer denominator suffices. 8
+8
+
+The correctness requirements of applications in the field of system’s analysis and
+verification prevent the adoption of floating-point coefficients, since any rounding
+error on the wrong side can invalidate the overall computation. For domains as complicated as that of polyhedra, the correct, precise and reasonably efficient handling
+
+7
+
+Restricting the attention to convex polyhedra, two of the main innovations
+introduced by the PPL are the complete handling of NNC polyhedra and
+the introduction of a new widening operator. Apart from the PPL, the only
+libraries—among those that provide the services required by applications in
+static analysis and computer-aided verification—that support NNC polyhedra are the already mentioned New Polka and the library by N. Halbwachs,
+A. Kerbrat and Y.-E. Proy called, simply, Polka [55]. The Polka library, however, is not available in source format and binaries are distributed under rather
+restrictive conditions (until about the year 1996 they could be freely downloaded), so our knowledge of it is as given in [55], the programmer’s manual in
+a package that includes the actual library. The support provided by Polka and
+New Polka for NNC polyhedra is incomplete, incurs avoidable inefficiencies
+and leaves the client application with the non-trivial task of a correct interpretation of the results. In particular, even though an NNC polyhedron can be
+described by using constraint systems that may contain strict inequalities, the
+Polka and New Polka libraries lack a corresponding extension for generator
+systems. In contrast, the PPL implements the proposal put forward in [13],
+whereby the introduction of closure points as a new kind of generator, allows
+a clean user interface, symmetric to the constraint system interface for NNC
+polyhedra, that is decoupled from the implementation. As explained in detail
+in [13], a user of the PPL is fully shielded from implementation details such
+as the extra ǫ dimension that users of the other libraries have to carefully
+take into account. Another feature that is unique to the PPL is the support
+for the minimization of the descriptions of an NNC polyhedron: we refer the
+interested reader to [13] for a precise account of the impact this new feature
+has on performance and usability.
+The original widening operator proposed by Cousot and Halbwachs [37,53]
+is termed standard widening since, for 25 years, all analysis and verification
+tools that employed convex polyhedra also employed that operator. Nonetheless, there was an unfulfilled demand for more precise widening operators.
+The Parma Polyhedra Library, besides the standard widening, offers the new
+widening proposed in [12]: on a single application this is always more precise
+than the standard widening. As these widenings are not monotonic, increased
+precision on a single application does not imply increased precision on the final
+result of the analysis. In practice, however, an overall increase of precision is
+almost always achieved [12].
+Both widenings can be improved, as said before, by applying the “widening with tokens” delay strategy or the “widening up-to” technique; moreover,
+“bounded” extrapolation operators are available that provide additional precision guarantees over the widenings upon which they are built.
+
+of floating-point rounding errors is an open issue.
+
+8
+
+2.2 Bounded Difference Shapes
+
+By restricting to particular subclasses of linear constraints, it is possible to obtain domains that are simpler and computationally more efficient than the one
+of convex polyhedra. One possibility, which has a long tradition in computer
+science [21], is to only consider potential constraints, also known as bounded
+differences: these are restricted to take the form vi − vj ≤ d or ±vi ≤ d, where
+vi and vj are variables and d, the inhomogeneous term, belongs to some computable number family. Systems of bounded differences have been used by the
+artificial intelligence community as a way to reason about temporal quantities
+[1,38], as well as by the model checking community as an efficient yet precise way to model and propagate timing requirements during the verification
+of various kinds of concurrent systems [39,65]. In the abstract interpretation
+field, the idea of using an abstract domain of bounded differences was put
+forward in [6] and the first fully developed application of bounded differences
+in this field can be found in [81]. Possible representations for finite systems
+of bounded differences are matrix-like data structures called difference-bound
+matrices (DBM) [21] and weighted graphs called constraint networks [38].
+These representations, however, have a “syntactic” nature: they encode sets
+of constraints rather than geometric shapes. As pointed out in [10], this has
+several drawbacks, the most important one being that natural extrapolation
+operators do not provide a convergence guarantee, that is, they are not widenings. This places an extra burden on the client application, which has to take
+into account the implementation details and use the domain elements with
+care so as to avoid non-termination of the analysis.
+In order to overcome the difficulties mentioned above and to continue pursuing a complete separation between interface (which must be natural and easy
+to use) and implementation (which must be efficient and robust), the Parma
+Polyhedra Library offers the “semantic” domain of bounded difference shapes.
+A bounded difference shape is nothing but a geometric shape, that is, a convex
+polyhedron: its internal representation need be of no concern to (and, in fact,
+is completely hidden from) the client application. The class template implementing this domain in the PPL is BD_Shape<T>, where the class template
+type parameter T defines the family of numbers that are used to (correctly)
+approximate the inhomogeneous terms of bounded differences. The value of T
+may be one of the following:
+• a bounded precision native integer type (that is, from signed char to long
+long and from int8_t to int64_t);
+• a bounded precision floating point type (float, double or long double);
+• an unbounded integer or rational type, as provided by GMP (mpz_class or
+mpq_class).
+9
+
+Among other things, PPL’s BD_Shape<T> offers the proper widening operator
+defined in [10] and a user interface that matches the interfaces of the general
+polyhedra classes C_Polyhedron and NNC_Polyhedron.
+
+2.3 Octagonal Shapes
+Another restricted class of linear constraints was introduced in [20]. These are
+of the form avi + bvj ≤ d, where a, b ∈ {−1, 0, +1} and d belongs to some computable number family. Systems of such constraints were called simple sections
+in [20] and have been given the structure of an abstract domain by A. Miné
+[69]. The resulting octagon abstract domain has, due to its syntactic nature,
+the same problems outlined in the previous section. This is why, as explained
+in detail in [10], the Parma Polyhedra Library offers a semantic domain of
+octagonal shapes, for which it provides a widening operator. This is implemented by the class template Octagonal_Shape<T>, where the class template
+type parameter T can be instantiated as for bounded difference shapes. 9 Another feature of this class is that its implementation uses the strong closure
+algorithm introduced in [10], which has lower complexity than the one used
+in the Octagon Abstract Domain Library 10 [69,70].
+
+2.4 Grids
+Given a1 , . . . , an , b, f ∈ Z, the linear congruence relation a1 v1 +· · ·+an vn ≡f b
+denotes the subset of Rn given by
+(
+
+hq1 , . . . , qn i ∈ R
+
+n
+
+∃µ ∈ Z .
+
+n
+X
+i=1
+
+)
+
+ai qi = b + µf ;
+
+when f 6= 0, the relation is said to be proper ; when f = 0, the relation is
+equivalent to (i.e., it denotes the same hyperplane as) a1 v1 + · · · + an vn = b.
+A congruence system is a finite set of congruence relations and a grid is any
+subset of Rn whose elements satisfy all the congruences of such a system. The
+grid domain is the set of all such grids.
+An example of grid is given in Figure 2, where the solutions of the congruence
+relations are given by the dashed lines and the grid elements by the (filled
+and unfilled) squares. The figure shows also that there is an alternative way
+of describing the same grid: if we call the points marked by the filled squares
+9
+
+Support for octagonal shapes has not yet been included into a formal release. It
+is however complete and available in the PPL’s public CVS repository.
+10 Until at least version 0.9.8.
+
+10
+
+rs
+
+rs
+
+y
+
+rs
+
+rs
+
+
+rs x ≡
+
+rs
+
+rs
+
+2 0
+
+rs
+
+rs
+
+rs
+
+x + 2y ≡4 2
+
+rs
+
+rs
+
+rs
+
+rs
+
+rs
+
+rs
+
+rs
+
+rs
+
+n rs
+
+rs
+
+rs
+
+x
+rs
+rs
+
+rs
+
+rs
+rs
+
+rs
+
+rs
+rs
+
+n
+
+points: (2, 0), (6, 0), (4, 1)
+
+o
+
+
+n
+o
+points: (2, 0)
+rs
+n
+o
+parameters: (4, 0), (2, 1)
+
+Figure 2. The double description method for grids
+
+p1 = ( 20 ), p2 = ( 60 ) and p3 = ( 41 ), we can see that the grid is given by
+{ π1 p1 + π2 p2 + π3 p3 ∈ R2 | π1 , π2 , π3 ∈ Z, π1 + π2 + π3 = 1 }.
+
+(1)
+
+We say that the set of points {p1 , p2 , p3 } generates the grid. Some of these
+generating points can be replaced by parameters that give the direction and
+spacing for the neighboring points. Specifically, by subtracting the point p1
+from each of the other two generating points p2 and p3 , we obtain the parameters q2 = ( 40 ) and q3 = ( 21 ) and can now express the grid as
+{ p1 + π2 q2 + π3 q3 ∈ R2 | π2 , π3 ∈ Z }.
+Notice that, in the generator representation for grids, points and parameters
+can have rational, non integer coordinates.
+The domain of grids, as outlined above, has been introduced by P. Granger
+[51,52] and its design has been completed in [8,9] by including refined algorithms and new operators for affine images, preimages and their generalizations, grid-difference and widening. The Parma Polyhedra Library includes
+the first truly complete implementation of this abstract domain by means of
+the Grid class. Congruence relations and systems thereof are realized by the
+classes Congruence and Congruence_System, and likewise for generators with
+the classes Grid_Generator, and Grid_Generator_System.
+A more restricted domain, the domain of integral lattices has been partly
+implemented in PolyLib [67] following the approach in [75,76]. An integral
+lattice in dimension n is the grid generated by the affine integral combination
+—as in (1)— of exactly n + 1 affinely independent points that are additionally
+bound to have integer coordinates. These restrictions have the consequences
+that only the generator representation is supported and, as explained in [8,9],
+11
+
+the reduced expressivity has an impact on the possibility to solve concrete
+analysis problems. The implementation of the domain of integral lattices in
+PolyLib is incomplete in the sense that it misses domain operators such as the
+join. Instead, it provides a union operator which, given two lattices returns
+a set of lattices representing the precise set union of the points of the given
+lattices. Similarly the difference operation on a pair of lattices returns a set of
+lattices whose union contains the exact set difference of their points. Moreover,
+although image and preimage operators are supported by PolyLib, as the
+integral lattice must be full dimensional, only invertible image operators are
+allowed.
+2.5 Powersets
+For applications requiring a high degree of precision, the Parma Polyhedra
+Library provides a generic implementation of the finite powerset construction
+[7,16]. This upgrades an abstract domain into a refined one where finite disjunctions of non redundant elements are precisely representable. The construction is implemented generically by the class template Powerset<D>, where the
+type parameter D must provide about ten methods and operators implementing, among other things, an entailment predicate and operators for obtaining
+an upper bound and the “meet” of two given elements. No other requirements
+are imposed and, in fact, the test suite of the PPL includes a program where
+Powerset<D> is instantiated with a non numerical domain.
+The class template Pointset_Powerset<PS> provides a specialization of class
+Powerset<D> that is suitable for the instantiation with the “semantic” numerical domains of the PPL: (C or NNC) polyhedra, bounded difference shapes,
+octagonal shapes, grids and combinations thereof. A most notable and, at the
+time of writing, unique feature of this implementation is the provision —in
+addition to the extrapolation operator proposed in [26]— of provably correct,
+certificate-based widening operators that lift the widening operators defined
+on the underlying domain PS [16].
+2.6 Linear Programming Problems
+The library includes a Linear Programming (LP) solver based on the simplex
+algorithm and using exact arithmetic. Note that the absence of rounding errors
+is essential for most (if not all) of the intended applications. Since it is common
+practice to solve an LP problem by exploiting duality results, correctness may
+be lost even if controlled rounding is used; this is because a feasible but possibly
+non-optimal solution for the dual of an LP problem may actually correspond
+to an unfeasible solution for the original LP problem.
+12
+
+The LP solver interface allows for both satisfiability checks and optimization
+of linear objective functions. A limited form of incrementality allows for the
+efficient re-optimization of an LP problem after modification of the objective
+function. Ongoing implementation work is focusing on improving the efficiency
+of the solver as well as providing better support for incremental computations,
+so as to also allow for the efficient re-optimization of the LP problem after
+a modification of the feasible region caused by the addition of further constraints. 11
+
+3
+
+Main Features
+
+In this section we review the main features of the Parma Polyhedra Library.
+We will focus on usability, on the absence of arbitrary limits due to the use
+of fully dynamic data structures, on some of the measures that contribute to
+the library’s robustness, on the support for resource-bounded computations,
+on the possibility to use machine integer coefficients without compromising
+correctness, on portability and on the availability of complete documentation.
+3.1 Usability
+By “usability” of the Parma Polyhedra Library, we actually mean two things:
+(1) that the library provides natural, easy to use interfaces that can be used,
+even by the non expert, to quickly prototype an application;
+(2) that, nonetheless, the library and its interfaces provide all the functionalities that allow their use in the development of professional, reliable
+applications.
+In other words, simplicity of the interfaces has not been obtained with simplistic solutions or by the omission of functionalities.
+As mentioned before particular care has been taken (to the point of developing
+the necessary theoretical concepts) in the complete decoupling of the user
+interfaces from all implementation details. So, the internal representation of,
+say, constraints, congruences, generators and systems thereof need not concern
+the client application. All the user interfaces, whatever language they interface
+to, refer to high-level concepts and never to their possible implementation
+in terms of vectors, matrices or other data structures. For instance, unlike
+PolyLib and New Polka, implementation devices (such as so-called positivity
+11 The incremental LP solver has not yet been included into a formal release. It is
+
+however complete and available in the PPL’s public CVS repository.
+
+13
+
+constraints [86] or ǫ-representations [13,57]) never surface at the user level
+and need not concern the client application. As another example, a user of the
+Octagon Abstract Domain Library must know that octagons are represented
+there by means of difference-bound matrices, that some of the operations on
+octagons do “close” these matrices, and that one argument to the widening is
+better closed for improved accuracy while the other should not be closed as
+this would prevent convergence.
+The Parma Polyhedra Library currently offers, besides the C++ interface, a
+portable Prolog interface and a C interface. The Prolog interface is “portable”
+in that it supports (despite the lack of standardization of Prolog foreign language interfaces) six major Prolog systems: Ciao, GNU Prolog, SWI-Prolog,
+SICStus, XSB and YAP. The C interface is particularly important, as it allows the PPL to interface with almost anything else: for example, third parties
+have already built interfaces for Haskell, Java and Objective Caml. The design
+of the interfaces to the directly supported languages has focused on ensuring
+that programmers can use the library following the most natural programming style in that language. As a simple example, in the appropriate contexts,
+‘X < 5*Z’ and ‘X + 2*Y + 5*Z >= 7’ is valid syntax expressing a strict and
+a non-strict inequality, both in the C++ and the Prolog interfaces. This can be
+done because both languages allow to override (or freely interpret) operators
+and provide exceptions as a powerful method of reporting run-time errors.
+Here is how a NNC polyhedron in a space of dimension 3 can be created using
+the C++ interface:
+
+#include <p p l . hh>
+namespace PPL = P a r m a P o l y h e d r a L i b r a r y ;
+...
+PPL : : V a r i a b l e X( 0 ) ;
+PPL : : V a r i a b l e Y( 1 ) ;
+PPL : : V a r i a b l e Z ( 2 ) ;
+PPL : : NNC Polyhedron ph ( 3 , PPL : : UNIVERSE ) ;
+ph . a d d c o n s t r a i n t (X + 2∗Y + 5∗Z >= 7 ) ;
+ph . a d d c o n s t r a i n t (X < 5∗Z ) ;
+...
+
+And here is how the same polyhedron can be created using the Prolog interface:
+
+14
+
+...
+numbervars ( [ X, Y, Z ] , 0 , ) ,
+ppl new NNC Polyhedron from constraints (
+[X + 2∗Y + 5∗Z >= 7 , X < 5∗Z ] ,
+PH
+),
+...
+
+In standard C things are more complicated as the language syntax does not
+allow to represent, say, constraints as easily. 12 Thus, in order to build constraints, the C application will have to build the linear expressions occurring
+in them and the memory used to hold these intermediate data structures will
+have to be explicitly managed, unless a conservative garbage collector is used.
+Moreover, lack of exceptions means that non-trivial error detection and handling will demand significantly more effort in C than in C++ or Prolog (all
+the functions of the C interface return an int: a negative value indicates an
+error has occurred). The best approach to development using the C interface
+is to begin by developing a layer of interface functions that are suited to the
+application at hand: the PPL’s C interface provides all the required services.
+Still on the subject of ease of use, the numeric abstractions provided by the library have similar interfaces. A high degree of integration is obtained through
+the adoption of common data types and the availability of methods specifically designed for interoperability. As a consequence, the specification and
+implementation of new abstractions and tools can be easily obtained by composition of the available services. As a simple example, the code in Listing 1 is
+exploiting the LP solver capabilities to efficiently compute (and print) all the
+upper bounds for the variables corresponding to the dimensions of a closed
+polyhedron.
+Note that the code in Listing 1 is taking advantage of a limited form of incrementality provided by the LP solver: the check for satisfiability (corresponding
+to the first phase of the simplex algorithm) is executed only once and it is not
+repeated when optimizing the different objective functions (namely, only the
+second phase of the simplex algorithm is executed in the for-loop). Code similar
+to the one above is actually used in the library itself to precisely approximate
+a polyhedron by means of a bounded difference or octagonal shape without
+incurring the potentially high cost of converting from the constraint to the
+generator representation of the polyhedron.
+12 Unless one represents them with strings. While a string-based interface is certainly
+
+possible, we do not believe it would make things simpler: strings would have to be
+parsed at run-time and parsing errors would have to be properly handled.
+
+15
+
+Listing 1. Printing upper bounds for all variables using the LP solver
+
+#include <ppl . hh>
+#include <i o s t r e a m >
+using namespace P a r m a P o ly he dr a L ibr a r y ;
+using namespace P a r m a P o ly he dr a L ibr a r y : : IO O pe r a t o r s ;
+void p r i n t u p p e r b o u n d s ( const C Polyhedron& ph ) {
+LP Problem l p ( ph . c o n s t r a i n t s ( ) ) ;
+// Check t h e s a t i s f i a b i l i t y o f t h e problem .
+i f ( ! lp . i s s a t i s f i a b l e ( ) ) {
+s t d : : c o ut << ” u n s a t i s f i a b l e ” << s t d : : e n d l ;
+return ;
+}
+// P r i n t t h e upper bound o f each v a r i a b l e .
+l p . s e t o p t i m i z a t i o n m o d e (MAXIMIZATION) ;
+Ge ne r a t o r g ( p o i n t ( ) ) ;
+C o e f f i c i e n t num , den ;
+const d i m e n s i o n t y p e dim = ph . s p a c e d i m e n s i o n ( ) ;
+for ( d i m e n s i o n t y p e i = 0 ; i < dim ; ++i ) {
+Variable x( i ) ;
+lp . s e t o b j e c t i v e f u n c t i o n (x ) ;
+LP Problem Status s t a t u s = l p . s o l v e ( ) ;
+i f ( s t a t u s == UNBOUNDED LP PROBLEM)
+s t d : : c o ut << x << ” < +i n f t y ” << s t d : : e n d l ;
+else {
+a s s e r t ( s t a t u s == OPTIMIZED LP PROBLEM ) ;
+g = lp . optimizing point ( ) ;
+l p . e v a l u a t e o b j e c t i v e f u n c t i o n ( g , num , den ) ;
+s t d : : c o ut << x << ” <= ” << num << ”/” << den
+<< s t d : : e n d l ;
+}
+}
+}
+3.2 Absence of Arbitrary Limits
+The only real restrictions imposed by the library on the client application are
+those caused by limitations of the available virtual memory. All data structures
+are fully dynamic and automatically expand (in amortized constant time) and
+shrink in a way that is completely transparent to the user, ensuring the best
+use of available memory.
+16
+
+In contrast, in the PolyLib, New Polka and HyTech libraries, matrices of coefficients, which are the main data structures used to represent polyhedra,
+cannot grow dynamically and the client application is ultimately responsible for specifying their dimensions. Since the worst case space complexity of
+the methods employed is exponential, in general the client application cannot
+make a safe and practical choice: specifying small dimensions may provoke a
+run-time failure; generous dimensions may waste significant amounts of memory and, again, result in unnecessary run-time failures.
+
+3.3 Robustness
+
+The clean separation between interface and implementation, among other important advantages, allows for the adoption of incremental and lazy computation techniques. The increased efficiency due to these techniques amply
+repays the cost of the interface checks that contribute to the library’s robustness, which, as it will be explained in the sequel, is one of its most important
+features.
+First, the library systematically checks all the interface invariants and throws
+an exception if any one of them is violated. This makes it very difficult to
+inadvertently create invalid objects and greatly simplifies the debugging of
+client applications. Secondly, the library is exception-safe, that is, it never
+leaks resources or leaves invalid object fragments around, even in the presence
+of exceptions. In particular, if an exception is raised, then all the memory
+allocated by the failed computation is discarded. These features allows applications using the PPL to use timeouts or to sensibly deal with run-time errors
+such as arithmetic overflows and out-of-memory conditions, so as to continue
+the computation in a reliable state (see below for more on this subject). It
+is important to stress that, while error handling and recovery are somewhat
+optional features (there may be no interest in continuing the computation after an error has occurred), error detection should be considered a mandatory
+feature in the field of system’s analysis and verification, since failure to detect an error can easily result into undefined (i.e., completely unpredictable)
+behavior, therefore compromising any statement about correctness.
+For comparison, PolyLib detects only some errors, sometimes setting a flag
+and sometimes printing a message and aborting, whereas New Polka and the
+HyTech libraries detect some errors, print an error message and abort. The
+Octagon Abstract Domain Library makes no attempt at detecting errors. None
+of these libraries perform a systematic check of interface invariants.
+17
+
+3.4 Resource-Bounded Computations
+The library, thanks to its exception-safety characteristics, naturally supports
+resource-bounded computations, that is, computations that are limited in the
+amount of CPU time or virtual memory or both. The client application can
+take advantage of this feature by attempting a computation that is potentially
+very expensive imposing a maximum limit on the resources to be used. Should
+this bound be exceeded, an exception is raised and the client application can
+resort to a simplified computation (possibly using a simpler numerical abstraction) trusting that the PPL will release all the resources allocated by the
+interrupted computation. With these facilities at hand, users of the library
+can quite easily code resource-bounded or, at least, resource-conscious numerical abstractions. An example is shown in Listing 2. This uses the Parma
+Watchdog Library (PWL), a library that virtualizes the interval timers for
+any XSI-conforming implementation of UNIX. 13 The PWL, which is currently distributed with the PPL, gives an application the ability to work with
+an unbounded number of independent “watchdog” timers.
+The example class Up_Appr_Polyhedron is meant to provide convex polyhedra with “upward approximated”, resource-conscious operations. As the main
+representation it uses closed convex polyhedra; the user can set a timeout for
+the operations and externally impose a limit on the virtual memory available
+to the process. When a resource limit is reached, the class temporarily switches
+to a simpler family of polyhedra: bounded difference shapes. Listing 3 shows a
+simple implementation for the intersection operation. If no timeout has been
+requested, then the operation is performed without any overhead. Otherwise
+the polyhedra are copied, a watchdog timer, w, is set and the operation is
+attempted. When w expires, the PPL is asked to abandon all expensive computations and to throw Timeout_object. Alternatively, if the process exceeds
+the virtual memory it has been allotted, then the bad_alloc standard exception will be thrown. If none of those happen, then control will be returned to
+the caller. Otherwise, bounded difference shapes approximating the argument
+polyhedra will be computed using a polynomial complexity method, 14 these
+shapes will be intersected and the intersection will be used to construct the
+resulting convex polyhedron.
+The technique illustrated in a simplified way by Listings 2 and 3 is quite
+powerful and allows the complexity-precision trade-off to be handled in a very
+flexible way. In particular, it is possible, thanks to the PWL, to work with
+13 XSI it is the core application programming interface for C and shell programming
+
+for systems conforming to the Single UNIX Specification.
+14 As mentioned in Section 2.6, it is also possible to compute these approximations
+using a “simplex complexity” algorithm (i.e., theoretically exponential but very
+efficient in practice).
+
+18
+
+Listing 2. Declaration of a class for resource-conscious computations
+
+#include <ppl . hh>
+#include <pwl . hh>
+#include <s t d e x c e p t >
+namespace PPL = P a r m a P o ly he dr a L ibr a r y ;
+namespace PWL = Parma Watchdog Library ;
+c l a s s Up Appr Polyhedron {
+private :
+// The t y p e o f t h e main p o l y h e d r a l a b s t r a c t i o n .
+typedef PPL : : C Polyhedron PH;
+// The t y p e o f a s i m p l e r p o l y h e d r a l a b s t r a c t i o n .
+typedef PPL : : BD Shape<m pq c la s s > SPH ;
+PH ph ;
+// Timeout i n h u n d re d t h o f a second ; 0 f o r no t i m e o u t .
+s t a t i c unsigned long t i m e o u t h s ;
+c l a s s Timeout : public PPL : : Throwable {
+...
+};
+s t a t i c Timeout T i m e o u t o b j e c t ;
+public :
+s t a t i c void s e t t i m e o u t ( unsigned long n ) ;
+...
+void i n t e r s e c t i o n a s s i g n ( const Up Appr Polyhedron& y ) ;
+...
+};
+
+multiple timers: while individual polyhedra operations can be guarded by a
+timer, other timers can monitor operations of greater granularity, such as
+entire analysis phases. When an analysis phase is taking too much, then the
+timeouts used for the individual operations can be shortened or the analyzer
+can switch to a totally different, less complex analysis technique. It is worth
+observing that, notwithstanding the friendliness of the PPL’s user interfaces,
+professional applications in the field of system’s analysis and verification are
+not expected to be directly based on the abstractions provided by the library.
+19
+
+Listing 3. Definition of a resource-conscious intersection method
+
+void Up Appr Polyhedron
+: : i n t e r s e c t i o n a s s i g n ( const Up Appr Polyhedron& y ) {
+i f ( t i m e o u t h s == 0 ) {
+// No t i m e o u t : do t h e o p e r a t i o n d i r e c t l y .
+ph . i n t e r s e c t i o n a s s i g n ( y . ph ) ;
+return ;
+}
+// Save c o p i e s o f ‘ ph ’ and ‘ y . ph ’ : t h e y may be needed
+// t o r e c o v e r from a r e s o u r c e s e x h a u s t i o n c o n d i t i o n .
+PH xph copy = ph ;
+PH yph copy = y . ph ;
+try {
+PWL: : Watchdog w( t i m e o u t h s ,
+PPL : : a b a n d o n e x p e n s i v e c o m p u t a t i o n s ,
+Timeout object ) ;
+ph . i n t e r s e c t i o n a s s i g n ( y . ph ) ;
+PPL : : a b a n d o n e x p e n s i v e c o m p u t a t i o n s = 0 ;
+return ;
+}
+catch ( const Timeout&) {
+// Timeout e x p i r e d .
+}
+catch ( const s t d : : b a d a l l o c &) {
+// Out o f memory .
+}
+// Re s o u rc e s e x h a u s t e d : use s i m p l e r p o l y h e d r a .
+PPL : : a b a n d o n e x p e n s i v e c o m p u t a t i o n s = 0 ;
+SPH x p h s i m p l e ( xph copy , PPL : : POLYNOMIAL COMPLEXITY ) ;
+SPH y p h s i m p l e ( yph copy , PPL : : POLYNOMIAL COMPLEXITY ) ;
+xph simple . i n t e r s e c t i o n a s s i g n ( yph simple ) ;
+ph = PH( x p h s i m p l e . m i n i m i z e d c o n s t r a i n t s ( ) ) ;
+// R e s t o r e ‘ y . ph ’ .
+const cast<PH&>(y . ph ) = yph copy ;
+}
+
+20
+
+Rather, the PPL abstractions have been designed so as to serve as building
+blocks for the actual analysis domains: in this field the complexity-precision
+trade-off is often so serious that the right way to face it is, by necessity,
+application-dependent.
+3.5 Unbounded or Native Integer Coefficients
+For the representation of general convex polyhedra, with the default configuration, the Parma Polyhedra Library uses unbounded precision integers. On
+the other hand, if speed is important and the numerical coefficients involved
+are likely to be small, applications may use native integers (8, 16, 32 and 64
+bit integers are supported by the PPL). This is a safe strategy since, when
+using native integers, the library also performs systematic (yet efficient) overflow detection. It is thus possible to adopt an approach whereby computations
+are first attempted with native integers. If a computation runs to completion,
+the user can be certain that no overflow occurred. Otherwise an exception is
+raised (as in the case seen before for resource-bounded computations), so that
+the client application can be restarted with bigger native integers or with unbounded integers. This is another application of the library’s exception-safety,
+as one can rather simply code the above approach as follows:
+
+try {
+// Analyze w i t h 64− b i t c o e f f i c i e n t s .
+...
+}
+catch ( const s t d : : o v e r f l o w e r r o r &) {
+// Analyze w i t h unbounded c o e f f i c i e n t s .
+...
+}
+...
+
+Again, the client application does not need to be concerned about the resources
+allocated by the PPL during the computation of the try block: everything will
+be deallocated automatically.
+Concerning other libraries, PolyLib and New Polka can use unbounded integers as coefficients, whereas the library of HyTech does not support them.
+Differently from the PPL, these libraries use finite integral types without any
+mechanism for overflow detection. Technically speaking and according to the
+C standard (the language in which they are written), this means that the effects of an overflow are completely undefined, i.e., client applications cannot
+make any assumption about what can happen should an overflow occur. In
+addition, PolyLib (and, according to [22], some versions of HyTech) can use
+21
+
+floating point values, in which case underflows and rounding errors, in addition
+to overflows, can affect the results.
+
+3.6 Portability and Documentation
+
+Great care has been taken to ensure the portability of the PPL. The library
+is written in standard C++, it follows all the available applicable standards
+and uses sophisticated automatic configuration mechanisms. It is known to
+run on all major UNIX-like operating systems, on Mac OS X (whether Intelor PowerPC-based) and on Windows (via Cygwin or MinGW).
+A big investment has also been made on documentation and at several levels.
+First, the theoretical underpinnings have been thoroughly investigated, integrated when necessary and written down: an extensive bibliography is available
+on the PPL web site. Secondly, during the entire development of the library,
+the quality, accessibility and completeness of the documentation has always
+been given a particular emphasis: while some parts of the library need more
+work in this respect, the vast majority of the code is thoroughly documented.
+The library has been documented using the Doxygen tool. 15 Doxygen is a documentation system for C++, C, Java, and other languages that can generate
+high-quality documentation from a collection of documented source files. The
+source files can be documented by means of ordinary comments, that can be
+placed near the program elements being documented: just above the declaration or definition of a member, class or namespace, for instance. This makes it
+much easier to keep the documentation consistent with the actual source code.
+Moreover, Doxygen allows the typesetting of mathematical formulas within
+comments by means of the relevant subset of LATEX, which is an important
+feature for a project like the PPL. It is also able to automatically extract
+the code structure and use this information to generate include-dependency
+graphs, inheritance diagrams, and collaboration diagrams. Doxygen can generate documentation in various formats, such as HTML, PostScript and PDF.
+The HTML and PDF output are fully hyperlinked, a feature that greatly
+facilitates “navigation” in the available documentation.
+The Parma Polyhedra Library is equipped with two manuals generated with
+the help of Doxygen: a user’s manual, containing all and only the information
+needed by people wishing to use the library [15]; and a developer’s reference
+manual that contains, in addition, all the details concerning the library implementation [14]. All manuals are available, in various formats, from the PPL
+web site and the user’s manual is also included in each source distribution.
+15 http://www.doxygen.org.
+
+22
+
+4
+
+Efficiency
+
+One natural question is how does the efficiency of the Parma Polyhedra Library
+compare with that of other polyhedra libraries. Of course, such a question does
+not have a definite answer. Apart from clarifying whether CPU or memory
+efficiency or both are the intended measures of interest, the answer will depend
+on the targeted applications: with different applications the results can vary
+wildly. Moreover, even within the same application, big variations may be
+observed for different inputs. For these reasons, it must be admitted that
+the only way to meaningfully assess the performance of the library is with
+respect to a particular application, a particular set of problem instances, and
+a particular definition of ‘performance’.
+For the same reasons, it is nonetheless instructive to compare the performance
+of various polyhedra libraries on a well-defined problem with a large set of
+freely available inputs. One such problem, called vertex/facet enumeration,
+is particularly relevant for implementations based on the Double Description
+method such as the Parma Polyhedra Library, New Polka and PolyLib, as this
+problem has to be solved whenever one description has to be converted into
+the other one. The vertex/facet enumeration problem is a well-studied one
+and several systems have been expressly developed to solve it. We have thus
+compared the above mentioned libraries with the following (in parentheses,
+the versions we have tested):
+• cddlib (version 0.94b), a C implementation of the Double Description method,
+by K. Fukuda [48]; 16
+• lrslib (version 0.42b), a C implementation of the reverse search algorithm
+for vertex enumeration/convex hull problems, by D. Avis [3,4]; 17
+• pd (version 1.7), a C program implementing a primal-dual algorithm using
+rational arithmetic, by A. Marzetta and maintained by D. Bremner [25]. 18
+Both cddlib and lrslib come with driver programs that support a polyhedra
+input format that was introduced by K. Fukuda and extended by D. Avis;
+this input format is also supported by the pd program. The distributions of
+cddlib and lrslib provide more than 100 different inputs of varying complexity
+for these programs. Driver programs that can read the same input format and
+use the PPL, New Polka and PolyLib are part of the PPL distribution since
+version 0.7.
+The tests have been performed on a PC equipped with an AMD Athlon 2800+
+with 1 GB of RAM and running GNU/Linux and GMP version 4.2. All the
+16 http://www.cs.mcgill.ca/
+
+~ fukuda/soft/cdd_home/cdd.html.
+~ avis/C/lrs.html.
+18 http://www.cs.unb.ca/profs/bremner/pd/.
+17 http://cgm.cs.mcgill.ca/
+
+23
+
+software has been compiled with GCC 4.0.3 at the optimization level that
+is the default for each package (i.e., the PPL was compiled with ‘-O2’, its
+default; PolyLib, cddlib, and pd with -O2; New Polka and lrslib with ‘-O3’).
+The obtained running times, in seconds, are reported in Tables 1 and 2. 19
+The entries marked with ‘n.a.’ in the pd’s column indicate the problems that
+cannot be solved by pd, which can only handle polyhedra that contain the
+origin. Entries marked with ‘ovfl’ indicate the problems on which pd runs into
+an arithmetic overflow. It should be noted that strictly speaking, lrslib solves
+a slightly different, easier problem than the one solved by the other systems:
+while the latter guarantee the result is minimized, the output of lrslib may
+contain duplicate rays.
+Table 1: Efficiency on vertex enumeration
+input
+ccc4.e
+ccc5.e
+ccc6.e
+ccp4.e
+ccp5.e
+ccp6.e
+cp4.e
+cp5.e
+cp6.e
+cube.e
+cut16_11.e
+cut32_16.e
+cyclic10-4.e
+cyclic12-6.e
+cyclic14-8.e
+cyclic16-10.e
+dcube10.e
+dcube12.e
+dcube3.e
+dcube6.e
+dcube8.e
+irbox20-4.e
+irbox200-4.e
+mp5.e
+prodst62.e
+redcheck.e
+reg24-5.e
+reg600-5_m.e
+samplev1.e
+samplev2.e
+samplev3.e
+
+PPL
+0.00
+0.00
+0.03
+0.00
+0.00
+0.05
+0.00
+0.00
+0.05
+0.00
+0.00
+0.05
+0.00
+0.00
+0.00
+0.02
+0.02
+0.17
+0.00
+0.00
+0.00
+0.00
+0.02
+0.00
+34.78
+0.00
+0.00
+5.05
+0.00
+0.00
+0.00
+
+New Polka
+0.11
+0.10
+0.14
+0.10
+0.10
+0.15
+0.08
+0.12
+0.18
+0.05
+0.12
+0.17
+0.07
+0.08
+0.09
+0.14
+0.13
+0.22
+0.08
+0.07
+0.12
+0.08
+0.07
+0.11
+161.09
+0.06
+0.08
+19.12
+0.09
+0.06
+0.07
+
+PolyLib
+0.03
+0.04
+0.26
+0.02
+0.04
+0.31
+0.03
+0.05
+0.30
+0.02
+0.04
+0.28
+0.02
+0.03
+0.04
+0.07
+0.10
+2.66
+0.02
+0.03
+0.03
+0.01
+0.02
+0.05
+123.28
+0.01
+0.03
+12.37
+0.02
+0.02
+0.02
+
+cddlib
+0.00
+0.02
+0.61
+0.00
+0.02
+0.90
+0.00
+0.02
+0.88
+0.00
+0.02
+0.91
+0.00
+0.01
+0.06
+0.24
+0.23
+1.29
+0.00
+0.00
+0.04
+0.01
+0.98
+0.59
+> 1h
+0.00
+0.01
+135.49
+0.00
+0.00
+0.00
+
+lrslib
+0.00
+0.00
+3.12
+0.00
+0.00
+3.95
+0.00
+0.00
+3.86
+0.00
+0.00
+4.32
+0.00
+0.00
+0.01
+0.04
+0.02
+0.10
+0.00
+0.00
+0.00
+0.00
+0.05
+0.84
+> 1h
+0.00
+0.00
+33.63
+0.00
+0.00
+0.00
+
+pd
+n.a.
+n.a.
+n.a.
+0.01
+5.36
+> 1h
+0.01
+5.29
+> 1h
+0.00
+3.86
+> 1h
+0.00
+0.44
+172.10
+> 1h
+> 1h
+> 1h
+0.00
+0.35
+119.53
+0.01
+0.18
+3.93
+ovfl
+0.00
+0.01
+n.a.
+n.a.
+n.a.
+n.a.
+
+19 Filenames have been shortened to fit the table on the page: in particular the .ext
+
+and .ine extensions have been shortened to .e and .i, respectively; moreover, the
+file called integralpoints.ine has been renamed integpoints.i.
+
+24
+
+Table 1: Efficiency on vertex enumeration (continued)
+input
+tsp5.e
+allzero.i
+cp4.i
+cp5.i
+cross10.i
+cross12.i
+cross4.i
+cross6.i
+cross8.i
+cube.i
+cube10.i
+cube12.i
+cube3.i
+cube6.i
+cube8.i
+cubetop.i
+cubocta.i
+cyc.i
+cyclic17_8.i
+diamond.i
+dodeca_m.i
+ex1.i
+grcubocta.i
+hexocta.i
+icododeca_m.i
+in0.i
+in1.i
+in2.i
+in3.i
+in4.i
+in5.i
+in6.i
+in7.i
+infeas.i
+integpoints.i
+kkd18_4.i
+kkd27_5.i
+kkd38_6.i
+kq20_11_m.i
+metric40_11.i
+metric80_16.i
+mit31-20.i
+mp5.i
+mp5a.i
+mp6.i
+nonfull.i
+origin.i
+project1_m.i
+project1res.i
+
+PPL
+0.00
+0.00
+0.00
+0.01
+0.08
+0.84
+0.00
+0.00
+0.01
+0.00
+0.02
+0.19
+0.00
+0.00
+0.00
+0.00
+0.00
+0.00
+0.04
+0.00
+0.00
+0.00
+0.00
+0.00
+0.00
+0.00
+0.00
+0.00
+0.00
+0.00
+0.00
+0.02
+0.18
+0.00
+0.00
+0.00
+0.05
+2.95
+0.19
+0.00
+0.13
+23.34
+0.00
+0.00
+0.33
+0.00
+0.00
+0.00
+0.00
+
+New Polka
+0.12
+0.06
+0.09
+0.12
+0.22
+3.04
+0.07
+0.06
+0.07
+0.09
+0.15
+0.32
+0.06
+0.10
+0.10
+0.08
+0.10
+0.08
+0.15
+0.08
+0.07
+0.07
+0.06
+0.05
+0.07
+0.06
+0.08
+0.08
+0.05
+0.10
+0.07
+0.14
+0.40
+0.09
+0.10
+0.10
+0.12
+5.26
+0.41
+0.11
+0.24
+27.21
+0.08
+0.10
+0.42
+0.06
+0.08
+0.10
+0.08
+
+25
+
+PolyLib
+0.04
+0.01
+0.02
+0.05
+0.14
+2.86
+0.02
+0.03
+0.03
+0.02
+0.16
+3.70
+0.02
+0.03
+0.05
+0.02
+0.02
+0.01
+0.14
+0.01
+0.02
+0.02
+0.02
+0.01
+0.02
+0.02
+0.02
+0.03
+0.02
+0.03
+0.04
+0.09
+0.44
+0.02
+0.04
+0.02
+0.07
+1.52
+0.45
+0.04
+0.07
+115.00
+0.04
+0.03
+0.75
+0.02
+0.02
+0.04
+0.02
+
+cddlib
+0.00
+0.00
+0.00
+0.14
+10.50
+166.15
+0.00
+0.04
+0.54
+0.00
+0.24
+1.35
+0.00
+0.01
+0.06
+0.00
+0.00
+0.00
+0.32
+0.00
+0.00
+0.00
+0.01
+0.02
+0.05
+0.00
+0.01
+0.00
+0.00
+0.01
+0.03
+0.42
+0.96
+0.00
+0.05
+0.02
+0.08
+0.32
+0.99
+0.07
+0.54
+103.19
+0.06
+0.06
+4.66
+0.00
+0.00
+0.03
+0.00
+
+lrslib
+0.00
+0.00
+0.00
+5.91
+> 1h
+> 1h
+0.00
+0.09
+28.90
+0.00
+0.03
+0.18
+0.00
+0.00
+0.00
+0.00
+0.00
+0.00
+0.08
+0.00
+0.00
+0.00
+0.00
+0.00
+0.00
+0.00
+0.00
+0.00
+0.00
+0.00
+0.00
+0.03
+0.08
+0.00
+0.00
+0.00
+0.01
+0.05
+0.08
+0.57
+32.09
+25.53
+0.58
+0.57
+1177.96
+0.00
+0.00
+0.00
+0.00
+
+pd
+n.a.
+n.a.
+n.a.
+n.a.
+1.38
+15.24
+0.00
+0.01
+0.14
+0.00
+> 1h
+> 1h
+0.00
+0.34
+123.23
+n.a.
+0.00
+0.00
+> 1h
+0.00
+n.a.
+n.a.
+0.01
+0.01
+n.a.
+n.a.
+n.a.
+n.a.
+n.a.
+n.a.
+n.a.
+n.a.
+n.a.
+n.a.
+n.a.
+n.a.
+n.a.
+n.a.
+n.a.
+n.a.
+n.a.
+> 1h
+n.a.
+n.a.
+n.a.
+n.a.
+n.a.
+1.10
+0.00
+
+Table 1: Efficiency on vertex enumeration (continued)
+input
+project2_m.i
+project2res.i
+rcubocta.i
+reg24-5.i
+rhomtria_m.i
+sample.i
+sampleh1.i
+sampleh2.i
+sampleh3.i
+sampleh4.i
+sampleh5.i
+sampleh6.i
+sampleh7.i
+sampleh8.i
+trunc10.i
+trunc7.i
+tsp5.i
+total
+
+PPL
+0.02
+0.00
+0.00
+0.00
+0.00
+0.00
+0.00
+0.00
+0.00
+0.00
+0.00
+0.00
+0.00
+52.87
+8.81
+0.02
+0.00
+130.34
+
+New Polka
+0.09
+0.08
+0.08
+0.08
+0.09
+0.08
+0.05
+0.06
+0.04
+0.07
+0.05
+0.06
+0.09
+73.64
+9.06
+0.13
+0.10
+308.12
+
+PolyLib
+0.05
+0.02
+0.01
+0.02
+0.02
+0.01
+0.02
+0.01
+0.02
+0.01
+0.01
+0.01
+0.01
+78.76
+0.08
+0.04
+0.04
+345.70
+
+cddlib
+0.46
+0.08
+0.01
+0.01
+0.04
+0.00
+0.00
+0.00
+0.00
+0.00
+0.00
+0.00
+0.00
+> 1h
+1.66
+0.13
+0.02
+
+lrslib
+0.13
+0.01
+0.00
+0.00
+0.00
+0.00
+0.00
+0.00
+0.00
+0.00
+0.00
+0.00
+0.00
+4.59
+9.15
+0.16
+0.00
+
+pd
+n.a.
+n.a.
+0.01
+0.01
+n.a.
+0.00
+n.a.
+n.a.
+n.a.
+n.a.
+n.a.
+n.a.
+n.a.
+n.a.
+737.37
+17.51
+n.a.
+
+In Table 2 we have collected the data concerning the hardest of these problems.
+Here we have imposed a memory limit of 768 MB: entries marked with ‘mem’
+indicate the problems on which this limit was exceeded. The entries marked
+with ‘tab’ in the New Polka’s column indicate the problems where New Polka
+ran “out of table space” in the conversion algorithm.
+Table 2: Efficiency on vertex enumeration: hard problems
+input
+cp7.e
+cyclic25_13.e
+cp6.i
+mit.i
+mit288-281.i
+mit41-16.i
+mit708-9.i
+mit71-61.i
+mit90-86.i
+
+PPL
+> 1h
+89.94
+> 1h
+> 1h
+mem
+137.14
+> 1h
+> 1h
+mem
+
+New Polka
+tab
+tab
+tab
+tab
+tab
+tab
+tab
+tab
+tab
+
+PolyLib
+> 1h
+354.83
+> 1h
+> 1h
+mem
+320.37
+> 1h
+mem
+mem
+
+cddlib
+> 1h
+221.98
+> 1h
+950.00
+mem
+325.65
+1016.23
+> 1h
+> 1h
+
+lrslib
+> 1h
+12.10
+> 1h
+2024.16
+> 1h
+33.89
+1927.18
+> 1h
+> 1h
+
+pd
+> 1h
+n.a.
+n.a.
+n.a.
+ovfl
+> 1h
+n.a.
+n.a.
+ovfl
+
+Another possibility of evaluating the performance of the Parma Polyhedra
+Library on a standard problem with standard data is offered by linear programming, which is the paradigm upon which several approaches to analysis
+and verification (such as, e.g., [77,79]) rest upon. This requires either a version
+of the simplex based on exact arithmetic, or, in case a classical floating-point
+implementation is used, the validation of the obtained result using alternative
+
+26
+
+methods. The MathSAT 20 decision procedure [24], which is applicable to the
+formal verification of infinite state systems (such as timed and hybrid systems),
+is based on a version of the Cassowary Constraint Solving Toolkit [5], modified
+so as to use exact arithmetic instead of floating-point numbers. Moreover, the
+algorithm employed by MathSAT requires incremental satisfiability checks: a
+set of constraints is added and satisfiability is checked, more constraints are
+added and satisfiability is re-checked, and so forth. We have thus measured the
+efficiency of the PPL’s incremental constraint solver by comparison with the
+version of Cassowary used in MathSAT and with the Wallaroo Linear Constraint Solving Library, 21 another descendant of Cassowary. The benchmarks
+we used are quite standard in the linear programming community: they come
+from the ‘lp’ directory of NetLib. 22 The solution times, in seconds, obtained
+for the problem of adding one constraint at a time, checking for satisfiability
+at each step, are given in Table 3.
+Table 3: Efficiency of the simplex solver on incremental satisfiability checking
+input
+adlittle.mps
+afiro.mps
+blend.mps
+boeing1.mps
+boeing2.mps
+kb2.mps
+sc105.mps
+sc50a.mps
+sc50b.mps
+total
+
+5
+
+PPL
+0.33
+0.02
+13.45
+47.28
+2.32
+0.11
+0.48
+0.05
+0.06
+64.10
+
+Wallaroo
+1.46
+0.05
+5.40
+87.80
+10.58
+0.30
+10.95
+0.64
+0.70
+117.88
+
+Cassowary/MathSAT
+1.51
+0.07
+8.23
+75.48
+14.67
+0.46
+7.23
+0.56
+0.94
+109.15
+
+Development Plans
+
+In this section we indicate the short- and mid-term development plans we
+have for the library. We deliberately omit all long-term projects: for all those
+we mention here, code —whether in the form of a prototype or as a proof-ofconcept exercise— has already been developed that proves the feasibility of
+the proposal.
+20 http://mathsat.itc.it/.
+21 http://sourceforge.net/projects/wallaroo/.
+22 http://www.netlib.org/lp/index.html.
+
+27
+
+5.1 More Abstractions
+
+Intervals and Bounding Boxes An important numerical domain is the
+domain of bounding boxes: these are representable by means of finite set of
+intervals or be seen as finite conjunctions of constraints of the form ±vi ≤ d
+or ±vi < d. Despite the fact that bounding boxes have been one of the first
+abstract domains ever proposed [31] and that they have been implemented
+and reimplemented dozens of times, no freely available implementation is really suitable for the purposes of abstract interpretation. In fact, the available
+interval libraries either lack support for non-closed intervals (so that they are
+unable to represent constraints of the form ±vi < d), or they do not provide the right support for approximation in the sense of partial correctness
+(e.g., division by an interval containing zero gives rise to a run-time error instead of giving an interval containing the result under the assumption that
+the concrete division being approximated was not a division by zero), or they
+disregard rounding errors and are therefore unsafe. We are thus working on a
+complete implementation of bounding boxes based on intervals. Such intervals
+are parametric on a number of features: they support open as well as closed
+boundaries; boundaries can be chosen within one of the number families mentioned in Section 2.2 (when boundaries are floating point numbers, rounding
+is of course controlled to maintain soundness); independently from the type
+of the boundaries, both plain intervals of real numbers and intervals subject
+to generic restrictions are supported. This notion of restriction can be instantiated to obtain intervals of integer numbers, modulo intervals [72,73], and
+generalizations of the latter providing more precise information. 23
+
+Grid-Polyhedra An interesting line of development consists in the combination of the grids domain with the several polyhedral domains provided
+by the PPL: not only the Z-polyhedra domain [2], but also many variations
+such as grid-polyhedra, grid-octagon, grid-bounded-difference, grid-interval
+domains (not to mention their powersets).
+
+Polynomial Equalities and Inequalities The work in [19] proved the
+feasibility of representing systems of polynomial inequalities of bounded degree by encoding them into convex polyhedra. The prototype implementation
+used for the experimental evaluation presented in [19] is being turned into a
+complete abstract domain and will be incorporated into the PPL.
+23 An implementation of these interval families is already available in the PPL’s
+
+public CVS repository.
+
+28
+
+5.2 More Language Interfaces
+The current version of the PPL only offers C and Prolog interfaces for (C and
+NNC) polyhedra and LP problems. It would not be difficult to add, along
+the same lines, interfaces for all the other abstractions. It can be done, rather
+quickly, mostly as a “copy and paste” exercise. Instead of following that route
+(which would imply substantial code duplication and an unaffordable maintenance burden), we are working at an automatic way of obtaining these interfaces out of a few “templates.” As part of this ongoing effort, we are extending
+the set of available direct interfaces 24 with Java and Objective Caml. 25 Finally there are plans to develop an interface that allows the use of the PPL’s
+numerical abstractions within Mathematica. 26
+5.3 Other Features
+Other features on the horizon of the Parma Polyhedra Library include the
+inclusion of: bidirectional serialization functions for all the supported abstractions; the ask-and-tell generic construction of [6]; 27 and the extrapolation
+operators defined in [59] and [61]; We also plan to add support for more
+complexity-throttling techniques such as: breaking down the set of the variables of interests into “packs” of manageable size [23,36,85]; support for Cartesian factoring as defined in [56]; and the limitation of the number of constraints
+and generators and/or the size of coefficients in the representation of polyhedra [44].
+
+6
+
+Discussion
+
+In this paper, we have presented the Parma Polyhedra Library, a library of
+numerical abstractions especially targeted at applications in the field of analysis and verification of software and hardware systems. We have illustrated the
+general philosophy that is behind the design of the library, its main features,
+examples highlighting the advantages offered to client applications, and the
+avenue we have prepared for future developments.
+24 As opposed to the indirect interfaces that can be obtained by passing through
+
+the C interface.
+25 Initial versions of these interfaces are already available in the PPL’s public CVS
+repository.
+26 http://www.wolfram.com/.
+27 Preliminary support for both these features is already available in the PPL’s
+public CVS repository.
+
+29
+
+The Parma Polyhedra Library is being used on several applications in the
+field of verification of hardware and software systems. It has been used for the
+verification of properties of oscillator circuits [46,47]; to verify the soundness
+of batch workflow networks (a kind of Petri net used in workflow management) [84]; in the field of safety analysis of continuous and hybrid systems
+to overapproximate the systems of linear differential equations expressing the
+dynamics of hybrid automata [41,43,45,80] and, in particular, the PPL is used
+in PHAVer, an innovative tool for the verification of such systems [44]. The
+PPL is also used: in a version of TVLA (3-Valued Logic Analysis Engine,
+http://www.cs.tau.ac.il/~tvla/), a system for the verification of properties of arrays and heap-allocated data [50]; in iCSSV (interprocedural C
+String Static Verifier), a tool for verifying the safety of string operations in
+C programs [42]; and in a static analyzer for gated data dependence graphs,
+an intermediate representation for optimizing compilation [62]. This analyzer
+employs, in particular, the precise widening operator and the widening with
+tokens technique introduced in [11,12]. In [77] the PPL is used to derive invariant linear equalities and inequalities for a subset of the C language; it is
+used in StInG [78] and LPInv [79], two systems for the analysis of transition
+systems; it is used for the model-checking of reconfigurable hybrid systems
+[82]; it is used in a static analysis tool for x86 binaries that automatically
+identifies instructions that can be used to redirect control flow, thus constituting vulnerabilities that can be exploited in order to bypass intrusion
+detection systems [64]; it is also used to represent and validate real-time systems’ constraints and behaviors [40] and to automatically derive the argument size relations that are needed for termination analysis of Prolog programs [68]. More applications using the Parma Polyhedra Library are listed
+at http://www.cs.unipr.it/ppl/Applications and linked pages.
+In conclusion, even though the library is still not mature and functionally complete, it already offers a combination of functionality, reliability, usability and
+performance that is not matched by similar, freely available libraries. Moreover, since the PPL is free software and distributed under the terms of the
+GNU General Public License (GPL), and due to the presence of extensive documentation, the library can already be regarded as an important contribution
+secured to the community.
+For the most up-to-date information, documentation and downloads and to
+follow the development work, the reader is referred to the Parma Polyhedra
+Library site at http://www.cs.unipr.it/ppl/.
+
+Acknowledgments. We would like to express our gratitude and appreciation to all the present and past developers of the Parma Polyhedra Library:
+Irene Bacchi, Abramo Bagnara, Danilo Bonardi, Sara Bonini, Andrea Cimino, Katy Dobson, Giordano Fracasso, Maximiliano Marchesi, Elena Mazzi,
+30
+
+David Merchat, Matthew Mundell, Andrea Pescetti, Barbara Quartieri, Elisa
+Ricci, Enric Rodrı́guez-Carbonell, Angela Stazzone, Fabio Trabucchi, Claudio
+Trento, Alessandro Zaccagnini, Tatiana Zolo. Thanks also to Aaron Bradley,
+for contributing to the project his Mathematica interface, to Goran Frehse,
+for contributing his code to limit the complexity of polyhedra, and to all the
+users of the library that provided us with helpful feedback.
+
+References
+
+[1] J. F. Allen, H. A. Kautz, A model of naive temporal reasoning, in: J. R. Hobbs,
+R. Moore (eds.), Formal Theories of the Commonsense World, Ablex, Norwood,
+NJ, 1985, pp. 251–268.
+[2] C.
+Ancourt,
+Génération
+automatique
+de
+codes
+de
+transfert pour multiprocesseurs à mémoires locales, Ph.D. thesis, Université
+de Paris VI, Paris, France (Mar. 1991).
+[3] D. Avis, Computational experience with the reverse search vertex enumeration
+algorithm, Optimization Methods and Software 10 (1998) 107–124.
+[4] D. Avis, lrs: A revised implementation of the reverse search vertex enumeration
+algorithm, in: G. Kalai, G. M. Ziegler (eds.), Polytopes — Combinatorics and
+Computation, vol. 29 of Oberwolfach Seminars, Birkhäuser-Verlag, 2000, pp.
+177–198.
+[5] G. J. Badros, A. Borning, P. J. Stuckey, The Cassowary linear arithmetic
+constraint solving algorithm, ACM Transactions on Computer-Human
+Interaction 8 (4) (2001) 267–306.
+[6] R. Bagnara, Data-flow analysis for constraint logic-based languages, Ph.D.
+thesis, Dipartimento di Informatica, Università di Pisa, Pisa, Italy, printed as
+Report TD-1/97 (Mar. 1997).
+[7] R. Bagnara, A hierarchy of constraint systems for data-flow analysis of
+constraint logic-based languages, Science of Computer Programming 30 (1–2)
+(1998) 119–155.
+[8] R. Bagnara, K. Dobson, P. M. Hill, M. Mundell, E. Zaffanella, A practical tool
+for analyzing the distribution of numerical values, available at http://www.
+comp.leeds.ac.uk/hill/Papers/papers.html. (2006).
+[9] R. Bagnara, K. Dobson, P. M. Hill, M. Mundell, E. Zaffanella, Grids: A domain
+for analyzing the distribution of numerical values, in: G. Puebla (ed.), Logicbased Program Synthesis and Transformation, 16th International Symposium,
+vol. 4407 of Lecture Notes in Computer Science, Springer-Verlag, Berlin, Venice,
+Italy, 2007.
+
+31
+
+[10] R. Bagnara, P. M. Hill, E. Mazzi, E. Zaffanella, Widening operators for weaklyrelational numeric abstractions, in: C. Hankin, I. Siveroni (eds.), Static Analysis:
+Proceedings of the 12th International Symposium, vol. 3672 of Lecture Notes
+in Computer Science, Springer-Verlag, Berlin, London, UK, 2005.
+[11] R. Bagnara, P. M. Hill, E. Ricci, E. Zaffanella, Precise widening operators
+for convex polyhedra, in: R. Cousot (ed.), Static Analysis: Proceedings of the
+10th International Symposium, vol. 2694 of Lecture Notes in Computer Science,
+Springer-Verlag, Berlin, San Diego, California, USA, 2003.
+[12] R. Bagnara, P. M. Hill, E. Ricci, E. Zaffanella, Precise widening operators for
+convex polyhedra, Science of Computer Programming 58 (1–2) (2005) 28–56.
+[13] R. Bagnara, P. M. Hill, E. Zaffanella, Not necessarily closed convex polyhedra
+and the double description method, Formal Aspects of Computing 17 (2) (2005)
+222–257.
+[14] R. Bagnara, P. M. Hill, E. Zaffanella, The Parma Polyhedra Library Developer’s
+Manual, Department of Mathematics, University of Parma, Parma, Italy, release
+0.9 ed., available at http://www.cs.unipr.it/ppl/ (Mar. 2006).
+[15] R. Bagnara, P. M. Hill, E. Zaffanella, The Parma Polyhedra Library User’s
+Manual, Department of Mathematics, University of Parma, Parma, Italy, release
+0.9 ed., available at http://www.cs.unipr.it/ppl/ (Mar. 2006).
+[16] R. Bagnara, P. M. Hill, E. Zaffanella, Widening operators for powerset domains,
+Software Tools for Technology Transfer 8 (4/5) (2006) 449–466, as the figures
+in the journal version of this paper have been improperly printed (rendering
+them useless), we recommend that interested readers download an electronic
+copy from this web site or contact one of the authors for a printed copy.
+[17] R. Bagnara, P. M. Hill, E. Zaffanella, Applications of polyhedral computations
+to the analysis and verification of hardware and software systems,
+Quaderno 458, Dipartimento di Matematica, Università di Parma, Italy,
+available at http://www.cs.unipr.it/Publications/. Also published as
+arXiv:cs.CG/0701122, available from http://arxiv.org/. (2007).
+[18] R. Bagnara, E. Ricci, E. Zaffanella, P. M. Hill, Possibly not closed convex
+polyhedra and the Parma Polyhedra Library, in: M. V. Hermenegildo, G. Puebla
+(eds.), Static Analysis: Proceedings of the 9th International Symposium, vol.
+2477 of Lecture Notes in Computer Science, Springer-Verlag, Berlin, Madrid,
+Spain, 2002.
+[19] R. Bagnara, E. Rodrı́guez-Carbonell, E. Zaffanella, Generation of basic semialgebraic invariants using convex polyhedra, in: C. Hankin, I. Siveroni (eds.),
+Static Analysis: Proceedings of the 12th International Symposium, vol. 3672
+of Lecture Notes in Computer Science, Springer-Verlag, Berlin, London, UK,
+2005.
+[20] V. Balasundaram, K. Kennedy, A technique for summarizing data access and its
+use in parallelism enhancing transformations, in: B. Knobe (ed.), Proceedings
+
+32
+
+of the ACM SIGPLAN’89 Conference on Programming Language Design and
+Implementation (PLDI), vol. 24(7) of ACM SIGPLAN Notices, ACM Press,
+Portland, Oregon, USA, 1989.
+[21] R. Bellman, Dynamic Programming, Princeton University Press, 1957.
+[22] B. Bérard, L. Fribourg:, Reachability analysis of (timed) Petri nets using real
+arithmetic, in: J. C. M. Baeten, S. Mauw (eds.), CONCUR’99: Concurrency
+Theory, Proceedings of the 10th International Conference, vol. 1664 of
+Lecture Notes in Computer Science, Springer-Verlag, Berlin, Eindhoven, The
+Netherlands, 1999.
+[23] B. Blanchet, P. Cousot, R. Cousot, J. Feret, L. Mauborgne, A. Miné,
+D. Monniaux, X. Rival, A static analyzer for large safety-critical software, in:
+Proceedings of the ACM SIGPLAN 2003 Conference on Programming Language
+Design and Implementation (PLDI’03), ACM Press, San Diego, California,
+USA, 2003.
+[24] M. Bozzano, R. Bruttomesso, A. Cimatti, T. A. Junttila, P. van Rossum,
+S. Schulz, R. Sebastiani, The MathSAT 3 system, in: R. Nieuwenhuis (ed.),
+Automated Deduction: Proceedings of the 20th International Conference, vol.
+3632 of Lecture Notes in Computer Science, Springer-Verlag, Berlin, Tallinn,
+Estonia, 2005.
+[25] D. Bremner, K. Fukuda, A. Marzetta, Primal-dual methods for vertex and facet
+enumeration, Discrete and Computational Geometry 20 (3) (1998) 333–357.
+[26] T. Bultan, R. Gerber, W. Pugh, Model-checking concurrent systems with
+unbounded integer variables: Symbolic representations, approximations, and
+experimental results, ACM Transactions on Programming Languages and
+Systems 21 (4) (1999) 747–789.
+[27] N. V. Chernikova, Algorithm for finding a general formula for the non-negative
+solutions of system of linear equations, U.S.S.R. Computational Mathematics
+and Mathematical Physics 4 (4) (1964) 151–158.
+[28] N. V. Chernikova, Algorithm for finding a general formula for the non-negative
+solutions of system of linear inequalities, U.S.S.R. Computational Mathematics
+and Mathematical Physics 5 (2) (1965) 228–233.
+[29] N. V. Chernikova, Algorithm for discovering the set of all solutions of
+a linear programming problem, U.S.S.R. Computational Mathematics and
+Mathematical Physics 8 (6) (1968) 282–293.
+[30] P. Cousot, Semantic foundations of program analysis, in: S. S. Muchnick,
+N. D. Jones (eds.), Program Flow Analysis: Theory and Applications, chap. 10,
+Prentice Hall, Englewood Cliffs, NJ, USA, 1981, pp. 303–342.
+[31] P. Cousot, R. Cousot, Static determination of dynamic properties of programs,
+in: B. Robinet (ed.), Proceedings of the Second International Symposium on
+Programming, Dunod, Paris, France, Paris, France, 1976.
+
+33
+
+[32] P. Cousot, R. Cousot, Abstract interpretation: A unified lattice model for
+static analysis of programs by construction or approximation of fixpoints,
+in: Proceedings of the Fourth Annual ACM Symposium on Principles of
+Programming Languages, ACM Press, New York, 1977.
+[33] P. Cousot, R. Cousot, Systematic design of program analysis frameworks,
+in: Proceedings of the Sixth Annual ACM Symposium on Principles of
+Programming Languages, ACM Press, New York, 1979.
+[34] P. Cousot, R. Cousot, Abstract interpretation frameworks, Journal of Logic and
+Computation 2 (4) (1992) 511–547.
+[35] P.
+Cousot,
+R.
+Cousot,
+Comparing the Galois connection and widening/narrowing approaches to
+abstract interpretation, in: M. Bruynooghe, M. Wirsing (eds.), Proceedings of
+the 4th International Symposium on Programming Language Implementation
+and Logic Programming, vol. 631 of Lecture Notes in Computer Science,
+Springer-Verlag, Berlin, Leuven, Belgium, 1992.
+[36] P. Cousot, R. Cousot, J. Feret, L. Mauborgne, A. Miné, D. Monniaux, X. Rival,
+The Astrée analyzer, in: M. Sagiv (ed.), Programming Languages and
+Systems, Proceedings of the 14th European Symposium on Programming, vol.
+3444 of Lecture Notes in Computer Science, Springer-Verlag, Berlin, Edinburgh,
+UK, 2005.
+[37] P. Cousot, N. Halbwachs, Automatic discovery of linear restraints among
+variables of a program, in: Conference Record of the Fifth Annual ACM
+Symposium on Principles of Programming Languages, ACM Press, Tucson,
+Arizona, 1978.
+[38] E. Davis, Constraint propagation with interval labels, Artificial Intelligence
+32 (3) (1987) 281–331.
+[39] D. L. Dill, Timing assumptions and verification of finite-state concurrent
+systems, in: J. Sifakis (ed.), Proceedings of the International Workshop on
+Automatic Verification Methods for Finite State Systems, vol. 407 of Lecture
+Notes in Computer Science, Springer-Verlag, Berlin, Grenoble, France, 1989.
+[40] D. Doose, Z. Mammeri, Polyhedra-based approach for incremental validation
+of real-time systems, in: L. T. Yang, M. Amamiya, Z. Liu, M. Guo, F. J.
+Rammig (eds.), Proceedings of the International Conference on Embedded and
+Ubiquitous Computing (EUC 2005), vol. 3824 of Lecture Notes in Computer
+Science, Springer-Verlag, Berlin, Nagasaki, Japan, 2005.
+[41] L. Doyen, T. A. Henzinger, J.-F. Raskin, Automatic rectangular refinement of
+affine hybrid systems, in: P. Pettersson, W. Yi (eds.), Proceedings of the 3rd
+International Conference on Formal Modeling and Analysis of Timed Systems
+(FORMATS 2005), vol. 3829 of Lecture Notes in Computer Science, SpringerVerlag, Berlin, Uppsala, Sweden, 2005.
+[42] R. Ellenbogen, Fully automatic verification of absence of errors via
+interprocedural integer analysis, Master’s thesis, School of Computer Science,
+Tel-Aviv University, Tel-Aviv, Israel (Dec. 2004).
+
+34
+
+[43] G. Frehse, Compositional verification of hybrid systems with discrete interaction
+using simulation relations, in: Proceedings of the IEEE Conference on Computer
+Aided Control Systems Design (CACSD 2004), Taipei, Taiwan, 2004.
+[44] G. Frehse, PHAVer: Algorithmic verification of hybrid systems past HyTech,
+in: M. Morari, L. Thiele (eds.), Hybrid Systems: Computation and Control:
+Proceedings of the 8th International Workshop (HSCC 2005), vol. 3414
+of Lecture Notes in Computer Science, Springer-Verlag, Berlin, Zürich,
+Switzerland, 2005.
+[45] G. Frehse, Z. Han, B. Krogh, Assume-guarantee reasoning for hybrid I/Oautomata by over-approximation of continuous interaction, in: Proceedings of
+the 43rd IEEE Conference on Decision and Control (CDC 2004), Atlantis,
+Paradise Island, Bahamas, 2004.
+[46] G. Frehse, B. H. Krogh, R. A. Rutenbar, Verifying analog oscillator circuits
+using forward/backward refinement, in: Proceedings of the 9th Conference on
+Design, Automation and Test in Europe (DATE 06), ACM SIGDA, Munich,
+Germany, 2006, CD-ROM publication.
+[47] G. Frehse, B. H. Krogh, R. A. Rutenbar, O. Maler, Time domain verification of
+oscillator circuit properties, in: Proceedings of the First Workshop on Formal
+Verification of Analog Circuits (FAC 2005), vol. 153 of Electronic Notes in
+Theoretical Computer Science, Elsevier Science B.V., Edinburgh, Scotland,
+2006.
+[48] K. Fukuda, A. Prodon, Double description method revisited, in: M. Deza,
+R. Euler, Y. Manoussakis (eds.), Combinatorics and Computer Science, 8th
+Franco-Japanese and 4th Franco-Chinese Conference, Brest, France, July 3-5,
+1995, Selected Papers, vol. 1120 of Lecture Notes in Computer Science, SpringerVerlag, Berlin, 1996.
+[49] D. Gopan, F. DiMaio, N. Dor, T. Reps, M. Sagiv, Numeric domains with
+summarized dimensions, in: K. Jensen, A. Podelski (eds.), Tools and Algorithms
+for the Construction and Analysis of Systems, 10th International Conference,
+TACAS 2004, vol. 2988 of Lecture Notes in Computer Science, Springer-Verlag,
+Berlin, Barcelona, Spain, 2004.
+[50] D. Gopan, T. W. Reps, M. Sagiv, A framework for numeric analysis of array
+operations, in: Proceedings of the 32nd ACM SIGPLAN-SIGACT Symposium
+on Principles of Programming Languages, Long Beach, California, USA, 2005.
+[51] P. Granger, Static analysis of linear congruence equalities among variables of a
+program, in: S. Abramsky, T. S. E. Maibaum (eds.), TAPSOFT’91: Proceedings
+of the International Joint Conference on Theory and Practice of Software
+Development, Volume 1: Colloquium on Trees in Algebra and Programming
+(CAAP’91), vol. 493 of Lecture Notes in Computer Science, Springer-Verlag,
+Berlin, Brighton, UK, 1991.
+[52] P. Granger, Static analyses of congruence properties on rational numbers
+(extended abstract), in: P. Van Hentenryck (ed.), Static Analysis: Proceedings
+
+35
+
+of the 4th International Symposium, vol. 1302 of Lecture Notes in Computer
+Science, Springer-Verlag, Berlin, Paris, France, 1997.
+[53] N. Halbwachs, Détermination automatique de relations linéaires vérifiées par
+les variables d’un programme, Thèse de 3ème cycle d’informatique, Université
+scientifique et médicale de Grenoble, Grenoble, France (Mar. 1979).
+[54] N. Halbwachs, Delay analysis in synchronous programs, in: C. Courcoubetis
+(ed.), Computer Aided Verification: Proceedings of the 5th International
+Conference, vol. 697 of Lecture Notes in Computer Science, Springer-Verlag,
+Berlin, Elounda, Greece, 1993.
+[55] N. Halbwachs, A. Kerbrat, Y.-E. Proy, POLyhedra INtegrated Environment,
+Verimag, France, version 1.0 of POLINE ed., documentation taken from source
+code (Sep. 1995).
+[56] N. Halbwachs, D. Merchat, C. Parent-Vigouroux, Cartesian factoring of
+polyhedra in linear relation analysis, in: R. Cousot (ed.), Static Analysis:
+Proceedings of the 10th International Symposium, vol. 2694 of Lecture Notes in
+Computer Science, Springer-Verlag, Berlin, San Diego, California, USA, 2003.
+[57] N. Halbwachs, Y.-E. Proy, P. Raymond, Verification of linear hybrid systems
+by means of convex approximations, in: B. Le Charlier (ed.), Static Analysis:
+Proceedings of the 1st International Symposium, vol. 864 of Lecture Notes in
+Computer Science, Springer-Verlag, Berlin, Namur, Belgium, 1994.
+[58] N. Halbwachs, Y.-E. Proy, P. Roumanoff, Verification of real-time systems using
+linear relation analysis, Formal Methods in System Design 11 (2) (1997) 157–
+185.
+[59] T. A. Henzinger, P.-H. Ho, A note on abstract interpretation strategies for
+hybrid automata, in: P. J. Antsaklis, W. Kohn, A. Nerode, S. Sastry (eds.),
+Hybrid Systems II, vol. 999 of Lecture Notes in Computer Science, SpringerVerlag, Berlin, 1995.
+[60] T. A. Henzinger, P.-H. Ho, H. Wong-Toi, HyTech: A model checker for hybrid
+systems, Software Tools for Technology Transfer 1 (1+2) (1997) 110–122.
+[61] T. A. Henzinger, J. Preussig, H. Wong-Toi, Some lessons from the hytech
+experience, in: Proceedings of the 40th Annual Conference on Decision and
+Control, IEEE Computer Society Press, 2001.
+[62] C. Hymans, E. Upton, Static analysis of gated data dependence graphs, in:
+R. Giacobazzi (ed.), Static Analysis: Proceedings of the 11th International
+Symposium, vol. 3148 of Lecture Notes in Computer Science, Springer-Verlag,
+Berlin, Verona, Italy, 2004.
+[63] B. Jeannet, Convex Polyhedra Library, release 1.1.3c ed., documentation of
+the “New Polka” library available at http://www.irisa.fr/prive/Bertrand.
+Jeannet/newpolka.html (Mar. 2002).
+
+36
+
+[64] C. Kruegel, E. Kirda, D. Mutz, W. Robertson, G. Vigna, Automating mimicry
+attacks using static binary analysis, in: Proceedings of Security ’05, the 14th
+USENIX Security Symposium, Baltimore, MD, USA, 2005.
+[65] K. Larsen, F. Larsson, P. Pettersson, W. Yi, Efficient verification of real-time
+systems: Compact data structure and state-space reduction, in: Proceedings
+of the 18th IEEE Real-Time Systems Symposium (RTSS’97), IEEE Computer
+Society Press, San Francisco, CA, 1997.
+[66] H. Le Verge, A note on Chernikova’s algorithm, Publication interne 635, IRISA,
+Campus de Beaulieu, Rennes, France (1992).
+[67] V. Loechner, PolyLib: A library for manipulating parameterized polyhedra,
+Available at http://icps.u-strasbg.fr/~ loechner/polylib/, declares itself
+to be a continuation of [86] (Mar. 1999).
+[68] F. Mesnard, R. Bagnara, cTI: A constraint-based termination inference tool
+for ISO-Prolog, Theory and Practice of Logic Programming 5 (1&2) (2005)
+243–257.
+[69] A. Miné, The octagon abstract domain, in: Proceedings of the Eighth Working
+Conference on Reverse Engineering (WCRE’01), IEEE Computer Society Press,
+Stuttgart, Germany, 2001.
+[70] A. Miné, Weakly relational numerical abstract domains, Ph.D. thesis, École
+Polytechnique, Paris, France (Mar. 2005).
+[71] T. S. Motzkin, H. Raiffa, G. L. Thompson, R. M. Thrall, The double description
+method, in: H. W. Kuhn, A. W. Tucker (eds.), Contributions to the Theory
+of Games – Volume II, No. 28 in Annals of Mathematics Studies, Princeton
+University Press, Princeton, New Jersey, 1953, pp. 51–73.
+[72] T. Nakanishi, A. Fukuda, Modulo interval arithmetic and its application to
+program analysis, Transactions of Information Processing Society of Japan
+42 (4) (2001) 829–837.
+[73] T. Nakanishi, K. Joe, C. D. Polychronopoulos, A. Fukuda, The modulo interval:
+A simple and practical representation for program analysis, in: Proceedings of
+the 1999 International Conference on Parallel Architectures and Compilation
+Techniques, IEEE Computer Society, Newport Beach, California, USA, 1999.
+[74] G. L. Nemhauser, L. A. Wolsey, Integer and Combinatorial Optimization, Wiley
+Interscience Series in Discrete Mathematics and Optimization, John Wiley &
+Sons, 1988.
+[75] P. Quinton, S. Rajopadhye, T. Risset, On manipulating Z-polyhedra, Tech. Rep.
+1016, IRISA, Campus Universitaire de Bealieu, Rennes, France (Jul. 1996).
+[76] P. Quinton, S. Rajopadhye, T. Risset, On manipulating Z-polyhedra using a
+canonic representation, Parallel Processing Letters 7 (2) (1997) 181–194.
+
+37
+
+[77] S. Sankaranarayanan, M. Colón, H. B. Sipma, Z. Manna, Efficient strongly
+relational polyhedral analysis, in: E. A. Emerson, K. S. Namjoshi (eds.),
+Verification, Model Checking and Abstract Interpretation: Proceedings of the
+7th International Conference (VMCAI 2006), vol. 3855 of Lecture Notes in
+Computer Science, Springer-Verlag, Berlin, Charleston, SC, USA, 2006.
+[78] S. Sankaranarayanan, H. B. Sipma, Z. Manna, Constraint-based linear-relations
+analysis, in: R. Giacobazzi (ed.), Static Analysis: Proceedings of the 11th
+International Symposium, vol. 3148 of Lecture Notes in Computer Science,
+Springer-Verlag, Berlin, Verona, Italy, 2004.
+[79] S. Sankaranarayanan, H. B. Sipma, Z. Manna, Scalable analysis of linear
+systems using mathematical programming, in: R. Cousot (ed.), Verification,
+Model Checking and Abstract Interpretation: Proceedings of the 6th
+International Conference (VMCAI 2005), vol. 3385 of Lecture Notes in
+Computer Science, Springer-Verlag, Berlin, Paris, France, 2005.
+[80] S. Sankaranarayanan, H. B. Sipma, Z. Manna, Fixed point iteration for
+computing the time elapse operator, in: J. Hespanha, A. Tiwari (eds.), Hybrid
+Systems: Computation and Control: Proceedings of the 9th International
+Workshop (HSCC 2006), vol. 3927 of Lecture Notes in Computer Science,
+Springer-Verlag, Berlin, Santa Barbara, CA, USA, 2006.
+[81] R. Shaham, E. K. Kolodner, S. Sagiv, Automatic removal of array memory leaks
+in Java, in: D. A. Watt (ed.), Proceedings of the 9th International Conference
+on Compiler Construction (CC 2000), vol. 1781 of Lecture Notes in Computer
+Science, Springer-Verlag, Berlin, Berlin, Germany, 2000.
+[82] H. Song, K. J. Compton, W. C. Rounds, SPHIN: a model checker for
+reconfigurable hybrid systems based on SPIN, in: R. Lazic, R. Nagarajan (eds.),
+Proceedings of the 5th International Workshop on Automated Verification of
+Critical Systems, vol. 145 of Electronic Notes in Theoretical Computer Science,
+University of Warwick, UK, 2006.
+[83] J. Stoer, C. Witzgall, Convexity and Optimization in Finite Dimensions I,
+Springer-Verlag, Berlin, 1970.
+[84] K. van Hee, O. Oanea, N. Sidorova, M. Voorhoeve, Verifying generalized
+soundness for workflow nets, in: I. Virbitskaite, A. Voronkov (eds.), Perspectives
+of System Informatics: Proceedings of the Sixth International Andrei Ershov
+Memorial Conference, vol. 4378 of Lecture Notes in Computer Science, SpringerVerlag, Berlin, Akademgorodok, Novosibirsk, Russia, 2006.
+[85] A. Venet, G. Brat, Precise and efficient static array bound checking for large
+embedded C programs, in: Proceedings of the ACM SIGPLAN 2004 Conference
+on Programming Language Design and Implementation (PLDI’04), ACM Press,
+Washington, DC, USA, 2004.
+[86] D. K. Wilde, A library for doing polyhedral operations, Master’s thesis, Oregon
+State University, Corvallis, Oregon, also published as IRISA Publication interne
+785, Rennes, France, 1993 (Dec. 1993).
+
+38
+
+

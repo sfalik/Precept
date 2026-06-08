@@ -34,6 +34,7 @@ Source string → Lexer.Lex → TokenStream → Parser.Parse → ConstructManife
 | Document | Purpose | Doc maturity |
 |----------|---------|--------------|
 | [compiler-and-runtime-design.md](../compiler-and-runtime-design.md) | How pipeline stages connect — artifact types, consumer contracts, LS integration strategy | Canonical design |
+| [soundness-and-coverage.md](soundness-and-coverage.md) | Verify-don't-trust verdict checking — witness format, the trusted checker, and the catalog-driven coverage analyzer that make the compile-time guarantee *checked* not *trusted* (cross-cuts proof engine, graph analyzer, type checker, fault correspondence, evaluator-order invariant) | Design (stub — building per the soundness plan) |
 | [diagnostic-system.md](diagnostic-system.md) | Diagnostic codes, severity, message templates, audience model, stage attribution | Draft |
 | [literal-system.md](literal-system.md) | How literals flow through every pipeline stage — lexer segmentation, parser assembly, type-checker resolution, evaluator materialization | Draft |
 | [tooling-surface.md](tooling-surface.md) | TextMate grammar generation, semantic token two-pass design, completion filtering | Full |

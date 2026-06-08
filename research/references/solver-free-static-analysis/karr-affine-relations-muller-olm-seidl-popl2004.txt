@@ -1,0 +1,1772 @@
+Precise Interprocedural Analysis through Linear Algebra
+Markus Müller-Olm
+
+∗
+
+Helmut Seidl
+
+FernUniversit ät Hagen, LG Praktische Informatik 5
+58084 Hagen, Germany
+
+TU München, Lehrstuhl für Informatik II
+80333 München, Germany
+
+mmo@ls5.cs.uni-dortmund.de
+
+seidl@informatik.tu-muenchen.de
+
+Abstract
+
+circumstances. Important application areas are optimizing compilers and validation or verification of programs. An often used
+simplification is to work with intraprocedural or context-insensitive
+analyses. Intraprocedural analyses treat bodies of single procedures
+(or methods) in isolation, while context-insensitive analyses assume
+conservatively that a procedure called at one call site may return to
+any other call site of this procedure. The context-insensitive approach, though interprocedural, still is limited in the quality of the
+computed information: if only weak information about one particular calling context of a procedure or method is available, this may
+affect all other calling contexts. The design of context-sensitive interprocedural analyses that mirror the actual call/return behavior of
+programs is generally deemed to be challenging. Here, if we speak
+about interprocedural analyses without further qualification, we always will mean context-sensitive ones.
+
+We apply linear algebra techniques to precise interprocedural
+dataflow analysis. Specifically, we describe analyses that determine for each program point identities that are valid among the
+program variables whenever control reaches that program point.
+Our analyses fully interpret assignment statements with affine expressions on the right hand side while considering other assignments as non-deterministic and ignoring conditions at branches.
+Under this abstraction, the analysis computes the set of all affine
+relations and, more generally, all polynomial relations of bounded
+degree precisely. The running time of our algorithms is linear in the
+program size and polynomial in the number of occurring variables.
+We also show how to deal with affine preconditions and local variables and indicate how to handle parameters and return values of
+procedures.
+
+In this paper, we show how linear algebra techniques can be used
+for interprocedural flow analysis. Our specific goal is to determine
+for each program point affine and, more generally, polynomial relations that are valid among the program variables whenever control reaches that program point. An affine relation is a condition
+of the form a0 + ∑ni+1 ai xi = 0, where a0 , . . . , an are constants and
+x1 , . . . , xn are program variables; a polynomial relation is a condition of the form p(x1 , . . . , xn ) = 0, where p is a multi-variate polynomial in x1 , . . . , xn . We call an analysis precise (w.r.t. a given class
+of programs) if it computes for every program point u of a program
+all valid relations of the given form which are valid along every feasible program path reaching u. (A program path is called feasible if
+it mirrors the actual call/return behavior of procedures.)
+
+Categories and Subject Descriptors: F.3.1 [Logics and Meanings of Programs]: Specifying and Verifying and Reasoning about
+Programs; D.3.3 [Programming Languages]: Language Constructs
+and Features—procedures, functions, and subroutines; D.3.4 [Programming Languages]: Processors—compilers; D.3.4 [Programming Languages]: Processors—optimization
+General Terms: algorithms, theory, verification.
+Keywords: interprocedural analysis, linear algebra, weakest precondition, affine relation, polynomial relation.
+
+Looking for valid affine and polynomial relations is a rather general
+question with many applications. First of all, many classical data
+flow analysis problems can be seen as problems about affine and
+polynomials relations. Some examples are: finding definite equalities among variables like x = y; constant propagation, i.e. detecting
+variables or expressions with a constant value at run-time; discovery of symbolic constants like x = 5y + 2 or even x = yz2 + 42;
+detection of complex common sub-expressions where even expressions are sought which are syntactically different but have the same
+value at run-time; and discovery of loop induction variables. Karr
+[10] also discusses applications in connection with parallelization
+of do-loops.
+
+1 Introduction
+The field of program analysis is concerned with designing algorithms that compute information about the dynamic behavior of
+programs by a static analysis. Such information is useful in many
+∗On leave from Universität Dortmund, FB 4, LS 5, 44221 Dortmund, Germany.
+
+Affine and polynomial relations found by an automatic analysis
+routine are also useful in program verification contexts, as they provide non-trivial valid assertions about the program. In particular,
+certain loop invariants can be discovered in this way fully automatically. As affine and, even more, polynomial relations express quite
+complex relationships among variables, the discovered assertions
+
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for profit or commercial advantage and that copies bear this notice and the full citation
+on the first page. To copy otherwise, to republish, to post on servers or to redistribute
+to lists, requires prior specific permission and/or a fee.
+POPL’04, January 14–16, 2004, Venice, Italy.
+Copyright 2004 ACM 1-58113-729-X/04/0001 ...$5.00
+
+330
+
+may form the backbone of the program proof and thus significantly
+simplify the verification task.
+
+Main:
+
+P:
+
+0
+
+5
+
+x2 := x1
+
+In this paper we consider affine programs for which our analysis will be precise, i.e., compute not some but all affine relations
+which are valid at a program point. We then extend this analysis
+to compute all valid polynomial relations up to a given degree d
+and to take affine preconditions into account completely. Affine
+programs differ from ordinary programs over integers in that they
+have non-deterministic (instead of conditional) branching, and contain only assignments where the right-hand sides either equal “?”
+denoting an unknown value, or are affine expressions such as in
+x3 := x1 − 3x2 + 7. Clearly, in practice our analyses can also be
+applied to arbitrary programs simply by ignoring the conditions at
+branchings and simulating input operations and non-affine righthand sides in assignments through assignments of unknown values.
+
+x1 := x1 + x2 + 1
+6
+
+1
+
+x3 := x3 + 1
+
+x3 := 0
+7
+
+2
+P
+
+P
+8
+
+3
+x1 := x1 − x2 − x3
+4
+
+To use linear algebra for program analysis is not a new idea. In his
+seminal paper [10], Karr presents an intraprocedural analysis that
+determines all intraprocedurally valid affine relations in an affine
+program. However, the potential of linear algebra has never been
+exploited fully. We extend Karr’s work in three respects. Firstly,
+we describe a precise interprocedural analysis of affine programs.
+Secondly, we extend our algorithm to an algorithm that computes
+all interprocedurally valid polynomial relations of degree bounded
+by some fixed d. Thirdly, we show how to treat local variables and
+indicate how to handle parameters and result values of procedures.
+Our base algorithm as well as the extended algorithms run in time
+linear in the program size and polynomial in the number of program
+variables.
+
+x1 := x1 − x2
+9
+
+Figure 1. An example program.
+
+x2 + 1. Consequently, at any call to P variable x1 holds the value
+x2 + x3 (x2 + 1) = x2 x3 + x2 + x3 . This amounts to saying that the
+polynomial relation (of degree 2) x2 x3 − x1 + x2 + x3 = 0 is valid
+at program points 2, 5 and 7.
+
+Related Work
+Unlike our algorithm, Karr’s intraprocedural algorithm [10] works
+with a forward propagation of affine spaces and uses quite complicated subroutines to deal with join points and assignments x j := t
+where the affine right-hand side depends on the variable x j on the
+left-hand side. Similar to our approach, it abstracts non-affine assignments and general guards. Due to the forward propagation
+strategy, however, it is able to handle positive affine guards precisely. In [13] we observe that, in absence of affine guards, checking a given affine relation for validity at a program point can be performed by a simpler backward propagating algorithm which in turn
+is generalized to a backward propagating algorithm for checking arbitrary polynomial relations for polynomial programs (where polynomial right hand side of assignments are interpreted) in [15, 14].
+In a recent paper, Gulwani and Necula [8] present a probabilistic
+analysis for finding affine relationships. Their algorithm is also just
+intraprocedurally applicable but asymptotically faster than Karr’s—
+at the price of a (small) probability of yielding non-valid affine relations.
+
+The key observation onto which our algorithms are based is that the
+weakest precondition of an affine or polynomial relation a along a
+single run of an affine program can be determined by means of a linear transformation applied to a. The set of all linear transformations
+of a vector space again forms a vector space and we can compute
+for each program point u the finite-dimensional subspace generated
+by the linear transformations induced by the program runs reaching
+u. A relation a turns out to be valid at u if and only if the subspace of linear transformations computed for u transforms a into 0
+(or a relation implied by the precondition, respectively). This implies that the set of all valid relations can be computed as the set
+of solutions of a linear equation system. Thus, finite-dimensional
+subspaces of linear transformation describe the effect of procedure
+calls precisely enough.
+The program in Figure 1 illustrates the kind of properties our analyses can handle. It consists of two procedures Main and P. After
+memorizing the (unknown) initial value of variable x1 in variable
+x2 and initializing x3 by zero, Main calls P. Procedure P can either
+terminate without changing any variable or call itself recursively.
+In the latter case, it increments x1 by x2 + 1 and x3 by 1 before the
+recursive call and decrements x1 by x2 afterwards. Therefore, the
+total effect of each instance of P with a recursive call is to increment both x1 and x3 by one. Thus, upon termination of the call to
+P in Main (i.e., at program point 3), x3 holds the number of recursive calls of P and x1 the value x2 + x3 . Consequently, the final
+assignment in Main always assigns zero to x1 . More formally, this
+amounts to saying that the affine relation x1 − x2 − x3 = 0 is valid
+at program point 3 and that the affine relation x1 = 0 is valid at
+program point 4.
+
+A generalization of these approaches to the interprocedural case is
+not obvious. The functional approach of Sharir/Pnueli [20, 11] to
+designing interprocedural data flow analyses is limited to finite lattices of data flow informations. Accordingly, it has successfully
+been applied to the detection of copy constants [17]. In copy constant detection only assignments of the form x := a are treated exactly where a is a constant or a variable. The lattice of affine spaces,
+however, is clearly infinite. The call string approach of [20], on the
+other hand, is applicable to more general lattices but abstracts the
+call/return behavior of procedures. Thus, it does not lead to precise
+interprocedural analyses. In more recent work on precise interprocedural analysis, Horwitz et al. propose a polynomial-time algorithm for detecting linear constants [9] interprocedurally. In linear constant detection only those affine assignments are interpreted
+whose right-hand sides contain at most one occurrence of a variable. We strictly improve on these results as our analyses treat all
+affine assignments exactly and determine more general properties.
+
+Another interesting relationship between the variables holds whenever P is called. As mentioned, variable x3 counts the number of
+recursive calls, and, thus, how often x1 has been incremented by
+
+331
+
+Main:
+
+P:
+
+0
+
+3
+
+x := 2
+1
+
+x := x
+
+x := 2 · x
+5
+
+P
+2
+
+assignments of the form x j := t0 + ∑ki=1 ti xi (with ti ∈ F for i =
+0, . . . , k and x j ∈ X) or non-deterministic assignments of the form
+x j :=? (with x j ∈ X). Assignments x j := x j have no effect onto
+the program state. They are also called skip statements and omitted
+in pictures. Non-deterministic assignments x j :=? represent a safe
+abstraction of statements in a source program our analysis cannot
+handle precisely, for example of assignments x j := t with non-affine
+expressions t or of read statements read(x j ). Let Stmt be the set of
+basic statements.
+
+x := x − 2
+6
+
+A program comprises a finite set Proc of procedure names that contains a distinguished procedure Main. Execution starts with a call
+to Main. Each procedure name p ∈ Proc is associated with a control flow graph Gp = (Np , E p , A p , e p , r p ) that consists of:
+
+Figure 2. Another example program.
+
+A generalization of Karr’s algorithm in another direction is the use
+of polyhedra instead of affine spaces for approximately representing sets of program states; the classic reference is Cousot’s and
+Halbwachs’ paper [6]. Polyhedra allow to determine besides affine
+equalities also affine inequalities like 3x1 + 5x2 ≤ 7x3 . Since the
+lattice of polyhedra has infinite height, widenings must be used to
+ensure termination of the analysis (see [2] for a recent discussion)—
+making it unsuitable for precise analyses. Sets of affine inequalities, however, allow to relate the values of variables before and
+after a procedure call (a relational analysis in the terminology of
+Cousot)—thus naturally allowing for an interprocedural generalization. A relational analysis, however, that uses affine spaces or
+polyhedra for approximating the relational semantics of procedures
+is not precise enough to detect all valid affine relations in a program with procedures. For a simple example see Figure 2. The
+true relational semantics of procedure P is described by the formula
+x = x0 ∨ x = 2 · x0 − 2) where x0 represents the initial and x the final value of the variable. The best approximation of this relation
+by an affine space or polyhedron is described by the formula true.
+It is obvious that this approximation of P’s semantics is too weak
+to detect that the affine relation x = 2 is valid at program point 2 in
+procedure Main.
+
+• a set Np of program points;
+• a set of edges E p ⊆ Np × Np ;
+• a mapping A p : E p → Stmt ∪ Proc that annotates each edge
+with a basic statement of the form described above or a procedure call;
+• a special entry (or start) point ep ∈ Np ; and
+• a special return point rp ∈ Np .
+We assume that the program points of different procedures are disjoint: N p ∩ Nq = 0/ for p = q. This can always be enforced by renaming program points.
+
+S
+
+S
+
+We write N for p∈Proc Np , E for p∈Proc E p , and A for
+S
+p∈Proc A p . We agree that Base = {e | A(e) ∈ Stmt} is the set
+of base edges and Callp = {e | A(e) ≡ p} is the set of edges that
+call procedure p.
+The core part of our algorithm can be understood as a precise abstract interpretation of a constraint system characterizing the program executions that reach program points. We represent program
+executions or runs by sequences of affine assignments. Formally, a
+run r is a finite sequence
+
+The paper is organized as follows. In Section 2, we formally introduce the programs to be analyzed together with their semantics.
+In Section 3, we introduce affine relations, their weakest preconditions along a program run and explain our algorithm for this special
+case. In Section 4, we generalize our approach to deal with arbitrary
+polynomial relations of bounded degree. In Section 5, we extend
+our approach to procedures with local variables and in Section 6 we
+show how to take into account affine preconditions completely.
+
+r ≡ s1 ; . . . ; sm
+of assignments si of the form x j := t where x j ∈ X and t ≡
+t0 + ∑ki=1 ti xi for some t0 , . . . ,tk ∈ F. We write Runs for the set
+of runs. The set of runs reaching program point u ∈ N can be characterized as the least solution of a system of subset constraints on
+run sets (see, e.g., [19] for a similar approach for explicitly parallel programs). We start by defining the program executions of base
+edges e in isolation. If e is annotated by an affine assignment, i.e.,
+A(e) ≡ x j := t, it gives rise to a single execution: S(e) = {x j := t}.
+The effect of base edges e annotated by a non-deterministic assignment x j :=? is captured by all runs that assign some value from F
+to x j :
+
+2 Affine Programs
+We model programs by systems of non-deterministic flow graphs
+that can recursively call each other as in Figure 1. Let X =
+{x1 , . . . , xk } be the set of (global) variables the program operates on.
+We use x to denote the column vector1 of variables x = (x1 , . . . , xk )t .
+We assume that the variables take values in a fixed field F. In practice, F is the field of rational numbers. Then a state assigning values to the variables is conveniently modeled by a k-dimensional
+(column) vector x = (x1 , . . . , xk )t ∈ Fk ; xi is the value assigned to
+variable xi . Note that we distinguish variables and their values by
+using a different font. For a state x, a variable xi and a value c ∈ F,
+we write x[xi → c] for the state (x1 , . . . , xi−1 , c, xi+1 , . . . , xk )t .
+
+S(e) = {x j := c | c ∈ F} .
+Thus, we capture the effect of non-deterministic assignments by
+collecting all constant assignments. Next, we characterize samelevel runs. Same-level runs of procedures capture complete runs of
+procedures in isolation. As auxiliary sets we consider same-level
+runs of program nodes, i.e., those runs that reach a program point u
+in a procedure p from a call to p on same-level, i.e., after all procedures called by p have terminated. The same-level runs of procedures and program nodes are the smallest solution of the constraint
+system S:
+
+We assume that the basic statements in the program are either affine
+1 The superscript “t” denotes the transpose operation which mirrors a matrix at the main diagonal and changes a row vector into a
+column vector (and vice versa).
+
+332
+
+[S1]
+[S2]
+[S3]
+[S4]
+
+hyper-plane in the k-dimensional vector space Fk . Such a relation
+can be represented as a polynomial of degree at most 1 (namely, the
+left-hand side) or, equivalently, as a column vector a = (a0 , . . . , ak )t .
+In particular, the set of all affine relations forms an F-vector space
+which is isomorphic to Fk+1 . The vector y ∈ Fk satisfies the affine
+relation a iff a0 + a · y = 0 where a = (a1 , . . . , ak )t and “·” denotes
+scalar product. We write y |= a to denote this fact. Geometrically,
+this means that the point y is an element of the hyper-plane described by a.
+
+S(q) ⊇ S(rq )
+S(eq ) ⊇ {ε}
+S(v) ⊇ S(u) ; S(e) if e = (u, v) ∈ Base
+S(v) ⊇ S(u) ; S(p) if e = (u, v) ∈ Call p
+
+where “ε” denotes the empty run, and the operator “;” denotes concatenation of run sets. By [S1], the set of same-level runs of a procedure q comprises all same-level runs reaching the return point of
+q. By [S2], the set of same-level runs of the entry point of a procedure contains the empty run. By [S3] and [S4], a same-level run
+for a program point v is obtained by considering an ingoing edge
+e = (u, v). In both cases, we concatenate a same-level run reaching
+u with a run corresponding to the edge. If e is a base edge, we concatenate with an edge from S(e). If e is a call to a procedure p, we
+take a same-level run of p.
+
+The affine relation a is valid after a single run r iff [[r]]x |= a for
+all x ∈ Fk , i.e., iff a0 + a · [[r]]x = 0 for all x ∈ Fk ; x represents
+the unknown initial state. Thus, a0 + a · [[r]]x = 0 is the weakest
+precondition for validity of the affine relation a after run r. We
+have
+a0 + a · [[r]]x = 0
+iff
+
+Next, we characterize the runs that reach program points. They are
+the smallest solution of the constraint system R:
+[R1]
+[R2]
+[R3]
+
+[Choice of Ar and br ]
+a0 + a · (Ar x + br ) = 0
+
+iff
+
+R(Main) ⊇ {ε}
+R(p)
+⊇ R(u)
+if (u, ) ∈ Call p
+R(u)
+⊇ R(p) ; S(u) if u ∈ Np
+
+iff
+
+[Linearity, rearrangement]
+(a0 + a · br ) + a · Ar x = 0
+[Law x · Ay = At x · y from linear algebra]
+(a0 + a · br ) + (Atr a ) · x = 0
+
+By [R1], the procedure Main is reachable by the empty path. By
+[R2], every procedure p is reachable by a path reaching a call of
+p. By [R3], we obtain a run reaching a program point u in some
+procedure p, by composing a run reaching p with a same-level run
+reaching u.
+
+From this characterization we see that the weakest precondition is
+again an affine relation. Even better: The mapping that assigns
+to each affine relation its weakest precondition before run r is the
+linear map described by the following (k + 1) × (k + 1) matrix Wr :
+
+
+1 btr
+Wr =
+(2)
+0 Atr
+
+So far, we have furnished procedural flow graphs with a symbolic
+operational semantics only by describing the sets of sequences
+of assignments possibly reaching program points. Each of these
+runs gives rise to a transformation of the underlying program state
+x ∈ Fk . Every assignment statement xi := t induces a state transformation [[x j := t]] : Fk → Fk given by
+
+In particular, we have proved that for every x ∈ Fk :
+[[r]]x |= a
+
+iff
+
+x |= Wr a .
+
+(3)
+
+Thus, the matrix Wr provides us with a finite description of the
+weakest precondition transformer for affine relations of a single
+program execution r.
+
+[[x j := t]]x = x[x j → t(x)] ,
+where t(x) is the value of term t in state x. This definition is inductively extended to runs: [[ε]] = Id, where Id is the identical mapping
+and [[ra]] = [[a]] ◦ [[r]].
+
+Note that the only affine relation which is true for all program states
+is the relation 0 = (0, . . . , 0)t . Thus, the affine relation a is valid after
+run r iff Wr a = 0, because the initial state is arbitrary. Accordingly,
+the affine relation a is valid at a program point u, iff it is valid after
+all runs r ∈ R(u). Summarizing, we have:
+
+The state transformation of an affine assignment x j := t0 + ∑ki=1 ti xi
+is an affine transformation. Hence, it can be written in the form
+[[x j := t]]x = Ax + b with a matrix A ∈ Fk×k and a (column) vector
+b ∈ Fk . More specifically, A and b have the form indicated below:
+
+
+
+
+0
+I j−1
+0
+(1)
+b =  t0 
+A =  t1 . . . tk 
+0
+Ik− j
+0
+
+L EMMA 1. The affine relation a ∈ Fk+1 is valid at program point
+u iff Wr a = 0 for all r ∈ R(u).
+Thus, the set W = {Wr | r ∈ R(u)} gives us a handle to solve the
+validity problem for affine relations. The problem is that we do
+not know how to represent W in a finitary way—let alone how to
+compute it. In this place, we recall from linear algebra that the set
+of (k + 1) × (k + 1) matrices again forms an F-vector space. The
+dimension of this vector space equals (k + 1)2 . We observe:
+
+Here, Ii is the unit matrix with i rows and columns and 0 denotes
+zero matrices and vectors of appropriate dimension. In b, t0 appears
+as j-th component.
+As a composition of affine transformations, the state transformer of
+a run is an affine transformation as well. For any run r, let Ar ∈ Fk×k
+and br ∈ Fk be such that [[r]]x = Ar x + br .
+
+L EMMA 2. Let M denote a set of n × n matrices.
+
+3 Affine Relations and Weakest Preconditions
+
+a) For every W ∈ M, the set {a | Wa = 0} forms a subspace of
+Fn .
+
+An affine relation over a vector space Fk is an equation a0 + a1 x1 +
+. . . ak xk = 0 for some ai ∈ F. Geometrically, it can be viewed as a
+
+b) As an intersection of vector spaces, the set {a | ∀W ∈ M :
+Wa = 0} forms a subspace of Fn .
+
+333
+
+c) For every a ∈ Fn , the following three statements are equivalent:
+
+height of Sub(V ), i.e., the maximal length of a strictly increasing
+chain, equals the dimension of V .
+
+– Wa = 0 for all W ∈ M;
+
+The desired abstraction of run sets is described by the mapping α :
+2Runs → Sub(F (k+1)×(k+1) ) :
+
+– Wa = 0 for all W ∈ Span(M).
+
+α(R) = Span({Wr | r ∈ R}) .
+
+– Wa = 0 for all W in a basis of Span(M).
+
+Thus, we have:
+
+Here, Span(M) denotes the vector space generated by the elements
+in M, i.e., the vector space of all linear combinations of elements
+in M. We conclude that we can work with Span(W ), i.e., the subspace of F(k+1)×(k+1) generated by W without losing interesting
+information. As a subspace of the vector space F(k+1)×(k+1) of dimension (k + 1)2 , Span(W ) can be described by a basis of at most
+(k + 1)2 matrices. Indeed, due to the special form of the matrices
+Wr —in the first column all but the first entry are zero—Span(W )
+can have at most dimension k2 + k + 1.
+
+/
+α(0)
+α({r})
+
+/ = {0}
+Span(0)
+Span({Wr })
+
+=
+=
+
+for a single run r. By Equation (2) we get for the empty run,
+α({ε})
+
+=
+
+Span({Ik+1 })
+
+because Aε = Ik and bε = 0.
+The mapping α is monotonic (w.r.t. subset ordering on sets of runs
+and subspaces.) Also it is not hard to see that it commutes with
+arbitrary unions.
+
+Based on these observations, we can determine the set of all affine
+relations at program point u from a basis of Span({Wr | r ∈ R(u)})
+and estimate the complexity of the resulting algorithm. For simplicity we use here and in the following unit cost measure for arithmetic
+operations.
+
+In order to solve the constraint system for the run sets R(u) over
+abstract domain Sub(F(k+1)×(k+1) ), we need adequate abstract versions of the operators and constants in this constraint system. In
+particular, we need an abstract version of the concatenation of run
+sets. For M1 , M2 ⊆ F(k+1)×(k+1) , we define:
+
+T HEOREM 1. Assume we are given a basis B for the set
+Span({Wr | r ∈ R(u)}). Then we have:
+
+M1 ◦ M2 = Span({A1 A2 | Ai ∈ Mi }) .
+
+a) Affine relation a ∈ Fk+1 is valid at program point u iff Wa = 0
+for all W ∈ B.
+
+First of all, we observe:
+L EMMA 3. For all sets of matrices M1 , M2 ,
+
+b) A basis for the subspace of all affine relations valid at program point u can be computed in time O (k5 ).
+
+Span(M1 ) ◦ Span(M2 ) = M1 ◦ M2 .
+
+P ROOF. Statement a) follows directly from Lemma 1 and
+Lemma 2,c).
+
+P ROOF. Observe first that Span(Mi ) ⊇ Mi and therefore,
+
+For seeing b), consider that by a) the affine relation a is valid at u
+iff a is a solution of all the equations
+
+by monotonicity of “◦”.
+
+Span(M1 ) ◦ Span(M2 ) ⊇ M1 ◦ M2
+
+(i)
+
+k
+
+For the reverse inclusion, consider arbitrary elements Bi = ∑ j λ j ·
+
+∑ wi j a j = 0
+
+(i)
+(i)
+A j in Span(Mi ) for suitable A j ∈ Mi . Then
+
+j=0
+
+for each matrix W = (wi j ) ∈ B and i = 0, . . . , k.
+
+(1) (2)
+
+m
+
+The basis B contains at most O (k2 ) matrices each of which contributes k + 1 equations. Thus, we must determine, the solution of
+an equation system with O (k3 ) equations over k + 1 variables. This
+can be done, e.g. by Gaussian elimination, in time O (k5 ).
+
+=
+=
+
+j
+
+(1) (2)
+
+by linearity of matrix multiplication. Since each Am A j is contained in M1 ◦ M2 , B1 B2 is contained in M1 ◦ M2 as well. Therefore,
+also the inclusion “⊆” follows.
+
+So we are left with the task to compute, for every program point u,
+(a basis of) Span({Wr | r ∈ R(u)}). This subspace of F(k+1)×(k+1)
+can be seen as an abstraction of the set R(u) of program executions
+reaching u. We are going to compute it by an abstract interpretation
+of the constraint system for R(u) from Section 2. Recall that the
+set of subspaces of a finite-dimensional F-vector space V forms a
+complete lattice (w.r.t. the ordering set inclusion) where the least
+element is given by the 0-dimensional vector space consisting of
+the 0-vector only. The least upper bound of two spaces V1 ,V2 is
+given by:
+V1 V2
+
+(1) (2)
+
+B1 B2 = ∑ ∑ λm λ j · Am A j
+
+Accordingly, a generating system for M1 ◦ M2 can be computed
+from generating systems G1 , G2 for M1 and M2 by multiplying each
+matrix in G1 with each matrix in G2 .
+Secondly, we observe that “◦” precisely abstracts the concatenation
+of run sets:
+L EMMA 4. Let R1 , R2 ⊆ Runs. Then
+α(R1 ) ◦ α(R2 ) = α(R1 ; R2 ) .
+
+Span(V1 ∪V2 )
+{v1 + v2 | vi ∈ Vi } .
+
+P ROOF. Consider the auxiliary map W mapping run sets to sets of
+matrices by:
+
+W (R) = {Wr | r ∈ R} .
+
+We denote the complete lattice of subspaces of V by Sub(V ). The
+
+334
+
+Then we have α(R) = Span(W (R)). We observe:
+
+T HEOREM 2. For every program of size n with k variables the
+following holds:
+
+{A1 A2 | Ai ∈ W (Ri )} = W (R1 ; R2 ) .
+
+a) The values:
+Span({Wr | r ∈ S(u)}), u ∈ N,
+Span({Wr | r ∈ S(p)}), p ∈ Proc,
+Span({Wr | r ∈ R(u)}), p ∈ Proc, and
+Span({Wr | r ∈ R(u)}), u ∈ N,
+are the least solutions of the constraint systems Sα and Rα ,
+respectively.
+
+This suffices as the span construction commutes with composition
+by Lemma 3.
+Let us now turn attention to the abstraction of base edges. Let
+us first consider a base edge e ∈ Base annotated by an affine
+assignment, i.e., A(e) ≡ x j := t where t ≡ t0 + ∑ni=1 ti xi . Then
+S(e) = {x j := t}. By (1) and (2), the corresponding abstract transformer is given by
+α(S(e))
+
+=
+=
+
+α({x j := t})
+
+Ij
+
+
+ 
+Span   −−−
+
+
+0
+
+t0
+..
+.
+tk
+
+b) These values can be computed in time O (p · k8 ).
+c) The sets of all valid affine relations at program point u, u ∈ N,
+can be computed in time O (n · k8 ).
+
+
+
+
+ 
+−−− 
+
+Ik− j
+0
+
+P ROOF. Statement a) amounts to saying that the least solution of
+constraint systems Sα and Rα is obtained from the least solution of
+S and R by applying the abstraction α. This follows from the Transfer Lemma known in fixpoint theory (see, e.g., [1, 4]), which can be
+applied since α commutes with arbitrary unions, the concatenation
+operator is precisely abstracted by the operator ◦ (Lemma 4), and
+the constant run sets {ε} and S(e) are replaced by their abstractions
+α({ε}) = Span({Id}) and α(S(e)), respectively.
+
+Informally, the weakest precondition for an affine relation a ∈ Fk+1
+is computed by substituting t into x j of the corresponding affine
+combination.
+Next, consider a base edge e ∈ Base annotated with x j :=?. In this
+case, S(e) = {x j := c | c ∈ F}—implying that we have to abstract an
+infinite set of runs if the field F is infinite. Clearly, the abstraction
+of this set again can be finitely represented. We obtain this representation by selecting two different values from F, e.g., 0 and 1. We
+find:
+
+For b) we show that the least solution of the abstracted constraint
+systems can be computed in time O (n · k8 ). For that, recall that the
+lattice of all subspaces of F(k+1)×(k+1) has height (k + 1)2 . Thus,
+a worklist-based fixpoint algorithm will evaluate at most O (n · k2 )
+constraints. Each constraint evaluation consists of multiplying two
+sets of at most (k + 1)2 matrices. The necessary (k + 1)4 matrix
+multiplications can be executed in time O (k7 ). Finally, we must
+compute a basis for the span of the resulting (k + 1)4 matrices. By
+Gaussian elimination, this can be done in time O (k8 ). Altogether,
+we obtain an upper complexity bound of O (n · k2 · k8 ) = O (n · k10 ).
+A better running time can be obtained if we use a semi-naive fixpoint iteration strategy [16, 3, 7]. The idea here is that when the
+value of a fixpoint variable changes, we do not propagate the complete new value to all uses of the variable in right-hand sides of
+constraints but just the increment, i.e., in our case the new matrices extending the current basis (instead of the complete new basis).
+The total time spent with a constraint then sums up to O (k8 ) which
+overall results in the desired complexity O (n · k8 ).
+
+L EMMA 5.
+α(S(e))
+
+=
+=
+
+α({x j := c | c ∈ F})
+Span({T0 , T1 }) ,
+
+where Tc = Wx j :=c is the matrix obtained from Ik+1 by replacing the
+j + 1-th column with (c, 0, . . . , 0)t .
+P ROOF. Only the second equation requires a proof. From Equations (1) and (2) we get α({x j := c | c ∈ F}) = Span({Tc | c ∈ F}).
+We verify: Tc = (1 − c) · T0 + c · T1 . Hence, Tc ∈ Span({T0 , T1 })
+and Span({Tc | c ∈ F}) = Span({T0 , T1 }).
+From the constraint systems S and R for run sets, we construct now
+the constraint systems Sα and Rα by application of α. The variables
+in the new constraint systems take subspaces of F(k+1)×(k+1) as
+values. We apply α to the occurring constant sets {ε} and S(e) and
+replace the concatenation operator “;” with “◦”:
+
+Finally, for c) we recall that we know from Theorem 1 that, from
+bases of Span({Wr | r ∈ R(u)}) for all program points u, we can
+compute the sets of all valid affine relations within the stated complexity bounds.
+
+⊇ Sα (rq )
+Sα (q)
+Sα (eq )
+⊇ Span({Id})
+Sα (v)
+⊇ Sα (u) ◦ α(S(e)) if e = (u, v) ∈ Base
+⊇ Sα (u) ◦ Sα (p) if e = (u, v) ∈ Call p
+Sα (v)
+Rα (Main) ⊇ Span({Id})
+Rα (p)
+⊇ Rα (u)
+if (u, ) ∈ Call p
+Rα (u)
+⊇ Rα (p) ◦ Sα (u) if u ∈ Np
+
+Let us consider the example program from Figure 1 for illustration. Due to lack of space, we cannot describe the fixpoint iteration
+in detail or give the full result. However, we report and discuss
+some characteristic values. The fixpoint iteration for Sα stabilizes
+after 3 iterations. We obtain: Sα (P) = Sα (9) = Span({I4 ,W1 }) and
+Sα (3) = Span({W1 ,W2 }), where W1 ,W2 are the matrices
+
+The resulting constraint system can be solved by computing on
+bases. For estimating the complexity of the resulting algorithm,
+we assume that the basic statements in the given program have
+size O (1). Thus, we measure the size n of the given program by
+|N| + |E|. Note that program nodes typically have bounded outdegree, such that typically |N| + |E| = O (|N|).
+
+
+
+0
+ 0
+W1 = 
+0
+0
+
+335
+
+1
+0
+0
+0
+
+0
+0
+0
+0
+
+
+1
+0 
+0 
+0
+
+
+
+1
+ 0
+W2 = 
+0
+0
+
+0
+1
+0
+0
+
+0
+1
+0
+0
+
+
+0
+0 
+0 
+0
+
+Also, Sα (Main) = Sα (4) = Span({W3 ,W4 }), where
+
+
+
+1 0 0 0
+0 0 0
+ 0 0 1 0 
+ 0 0 0
+W4 = 
+W3 = 
+0 0 0 0 
+0 0 0
+0 0 0 0
+0 0 0
+
+polynomials of bounded degree. The degree of a polynomial p (or
+the polynomial relation p = 0) is the maximal sum j1 + . . . + jk of
+j
+j
+exponents of a monomial a x11 . . . xkk occurring in p. We denote the
+set of polynomials of degree at most d by F≤d [X].
+
+
+
+1
+0 
+0 
+0
+
+ 
+F≤d [X] is an F-vector space of dimension k+d
+= O ((k + d)d ):
+d
+j1
+jk
+obviously, the monomials x1 . . . xk ∈ F≤d [X] with coefficient 1
+form a basis of F≤d [X] and we prove momentarily by induction
+ 
+such monomials. For d = 0 or k = 0 there
+that there are k+d
+d
+is just the single monomial x01 . . . x0k or 1, respectively, and indeed
+k d 
+assume d > 0 or k > 0. By induction hypothesis
+0 = d = 1. So
+
+monomials
+of degree less than d. The monomials
+there are k+d−1
+d−1
+
+
+with degree d over k variables are obtained from the k−1+d
+monod
+j1
+jk−1
+mials x1 . . . xk−1 of degree at most d over the first k − 1 variables
+by multiplying with xlkk where lk = d − ∑k−1
+i=1 li . Altogether, there
+
+ k−1+d  k+d 
+are thus k+d−1
++
+=
+monomials
+with coefficient 1
+d−1
+d
+d
+of degree at most d.
+
+As there are no recursive calls to Main, reaching runs and samelevel runs coincide for the program points of Main. Consequently,
+we have, Rα (3) = Sα (3) = Span({W1 ,W2 }). Hence, at program
+point 3 just the affine relations a = (a0 , . . . , ak )t with W1 a = 0 and
+W2 a = 0 are valid which reduces to the requirements a0 = 0 and
+a2 = a3 = −a1 . Therefore, just the affine relations of the form
+a1 x1 − a1 x2 − a1 x3 = 0 are valid at program point 3, in particular,
+x1 − x2 − x3 = 0 which confirms our informal reasoning from the
+introduction.
+For program point 4 we have Rα (4) = Sα (4) = Span({W3 ,W4 }).
+Here, the requirements W3 a = 0 and W4 a = 0 reduce to a0 = a2 =
+a3 = 0. Thus, just the affine relations of the form a1 x1 = 0 are valid
+at program point 4, in particular, x1 = 0. Again this confirms our
+informal reasoning that x1 is a constant of value zero.
+
+The polynomial relation p = 0 is valid after a single run r iff for all
+x ∈ Fk , p[[[r]]x/x] = 0 or, equivalently, p[(Ar x + br )/x] = 0 where
+Ar , br are defined as in Section 2. Thus, p[(Ar x + br )/x] = 0 is the
+weakest precondition for validity of p = 0 after run r. We observe:
+
+The computation of Rα for the program points of P stabilizes again
+after 3 iterations. For the program point 7 just before the recursive
+call to P, we obtain Rα (7) = Span({W5 ,W6 }), where
+
+
+
+
+1 0 0 0
+0 1 0 1
+ 0 1 1 0 
+ 0 1 0 0 
+W6 = 
+W5 = 
+0 0 0 0 
+0 0 0 0 
+0 0 0 0
+0 0 0 0
+
+L EMMA 6. 1. The polynomial p[(Ar x + br )/x] is again of degree at most d.
+(d)
+
+2. The mapping Wr which maps polynomials p of degree at
+most d to p[(Ar x + br )/x] is linear.
+
+Here the conditions W5 a = 0 and W6 a = 0 for valid affine relations
+translate into a0 = a1 = a2 = a3 = 0. Interestingly, this implies that
+no non-trivial affine relation is valid at every call to P.
+
+P ROOF. For a proof of the first statement, it suffices to consider a
+run r ≡ xi := t, t ≡ t0 + ∑km=1 tm xm , of a single assignment and a
+j
+j
+single monomial p ≡ x11 . . . xkk . Then
+
+In order to find out about validity of the polynomial relation x2 x3 −
+x1 +x2 +x3 = 0 at program point 7, hinted upon in the introduction,
+we must generalize our analysis to polynomial relations which is
+the topic of the next section.
+
+p[(Ar x + br )/x]
+=
+
+4 Polynomial Relations of Bounded Degree
+
+p[t/xi ]
+
+
+ji  κ0
+· t0 . . .tkκk ·
+∑κ0 +...+κk = ji κ0 ,...,κ
+k
+j +κ1
+
+x11
+ji 
+
+Polynomial relations are much more expressive than affine relations. In particular, they are closed under disjunction: p = 0 ∨ q = 0
+holds if and only if pq = 0. For example, the relation:
+
+=
+
+j
+
+i−1
+. . . xi−1
+
++κi−1 κi ji+1 +κi+1
+j +κ
+xi xi+1
+. . . xkk k ,
+
+
+where the κ0 ,...,κk are the multinomial coefficients for the ji -th
+power of a sum on k + 1 summands. Since in each monomial of
+the result, κ0 + . . . + κk = ji , the degree of p[t/xi ] is bounded by
+j1 + . . . + jk , i.e., the degree of p.
+
+(x1 − 1) · (x1 − x2 ) = 0
+represents the disjunction of the two affine relations:
+
+The second assertion follows since substitution commutes with
+sums and constant multiples.
+
+x1 − 1 = 0 ∨ x1 − x2 = 0 .
+Also, the property whether a variable x j has a value in a given finite
+set {c1 , . . . , cr } ⊆ F with r elements can be expressed by a polynomial relation:
+
+The only polynomial relation which is true for all program states is
+the zero relation 0 = 0. As for affine relations, we conclude that the
+(d)
+polynomial relation p = 0 is valid after run r iff Wr p = 0 (where
+0 denotes the zero polynomial). Summarizing, we have:
+
+(x j − c1 ) · . . . · (x j − cr ) = 0 .
+Formally, a polynomial relation over a vector space Fk is an equation p = 0 where p is a polynomial over the unknowns X, i.e.,
+p ∈ F[X]. The vector y ∈ Fk satisfies the polynomial relation p = 0,
+y |= p for short, iff p[y/x] = 0 where [y/x] denotes the substitution
+of the values yi for the variables xi .
+
+L EMMA 7. The polynomial relation p of degree at most d is valid
+(d)
+at program point u iff Wr p = 0 for all r ∈ R(u).
+Now we can proceed analogously to Section 3. By applying
+(d)
+Lemma 2, we can safely replace the set {Wr | r ∈ R(u)} with
+its span. The resulting subspace of linear mappings can be described by a basis of at most O ((k + d)2d ) matrices. The entries of
+these matrices are now indexed by pairs of tuples J = ( j1 , . . . , jk ),
+
+The set of polynomials F[X] forms an F-vector space. However,
+as the dimension of this vector space is infinite, we cannot effectively compute with bases. One way out is to restrict attention to
+
+336
+
+∑ki=1 ji ≤ d. Let I denote the set of all such tuples. We determine
+the set of all valid polynomial relations at program point u for polynomials of degree at most d as follows:
+
+have at most degree d and are uniquely determined by p. For 0 ≤
+i ≤ d let Ci be the mapping on F≤d [X] that maps each p to its i-th
+coefficient polynomial, i.e., Ci (p) = pi . It is not hard to see that Ci
+is a linear map and hence can be represented by a matrix. We find
+that α(d) (S(e)) can be finitely represented by C0 , . . . ,Cd :
+
+T HEOREM 3. Assume we are given a basis B for the set
+(d)
+Span({Wr | r ∈ R(u)}). Then we have:
+
+L EMMA 8. If F has more than d elements, then
+
+a) The polynomial relation p = 0 of degree at most d is valid at
+program point u iff W p = 0 for all W ∈ B.
+
+α(d) (S(e))
+
+b) A basis of the subspace of all polynomial relations of degree
+at most d valid at program point u can be computed in time
+O ((k + d)5d ).
+
+(d)
+
+c ∈ F}) = Span({Wx j :=c | c ∈ F}). It remains to show that this span
+equals Span({Cl | l = 0, . . . , d}). For this we show:
+(d)
+
+1. Wx j :=c ∈ Span({Cl | l = 0, . . . , d}) for all c ∈ F.
+
+For the proof of b), note that by a) the polynomial relation p = 0
+j
+j
+is valid at u iff p ≡ ∑J=( j1 ,..., jk )∈I aJ x11 . . . xkk , where the aJ , J ∈ I ,
+are a solution of the equation:
+
+(d)
+
+2. Cl ∈ Span({Wx j :=c | c ∈ F}) for l = 0, . . . , d.
+To 1: For arbitrary p ∈ F≤d [X] we have
+
+∑ wIJ aJ = 0
+
+J∈I
+
+(d)
+
+i=0
+
+(d)
+This means Wx j :=c = ∑di=0 ciCi , which implies 1.
+
+To 2: Since the cardinality of F is at least d + 1, we can find d + 1
+distinct elements c0 , . . . , cd ∈ F. Defining matrix A by
+
+
+1 c0 . . . cd0
+d
+ 1 c1 . . . c 
+1 
+
+A =  .
+.. . .
+.. 
+ ..
+.
+.
+. 
+1 cd . . . cdd
+
+By Theorem 3, it suffices to compute, for every program point u,
+(d)
+the span of the set of all precondition transformers Wr , r ∈ R(u).
+We do so by abstracting the run sets to subspaces of linear transformations now of polynomials of degree at most d. The abstraction is
+thus given by:
+| r ∈ R}) .
+
+it is not hard to see, that
+
+
+
+
+p[c0 /x j ]
+C0 (p)
+
+
+
+
+..
+..
+A
+ = 
+
+.
+.
+Cd (p)
+p[cd /x j ]
+
+As in the case of affine relations, we have:
+/
+α(d) (0)
+
+=
+
+/ = {0}
+Span(0)
+
+(d)
+
+=
+
+Span({Wr })
+
+α
+
+({r})
+
+(d)
+
+The determinant of A is an instance of what is known as Vandermonde’s determinant and has the value ∏0≤i<l≤d (cl − ci ). As all ci
+are distinct, the determinant is different from 0. Therefore, matrix
+A is invertible and for the inverse matrix A−1 = (bil ), we have
+
+
+
+
+p[c0 /x j ]
+C0 (p)
+
+
+
+
+..
+..
+ = A−1 
+
+
+.
+.
+Cd (p)
+p[cd /x j ]
+
+for a single run r. In particular,
+α(d) ({ε})
+
+=
+
+d
+
+Wx j :=c (p) = p[c/x j ] = ∑ Ci (p)ci .
+
+for every matrix W = (wIJ ) ∈ B and every I ∈ I . The basis B may
+contain at most O ((k + d)2d ) matrices each of which contributes
+O ((k + d)d ) equations. Thus, we have to compute the solution of
+an equation system with O ((k + d)3d ) equations over O ((k + d)d )
+variables. This can be done in time O ((k + d)5d ).
+
+(d)
+
+α(d) ({x j := c | c ∈ F})
+Span({Cl | l = 0, . . . , d}) .
+
+P ROOF. From the definitions we have α(d) (S(e)) = α(d) ({x j := c |
+
+P ROOF. Statement a) follows directly from Lemma 2 and
+Lemma 7.
+
+α(d) (R) = Span({Wr
+
+=
+=
+
+Span({II }) ,
+
+where II is the diagonal matrix describing the identity. The mapping α(d) is again monotonic (w.r.t. subset ordering on sets of
+runs and subspaces) and commutes with arbitrary unions. Also,
+Lemma 4 analogously holds for α(d) . Therefore, the desired values
+can be computed by abstracting the constraint systems for samelevel and reaching run sets. In order to obtain an effective algorithm, it remains to derive explicit abstractions for the effects of
+base edges.
+
+Ci = ∑dl=0 bil Wx j :=cl , which implies 2.
+
+For a definite assignment x j := t, this is obviously possible. It remains to consider a base edge e ∈ Base annotated by x j :=? with
+S(e) = {x j := c | c ∈ F}.
+
+Analogously to the last section, we construct constraint systems
+Sα(d) , Rα(d) which are obtained from the constraint systems S and R
+by applying α(d) . We conclude:
+
+In case F contains less than d + 1 elements, the set S(e) is also finite
+and we simply may enumerate it. More interesting is the case when
+F has at least d + 1 elements, e.g., because F has characteristic 0.
+
+T HEOREM 4. For every program of size n with k variables the
+following holds:
+
+(d)
+
+Thus, Ci (p) = ∑dl=0 bil p[cl /x j ] = ∑dl=0 bil Wx j :=cl (p). This shows
+(d)
+
+a) The values:
+(d)
+Span({Wr | r ∈ S(u)}), u ∈ N,
+(d)
+Span({Wr | r ∈ S(p)}), p ∈ Proc,
+
+Each polynomial p ∈ F≤d [X] can be written as p ≡ ∑di=0 pi · xij for
+polynomials pi not containing x j . The coefficient polynomials pi
+
+337
+
+(d)
+
+we again define: S (e) = {x j := t}. Similarly for A(e) ≡ x j :=?,
+
+Span({Wr | r ∈ R(p)}), p ∈ Proc, and
+(d)
+Span({Wr | r ∈ R(u)}), u ∈ N,
+are the least solutions of the constraint systems Sα(d) and
+Rα(d) , respectively.
+
+S (e) = {x j := c | c ∈ F} .
+The same-level runs of procedures and program nodes are the
+smallest solution of the following constraint system S :
+
+b) The sets of all valid polynomial relations of degree at most d
+at program point u, u ∈ N, can be computed in time O (n · (k +
+d)8d ).
+
+[S 1]
+[S 2]
+[S 3]
+[S 4]
+
+Consider again the example program from the introduction. Since
+it uses three program variables, the
+of polynomials of
+ vector-space
+
+degree at most 2 has dimension 3+2
+=
+10.
+Assume
+we have or2
+dered the index tuples of monomials lexicographically as follows:
+
+Note that, for convenience, the application of the constructor call
+to all sequences of a set S is denoted by callS. Constraints [S 1],
+[S 2] and [S 3] are as in Section 2. The new constraint [S 4] deals
+with calls. If the ingoing edge e = (u, v) is a call to a procedure p,
+we concatenate a same-level run reaching u with a tree constructed
+from a same-level run of p by applying the constructor call.
+
+(0, 0, 0) ≺ (0, 0, 1) ≺ . . . ≺ (1, 1, 0) ≺ (2, 0, 0) .
+Then the pre-condition transformer, e.g., of the assignment x1 :=
+x1 + x2 + 1 is given by the matrix:
+
+
+1 0 0 0 0 0 1 0 0 1
+ 0 1 0 0 0 0 0 1 0 0 
+ 0 0 1 0 0 0 0 0 0 0 
+
+
+ 0 0 0 1 0 0 1 0 1 2 
+
+
+ 0 0 0 0 1 0 0 1 0 0 
+
+
+ 0 0 0 0 0 1 0 0 1 1 
+
+
+ 0 0 0 0 0 0 1 0 0 2 
+
+
+ 0 0 0 0 0 0 0 1 0 0 
+ 0 0 0 0 0 0 0 0 1 2 
+0
+
+0
+
+0
+
+0
+
+0
+
+0
+
+0
+
+0
+
+0
+
+For characterizing the runs that reach program points and procedures, we construct the constraint system R :
+[R 1]
+[R 2]
+[R 3]
+
+1
+
+Each of these runs gives rise to a transformation of the underlying
+program state x ∈ Fm . Here, we just explain how the transformations of enter and calls are obtained. The transformation [[enter]]
+passes the values of the globals x j ( j = 1, . . . , k) and sets the locals
+x j , j > k, to 0.2 Thus,
+
+
+Ik 0
+[[enter]] = [[xk+1 := 0; . . . ; xm := 0]] =
+.
+0 0
+
+5 Local Variables
+So far we have considered programs which operate on global variables only. In this section, we explain how our techniques can be
+extended to work on procedures with global and local variables.
+
+Let us denote this m × m matrix by E  .
+The transformation [[calls]] is more complicated. Like [[enter]], it
+must pass the values of the globals into the execution of the called
+procedure and initialize its local variables. In addition, it must return the values of the globals to the calling context and restore the
+values of the local variables. Given that [[s]]x = As x + bs as in Section 2, we define:
+
+For notational convenience, we assume that all procedures have the
+same set X = {x1 , . . . , xm } of variables where the first k are global
+and the remaining m − k are local. For describing program executions, it now no longer suffices to consider execution paths. Instead,
+we have to take the proper nesting of calls into account. Therefore,
+same-level runs s and reaching runs r are now finite sequences of
+(unranked) trees b and, possibly, enter:
+::=
+::=
+::=
+::=
+
+R (Main) ⊇ {ε}
+R (p)
+⊇ R (u) ,
+if (u, ) ∈ Call p
+
+R (u)
+⊇ R (p) ; {enter} ; S (u) , if u ∈ Np
+
+Constraints [R 1] and [R 2] are as in Section 3. The only modification occurs in [R 3] where an enter is inserted between the run
+reaching the current procedure p and the same-level run inside p.
+
+We refrain from describing the details of the fixpoint iteration. The
+least fixpoint computation for analyzing the valid quadratic relations at the entry of procedure p stabilizes after three iterations
+with three matrices. The rows of these matrices span a vector
+space of dimension 9 and have the (coefficients of) the relation
+x2 x3 − x1 + x2 + x3 = 0 as their only non-trivial solution (up to
+constant multiples, of course). Again, this confirms our informal
+reasoning from the introduction.
+
+st
+s
+rt
+r
+
+S (q) ⊇ S (rq )
+S (eq ) ⊇ {ε}
+S (v) ⊇ S (u) ; S (e)
+if e = (u, v) ∈ Base
+S (v) ⊇ S (u) ; callS (p) if e = (u, v) ∈ Call p
+
+E  ([[s]](E  x)) + T  x
+(E  As E  + T  ) x + E  bs ,
+
+
+0
+0
+. The outermost appliwhere T  is the m × m matrix
+0 Im−k
+
+cation of E in the first summand prohibits propagation of the called
+procedure’s local variables and the second summand, T  x bypasses
+the values of the local variables of the calling context. The above
+calculation shows that [[calls]] is an affine transformation as well.
+[[calls]] x
+
+x j := t | calls
+st1 ; . . . ; st n
+(n ≥ 0)
+x j := t | calls | enter
+rt1 ; . . . ; rt n
+(n ≥ 0)
+
+Trees represent base actions or complete executions of procedures.
+Same-level runs represent sequences of such completed executions,
+while reaching runs may enter a procedure—without ever leaving it
+again.
+
+=
+=
+
+2 By convention, local variables are initialized by 0. Other con-
+
+The set of runs reaching program point u ∈ N can again be characterized as the least solution of a system of subset constraints on run
+sets. If e is annotated by an affine assignment, i.e., A(e) ≡ x j := t,
+
+ventions could easily be modeled as well. Uninitialized local variables as in C, for instance, can be handled by adding x j :=? statements for j = k + 1, . . . , m at the beginning of each procedure body.
+
+338
+
+6 Affine Preconditions
+
+We want to determine for every (reaching or same-level) run the
+transformation which produces the weakest precondition. For simplicity, we construct the weakest precondition transformer only for
+affine relations. The weakest precondition transformer for enter is
+given by:
+
+
+Ik+1 0
+.
+Wenter = Wxk+1 :=0;...;xm :=0 =
+0
+0
+
+The analyses considered so far assume that we have no knowledge
+whatsoever about the initial state in which the program is started.
+However, in a verification context we are often in a more lucky situation when we are given a precondition that constrains potential
+initial states. Of course, if less initial states are possible more relations may be valid at the nodes of a program and an analyses that
+ignores the precondition may be overly pessimistic. In this section
+we extend the analyses of Section 3 and Section 4 to take into account affine preconditions completely. The analyses of this section
+thus compute for each program point of an affine program the space
+of all those affine or polynomial relations that are valid whenever
+the program is started in a state satisfying a given affine precondition.
+
+Let E denote this matrix. To obtain analogous results as in Section 3, we determine the weakest precondition transformation of
+calls. We define an operator ✷ : F(m+1)×(k+1) → F(m+1)×(k+1)
+on (m + 1) × (m + 1) matrices by:
+✷(W ) = EW E + w · T
+where w is the element inthe left upper
+ corner of W , and T is the
+0
+0
+(m + 1) × (m + 1) matrix
+.
+0 Im−k
+
+Assume given a finite set Pre ⊆ F k+1 of affine relations, representing the affine precondition. We say that Pre is satisfiable if
+there is an x ∈ Fk such that x |= h for all h ∈ Pre. If Pre is not
+satisfiable, all relations are valid at all program points under precondition Pre. As we can check whether Pre is satisfiable or not
+with the aid of Gaussian elimination, we can detect this trivial
+case. Thus, we assume without loss of generality that Pre is satisfiable in the following. In this case, the set of states satisfying
+Pre, Sat(Pre) = {x ∈ Fk | x |= h, h ∈ Pre}, is an affine subspace of
+Fk and can be represented in the form Sat(Pre) = x0 + L, where
+x0 ∈ Sat(Pre) and L is a (linear) subspace of Fk . Assume that
+x1 , . . . , xl with l ≤ k is a basis of L. Then we have
+
+The operator ✷ returns a linear transformation and is itself linear.
+This implies that ✷ maps subspaces of F(k+1)×(k+1) to subspaces
+of F(k+1)×(k+1) and, considered as a mapping on subspaces, commutes with arbitrary least upper bounds. Moreover, we have:
+L EMMA 9. Let Ws denote the precondition transformer for s.
+Then for an affine relation a ∈ Fm and a program state x ∈ Fm ,
+[[calls]]x |= a iff x |= ✷(Ws ) a.
+Thus, Wcalls = ✷(Ws ) is the weakest precondition transformer for
+calls. In order to furnish the same approach as for global variables, we define the abstraction function α for sets R of (same-level
+or reaching) runs by:
+
+l
+
+Sat(Pre) = {x0 + ∑ λr xr | λ1 , . . . , λl ∈ F} .
+
+(4)
+
+r=1
+
+Vectors x0 , . . . , xl ∈ Fk with this property can be computed from Pre
+with standard techniques from linear algebra.
+
+α(R) = Span({Wr | r ∈ R})
+In particular, α({enter}) = Span({E}).
+
+Obviously, an affine relation a is valid at a program point u under precondition Pre, iff its weakest precondition for each program
+path r reaching u is valid for all x ∈ Sat(Pre), i.e., if x |= Wr a for
+all r ∈ R(u), x ∈ Sat(Pre). By the characterization of Sat(Pre) in
+Equation 4, we thus have:
+
+Analogously to Lemma 4, we find:
+L EMMA 10. For every set S of same-level runs,
+α(callS) = α({calls | s ∈ S}) = ✷(α(S)) .
+
+L EMMA 11. The affine relation a ∈ Fk+1 is valid at program
+point u under precondition Pre iff x0 + ∑lr=1 λr xr |= Wr a for all
+λ1 , . . . , λl ∈ F, r ∈ R(u).
+
+Finally, we construct constraint systems Sα and Rα from S and
+R by applying α where concatenation is replaced with “◦” and the
+constructor call is replaced with “✷”. Then we obtain our main
+theorem for programs with local variables:
+
+By arguing analogously to Section 3 we can equivalently require
+this property for all matrices W in a basis of Span{Wr | r ∈ R(u)}.
+Thus, we obtain the following generalization of Theorem 1:
+
+T HEOREM 5. For a program of size n with m global and local
+variables the following holds:
+
+T HEOREM 6. Assume we are given a basis B for the set
+Span({Wr | r ∈ R(u)}). Then we have:
+
+a) The values:
+Span({Ws | s ∈ S (u)}), u ∈ N,
+Span({Ws | s ∈ S (p)}), p ∈ Proc,
+Span({Ws | s ∈ R (p)}), p ∈ Proc, and
+Span({Wr | r ∈ R (u)}), u ∈ N,
+are the least solutions of the constraint systems Sα and Rα ,
+respectively.
+
+a) Affine relation a ∈ Fk+1 is valid at program point u under
+precondition Pre iff x0 + ∑lr=1 λr xr |= Wa for all λ1 , . . . , λl ∈
+F, W ∈ B.
+b) A basis for the subspace of all affine relations valid at program point u under precondition Pre can be computed in time
+O (k5 ).
+
+b) The sets of all valid affine relations at program point u, u ∈ N,
+can be computed in time O (n · m8 ).
+
+P ROOF. As a) has already been justified we prove only b). By a)
+an affine relation a is valid at u if and only if for all W ∈ B:
+
+Our technique can be adapted to procedures with parameters. Value
+parameters, for instance, can be simulated via a scratch pad of globals through which the actual parameters are communicated from the
+caller to the callee. Return values can be treated similarly.
+
+l
+
+x0 + ∑ λr xr |= Wa
+r=1
+
+339
+
+for all λ1 , . . . , λl ∈ F .
+
+(5)
+
+By unfolding the definition of “|=” and writing W = (wi j ) and xi =
+(xi1 , . . . , xik )t for i = 0, . . . , l, Formula (5) means that
+k
+
+k
+
+l
+
+k
+
+k
+
+j=0
+
+i=1
+
+r=1
+
+j=0
+
+i=1
+
+presence of local variables and parameter passing by value and result. We also generalized our analyses to take affine preconditions
+into account.
+
+∑ a j (w0 j + ∑ x0i wi j ) + ∑ λr ∑ a j ∑ xri wi j = 0
+
+All our analyses run in polynomial time. More precisely, they are
+linear in the program size and polynomial of a higher degree in the
+number of variables. It remains for future work to find out whether
+this theoretical complexity bound is prohibitive to apply the analysis in practice or in how far heuristic methods are necessary to
+identify promising but sufficiently small sets of variables to be included in the analysis.
+
+for all λ1 , . . . , λl ∈ F. This is an affine equation in the λr whose
+coefficients are affine combinations of the a j . It is valid for all λr if
+and only if all these combinations are 0. Therefore, an affine relation a is valid at u under precondition Pre if and only if it satisfies
+the equations:
+k
+
+k
+
+j=0
+
+i=1
+
+Instrumental for our approach is that we can capture the effect
+of procedures as weakest precondition transformers for affine and
+polynomial relations completely by subspaces of linear maps. This
+provides us with a kind of abstract “higher-order denotation” of
+procedures that we can compute in polynomial time and use at any
+call site. Similar in spirit is “relational analysis” of recursive procedures as proposed by Cousot [5, 6] and the “functional approach”
+to interprocedural analysis [20, 11]. While these approaches rely
+on relations or functions, we capture the effects of procedures by
+finitely representable sets of functions.
+
+∑ a j (w0 j + ∑ x0i wi j ) = 0
+
+and
+k
+
+k
+
+j=0
+
+i=1
+
+∑ a j ∑ xri wi j = 0
+
+for r = 1, . . . , l
+
+for all W = (wi j ) ∈ B. We can hence compute the subspace of all
+valid affine relations by setting up and solving the linear equation
+system consisting of all these equations.
+
+Our results improve on the analysis of linear constants by Horwitz et al. [9, 17] and, upto the treatment of positive affine guards,
+also on the results obtained by Karr [10]. In a recent paper, Reps,
+Schwoon, and Jha [18] use a library for reachability analysis of
+weighted pushdown systems for interprocedural dataflow analysis.
+They report that G. Balakrishnan has created a prototype implementation of our interprocedural analysis for affine relations based on a
+preliminary version of the current paper.
+
+Let us estimate the complexity of this procedure. Each matrix W ∈
+B contributes l + 1 = O (k) equations and there are at most O (k2 )
+matrices in B. Hence the equation system has O (k3 ) equations.
+It is not hard to see, that the coefficients of each equation can be
+computed in time O (k2 ). Hence the equation system can be set up
+in time O (k5 ). As a linear equation system with O (k3 ) equations
+in the k + 1 variables a0 , . . . , ak it can be solved, e.g., by Gaussian
+elimination in time O (k5 ).
+
+The results of this paper are still not strong enough to deal with
+positive affine guards as Karr’s approach. Also, they do not generalize our intraprocedural analysis in [15, 14] where we succeed in
+checking the validity of arbitrary polynomial relations for polynomial programs—even in presence of negative polynomial guards. It
+remains as challenging open problems whether or not precise interprocedural treatments of positive guards or precise interprocedural
+analysis of polynomial programs are possible.
+
+From Theorem 2 we know that we can compute a basis of
+Span({Wr | r ∈ R(u)}) in time O (n · k8 ). Together with Theorem 6
+this implies:
+C OROLLARY 1. The sets of all valid affine relations at program
+point u, u ∈ N, under precondition Pre can be computed in time
+O (n · k8 ).
+This approach for treating affine preconditions can straightforwardly be generalized to the setting of Section 4. Here a polynomial relation of degree at most d turns out to be valid at a program
+point u under precondition Pre if and only if for all W in a basis of
+(d)
+Span({Wr | r ∈ R(u)}):
+l
+
+x0 + ∑ λr xr |= W p
+
+for all λ1 , . . . , λl ∈ F .
+
+Acknowledgments
+We would like to thank the anonymous POPL reviewers for their
+remarks that helped to improve our original submission. The first
+author would also like to thank the members of IFIP Working
+Group 2.2 for their constructive comments on a talk about a preliminary version of this paper.
+
+(6)
+
+r=1
+
+8 References
+
+This time, this translates to a polynomial equation (of degree at most
+d) in the λr whose coefficients are affine combinations of the coefficients of p. Again all these affine combinations must equal 0 which
+gives rise to a linear equation system that we can set up and solve.
+
+[1] K. R. Apt and G. D. Plotkin. Countable Nondeterminism and
+Random Assignment. Journal of the ACM, 33(4):724–767,
+1986.
+
+C OROLLARY 2. The sets of all valid polynomial relations of degree at most d at program point u, u ∈ N, under precondition Pre
+can be computed in time O (n · (k + d)8d ).
+
+[2] R. Bagnara, P. Hill, E. Ricci, and E. Zaffanella. Precise
+Widening Operators for Convex Polyhedra. In 10th Int. Static
+Analysis Symposium (SAS), pages 337–354. LNCS 2694,
+Springer-Verlag, 2003.
+
+7 Conclusion
+
+[3] I. Balbin and K. Ramamohanarao. A Generalization of the
+Differential Approach to Recursive Query Evaluation. Journal of Logic Programming (JLP), 4(3):259–262, 1987.
+[4] P. Cousot. Constructive Design of a Hierarchy of Semantics of a Transition System by Abstract Interpretation. Elec-
+
+We have presented an interprocedural analysis that determines for
+each program point of an affine program the set of all valid affine
+relations. We generalized the algorithm to infer all polynomial relations of bounded degree and showed that our methods work also in
+
+340
+
+tronic Notes in Theoretical Computer Science, 6, 1997. URL:
+www.elsevier.nl/locate/entcs/volume6.html.
+
+[13] M. Müller-Olm and O. Rüthing. The Complexity of Constant Propagation. In 10th European Symposium on Programming (ESOP), pages
+190–205. LNCS 2028, Springer-Verlag, 2001.
+
+[5] P. Cousot and R. Cousot. Static Determination of Dynamic Properties
+of Recursive Procedures. In E. Neuhold, editor, IFIP Conf. on Formal Description of Programming Concepts, pages 237–277. NorthHolland, 1977.
+
+[14] M. Müller-Olm and H. Seidl. Computing Polynomial Program Invariants. Submitted for publication.
+[15] M. Müller-Olm and H. Seidl. Polynomial Constants are Decidable.
+In 9th Static Analysis Symposium (SAS), pages 4–19. LNCS 2477,
+Springer-Verlag, 2002.
+
+[6] P. Cousot and N. Halbwachs. Automatic Discovery of Linear Restraints among Variables of a Program. In 5th ACM SIGPLANSIGACT Symp. on Principles of Programming Languages (POPL),
+pages 84–97, 1978.
+
+[16] B. Paige and S. Koenig. Finite Differencing of Computable Expressions. ACM Trans. Prog. Lang. and Syst., 4(3):402–454, 1982.
+
+[7] C. Fecht and H. Seidl. Propagating Differences: An Efficient New
+Fixpoint Algorithm for Distributive Constraint Systems. Nordic Journal of Computing (NJC), 5(4):304–329, 1998.
+
+[17] T. Reps, S. Horwitz, and M. Sagiv. Precise Interprocedural Dataflow
+Analysis via Graph Reachability. In 22nd ACM SIGPLAN-SIGACT
+Symp. on Principles of Programming Languages (POPL), pages 49–
+61. ACM Press, 1995.
+
+[8] S. Gulwani and G. Necula. Discovering Affine Equalities Using Random Interpretation. In 30th Ann. ACM Symp. on Principles of Programming Languages (POPL), pages 74–84, 2003.
+
+[18] T. Reps, S. Schwoon, and S. Jha. Weighted Pushdown Systems and
+their Application to Interprocedural Dataflow Analysis. In Int. Static
+Analysis Symposium (SAS), pages 189–213. LNCS 2694, SpringerVerlag, 2003.
+
+[9] S. Horwitz, T. Reps, and M. Sagiv. Precise Interprocedural Dataflow
+Analysis with Applications to Constant Propagation. Theoretical
+Computer Science (TCS), 167(1&2):131–170, 1996.
+
+[19] H. Seidl and B. Steffen. Constraint-Based Inter-Procedural Analysis
+of Parallel Programs. Nordic Journal of Computing (NJC), 7(4):375–
+400, 2000.
+
+[10] M. Karr. Affine Relationships Among Variables of a Program. Acta
+Informatica, 6:133–151, 1976.
+[11] J. Knoop and B. Steffen. The Interprocedural Coincidence Theorem. In Compiler Construction (CC), pages 125–140. LNCS 541,
+Springer-Verlag, 1992.
+
+[20] M. Sharir and A. Pnueli. Two Approaches to Interprocedural Data
+Flow Analysis. In [12], chapter 7, pages 189–233.
+
+[12] S. S. Muchnick and N. D. Jones, editors. Program Flow Analysis:
+Theory and Applications. Prentice Hall, Engelwood Cliffs, New Jersey, 1981.
+
+341
+
+
