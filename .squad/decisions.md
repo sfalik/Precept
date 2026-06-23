@@ -12,6 +12,7 @@
 **To:** Shane
 **Status:** ⚠️ Recommendation pending Shane sign-off. Merged from `.squad/decisions/inbox/frank-arg-constraint-propagation-assessment.md`.
 **Target:** `docs/Working/compiler-readiness-plan-2026-06-16.md`
+**Persisted assessment:** `docs/Working/compiler-readiness-plan-2026-06-16-arg-constraint-propagation-assessment.md` (HELD by owner).
 
 - Plan re-review: still sound; no new blockers.
 - Recommendation: do not add a new slice for arg-constraint propagation.

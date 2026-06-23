@@ -1,0 +1,1 @@
+Merged the arg-constraint doc-promotion inbox note into `.squad/decisions.md`, annotated the existing 2026-06-23T23:24:14Z decision with the persisted assessment path, and removed the inbox file. Decisions stayed below archive threshold; no history summarization was needed.
