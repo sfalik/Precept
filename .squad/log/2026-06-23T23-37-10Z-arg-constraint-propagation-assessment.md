@@ -1,0 +1,1 @@
+Frank's assessment batch was recorded: the compiler-readiness plan remains sound, the arg-constraint-propagation idea is a recommendation rather than a ratified decision, and the owner conversation should absorb the ingress-arg axis instead of adding a new slice. No archive or history summarization thresholds were crossed.
