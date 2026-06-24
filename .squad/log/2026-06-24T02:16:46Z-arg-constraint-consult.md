@@ -1,0 +1,1 @@
+Frank opposed the amendment as posed and recommended the inverse: infer the field's band as the arg contract in `set Field = Arg`, reject only what is provably out-of-band, and leave merely unprovable ingress facts to runtime governance.
