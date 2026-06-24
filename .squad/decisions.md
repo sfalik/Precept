@@ -10,14 +10,12 @@
 
 **By:** Frank
 **To:** Shane
-**Status:** ⚠️ Recommendation pending Shane sign-off. Merged from `.squad/decisions/inbox/frank-arg-constraint-propagation-assessment.md`.
+**Status:** Advisory design opinion — not pending Shane sign-off; merged from `.squad/decisions/inbox/frank-arg-constraint-doc-reframe.md`.
 **Target:** `docs/Working/compiler-readiness-plan-2026-06-16.md`
-**Persisted assessment:** `docs/Working/compiler-readiness-plan-2026-06-16-arg-constraint-propagation-assessment.md` (HELD by owner).
+**Persisted assessment:** `docs/Working/arg-constraint-propagation-opinion-2026-06-23.md`
 
-- Plan re-review: still sound; no new blockers.
-- Recommendation: do not add a new slice for arg-constraint propagation.
-- Open item: fold the ingress-arg axis into the existing GATE-F Phase-0 owner conversation.
-- Philosophy gap surfaced, not resolved: prevention boundary for ingress arg→field assignment.
+- Reframed per owner direction (2026-06-23) from “plan amendment to fold into GATE-F” to an advisory design opinion; verdict = oppose-as-posed; recommend the inverse (infer-band / reject-provable / govern-rest).
+- The earlier “pending Shane sign-off” framing applied to the amendment; this advisory opinion is on the merits, not a ratification item.
 
 ---
 

@@ -1,0 +1,1 @@
+Merged the arg-constraint reframe inbox note into `.squad/decisions.md`, updated the existing 2026-06-23 entry to the new advisory opinion memo, deleted the inbox file, and summarized Frank’s history to keep only durable guidance and recent concise updates.
