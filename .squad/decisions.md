@@ -166,3 +166,30 @@ share is unbuilt at HEAD.
   Owner-gated; out of scope for a design pass.
 
 *Neutral on the final model choice. Frank rules in Phase 3; Shane ratifies. This is evidence, stated hard per the Slice-D mandate.*
+
+---
+
+### 2026-07-06T20:36:38Z: Guarantee-Model Ruling — Band Enforcement Decision
+
+**By:** Frank (Lead/Architect & Language Designer)
+**To:** Shane (Owner)
+**Status:** 🟡 Draft ruling — pending Shane ratification
+**Ruling doc:** `docs/Working/proof-engine-boundary-ruling-2026-07-06.md`
+**Operation:** Band Enforcement — Compiler Guarantee-Model Ruling (Phase 3)
+**Merged from:** `.squad/decisions/inbox/frank-guarantee-model-ruling.md`
+
+**Headline decision:**
+- **Precept is governed by the HYBRID model** — total-internal prove-or-reject (definition-driven), runtime governance only at raw-ingress-origin boundary (host-supplied values at slot entry, checked against slot contract).
+- **D2 (band-split drift) is DECLINED** — unratified, git-untracked, contradicted fleet assumption. Model does not switch to pure-B; Hybrid governs.
+- **The ingress-origin boundary is decidable** by four-part predicate: (1) host-origin, (2) ingress-edge, (3) same-slot contract, (4) no-expression-node.
+
+**Why:**
+- Model A fails on **identity** (`philosophy.md:57`, Principle 11): philosophy forbids unproven runtime faults as primary enforcer; fleet's "runtime can't enforce" is unbuilt-artifact pricing, not defeat.
+- Pure-B would make legitimate governance rules (product/ratio/balance identities in 21/77 samples) inexpressible; rules are governance constraints (`precept-language-spec.md:268`), not deferred faults.
+- Hybrid solves both: governs rules (expressible) and prove-or-rejects arithmetic (internal).
+
+**Verified at HEAD:** `e09f1af44febcaa8c3768c4a28f94cb45a91d820` by cross-family agents (verifier-a-redteam, verifier-b-crux).
+
+**Downstream:** Q5–Q11 dispositions all under Hybrid. Requires no weakening of spec (`§0.7:266` "no deferral") or philosophy. Ratifies owner's committed intent.
+
+**Ratification:** Awaiting Shane sign-off via checklist in ruling doc §9. On acceptance → Phase 5 compiler re-scope + runtime-governance capture-only.
