@@ -78,3 +78,91 @@ General honesty-sweep principle named at plan `:1045`: when a decision relaxes a
 **READY FOR OWNER SIGN-OFF on the Phase-0 gate set — Yes.** No residual blockers. The Phase-0 gate ratification itself — GATE-F's owner-gated spec amendments, the `philosophy.md` overflow reconciliation, GATE-I's fault-delivery pick — remains Shane's, as it must be.
 
 — Frank
+# Decision note — Band-model ruling: Phase-0 corpus map & frozen question set
+
+**Author:** Frank (Lead/Architect) · **Owner:** Shane · **Date:** 2026-07-06 · **Phase:** 0 (setup — no ruling)
+**Branch:** `spike/Precept-V2-Radical`
+
+## What this note records
+Phase-0 of the Shane-approved bounded research operation that will rule on **which guarantee model governs Precept**. Phase 0 only *frames* the evidence hunt; the ruling is Phase 3, Shane ratifies Phase 4. Nothing here decides the model.
+
+## Primary axis (Q1) — the frozen fork
+The ruling's primary axis is a three-way meta-fork; every other question resolves as a consequence:
+
+- **Model A — Bounded compiler + runtime governance.** Compiler proves a subset; non-discharged bounds are *governed at runtime*. Partial compiler + stopping rule. Precedent: gradual verification, SPARK/Ada. Risk: false promise + runtime-enforcement limits.
+- **Model B — Total compiler + deliberately limited surface.** Not-statically-decidable ⇒ **inexpressible**; author rewrites into the provable subset. "Compiles clean" = "totally proven." Cost: expressive power. Philosophy-native.
+- **Principled hybrid — total over the definition-internal surface, with an honest, typed, VISIBLE governance boundary only at genuinely-external runtime input** (§0.7:268 surface). No silent partial-proof.
+
+Q2–Q11 (stopping/admissibility rule; expressiveness cost of B; runtime-enforceability of the deferred set; proven-violation severity; default-vs-set-action consistency; merely-unprovable case; carries-proof bounds; false-promise resolution; philosophy over-read + GATE-F spec amendments; taxonomy/adjacent-calls) are each framed "under A / under B / under hybrid" so readers hunt for *discriminating* evidence, not history summaries. Added sub-questions: Q1a (provenance of the debate's own authority), Q2a (is D2 even shipped — finding: proposal-only), Q3a (does §0.6:249 already show Model B live for the string-length axis), Q4a (does `ConstraintsFailed` distinguish external-input governance from deferred internal-band enforcement).
+
+## Two ground-truth discriminators (verified first-hand at HEAD)
+1. **Spec §0.7:266 says "there is no deferral"** and §0.6:258 says count bounds are "never deferred to a runtime check." Canonical spec is presently written B/hybrid-shaped; D2 (`decision-index.md:20`) would amend it toward A (that amendment IS GATE-F).
+2. **D2 band-split is proposal-only, not shipped.** At HEAD `CountBoundViolation`(:1295) / `LengthBoundViolation`(:1283) are `Severity.Error`; PRE0136 fires even on the merely-unprovable case. Readers must not describe D2 as current behavior.
+
+## Deliverables & locations
+- **Reader-brief template + full corpus map + frozen question set:** `~/.copilot/session-state/21c4af47-5141-4752-ac79-6938d5c2e269/files/phase0-corpus-map-and-brief-spec.md` (Sections 1–4).
+- **Fleet:** 6 readers (A niche packet · B fault-floor+precedent · C 06-16 plan/D1–D4/GATEs · **D reserved-crux+runtime-enforceability, owned by George** · E 2026-07-06 convergence [verify-don't-inherit] · F expressiveness ledger) + **anchor G** (primary-source/provenance/git-blame loop-breaker).
+- Corpus gaps I fixed vs the plan: added the expressiveness-cost corpus (F), the prior-art precedent surveys (B), and an end-to-end runtime-enforceability owner (D/George); corrected the plan's "§0.7:258" → §0.6:258.
+
+## Guardrails carried
+Owner-gated surfaces (`philosophy.md`, spec §0.6/§0.7, GATE-F/GATE-H amendments) are **recommend-only** until Shane's one-pass ratification (Phase 4). No spec/philosophy edit in this operation. Fresh re-derivation (D-A): the 2026-07-03 and 2026-07-06 docs are claims to verify, not a starting position.
+
+---
+
+---
+title: Runtime CANNOT enforce a deferred internal declared band — Model A escape hatch is a false promise at the enforcement layer
+author: George (Runtime Dev)
+date: 2026-07-06
+operation: Band Enforcement — Compiler Guarantee-Model Ruling (Model A vs B vs hybrid)
+slice: D (reserved crux + runtime-enforceability reality)
+status: Evidence finding for Frank's Phase-3 ruling — NOT a ruling. Stated as a hard yes/no per mandate.
+brief: session-state/.../files/briefs/brief-D-george-runtime.md
+---
+
+# Hard finding (Q4)
+
+**The runtime CANNOT reliably enforce a deferred internal declared band** (`min`/`max`/
+`minlength`/`maxlength`/`mincount`/`maxcount`) — because a declared band has **no runtime
+governance representation at all**, and even the rule/ensure governance path it would
+share is unbuilt at HEAD.
+
+## Why (primary-source spine)
+
+1. **Bands are not a runtime constraint kind.** `ConstraintKind` (`src/Precept/Language/ConstraintKind.cs:9-24`)
+   = `Invariant` (rule) + `StateResident`/`StateEntry`/`StateExit` (ensures) + `EventPrecondition`.
+   No band kind. A band cannot become a `ConstraintDescriptor` — that type requires an
+   `ExpressionText` + `Because` a band declaration lacks (`src/Precept/Runtime/SharedTypes.cs:42`).
+2. **`ConstraintsFailed` covers rules + ensures only.** `docs/runtime/result-types.md:114,121`
+   ("Covers ALL post-fire constraints: global rules, state ensures, AND event ensures"). One
+   undifferentiated governance path; bands are on **none** of it (answers Q4a: the disposition
+   surface has nothing to render for a deferred band).
+3. **The §7.6 sweep evaluates only rule/ensure buckets.** `docs/runtime/evaluator.md:1326-1360`,
+   `:1695-1698` ("Every `ConstraintDescriptor` appears in exactly one bucket").
+4. **Band proof is compile-time-only.** `docs/compiler/proof-engine.md:107` — "Proof ledger does
+   NOT cross the compile-runtime boundary — only `FaultSiteDescriptor` residue (defense-in-depth
+   backstops) crosses into runtime." An internal-computed band violation is a **compile-time**
+   `NumericOverflow` Error (`docs/compiler/diagnostic-system.md:163`; `Diagnostics.cs:697/1283/1295`
+   all Error at HEAD).
+5. **The only runtime residue is a defense-in-depth fault, framed as a compiler defect.**
+   `FaultCode.OutOfRange` (`src/Precept/Language/FaultCode.cs:47-48`); `docs/runtime/fault-system.md:280,316`
+   — "reachable only for out-of-contract data … a fault on contract data would indicate a
+   proof-engine gap — a defect to fix, not a condition to design around."
+6. **No band-deferral seam exists.** The only "deferred" seam in the evaluator is lazy collection
+   materialization (`docs/runtime/evaluator.md:1280`, "DEFERRED — do NOT implement"). Unrelated.
+7. **The commit pipeline is stubbed.** `Version.cs:81` (`Fire` → `UndefinedEvent()`), `Version.cs:85`
+   (`Update` → `NotImplementedException`), `Precept.cs:158` (`Constraints` → `NotImplementedException`),
+   `Evaluator.cs:46` ("TODO: implement Fire/Update once the executable model is designed").
+
+## Bearing on the ruling
+
+- **Undermines Model A.** Its "defer to runtime" escape hatch requires a runtime band-enforcement
+  surface that is neither designed nor shipped, and that §0.7:266 ("there is no deferral") forbids.
+  The governance-checkpoint view (`band-guarantee-boundary-analysis-2026-07-03.md:114`) *assumes*
+  "Fire refuses the write"; the runtime canon **refutes** the premise.
+- **Consistent with B / already-hybrid.** Shipped reality = compile-time prove-or-reject for bands;
+  runtime governance for rules/ensures + §0.7:268 external-input ingress. That *is* the hybrid line.
+- **Cost of choosing A anyway:** must first commission a runtime band-governance surface (lower
+  bands → `Invariant` constraints, or add an ingress band-validation pass) AND amend §0.7:266.
+  Owner-gated; out of scope for a design pass.
+
+*Neutral on the final model choice. Frank rules in Phase 3; Shane ratifies. This is evidence, stated hard per the Slice-D mandate.*
