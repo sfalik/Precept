@@ -45,3 +45,4 @@ tools/Precept.VsCode/server/
 *.pem
 
 *.lscache
+.squad/.cache/

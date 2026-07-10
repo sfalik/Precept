@@ -10,8 +10,8 @@ permissions:
 
 jobs:
   assign-work:
-    # Standard member assignment — fires for squad:{member} labels except squad:chore (Ralph handles chore pickup)
-    if: startsWith(github.event.label.name, 'squad:') && github.event.label.name != 'squad:chore'
+    # Only trigger on squad:{member} labels (not the base "squad" label)
+    if: startsWith(github.event.label.name, 'squad:')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -27,22 +27,9 @@ jobs:
             // Extract member name from label (e.g., "squad:ripley" → "ripley")
             const memberName = label.replace('squad:', '').toLowerCase();
 
-            // Skip duplicate comment when Ralph routes a chore issue: Ralph's pickup comment
-            // already explains the assignment — suppress the generic assign-work comment.
-            const hasChoreGate = issue.labels.some(l => l.name === 'squad:chore');
-            const routedByWorkflow = context.actor === 'github-actions[bot]';
-            if (hasChoreGate && routedByWorkflow) {
-              core.info(`Skipping duplicate assignment comment for chore-routed issue #${issue.number}`);
-              return;
-            }
-
-            // Read team roster — check .squad/ first, fall back to .ai-team/
-            let teamFile = '.squad/team.md';
+            const teamFile = '.squad/team.md';
             if (!fs.existsSync(teamFile)) {
-              teamFile = '.ai-team/team.md';
-            }
-            if (!fs.existsSync(teamFile)) {
-              core.warning('No .squad/team.md or .ai-team/team.md found — cannot assign work');
+              core.warning('No .squad/team.md found — cannot assign work');
               return;
             }
 
@@ -81,7 +68,7 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: issue.number,
-                body: `⚠️ No squad member found matching label \`${label}\`. Check \`.squad/team.md\` (or \`.ai-team/team.md\`) for valid member names.`
+                body: `⚠️ No squad member found matching label \`${label}\`. Check \`.squad/team.md\` for valid member names.`
               });
               return;
             }
@@ -168,172 +155,3 @@ jobs:
                 core.warning(`Fallback also failed: ${err2.message}`);
               }
             }
-
-  # Ralph autonomous chore pickup — fires when squad:chore is applied to an issue.
-  # squad:chore is the explicit approval gate: Shane applies it, Ralph picks it up.
-  # Ralph routes the issue to the best-fit real squad member using keyword/role matching,
-  # applies the squad:{member} label (which triggers the standard assign-work job above),
-  # and preserves the full review ceremony for that member's work.
-  ralph-chore-pickup:
-    if: github.event.label.name == 'squad:chore'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Route squad:chore issue to a real member
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const issue = context.payload.issue;
-
-            // Read team roster — check .squad/ first, fall back to .ai-team/
-            let teamFile = '.squad/team.md';
-            if (!fs.existsSync(teamFile)) {
-              teamFile = '.ai-team/team.md';
-            }
-            if (!fs.existsSync(teamFile)) {
-              core.warning('No .squad/team.md or .ai-team/team.md found — cannot route chore pickup');
-              return;
-            }
-
-            const content = fs.readFileSync(teamFile, 'utf8');
-            const lines = content.split('\n');
-
-            const members = [];
-            let inMembersTable = false;
-            for (const line of lines) {
-              if (line.match(/^##\s+(Members|Team Roster)/i)) {
-                inMembersTable = true;
-                continue;
-              }
-              if (inMembersTable && line.startsWith('## ')) {
-                break;
-              }
-              if (inMembersTable && line.startsWith('|') && !line.includes('---') && !line.includes('Name')) {
-                const cells = line.split('|').map(c => c.trim()).filter(Boolean);
-                // Exclude Scribe and Ralph — they are not work-pickup members
-                if (cells.length >= 2 && cells[0] !== 'Scribe' && cells[0] !== 'Ralph') {
-                  members.push({ name: cells[0], role: cells[1] });
-                }
-              }
-            }
-
-            if (members.length === 0) {
-              core.warning('No squad members found in team roster — cannot route chore pickup');
-              return;
-            }
-
-            // Read routing rules if available
-            let routingContent = '';
-            const routingFile = '.squad/routing.md';
-            if (fs.existsSync(routingFile)) {
-              routingContent = fs.readFileSync(routingFile, 'utf8').toLowerCase();
-            }
-
-            const issueText = `${issue.title}\n${issue.body || ''}`.toLowerCase();
-
-            // Route by keyword matching against member roles and routing doc
-            let assignedMember = null;
-
-            // 1. Routing doc keyword match
-            if (routingContent) {
-              for (const member of members) {
-                const memberName = member.name.toLowerCase();
-                const memberRole = member.role.toLowerCase();
-                // Look for lines in routing.md that associate this member with matching keywords
-                const issueWords = issueText.split(/\s+/).filter(w => w.length > 4);
-                const routingMentionsMember = routingContent.includes(memberName) || routingContent.includes(memberRole);
-                if (routingMentionsMember) {
-                  // Find the routing table rows that reference this member
-                  const routingLines = routingContent.split('\n');
-                  for (const rline of routingLines) {
-                    if (!rline.includes(memberName) && !rline.includes(memberRole)) continue;
-                    const matched = issueWords.some(word => rline.includes(word));
-                    if (matched) {
-                      assignedMember = member;
-                      break;
-                    }
-                  }
-                }
-                if (assignedMember) break;
-              }
-            }
-
-            // 2. Role keyword match
-            if (!assignedMember) {
-              for (const member of members) {
-                const role = member.role.toLowerCase();
-                if ((role.includes('lead') || role.includes('architect')) &&
-                    (issueText.includes('architect') || issueText.includes('design') || issueText.includes('refactor'))) {
-                  assignedMember = member;
-                  break;
-                }
-                if ((role.includes('mcp') || role.includes('ai') || role.includes('plugin')) &&
-                    (issueText.includes('mcp') || issueText.includes('plugin') || issueText.includes('ai') || issueText.includes('tool'))) {
-                  assignedMember = member;
-                  break;
-                }
-                if ((role.includes('runtime') || role.includes('parser') || role.includes('dsl')) &&
-                    (issueText.includes('parser') || issueText.includes('runtime') || issueText.includes('dsl') || issueText.includes('type'))) {
-                  assignedMember = member;
-                  break;
-                }
-                if ((role.includes('test') || role.includes('qa') || role.includes('quality')) &&
-                    (issueText.includes('test') || issueText.includes('coverage') || issueText.includes('regression'))) {
-                  assignedMember = member;
-                  break;
-                }
-                if ((role.includes('tooling') || role.includes('extension') || role.includes('language server')) &&
-                    (issueText.includes('extension') || issueText.includes('language server') || issueText.includes('lsp') || issueText.includes('vscode'))) {
-                  assignedMember = member;
-                  break;
-                }
-                if ((role.includes('brand') || role.includes('docs') || role.includes('devrel')) &&
-                    (issueText.includes('readme') || issueText.includes('docs') || issueText.includes('brand'))) {
-                  assignedMember = member;
-                  break;
-                }
-              }
-            }
-
-            // 3. Default: Lead/Architect fallback
-            if (!assignedMember) {
-              assignedMember = members.find(m =>
-                m.role.toLowerCase().includes('lead') || m.role.toLowerCase().includes('architect')
-              ) || members[0];
-            }
-
-            const assignLabel = `squad:${assignedMember.name.toLowerCase()}`;
-
-            // Apply the real member label — this cascades to the standard assign-work job
-            await github.rest.issues.addLabels({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: issue.number,
-              labels: [assignLabel]
-            });
-
-            // Post Ralph pickup comment
-            const comment = [
-              `### 🔄 Ralph — Autonomous Chore Pickup`,
-              '',
-              `**Issue:** #${issue.number} — ${issue.title}`,
-              `**Routed to:** ${assignedMember.name} (${assignedMember.role})`,
-              '',
-              `This issue had the \`squad:chore\` label, which is the explicit approval signal for Ralph autonomous chore pickup.`,
-              `Ralph has routed it to **${assignedMember.name}** based on role and keyword matching.`,
-              '',
-              `The \`${assignLabel}\` label has been applied. **Review ceremony is preserved** — ${assignedMember.name}'s work will go through the normal PR review flow before merge.`,
-              '',
-              `> To override routing, remove \`${assignLabel}\` and add a different \`squad:{member}\` label.`,
-            ].join('\n');
-
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: issue.number,
-              body: comment
-            });
-
-            core.info(`Ralph routed issue #${issue.number} → ${assignedMember.name} (${assignLabel})`);

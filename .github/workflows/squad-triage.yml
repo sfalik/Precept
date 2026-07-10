@@ -22,13 +22,9 @@ jobs:
             const fs = require('fs');
             const issue = context.payload.issue;
 
-            // Read team roster — check .squad/ first, fall back to .ai-team/
-            let teamFile = '.squad/team.md';
+            const teamFile = '.squad/team.md';
             if (!fs.existsSync(teamFile)) {
-              teamFile = '.ai-team/team.md';
-            }
-            if (!fs.existsSync(teamFile)) {
-              core.warning('No .squad/team.md or .ai-team/team.md found — cannot triage');
+              core.warning('No .squad/team.md found — cannot triage');
               return;
             }
 
@@ -79,8 +75,7 @@ jobs:
               }
               if (inMembersTable && line.startsWith('|') && !line.includes('---') && !line.includes('Name')) {
                 const cells = line.split('|').map(c => c.trim()).filter(Boolean);
-                // Exclude Scribe (silent logger) and Ralph (special autonomous-pickup role)
-                if (cells.length >= 2 && cells[0] !== 'Scribe' && cells[0] !== 'Ralph') {
+                if (cells.length >= 2 && cells[0] !== 'Scribe') {
                   members.push({
                     name: cells[0],
                     role: cells[1]
@@ -89,11 +84,7 @@ jobs:
               }
             }
 
-            // Read routing rules — check .squad/ first, fall back to .ai-team/
-            let routingFile = '.squad/routing.md';
-            if (!fs.existsSync(routingFile)) {
-              routingFile = '.ai-team/routing.md';
-            }
+            const routingFile = '.squad/routing.md';
             let routingContent = '';
             if (fs.existsSync(routingFile)) {
               routingContent = fs.readFileSync(routingFile, 'utf8');
@@ -200,6 +191,14 @@ jobs:
               repo: context.repo.repo,
               issue_number: issue.number,
               labels: [assignLabel]
+            });
+
+            // Apply default triage verdict
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              labels: ['go:needs-research']
             });
 
             // Auto-assign @copilot if enabled
