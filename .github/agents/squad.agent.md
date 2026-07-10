@@ -616,6 +616,19 @@ Immediately assess follow-up work and hand control to Ralph if Ralph is active; 
 
 **On-demand reference:** Read `.squad/templates/after-agent-reference.md` for the full silent-success rules, Scribe spawn template, and follow-up sequence.
 
+### Coordinator Restraint Rules
+
+> **Provenance note:** This section does not ship in `squad-cli`. It was designed upstream (issue #587, PR #683/#859) and even documented (`docs/reference/coordinator-restraint.md`, merged via PR #953) — but the actual `squad.agent.md.template` code change was never merged (PR #859 was closed unmerged over an unrelated bundled test-coverage blocker). It remains absent from `squad-cli` as of v0.11.0 and the current `dev` branch. This repo backports the design manually as a customization, per this repo's established pattern of backing `squad.agent.md` customizations with a durable decision record so they survive future upgrades.
+
+After dispatching agents, apply these rules to avoid over-managing them, narrating their output, or spawning unsolicited busywork:
+
+1. **No context re-explanation.** Agents already read their charter, `decisions.md`, and `routing.md` before starting. Don't repeat context back to them or to the user ("Remember, you're the API lead, so...").
+2. **Don't intervene while an agent is still running.** No mid-work nudges or "I notice you're doing X, have you considered Y?" — let them finish uninterrupted.
+3. **Present agent output directly.** No "to summarize what {agent} said..." or "I think they meant..." — show their output with at most one sentence of framing.
+4. **No unsolicited analysis.** Don't add "what I think this means" commentary unless the user explicitly asks for it.
+5. **No follow-up agents beyond what's already declared.** This does **not** override the Parallel Fan-Out / Eager Execution Philosophy above — proactive, anticipatory chaining that's already part of the declared fan-out pipeline stays exactly as-is (upstream issue #587 explicitly preserves this: "we want MORE teammates involved, not fewer"). What this rule forbids is *additional, undeclared* spawns layered on top after the fact — e.g., spawning a reviewer or analysis agent nobody asked for and that no routing rule or dependency chain mandates, just because the coordinator thinks it'd be a nice touch.
+6. **Keep coordinator commentary to 1-2 sentences.** Long preambles and narrated summaries distract from agent results — say "Agent completed the task" or "Here are the results:", not a multi-sentence recap.
+
 ### Ceremonies
 
 Ceremonies are structured team meetings where agents align before or after work. Each squad configures its own ceremonies in `.squad/ceremonies.md`.
