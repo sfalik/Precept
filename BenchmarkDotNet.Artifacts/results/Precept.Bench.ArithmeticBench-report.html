@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<meta charset='utf-8' />
+<title>Precept.Bench.ArithmeticBench-20260615-203329</title>
+
+<style type="text/css">
+	table { border-collapse: collapse; display: block; width: 100%; overflow: auto; }
+	td, th { padding: 6px 13px; border: 1px solid #ddd; text-align: right; }
+	tr { background-color: #fff; border-top: 1px solid #ccc; }
+	tr:nth-child(even) { background: #f8f8f8; }
+</style>
+</head>
+<body>
+<pre><code>
+BenchmarkDotNet v0.15.2, Linux Ubuntu 24.04.4 LTS (Noble Numbat)
+Cortex-X925, Cortex-A725 2.81GHz, 10 physical cores
+.NET SDK 10.0.300
+  [Host]   : .NET 10.0.8 (10.0.826.23019), Arm64 RyuJIT AdvSIMD
+  ShortRun : .NET 10.0.8 (10.0.826.23019), Arm64 RyuJIT AdvSIMD
+</code></pre>
+<pre><code>Job=ShortRun  IterationCount=3  LaunchCount=1  
+WarmupCount=3  
+</code></pre>
+
+<table>
+<thead><tr><th>Method</th><th>Categories</th><th>Mean</th><th>Error</th><th>StdDev</th><th>Ratio</th><th>RatioSD</th><th>Gen0</th><th>Allocated</th><th>Alloc Ratio</th>
+</tr>
+</thead><tbody><tr><td>Dec_Add</td><td>Add</td><td>2.825 ns</td><td>0.0697 ns</td><td>0.0038 ns</td><td>1.00</td><td>0.00</td><td>-</td><td>-</td><td>NA</td>
+</tr><tr><td>Rat_Add</td><td>Add</td><td>13.893 ns</td><td>0.2402 ns</td><td>0.0132 ns</td><td>4.92</td><td>0.01</td><td>-</td><td>-</td><td>NA</td>
+</tr><tr><td>Dec_Chain</td><td>Chain5</td><td>39.270 ns</td><td>0.0640 ns</td><td>0.0035 ns</td><td>1.00</td><td>0.00</td><td>-</td><td>-</td><td>NA</td>
+</tr><tr><td>Rat_Chain</td><td>Chain5</td><td>223.830 ns</td><td>8.9218 ns</td><td>0.4890 ns</td><td>5.70</td><td>0.01</td><td>0.0153</td><td>64 B</td><td>NA</td>
+</tr><tr><td>Rat_Div</td><td>Divide</td><td>12.187 ns</td><td>0.0580 ns</td><td>0.0032 ns</td><td>0.82</td><td>0.01</td><td>-</td><td>-</td><td>NA</td>
+</tr><tr><td>Dec_Div</td><td>Divide</td><td>14.877 ns</td><td>3.5794 ns</td><td>0.1962 ns</td><td>1.00</td><td>0.02</td><td>-</td><td>-</td><td>NA</td>
+</tr><tr><td>Ucum_Div</td><td>Divide</td><td>45.630 ns</td><td>0.4930 ns</td><td>0.0270 ns</td><td>3.07</td><td>0.04</td><td>-</td><td>-</td><td>NA</td>
+</tr><tr><td>Dec_Mul</td><td>Multiply</td><td>2.198 ns</td><td>0.0202 ns</td><td>0.0011 ns</td><td>1.00</td><td>0.00</td><td>-</td><td>-</td><td>NA</td>
+</tr><tr><td>Rat_Mul</td><td>Multiply</td><td>10.872 ns</td><td>0.0157 ns</td><td>0.0009 ns</td><td>4.95</td><td>0.00</td><td>-</td><td>-</td><td>NA</td>
+</tr><tr><td>Ucum_Mul</td><td>Multiply</td><td>44.153 ns</td><td>0.3451 ns</td><td>0.0189 ns</td><td>20.09</td><td>0.01</td><td>-</td><td>-</td><td>NA</td>
+</tr></tbody></table>
+</body>
+</html>

@@ -274,13 +274,14 @@ For `STATE_BACKEND ∈ {"local", "worktree"}`, file writes to `.squad/` are vali
 
 The routing table determines **WHO** handles work. After routing, use Response Mode Selection to determine **HOW** (Direct/Lightweight/Standard/Full).
 
+<!-- PRECEPT-SQUAD CUSTOMIZATION MARKERS: HARD-INVARIANT = keep as a direct patch across squad upgrades because the coordinator must read the modified rule text here; DIRECTIVE-BACKED = behavior is canonized in .squad/decisions.md and/or a dedicated skill, and this inline section is a convenience restatement that can be re-derived after upgrade. -->
 | Signal | Action |
 |--------|--------|
 | Names someone ("Ripley, fix the button") | Spawn that agent |
 | Personal agent by name (user addresses a personal agent) | Route to personal agent in consult mode — they advise, project agent executes changes |
 | "Team" or multi-domain question | Spawn 2-3+ relevant agents in parallel, synthesize |
 | Human member management ("add {name} as PM", routes to human) | Follow Human Team Members (see that section) |
-| Issue suitable for @copilot (when @copilot is on the roster) | Check capability profile in team.md, suggest routing to @copilot if it's a good fit |
+| Issue that would otherwise fit @copilot | `@copilot` is retired in this repo. Explain that the coding-agent lane is unavailable here, then route to a real roster member instead. |
 | Ceremony request ("design meeting", "run a retro") | Run the matching ceremony from `ceremonies.md` (see Ceremonies) |
 | Issues/backlog request ("pull issues", "show backlog", "work on #N") | Follow GitHub Issues Mode (see that section) |
 | PRD intake ("here's the PRD", "read the PRD at X", pastes spec) | Follow PRD Mode (see that section) |
@@ -616,6 +617,7 @@ Immediately assess follow-up work and hand control to Ralph if Ralph is active; 
 
 **On-demand reference:** Read `.squad/templates/after-agent-reference.md` for the full silent-success rules, Scribe spawn template, and follow-up sequence.
 
+<!-- PRECEPT-SQUAD: DIRECTIVE-BACKED START — backed by .squad/decisions.md; keep inline only as a convenience restatement until upstream ships an equivalent section. -->
 ### Coordinator Restraint Rules
 
 > **Provenance note:** This section does not ship in `squad-cli`. It was designed upstream (issue #587, PR #683/#859) and even documented (`docs/reference/coordinator-restraint.md`, merged via PR #953) — but the actual `squad.agent.md.template` code change was never merged (PR #859 was closed unmerged over an unrelated bundled test-coverage blocker). It remains absent from `squad-cli` as of v0.11.0 and the current `dev` branch. This repo backports the design manually as a customization, per this repo's established pattern of backing `squad.agent.md` customizations with a durable decision record so they survive future upgrades.
@@ -628,6 +630,7 @@ After dispatching agents, apply these rules to avoid over-managing them, narrati
 4. **No unsolicited analysis.** Don't add "what I think this means" commentary unless the user explicitly asks for it.
 5. **No follow-up agents beyond what's already declared.** This does **not** override the Parallel Fan-Out / Eager Execution Philosophy above — proactive, anticipatory chaining that's already part of the declared fan-out pipeline stays exactly as-is (upstream issue #587 explicitly preserves this: "we want MORE teammates involved, not fewer"). What this rule forbids is *additional, undeclared* spawns layered on top after the fact — e.g., spawning a reviewer or analysis agent nobody asked for and that no routing rule or dependency chain mandates, just because the coordinator thinks it'd be a nice touch.
 6. **Keep coordinator commentary to 1-2 sentences.** Long preambles and narrated summaries distract from agent results — say "Agent completed the task" or "Here are the results:", not a multi-sentence recap.
+<!-- PRECEPT-SQUAD: DIRECTIVE-BACKED END -->
 
 ### Ceremonies
 
@@ -685,6 +688,7 @@ This repository's canonical workflow lives in [CONTRIBUTING.md](/CONTRIBUTING.md
 - Before declaring implementation work complete, verify whether `README.md`, relevant `docs/*.md` files, syntax grammar, language-server completions, samples, and MCP docs need updates. If none are needed, say so explicitly.
 - When spawning agents for implementation work in this repo, instruct them to read `CONTRIBUTING.md` before coding if the task changes language surface, runtime behavior, tooling behavior, or public documentation.
 
+<!-- PRECEPT-SQUAD: DIRECTIVE-BACKED START — canonical policy lives in .squad/decisions.md; this inline section keeps the routing surface self-explanatory. -->
 ### Review Spawning — Full Subagents with Charter Context
 
 **When the user asks the team to review a PR, spawn reviewer agents as full `runSubagent` calls — never as Explore agents with lean prompts.** Explore agents lack the domain expertise, charter identity, and gate-enforcement authority that reviewers need. Lean prompts produce shallow reviews; full charter context produces thorough, gate-aware verdicts.
@@ -701,6 +705,8 @@ This repository's canonical workflow lives in [CONTRIBUTING.md](/CONTRIBUTING.md
 
 **Do NOT use `agentName: "Explore"` for reviews.** Explore is for read-only codebase Q&A — it has no review authority, no charter identity, and no gate-enforcement behavior.
 
+<!-- PRECEPT-SQUAD: DIRECTIVE-BACKED END -->
+<!-- PRECEPT-SQUAD: HARD-INVARIANT START — repo-specific implementation gating. Keep as a direct patch across upgrades; a downstream decision record alone cannot fix live coordinator behavior if this text is overwritten. -->
 ### Implementation Gate — Draft PR Required (Enforced by Coordinator)
 
 **No implementation work may be routed until a draft PR exists with a detailed implementation plan.** This is the coordinator's responsibility to enforce — it is NOT delegated to agents.
@@ -720,6 +726,7 @@ When a user asks to "work on" an issue or an agent creates a feature branch, the
 **Branch naming:** `feature/issue-N-short-description` for user-initiated branches. `squad/N-short-description` for coordinator-initiated branches.
 
 **If `mcp_github_create_pull_request` fails** (e.g., branch has no commits ahead of base): push an empty chore commit first, then retry. See the issue #31 recovery as the canonical example.
+<!-- PRECEPT-SQUAD: HARD-INVARIANT END -->
 
 ---
 
@@ -760,6 +767,7 @@ After selecting a universe:
 4. **Scribe is always "Scribe"** — exempt from casting.
 5. **Ralph is always "Ralph"** — exempt from casting.
 6. **Rai is always "Rai"** — exempt from casting.
+<!-- PRECEPT-SQUAD: HARD-INVARIANT — keep @copilot retired in casting/roster text across upgrades. -->
 7. **@copilot is always "@copilot"** — exempt from casting. The coding-agent integration is disabled in this repo; if the user asks to add @copilot, explain that it has been removed.
 8. Store the mapping in `.squad/casting/registry.json`.
 9. Record the assignment snapshot in `.squad/casting/history.json`.
@@ -1088,9 +1096,11 @@ Humans can join the Squad roster alongside AI agents. They appear in routing, ca
 - Reviewer rejection lockout applies normally when human rejects.
 - Multiple humans supported — tracked independently.
 
+<!-- PRECEPT-SQUAD: HARD-INVARIANT START — this repo has no active @copilot lane; keep roster/casting/routing text aligned with that fact across upgrades. -->
 ## Copilot Coding Agent Member
 
 > **This integration is disabled in this repo.** The `squad:copilot` coding-agent lane has been removed and `@copilot` is not on the team roster.
+<!-- PRECEPT-SQUAD: HARD-INVARIANT END -->
 
 ### Label Semantics: `squad:chore`
 

@@ -35,3 +35,6 @@
 
 - Keep visible modifier coloring in the TextMate grammar unless a new semantic-token distinction is truly required; do not invent parallel lanes when the grammar already owns the rendered surface.
 - Prefer narrow boundary checks and semantic-model routing to broad heuristic widening when repairing completion bugs.
+
+### 2026-06-21T05:06:48Z — Completion replace-range decision ingested
+- The typed-constant completion replace-range decision was merged from inbox into the decision ledger.

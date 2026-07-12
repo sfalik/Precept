@@ -15,7 +15,7 @@ Apply D1 (overflow parked), D2 (band split), D3 (atomicity relaxed), and Frank's
 
 1. **Status field (Frank A1).** Update the doc's status to note the three applied owner decisions (overflow parked, band split compiler/runtime, atomicity relaxed) and that the readiness plan now derives from the corrected framing. Reference the 2026-06-16 plan.
 
-2. **Floor count 11 → 10.** Representability overflow (family 9) moves OUT of the prove-or-reject floor into a new **"Known faults — accepted, parked"** sub-section. Propagate the count to the Conclusions line and every place the doc says "11 floor families."
+2. **Floor count 11 → 9.** D1 parks TWO families: decimal representability overflow (family 9) AND temporal representability overflow (family 10) both move OUT of the prove-or-reject floor into a new **"Known faults — accepted, parked"** sub-section — removing two of eleven leaves nine. Propagate the count to the Conclusions line and every place the doc says "11 floor families."
 
 3. **Floor invariant carve-out (the single most load-bearing reframe).** Amend "prove-or-reject, never defer" to **"prove-or-reject EXCEPT decimal/temporal representability overflow — a parked known fault we never claim prevented."** Mark this as an **owner-approved honesty carve-out**, not auto-resolved (philosophy gate). Keep it **distinct** from the band relocation (bands are relocated to runtime governance, not relaxed).
 
@@ -53,14 +53,14 @@ Every runtime decision the compiler plan forces, grouped by target doc. **Consol
 ### B.1 — `evaluator.md`
 
 - **§7.6 governance / ingress sweep (ONE consolidated pass)** — constraint-plan synthesis from DesugarsToRule + per-commit/ingress enforcement; the recoverable governance-refusal lane for reclassified bands (distinct from `Faulted`); committed-state tier-2 discharge invariant (every prior commit enforces the discharging constraint); collect-all (no short-circuit) sweep; element-ingress governance (Rule 2 / AC 7); 2c-ii field-reference-bound ingress; omit-clears-on-entry + readonly/editable patch enforcement; the umbrella ingress value-constraint sweep (guarantee-contract Part 2, spec §0.7).
-- **§7.1 / §7.2** — the executable model: exact EventOutcome / UpdateOutcome / EventInspection / UpdateInspection / RestoreOutcome shapes per scenario; Create verdict space (Created/Rejected); FromJson/Restore (Restore substantially dissolves into next-operation re-governance + out-of-contract trap backstop).
+- **§7.1 / §7.2** — the executable model: exact EventOutcome / UpdateOutcome / EventInspection / UpdateInspection / RestoreOutcome shapes per scenario; Create verdict space (Created/Rejected); the **mincount Create-time refusal** (refuse at Create, per the GATE-E posture, when a `mincount`-bounded field is empty at birth — the runtime enforcement half of Phase 3 Slice 3.3's compile-side ledger-honesty + definition-incoherence-flag work; capture: `evaluator.md §7.1 Create`); FromJson/Restore (Restore substantially dissolves into next-operation re-governance + out-of-contract trap backstop).
 - **§7.5** — omit-clears + readonly/editable patch semantics.
 - **§9 / §7.6 fault delivery (GATE-I)** — reconcile the in-canon contradiction: `result-types.md:51/63/72` (throw `FaultException`) vs `result-types.md:104/117/127` + `evaluator.md §7.6` (`EventOutcome.Faulted(Fault)` structured variant) vs `fault-system.md` Q1 (open). Settle to ONE shape (Decision 4 "Structured Outcomes, Never Exceptions" leans Faulted). Owner-facing — surface, don't unilaterally pick.
 - **§10** — the "no diagnostics ⇒ evaluator never faults" contract, amended to **except the parked decimal/temporal representability family** (D1 honesty carve-out); plus the committed-state invariant; plus the position-totality / creation-exhaustiveness checker as the HARD runtime precondition that keeps the contract alive as the language grows.
 - **Cross-unit reduction-rule section (MO-DSO-05, highest-priority extraction — never written)** — `k = ScaleToBase(u_q)/ScaleToBase(u_p)` in decimal, target-directed to the price denominator unit, rounding at maxplaces, `k=1` same-unit; covers BUG-030 value-application and the BIZ-9/10/11/12/13 derived-value computations (money/money exchangerate value, quantity/quantity compound value, inverse-division value, time-denominator cancellation value). *(Type derivation is Phase-4 compiler work; value computation defers here.)*
 - **BRANCH_FALSE/BRANCH_TRUE/if-lowering opcode contract** — the conditional-totality spec half; fixes `evaluator.md:993` + the &&/||/?: notation drift at 6 sites.
 - **Edge-value semantics** — banker's rounding, clamp directions, ∞/NaN, integer-conversion overflow.
-- **§Intake-Boundary (extend `:297-311`)** — D8 dynamic-write dimension-narrowed target-directed conversion. **Matched pair** with the Phase-4 compile-side admission, which stays BLOCKED until this lands.
+- **§Intake-Boundary (extend `:297-311`)** — D8 dynamic-write dimension-narrowed target-directed conversion. **Admit-now / defer-enforcement:** the compiler **admits** the D8 dynamic-write conversion now (it is fault-safe — a finite UCUM scale factor a complete runtime performs); the conversion's runtime **enforcement** is the deferred, captured obligation this section records (plan §11.B). Pre-release the admission creates no live fault (the runtime is a stub); the capture pointer, not a held compiler rejection, keeps the defer honest.
 - **D9 injectable per-operation clock** — so `now()` is deterministic/testable.
 - **D18 executor-module dispatch + D13a serialization; temporal execution contract** (incl. NodaTime STJ).
 - **OD-1 shared expression-evaluation core** — the runtime evaluator and compile-time ConstantFold must share ONE core (also recorded in `compiler-and-runtime-design.md`).
@@ -104,6 +104,7 @@ Every runtime decision the compiler plan forces, grouped by target doc. **Consol
 ### B.7 — `descriptor-types.md`
 
 - F-API-01 typed field descriptors — solidify the descriptor surface the evaluator builds against; verify reuse of existing FieldDescriptor, not a fork.
+- **Descriptor builder population** — the runtime pass that populates the descriptor instances from the compiled model (the tail Slice 7.4 defers: the type/signature surface is Phase-7 COMPILER_CODE; the population pass is runtime coding). Captures: `descriptor-types.md` (builder-population pass pending) + `evaluator.md §7.1`.
 
 ### B.8 — `compiler-and-runtime-design.md`
 
@@ -116,4 +117,4 @@ Every runtime decision the compiler plan forces, grouped by target doc. **Consol
 ### B.10 — Owner-gated, NEVER auto-edited
 
 - **`philosophy.md`** absolute-claims reconciliation — bands relocated to runtime governance (not weakened, Frank A6); overflow genuinely a disclosed limitation (D1). Surface as a guarantee-statement promotion; the owner authorizes. The core-guarantee category changed (overflow now a disclosed limitation), so this is a genuine philosophy-gap surface, not an incidental sync.
-- **GATE-F** spec amendments (§0.7 L256/L258/L266, §0.6 item-6 L208, Principle 11 "constraint range impossibility" + L112 "defensive redundancy") — Tier-3 owner-approval, enumerated complete before the conversation (Frank B1).
+- **GATE-F** spec amendments (§0.6 L256/L258 + §0.7 L266, §0.6 item-6 L208, Principle 11 "constraint range impossibility" + L112 "defensive redundancy") — Tier-3 owner-approval, enumerated complete before the conversation (Frank B1).

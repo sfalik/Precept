@@ -78,6 +78,10 @@ General honesty-sweep principle named at plan `:1045`: when a decision relaxes a
 **READY FOR OWNER SIGN-OFF on the Phase-0 gate set — Yes.** No residual blockers. The Phase-0 gate ratification itself — GATE-F's owner-gated spec amendments, the `philosophy.md` overflow reconciliation, GATE-I's fault-delivery pick — remains Shane's, as it must be.
 
 — Frank
+## Runtime Guarantee Model
+
+---
+
 # Decision note — Band-model ruling: Phase-0 corpus map & frozen question set
 
 **Author:** Frank (Lead/Architect) · **Owner:** Shane · **Date:** 2026-07-06 · **Phase:** 0 (setup — no ruling)
@@ -169,27 +173,155 @@ share is unbuilt at HEAD.
 
 ---
 
-### 2026-07-06T20:36:38Z: Guarantee-Model Ruling — Band Enforcement Decision
+---
+
+### 2026-07-06: Proof-Engine Boundary Ruling — Revision 2 (re-derivation under two owner corrections)
 
 **By:** Frank (Lead/Architect & Language Designer)
-**To:** Shane (Owner)
-**Status:** 🟡 Draft ruling — pending Shane ratification
-**Ruling doc:** `docs/Working/proof-engine-boundary-ruling-2026-07-06.md`
-**Operation:** Band Enforcement — Compiler Guarantee-Model Ruling (Phase 3)
-**Merged from:** `.squad/decisions/inbox/frank-guarantee-model-ruling.md`
+**To:** Shane (owner)
+**Status:** Draft — pending Shane ratification. RECOMMENDATION for owner-gated surfaces (`docs/philosophy.md`, spec §0.6/§0.7); nothing edited.
+**Branch:** spike/Precept-V2-Radical
+**Verified-at-HEAD:** a6922fd829ad5c8a227fadfa2504a584b9e630a0
+**Ruling:** `docs/Working/proof-engine-boundary-ruling-2026-07-06.md` (Revision 2; overwrites the canonical path)
+**Supersedes:** `docs/Working/proof-engine-boundary-ruling-2026-07-06-v1-superseded.md` (v1 preserved; this is a full re-derivation, not an amendment)
 
-**Headline decision:**
-- **Precept is governed by the HYBRID model** — total-internal prove-or-reject (definition-driven), runtime governance only at raw-ingress-origin boundary (host-supplied values at slot entry, checked against slot contract).
-- **D2 (band-split drift) is DECLINED** — unratified, git-untracked, contradicted fleet assumption. Model does not switch to pure-B; Hybrid governs.
-- **The ingress-origin boundary is decidable** by four-part predicate: (1) host-origin, (2) ingress-edge, (3) same-slot contract, (4) no-expression-node.
+---
 
-**Why:**
-- Model A fails on **identity** (`philosophy.md:57`, Principle 11): philosophy forbids unproven runtime faults as primary enforcer; fleet's "runtime can't enforce" is unbuilt-artifact pricing, not defeat.
-- Pure-B would make legitimate governance rules (product/ratio/balance identities in 21/77 samples) inexpressible; rules are governance constraints (`precept-language-spec.md:268`), not deferred faults.
-- Hybrid solves both: governs rules (expressible) and prove-or-rejects arithmetic (internal).
+## Revised headline
 
-**Verified at HEAD:** `e09f1af44febcaa8c3768c4a28f94cb45a91d820` by cross-family agents (verifier-a-redteam, verifier-b-crux).
+**The verdict did not move — Hybrid governs Precept, Model A and pure-B are both rejected — but the two corrections replaced two wrong pillars of the derivation, and the boundary rule is materially sharper.**
 
-**Downstream:** Q5–Q11 dispositions all under Hybrid. Requires no weakening of spec (`§0.7:266` "no deferral") or philosophy. Ratifies owner's committed intent.
+The compiler is **total over the fault surface**: every fault-prone operation over a *definition-derived* value (division, overflow-arithmetic, `sqrt`/`pow`, empty/index access, and containment of a *computed result* in a declared bound) is compile-time **prove-or-reject**, never deferred to a runtime fault-trap. The language is **not** limited to the decidable fragment (pure-B rejected): a declared constraint — **modifier or rule, one construct** (`spec:1135`/`:1138`) — is at once a runtime-**governed** obligation on the raw external values entering its fields (`:268`) and a compile-time **proof premise** (`:203`). **Governance is not fault-deferral** — the fault is proven complete at compile time and only its precondition is enforced at ingress (Composition, `:270`).
 
-**Ratification:** Awaiting Shane sign-off via checklist in ruling doc §9. On acceptance → Phase 5 compiler re-scope + runtime-governance capture-only.
+**One-line boundary (re-derived, syntax-blind):** *a raw external value at its own ingress slot is **governed**; any value a Precept expression has derived from it is **proven-or-rejected**; `max 100` and `rule x <= 100` get identical dispositions; **decidability decides whether a prove-or-reject obligation discharges or the definition is rejected — never whether it is proven or governed.***
+
+## How each challenge landed
+
+- **Challenge 1 (constraint = rule):** disposition is a property of the **obligation**, not the construct. Every constraint does both — governed-at-ingress (A.1) and proof-premise (A.2); prove-or-reject attaches to fault-prone **operations over derived values** (B), routed by origin (`:268` "before any computation derives"), never by spelling. Decidability is the **discharge oracle**, not the router — reconciling the anti-slide requirement with `:1138` ("proof participation is a function of decidability"). v1's "decidability is never a routing criterion" was the error; it's never the router, always the oracle.
+- **Challenge 2 (no-deferrals was a process safeguard):** the `§0.7:266` "no deferral" clause was **redundant** — it restates Principles 7/10/11. Model A is rejected on `philosophy.md:57` + Principles 7/10/11 + the owner-**shipped** count-bound prove-or-reject (`c27a382b`) + the bug tracker classifying silent deferral as soundness holes (BUG-017/020/021) — all independent of the clause. `:266` demoted from pillar to corroboration; its **meaning flagged owner-gated** (R1, recommend "Reading N": no-deferral scopes to fault-proof only; governance is not deferral). One new door opened: an explicit author-visible trust construct is not Model A and is flagged as a future `/design` question (R4).
+
+## Owner action items (ratification checklist — full detail in §10 of the ruling)
+
+- Ratify **Hybrid** (total-over-faults + governed-carriers) and the **Obligation-Role Rule** (§4).
+- **R1:** confirm the meaning of `§0.7:266` "no deferral" (recommend Reading N; do not edit).
+- **R2 (optional):** adopt the syntax-explicit precision clause on `§0.7:268`.
+- **R4 (new):** decide whether to open a `/design` question for an explicit trust construct.
+- **R5:** confirm no edit to `docs/philosophy.md`.
+- Confirm Q5/Q7 stay **Error**; approve the per-obligation PROVEN/GOVERNED surface (no DEFERRED state); confirm BUG-017/020/021 are the Phase-5 completion target.
+
+## Provenance (updated)
+
+`§0.7:266` is owner-committed (`5af46537`, sfalik) but its intended *meaning* is now owner-flagged → R1. The nearest owner **language** decision (count Reading A, `c27a382b`, "yes, unproven divisor") points the same way as the ruling. D2's premise ("non-carries-proof bands" distinct from rules) **does not survive** constraint = rule (`ConstraintKind.cs` has no band member). This ruling does not overturn an owner decision.
+
+---
+
+## 2026-07-09 — Revision 3 addendum (overflow-scope reconciliation)
+
+**By:** Frank · **To:** Shane · **Status:** Draft — pending ratification. Recommend-only for owner-gated surfaces; nothing edited in philosophy/spec.
+**Ruling:** `docs/Working/proof-engine-boundary-ruling-2026-07-06.md` (now Revision 3; edited **in place**, not a new file). Rev-2 snapshot preserved at session-state `files/ruling-v2-pre-overflow-revision.md`.
+**Trigger:** owner directive — "we explicitly pushed overflow out of scope for now; research that, then revise the ruling" — plus the `TotalCostInvariant` stress-test that exposed the over-rejection.
+
+### What changed (model verdict UNCHANGED — Hybrid + Obligation-Role Rule stand)
+
+Only overflow's treatment *within* the model moved. **Representational** overflow (`NumericOverflow` — a computed value exceeding what the decimal/money/temporal **type itself** can hold) is carved OUT of the live family-B prove-or-reject set and reclassified as an **owner-parked, disclosed known gap** (D1, `decision-index.md:19`; plan §2 D1, `compiler-readiness-plan-2026-06-16.md:188`–`:199`): a defense-in-depth backstop with no live `[StaticallyPreventable]` guarantee; temporary; no doc may claim it prevented. The rest of the fault floor stays LIVE prove-or-reject: division-by-zero, `sqrt`/`pow` domain, empty/index access, and **declared-bound containment** (`OutOfRange`/assignment-range, `:697`/`spec:208`).
+
+**The load-bearing distinction:** `NumericOverflow` (value-vs-**type-range**) ≠ `OutOfRange` (value-vs-**declared-min/max**) — two different faults (`overflow-prevention-design-analysis.md:516`). The fault surface is now explicitly **two-tier**: live-enforced faults vs the parked overflow lane.
+
+### Edits made in place
+
+- **§1 executive ruling & §4.B Obligation-Role Rule** — fault lists made two-tier; representational overflow carved out; `NumericOverflow`≠`OutOfRange` stated explicitly.
+- **Worked examples** — row 3 & Q6 de-conflated (`set X=150` on `max 100` is `OutOfRange`, not `NumericOverflow`); rows 6/7/10/12 updated (representational-overflow reject removed; declared-bound containment stays live). **Row 10 (`TotalCost`)**: under overflow-parked it **compiles clean** once fields are initialized (invariant governed; product overflow parked; result-`max` doesn't back-propagate). Added a table scope-note: examples assume field-initialization satisfied (the row-10 `RequiredFieldsNeedInitialEvent` structural-first finding).
+- **Q5/Q7/Q11 + D1 adjacency** — reconciled: representational overflow out of the live set; Q11 taxonomy gains a "parked overflow lane" row and `RequiredFieldsNeedInitialEvent` in definition-incoherence; the Rev-2 "unresolved D1 clash / BUG-017 debt" flag RESOLVED (BUG-017 is `OutOfRange`, live — not the overflow question).
+- **§0.1 principle appendix** — Principles 7/10/11 rows updated to the disclosed-gap position.
+
+### New owner action item
+
+- **R6 (new):** reconcile `philosophy.md:53` + spec Principles 10/11 (`:110`/`:112`) — which still list overflow as prevented — with D1's park. This is a **disclosed, surfaced-only (DoD-9)** gap; owner-gated; enumeration via GATE-F (`decision-index.md:46`). **Recommend-only — did NOT edit philosophy or spec.** GATE-O (∞/NaN, integer-conversion overflow) remains pending owner disposition.
+
+**Net:** the ruling now honestly matches the owner's overflow-out-of-scope decision without weakening the Hybrid model. Status stays **Draft — pending Shane ratification.**
+
+---
+
+## Coordinator Policy
+
+---
+
+### 2026-07-10T03-52-46: Policy — Reviewer agents must be spawned as full subagents with inlined charter, never as lean Explore agents
+**By:** squad-coordinator
+**What:** Policy — Reviewer agents must be spawned as full subagents with inlined charter, never as lean Explore agents
+**References:** CONTRIBUTING.md, .github/agents/squad.agent.md, docs/scenarios/upgrading.md (bradygaster/squad)
+**Why:** **Context:** Discovered during the v0.9.4 → v0.11.0 squad upgrade audit that this repo's `.github/agents/squad.agent.md` contains a "Review Spawning — Full Subagents with Charter Context" section with no backing decision record. Per official Squad guidance (docs/scenarios/upgrading.md): "Don't customize squad.agent.md... if you need custom behavior, use directives in decisions.md instead." This decision closes that gap so the policy survives future upgrades even if the corresponding squad.agent.md section is silently overwritten.
+
+**Policy:**
+When the user asks the team to review a PR, reviewer agents (e.g. Frank, Soup Nazi) MUST be spawned as full `runSubagent`/`task` calls with the reviewer's charter.md inlined into the spawn prompt — never as lean Explore agents. Explore agents lack domain expertise, charter identity, and gate-enforcement authority needed for a thorough, gate-aware verdict.
+
+**Required spawn pattern per reviewer:**
+1. Read the reviewer's charter (`{team_root}/.squad/agents/{name}/charter.md`) and inline it into the spawn prompt.
+2. Include the reviewer's identity block (name, role, expertise, style).
+3. Include the linked issue's acceptance criteria for the tester/AC-gate reviewer — instruct them to read the issue directly via GitHub tools.
+4. Specify review criteria by role: Lead/Architect (Frank) — doc accuracy vs. implementation, diagnostic message correctness, grammar sync, completions/hover, dead code scan. Tester (Soup Nazi) — AC-to-test matrix, spot-check test quality, disabled test scan.
+5. Require structured output: `APPROVED` or `BLOCKED` with numbered findings (`B{N}:` / `G{N}:`).
+6. Spawn reviewers in parallel — no data dependency between them.
+
+**Rule:** Do NOT use a generic Explore agent for reviews under any circumstance.
+
+**Remediation:** `.github/agents/squad.agent.md` § "Review Spawning — Full Subagents with Charter Context" is the applied instantiation of this decision. If a future upgrade overwrites that section, re-derive it from this record.
+
+---
+
+### 2026-07-10T09-19-58-04:00: Policy — Squad customization is directive-first, minimum-patch; only hard coordinator invariants stay as direct `squad.agent.md` patches
+**By:** Frank
+**What:** Policy — Squad customization is directive-first, minimum-patch; only hard coordinator invariants stay as direct `squad.agent.md` patches
+**References:** `.github/agents/squad.agent.md`, `.squad/decisions.md`, `.github/skills/coordinator-source-of-truth/SKILL.md`, `docs/scenarios/upgrading.md` (bradygaster/squad)
+**Why:** **Context:** The v0.9.4 → v0.11.0 upgrade audit found repo-local `squad.agent.md` customizations with no durable classification. Upstream guidance says to prefer directives/skills over direct `squad.agent.md` edits, but this repo also has a small set of repo-specific coordinator rules that must stay live in the governance file itself or the coordinator will immediately route/gate incorrectly after an overwrite.
+
+**Policy:**
+- Default to **directive-first, minimum-patch** customization. If a local behavior can live canonically in `.squad/decisions.md` or a dedicated skill, put it there and treat any `squad.agent.md` copy as a convenience restatement.
+- Reserve direct `squad.agent.md` patches for **HARD-INVARIANT** sections only: repo-specific coordinator text that must remain in the live governance file because a post-hoc decision record cannot correct the coordinator after the file is overwritten. The current hard-invariant set is:
+  1. **`@copilot` retired/disabled lane** — routing, roster, and casting text must all say the lane is unavailable in this repo.
+  2. **Implementation Gate — Draft PR Required** — the coordinator must read and enforce the draft-PR gate directly from its live governance file.
+- Treat these as **DIRECTIVE-BACKED** local customizations instead of hard invariants:
+  1. **Review Spawning — Full Subagents with Charter Context**
+  2. **Coordinator Restraint Rules**
+- Marker convention in `.github/agents/squad.agent.md`:
+  - `<!-- PRECEPT-SQUAD: HARD-INVARIANT START ... -->` / `END`
+  - `<!-- PRECEPT-SQUAD: DIRECTIVE-BACKED START ... -->` / `END`
+
+**Rationale:** This keeps the live coordinator patch surface as small as possible while preserving the few repo-specific rules that cannot safely rely on a later recovery pass.
+
+**Alternatives considered and rejected:**
+1. **Keep every customization as a direct `squad.agent.md` patch:** rejected — maximizes upgrade drift and recreates the overwrite problem on every `squad upgrade`.
+2. **Move every customization out of `squad.agent.md` immediately:** rejected — live routing/gating/roster semantics would still be wrong the moment an upgrade overwrote the coordinator file.
+3. **Leave customizations unmarked:** rejected — future audits would have no durable way to distinguish must-reapply invariants from convenience restatements.
+
+**Precedent:** Matches official Squad upgrade guidance to prefer directives/skills for local behavior, while preserving the repo's existing pattern of backing surviving `squad.agent.md` customizations with a durable decision record.
+
+**Tradeoff accepted:** A small direct-patch surface remains and must still be re-verified on upgrades, but the required reapply set is now explicit, minimal, and auditable.
+
+**Remediation:** If a future upgrade overwrites `squad.agent.md`, reapply HARD-INVARIANT blocks first; regenerate or omit DIRECTIVE-BACKED blocks from the canonical decisions/skills as needed.
+
+---
+
+### 2026-07-10T04-07-22: Backport Coordinator Restraint Rules as a `squad.agent.md` customization (upstream never shipped the code)
+**By:** squad-coordinator
+**What:** Backport Coordinator Restraint Rules as a `squad.agent.md` customization (upstream never shipped the code)
+**References:** upstream issue #587, PR #683, PR #859, PR #953, `.github/agents/squad.agent.md`
+**Why:** **Decision:** Add a "Coordinator Restraint Rules" section to `.github/agents/squad.agent.md` as a deliberate local customization, since this feature never shipped upstream in `squad-cli`.
+
+**Why (research trail):**
+- Upstream issue #587 (bradygaster/squad, filed 2026-03-24 by the repo owner) proposed 6 restraint rules to stop the coordinator from over-narrating agent output, re-explaining context, or spawning unsolicited follow-ups.
+- Code PR #683 implemented it; got bundled into batch PR #859 (2026-04-05) alongside unrelated fixes (compaction recovery, result persistence, and an unrelated `squad watch`/`triage` CLI flag fix).
+- PR #859 was closed unmerged on 2026-04-10 — blocked by a missing-test-coverage flag on the unrelated bundled CLI flag fix, not on the restraint-rules content itself.
+- PR #953 (docs-only) merged the next day, 2026-04-11, publishing `docs/reference/coordinator-restraint.md` describing the 6 rules as if shipped.
+- Issue #587 was closed "completed" on 2026-04-18 with no linked commit — the feature was never actually merged into `squad.agent.md.template`. Confirmed absent from `squad-cli` as of the current upgrade audit.
+- No open upstream issue currently reports this specific docs/code desync, though other issues report the same class of bug (docs/CHANGELOG claiming shipped features that were never wired into install manifests or runtime).
+
+**Reconciliation with existing behavior:** Rule 5 ("no follow-up agents unless mandated") must not override this repo's existing Parallel Fan-Out / Eager Execution Philosophy. The local backport therefore forbids only additional, undeclared follow-up spawns layered on after the fact; it does not block already-declared proactive chaining.
+
+**Alternatives considered and rejected:**
+1. **Do nothing / wait for upstream to ship it:** rejected — no upstream work is in flight and the feature was already incorrectly treated as shipped.
+2. **Copy the upstream docs wording verbatim:** rejected — that would silently contradict this repo's declared eager fan-out behavior.
+
+**Precedent:** Follows the same repo pattern as other `squad.agent.md` customizations: apply the local section, then back it with a durable decision record so the behavior survives future upgrades.
+
+**Tradeoff accepted:** This remains a local customization until upstream actually ships the code, so it must be re-verified during future Squad upgrades.

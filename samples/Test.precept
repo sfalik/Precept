@@ -1,17 +1,15 @@
-precept Test
+precept TotalCostInvariant
 
-# Minimal fixture for parser integration tests. The single-line event
-# declaration `event create initial, start, stop, reset` exercises the
-# parser's comma-separated event-entry list with one entry carrying the
-# `initial` modifier — see test/Precept.Tests/Parser/ParserIntegrationTests.cs
-# TestSample_EventDeclaration_BindsInitialToCreateOnly.
+field AvgCost as money in 'USD' editable optional
+field Quantity as integer editable optional
+field TotalCost as money in 'USD' max '1000 USD' optional
 
-event create initial, start, stop, reset
-state Idle initial
-state Running
-state Stopped terminal
+event testEvent
+on testEvent
+    when Quantity is set and AvgCost is set
+    -> set TotalCost = AvgCost * Quantity
 
-from Idle on create -> transition Running
-from Running on start -> no transition
-from Running on stop -> transition Stopped
-from Running on reset -> transition Idle
+event testEvent2
+on testEvent2
+    when AvgCost is set
+    -> set TotalCost = AvgCost + AvgCost

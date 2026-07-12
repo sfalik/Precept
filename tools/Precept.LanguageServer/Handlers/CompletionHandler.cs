@@ -462,7 +462,8 @@ internal sealed class CompletionHandler : ICompletionHandler
     private static bool IsAtLineStart(string lineText, int character)
     {
         var prefixLength = Math.Clamp(character, 0, lineText.Length);
-        return character == 0 || lineText[..prefixLength].Trim().Length == 0;
+        var trimmed = lineText[..prefixLength].TrimStart();
+        return trimmed.Length == 0 || !trimmed.Contains(' ');
     }
 
     private static ModifierDomain GetModifierDomain(

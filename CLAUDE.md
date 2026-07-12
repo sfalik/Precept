@@ -70,9 +70,9 @@ Brand research lives in `design/brand/research/`; UX/design-system research in `
 
 **Use the `/research` skill for new investigations** — it enforces folder discipline, citation requirements, and the promote-or-cite rule. See `research/README.md` for the canonical map.
 
-### Ignore: `.squad/`
+### `.squad/` is live Squad state, not Precept product truth
 
-`.squad/` is legacy state from a previous AI workflow (the Squad framework). It is **not maintained and not load-bearing** for current work. Do not read `.squad/` files for current project state, decisions, conventions, or team roster — that information has moved to `docs/`, `CLAUDE.md`, and the canonical specs. Read `.squad/` only if the user explicitly asks about historical Squad context.
+`.squad/` is live Squad operational state: roster/routing, casting, decisions, agent histories, logs, and memory. It is **not** the source of truth for Precept product design, language semantics, or implementation behavior — those live in `docs/`, `README.md`, `CONTRIBUTING.md`, and this `CLAUDE.md`. Ignore `.squad/` when reasoning about Precept itself; read it when operating, auditing, or repairing Squad.
 
 ## Catalog System (Non-Negotiable)
 

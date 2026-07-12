@@ -528,7 +528,7 @@ Every diagnostic is produced by `Diagnostics.Create(code, span, args…)`. The `
    - **Proof KeyPresence-flag** — `KeyPresenceSafety` vs. `KeyUniquenessGuard` by the requirement's absence flag.
    - **Proof QualifierChain compound-period override** — `CompoundPeriodDenominator` replaces the generic chain code when the period subject resolves to a multi-component basis.
 
-The authoritative enumeration of these shapes lives in `src/Precept.Analyzers/DiagnosticCoverageScanner.cs` (Pattern 1 = literal, Pattern 2 = catalog-mediated field, Pattern 3 = the dispatch residue). The `Precept0027` coverage gate reads that scanner to require every `DiagnosticCode` member to have at least one emission site; a literal `Diagnostics.Create(DiagnosticCode.X)` grep alone is incomplete because it misses the catalog-mediated shape.
+The scanner in `src/Precept.Analyzers/DiagnosticCoverageScanner.cs` detects the first two shapes: Pattern 1 (literal first-argument `Diagnostics.Create(DiagnosticCode.X, …)`) and Patterns 2/2b (catalog-mediated — a `DiagnosticCode` carried on a catalog-meta field that an emission site reads). It does **not** detect the context-determined residue (shape 3 above) — those emission sites are dynamically dispatched and must be enumerated by hand when taking a coverage inventory. The `Precept0027` coverage gate reads that scanner to require every `DiagnosticCode` member to have at least one emission site; a literal `Diagnostics.Create(DiagnosticCode.X)` grep alone is incomplete because it misses the catalog-mediated shape.
 
 ### The `[StaticallyPreventable]`-derived fault map
 
