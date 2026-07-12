@@ -11,8 +11,13 @@ using Precept.Bench;
 //                       arithmetic the runtime would do (incl. add + a realistic chain) can be measured.
 //                       Bench-only; not production.
 
-// First: the size-growth demo (the rational blow-up concern) — cheap, printed before the timed run.
-BlowUp.Print();
+// The size-growth demo (the rational blow-up concern) is only relevant to the arithmetic
+// bench; skip it when a specific benchmark is selected via args (e.g. --filter *CompileBench*).
+if (args.Length == 0)
+{
+    BlowUp.Print();
+}
 
-// Then: the rigorous timing via BenchmarkDotNet.
-BenchmarkRunner.Run<ArithmeticBench>();
+// Rigorous timing via BenchmarkDotNet. Switcher so a single class can be selected:
+//   dotnet run -c Release --project tools/Precept.Bench -- --filter *CompileBench*
+BenchmarkSwitcher.FromTypes(new[] { typeof(ArithmeticBench), typeof(CompileBench) }).Run(args);
