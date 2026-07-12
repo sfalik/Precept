@@ -1,45 +1,187 @@
-# Q1 Deep Analysis — Pure Prove-or-Reject on Merely-Unprovable Derived Writes into Non-Proof-Carrying Bounds
+All corpus and canon evidence is gathered. Here is the analysis.
 
-## Method (reproducible)
+---
 
-- Derived-write census: `grep -nE 'set [A-Za-z]+ ?= ?[^"]*[+*/-]' samples/*.precept` → **238 derived writes** across 77 samples.
-- Bounded-target census: `grep -nE 'field .*(min|max|nonnegative|positive)' samples/*.precept` (excluding maxlength/maxcount) → bounded targets are overwhelmingly `nonnegative` counters/accumulators (265 `nonnegative`, 179 `positive` corpus-wide) plus ~40 percent/score bands (`max 100` family).
-- Cell membership = intersection: derived write × bounded target × merely-unprovable at design ceiling. Every member individually inspected with its guard context.
+# Q1 — The Merely-Unprovable Cell Under Pure Prove-or-Reject: Corpus-Grounded Taxonomy and Verdicts
 
-## Decisive census facts
+## 0. Premises: held fixed vs. challenged
 
-1. **Exactly ONE money field in the entire corpus has a `max`: `samples/Test.precept:5`** (`grep -nE 'field .* as money[^#]*max ' samples/*.precept` → one hit). The 214 unbounded money fields (research/architecture/compiler/bounds-only-constraint-enforcement-2026-06-05.md:120) are **never targets of this cell's obligation** — an unbounded target carries no in-band proof obligation. The AvgCost×Quantity-into-`max '1000 USD'` case is synthetic; it has zero real-corpus instances.
-2. The corpus authors **already write the proof witnesses** as business rules: reject-rows before increments (`saas-trial-to-paid.precept:126-128` `when ExtensionCount >= 3 -> reject`; `global-meeting-scheduler.precept:197-203` `when ParticipantCount >= 500 -> reject`), guards before decrements (`inventory-item.precept:155` `when QuantityOnHand >= FulfillOrder.Qty * StockingUnitsPerSaleUnit`; `production-schedule-management.precept:102-106` three stacked reject rows covering hours, count, and high-priority count), explicit clamps (`patient-care-plan-coordination.precept:185` `min(GoalProgressPercent + 25, 100)`; `shopping-cart.precept:213` `max(0.0, ...)`; `crosswalk-signal.precept:60-66` explicit `<= 1 -> set 0` row before the decrement row). These exist because they ARE the domain rules, not proof ceremony.
+**Held fixed (identity-level, with justification):**
 
-## The universal-remediation lemma (why bound-invention is never forced in this cell)
+1. **Legibility of proof** — proof reasoning must be explainable to the domain-expert author via structured, inspectable witnesses (`docs/philosophy.md:60` full inspectability; `precept-language-spec.md:225`'s *underlying commitment*, not its specific solver-exclusion line — see challenge C1). Identity-level because the primary author is a non-developer (`docs/philosophy.md:92`) and an unexplainable verdict is unusable to her.
+2. **Prevention / structural impossibility** (`docs/philosophy.md:7,49`). The product's category claim.
+3. **One-file knowledge boundary** — "All proof facts derive from the `.precept` definition. No external oracle" (`precept-language-spec.md:228`, proof philosophy #4). Identity-level because it is what makes any proof *meaningful to the author of that one file*; it also permanently bounds Class 4 below.
+4. **Determinism** (`docs/philosophy.md:22`) — grounds the single-timestamp-per-operation recommendation in Class 7.
+5. **Honesty about approximation** (`docs/philosophy.md:23-25`) — grounds the rounding findings (Class 5c) and the bound-is-false verdict (Class 6).
 
-For any derived write `set F = E` into policy band `F max B` (or `nonnegative`), the remediation `when E <= B` (guard restating the band; reject/fall-through otherwise) is **always expressible today** (arithmetic guards exist: `equipment-lease-agreement.precept:192` `when TotalPaid + CureDefault.Amount > TotalScheduledValue -> reject`) and is **semantically identical to the end-state governed behavior** — runtime governance would refuse the violating write at exactly that boundary anyway. Discharging it needs only syntactic guard-term subsumption (guard expression textually covers the write expression) — deterministic, legible, solver-free, i.e. MERELY-UNIMPLEMENTED, not foreclosed by the SMT exclusion (docs/language/precept-language-spec.md:218-230 demands legible witnesses; a matched guard is the most legible witness possible). **Therefore the posture never forces a source `max`; the worst it can force is a guard restating a domain quantity that already appears in the file.** Bounding-the-factors (AvgCost `max '10 USD'` × Quantity `max 100` — arbitrary factorization of the cap, no domain content) is a *worse alternative the author is never forced into*.
+**Challenged current-spec decisions** (each with a "spec should say" — expanded in §3):
 
-## Taxonomy and per-class verdicts
+- **C1**: `precept-language-spec.md:225` (blanket SMT/Z3 exclusion as the power line)
+- **C2**: `precept-language-spec.md` §0.6 relational scope — "single-pass and depth-bounded (no transitive chasing of a third field)" (§0.6 item 2/3 closing paragraph, quoted from spec lines ~258-263)
+- **C3**: `docs/language/collection-types.md:860` — "deliberately held back: `map`, `filter`, `reduce`, `sum`…"
+- **C4**: `precept-language-spec.md:266-272` (§0.7 "no result outside a declared bound") — which, on this analysis, largely **survives**, with one wording sharpening.
 
-**Class 1 — Unguarded subtraction into `nonnegative` (the Balance shape).** Corpus: `inventory-item.precept:167` (`TotalCostOfGoods = TotalCostOfGoods - ReturnOrder.Qty * StockingUnitsPerSaleUnit * AverageCost`, nonnegative at :67, **no guard** — moving-average drift or over-return drives it negative); `saas-license-management.precept:199` (`LicensesAllocated - 1` from InUse, **no guard** — repeated ReturnLicense drives Allocated negative while the sum rule at :62 stays satisfied because the pair-update preserves it); `saas-license-management.precept:123-124` (Purchased-state allocation row lacks the capacity reject its two sibling states have at :132/:142). Forced remediation: a guard/reject row ("can't return more than allocated", "can't reverse more COGS than recorded" — or *drop* `nonnegative`, admitting a signed register, which is the accounting-correct alternative for COGS). Each rejection surfaces a genuine unanswered domain decision or a real missing rule the sibling rows already have. **Verdict: FORCES-BETTER** (this is the overdraft exemplar, and it occurs unguarded in real samples).
+**Not held as authority:** Frank's paper (`docs/Working/frank-prove-or-reject-position-2026-07-11.md`), the thesis (`docs/Working/precept-identity-and-guarantees-thesis-2026-07-11.md`) — engaged as arguments below.
 
-**Class 2 — Guarded subtraction / reject-row-preceded mutation.** Corpus: `inventory-item.precept:155-158`, `production-schedule-management.precept:102-116`, `equipment-lease-agreement.precept:190-196` (`when PaymentsMissed == 0 -> reject` then `PaymentsMissed - 1`), `crosswalk-signal.precept:60-66`, all `max`-capped counters (`saas-trial-to-paid.precept:126-140`, `global-meeting-scheduler.precept:197-203`, `event-registration.precept:77` `TicketsIssued = SeatsReserved` where SeatsReserved `max 100` at :17 covers TicketsIssued `max 100` at :18). Provable at ceiling given: guard-fact narrowing, **first-match row-complement narrowing** (fall-through row inherits negation of earlier guards), integer tightening (`x≥0 ∧ x≠0 ⇒ x≥1`), term subsumption, and min/max clamp rules — all deterministic and legible, hence MERELY-UNIMPLEMENTED. **Verdict: NOT IN THE CELL (compiles clean).** Load-bearing assumption flagged below.
+---
 
-**Class 3 — Accumulator `X = X + source` into `nonnegative`, source sign undeclared.** Corpus: `contractor-invoice-settlement.precept:121` (`AmountApplied += Payment` where `field Payment as money optional`, :50 — no sign); `equipment-lease-agreement.precept:212` (`TotalOverageCharge += HourlyOverageRate * UsageHours` — rate `optional` unsigned at :49, arg unsigned at :119). Forced remediation: declare `positive`/`nonnegative` on the source arg/field — a true domain fact (payments, rates, usage hours), enforced at ingress (the uncontested lane), and it **closes a silent wrong-success governance cannot see**: a negative `UsageHours` *reduces* the accrued charge while the result stays ≥ 0 — no refusal ever fires. Contrast the corpus files that already declare it (`insurance-subrogation.precept:121,127`; `manufacturing-quality-inspection.precept:65`; `saas-subscription-billing.precept:19`). **Verdict: FORCES-BETTER.**
+## 1. The decisive structural fact: what "merely unprovable" can even mean in this language
 
-**Class 4 — Manual aggregate-mirror counters (`Count`/`Total` mirroring a collection).** Corpus: `bill-of-materials-management.precept:114,123` (`TotalComponentUnits - (Components for X) ...`), `shopping-cart.precept:125,154,168` (`ItemCount - (ItemQuantities for ...)`), `global-meeting-scheduler.precept:219` (`ParticipantCount - 1` guarded only by `contains`, :216). The true justification is an inductive cross-write invariant (`Count == collection sum/cardinality`) that is undeclared and — for sums — inexpressible (aggregation is the known surface gap, docs/Working/compile-time-niche-decision-packet-2026-06-10.md:121). Proving it needs inductive invariant inference over event sequences: **FUNDAMENTAL relative to the declared-facts ceiling** (spec:224, "all proof facts derive from the definition" — there is no declared fact to derive it from), not an engine TODO. Forced remediation: a redundant-always-true guard (`when (Components for X) <= TotalComponentUnits`) — one line, invents **no number**, refusal-equivalent to governance, but encodes no new domain rule. For cardinality mirrors, the better remediation is restructure (`field ParticipantCount <- ParticipantEmails.count` + `maxcount 500` on the set — the cap moves to its real home and the drift-prone manual mirror disappears). **Verdict: NEUTRAL (pure friction, ~6 sites corpus-wide) for sums; FORCES-BETTER via restructure for cardinality mirrors.** This is the honest residue — friction, but not the objection's shape.
+Before the taxonomy, one observation that reorganizes the whole question. Precept's execution model is loop-free, total, and finite-vocabulary (`precept-language-spec.md:158-174`). A single operation is a bounded chain of assignments over (mostly linear) arithmetic with finite conditionals. **Linear arithmetic over ordered fields is decidable, with certificates** — Fourier–Motzkin elimination and linear-combination (Farkas) witnesses are complete for it and every step is a human-readable inequality derivation. So for a single operation, genuine logical undecidability essentially never arises. In this language, "the right engine can neither prove nor refute containment" can only come from **three sources**:
 
-**Class 5 — Product/quotient into a declared cap (the Test.precept flagship).** `samples/Test.precept:10` (`TotalCost = AvgCost * Quantity` into `max '1000 USD'`, sources unbounded `optional`). Merely-unprovable (unbounded factor intervals; genuinely could violate). Forced remediation is a **choice**: (a) guard `when AvgCost * Quantity <= '1000 USD'` — restates the cap, refusal-identical to governance, provable by term subsumption; drift is self-catching (tighten the max, the stale guard makes it unprovable again → error); (b) bound the factors — arbitrary factorization, never forced because (a) exists; (c) drop the cap. **Verdict: NEUTRAL** (ceremony: the band is restated at each of the 2 write sites — and the restatement is the reject-row idiom the corpus uses 258 times already). Real-corpus membership of this class: **zero** (see census fact 1). Related in-corpus near-misses resolve cleanly: `supplier-quality-management.precept:23` (`(QualityScore+DeliveryScore)/2` into `max 100` — provable at ceiling from source bounds, interval arithmetic); `saas-customer-onboarding.precept:128` percentage write is *unbounded*, and had it carried the domain-natural `max 100`, rejection would force `when CompletedMilestones < TotalMilestones` — a currently-missing real rule (the file today permits completing milestone 11 of 10 → 110%). Even the hypothetical lands FORCES-BETTER.
+- **(S1) Contingency** — both outcomes are genuinely reachable depending on runtime values. `Deposits − Withdrawals` really can be negative for some governed inputs and nonnegative for others. Nothing to prove; nothing to refute; a real unhandled case exists.
+- **(S2) Missing inductive premise** — the fact that makes the write safe is true of every reachable state but is established only *across operation history* (an invariant the definition maintains but nowhere states, or cannot state).
+- **(S3) Knowledge outside the file** — the fact lives in the world (the caller's ledger, an external job table), not in the definition. Unknowable by *any* engine honoring the one-file boundary (held-fixed premise 3).
 
-**Class 6 — Temporal derived writes into bounded temporal targets** (`now() + period` into a date band). Corpus: **empty** — every `now()+...` target is unbounded (`saas-user-provisioning.precept:126`, `saas-license-management.precept:218-228`, `insurance-renewal-processing.precept:158`). The one bounded temporal-ish field (`payment-method.precept:17-18`) takes direct arg writes only. **Verdict: no corpus instance; flagged as the class to re-examine if bounded temporal targets appear** (a `now()`-dependent guard is a genuinely awkward witness).
+This is the deep reason the overdraft intuition generalizes: **S1 is the dominant source, and an S1 case is by definition an unanswered domain question** — the definition reaches a value the domain may not accept and does not say what happens then. S2 splits into "expressible with more engine power" (exits the cell) and "expressible only with more *language*" (the one FORCES-WORSE pocket, Class 2). S3 is permanent but, as the corpus shows, its forced remediation is domain-honest.
 
-## The bound-invention objection (packet:129) — is it real in this cell?
+**Corpus method (reproducible):** census of all derived writes via `grep -n "set [A-Za-z]* = .*[-+*/]" samples/*.precept` (267 hits across 77 files), all subtraction writes via `grep -n "set [A-Za-z]* = .*- "`, cross-referenced against each file's bounded field declarations (`grep "^field" | grep -E "min |max |nonnegative|positive"`) and guard/reject rows. Every claim below cites file:line.
 
-**No.** The packet's bill — "representability ceilings (`max '10000000.00 USD'`) masquerading as policy, landing wherever arithmetic demands them" — attaches to **arithmetic-fault obligations** (overflow/places, proof-carrying, outside this cell by construction) and to **reject-unbounded-source as a relational-narrowing precondition** (research doc:120-122's 214-field cascade — a different mechanism, already rejected there as a default-check stand-in, :141). In the cell under study the obligation sits on the **bounded target**, and the universal guard-remediation means the forced witness always restates a domain quantity already in the file (the cap itself, or a source's sign) — never an invented ceiling. The corpus corroborates structurally: authors leave genuinely open-ended derived targets unbounded (`insurance-subrogation.precept:31` `NetRecovery` deliberately signed; `insurance-renewal-processing.precept:27` `PremiumChange` signed; `event-venue-booking.precept:54` computed `OutstandingBalance` unbounded), which under this posture is **legal and obligation-free**. The 214:10 figure is evidence *against a different posture*, not this one.
+---
 
-## Corpus-grounded finding on FORCES-WORSE
+## 2. The taxonomy and per-class verdicts
 
-**Strict FORCES-WORSE (author forced to encode a false or arbitrary domain claim) occurs zero times in the 77-sample corpus.** The hunt's best candidates each dissolved: the COGS reversal (Class 1) forces a real refuse-vs-signed-register decision; the overage-charge product (Class 3) forces a true sign fact that closes a silent wrong-success; the money-cap product (Class 5) has no real-corpus instance and a non-worse guard route in the synthetic one. The honest residue is **Class 4 friction**: ~6 sites where a redundant-always-true guard is extracted with zero domain content, because the justifying aggregate invariant is fundamentally outside the declared-facts ceiling and the clean restructure needs the aggregation surface the language lacks. That is ceremony (one exact, number-free line per site), not bound-invention.
+### Class 1 — Provable by the RIGHT engine: **NOT in the cell.** The honest finding is "current spec under-powers the engine."
 
-## Load-bearing assumptions (would change the verdicts)
+This class is enormous in the corpus — and it is the central corpus finding: **the sample authors already write, voluntarily and idiomatically, exactly the structures a legible engine needs**, and the current spec does not commit to consuming them. Each sub-item names the required engine power, its legibility certificate, and corpus exemplars.
 
-1. **First-match row-complement narrowing must be inside the design ceiling.** ~10 Class-2 sites are "clean" only via it. It is deterministic and legible (negation of prior rows' linear guard atoms), so I classify its absence as MERELY-UNIMPLEMENTED — but if the owner rules it *out* of the ceiling, those sites fall into the cell and the forced remediation is duplicating the already-written reject-row condition into the mutation row's guard: pure friction at scale (~10+ sites), which would materially strengthen the friction case against the pure posture. This is the single highest-leverage ceiling question the analysis surfaced.
-2. Guard-term subsumption and sequenced-write dataflow (pre/post-state tracking through action lists, e.g. `inventory-item.precept:156-159`) similarly assumed in-ceiling; same classification.
-3. Corpus caveat: samples are idiom-aware demo authoring (research doc:135); real authors may band derived targets more aggressively (percent bands especially), which would grow Classes 4-5. The Class-5 guard route survives that shift; Class-4 friction scales with manual-mirror usage.
-4. Two incidental latent sample defects found during the hunt (not this cell's subject, worth filing): `saas-customer-onboarding.precept:127-128` reads `CompletedMilestones + 1` after already incrementing it (double-count if sequenced reads see the new value); `saas-license-management.precept:155` `PeakUsageCount = LicensesInUse + 1` overwrites the peak unconditionally rather than taking a max.
+**1a. Row-order complement narrowing.** A fall-through row runs only when the rows above did not match; their negated guards are premises. Certificate: "this row executes only when `ExtensionCount < 3`, because the row above catches `>= 3`" — a sentence any author who understands row order already believes.
+
+```precept
+from ActiveTrial on ExtendTrial when ExtensionCount >= 3
+    -> reject "Maximum of three extensions already applied…"
+from ActiveTrial on ExtendTrial
+    -> set ExtensionCount = ExtensionCount + 1     # provable ≤ 3 ONLY via complement
+```
+(`saas-trial-to-paid.precept:125-136`, field `max 3` at `:30`. Same shape: `global-meeting-scheduler.precept:197-203` (max 500); `crosswalk-signal.precept:60-66`; the health-score routing into `in Active ensure OverallHealthScore >= 50`, `saas-customer-success.precept:126-142,74-75`.)
+
+**1b. Weakest-precondition substitution through set-chains.** Check a post-state rule by substituting the assignments into it; the certificate is the rewritten expression side-by-side with the guard that discharges it.
+
+```precept
+from ExpiringSoon on Renew when AmountPaid + Renew.Amount > DuesAmount * (RenewalCount + 2)
+    -> reject "…"
+from ExpiringSoon on Renew
+    -> set AmountPaid = AmountPaid + Renew.Amount
+    -> set RenewalCount = RenewalCount + 1
+# rule AmountPaid <= DuesAmount * (RenewalCount + 1)   — post-state instance ≡ the complement guard, exactly
+```
+(`non-profit-membership-renewal.precept:70,180-186`. Also the transfer pattern `PaymentsMissed − 1` / `PaymentsMade + 1` preserving `rule PaymentsMade + PaymentsMissed <= PaymentsScheduled` — sum unchanged under transfer, `equipment-lease-agreement.precept:79,191-198`; and `event-venue-booking.precept:274` discharging `rule AmountPaid <= QuotedTotal` through the computed field `AmountPaid <- DepositPaid + FinalPayment`, `:53,96`.)
+
+**1c. Declared relational rules as premises, including three-variable linear.** `bounds-only-constraint-enforcement-2026-06-05.md:112` marks `A + B <= C` as unrepresentable in the interval/octagon lane — but linear-combination reasoning with an explicit witness handles it legibly:
+
+```precept
+rule ProducedQuantity + ScrapQuantity <= PlannedQuantity because "…"   # production-order-tracking:66
+-> set ScrapQuantity = PlannedQuantity - ProducedQuantity              # :234
+# nonnegative because: Produced + Scrap ≤ Planned and Scrap ≥ 0 ⟹ Produced ≤ Planned. Two lines, citable.
+```
+Likewise `YieldPercent = ProducedQuantity * 100.0 / PlannedQuantity` into `rule YieldPercent <= 100` (`production-order-tracking.precept:33-35,144`) via the ratio lemma `0 ≤ x ≤ y, y > 0 ⟹ 100·x/y ≤ 100` — a *named lemma with instantiated operands* is a legible witness.
+
+**1d. `min`/`max`/clamp lemmas** — `min(a,b) ≤ b` (`insurance-claim.precept:127`); clamping (`min(expr, cap)`) as the author's explicit saturation choice.
+
+**1e. Event-scoped ensures as argument premises** — `on Approve ensure Approve.Amount <= ClaimAmount` (`insurance-claim.precept:86`) is governed at ingress and must flow as a premise into `set ApprovedAmount = … else Approve.Amount` proving `rule ApprovedAmount <= ClaimAmount` (`:47,127`). This is the composition seam (`docs/philosophy.md:55`) applied to derived writes — the derived value's *inputs* carry ingress-made-true constraints.
+
+**1f. State-flow fact propagation** — `on Submit ensure ClaimAmount > '0.00 USD'` (`insurance-claim.precept:79`) plus `ClaimAmount` modifiable only in Draft (`:65`) means `ClaimAmount > 0` holds at every Approve. The certificate is a path argument ("every path into UnderReview passes Submit's ensure; the field is frozen after Draft") — inspectable dataflow, not an oracle.
+
+**1g. Rounding-aware exact decimal reasoning** — see Class 5c, where it *refutes* rather than proves.
+
+**Verdict on Class 1: these cases must compile clean.** None of them is an argument about the posture; every one is a spec-power obligation. The current spec's relational mechanism is explicitly "single-pass and depth-bounded (no transitive chasing)" and commits to none of 1a/1b/1e/1f — that is challenge C2. A prove-or-reject posture shipped *without* Class-1 powers would reject half the corpus's best idioms and would deserve the thesis's over-rejection critique; with them, the corpus's guarded rows all discharge.
+
+---
+
+### Class 2 — TRUE CELL today: internal truth, aggregate-linking invariant the *language cannot state*. **The only FORCES-WORSE pocket — and it converts to "spec should be more powerful."**
+
+The shape: a scalar accumulator mirrors an aggregate of a collection the entity itself holds; a decrement reads the collection back and subtracts.
+
+```precept
+# shopping-cart.precept:48,53,125,154,168 — ItemCount nonnegative, rule ItemCount <= 1000
+from Cart on RemoveItem when LineItems contains RemoveItem.ItemId
+    -> set ItemCount = ItemCount - (ItemQuantities for RemoveItem.ItemId)   # ≥ 0 only because
+    -> remove ItemQuantities RemoveItem.ItemId                              # ItemCount == sum(ItemQuantities)
+```
+Same shape: `bill-of-materials-management.precept:35,55,114,123` (`TotalComponentUnits` nonnegative, plus `rule TotalComponentUnits >= ComponentPartNumbers.count`); `event-venue-booking.precept:214` dodges only because `AddOnTotal` (`:48`) carries no bound.
+
+**Is it truly in the cell under the right engine?** The invariant `ItemCount == sum of ItemQuantities values` is (i) true in every reachable state, (ii) the *only* fact that proves the write, (iii) **inexpressible**, because `collection-types.md:860` deliberately holds back `sum`. No amount of engine power can use a premise the language cannot state. So yes — truly in the cell *under the current language*.
+
+**The forced remediation under pure prove-or-reject, exactly:** one of —
+- `when (ItemQuantities for RemoveItem.ItemId) <= ItemCount` + an unreachable reject row — a **dead-guard fiction**: the definition now asserts, in permanent legible source, that "removed quantity exceeding the item count" is a live scenario, and carries a refusal message no input can ever trigger. This is anti-legible: it corrupts the definition-as-documentation.
+- Drop `nonnegative` from `ItemCount` — abandon a true domain constraint. Worse.
+- Hand-maintained special cases (the cart already does this: the `ItemQuantities.count == 1` row hard-sets `ItemCount = 0`, `shopping-cart.precept:144-150`) — denormalization workarounds multiplying.
+
+**Verdict: FORCES-WORSE — but the honest finding is C3, not GOVERN.** The right engine *plus the right language* proves this legibly: admit scalar `sum(Collection)` in rule/computed-field position and check declared aggregate-equality rules by **inductive preservation with delta certificates** — "this operation replaces the entry (old value v) with Quantity and adjusts ItemCount by Quantity − v; the sum changes by Quantity − v; equality preserved." That is a ledger argument a bookkeeper reads, with Event-B invariant-preservation obligations (Abrial, *Modeling in Event-B*, 2010) as precedent — discharged automatically here because the mutation vocabulary is closed and each action's aggregate delta is known (the spec already does exactly this for `count` intervals: §0.6 implementation notes, "advanced by each mutation's sound per-kind/per-action delta"). Sum-of-scalar-elements does not need the "structured collection element types" that `collection-types.md:860` cites as the hold-back reason; the corpus is *already computing aggregates by hand, less safely* — the hold-back protects a purity line ("predicate not computation") at the cost of forcing exactly the unsound manual accounting a domain-integrity engine exists to prevent. **Recommendation: reopen the `sum` hold-back through the owner-consultation gate + `/design`; the best-supported fix is a computed field `ItemCount <- sum(ItemQuantities)`, which deletes the denormalized counter entirely.** Until that ships, this class is the real, bounded cost of the pure posture: 2 corpus files (cart, BOM), ~5 write-sites.
+
+---
+
+### Class 3 — In the cell only by denormalization; the current language already has the better fix. **FORCES-BETTER.**
+
+The count-mirror shape: a stored counter shadowing `Collection.count`, decremented under a membership guard.
+
+```precept
+# global-meeting-scheduler.precept:102,215-219 — ParticipantCount nonnegative max 500
+from Draft, Scheduled on RemoveParticipant       # membership reject-row above (:215)
+    -> remove ParticipantEmails RemoveParticipant.Email
+    -> set ParticipantCount = ParticipantCount - 1        # ≥ 0 only via ParticipantCount == ParticipantEmails.count
+```
+(Same: `library-inter-library-loan.precept:39,201-206`; `event-venue-booking.precept:63,215`.)
+
+The linking invariant is unstated, so the write is unprovable — but unlike Class 2, the language can already express the fix: **make the counter computed** (`field ParticipantCount as integer <- ParticipantEmails.count` — the corpus uses `<-` at `event-venue-booking.precept:53-54`) or declare the count-equality rule (count-comparison rules exist: `lab-test-order-results.precept:31`) and let Class-1c/1h powers close it. Rejection here flushes out a denormalized counter — the classic source of drift bugs, squarely Precept's mandate. **The forced remediation deletes state rather than inventing fiction. FORCES-BETTER.**
+
+### Class 4 — TRUE CELL permanently: the truth lives outside the file. **FORCES-BETTER, and the corpus authors already agree.**
+
+The projection-entity shape: the entity summarizes external state; a mutation trusts a caller-supplied delta.
+
+```precept
+# production-schedule-management.precept:27,102-116 — TotalScheduledHours nonnegative
+from Draft on RemoveJob when RemoveJob.Hours > TotalScheduledHours
+    -> reject "Cannot remove {RemoveJob.Hours} — only {TotalScheduledHours} currently scheduled"
+from Draft on RemoveJob …
+    -> set TotalScheduledHours = TotalScheduledHours - RemoveJob.Hours
+```
+No engine honoring the one-file boundary (held-fixed premise 3) can prove `RemoveJob.Hours` matches the hours once added — the invariant lives in the world. Truly, permanently in the cell. But look at the forced remediation: **the guard is already there, written voluntarily**, and it is *not* fiction — the caller genuinely can send a wrong delta, the refusal is reachable, and it is addressed to the party who can act (the caller). The deeper fix the cell pressure produces is even better: keep the truth *inside* the entity — which is precisely what `event-venue-booking.precept:208-210` documents in its own comment: *"reads the fee back from AddOnFees so AddOnTotal can be decremented without trusting an event-arg."* The corpus names arg-trusting as the anti-pattern unprompted. Note also `production-schedule-management.precept`'s residual hole: the non-high-priority RemoveJob row cannot preserve `rule HighPriorityJobCount <= JobCount` (`:46`) when every remaining job is high-priority — a *reachable* violation a prove-or-reject compiler would force into an explicit reject row. **FORCES-BETTER.**
+
+### Class 5 — TRUE CELL (contingency, S1): the genuinely-open domain edge. **FORCES-BETTER — the exemplar class, with three corpus-caught latent bugs.**
+
+**(5a) Overdraft/underflow.** Frank's exemplar (`frank-prove-or-reject-position:50-53,121-135`), and the corpus has real unguarded instances *inconsistent with the same file's own idiom*:
+
+```precept
+# inventory-item.precept — FulfillOrder IS guarded (:155), RecordShrinkage is NOT:
+from Listed on RecordShrinkage
+    -> set QuantityOnHand = QuantityOnHand - RecordShrinkage.Qty     # :182 — nonnegative (:49), unguarded
+```
+Forced remediation: the guard+reject pair the file already uses two rows up ("what happens when shrinkage exceeds stock?" — a real warehouse question). **Latent bug #1.**
+
+**(5b) The false-invariant subtraction.** `TotalCostOfGoods -= ReturnOrder.Qty × SUPS × AverageCost` (`inventory-item.precept:167`, nonnegative at `:67`): the head-invariant "returns never exceed recorded COGS" is *actually false* — `AverageCost` is a moving weighted average, so a return valued at today's WAC can exceed the COGS recorded at sale time. Rejection forces the author to confront a genuine accounting flaw. **Latent bug #2.**
+
+**(5c) The rounding penny.** `rule ApprovedAmount * 2 <= ClaimAmount when FraudFlag` with `set ApprovedAmount = … min(Approve.Amount, ClaimAmount / 2) …` (`insurance-claim.precept:49,127`): if money division rounds to representable cents, an odd-cent `ClaimAmount` makes `(ClaimAmount/2)·2` exceed `ClaimAmount` by one cent — a rounding-aware, place-value-legible engine cannot prove containment *because it is contingently false*. Forced remediation: restate the rule as `ApprovedAmount <= ClaimAmount / 2` (congruent with the computed expression — then provable) or fix the rounding direction. **Latent penny bug #3** (conditional on the rounding model — the D1-adjacent numeric decision the owner has not made; flagging, not asserting).
+
+**(5d) Cap overflow on accumulate/multiply.** `shopping-cart.precept` AddItem rows (`:124-136`) carry **no** `<= 1000` guard against `rule ItemCount <= 1000` (`:53`) — "what happens at the cart cap?" is unanswered. And `samples/Test.precept:5,10` — `set TotalCost = AvgCost * Quantity` into `max '1000 USD'` with both sources unbounded/optional — is the pure S1 case: the forced remediation is the mirror guard + explicit else (`when AvgCost * Quantity <= '1000 USD' -> set … ; -> reject/clamp …`), which a congruence-capable engine (1i) *always accepts*. Note what this means structurally: **with guard congruence, the maximally-forced remediation in this class is never bound-invention — it is "make the unhandled case explicit,"** and that is a domain decision, not prover ceremony.
+
+**Verdict: FORCES-BETTER across the class**, corroborated by the corpus itself: the guard/reject-row idiom is already the overwhelmingly dominant pattern (trial-to-paid, meeting-scheduler, nonprofit, vehicle-registration, lease, venue, crosswalk, prod-sched, inventory-FulfillOrder), and the exceptions read as sample bugs prove-or-reject would have caught.
+
+### Class 6 — The bound-is-false class. **FORCES-BETTER (honesty), and the 214-figure re-read.**
+
+Where a signed quantity would be wrongly bounded, rejection forces removing the false bound. The corpus already behaves this way: `NetRecovery` (`insurance-subrogation.precept:31` — settlement minus legal costs, legitimately negative), `PremiumChange` (`insurance-renewal-processing.precept:141`), `PremiumAdjustment` (`insurance-policy-endorsement.precept:139`) are all **unbounded**, by evident authorial intent. This is the correct re-reading of the **214 unbounded vs 10 bounded money fields** (`research/architecture/compiler/bounds-only-constraint-enforcement-2026-06-05.md:120-122`): that figure quantifies the over-rejection cascade of a *different* posture — reject-unbounded-**source** to feed relational narrowing (the doc's own framing: "every money field that appears as a relational-rule **RHS**… would need a new max"). The Q1 cell's obligation attaches only where the *target* carries a declared band — and 214 unbounded targets generate **zero** containment obligations. The corpus shows authors do not write bounds they don't mean; where they do write one (`max 3` extensions, `max 500` participants, `max 100` seats, `<= 1000` cart items), it is real policy and the corpus pairs it with cap-handling rows. **The bound-invention cascade does not materialize in this cell**; the guard-mirror escape (5d) exists at every site the cascade could have hit.
+
+### Class 7 — Corpus-empty hypotheticals. **NEUTRAL.**
+
+- **Derived temporal into temporal bounds**: zero corpus instances (`GracePeriodEnd`, `TargetCompletion` are optional and unconstrained relative to other dates — `insurance-renewal-processing.precept:32`, `insurance-claim-adjudication.precept:63`). Same-operation `now()`-relations should be made provable by speccing **one evaluation timestamp per operation** (a determinism corollary worth writing down); cross-operation clock relations stay in the cell, remediation = a guard on the comparison — a reachable, meaningful condition. NEUTRAL.
+- **Derived strings into `maxlength`**: zero corpus instances (`DenialReason` is unbounded, `patient-enrollment.precept:50`); remediation would be a `maxlength` on the source event-arg — an ordinary ingress contract. NEUTRAL.
+
+---
+
+## 3. What the spec SHOULD say (the challenged decisions, resolved)
+
+**C1 — replace spec:225's solver-name line with a certificate criterion.** The identity commitment is legibility, not any particular tool exclusion. The right line: *a decision procedure is admissible iff every verdict it returns carries a structured, domain-legible witness (the premises used, the derivation steps, the instantiated lemma); certificate-free oracle verdicts are inadmissible regardless of power.* This admits Fourier–Motzkin/Farkas linear certificates, min/max lemmas, place-value decimal and rounding derivations, count/sum delta ledgers, path arguments — everything Class 1 needs — while still excluding "Z3 said UNSAT." (Precedent: certifying algorithms, McConnell et al., *Computer Science Review* 2011; proof-carrying SMT cores are themselves certificates, which shows the line is witness-vs-oracle, not tool-vs-tool.)
+
+**C2 — the relational engine must grow to the corpus's idioms**: row-complement narrowing (1a), WP substitution through set-chains (1b), declared-rule premises incl. three-variable linear (1c), event-ensure premises (1e), state-flow fact propagation (1f), guard-expression congruence (1i). The current "single-pass, depth-bounded, no transitive chasing" scope leaves the corpus's own guarded rows unprovable — under prove-or-reject that under-power *is* the over-rejection problem, and it is fixable without any posture change.
+
+**C3 — reopen the `sum` hold-back** (`collection-types.md:860`) for scalar aggregates in rule/computed-field position, with inductive preservation checking (delta certificates). This is the single change that empties the only FORCES-WORSE class (Class 2). Language-surface change → owner conversation + `/design` per the gate; this analysis only establishes the need.
+
+**C4 — §0.7's "no result outside a declared bound" (spec:266-272) can stand** for this cell — *contra* the thesis's Recommendation A — **conditional on C1–C3 shipping**, with Frank's own conceded sharpening folded in: "derived values are proven against every **decidable** declared constraint" (`frank-prove-or-reject-position:141`). Without C1–C3, prove-or-reject over-rejects the corpus's best idioms and the thesis's critique lands.
+
+---
+
+## 4. Bottom line
+
+**The cell, under the right engine, is small and almost entirely FORCES-BETTER.** Enumerated against all 267 derived writes in the 77-file corpus: every guarded accumulator, transfer, ratio, routing, and cap idiom is provable by a legible engine (Class 1 — the dominant population, currently mis-filed as cell members only because the spec under-powers the engine). What genuinely remains is: contingent domain edges where rejection surfaces an unanswered question or a latent bug (Class 5 — three real bugs found in polished samples: unguarded shrinkage, WAC-drift returns, the fraud-cap penny case); external-truth projections where the forced guard is honest and the corpus already writes it (Class 4); denormalized counters where rejection forces strictly better modeling (Class 3); and false bounds rejection forces the author to delete (Class 6 — which is also the correct reading of the 214-unbounded-money figure: it measures a different posture's cascade; in this cell, unbounded targets carry no obligation and the guard-mirror escape means bound-invention is never actually forced).
+
+**Exactly one FORCES-WORSE class survives scrutiny — the aggregate-linking invariants (Class 2: `shopping-cart`, `bill-of-materials`) — and its honest resolution is "the spec should be more powerful" (admit `sum` + inductive preservation, challenge C3), not "reject forces worse, therefore govern."** Under pure prove-or-reject with today's language, those ~5 write-sites are forced into dead-guard fiction, which is a real anti-legibility cost and should be named as the posture's price if C3 is refused. One honesty note against Frank's strongest rhetorical leg: for accumulator-plus-external-delta shapes (the cart cap, payment accumulators), a runtime refusal is *not* "addressed to no one" — the caller's argument caused the breach and the caller can act; his argument is exact only for purely-internal derivations. It does not change the verdicts — the prove-or-reject remediation (an explicit reject row with a domain-authored message) is better authoring than a generic `ConstraintsFailed` in every corpus instance examined — but the boundary ruling should not rest on the overstated form.

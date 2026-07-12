@@ -1,0 +1,19 @@
+Now I have what's needed. Confirmed BUG-020 is Active (not yet built) at line 188, and 2c-i (relational narrowing) is already shipped per proof-engine.md's detailed rule-source relation section.
+
+## Summary: what's already committed vs. genuinely new
+
+**Baseline — what the proof engine already does (built, in `src/Precept/Pipeline/ProofEngine.cs`, doc status "Implemented" — `docs/compiler/proof-engine.md:8`):**
+
+The engine already runs **11 named discharge strategies** end to end (`proof-engine.md:710-1727`, header list confirmed by `grep '^#### Strategy'`): Literal Proof, Declaration Attribute Proof, Guard-in-Path, Straightforward Flow Narrowing, Qualifier Compatibility, Dimensional Product, Compositional Constraint (the "octagon-style" relational narrowing), Interval/Length/Count Containment, plus CollectionGrowth. This includes the first half of the relational-rules-and-bounds design ("2c-i") — declared rules narrowing each other during proof — which is already shipped (`proof-engine.md:2531` walks through the shipped relation-as-fact representation in detail; `docs/Working/compiler-readiness-plan-2026-06-16.md:66` confirms "2c-i (already shipped)").
+
+Worth flagging as a side finding, not part of your ask: the doc's own narrative sections are stale about this count. §12 ("Bounded, Non-Extensible Strategy Set," `proof-engine.md:2578-2585`) still says "Five strategies only" and §13 (`proof-engine.md:2603-2605`) says "all six strategies" — both undercount the 11 that are actually numbered and specified in the body. That's doc drift, not a scoping fact.
+
+**What's genuinely new / the incremental delta — Phase 5 of the readiness plan (`compiler-readiness-plan-2026-06-16.md:941-1185`), not yet built:**
+
+- **Slice 5.1 — "2c-ii," the flagship** (`:964-999`): make field-reference bound modifiers (`min Floor`, `max Ceiling`, relational `min/max Expr`) participate in proof — desugar each to a synthetic `TypedRule` and prove-or-reject at compile time. Plan's own words: *"the largest unbuilt locked design in the codebase"* (`:947`). Currently these bounds are silently accepted and inert — verified at `TypeChecker.Validation.Modifiers.cs:462-480` (`:966`) and probe P28 (`:972`). This is confirmed Active in `docs/Working/bugs.md:188` (BUG-020).
+- **Slice 5.2** (`:1003-1020`): the conditional-totality proof half (per-branch guard narrowing via `AssumedConditions`/`EffectiveGuard`) and the computed-field default-fold wiring — both new proof-engine completeness work, explicitly warned against resurrecting the deleted verify-don't-trust architecture.
+- **Slices 5.3-5.7**: mostly type-checker/parser/graph fixes that feed obligations *into* the existing strategies (collection write-site typing holes, modifier write-site proof participation, rule/ensure condition typing, because-clause interpolation binding, states/actions typing, binder/graph-analyzer soundness fixes) rather than new proof strategies themselves.
+
+**Net cost framing:** the five/six/eleven-strategy discharge *machinery* is baseline — already built and running. The incremental proof-engine-specific delta is two items: 2c-ii's rule-synthesis-and-discharge path for field-reference bounds (Slice 5.1, the single largest item), and the conditional-totality narrowing plus computed-field fold (Slice 5.2). Everything else in Phase 5 is upstream obligation-generation work (type-checker/parser/graph) that feeds the already-built strategies, not new proof machinery.
+
+**Files read:** `/home/sfalik/source/repos/Precept/docs/compiler/proof-engine.md` (lines 1-60, 490-2619), `/home/sfalik/source/repos/Precept/docs/Working/compiler-readiness-plan-2026-06-16.md` (lines 8-183, 941-1203), `/home/sfalik/source/repos/Precept/docs/Working/bugs.md` (BUG-020/027/028/031/032 entries).
