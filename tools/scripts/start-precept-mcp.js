@@ -27,6 +27,16 @@ function main() {
 function ensureBuild() {
   fs.mkdirSync(buildRoot, { recursive: true });
 
+  // Emit the build output fresh each launch. The build targets a persistent
+  // artifacts dir and is incremental; combined with floating package versions
+  // (e.g. NodaTime 3.*), an incremental build can bump deps.json to a newly
+  // resolved version while leaving the previously-copied dependency assembly in
+  // the output, producing an inconsistent pair (deps.json demands a version the
+  // copied DLL is not) that throws FileNotFoundException at runtime. Clearing the
+  // output dir first forces a consistent dependency set. Safe while a prior server
+  // is running: it executes from a shadow copy under runtime/, never from bin/.
+  fs.rmSync(buildBinRoot, { recursive: true, force: true });
+
   const build = spawnSync(
     "dotnet",
     ["build", projectPath, "--artifacts-path", buildRoot, "-c", "Release"],
