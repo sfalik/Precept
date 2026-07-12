@@ -46,3 +46,6 @@ tools/Precept.VsCode/server/
 
 *.lscache
 .squad/.cache/
+
+# Generated benchmark output — regenerable via `dotnet run -c Release --project tools/Precept.Bench`
+BenchmarkDotNet.Artifacts/
