@@ -98,6 +98,7 @@ The skill enforces:
 
 ## Anti-patterns to refuse
 
+- Jargon-dense prose, coined terms used without a plain definition, or bare internal labels (`Q7`, `§1b`, `D-3`) the reader must decode — write for the owner in plain language (see the design skill's **Legibility** conventions), and give every behavioral claim a concrete, syntax-validated `.precept` sample
 - All phases at the same level of detail ("plan everything now")
 - Phases without exit criteria ("phase 5: do proof engine work")
 - Decisions buried mid-execution ("step 3: figure out whether to use X or Y")

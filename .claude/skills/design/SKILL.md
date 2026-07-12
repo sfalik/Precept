@@ -145,6 +145,17 @@ Precept's primary author is the **domain expert**, not the developer (see `docs/
 
 **Reviewer obligation.** A missing Audience and Teachability section on a language-surface change is a BLOCKER. A worked example that's a compiler-test fragment rather than a plausible domain scenario is a CONCERN. An error message that uses compiler-internal vocabulary is a CONCERN.
 
+## Legibility — plain language and worked samples (EVERY doc, not only language-surface ones)
+
+The doc is read later by the owner or a domain expert to make a decision — write for *that reader*, who does not have the author's context, not for yourself. This applies to **every** doc the lifecycle produces, including analysis, feasibility, and roadmap docs that touch no language surface. (Derived from what made the 2026-07 proof-engine docs readable; the failure mode it prevents is the "decoder-ring" doc dense with coined terms.)
+
+- **No coined term without a plain definition on first use.** Prefer plain prose. Where a technical term is genuinely load-bearing (`weakest precondition`, `Farkas certificate`, `octagon`), name it once and gloss it in plain words in the same breath — *"variable elimination (combine two inequalities to cancel a shared term)"* — then use the plain phrasing. A `## Glossary` / "How to read this document" block is fine for a necessarily-dense doc, but a glossary is **not** a licence to keep the body jargon-dense.
+- **Spell out internal labels.** No bare `Q7`, `R4`, `§1b`, `D-3`, `S1/S2`, `C3-F2` treated as self-explanatory — say what each means in plain words, with at most a light parenthetical pointer. These labels rot and mean nothing to a later reader.
+- **Every behavioral claim gets a picture.** For any claim about what the system accepts, rejects, or computes, show a concrete `.precept` example — usually the case that fails **and** the author's fix. Ground it in real `samples/` conventions, syntax-validate it (use the precept MCP as a *syntax* oracle — never the current proof verdict as design authority), and label proposed-design vs. current behavior with a `(today: …)` note where they differ.
+- **Expansion, not dumbing-down.** Plain language adds clarity; it never drops rigor, `path:line` citations, or the four-leg rationale. If a passage cannot be said plainly, that usually means the idea is not yet clear — not that jargon is required.
+
+**Reviewer obligation.** Coined jargon used without a plain definition, a bare internal label, or a behavioral claim with no worked sample is a CONCERN; a doc that is systematically jargon-dense (a decoder-ring read) is a BLOCKER.
+
 ## Semantic Rules
 
 [Required when the design touches expression evaluation, typing rules, proof obligations, or constraint semantics. Omit with an explicit one-line note for designs that touch only diagnostics, formatting, or documentation.]
@@ -468,6 +479,10 @@ The skill enforces:
 - Write `## Language Design Grounding` citing only Precept-internal docs — general language design requires engaging the broader field (comparable systems, PLT theory)
 - Omit `## Architecture Grounding` for a pipeline or catalog change ("catalog discipline is obvious here")
 - Leave any Runtime / Tooling / MCP propagation category blank rather than explicitly "None"
+- Coin a shorthand ("the cell", "the seam") and use it throughout without ever defining it in plain words
+- Reference internal decision labels (`Q7`, `R4`, `§1b`, `D-3`) as if the reader has the source open
+- Make a behavioral claim (what compiles / rejects / is computed) with no concrete, syntax-validated `.precept` sample
+- Lean on a glossary to justify keeping the body dense with undefined jargon
 
 ## Quick reference
 

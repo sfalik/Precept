@@ -110,6 +110,8 @@ The sub-agent does the heavy lifting in isolation; you stay in the parent sessio
 
 Every research file follows this shape. The frontmatter and four sections (Methodology, Findings, Threats to Validity, Sources) are **required**; the others apply to research that proposes conclusions.
 
+**Legibility.** Write for the reader who will act on this, in plain language — no coined term without a plain definition on first use, internal labels spelled out, and a concrete example wherever it makes a finding tangible (see the design skill's **Legibility** conventions). Expansion, not dumbing-down: plain prose never drops citations or rigor.
+
 ```markdown
 ---
 status: Active | Promoted to: <canonical-link> | Cited | Stale | Superseded by: <link> | Archived

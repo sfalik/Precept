@@ -256,6 +256,7 @@ Both modes run this skill as a multi-agent `Workflow` instead of a single inline
 
 ## Anti-patterns to refuse
 
+- Pass a doc that is jargon-dense, coins terms without a plain definition, uses bare internal labels, or makes behavioral claims with no worked `.precept` sample — a regression against the design skill's **Legibility** conventions (systematic jargon = BLOCKER; isolated lapses = CONCERN).
 - Mark "complete" with 🔴 status (must remediate or explicitly accept debt) — whole-item.
 - Skip the precept-reviewer spawn on the branch that calls for it (catalog/research/design/doc-sync discipline must be verified).
 - Skip acceptance-criteria verification on whole-item (the design said this passes; the review must verify it passes).
