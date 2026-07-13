@@ -410,6 +410,69 @@ Per-slice test matrices are written **in each slice**, not here. What every slic
 
 ---
 
+## Stage 1 — Execution Methodology (per-slice)
+
+### The stable-vs-rots split (why "heavyweight all slices" is safe)
+
+All seven slices get **heavyweight DESIGN + doc/code REVIEW + ACCEPTANCE CRITERIA up front** —
+these are stable because they're grounded in the ruled decisions + the spec, not in current line
+numbers.
+
+The **exact implementation edit-plan is re-grounded at each slice's start**, NOT written now —
+because **Slice 0 reshapes the substrate every later slice builds on** (Slice 0 changes the
+verdict model binary→DU, the ledger shape, the emission path, and edits `BuildNarrowedIntervals`,
+the exact function §6 and §2 extend). Line-pinned edit plans written today would be stale by the
+time those slices run.
+
+### The per-slice process (the floor every slice gets)
+
+1. **Doc + code review** (delegated) — read the current code the slice touches + its canonical
+   docs; verify anchors (which will have shifted), confirm the reuse seams, surface any drift or
+   refactor/removal.
+2. **Acceptance criteria — locked BEFORE any code** — the full input/obligation family
+   enumerated, one failing test per shape + one per soundness/invariant rule, as `# EXPECT:`
+   diagnostic samples under `test/integrationtests/diagnostics/` + full-compile assertions
+   (`Compiler.Compile(...)` / `CompileExpectingError`, never the type-checker-only `Check`). This
+   is the non-negotiable.
+3. **Adversarial review** (Fable, soundness-critical slices) — before code on the design/criteria,
+   and after code on the diff.
+4. **[Design pass — only where genuinely open]** a `/design` pass (Fable judge-panel) where real
+   design space exists.
+5. **Gate → delegate build to a fresh worktree agent → adversarial diff review → integrate →
+   pause at the slice boundary for owner review.**
+
+### Rigor tiering (how much per slice — calibrated, not uniform)
+
+| Slice | Design | Doc+code review | Acceptance criteria | Adversarial (Fable) |
+|---|---|---|---|---|
+| **Slice 0** (DU + certificate + CertificateSteps + 4 fail-open fixes) | Full `/design` (lean 2-lens Fable panel — CertificateSteps membership + witness shape genuinely open) | Deep | Exhaustive (each fail-open hole failing-test-first + the ⊥/anti-transitivity/staleness invariant cells) | Before & after |
+| **§1a / §6 / §2** (proof strategies) | Design **review** (seams ruled) | Deep (soundness rails) | Full family + rail cells | Before & after |
+| **§4a witness** | Some design (rendering + open grid cells) | Moderate | Full witness family | Before & after |
+| **§3 money / structural-severity** (mechanical) | Light — confirm the ruled seam | Moderate | Op/severity family + corpus reconciliation | Focused (money ⊥-in-arithmetic; terminal-detection regression) |
+
+### Model-tiering the subagents (cost discipline)
+
+- **Mechanical work** (doc edits, citation sweeps, applying specified changes, drafting acceptance
+  matrices from a clear spec, simple reads) → **Haiku/Sonnet**.
+- **Hard synthesis** (reconciling conflicting design inputs, judgment-heavy planning) →
+  **Opus / fork**.
+- **Independence** (design panels, adversarial reviews) → **Fable**.
+- Fable is **surgical but not stingy**: the whole 7-slice heavyweight pass is ~9 Fable passes ≈ a
+  third-to-half of one weekly Fable budget; free through ~Jul 19 (weekly Fable limit resets Jul 16).
+  Aim Fable where independence pays; run everything else on cheap models. The mechanical build
+  (worktree coding agents) uses no Fable.
+
+### Resume pointer
+
+**Stage 0 is complete and committed (3e3fb0dd). The next action is Slice 0** — its lean 2-lens
+Fable design panel (CertificateSteps membership + witness shape) + the acceptance matrix drafted
+by a cheap general-purpose agent — then apply the tiering above across §3 / §2 / §4a / §1a / §6 /
+structural-severity. Companion docs: `-architecture.md` (the locked design + the 4 Slice-0
+soundness holes), `-structural-severity.md`, `-pipeline-evaluation.md`; rulings in
+`proof-engine-decision-ledger-2026-07-12.md` (Stage-0b section).
+
+---
+
 ## 6. Definition of Done (MVP-shippable)
 
 The MVP ships when **all** hold:
