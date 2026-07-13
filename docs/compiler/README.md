@@ -27,15 +27,15 @@ Source string → Lexer.Lex → TokenStream → Parser.Parse → ConstructManife
 | 3. Name Binder | [name-binder.md](name-binder.md) | Full | Implemented |
 | 4. Type Checker | [type-checker.md](type-checker.md) | Full | Implemented |
 | 5. Graph Analyzer | [graph-analyzer.md](graph-analyzer.md) | Full | Implemented |
-| 6. Proof Engine | [proof-engine.md](proof-engine.md) | Full | Implemented |
+| 6. Proof Engine | [proof-engine.md](proof-engine.md) | Full | Implemented (base); prove-or-reject MVP designed |
 
 ## Cross-Cutting Infrastructure
 
 | Document | Purpose | Doc maturity |
 |----------|---------|--------------|
 | [compiler-and-runtime-design.md](../compiler-and-runtime-design.md) | How pipeline stages connect — artifact types, consumer contracts, LS integration strategy | Canonical design |
-| [soundness-and-coverage.md](soundness-and-coverage.md) | Verify-don't-trust verdict checking — witness format, the trusted checker, and the catalog-driven coverage analyzer that make the compile-time guarantee *checked* not *trusted* (cross-cuts proof engine, graph analyzer, type checker, fault correspondence, evaluator-order invariant) | Design (stub — building per the soundness plan) |
-| [diagnostic-system.md](diagnostic-system.md) | Diagnostic codes, severity, message templates, audience model, stage attribution | Draft |
+| [soundness-and-coverage.md](soundness-and-coverage.md) | How the prove-or-reject guarantee is made sound — the legible certificate format, the witness, the deferred independent re-checker, and coverage of the known fail-open holes (cross-cuts proof engine, graph analyzer, type checker, fault correspondence) | Design (skeleton) |
+| [diagnostic-system.md](diagnostic-system.md) | Diagnostic codes, severity, message templates, audience model, stage attribution | Full |
 | [literal-system.md](literal-system.md) | How literals flow through every pipeline stage — lexer segmentation, parser assembly, type-checker resolution, evaluator materialization | Draft |
 | [tooling-surface.md](tooling-surface.md) | TextMate grammar generation, semantic token two-pass design, completion filtering | Full |
 | [grammar-generator.md](grammar-generator.md) | Grammar generator algorithm, pattern templates, structural composition, catalog gap | Full |

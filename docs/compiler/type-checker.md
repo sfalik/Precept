@@ -896,9 +896,9 @@ When resolving an identifier expression, check scopes in this order:
 
 For step 3 with `CurrentScope == PriorFieldsOnly`: if the resolved field's index >= `CurrentFieldIndex`, emit "ForwardReferenceProhibited" diagnostic instead.
 
-### Stub Strategy for Unimplemented Arms
+### Unknown-node fallback arm
 
-Every expression node type that won't be implemented in its slice has an explicit stub arm returning `TypedErrorExpression` with a `NotYetImplemented` marker. No switch fallthrough, no crash. This is required from Slice 2 onward to prevent test failures when expressions contain forms not yet handled.
+The type checker resolves every `ParsedExpression` node type; there is no `NotYetImplemented` marker (it exists nowhere in the source). The expression dispatch ends in a single catch-all `_ => ResolveUnknownExpression(...)` arm (`TypeChecker.Expressions.cs`) that emits a `TypeMismatch` diagnostic ("expected known expression, got …") and returns `TypedErrorExpression` — no switch fallthrough, no crash. This arm is defensive: it is unreachable for well-formed parser output, catching only an unexpected node shape rather than a deliberately-deferred one.
 
 ---
 

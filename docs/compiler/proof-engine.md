@@ -5,7 +5,7 @@
 | Property | Value |
 |---|---|
 | Doc maturity | Full |
-| Implementation state | Implemented |
+| Implementation state | Base engine implemented; the prove-or-reject MVP (three-way `ProofVerdict`, certificate format, §1a multi-term / §2 case-by-case / §3 money / §6 field-vs-constant strategies, and the Slice-0 fail-open soundness fixes) is **designed, not yet implemented** — see §13 |
 | Source | `src/Precept/Pipeline/ProofEngine.cs`, `src/Precept/Pipeline/ProofLedger.cs` |
 | Upstream | SemanticIndex + StateGraph, catalog metadata (Operations, Functions, Types, Modifiers, Actions, Diagnostics, Faults) |
 | Downstream | Compilation (proof ledger), Precept Builder (fault backstops, constraint influence map) |
@@ -2419,17 +2419,17 @@ static bool ContainsErrorExpression(TypedExpression expr) => expr switch
 
 ## 11. Design Rationale and Decisions
 
-### Decision 1: Bounded Strategy Set vs. SMT Solver
+### Decision 1: Admissibility by Certificate, Not a Tool Ban
 
-**Decision:** The proof engine uses a bounded set of proof strategies — no general SMT solver. The set has grown by one strategy at a time as the language surface has expanded (currently a handful of catalog-driven strategies plus several requirement-dispatched ones); each addition has gone through `/design` review against this same rationale.
+**Decision:** A proof strategy is admissible **if and only if** it satisfies four criteria: it (1) emits a **legible, independently re-checkable certificate** from a small, spec-enumerated vocabulary (the `CertificateSteps` catalog); (2) is **performant** (does not break single-file recompile on keystroke); (3) is **right-sized** for Precept's small, few-variable, loop-free problems, capping and falling back to "couldn't prove — here is what would" rather than searching unboundedly; and (4) **earns its place** with evidence of real value. The *search* a strategy uses is unconstrained — authority rests in the certificate, not the search. This replaces an earlier categorical ban on solver-style engines: an SMT-style opaque proof trace is excluded because it fails criterion (1) — it is unreadable and not replayable from a spec-owned vocabulary — not because "solver" names a forbidden category. The strategy set has grown one strategy at a time; each addition goes through `/design` review against these criteria.
 
 **Rationale:**
+- **Legibility is the commitment.** A replayable certificate from a spec-owned vocabulary makes proof reasoning inspectable to authors, tooling, and AI agents — which is the actual requirement the old tool ban was standing in for (spec §0.6 proof philosophy #3).
 - **Predictability:** Every proof attempt completes in bounded, deterministic time. No solver timeouts, no "unknown" results, no resource exhaustion.
-- **Auditability:** Each strategy is a simple predicate function (~10–30 lines). Authors can understand exactly why an obligation was proved or not.
-- **Zero external dependencies:** No Z3, no CVC5, no SAT solver. The proof engine is self-contained within the Precept runtime.
-- **Coverage sufficiency:** The DSL expression language is intentionally constrained. Precept does not support arbitrary arithmetic, unbounded loops, or recursive definitions. The strategies cover the realistic obligation space — including qualifier compatibility and dimensional product as dedicated bounded cases.
+- **Auditability:** Each strategy is a simple predicate function (~10–30 lines) whose certificate an independent checker can replay. Authors can understand exactly why an obligation was proved or not.
+- **Right-sized, not maximal.** Precept's expression language is constrained — no arbitrary arithmetic, no loops, no recursion — so heavyweight solver machinery would forfeit legibility and performance for benefit the domain does not need.
 
-**Trade-off accepted:** The proof engine cannot discharge complex cross-field value relationships or inductive properties. This is acceptable because:
+**Trade-off accepted:** The proof engine deliberately forgoes strategies that could prove more but cannot carry a legible certificate or do not earn their place (e.g. multi-hop fact combination — deferred, see §13). This is acceptable because:
 1. Such relationships are rare in business state machines
 2. Authors can add guards to make obligations statically dischargeable
 3. Defense-in-depth backstops catch any runtime failures
@@ -2604,6 +2604,18 @@ The proof engine produces a `ConstraintInfluenceMap` that enables AI agents to r
 
 Items 1 and 2 are resolved — the full ProofEngine body is implemented with all six strategies, obligation collection, diagnostic emission, constraint influence analysis, initial-state satisfiability, and ProofForwardingFact consumption.
 
+### Prove-or-reject MVP — designed, not yet implemented
+
+The base engine above is implemented. A further **prove-or-reject MVP** is designed but not yet built — under prove-or-reject, when the compiler cannot prove a computed value stays inside its declared limit, it **rejects the definition** rather than deferring the check to runtime. The designed-not-built layer comprises:
+
+- **Three-way verdict as a discriminated union.** The obligation verdict becomes a `ProofVerdict` DU with three cases — `Proven` (carries its certificate), `ProvenViolating(witness)` (rejected, `Severity.Error`, carries a certificate plus a validated witness configuration), and `Unresolved(condition)` (rejected, carries a certificate plus the printed weakest precondition). Each case carries only its own evidence, so an illegal combination (a witness on a clean proof) is structurally unrepresentable. This replaces today's binary `ProofDisposition { Proved, Unresolved }` plus nullable evidence siblings.
+- **Certificate format only — no live re-checker in the MVP.** The MVP ships the certificate *format*: every step carries a recomputable conclusion from a spec-enumerated `CertificateSteps` catalog, and every premise cites the author declaration it used by source span, so the derivation is **re-checkable in principle** — by hand now, or by a future independent checker. The MVP builds **no live re-checker** and **no checker-gated mint**: a `Proven` verdict is minted by the discharge cascade, not by passing an independent replay first. The independent re-checker is a separate, later item (deferred; tracked as §5b in `soundness-and-coverage.md`), so MVP soundness comes from fixing the engine directly (the Slice-0 fail-open fixes), not from replay.
+- **New strategies:** §1a (multi-term single-fact + guard-sum matching), §2 (case-by-case: conditional arms + event-input narrowing), §3 (money through × and ÷ via catalog `IntervalTransfer` wiring), §6 (field-vs-constant rules honored in bound checks).
+
+### Deferred (open) — multi-fact combination (§1b)
+
+**Deliberately deferred, not scheduled.** Combining two or more separately-declared facts to prove a bound neither states alone (e.g. "allocations ≤ commitments" + "commitments ≤ plan" ⟹ a division is safe) is **out of scope**. Combining linear facts is never an *expressibility* gain — the combination of linear inequalities is itself a linear inequality the author can state as one rule — so its only benefit is ergonomic, and §6 (author states the consequence as one rule; the engine applies it) is the honest fix. The spec's single-hop, depth-bounded rule (`precept-language-spec.md` §0.6, "single-pass and depth-bounded — no transitive chasing of a third field") is **not overridden**: the engine never chases a chain of facts. Revisit only if a recurring real definition genuinely resists naming the combined bound as an intermediate field.
+
 ### Validation Required
 
 3. **Five-strategy coverage validation** — validate five-strategy coverage against all 20 sample files in `samples/` before committing to no sixth strategy. Qualifier-compatibility obligations are now an explicit Strategy 5 case; cross-field comparison obligations remain the highest-risk residual category.
@@ -2634,15 +2646,15 @@ Items 1 and 2 are resolved — the full ProofEngine body is implemented with all
 
 ## 14. Deliberate Exclusions
 
-### No SMT Solver
+### No Opaque Solver (excluded by the certificate criterion, not by category)
 
-The bounded strategy set is intentional. General proof is not a goal. Adding an SMT solver would:
-- Introduce non-deterministic verification times
-- Add external dependencies (Z3, CVC5)
-- Complicate the build and deployment story
-- Provide marginal benefit for the constrained DSL expression language
+What is excluded is any strategy that cannot carry a legible, replayable certificate or does not earn its place — not "solvers" as a named category. An SMT-style solver is excluded because its proof trace is opaque (fails the legibility/re-checkability criterion), not because the word "solver" is forbidden. Concretely, an SMT solver would:
+- Introduce non-deterministic verification times (fails the performant + right-sized criteria)
+- Emit an opaque trace no author or independent checker can replay (fails the legibility criterion)
+- Add external dependencies (Z3, CVC5) and complicate the build and deployment story
+- Provide marginal benefit for the constrained DSL expression language (fails the earns-its-place criterion)
 
-If an obligation cannot be discharged by the six strategies, the author adds a guard or modifier to make it statically provable, or accepts the defense-in-depth backstop.
+If an obligation cannot be discharged by an admissible strategy, the compiler **rejects** and names what would make the operation provably safe; the author adds a guard, modifier, or rule to make it statically provable. (The admissibility criterion is stated in full in Decision 1, §11.)
 
 ### No Runtime Obligation Checking
 
