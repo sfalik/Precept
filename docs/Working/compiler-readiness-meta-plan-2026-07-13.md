@@ -135,6 +135,7 @@ below, so the design can be checked against its purpose.
 | **Enumeration covers only the instance tripped over** (design-time family under-enumeration) | Each gap-unit expands to the **whole input family** with every cell disposed, and every `[StaticallyPreventable]` code it touches is verified live-not-dead (§ 6). |
 | **Redefining the bar to pass** (an unprovable case reframed as an "acceptable conservative boundary") | Creation-completeness is closed by three mechanical build-time checks, not a narrative; an undeclared position is a red build. "Unprovable = reject" is mechanical (§ 4). The arithmetic-false-Prove residual is *named as an open hole with a mitigation*, never marked N/A (§ 4.4, § 10). |
 | **Certifying "complete" while unsound work slips through** (presenting a shape-limited sweep as a proof of no-false-Prove) | § 10 certifies only what each mechanism actually proves. The discharge sweep is stated as shape-limited; the arithmetic-false-Prove class is a **stated residual**, not a closed cell. |
+| **Mistaking an engineering wall for an identity crisis** (a slice hits a boundary; the reflex is to re-litigate "what should Precept be" instead of diagnosing the wall — this cost roughly a month in the June→July arc, per Frank's 2026-07-13 retrospective) | **Engineering-diagnosis-first rule (§ 7.4).** At any hard slice, the *first* artifact is a one-page engineering diagnosis of the boundary — what is genuinely undecidable, what is merely-unimplemented, and what one authored rule would discharge it. Re-opening design or product identity is allowed *only if that diagnosis fails to close* — which, on the 2c-ii evidence, it usually will not. |
 
 ---
 
@@ -736,6 +737,15 @@ Chosen to eliminate rework — each layer is a stable base the next builds on:
   BUG-031 (guard root) and BUG-032 (member-argument child position) are the refactor's first failing
   tests. *Rationale: every downstream unit either asserts on the verdict shape or must not reintroduce
   an un-obligated position; both guards must exist first.*
+  **Two must-fix-before-Slice-0 items (Frank's 2026-07-13 charter-gate review — Slice 0 is the highest
+  recurrence risk, the June "2c-ii" analog):** (1) **Fold the `DeadEndState` Warning→Error flip INTO
+  Slice 0.** Slice 0 relabels dead-end rows claiming outcome-neutrality "now that `DeadEndState` =
+  Error," but that flip is delivered by the structural-severity slice — so building Slice 0 first as
+  written changes corpus outcomes the plan swears are neutral. (2) **Rule OQ1 (the certificate
+  step-kind for the multi-term match) before Slice 0's definition-of-done depends on it** — it is on
+  the critical path with no ruling logged. Do not start Slice 0 with either open, and treat Slice 0
+  the way 2c-ii should have been: full input-space enumeration + adversarial soundness review before
+  commit + refuse any "while we're here" scope.
 
 - **Layer 1 — Discharge-soundness correction (mostly serial).** The fail-open holes on *already-walked*
   obligations + the `bool?`-and-dict-write sweep, plus standing-up the behavioral false-Prove hunt
@@ -776,6 +786,20 @@ agent exactly as they obscure review for the owner. Mechanically checkable: no u
 no bare internal label carrying load-bearing meaning; a worked example for every behavioral claim; the
 plan scans cleanly top to bottom. An independent context-free-legibility pass asks: *could an agent
 with none of this conversation's context build exactly this unit from the brief alone?*
+
+### 7.4 Engineering-diagnosis-first at hard slices (the anti-spiral rule)
+
+When a slice hits a wall — a case the engine cannot prove, a reuse that over-proves, a "mostly-reuse"
+scope that explodes on contact — the **first artifact is a one-page engineering diagnosis of the
+boundary**, not a re-opening of "what should Precept be." The diagnosis answers three questions: what
+is *genuinely undecidable*, what is *merely-unimplemented* (buildable, just not built), and what *one
+authored rule* would discharge it (the § 6 escape valve). A design or product-identity re-litigation
+is permitted **only if that diagnosis fails to close.** This is the countermeasure to the failure that
+cost roughly a month in the June→July arc (Frank's 2026-07-13 retrospective): the June "2c-ii"
+amendment already *held* the correct engineering diagnosis — the over-prove on unbounded references
+and the missing default-fold — but the team set it down and picked up the philosophy question instead.
+The reflex will get more chances to fire (the aggregates design, any §1b revisit, the overflow work);
+this rule fires first, every time.
 
 ---
 
