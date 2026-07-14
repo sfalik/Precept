@@ -78,7 +78,7 @@ Per [`philosophy.md`](../philosophy.md) — "honesty about approximation": Prece
 | Type | Stance | Implication |
 |------|--------|-------------|
 | `string` | Exact | UTF-16 round-trips losslessly. |
-| `integer` | Exact | Arbitrary-precision whole numbers; no overflow, no rounding. |
+| `integer` | Exact | Fixed-width 64-bit whole numbers; no rounding. Overflow handling — compile-time proof-or-reject vs. adopting an arbitrary-precision representation — is a deferred post-MVP decision (see [Open Questions](#open-questions--implementation-notes)). |
 | `decimal` | Exact | Base-10 fractional arithmetic; no float drift. Use for financial, rates, tax, currency-precision-sensitive values. |
 | `number` | **Approximate by design** | IEEE 754 double. Tolerates approximation error; appropriate for scientific computation, scoring, statistical aggregates. The proof engine cannot prove exact equality on `number`. |
 | `boolean` | Exact | Two values, no third. |
@@ -610,7 +610,7 @@ Authors who need an unbounded-end-of-range comparison on a fixed-format string c
 | `max(a, b)` | `(numeric, numeric) → numeric` | Common numeric type | |
 | `abs(value)` | `(numeric) → numeric` | Same type as input | Type-preserving: `integer → integer`, `decimal → decimal`, `number → number` |
 | `clamp(value, lo, hi)` | `(numeric, numeric, numeric) → numeric` | Common numeric type | |
-| `pow(base, exp)` | `(numeric, integer) → numeric` | Same type as `base` | `exp` must be non-negative for integer lane |
+| `pow(base, exp)` | `(numeric, integer) → numeric` | Same type as `base` | `exp` must be non-negative — negative exponents break decimal-lane closure |
 | `sqrt(value)` | `(number) → number` | `number` | **Number-lane only.** `sqrt(decimal)` is a type error — use `sqrt(approximate(value))`. Proof engine checks non-negativity. |
 
 ### Rounding functions
@@ -683,7 +683,7 @@ A function keeps its `decimal` overload if and only if the mathematical operatio
 
 ## Open Questions / Implementation Notes
 
-_TBD — open questions will be captured here as the type checker and evaluator implementation progresses._
+**Integer overflow model (deferred, post-MVP).** `integer` is fixed-width 64-bit. Whether arithmetic overflow is handled by compile-time proof-or-reject (prove no operation can exceed the representable range, else reject the definition) or by adopting an arbitrary-precision representation (removing overflow as a failure mode) is a post-MVP decision, not yet ruled. Until it is, `integer` arithmetic that could exceed the 64-bit range carries no live compile-time guarantee.
 
 ---
 

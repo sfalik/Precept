@@ -1573,7 +1573,7 @@ The seven business-domain types reuse the existing field-constraint vocabulary f
 | `positive` | `Field > 0` | `(0, +∞)` | `field Rate as exchangerate in 'USD/EUR' positive` |
 | `nonzero` (#111) | `Field != 0` | excludes zero | `field Divisor as quantity in 'each' nonzero` |
 | `min N` | `Field >= N` | `[N, +∞)` | `field OrderQty as quantity in 'each' min 1` |
-| `max N` | `Field <= N` | `(-∞, N]` | `field Score as quantity max 100` |
+| `max N` | `Field <= N` | `(-∞, N]` | `field Score as quantity in 'each' max 100` |
 | `maxplaces N` | Runtime enforcement | — | `field Amount as money in 'USD' maxplaces 2` |
 
 **`maxplaces` and ISO 4217:** `maxplaces` is available on all four magnitude types and is **explicit-only** for all of them — including `money`. `money in '<currency>'` carries no implicit precision constraint. ISO 4217 minor-unit data (e.g., USD=2, JPY=0, BHD=3) is available via `CurrencyCatalog.Get(code).MinorUnit` for author-side rounding decisions. Authors who want ISO-derived strictness opt in explicitly: `field Cost as money in 'USD' maxplaces 2`. This also enables non-standard precision when the domain requires it (e.g., `field Rate as money in 'USD' maxplaces 6` for forex platforms) without needing an override concept.
@@ -1986,7 +1986,7 @@ This proposal extends mechanisms established by the temporal proposal (Issue #10
 - Period basis validation: verify that declared basis components are legal for the source operation type.
 - Mutual exclusivity: reject any field declaration that has both `in` and `of`.
 - **Discrete equality narrowing:** A branch-scoped `QualifierNarrowingConstraint` fact, built from `when Field.accessor == 'literal'` guards and discharged by dedicated proof-engine strategies — value-exact for identity axes, D14 subset for the period basis. Reuses the guard branch-decomposition walk and the reassignment-invalidation pass; keeps a separate fact algebra from the numeric path.
-- **Money precision:** ISO 4217 minor-units lookup during constraint resolution. Default `maxplaces` derived from currency code. Half-even rounding on all money arithmetic results.
+- **Money precision:** `maxplaces` is explicit-only on all magnitude types — `money in '<currency>'` carries no implicit precision constraint. ISO 4217 minor-unit data is available via `CurrencyCatalog.Get(code).MinorUnit` for author-side rounding decisions. There is no implicit rounding: authors call `round(...)` explicitly (default mode half-even).
 - **Duration cancellation (D15):** When a duration operand appears against a compound type with a time-unit denominator, verify the denominator is `hours`, `minutes`, or `seconds`. Emit a compile error for `days`/`weeks`/`months`/`years` denominators with duration operands, with a teachable message explaining the fixed-length boundary.
 
 > **Implementation risk — cancellation algebra complexity:** Compound-type cancellation (`price × quantity = money`, `amount / exchangerate = money`) is the highest-complexity implementation item in this proposal. The design deliberately constrains scope via D15's single-basis matching rule — periods must match compound denominators exactly, multi-hop conversion chains and compound denominators are out of scope. Even so, the cancellation verifier touches type checking, operator resolution, and unit compatibility in a single pass. Budget implementation time accordingly.
