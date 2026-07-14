@@ -154,8 +154,8 @@ The shared temporal parsing subsystem lives in `src/Precept/Language/Time/`. `Te
 | `instant` | `Instant` | ISO instant with trailing `Z` | `2026-04-15T14:30:00Z` |
 | `zoneddatetime` | `ZonedDateTime` | Local datetime plus bracketed IANA zone | `2026-04-15T14:30:00[America/New_York]` |
 | `timezone` | `DateTimeZone` | IANA timezone identifier | `America/New_York` |
-| `duration` | `Duration` | Temporal quantity or ISO duration | `PT72H` |
-| `period` | `Period` | Temporal quantity or ISO period | `P30D` |
+| `duration` | `Duration` | Temporal quantity (typed constant) | `72:00:00` |
+| `period` | `Period` | Temporal quantity (typed constant) | `P30D` |
 
 **Timezone mediation** uses a single dot-accessor operation — `.inZone(tz)` — that produces a `zoneddatetime`, with navigation to local types via dot chains:
 - `myInstant.inZone(tz)` → `zoneddatetime`
@@ -593,7 +593,7 @@ when now() - IncidentAt <= '30 days'
 | `now().inZone(tz).date` | `date` | Today in timezone |
 | `now().inZone(tz).time` | `time` | Current time of day in timezone |
 
-**Locked Decision #21 — `now()` is UTC-only (no timezone overload):**
+**Locked Decision — `now()` is UTC-only (no timezone overload):**
 - **Decision:** `now()` returns `instant` (UTC). No `now(timezone)` variant.
 - **Why:** Timezone-aware "now" is structurally `now().inZone(tz)` — two explicit steps. A `now(tz)` shorthand would return `zoneddatetime`, introducing a second return type from the same function name. Overload resolution by argument type is a complexity Precept avoids. The two-step form is explicit and composable.
 - **Alternatives rejected:** `now(tz) → zoneddatetime` — second return type, overload complexity. `today() → date` shorthand — redundant (`now().inZone(tz).date` is the right pattern); encourages timezone-implicit date construction.
@@ -1729,7 +1729,7 @@ Temporal types are valid as collection inner types where the collection's struct
 
 **`queue of <T>` and `stack of <T>`** — all 8 temporal types are valid. Queues and stacks are ordered by insertion, not by value comparison.
 
-**`set of <T>`** — Precept sets are backed by `SortedSet<object>` and require `IComparable<T>`. Five temporal types support this:
+**`set of <T>`** — all eight temporal types are valid as set inner types: set membership needs only well-defined equality, which every temporal type has (NodaTime native). The five with a natural ordering additionally support `.min`/`.max`; on the other three those accessors are type errors:
 
 | Inner type | `set of` | `queue of` / `stack of` |
 |---|---|---|
@@ -1738,9 +1738,9 @@ Temporal types are valid as collection inner types where the collection's struct
 | `instant` | ✓ | ✓ |
 | `duration` | ✓ | ✓ |
 | `datetime` | ✓ | ✓ |
-| `period` | **✗** — no natural ordering | ✓ |
-| `timezone` | **✗** — no natural ordering | ✓ |
-| `zoneddatetime` | **✗** — no natural ordering | ✓ |
+| `period` | ✓ (equality; `.min`/`.max` are type errors) | ✓ |
+| `timezone` | ✓ (equality; `.min`/`.max` are type errors) | ✓ |
+| `zoneddatetime` | ✓ (equality; `.min`/`.max` are type errors) | ✓ |
 
 `set of period`, `set of timezone`, and `set of zoneddatetime` are valid — these types have well-defined equality semantics (NodaTime native) and set membership is coherent. `.min` and `.max` are type errors on these sets: the types carry no natural ordering. The error message is: `"Type '{T}' supports equality but not ordering. Remove the .min/.max call, or use a type that supports ordering."` The prior restriction ("use queue or stack instead") was more restrictive than necessary — equality alone is sufficient for set membership.
 

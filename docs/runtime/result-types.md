@@ -48,7 +48,7 @@ The runtime uses three type families to represent operation results:
 2. **UpdateOutcome** (4 variants) — returned by `Version.Update`. One committed result.
 3. **Inspection types** (EventInspection, UpdateInspection) — returned by `Version.InspectFire` and `Version.InspectUpdate`. Progressive annotated landscape.
 
-Faults (evaluator-level errors the type checker should have prevented) throw `FaultException` — they are not in the outcome hierarchy. See `fault-system.md`.
+Faults (evaluator-level errors the type checker should have prevented) are returned as the `EventOutcome.Faulted(Fault)` variant — a structured value inside the outcome hierarchy, never thrown. See `fault-system.md`.
 
 ## Responsibilities and Boundaries
 
@@ -60,7 +60,7 @@ Faults (evaluator-level errors the type checker should have prevented) throw `Fa
 - The `Version` API surface (`Fire`, `Update`, `InspectFire`, `InspectUpdate`)
 
 **Does NOT OWN**
-- Fault/exception handling — `FaultException` is defined in `fault-system.md`
+- Fault classification — `Fault` and `FaultCode` are defined in `fault-system.md` (surfaced here as the `EventOutcome.Faulted` variant)
 - The executable model or evaluation pipeline implementation — see `executable-model.md`
 - Constraint descriptors and catalog metadata — declared in the DSL catalog
 - DSL parsing and type checking
@@ -69,7 +69,7 @@ Faults (evaluator-level errors the type checker should have prevented) throw `Fa
 
 The result type families are scoped to exactly the operations the `Version` exposes: two commit operations (`Fire`, `Update`) and two inspection counterparts (`InspectFire`, `InspectUpdate`). Each commit operation returns its own sealed hierarchy so callers pattern-match exactly the variants their operation can produce. Inspection operations return an annotated landscape without committing state.
 
-Faults — errors the type checker should have prevented, such as referencing an unknown field — are excluded from the outcome hierarchy and throw `FaultException` instead. This keeps outcome hierarchies to business-meaningful variants and avoids forcing every call site to handle error conditions that are programmer errors.
+Faults — errors the type checker should have prevented, such as referencing an unknown field — surface as the single `EventOutcome.Faulted(Fault)` variant rather than as thrown exceptions. Confining them to one backstop variant keeps the rest of the hierarchy business-meaningful while still letting a caller pattern-match the impossible-path case explicitly, with no hidden control flow.
 
 ## Inputs and Outputs
 
@@ -425,7 +425,7 @@ Guard evaluation under partial args must use Kleene three-value logic. Compariso
 
 - `compiler-and-runtime-design.md` — compiler/runtime architecture overview
 - `executable-model.md` (D8/R4) — arg-dependency sets and evaluator contract
-- `fault-system.md` — `FaultException`; evaluator-level faults excluded from outcome hierarchy
+- `fault-system.md` — `Fault`/`FaultCode`; an evaluator-level fault is returned as the `EventOutcome.Faulted(Fault)` variant
 - `runtime-api.md` — full `Version` API spec; § Constraint Exposure Model (three-tier model, Tier 3 = `ConstraintResult.Constraint`)
 
 ---

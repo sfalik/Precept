@@ -11,7 +11,7 @@ public static class Types
         new FixedReturnAccessor("year",      TypeKind.Integer, "Year component"),
         new FixedReturnAccessor("month",     TypeKind.Integer, "Month component"),
         new FixedReturnAccessor("day",       TypeKind.Integer, "Day component"),
-        new FixedReturnAccessor("dayOfWeek", TypeKind.Integer, "Day of week (0=Sunday)"),
+        new FixedReturnAccessor("dayOfWeek", TypeKind.Integer, "ISO day of week: Monday=1, Sunday=7"),
     ];
 
     private static readonly TypeAccessor[] TimeComponentAccessors =

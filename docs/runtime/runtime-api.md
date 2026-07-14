@@ -80,7 +80,7 @@ The API surface is deliberately small. Two types carry the entire public contrac
 
 **OWNS:** Public API surface (`Precept` and `Version`); executable model lifecycle (construction from `Compilation`, validation); entity construction (`Create`, `InspectCreate`); entity restoration (`Restore`); operation dispatch (`Fire`, `Update`); inspection surface (`InspectFire`, `InspectUpdate`); definition-level structural queries (`States`, `Fields`, `Events`, `Constraints`); constraint exposure model (all three tiers); field access surface (`FieldAccess`, `AvailableEvents`, `RequiredArgs`, `ApplicableConstraints`).
 
-**Does NOT OWN:** Compilation (owned by the compiler pipeline); evaluation logic (owned by the `Evaluator`); executable model internals / dispatch table layouts (pending D8/R4); result type definitions (`EventOutcome.cs`, `UpdateOutcome.cs`); descriptor type definitions (`Descriptors.cs`); fault system (`FaultException` and fault site taxonomy).
+**Does NOT OWN:** Compilation (owned by the compiler pipeline); evaluation logic (owned by the `Evaluator`); executable model internals / dispatch table layouts (pending D8/R4); result type definitions (`EventOutcome.cs`, `UpdateOutcome.cs`); descriptor type definitions (`Descriptors.cs`); fault system (`Fault` and fault site taxonomy).
 
 ---
 
@@ -882,7 +882,7 @@ For stateless precepts (no `state` declarations), `CreateInitialVersion` returns
 ## Deliberate Exclusions
 
 - **No `IReadOnlyDictionary<string, object?>` overloads.** Fully obsolete. The two-lane ingress (JSON + typed) covers all callers. No dictionary-based convenience extensions exist or will be added.
-- **No fault type definitions.** `FaultException` and fault site taxonomy are in `fault-system.md`. The runtime API surface only produces structured outcomes — faults are the exceptional escape hatch for impossible-path bugs, not part of the normal outcome model.
+- **No fault type definitions.** `Fault` and fault site taxonomy are in `fault-system.md`. The runtime API surface produces structured outcomes only; an evaluator fault surfaces as the `EventOutcome.Faulted(Fault)` variant — a backstop for impossible-path bugs — never thrown.
 - **No result type hierarchy.** Full `EventOutcome`, `UpdateOutcome`, and inspection type shapes are in `result-types.md`. This document covers when and why each operation produces outcomes; `result-types.md` covers the shape of each type.
 - **No evaluation logic.** The runtime API delegates all evaluation to the `Evaluator`. No pipeline mechanics live in `Precept.cs` or `Version.cs`.
 - **No build-time analysis.** Graph analysis, type checking, and compilation are owned by the compiler pipeline. `Precept.From()` accepts only an error-free `Compilation` — it does not re-analyze.
@@ -896,7 +896,7 @@ For stateless precepts (no `state` declarations), `CreateInitialVersion` returns
 |---|---|
 | Compiler and runtime architectural decisions (R1–R5, D8) | `docs/compiler-and-runtime-design.md` |
 | Full result type taxonomy (`EventOutcome`, `UpdateOutcome`, inspection types) | `docs/runtime/result-types.md` |
-| Fault system and `FaultException` taxonomy | `docs/runtime/fault-system.md` |
+| Fault system and `Fault` taxonomy | `docs/runtime/fault-system.md` |
 | Evaluator — plan execution and pipeline mechanics | `docs/runtime/evaluator.md` |
 | Descriptor types used in outcomes and inspections | `docs/runtime/descriptor-types.md` |
 | Precept Builder — how the executable model is constructed from `Compilation` | `docs/runtime/precept-builder.md` |

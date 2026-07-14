@@ -7,7 +7,7 @@
 | Property | Value |
 |---|---|
 | Doc maturity | Incremental — grows as each compiler stage is designed and implemented |
-| Implementation state | §1 Lexer complete; §2 Parser complete; §3 Name Binding and Type Checker complete; §3A Language Semantics complete; §0 Preamble complete; §4 Graph Analyzer complete; §5 Proof Engine complete |
+| Implementation state | §1 Lexer complete; §2 Parser complete; §3 Name Binding and Type Checker complete; §3A Language Semantics complete; §0 Preamble complete; §4 Graph Analyzer complete; §5 Proof Engine — base engine implemented; prove-or-reject MVP + fail-open soundness fixes designed, not yet implemented (see docs/compiler/proof-engine.md) |
 | Grounding | `docs/archive/language-design/precept-language-vision.md` (archived v1 vision) |
 | Clean room rule | References v1 grammar and keyword inventory; does not import v1 implementation details |
 
@@ -234,17 +234,17 @@ The proof layer is governed by these requirements, which are language-level comm
 
 #### Implementation status
 
-The proof-engine obligations enumerated above describe the full language-level contract. As of 2026-05-24 the following obligations are **specification-only** — the runtime gate does not depend on them, and the Compiler Readiness Plan (Phase 5) tracks the work to ship each one:
+The proof-engine obligations enumerated above describe the full language-level contract. The proof engine's satisfiability scan now emits the rule- and guard-level obligations that a prior version of this table marked unbuilt — see [`diagnostic-system.md`](../compiler/diagnostic-system.md) and [`proof-engine.md`](../compiler/proof-engine.md):
 
-| # | Obligation | Status | Tracking ID |
-|---|---|---|---|
-| 7 | Contradictory rule detection | Specification-only | F-LANG-SPEC-03 (Phase 5) |
-| 8 | Vacuous rule detection | Specification-only | F-LANG-SPEC-04 (Phase 5) |
-| 9 | Dead guard detection (`UnsatisfiableGuard` PRE0082) | Specification-only | F-LANG-SPEC-02 (Phase 5) |
-| 10 | Tautological guard detection | Specification-only | F-LANG-SPEC-05 (Phase 5) |
-| 12 | Sharpened reachability/routing diagnostics from proven-dead guards | Specification-only — depends on #9 + #10 | F-LANG-SPEC-12 (Phase 5) |
+| # | Obligation | Status |
+|---|---|---|
+| 7 | Contradictory rule detection (`ContradictoryRule` PRE0155, `UnsatisfiableRule` PRE0159) | Implemented — emitting |
+| 8 | Vacuous rule detection (`VacuousRule` PRE0154) | Implemented — emitting |
+| 9 | Dead guard detection (`UnsatisfiableGuard` PRE0082) | Implemented — emitting |
+| 10 | Tautological guard detection (`TautologicalGuard` PRE0153) | Implemented — emitting |
+| 12 | Sharpened reachability/routing diagnostics from proven-dead guards | Specification-only — depends on #9 + #10 |
 
-All other obligations (numeric intervals, relational reasoning, divisor safety, non-negative obligations, unit-aware comparison, assignment-range impossibility, default-violation enforcement, proof attribution) are implemented and exercised by the proof-engine test suite. Authors who depend on the specification-only obligations today must supply the equivalent hand-written constraints (an explicit `rule` or `ensure`) until Phase 5 ships them.
+All other obligations (numeric intervals, relational reasoning, divisor safety, non-negative obligations, unit-aware comparison, assignment-range impossibility, default-violation enforcement, proof attribution) are implemented and exercised by the proof-engine test suite. Obligation 12 (sharpened reachability/routing from proven-dead guards) is the one remaining specification-only item; an author who depends on it today supplies the equivalent hand-written constraint (an explicit `rule` or `ensure`) until it ships.
 
 **Assignment-range impossibility (item 6) — string-length dimension.** Length containment for `minlength`/`maxlength`-bounded string fields now covers **non-literal** assignment RHS, not only string literals. The proof engine computes a static string-length interval for the assigned expression (literal, field/arg reference, concatenation, conditional, interpolation, member access, and the length-stable string functions) and discharges the obligation only when that interval is provably within the declared bounds; an unbounded source flowing into a capped field is a genuine gap that the author closes by declaring the matching bound on the source (§0.7 Composition). A collection's string inner type may carry the same `minlength`/`maxlength` bound (`queue of string maxlength 200` — §2.3): an element read via a collection accessor (`.peek`/`.first`/`.last`) then carries that bound and proves into a capped destination, and an element write-site must prove its source within the bound.
 
@@ -328,7 +328,7 @@ Every token the lexer can produce. Organized by category to match the `TokenKind
 | `As` | `as` | Type annotation (`field X as number`) |
 | `Default` | `default` | Default value modifier |
 | `Optional` | `optional` | Field optionality modifier (v2) |
-| (retired) | (retired) | The `writable` field-level modifier was retired in favor of the unified `editable` access-mode adjective (F-LANG-GRAPH-04). The `Editable` token now stands at both field-declaration and per-state-modify positions. |
+| (retired) | (retired) | The `writable` field-level modifier was retired in favor of the unified `editable` access-mode adjective. The `Editable` token now stands at both field-declaration and per-state-modify positions. |
 | `Because` | `because` | Reason clause |
 | `Initial` | `initial` | Initial state marker |
 | `Ascending` | `ascending` | Sort direction modifier — ascending order for `queue of T by P` and `log of T by P` (v3) |
@@ -580,7 +580,7 @@ Keywords are **strictly lowercase**. Identifiers are case-sensitive: `From` is a
 The complete v2 reserved keyword set:
 
 ```
-precept  field  as  default  optional  writable  rule  because
+precept  field  as  default  optional  rule  because
 state  initial  terminal  required  irreversible  event  ensure
 success  warning  error
 in  to  from  on  when  any  all  each  of  by  at  for
@@ -599,7 +599,7 @@ min  max  minlength  maxlength  mincount  maxcount
 ascending  descending  countof  peekby
 ```
 
-**v2 additions** (not in v1): `optional`, `writable`, `omit`, `clear`, `nonzero`, `is`, `integer`, `decimal`, `choice`, `maxplaces`, `ordered`, `terminal`, `required`, `irreversible`, `success`, `warning`, `error`, `date`, `time`, `instant`, `duration`, `period`, `timezone`, `zoneddatetime`, `datetime`, `money`, `currency`, `quantity`, `unitofmeasure`, `dimension`, `price`, `exchangerate`, `each`.
+**v2 additions** (not in v1): `optional`, `omit`, `clear`, `nonzero`, `is`, `integer`, `decimal`, `choice`, `maxplaces`, `ordered`, `terminal`, `required`, `irreversible`, `success`, `warning`, `error`, `date`, `time`, `instant`, `duration`, `period`, `timezone`, `zoneddatetime`, `datetime`, `money`, `currency`, `quantity`, `unitofmeasure`, `dimension`, `price`, `exchangerate`, `each`.
 
 > **Quantifier keywords:** `each` (v2), `any`, and `no` serve as quantifier keywords in expression position when followed by `Identifier in CollectionRef (`. `each` is quantifier-only. `any` also appears as state wildcard (`in any`, `from any`). `no` also appears in `no transition`. Disambiguation is by lookahead at the parser level — the lexer emits a single token kind for each.
 
@@ -1062,7 +1062,7 @@ Root-level access mode declarations are **not valid syntax** — use the `editab
 
 State-scoped access modes (`in StateTarget`) use `modify` for constraint declarations and `omit` for structural exclusion. `StateTarget` may be a single state name, a comma-delimited list of state names, or `any`; comma-delimited state targets expand to one independent access-mode or omit declaration per named state. Guarded access modes read `in <StateTarget> when <Guard> modify <FieldTarget> readonly|editable`; the field target is either `all` or a comma-separated list of field names.
 
-The `editable` keyword is a single shared keyword at both positions (field declaration and per-state `modify F editable`). Per F-LANG-GRAPH-04, this is the cross-position-unified pattern used by 6 of 8 surveyed comparator languages (TypeScript `readonly`, Kotlin `val`/`var`, Swift `let`/`var`, C# `readonly`, Java `final`, Scala `val`/`var`); the prior split between `writable` (field declaration) and `editable` (per-state) was retired before external authors saw it.
+The `editable` keyword is a single shared keyword at both positions (field declaration and per-state `modify F editable`). This is the cross-position-unified pattern used by 6 of 8 surveyed comparator languages (TypeScript `readonly`, Kotlin `val`/`var`, Swift `let`/`var`, C# `readonly`, Java `final`, Scala `val`/`var`); the prior split between `writable` (field declaration) and `editable` (per-state) was retired before external authors saw it.
 
 **Composition rules:**
 1. **Field baseline** — `editable` modifier on a field declaration sets the field's default to editable across all states.
@@ -1583,20 +1583,20 @@ Functions are validated against a closed catalog. There are no user-defined func
 |  | `(quantity, integer) → quantity` | `quantity` | `places` must be non-negative integer; result preserves the input unit qualifier |
 | `approximate(value)` | `(decimal) → number` | `number` | **Explicit bridge: decimal→number**; makes precision loss visible |
 | `pow(base, exp)` | `(numeric, integer) → numeric` | Same numeric type as `base` | `exp` must be non-negative for integer lane |
-| `sqrt(value)` | `(number) → number` | `number` | Number-lane only; `decimal` and `integer` inputs are type errors (no .NET `Math.Sqrt` overload for `decimal`; use `approximate(value)` to convert first). Proof engine checks non-negativity. |
+| `sqrt(value)` | `(number) → number` | `number` | Number-lane only; `decimal` inputs are a type error (no .NET `Math.Sqrt` overload for `decimal`; use `approximate(value)` to convert first); `integer` widens losslessly to `number`. Proof engine checks non-negativity. |
 | `trim(value)` | `(string) → string` | `string` | — |
 | `startsWith(s, prefix)` | `(string, string) → boolean` | `boolean` | Case-sensitive. Compile error when first arg is `~string` — use `~startsWith` instead. See `CaseInsensitiveFieldRequiresTildeStartsWith`. |
 | `endsWith(s, suffix)` | `(string, string) → boolean` | `boolean` | Case-sensitive. Compile error when first arg is `~string` — use `~endsWith` instead. See `CaseInsensitiveFieldRequiresTildeEndsWith`. |
 | `~startsWith(s, prefix)` | `(~string, string) → boolean` | `boolean` | CI prefix test using `OrdinalIgnoreCase`. First arg must be `~string`; compile error otherwise. |
 | `~endsWith(s, suffix)` | `(~string, string) → boolean` | `boolean` | CI suffix test using `OrdinalIgnoreCase`. First arg must be `~string`; compile error otherwise. |
-
-> **CI functions and the catalog.** `~startsWith` and `~endsWith` have dedicated `FunctionKind` catalog entries (`TildeStartsWith`, `TildeEndsWith`) and are syntactically distinct from regular function calls. The leading `~` token is the null-denotation leader for the `CIFunctionCallExpression` expression form (ExpressionForms catalog). Completions, hover, and MCP vocabulary derive from `FunctionMeta` entries — not from the `HasCIVariant` flag on the base functions.
 | `toLower(s)` | `(string) → string` | `string` | Lowercase (invariant culture) |
 | `toUpper(s)` | `(string) → string` | `string` | Uppercase (invariant culture) |
 | `left(s, n)` | `(string, integer) → string` | `string` | Leftmost N code units (clamped to string length) |
 | `right(s, n)` | `(string, integer) → string` | `string` | Rightmost N code units (clamped to string length) |
 | `mid(s, start, length)` | `(string, integer, integer) → string` | `string` | 1-indexed substring (clamped); `start` and `length` must be positive `integer` |
 | `now()` | `() → instant` | `instant` | — |
+
+> **CI functions and the catalog.** `~startsWith` and `~endsWith` have dedicated `FunctionKind` catalog entries (`TildeStartsWith`, `TildeEndsWith`) and are syntactically distinct from regular function calls. The leading `~` token is the null-denotation leader for the `CIFunctionCallExpression` expression form (ExpressionForms catalog). Completions, hover, and MCP vocabulary derive from `FunctionMeta` entries — not from the `HasCIVariant` flag on the base functions.
 
 > **`~string` argument compatibility for string functions.** Functions accepting `(string)` parameters — `trim`, `toLower`, `toUpper`, `left`, `right`, `mid` — also accept `~string` arguments via the bidirectional assignment compatibility rule (§3.8). No enforcement diagnostic is emitted for these functions. CI semantics do not apply to structural operations — these functions operate on the stored value regardless of the `~` qualifier.
 
@@ -1723,11 +1723,11 @@ Type errors: applying a set operation to a non-set field, a queue operation to a
 | Field not declared | Access mode names a field that doesn't exist | `UndeclaredField` |
 | State not declared | Access mode scoped to a state that doesn't exist | `UndeclaredState` |
 | Computed field in editable mode | A computed field is listed in a `modify ... editable` access mode declaration | `ComputedFieldNotWritable` |
-| `writable` on computed field | A computed field carries the `writable` modifier | `ComputedFieldNotWritable` |
-| `writable` on event arg | An event argument carries the `writable` modifier | `WritableOnEventArg` |
+| `editable` on computed field | A computed field carries the `editable` modifier | `ComputedFieldNotWritable` |
+| `editable` on event arg | An event argument carries the `editable` modifier | `EditableOnEventArg` |
 | Conflicting access modes | Same field has both `modify` and `omit` in the same state | `ConflictingAccessModes` |
-| Redundant access mode (unguarded) | `in <State> modify F editable` where `F` has `writable` (baseline already editable), or `in <State> modify F readonly` where `F` lacks `writable` (baseline already read-only); named-field forms only | `RedundantAccessMode` (error) |
-| Redundant access mode (guarded) | `in <State> when Guard modify F readonly` where `F` lacks `writable` — guard-true branch = read-only, guard-false branch = read-only (D3 baseline); the guard changes nothing | `RedundantAccessMode` (error) |
+| Redundant access mode (unguarded) | `in <State> modify F editable` where `F` is `editable` (baseline already editable), or `in <State> modify F readonly` where `F` is not `editable` (baseline already read-only); named-field forms only | `RedundantAccessMode` (error) |
+| Redundant access mode (guarded) | `in <State> when Guard modify F readonly` where `F` is not `editable` — guard-true branch = read-only, guard-false branch = read-only (D3 baseline); the guard changes nothing | `RedundantAccessMode` (error) |
 
 #### Computed field validation
 
@@ -2130,7 +2130,7 @@ This is not merely a tooling convenience. It is a language-level guarantee that 
 
 ## 5. Proof Engine
 
-> **Status:** Implemented.
+> **Status:** Base engine implemented; prove-or-reject MVP and fail-open soundness fixes designed, not yet implemented — see docs/compiler/proof-engine.md.
 
 Precept's proof system is the compile-time layer that prevents invalid qualifier and safety configurations from entering an accepted definition. Conceptually it runs in two passes: it first instantiates proof obligations from typed expressions and actions, then discharges those obligations from literals, declaration metadata, guards, simple flow facts, and qualifier compatibility. It also checks initial-state satisfiability against default values (`PRE0115`). See [`docs/compiler/proof-engine.md`](../compiler/proof-engine.md) for implementation detail and §7 there for qualifier-resolution mechanics.
 

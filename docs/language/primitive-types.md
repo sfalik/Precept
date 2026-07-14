@@ -67,7 +67,7 @@ Precept has six primitive types. Each has a fixed backing type, a defined operat
 | `decimal` | exact base-10 fractional | Financial, rate, tax — exactness required | `3.14` |
 | `number` | IEEE 754 double | Scientific, scoring — approximation acceptable | `1.5e2` |
 | `boolean` | true/false | Guards, conditions, flags | `true` |
-| `choice` | finite string set | Enumerations with optional ordering | `"draft"` |
+| `choice` | finite set of typed literals (string / integer / decimal / number / boolean) | Enumerations with optional ordering | `"draft"`, `3` |
 
 ---
 
@@ -82,7 +82,7 @@ Per [`philosophy.md`](../philosophy.md) — "honesty about approximation": Prece
 | `decimal` | Exact | Base-10 fractional arithmetic; no float drift. Use for financial, rates, tax, currency-precision-sensitive values. |
 | `number` | **Approximate by design** | IEEE 754 double. Tolerates approximation error; appropriate for scientific computation, scoring, statistical aggregates. The proof engine cannot prove exact equality on `number`. |
 | `boolean` | Exact | Two values, no third. |
-| `choice` | Exact | Finite enumeration. |
+| `choice` | Exact | Finite enumeration over one backing element type (`string`, `integer`, `decimal`, `number`, or `boolean`). |
 
 **The lane separation matters.** `decimal` and `number` are distinct types — there is no implicit coercion. An author who writes `field Price as number` has opted into approximation; one who writes `field Price as decimal` has opted out. Mixing them in arithmetic requires an explicit conversion; the type system surfaces the choice rather than hiding it. See [Numeric Lane Rules](#numeric-lane-rules) for the full rule set.
 
@@ -323,9 +323,10 @@ Relational comparison (`<`, `>`, `<=`, `>=`) is a type error. Arithmetic is a ty
 ```precept
 field Status as choice of string("draft", "active", "closed") default "draft"
 field Priority as choice of string("low", "medium", "high") ordered default "low"
+field EscalationLevel as choice of integer(1, 2, 3) ordered default 1
 ```
 
-**Backing:** String value constrained to a declared finite set. Stored and serialized as the string value.
+**Backing:** A value constrained to a declared finite set of literals. The element type is one of `string`, `integer`, `decimal`, `number`, or `boolean` (`ChoiceElementType`, spec §3.8); string is the common case. Stored and serialized as the underlying element value.
 
 **Variants:**
 
@@ -344,7 +345,7 @@ field Priority as choice of string("low", "medium", "high") ordered default "low
 
 Arithmetic is a type error. Logical operators are a type error.
 
-**Ordinal rank is field-local.** Comparison is valid only between a choice field and a literal from its own declared set. Comparing two choice fields — even with the same member set — is a compile-time error.
+**Ordinal rank is field-local.** A choice field always compares against a literal from its own declared set. Two choice fields may also be compared with `<` `>` `<=` `>=` when both are `ordered`, share the same backing element type, and one field's declared value order is an order-preserving subsequence of the other's — the shared ordering is what makes their ranks commensurable. When that subsequence relationship does not hold (disjoint sets, a mismatched element type, or incompatible orderings), the comparison is a compile-time type error. See [Language Spec §3.6](precept-language-spec.md).
 
 **Literal validation:** Every literal assigned to or compared against a choice field must be a member of that field's declared set. Non-member literals are compile-time errors, in both assignment and comparison positions.
 

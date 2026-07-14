@@ -5,10 +5,10 @@
 | Property | Value |
 |----------|-------|
 | Doc maturity | Draft — type definitions documented; evaluator integration sections pending |
-| Implementation state | Partial — `FaultCode`, `FaultMeta`, `Faults`, `Fault`, `FaultSeverity` implemented; `FaultException` and evaluator integration pending |
+| Implementation state | Partial — `FaultCode`, `FaultMeta`, `Faults`, `Fault`, `FaultSeverity` implemented; evaluator integration pending |
 | Source | `src/Precept/Language/FaultCode.cs`, `src/Precept/Language/Fault.cs`, `src/Precept/Language/Faults.cs` |
 | Upstream | `docs/compiler/diagnostic-system.md` — every `FaultCode` member references a `DiagnosticCode` via `[StaticallyPreventable]` |
-| Downstream | `docs/runtime/result-types.md` — `FaultException` exits the outcome hierarchy; `docs/runtime/evaluator.md` — the evaluator produces `Fault` values |
+| Downstream | `docs/runtime/result-types.md` — a fault is returned as the `EventOutcome.Faulted(Fault)` variant; `docs/runtime/evaluator.md` — the evaluator produces `Fault` values |
 
 ## Contents
 
@@ -63,8 +63,8 @@ The relationship between the two systems is structural, not incidental. Every `F
 
 ### Does NOT OWN
 
-- `EventOutcome`, `UpdateOutcome` result hierarchies — see `result-types.md`; faults are outside the normal outcome hierarchy
-- How the evaluator throws or returns `Fault` values (`FaultException` shape, result type) — see `evaluator.md` and open question Q1
+- `EventOutcome`, `UpdateOutcome` result hierarchies — see `result-types.md`; a fault is surfaced as the `EventOutcome.Faulted(Fault)` variant defined there
+- How the evaluator produces `Fault` values and returns them as the `EventOutcome.Faulted` variant — see `evaluator.md`
 - `DiagnosticCode` definitions and compiler pipeline diagnostics — see `diagnostic-system.md`
 - Roslyn analyzer rules (PRECEPT0001–PRECEPT0004, PRECEPT0016) that enforce the chain — see `src/Precept.Analyzers/`
 
@@ -92,7 +92,7 @@ The fault system mirrors the compiler's diagnostic system but is trimmed for the
 
 | Output | Consumer |
 |--------|----------|
-| `Fault` (readonly record struct) | Evaluator → `FaultException` → caller (shape pending Q1) |
+| `Fault` (readonly record struct) | Evaluator → `EventOutcome.Faulted(Fault)` → caller |
 | `FaultMeta` | MCP `precept_proofs` enumerates `Faults.All` to list all evaluator fault codes; `precept_diagnostic <CODE>` returns per-code detail |
 | `Faults.All` | Language server and drift tests enumerate all registered fault codes |
 
@@ -122,7 +122,7 @@ public enum FaultCode
     [StaticallyPreventable(DiagnosticCode.UndeclaredField)]
     UndeclaredField,
 
-    [StaticallyPreventable(DiagnosticCode.NullInNonNullableContext)]
+    [StaticallyPreventable(DiagnosticCode.UnprovedPresenceRequirement)]
     UnexpectedNull,
 
     [StaticallyPreventable(DiagnosticCode.InvalidMemberAccess)]
@@ -148,6 +148,12 @@ public enum FaultCode
 
     [StaticallyPreventable(DiagnosticCode.OutOfRange)]
     OutOfRange,
+
+    [StaticallyPreventable(DiagnosticCode.LengthBoundViolation)]
+    LengthBoundViolation,
+
+    [StaticallyPreventable(DiagnosticCode.CountBoundViolation)]
+    CountBoundViolation,
 }
 ```
 
@@ -187,7 +193,7 @@ public static class Faults
         FaultCode.DivisionByZero => new(nameof(FaultCode.DivisionByZero),
             "Divisor evaluated to zero",
             RecoveryHint: "Guard the transition with 'when Divisor != 0', or apply the 'nonzero' or 'positive' modifier to the divisor field"),
-        // ... all 13 members, exhaustive, nameof()-derived ...
+        // ... all 15 members, exhaustive, nameof()-derived ...
         _ => throw new ArgumentOutOfRangeException(nameof(code), code, null),
     };
 
@@ -285,20 +291,20 @@ The prototype evaluator throws `ConstraintViolationException` on rule violations
 
 ## Open Questions / Implementation Notes
 
-### Q1 — Evaluator result type
+### Q1 — Evaluator result type (resolved)
 
-What does the evaluator return? The fault system's output type depends on this decision.
+**Resolved:** a fault is returned as the `EventOutcome.Faulted(Fault)` variant — a structured value inside the outcome hierarchy, never thrown. `Version.Fire` surfaces it exactly like any other outcome; callers pattern-match `Faulted` alongside `Transitioned`, `Applied`, and the rest. There is no `FaultException` control-flow path.
 
-**Candidates:**
+The options weighed before settling on the outcome-variant shape:
 
 | Option | Shape | Trade-off |
 |--------|-------|-----------|
-| Exception | `throw FaultException(fault)` | Simple; fault is rare path; loses structured return |
+| Outcome variant (chosen) | `EventOutcome.Faulted(Fault)` | Structured, pattern-matched at the one call site that already switches on `EventOutcome`; no hidden control flow |
+| Exception | `throw FaultException(fault)` | Simple; fault is a rare path; loses structured return and adds a hidden escape path |
 | Discriminated union | `Result<T, Fault>` | Explicit at every call site; C# lacks native DU syntax |
 | Out parameter | `bool TryEval(out T value, out Fault? fault)` | Familiar; ugly for nested expressions |
-| Nullable return + fault field | `EvalResult<T> { Value?, Fault? }` | Simple record; requires null checks |
 
-The prototype uses exceptions (`ConstraintViolationException`). `result-types.md` currently references `FaultException` as the throw path — faults are outside the `EventOutcome`/`UpdateOutcome` hierarchy. The new design should decide whether `Fault` is a control-flow exception or a structured value before `Fault` is finalized.
+The prototype used exceptions (`ConstraintViolationException`); the redesign does not — `Fault` is a structured value carried by `EventOutcome.Faulted`, consistent with the outcome-based model the rest of the runtime uses.
 
 ### Q2 — Fault context
 
@@ -319,7 +325,7 @@ This affects how aggressively the evaluator should assert vs. gracefully fault. 
 
 ## Deliberate Exclusions
 
-**`FaultException` type** — not yet implemented. Whether faults are thrown as exceptions or returned as structured values is open question Q1. Adding `FaultException` before the evaluator result type is decided would constrain the design.
+**`FaultException` type** — deliberately excluded. Faults are returned as the `EventOutcome.Faulted(Fault)` variant, never thrown (Q1, resolved), so no fault-carrying exception type exists in the design.
 
 **`Fault.SourceSpan`** — excluded from the current `Fault` struct. At runtime, there is no source text in scope; the expression being evaluated is an in-memory execution plan, not a construct manifest. If expression context is needed it will be a different field shape (see Q2).
 
@@ -334,7 +340,7 @@ This affects how aggressively the evaluator should assert vs. gracefully fault. 
 | Document | Relationship |
 |----------|-------------|
 | [diagnostic-system.md](../compiler/diagnostic-system.md) | Mirror document — every `FaultCode` member links to a `DiagnosticCode` via `[StaticallyPreventable]`; the full enforcement chain, end-to-end example, and PREC rule rationale are documented there |
-| [result-types.md](result-types.md) | Defines `EventOutcome` and `UpdateOutcome`; faults exit this hierarchy via `FaultException` (pending Q1) |
+| [result-types.md](result-types.md) | Defines `EventOutcome` and `UpdateOutcome`; a fault is returned as the `EventOutcome.Faulted(Fault)` variant within this hierarchy |
 | [evaluator.md](evaluator.md) | The evaluator is the primary consumer of the fault system; calls `Fail(FaultCode.X)` at each failure site |
 | [runtime-api.md](runtime-api.md) | Public API surface that exposes fault information to host applications |
 

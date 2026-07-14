@@ -443,7 +443,7 @@ public static class Diagnostics
 {
     public static DiagnosticMeta GetMeta(DiagnosticCode code) => code switch
     {
-        // 144 arms — one per DiagnosticCode member.
+        // 164 arms — one per DiagnosticCode member.
         // Each arm maps the code to its stage, severity, message template, category,
         // and optional related codes, fix hints, fault prevention links, and suggestion sources.
         // Representative examples:
@@ -452,7 +452,7 @@ public static class Diagnostics
         DiagnosticCode.UndeclaredField               => new(..., DiagnosticCategory.Naming, SuggestionSources: [SuggestionSource.UserFields]),
         DiagnosticCode.UnreachableState              => new(..., DiagnosticCategory.Safety),
         DiagnosticCode.DivisionByZero                => new(..., DiagnosticCategory.Proof, PreventsFault: FaultCode.DivisionByZero),
-        // ... (all 115 arms present in source)
+        // ... (all 164 arms present in source)
     };
 
     public static Diagnostic Create(
