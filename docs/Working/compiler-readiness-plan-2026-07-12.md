@@ -426,26 +426,51 @@ time those slices run.
 
 ### The per-slice process (the floor every slice gets)
 
-1. **Doc + code review** (delegated) — read the current code the slice touches + its canonical
-   docs; verify anchors (which will have shifted), confirm the reuse seams, surface any drift or
-   refactor/removal.
-2. **Acceptance criteria — locked BEFORE any code** — the full input/obligation family
-   enumerated, one failing test per shape + one per soundness/invariant rule, as `# EXPECT:`
-   diagnostic samples under `test/integrationtests/diagnostics/` + full-compile assertions
-   (`Compiler.Compile(...)` / `CompileExpectingError`, never the type-checker-only `Check`). This
-   is the non-negotiable.
-3. **Adversarial review** (Fable, soundness-critical slices) — before code on the design/criteria,
-   and after code on the diff.
-4. **[Design pass — only where genuinely open]** a `/design` pass (Fable judge-panel) where real
-   design space exists.
-5. **Gate → delegate build to a fresh worktree agent → adversarial diff review → integrate →
+1. **Doc + code review (delegated, rigorous)** — read the current code the slice touches and its
+   canonical docs **against committed HEAD**; verify anchors (which will have shifted), confirm
+   the reuse seams, and produce a **drift ledger**: every place a canonical doc diverges from the
+   actual code/behavior the slice touches, plus any stale framing (working-doc statuses,
+   superseded decisions). Classify each entry — unintended drift to correct vs. an intended-but-
+   not-yet-built target to leave stated.
+
+2. **[Design pass — only where genuinely open]** a `/design` pass **run as a fresh, independent
+   Fable subagent** (grounded through its prompt at the source docs + the locked-vs-open split —
+   *not* a fork; see model-tiering), where real design space exists. It runs here, before the doc
+   correction, so the canon has a correct, locked design to be reconciled *to*. The main loop
+   **orchestrates and relays** the result for owner review; it does not author the design itself,
+   and it is not the last word on whether the design is right.
+
+3. **Canonical-doc review and correction — gated, BEFORE acceptance criteria.** Actually correct
+   the canonical docs the slice touches (spec, the affected stage doc, the catalog inventory, and
+   the diagnostic/runtime/tooling docs per the CLAUDE.md routing table) so they match ground truth
+   and the locked design **before anything is derived from them**. Canonical-doc edits are load-
+   bearing → **owner-visible diff, owner sign-off before acceptance criteria proceed.** Ground
+   every correction against **committed HEAD** (never let a this-session working-tree edit validate
+   itself); the spec states the *intended* end-state, so **remove only unintended drift — never
+   annotate a not-yet-built target as absent, and never falsely claim a target is implemented.**
+   *Why this gates the acceptance criteria:* the criteria — and every downstream build agent — are
+   derived from the canon; writing them against a stale doc propagates the drift into the tests and
+   then the code. Reconcile the source doc; do not patch around it in a prompt (agents inherit
+   whatever canon you hand them).
+
+4. **Acceptance criteria — locked BEFORE any code, derived from the corrected canon** — the full
+   input/obligation family enumerated, one failing test per shape + one per soundness/invariant
+   rule, as `# EXPECT:` diagnostic samples under `test/integrationtests/diagnostics/` + full-compile
+   assertions (`Compiler.Compile(...)` / `CompileExpectingError`, never the type-checker-only
+   `Check`). This is the non-negotiable.
+
+5. **Adversarial review (Fable, soundness-critical slices)** — a separate pass *outside* the
+   authoring/correction work: before code, over the corrected docs + design + criteria; after code,
+   over the diff.
+
+6. **Gate → delegate build to a fresh worktree agent → adversarial diff review → integrate →
    pause at the slice boundary for owner review.**
 
 ### Rigor tiering (how much per slice — calibrated, not uniform)
 
-| Slice | Design | Doc+code review | Acceptance criteria | Adversarial (Fable) |
+| Slice | Design | Doc review + correction | Acceptance criteria | Adversarial (Fable) |
 |---|---|---|---|---|
-| **Slice 0** (DU + certificate + CertificateSteps + 4 fail-open fixes) | Full `/design` (lean 2-lens Fable panel — CertificateSteps membership + witness shape genuinely open) | Deep | Exhaustive (each fail-open hole failing-test-first + the ⊥/anti-transitivity/staleness invariant cells) | Before & after |
+| **Slice 0** (DU + certificate + CertificateSteps + 4 fail-open fixes) | Full `/design` as one independent Fable subagent carrying both the legibility and soundness lenses itself — the `CertificateSteps` membership is the open substance; the witness is already locked (architecture §1.4) except the Presence/KeyPresence config-witness cell, which defaults to deferred | Deep | Exhaustive (each fail-open hole failing-test-first + the ⊥/anti-transitivity/staleness invariant cells) | Before & after |
 | **§1a / §6 / §2** (proof strategies) | Design **review** (seams ruled) | Deep (soundness rails) | Full family + rail cells | Before & after |
 | **§4a witness** | Some design (rendering + open grid cells) | Moderate | Full witness family | Before & after |
 | **§3 money / structural-severity** (mechanical) | Light — confirm the ruled seam | Moderate | Op/severity family + corpus reconciliation | Focused (money ⊥-in-arithmetic; terminal-detection regression) |
@@ -454,9 +479,19 @@ time those slices run.
 
 - **Mechanical work** (doc edits, citation sweeps, applying specified changes, drafting acceptance
   matrices from a clear spec, simple reads) → **Haiku/Sonnet**.
-- **Hard synthesis** (reconciling conflicting design inputs, judgment-heavy planning) →
-  **Opus / fork**.
-- **Independence** (design panels, adversarial reviews) → **Fable**.
+- **Hard synthesis where the main loop's own context IS the asset and independence is not
+  needed** (e.g. a large mechanical refactor that continues this session's reasoning) → **Opus,
+  or a fork** (a fork inherits this session's full context and runs on this session's model).
+- **Design authoring, design review, and adversarial review** → **a fresh, independent Fable
+  subagent — never a fork.** Independence is the entire point of these passes, and a fork
+  defeats it: a fork *is* the main loop (same model, same context, same priors), so a forked
+  "design" pass only launders the orchestrator's own framing back as if it were reviewed. A fork
+  also cannot spawn its own helper subagents. Ground the fresh agent through its **prompt** —
+  point it at the source docs and the locked-vs-open split — so it reasons from source, not from
+  the orchestrator's assumptions. Fold the needed lenses (e.g. legibility vs. soundness) into
+  that one agent's task rather than nesting Fable-spawns-Fable; keep independent *verification*
+  as a separate pass **outside** the authoring agent (the after-code adversarial review), not
+  nested inside it.
 - Fable is **surgical but not stingy**: the whole 7-slice heavyweight pass is ~9 Fable passes ≈ a
   third-to-half of one weekly Fable budget; free through ~Jul 19 (weekly Fable limit resets Jul 16).
   Aim Fable where independence pays; run everything else on cheap models. The mechanical build
@@ -464,9 +499,10 @@ time those slices run.
 
 ### Resume pointer
 
-**Stage 0 is complete and committed (3e3fb0dd). The next action is Slice 0** — its lean 2-lens
-Fable design panel (CertificateSteps membership + witness shape) + the acceptance matrix drafted
-by a cheap general-purpose agent — then apply the tiering above across §3 / §2 / §4a / §1a / §6 /
+**Stage 0 is complete and committed (3e3fb0dd). The next action is Slice 0** — its `/design` pass
+on `CertificateSteps` membership, run as one fresh independent Fable subagent that carries both
+the legibility and soundness lenses itself (not a fork, not the main loop) and drafts its own
+test-shaped acceptance matrix — then apply the tiering above across §3 / §2 / §4a / §1a / §6 /
 structural-severity. Companion docs: `-architecture.md` (the locked design + the 4 Slice-0
 soundness holes), `-structural-severity.md`, `-pipeline-evaluation.md`; rulings in
 `proof-engine-decision-ledger-2026-07-12.md` (Stage-0b section).
