@@ -1,0 +1,2576 @@
+[
+  {
+    "id": "spec-parser/prec/or-left-assoc",
+    "desc": "or is left-associative",
+    "exercise": "rule a or b or c because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:833",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-precedence-table"
+  },
+  {
+    "id": "spec-parser/prec/and-left-assoc",
+    "desc": "and is left-associative",
+    "exercise": "rule a and b and c because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:834",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-precedence-table"
+  },
+  {
+    "id": "spec-parser/prec/or-below-and",
+    "desc": "or binds looser than and (a or b and c)",
+    "exercise": "rule a or b and c because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:833",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-precedence-table"
+  },
+  {
+    "id": "spec-parser/prec/not-prefix",
+    "desc": "not is prefix negation",
+    "exercise": "rule not a because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:835",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-precedence-table"
+  },
+  {
+    "id": "spec-parser/prec/not-not",
+    "desc": "not chains as prefix",
+    "exercise": "rule not not a because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:835",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-precedence-table"
+  },
+  {
+    "id": "spec-parser/prec/comparison",
+    "desc": "comparison operator parses",
+    "exercise": "rule a < b because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:836",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-precedence-table"
+  },
+  {
+    "id": "spec-parser/prec/contains-infix",
+    "desc": "contains is collection membership infix",
+    "exercise": "rule tags contains 'x' because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:837",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-precedence-table"
+  },
+  {
+    "id": "spec-parser/prec/for-lookup-infix",
+    "desc": "for is infix lookup key access",
+    "exercise": "field Rate as lookup of string to number\nrule (Rate for 'k') > 0 because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:838",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-precedence-table"
+  },
+  {
+    "id": "spec-parser/prec/additive-left",
+    "desc": "additive + - left-associative",
+    "exercise": "field R as number <- a + b - c",
+    "specCite": "docs/language/precept-language-spec.md:839",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-precedence-table"
+  },
+  {
+    "id": "spec-parser/prec/multiplicative-left",
+    "desc": "multiplicative * / % left-associative",
+    "exercise": "field R as number <- a * b / c % d",
+    "specCite": "docs/language/precept-language-spec.md:840",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-precedence-table"
+  },
+  {
+    "id": "spec-parser/prec/mul-over-add",
+    "desc": "multiplicative binds tighter than additive",
+    "exercise": "field R as number <- a + b * c",
+    "specCite": "docs/language/precept-language-spec.md:840",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-precedence-table"
+  },
+  {
+    "id": "spec-parser/prec/is-set-postfix",
+    "desc": "is set is postfix presence test",
+    "exercise": "rule f is set because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:841",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-precedence-table"
+  },
+  {
+    "id": "spec-parser/prec/is-not-set-postfix",
+    "desc": "is not set postfix",
+    "exercise": "rule f is not set because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:841",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-precedence-table"
+  },
+  {
+    "id": "spec-parser/prec/unary-minus",
+    "desc": "unary minus prefix negation",
+    "exercise": "field R as number <- -a",
+    "specCite": "docs/language/precept-language-spec.md:842",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-precedence-table"
+  },
+  {
+    "id": "spec-parser/prec/unary-minus-tighter",
+    "desc": "unary minus binds tighter than additive",
+    "exercise": "field R as number <- -a + b",
+    "specCite": "docs/language/precept-language-spec.md:842",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-precedence-table"
+  },
+  {
+    "id": "spec-parser/prec/member-access-dot",
+    "desc": "dot member access binds tightest",
+    "exercise": "rule event.amount > 0 because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:843",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-precedence-table"
+  },
+  {
+    "id": "spec-parser/prec/call-postfix",
+    "desc": "postfix ( is function/method call",
+    "exercise": "field R as number <- round(a, 2)",
+    "specCite": "docs/language/precept-language-spec.md:844",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-precedence-table"
+  },
+  {
+    "id": "spec-parser/prec/is-set-shares-mult",
+    "desc": "A * B is set parses as (A*B) is set",
+    "exercise": "rule a * b is set because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:846",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-precedence-table"
+  },
+  {
+    "id": "spec-parser/nonassoc/eq-chain",
+    "desc": "== chaining is a parse error",
+    "exercise": "rule a == b == c because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:846",
+    "expected": "reject:NonAssociativeComparison",
+    "source": "added",
+    "block": "2.1-non-associative"
+  },
+  {
+    "id": "spec-parser/nonassoc/neq-chain",
+    "desc": "!= chaining is a parse error",
+    "exercise": "rule a != b != c because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:846",
+    "expected": "reject:NonAssociativeComparison",
+    "source": "added",
+    "block": "2.1-non-associative"
+  },
+  {
+    "id": "spec-parser/nonassoc/lt-chain",
+    "desc": "< chaining is a parse error",
+    "exercise": "rule a < b < c because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:846",
+    "expected": "reject:NonAssociativeComparison",
+    "source": "added",
+    "block": "2.1-non-associative"
+  },
+  {
+    "id": "spec-parser/nonassoc/gt-chain",
+    "desc": "> chaining is a parse error",
+    "exercise": "rule a > b > c because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:846",
+    "expected": "reject:NonAssociativeComparison",
+    "source": "added",
+    "block": "2.1-non-associative"
+  },
+  {
+    "id": "spec-parser/nonassoc/le-chain",
+    "desc": "<= chaining is a parse error",
+    "exercise": "rule a <= b <= c because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:846",
+    "expected": "reject:NonAssociativeComparison",
+    "source": "added",
+    "block": "2.1-non-associative"
+  },
+  {
+    "id": "spec-parser/nonassoc/ge-chain",
+    "desc": ">= chaining is a parse error",
+    "exercise": "rule a >= b >= c because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:846",
+    "expected": "reject:NonAssociativeComparison",
+    "source": "added",
+    "block": "2.1-non-associative"
+  },
+  {
+    "id": "spec-parser/nonassoc/approx-chain",
+    "desc": "~= chaining is a parse error",
+    "exercise": "rule a ~= b ~= c because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:846",
+    "expected": "reject:NonAssociativeComparison",
+    "source": "added",
+    "block": "2.1-non-associative"
+  },
+  {
+    "id": "spec-parser/nonassoc/napprox-chain",
+    "desc": "!~ chaining is a parse error",
+    "exercise": "rule a !~ b !~ c because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:846",
+    "expected": "reject:NonAssociativeComparison",
+    "source": "added",
+    "block": "2.1-non-associative"
+  },
+  {
+    "id": "spec-parser/nonassoc/mixed-chain",
+    "desc": "mixed comparison chain is a parse error",
+    "exercise": "rule a < b == c because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:846",
+    "expected": "reject:NonAssociativeComparison",
+    "source": "added",
+    "block": "2.1-non-associative"
+  },
+  {
+    "id": "spec-parser/nonassoc/contains-chain",
+    "desc": "contains chaining is a parse error",
+    "exercise": "rule a contains b contains c because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:846",
+    "expected": "reject:NonAssociativeComparison",
+    "source": "added",
+    "block": "2.1-non-associative"
+  },
+  {
+    "id": "spec-parser/nonassoc/is-set-chain",
+    "desc": "is set chaining is not allowed (bool not collection)",
+    "exercise": "rule f is set is set because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:846",
+    "expected": "reject:any",
+    "source": "added",
+    "block": "2.1-non-associative"
+  },
+  {
+    "id": "spec-parser/sep/computed-arrow-ok",
+    "desc": "<- introduces field computed body",
+    "exercise": "field Total as number <- a + b",
+    "specCite": "docs/language/precept-language-spec.md:850",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-structural-separators"
+  },
+  {
+    "id": "spec-parser/sep/computed-arrow-in-expr",
+    "desc": "<- inside an expression position is not an operator",
+    "exercise": "rule a <- b because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:850",
+    "expected": "reject:any",
+    "source": "added",
+    "block": "2.1-structural-separators"
+  },
+  {
+    "id": "spec-parser/sep/action-arrow-in-expr",
+    "desc": "-> inside an expression position is not an operator",
+    "exercise": "rule a -> b because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:850",
+    "expected": "reject:any",
+    "source": "added",
+    "block": "2.1-structural-separators"
+  },
+  {
+    "id": "spec-parser/nud/identifier",
+    "desc": "Identifier atom -> IdentifierExpression",
+    "exercise": "rule Amount > 0 because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:856",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-null-denotation"
+  },
+  {
+    "id": "spec-parser/nud/number-literal",
+    "desc": "NumberLiteral atom",
+    "exercise": "rule Amount > 5 because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:857",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-null-denotation"
+  },
+  {
+    "id": "spec-parser/nud/true-literal",
+    "desc": "true literal atom",
+    "exercise": "rule Flag == true because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:858",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-null-denotation"
+  },
+  {
+    "id": "spec-parser/nud/false-literal",
+    "desc": "false literal atom",
+    "exercise": "rule Flag == false because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:858",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-null-denotation"
+  },
+  {
+    "id": "spec-parser/nud/string-literal",
+    "desc": "StringLiteral atom",
+    "exercise": "rule Name == 'x' because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:859",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-null-denotation"
+  },
+  {
+    "id": "spec-parser/nud/interpolated-string",
+    "desc": "StringStart -> interpolated string reassembly",
+    "exercise": "rule Msg == \"hi {Name}\" because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:860",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-null-denotation"
+  },
+  {
+    "id": "spec-parser/nud/typed-constant",
+    "desc": "TypedConstant atom -> TypedConstantExpression",
+    "exercise": "rule Price > '5 USD' because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:861",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-null-denotation"
+  },
+  {
+    "id": "spec-parser/nud/interpolated-typed-constant",
+    "desc": "TypedConstantStart -> interpolated typed constant",
+    "exercise": "field P as money 'USD' <- '{n} USD'",
+    "specCite": "docs/language/precept-language-spec.md:862",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-null-denotation"
+  },
+  {
+    "id": "spec-parser/nud/list-literal",
+    "desc": "LeftBracket -> ListLiteralExpression",
+    "exercise": "field Xs as list of integer default [1, 2, 3]",
+    "specCite": "docs/language/precept-language-spec.md:863",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-null-denotation"
+  },
+  {
+    "id": "spec-parser/nud/parenthesized",
+    "desc": "LeftParen -> ParenthesizedExpression",
+    "exercise": "field R as number <- (a + b) * c",
+    "specCite": "docs/language/precept-language-spec.md:864",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-null-denotation"
+  },
+  {
+    "id": "spec-parser/nud/not-prefix",
+    "desc": "Not -> UnaryExpression(Not)",
+    "exercise": "rule not Flag because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:865",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-null-denotation"
+  },
+  {
+    "id": "spec-parser/nud/minus-prefix",
+    "desc": "Minus -> UnaryExpression(Negate)",
+    "exercise": "field R as number <- -Amount",
+    "specCite": "docs/language/precept-language-spec.md:866",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-null-denotation"
+  },
+  {
+    "id": "spec-parser/nud/if-then-else",
+    "desc": "If -> ConditionalExpression",
+    "exercise": "field R as number <- if Flag then 1 else 2",
+    "specCite": "docs/language/precept-language-spec.md:867",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-null-denotation"
+  },
+  {
+    "id": "spec-parser/nud/if-missing-then",
+    "desc": "conditional missing then is a parse error",
+    "exercise": "field R as number <- if Flag 1 else 2",
+    "specCite": "docs/language/precept-language-spec.md:867",
+    "expected": "reject:ExpectedToken",
+    "source": "added",
+    "block": "2.1-null-denotation"
+  },
+  {
+    "id": "spec-parser/nud/if-missing-else",
+    "desc": "conditional missing else is a parse error",
+    "exercise": "field R as number <- if Flag then 1",
+    "specCite": "docs/language/precept-language-spec.md:867",
+    "expected": "reject:ExpectedToken",
+    "source": "added",
+    "block": "2.1-null-denotation"
+  },
+  {
+    "id": "spec-parser/nud/quantifier-each",
+    "desc": "each quantifier atom",
+    "exercise": "rule each x in items (x > 0) because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:868",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-null-denotation"
+  },
+  {
+    "id": "spec-parser/nud/quantifier-any",
+    "desc": "any quantifier atom (lookahead-disambiguated)",
+    "exercise": "rule any x in items (x > 0) because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:868",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-null-denotation"
+  },
+  {
+    "id": "spec-parser/nud/quantifier-no",
+    "desc": "no quantifier atom (lookahead-disambiguated)",
+    "exercise": "rule no x in items (x > 0) because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:868",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-null-denotation"
+  },
+  {
+    "id": "spec-parser/nud/any-as-modifier",
+    "desc": "any not followed by 'ident in ref (' stays a state modifier",
+    "exercise": "in any ensure Flag because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:868",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-null-denotation"
+  },
+  {
+    "id": "spec-parser/nud/ci-startswith",
+    "desc": "~startsWith(a,b) CI function call -> boolean",
+    "exercise": "field Email as ~string\nrule ~startsWith(Email, 'a') because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:869",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-null-denotation"
+  },
+  {
+    "id": "spec-parser/nud/ci-endswith",
+    "desc": "~endsWith(a,b) CI function call -> boolean",
+    "exercise": "field Email as ~string\nrule ~endsWith(Email, 'z') because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:869",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-null-denotation"
+  },
+  {
+    "id": "spec-parser/nud/ci-firstarg-not-cistring",
+    "desc": "~startsWith first arg must be ~string",
+    "exercise": "field Name as string\nrule ~startsWith(Name, 'a') because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:869",
+    "expected": "reject:any",
+    "source": "added",
+    "block": "2.1-null-denotation"
+  },
+  {
+    "id": "spec-parser/nud/other-keyword-atom",
+    "desc": "keyword in atom position -> diagnostic",
+    "exercise": "rule ensure > 0 because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:870",
+    "expected": "reject:UnexpectedKeyword",
+    "source": "added",
+    "block": "2.1-null-denotation"
+  },
+  {
+    "id": "spec-parser/led/or",
+    "desc": "Or infix -> BinaryExpression(Or)",
+    "exercise": "rule a or b because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:876",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-left-denotation"
+  },
+  {
+    "id": "spec-parser/led/and",
+    "desc": "And infix -> BinaryExpression(And)",
+    "exercise": "rule a and b because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:877",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-left-denotation"
+  },
+  {
+    "id": "spec-parser/led/comparison-eq",
+    "desc": "== infix -> BinaryExpression",
+    "exercise": "rule a == b because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:878",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-left-denotation"
+  },
+  {
+    "id": "spec-parser/led/comparison-approx",
+    "desc": "~= infix -> BinaryExpression",
+    "exercise": "rule a ~= b because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:878",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-left-denotation"
+  },
+  {
+    "id": "spec-parser/led/comparison-napprox",
+    "desc": "!~ infix -> BinaryExpression",
+    "exercise": "rule a !~ b because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:878",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-left-denotation"
+  },
+  {
+    "id": "spec-parser/led/contains",
+    "desc": "Contains infix -> BinaryExpression(Contains)",
+    "exercise": "rule tags contains 'x' because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:879",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-left-denotation"
+  },
+  {
+    "id": "spec-parser/led/for-lookup",
+    "desc": "For infix -> LookupAccess (V result)",
+    "exercise": "field Rate as lookup of string to number\nrule (Rate for 'k') > 0 because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:880",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-left-denotation"
+  },
+  {
+    "id": "spec-parser/led/is-set",
+    "desc": "Is postfix -> IsSetExpression",
+    "exercise": "rule f is set because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:881",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-left-denotation"
+  },
+  {
+    "id": "spec-parser/led/is-not-set",
+    "desc": "Is Not Set postfix -> IsSetExpression",
+    "exercise": "rule f is not set because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:881",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-left-denotation"
+  },
+  {
+    "id": "spec-parser/led/additive",
+    "desc": "+ - infix -> BinaryExpression",
+    "exercise": "field R as number <- a - b",
+    "specCite": "docs/language/precept-language-spec.md:882",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-left-denotation"
+  },
+  {
+    "id": "spec-parser/led/multiplicative",
+    "desc": "* / % infix -> BinaryExpression",
+    "exercise": "field R as number <- a % b",
+    "specCite": "docs/language/precept-language-spec.md:883",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-left-denotation"
+  },
+  {
+    "id": "spec-parser/led/member-access",
+    "desc": "Dot -> MemberAccessExpression",
+    "exercise": "rule event.amount > 0 because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:884",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-left-denotation"
+  },
+  {
+    "id": "spec-parser/led/call-on-identifier",
+    "desc": "( after IdentifierExpression -> CallExpression",
+    "exercise": "field R as number <- round(a, 2)",
+    "specCite": "docs/language/precept-language-spec.md:885",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-left-denotation"
+  },
+  {
+    "id": "spec-parser/led/method-call",
+    "desc": "( after MemberAccessExpression -> MethodCallExpression",
+    "exercise": "field D as date\nrule D.year() > 2000 because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:885",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.1-left-denotation"
+  },
+  {
+    "id": "spec-parser/led/call-non-callable-literal",
+    "desc": "( after a literal -> diagnostic (not callable)",
+    "exercise": "field R as number <- 5(a)",
+    "specCite": "docs/language/precept-language-spec.md:885",
+    "expected": "reject:InvalidCallTarget",
+    "source": "added",
+    "block": "2.1-left-denotation"
+  },
+  {
+    "id": "spec-parser/led/call-non-callable-paren",
+    "desc": "( after parenthesized expr -> diagnostic",
+    "exercise": "field R as number <- (a + b)(c)",
+    "specCite": "docs/language/precept-language-spec.md:885",
+    "expected": "reject:InvalidCallTarget",
+    "source": "added",
+    "block": "2.1-left-denotation"
+  },
+  {
+    "id": "spec-parser/dispatch/field",
+    "desc": "field leading token -> FieldDeclaration",
+    "exercise": "field Amount as number",
+    "specCite": "docs/language/precept-language-spec.md:895",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-top-level-dispatch"
+  },
+  {
+    "id": "spec-parser/dispatch/state",
+    "desc": "state leading token -> StateDeclaration",
+    "exercise": "state Draft, Final",
+    "specCite": "docs/language/precept-language-spec.md:896",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-top-level-dispatch"
+  },
+  {
+    "id": "spec-parser/dispatch/event",
+    "desc": "event leading token -> EventDeclaration",
+    "exercise": "event Submit",
+    "specCite": "docs/language/precept-language-spec.md:897",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-top-level-dispatch"
+  },
+  {
+    "id": "spec-parser/dispatch/rule",
+    "desc": "rule leading token -> RuleDeclaration",
+    "exercise": "rule Amount > 0 because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:898",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-top-level-dispatch"
+  },
+  {
+    "id": "spec-parser/dispatch/in",
+    "desc": "in leading token dispatches state ensure/access/omit",
+    "exercise": "in Draft ensure Amount > 0 because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:899",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-top-level-dispatch"
+  },
+  {
+    "id": "spec-parser/dispatch/to",
+    "desc": "to leading token dispatches state ensure/action",
+    "exercise": "to Final ensure Amount > 0 because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:900",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-top-level-dispatch"
+  },
+  {
+    "id": "spec-parser/dispatch/from",
+    "desc": "from leading token dispatches transition/ensure/action",
+    "exercise": "from Draft on Submit -> transition Final",
+    "specCite": "docs/language/precept-language-spec.md:901",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-top-level-dispatch"
+  },
+  {
+    "id": "spec-parser/dispatch/on",
+    "desc": "on leading token dispatches event ensure/handler",
+    "exercise": "on Submit ensure Amount > 0 because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:902",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-top-level-dispatch"
+  },
+  {
+    "id": "spec-parser/dispatch/unknown-leading",
+    "desc": "unknown leading token -> diagnostic + resync",
+    "exercise": "frobnicate Amount as number",
+    "specCite": "docs/language/precept-language-spec.md:904",
+    "expected": "reject:any",
+    "source": "added",
+    "block": "2.2-top-level-dispatch"
+  },
+  {
+    "id": "spec-parser/field/single",
+    "desc": "single field declaration",
+    "exercise": "field Amount as number",
+    "specCite": "docs/language/precept-language-spec.md:909",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-field-declaration"
+  },
+  {
+    "id": "spec-parser/field/multi-name",
+    "desc": "multi-name shorthand shares one type",
+    "exercise": "field A, B, C as string",
+    "specCite": "docs/language/precept-language-spec.md:912",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-field-declaration"
+  },
+  {
+    "id": "spec-parser/field/modifiers-before-arrow",
+    "desc": "modifiers appear before computed arrow",
+    "exercise": "field Total as number nonnegative <- a + b",
+    "specCite": "docs/language/precept-language-spec.md:912",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-field-declaration"
+  },
+  {
+    "id": "spec-parser/field/computed-arrow",
+    "desc": "<- introduces computed expression",
+    "exercise": "field Total as number <- a + b",
+    "specCite": "docs/language/precept-language-spec.md:912",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-field-declaration"
+  },
+  {
+    "id": "spec-parser/field/missing-as",
+    "desc": "field missing 'as' keyword -> ExpectedToken",
+    "exercise": "field Amount number",
+    "specCite": "docs/language/precept-language-spec.md:909",
+    "expected": "reject:ExpectedToken",
+    "source": "added",
+    "block": "2.2-field-declaration"
+  },
+  {
+    "id": "spec-parser/field/missing-type",
+    "desc": "field missing type after as -> ExpectedToken",
+    "exercise": "field Amount as",
+    "specCite": "docs/language/precept-language-spec.md:909",
+    "expected": "reject:ExpectedToken",
+    "source": "added",
+    "block": "2.2-field-declaration"
+  },
+  {
+    "id": "spec-parser/field/missing-identifier",
+    "desc": "field missing name -> ExpectedToken",
+    "exercise": "field as number",
+    "specCite": "docs/language/precept-language-spec.md:909",
+    "expected": "reject:ExpectedToken",
+    "source": "added",
+    "block": "2.2-field-declaration"
+  },
+  {
+    "id": "spec-parser/field/trailing-comma",
+    "desc": "field multi-name trailing comma -> ExpectedToken",
+    "exercise": "field A, B, as string",
+    "specCite": "docs/language/precept-language-spec.md:909",
+    "expected": "reject:ExpectedToken",
+    "source": "added",
+    "block": "2.2-field-declaration"
+  },
+  {
+    "id": "spec-parser/field/modifier-after-arrow",
+    "desc": "modifier after computed arrow is misordered",
+    "exercise": "field Total as number <- a + b nonnegative",
+    "specCite": "docs/language/precept-language-spec.md:912",
+    "expected": "reject:any",
+    "source": "added",
+    "block": "2.2-field-declaration"
+  },
+  {
+    "id": "spec-parser/field/empty-computed",
+    "desc": "<- with no expression body -> ExpectedToken",
+    "exercise": "field Total as number <-",
+    "specCite": "docs/language/precept-language-spec.md:909",
+    "expected": "reject:ExpectedToken",
+    "source": "added",
+    "block": "2.2-field-declaration"
+  },
+  {
+    "id": "spec-parser/state/single",
+    "desc": "single state declaration",
+    "exercise": "state Draft",
+    "specCite": "docs/language/precept-language-spec.md:917",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-state-declaration"
+  },
+  {
+    "id": "spec-parser/state/multi",
+    "desc": "comma-delimited state entries",
+    "exercise": "state Draft, Review, Final",
+    "specCite": "docs/language/precept-language-spec.md:917",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-state-declaration"
+  },
+  {
+    "id": "spec-parser/state/initial",
+    "desc": "initial marker on a state",
+    "exercise": "state Draft initial",
+    "specCite": "docs/language/precept-language-spec.md:918",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-state-declaration"
+  },
+  {
+    "id": "spec-parser/state/mod-terminal",
+    "desc": "terminal state modifier",
+    "exercise": "state Closed terminal",
+    "specCite": "docs/language/precept-language-spec.md:919",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-state-declaration"
+  },
+  {
+    "id": "spec-parser/state/mod-required",
+    "desc": "required state modifier",
+    "exercise": "state Active required",
+    "specCite": "docs/language/precept-language-spec.md:919",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-state-declaration"
+  },
+  {
+    "id": "spec-parser/state/mod-irreversible",
+    "desc": "irreversible state modifier",
+    "exercise": "state Signed irreversible",
+    "specCite": "docs/language/precept-language-spec.md:919",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-state-declaration"
+  },
+  {
+    "id": "spec-parser/state/mod-success",
+    "desc": "success state modifier",
+    "exercise": "state Done success",
+    "specCite": "docs/language/precept-language-spec.md:919",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-state-declaration"
+  },
+  {
+    "id": "spec-parser/state/mod-warning",
+    "desc": "warning state modifier",
+    "exercise": "state Stale warning",
+    "specCite": "docs/language/precept-language-spec.md:919",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-state-declaration"
+  },
+  {
+    "id": "spec-parser/state/mod-error",
+    "desc": "error state modifier",
+    "exercise": "state Failed error",
+    "specCite": "docs/language/precept-language-spec.md:919",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-state-declaration"
+  },
+  {
+    "id": "spec-parser/state/unknown-modifier",
+    "desc": "unknown state modifier -> diagnostic",
+    "exercise": "state Draft frobnicate",
+    "specCite": "docs/language/precept-language-spec.md:919",
+    "expected": "reject:any",
+    "source": "added",
+    "block": "2.2-state-declaration"
+  },
+  {
+    "id": "spec-parser/state/missing-identifier",
+    "desc": "state with no name -> ExpectedToken",
+    "exercise": "state",
+    "specCite": "docs/language/precept-language-spec.md:917",
+    "expected": "reject:ExpectedToken",
+    "source": "added",
+    "block": "2.2-state-declaration"
+  },
+  {
+    "id": "spec-parser/event/no-args",
+    "desc": "event with no argument list",
+    "exercise": "event Submit",
+    "specCite": "docs/language/precept-language-spec.md:925",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-event-declaration"
+  },
+  {
+    "id": "spec-parser/event/with-args",
+    "desc": "event with parenthesized arg list",
+    "exercise": "event Submit(Amount as number)",
+    "specCite": "docs/language/precept-language-spec.md:925",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-event-declaration"
+  },
+  {
+    "id": "spec-parser/event/multi-name",
+    "desc": "multi-name event declaration",
+    "exercise": "event Open, Close",
+    "specCite": "docs/language/precept-language-spec.md:925",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-event-declaration"
+  },
+  {
+    "id": "spec-parser/event/initial-after-args",
+    "desc": "initial keyword follows arg list",
+    "exercise": "event Create(Amount as number) initial",
+    "specCite": "docs/language/precept-language-spec.md:930",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-event-declaration"
+  },
+  {
+    "id": "spec-parser/event/arg-modifiers",
+    "desc": "event arg carries field modifiers",
+    "exercise": "event Submit(Amount as number nonnegative)",
+    "specCite": "docs/language/precept-language-spec.md:927",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-event-declaration"
+  },
+  {
+    "id": "spec-parser/event/arg-missing-as",
+    "desc": "event arg missing 'as' -> ExpectedToken",
+    "exercise": "event Submit(Amount number)",
+    "specCite": "docs/language/precept-language-spec.md:927",
+    "expected": "reject:ExpectedToken",
+    "source": "added",
+    "block": "2.2-event-declaration"
+  },
+  {
+    "id": "spec-parser/event/unclosed-paren",
+    "desc": "event arg list unclosed paren -> ExpectedToken",
+    "exercise": "event Submit(Amount as number",
+    "specCite": "docs/language/precept-language-spec.md:925",
+    "expected": "reject:ExpectedToken",
+    "source": "added",
+    "block": "2.2-event-declaration"
+  },
+  {
+    "id": "spec-parser/event/initial-before-args",
+    "desc": "initial before arg list is misordered",
+    "exercise": "event Create initial (Amount as number)",
+    "specCite": "docs/language/precept-language-spec.md:930",
+    "expected": "reject:any",
+    "source": "added",
+    "block": "2.2-event-declaration"
+  },
+  {
+    "id": "spec-parser/rule/basic",
+    "desc": "rule BoolExpr because StringExpr",
+    "exercise": "rule Amount > 0 because 'must be positive'",
+    "specCite": "docs/language/precept-language-spec.md:935",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-rule-declaration"
+  },
+  {
+    "id": "spec-parser/rule/with-when",
+    "desc": "rule with optional when guard",
+    "exercise": "rule Amount > 0 when Active because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:935",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-rule-declaration"
+  },
+  {
+    "id": "spec-parser/rule/missing-because",
+    "desc": "rule missing because -> ExpectedToken",
+    "exercise": "rule Amount > 0",
+    "specCite": "docs/language/precept-language-spec.md:935",
+    "expected": "reject:ExpectedToken",
+    "source": "added",
+    "block": "2.2-rule-declaration"
+  },
+  {
+    "id": "spec-parser/rule/missing-expr",
+    "desc": "rule missing boolean expr -> ExpectedToken",
+    "exercise": "rule because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:935",
+    "expected": "reject:ExpectedToken",
+    "source": "added",
+    "block": "2.2-rule-declaration"
+  },
+  {
+    "id": "spec-parser/rule/missing-reason-string",
+    "desc": "rule because with no string -> ExpectedToken",
+    "exercise": "rule Amount > 0 because",
+    "specCite": "docs/language/precept-language-spec.md:935",
+    "expected": "reject:ExpectedToken",
+    "source": "added",
+    "block": "2.2-rule-declaration"
+  },
+  {
+    "id": "spec-parser/rule/when-after-because",
+    "desc": "when after because is misordered",
+    "exercise": "rule Amount > 0 because 'r' when Active",
+    "specCite": "docs/language/precept-language-spec.md:935",
+    "expected": "reject:any",
+    "source": "added",
+    "block": "2.2-rule-declaration"
+  },
+  {
+    "id": "spec-parser/prep/in-ensure",
+    "desc": "in + ensure -> state ensure",
+    "exercise": "in Draft ensure Amount > 0 because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:946",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-preposition-dispatch"
+  },
+  {
+    "id": "spec-parser/prep/in-modify",
+    "desc": "in + modify -> access mode",
+    "exercise": "field Amount as number editable\nin Draft modify Amount readonly",
+    "specCite": "docs/language/precept-language-spec.md:947",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-preposition-dispatch"
+  },
+  {
+    "id": "spec-parser/prep/in-omit",
+    "desc": "in + omit -> omit declaration",
+    "exercise": "in Draft omit Amount",
+    "specCite": "docs/language/precept-language-spec.md:948",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-preposition-dispatch"
+  },
+  {
+    "id": "spec-parser/prep/to-ensure",
+    "desc": "to + ensure -> state ensure (to-scoped)",
+    "exercise": "to Final ensure Amount > 0 because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:949",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-preposition-dispatch"
+  },
+  {
+    "id": "spec-parser/prep/to-action",
+    "desc": "to + -> -> state entry action",
+    "exercise": "to Final -> set Amount = 0",
+    "specCite": "docs/language/precept-language-spec.md:950",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-preposition-dispatch"
+  },
+  {
+    "id": "spec-parser/prep/from-on",
+    "desc": "from + on -> transition row",
+    "exercise": "from Draft on Submit -> transition Final",
+    "specCite": "docs/language/precept-language-spec.md:951",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-preposition-dispatch"
+  },
+  {
+    "id": "spec-parser/prep/from-ensure",
+    "desc": "from + ensure -> state ensure (from-scoped)",
+    "exercise": "from Draft ensure Amount > 0 because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:952",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-preposition-dispatch"
+  },
+  {
+    "id": "spec-parser/prep/from-action",
+    "desc": "from + -> -> state exit action",
+    "exercise": "from Draft -> set Amount = 0",
+    "specCite": "docs/language/precept-language-spec.md:953",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-preposition-dispatch"
+  },
+  {
+    "id": "spec-parser/prep/state-target-any",
+    "desc": "any is the state wildcard",
+    "exercise": "in any ensure Amount > 0 because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:956",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-preposition-dispatch"
+  },
+  {
+    "id": "spec-parser/prep/state-target-comma",
+    "desc": "comma-delimited StateTarget expands per state",
+    "exercise": "in Draft, Review ensure Amount > 0 because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:960",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-preposition-dispatch"
+  },
+  {
+    "id": "spec-parser/prep/ensure-pre-verb-when",
+    "desc": "state ensure supports pre-verb when guard",
+    "exercise": "in Draft when Active ensure Amount > 0 because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:960",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-preposition-dispatch"
+  },
+  {
+    "id": "spec-parser/prep/omit-no-when",
+    "desc": "omit does not support when guard",
+    "exercise": "in Draft when Active omit Amount",
+    "specCite": "docs/language/precept-language-spec.md:960",
+    "expected": "reject:OmitDoesNotSupportGuard",
+    "source": "added",
+    "block": "2.2-preposition-dispatch"
+  },
+  {
+    "id": "spec-parser/trans/basic",
+    "desc": "transition row with outcome",
+    "exercise": "from Draft on Submit -> transition Final",
+    "specCite": "docs/language/precept-language-spec.md:965",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-transition-row"
+  },
+  {
+    "id": "spec-parser/trans/with-when",
+    "desc": "transition row with post-event when guard",
+    "exercise": "from Draft on Submit when Amount > 0 -> transition Final",
+    "specCite": "docs/language/precept-language-spec.md:965",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-transition-row"
+  },
+  {
+    "id": "spec-parser/trans/action-set",
+    "desc": "set action statement",
+    "exercise": "from Draft on Submit -> set Amount = 0 -> transition Final",
+    "specCite": "docs/language/precept-language-spec.md:969",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-transition-row"
+  },
+  {
+    "id": "spec-parser/trans/action-add",
+    "desc": "add action statement",
+    "exercise": "from Draft on Submit -> add Tags 'x' -> transition Final",
+    "specCite": "docs/language/precept-language-spec.md:970",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-transition-row"
+  },
+  {
+    "id": "spec-parser/trans/action-remove",
+    "desc": "remove action statement",
+    "exercise": "from Draft on Submit -> remove Tags 'x' -> transition Final",
+    "specCite": "docs/language/precept-language-spec.md:971",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-transition-row"
+  },
+  {
+    "id": "spec-parser/trans/action-remove-at",
+    "desc": "remove ... at action statement",
+    "exercise": "from Draft on Submit -> remove Items at 0 -> transition Final",
+    "specCite": "docs/language/precept-language-spec.md:972",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-transition-row"
+  },
+  {
+    "id": "spec-parser/trans/action-enqueue",
+    "desc": "enqueue action statement",
+    "exercise": "from Draft on Submit -> enqueue Q 'x' -> transition Final",
+    "specCite": "docs/language/precept-language-spec.md:973",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-transition-row"
+  },
+  {
+    "id": "spec-parser/trans/action-enqueue-by",
+    "desc": "enqueue ... by action statement",
+    "exercise": "from Draft on Submit -> enqueue Q 'x' by 5 -> transition Final",
+    "specCite": "docs/language/precept-language-spec.md:974",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-transition-row"
+  },
+  {
+    "id": "spec-parser/trans/action-dequeue",
+    "desc": "dequeue action statement",
+    "exercise": "from Draft on Submit -> dequeue Q -> transition Final",
+    "specCite": "docs/language/precept-language-spec.md:975",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-transition-row"
+  },
+  {
+    "id": "spec-parser/trans/action-dequeue-into",
+    "desc": "dequeue ... into action statement",
+    "exercise": "from Draft on Submit -> dequeue Q into Head -> transition Final",
+    "specCite": "docs/language/precept-language-spec.md:975",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-transition-row"
+  },
+  {
+    "id": "spec-parser/trans/action-dequeue-into-by",
+    "desc": "dequeue ... into ... by action statement",
+    "exercise": "from Draft on Submit -> dequeue Q into Head by Prio -> transition Final",
+    "specCite": "docs/language/precept-language-spec.md:975",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-transition-row"
+  },
+  {
+    "id": "spec-parser/trans/action-push",
+    "desc": "push action statement",
+    "exercise": "from Draft on Submit -> push St 'x' -> transition Final",
+    "specCite": "docs/language/precept-language-spec.md:976",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-transition-row"
+  },
+  {
+    "id": "spec-parser/trans/action-pop",
+    "desc": "pop action statement",
+    "exercise": "from Draft on Submit -> pop St -> transition Final",
+    "specCite": "docs/language/precept-language-spec.md:977",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-transition-row"
+  },
+  {
+    "id": "spec-parser/trans/action-pop-into",
+    "desc": "pop ... into action statement",
+    "exercise": "from Draft on Submit -> pop St into Top -> transition Final",
+    "specCite": "docs/language/precept-language-spec.md:977",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-transition-row"
+  },
+  {
+    "id": "spec-parser/trans/action-clear",
+    "desc": "clear action statement",
+    "exercise": "from Draft on Submit -> clear Tags -> transition Final",
+    "specCite": "docs/language/precept-language-spec.md:978",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-transition-row"
+  },
+  {
+    "id": "spec-parser/trans/action-append",
+    "desc": "append action statement",
+    "exercise": "from Draft on Submit -> append Log 'x' -> transition Final",
+    "specCite": "docs/language/precept-language-spec.md:979",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-transition-row"
+  },
+  {
+    "id": "spec-parser/trans/action-append-by",
+    "desc": "append ... by action statement",
+    "exercise": "from Draft on Submit -> append Log 'x' by 5 -> transition Final",
+    "specCite": "docs/language/precept-language-spec.md:980",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-transition-row"
+  },
+  {
+    "id": "spec-parser/trans/action-insert-at",
+    "desc": "insert ... at action statement",
+    "exercise": "from Draft on Submit -> insert Items 'x' at 0 -> transition Final",
+    "specCite": "docs/language/precept-language-spec.md:981",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-transition-row"
+  },
+  {
+    "id": "spec-parser/trans/action-put",
+    "desc": "put ... = action statement",
+    "exercise": "from Draft on Submit -> put Map 'k' = 'v' -> transition Final",
+    "specCite": "docs/language/precept-language-spec.md:982",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-transition-row"
+  },
+  {
+    "id": "spec-parser/trans/outcome-transition",
+    "desc": "transition outcome",
+    "exercise": "from Draft on Submit -> transition Final",
+    "specCite": "docs/language/precept-language-spec.md:984",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-transition-row"
+  },
+  {
+    "id": "spec-parser/trans/outcome-no-transition",
+    "desc": "no transition outcome",
+    "exercise": "from Draft on Submit -> no transition",
+    "specCite": "docs/language/precept-language-spec.md:985",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-transition-row"
+  },
+  {
+    "id": "spec-parser/trans/outcome-reject",
+    "desc": "reject outcome with message",
+    "exercise": "from Draft on Submit -> reject 'not allowed'",
+    "specCite": "docs/language/precept-language-spec.md:986",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-transition-row"
+  },
+  {
+    "id": "spec-parser/trans/missing-outcome",
+    "desc": "transition row with no outcome -> ExpectedOutcome",
+    "exercise": "from Draft on Submit -> set Amount = 0",
+    "specCite": "docs/language/precept-language-spec.md:967",
+    "expected": "reject:ExpectedOutcome",
+    "source": "added",
+    "block": "2.2-transition-row"
+  },
+  {
+    "id": "spec-parser/trans/pre-event-guard",
+    "desc": "when guard before event target -> PreEventGuardNotAllowed",
+    "exercise": "from Draft when Amount > 0 on Submit -> transition Final",
+    "specCite": "docs/language/precept-language-spec.md:965",
+    "expected": "reject:PreEventGuardNotAllowed",
+    "source": "added",
+    "block": "2.2-transition-row"
+  },
+  {
+    "id": "spec-parser/trans/comma-state-desugar",
+    "desc": "comma StateTarget desugars per state",
+    "exercise": "from Draft, Review on Submit -> transition Final",
+    "specCite": "docs/language/precept-language-spec.md:989",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-transition-row"
+  },
+  {
+    "id": "spec-parser/trans/unknown-action",
+    "desc": "unknown action keyword after -> -> diagnostic",
+    "exercise": "from Draft on Submit -> frobnicate Tags -> transition Final",
+    "specCite": "docs/language/precept-language-spec.md:966",
+    "expected": "reject:any",
+    "source": "added",
+    "block": "2.2-transition-row"
+  },
+  {
+    "id": "spec-parser/ensure/in",
+    "desc": "in-scoped state ensure",
+    "exercise": "in Draft ensure Amount > 0 because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:994",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-state-event-ensure"
+  },
+  {
+    "id": "spec-parser/ensure/to",
+    "desc": "to-scoped state ensure",
+    "exercise": "to Final ensure Amount > 0 because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:994",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-state-event-ensure"
+  },
+  {
+    "id": "spec-parser/ensure/from",
+    "desc": "from-scoped state ensure",
+    "exercise": "from Draft ensure Amount > 0 because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:994",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-state-event-ensure"
+  },
+  {
+    "id": "spec-parser/ensure/on-event",
+    "desc": "event ensure on Event",
+    "exercise": "on Submit ensure Amount > 0 because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:995",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-state-event-ensure"
+  },
+  {
+    "id": "spec-parser/ensure/pre-verb-when",
+    "desc": "ensure pre-verb when guard",
+    "exercise": "in Draft when Active ensure Amount > 0 because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:994",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-state-event-ensure"
+  },
+  {
+    "id": "spec-parser/ensure/missing-because",
+    "desc": "ensure missing because -> ExpectedToken",
+    "exercise": "in Draft ensure Amount > 0",
+    "specCite": "docs/language/precept-language-spec.md:994",
+    "expected": "reject:ExpectedToken",
+    "source": "added",
+    "block": "2.2-state-event-ensure"
+  },
+  {
+    "id": "spec-parser/ensure/missing-expr",
+    "desc": "ensure missing boolean expr -> ExpectedToken",
+    "exercise": "in Draft ensure because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:994",
+    "expected": "reject:ExpectedToken",
+    "source": "added",
+    "block": "2.2-state-event-ensure"
+  },
+  {
+    "id": "spec-parser/hook/basic",
+    "desc": "stateless on Event -> action chain",
+    "exercise": "on Submit -> set Amount = 0",
+    "specCite": "docs/language/precept-language-spec.md:1003",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-stateless-event-hook"
+  },
+  {
+    "id": "spec-parser/hook/multi-action",
+    "desc": "event handler with multiple actions",
+    "exercise": "on Submit -> set A = 0 -> set B = 1",
+    "specCite": "docs/language/precept-language-spec.md:1004",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-stateless-event-hook"
+  },
+  {
+    "id": "spec-parser/hook/with-when",
+    "desc": "event handler does not support when guard",
+    "exercise": "on Submit when Active -> set Amount = 0",
+    "specCite": "docs/language/precept-language-spec.md:1007",
+    "expected": "reject:EventHandlerDoesNotSupportGuard",
+    "source": "added",
+    "block": "2.2-stateless-event-hook"
+  },
+  {
+    "id": "spec-parser/stateaction/to",
+    "desc": "to-scoped state entry action",
+    "exercise": "to Final -> set Amount = 0",
+    "specCite": "docs/language/precept-language-spec.md:1012",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-state-action"
+  },
+  {
+    "id": "spec-parser/stateaction/from",
+    "desc": "from-scoped state exit action",
+    "exercise": "from Draft -> set Amount = 0",
+    "specCite": "docs/language/precept-language-spec.md:1012",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-state-action"
+  },
+  {
+    "id": "spec-parser/stateaction/with-when",
+    "desc": "state action supports when guard",
+    "exercise": "to Final when Active -> set Amount = 0",
+    "specCite": "docs/language/precept-language-spec.md:1012",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-state-action"
+  },
+  {
+    "id": "spec-parser/stateaction/comma-desugar",
+    "desc": "comma StateTarget expands per state hook",
+    "exercise": "to Final, Closed -> set Amount = 0",
+    "specCite": "docs/language/precept-language-spec.md:1016",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-state-action"
+  },
+  {
+    "id": "spec-parser/quant/each",
+    "desc": "each quantifier expression",
+    "exercise": "rule each x in items (x > 0) because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:1021",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-quantifier-grammar"
+  },
+  {
+    "id": "spec-parser/quant/any",
+    "desc": "any quantifier expression",
+    "exercise": "rule any x in items (x > 0) because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:1021",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-quantifier-grammar"
+  },
+  {
+    "id": "spec-parser/quant/no",
+    "desc": "no quantifier expression",
+    "exercise": "rule no x in items (x > 0) because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:1021",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-quantifier-grammar"
+  },
+  {
+    "id": "spec-parser/quant/collectionref-bare-only",
+    "desc": "CollectionRef must be a bare field name",
+    "exercise": "rule each x in event.items (x > 0) because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:1026",
+    "expected": "reject:ExpectedFieldName",
+    "source": "added",
+    "block": "2.2-quantifier-grammar"
+  },
+  {
+    "id": "spec-parser/quant/collectionref-computed",
+    "desc": "CollectionRef cannot be a computed expression",
+    "exercise": "rule each x in (items) (x > 0) because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:1026",
+    "expected": "reject:ExpectedFieldName",
+    "source": "added",
+    "block": "2.2-quantifier-grammar"
+  },
+  {
+    "id": "spec-parser/quant/nested",
+    "desc": "quantifier predicate can nest quantifiers",
+    "exercise": "rule each x in groups (any y in x (y > 0)) because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:1028",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-quantifier-grammar"
+  },
+  {
+    "id": "spec-parser/quant/missing-paren",
+    "desc": "quantifier missing predicate parens -> ExpectedToken",
+    "exercise": "rule each x in items x > 0 because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:1021",
+    "expected": "reject:any",
+    "source": "added",
+    "block": "2.2-quantifier-grammar"
+  },
+  {
+    "id": "spec-parser/access/modify-readonly",
+    "desc": "modify Field readonly singular constraint",
+    "exercise": "field Amount as number editable\nin Draft modify Amount readonly",
+    "specCite": "docs/language/precept-language-spec.md:1038",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-access-mode-omit"
+  },
+  {
+    "id": "spec-parser/access/modify-editable",
+    "desc": "modify Field editable singular upgrade",
+    "exercise": "in Draft modify Amount editable",
+    "specCite": "docs/language/precept-language-spec.md:1039",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-access-mode-omit"
+  },
+  {
+    "id": "spec-parser/access/modify-comma-readonly",
+    "desc": "modify comma-separated fields readonly",
+    "exercise": "field A as number editable\nfield B as number editable\nin Draft modify A, B readonly",
+    "specCite": "docs/language/precept-language-spec.md:1040",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-access-mode-omit"
+  },
+  {
+    "id": "spec-parser/access/modify-comma-editable",
+    "desc": "modify comma-separated fields editable",
+    "exercise": "in Draft modify A, B editable",
+    "specCite": "docs/language/precept-language-spec.md:1041",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-access-mode-omit"
+  },
+  {
+    "id": "spec-parser/access/modify-all-readonly",
+    "desc": "modify all readonly state-scoped",
+    "exercise": "in Draft modify all readonly",
+    "specCite": "docs/language/precept-language-spec.md:1042",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-access-mode-omit"
+  },
+  {
+    "id": "spec-parser/access/modify-all-editable",
+    "desc": "modify all editable state-scoped",
+    "exercise": "in Draft modify all editable",
+    "specCite": "docs/language/precept-language-spec.md:1043",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-access-mode-omit"
+  },
+  {
+    "id": "spec-parser/access/omit-single",
+    "desc": "omit Field structural exclusion",
+    "exercise": "in Draft omit Amount",
+    "specCite": "docs/language/precept-language-spec.md:1046",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-access-mode-omit"
+  },
+  {
+    "id": "spec-parser/access/omit-comma",
+    "desc": "omit comma-separated fields",
+    "exercise": "in Draft omit A, B",
+    "specCite": "docs/language/precept-language-spec.md:1047",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-access-mode-omit"
+  },
+  {
+    "id": "spec-parser/access/omit-all",
+    "desc": "omit all (no fields visible)",
+    "exercise": "in Draft omit all",
+    "specCite": "docs/language/precept-language-spec.md:1048",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-access-mode-omit"
+  },
+  {
+    "id": "spec-parser/access/guarded-modify",
+    "desc": "guarded access mode with when",
+    "exercise": "field Amount as number editable\nin Draft when Active modify Amount readonly",
+    "specCite": "docs/language/precept-language-spec.md:1063",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-access-mode-omit"
+  },
+  {
+    "id": "spec-parser/access/root-level-invalid",
+    "desc": "root-level access mode is not valid syntax",
+    "exercise": "modify Amount readonly",
+    "specCite": "docs/language/precept-language-spec.md:1061",
+    "expected": "reject:any",
+    "source": "added",
+    "block": "2.2-access-mode-omit"
+  },
+  {
+    "id": "spec-parser/access/guarded-readonly-no-editable-baseline",
+    "desc": "guarded readonly without editable baseline -> RedundantAccessMode",
+    "exercise": "field Amount as number\nin Draft when Active modify Amount readonly",
+    "specCite": "docs/language/precept-language-spec.md:1072",
+    "expected": "reject:RedundantAccessMode",
+    "source": "added",
+    "block": "2.2-access-mode-omit"
+  },
+  {
+    "id": "spec-parser/access/redundant-editable-baseline",
+    "desc": "unguarded modify editable on already-editable field -> RedundantAccessMode",
+    "exercise": "field Amount as number editable\nin Draft modify Amount editable",
+    "specCite": "docs/language/precept-language-spec.md:1073",
+    "expected": "reject:RedundantAccessMode",
+    "source": "added",
+    "block": "2.2-access-mode-omit"
+  },
+  {
+    "id": "spec-parser/access/redundant-readonly-default",
+    "desc": "unguarded modify readonly on read-only-default field -> RedundantAccessMode",
+    "exercise": "field Amount as number\nin Draft modify Amount readonly",
+    "specCite": "docs/language/precept-language-spec.md:1073",
+    "expected": "reject:RedundantAccessMode",
+    "source": "added",
+    "block": "2.2-access-mode-omit"
+  },
+  {
+    "id": "spec-parser/access/all-form-exempt-redundancy",
+    "desc": "modify all forms exempt from redundancy check",
+    "exercise": "field Amount as number\nin Draft modify all readonly",
+    "specCite": "docs/language/precept-language-spec.md:1073",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-access-mode-omit"
+  },
+  {
+    "id": "spec-parser/access/conflicting-modes",
+    "desc": "conflicting modes on same (field,state) -> compile error",
+    "exercise": "field Amount as number editable\nin Draft modify Amount readonly\nin Draft modify Amount editable",
+    "specCite": "docs/language/precept-language-spec.md:1084",
+    "expected": "reject:any",
+    "source": "added",
+    "block": "2.2-access-mode-omit"
+  },
+  {
+    "id": "spec-parser/access/editable-on-computed",
+    "desc": "editable on computed field -> ComputedFieldNotWritable",
+    "exercise": "field Total as number editable <- a + b",
+    "specCite": "docs/language/precept-language-spec.md:1085",
+    "expected": "reject:ComputedFieldNotWritable",
+    "source": "added",
+    "block": "2.2-access-mode-omit"
+  },
+  {
+    "id": "spec-parser/access/editable-on-event-arg",
+    "desc": "editable on event argument -> EditableOnEventArg",
+    "exercise": "event Submit(Amount as number editable)",
+    "specCite": "docs/language/precept-language-spec.md:1086",
+    "expected": "reject:EditableOnEventArg",
+    "source": "added",
+    "block": "2.2-access-mode-omit"
+  },
+  {
+    "id": "spec-parser/access/omit-exempt-redundancy",
+    "desc": "omit is exempt from redundancy (structural, never redundant)",
+    "exercise": "field Amount as number\nin Draft omit Amount",
+    "specCite": "docs/language/precept-language-spec.md:1073",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.2-access-mode-omit"
+  },
+  {
+    "id": "spec-parser/access/set-omit-target",
+    "desc": "set targeting an omit field in target state -> compile error",
+    "exercise": "field Amount as number\nin Final omit Amount\nfrom Draft on Submit -> set Amount = 0 -> transition Final",
+    "specCite": "docs/language/precept-language-spec.md:1083",
+    "expected": "reject:OmittedFieldSetInTargetState",
+    "source": "added",
+    "block": "2.2-access-mode-omit"
+  },
+  {
+    "id": "spec-parser/access/read-omit-in-state",
+    "desc": "reading an omit field in the anchoring state -> compile error",
+    "exercise": "field Amount as number\nin Draft omit Amount\nin Draft ensure Amount > 0 because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:1081",
+    "expected": "reject:OmittedFieldReadInState",
+    "source": "added",
+    "block": "2.2-access-mode-omit"
+  },
+  {
+    "id": "spec-parser/access/required-unassigned-on-entry",
+    "desc": "required field un-omitted on entry without set -> compile error",
+    "exercise": "field Amount as number\nin Draft omit Amount\nfrom Draft on Submit -> transition Final",
+    "specCite": "docs/language/precept-language-spec.md:1076",
+    "expected": "reject:RequiredFieldUnassignedOnEntry",
+    "source": "added",
+    "block": "2.2-access-mode-omit"
+  },
+  {
+    "id": "spec-parser/access/materialized-self-reference",
+    "desc": "first materializing assignment cannot read the field -> compile error",
+    "exercise": "field Amount as number\nin Draft omit Amount\nfrom Draft on Submit -> set Amount = Amount + 1 -> transition Final",
+    "specCite": "docs/language/precept-language-spec.md:1078",
+    "expected": "reject:MaterializedFieldSelfReference",
+    "source": "added",
+    "block": "2.2-access-mode-omit"
+  },
+  {
+    "id": "spec-parser/scalar/ci-string",
+    "desc": "~string scalar type parses",
+    "exercise": "field F as ~string",
+    "specCite": "docs/language/precept-language-spec.md:1095",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.3-typeref-grammar"
+  },
+  {
+    "id": "spec-parser/scalar/string",
+    "desc": "string scalar type parses",
+    "exercise": "field F as string",
+    "specCite": "docs/language/precept-language-spec.md:1095",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.3-typeref-grammar"
+  },
+  {
+    "id": "spec-parser/scalar/number",
+    "desc": "number scalar type parses",
+    "exercise": "field F as number",
+    "specCite": "docs/language/precept-language-spec.md:1095",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.3-typeref-grammar"
+  },
+  {
+    "id": "spec-parser/scalar/integer",
+    "desc": "integer scalar type parses",
+    "exercise": "field F as integer",
+    "specCite": "docs/language/precept-language-spec.md:1095",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.3-typeref-grammar"
+  },
+  {
+    "id": "spec-parser/scalar/decimal",
+    "desc": "decimal scalar type parses",
+    "exercise": "field F as decimal",
+    "specCite": "docs/language/precept-language-spec.md:1095",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.3-typeref-grammar"
+  },
+  {
+    "id": "spec-parser/scalar/boolean",
+    "desc": "boolean scalar type parses",
+    "exercise": "field F as boolean",
+    "specCite": "docs/language/precept-language-spec.md:1095",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.3-typeref-grammar"
+  },
+  {
+    "id": "spec-parser/scalar/date",
+    "desc": "date scalar type parses",
+    "exercise": "field F as date",
+    "specCite": "docs/language/precept-language-spec.md:1095",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.3-typeref-grammar"
+  },
+  {
+    "id": "spec-parser/scalar/time",
+    "desc": "time scalar type parses",
+    "exercise": "field F as time",
+    "specCite": "docs/language/precept-language-spec.md:1095",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.3-typeref-grammar"
+  },
+  {
+    "id": "spec-parser/scalar/instant",
+    "desc": "instant scalar type parses",
+    "exercise": "field F as instant",
+    "specCite": "docs/language/precept-language-spec.md:1095",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.3-typeref-grammar"
+  },
+  {
+    "id": "spec-parser/scalar/duration",
+    "desc": "duration scalar type parses",
+    "exercise": "field F as duration",
+    "specCite": "docs/language/precept-language-spec.md:1095",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.3-typeref-grammar"
+  },
+  {
+    "id": "spec-parser/scalar/period",
+    "desc": "period scalar type parses",
+    "exercise": "field F as period",
+    "specCite": "docs/language/precept-language-spec.md:1095",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.3-typeref-grammar"
+  },
+  {
+    "id": "spec-parser/scalar/timezone",
+    "desc": "timezone scalar type parses",
+    "exercise": "field F as timezone",
+    "specCite": "docs/language/precept-language-spec.md:1095",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.3-typeref-grammar"
+  },
+  {
+    "id": "spec-parser/scalar/zoneddatetime",
+    "desc": "zoneddatetime scalar type parses",
+    "exercise": "field F as zoneddatetime",
+    "specCite": "docs/language/precept-language-spec.md:1095",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.3-typeref-grammar"
+  },
+  {
+    "id": "spec-parser/scalar/datetime",
+    "desc": "datetime scalar type parses",
+    "exercise": "field F as datetime",
+    "specCite": "docs/language/precept-language-spec.md:1095",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.3-typeref-grammar"
+  },
+  {
+    "id": "spec-parser/scalar/money",
+    "desc": "money scalar type parses",
+    "exercise": "field F as money",
+    "specCite": "docs/language/precept-language-spec.md:1095",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.3-typeref-grammar"
+  },
+  {
+    "id": "spec-parser/scalar/currency",
+    "desc": "currency scalar type parses",
+    "exercise": "field F as currency",
+    "specCite": "docs/language/precept-language-spec.md:1095",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.3-typeref-grammar"
+  },
+  {
+    "id": "spec-parser/scalar/quantity",
+    "desc": "quantity scalar type parses",
+    "exercise": "field F as quantity",
+    "specCite": "docs/language/precept-language-spec.md:1095",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.3-typeref-grammar"
+  },
+  {
+    "id": "spec-parser/scalar/unitofmeasure",
+    "desc": "unitofmeasure scalar type parses",
+    "exercise": "field F as unitofmeasure",
+    "specCite": "docs/language/precept-language-spec.md:1095",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.3-typeref-grammar"
+  },
+  {
+    "id": "spec-parser/scalar/dimension",
+    "desc": "dimension scalar type parses",
+    "exercise": "field F as dimension",
+    "specCite": "docs/language/precept-language-spec.md:1095",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.3-typeref-grammar"
+  },
+  {
+    "id": "spec-parser/scalar/price",
+    "desc": "price scalar type parses",
+    "exercise": "field F as price",
+    "specCite": "docs/language/precept-language-spec.md:1095",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.3-typeref-grammar"
+  },
+  {
+    "id": "spec-parser/scalar/exchangerate",
+    "desc": "exchangerate scalar type parses",
+    "exercise": "field F as exchangerate",
+    "specCite": "docs/language/precept-language-spec.md:1095",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.3-typeref-grammar"
+  },
+  {
+    "id": "spec-parser/coll/set-of",
+    "desc": "set of inner type",
+    "exercise": "field Tags as set of string",
+    "specCite": "docs/language/precept-language-spec.md:1101",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.3-typeref-grammar"
+  },
+  {
+    "id": "spec-parser/coll/queue-of",
+    "desc": "queue of inner type",
+    "exercise": "field Q as queue of string",
+    "specCite": "docs/language/precept-language-spec.md:1101",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.3-typeref-grammar"
+  },
+  {
+    "id": "spec-parser/coll/stack-of",
+    "desc": "stack of inner type",
+    "exercise": "field St as stack of string",
+    "specCite": "docs/language/precept-language-spec.md:1101",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.3-typeref-grammar"
+  },
+  {
+    "id": "spec-parser/coll/bag-of",
+    "desc": "bag of inner type",
+    "exercise": "field Bg as bag of string",
+    "specCite": "docs/language/precept-language-spec.md:1102",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.3-typeref-grammar"
+  },
+  {
+    "id": "spec-parser/coll/list-of",
+    "desc": "list of inner type",
+    "exercise": "field Ls as list of string",
+    "specCite": "docs/language/precept-language-spec.md:1103",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.3-typeref-grammar"
+  },
+  {
+    "id": "spec-parser/coll/log-of",
+    "desc": "log of inner type",
+    "exercise": "field Lg as log of string",
+    "specCite": "docs/language/precept-language-spec.md:1104",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.3-typeref-grammar"
+  },
+  {
+    "id": "spec-parser/coll/log-of-by",
+    "desc": "log of inner by inner",
+    "exercise": "field Lg as log of string by integer",
+    "specCite": "docs/language/precept-language-spec.md:1105",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.3-typeref-grammar"
+  },
+  {
+    "id": "spec-parser/coll/queue-of-by",
+    "desc": "queue of inner by inner",
+    "exercise": "field Q as queue of string by integer",
+    "specCite": "docs/language/precept-language-spec.md:1106",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.3-typeref-grammar"
+  },
+  {
+    "id": "spec-parser/coll/queue-of-by-ascending",
+    "desc": "queue of inner by inner ascending",
+    "exercise": "field Q as queue of string by integer ascending",
+    "specCite": "docs/language/precept-language-spec.md:1106",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.3-typeref-grammar"
+  },
+  {
+    "id": "spec-parser/coll/queue-of-by-descending",
+    "desc": "queue of inner by inner descending",
+    "exercise": "field Q as queue of string by integer descending",
+    "specCite": "docs/language/precept-language-spec.md:1106",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.3-typeref-grammar"
+  },
+  {
+    "id": "spec-parser/coll/lookup-of-to",
+    "desc": "lookup of inner to inner",
+    "exercise": "field M as lookup of string to number",
+    "specCite": "docs/language/precept-language-spec.md:1107",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.3-typeref-grammar"
+  },
+  {
+    "id": "spec-parser/coll/inner-value-modifier",
+    "desc": "inner type carries value modifier",
+    "exercise": "field Q as queue of string maxlength 200",
+    "specCite": "docs/language/precept-language-spec.md:1108",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.3-typeref-grammar"
+  },
+  {
+    "id": "spec-parser/coll/inner-qualifier-and-modifier",
+    "desc": "inner type carries qualifier and value modifier",
+    "exercise": "field S as set of money in 'USD' nonnegative",
+    "specCite": "docs/language/precept-language-spec.md:1108",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.3-typeref-grammar"
+  },
+  {
+    "id": "spec-parser/qual/in",
+    "desc": "in unit qualifier pins unit/currency",
+    "exercise": "field P as money in 'USD'",
+    "specCite": "docs/language/precept-language-spec.md:1116",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.3-typeref-grammar"
+  },
+  {
+    "id": "spec-parser/qual/of",
+    "desc": "of family qualifier constrains dimension",
+    "exercise": "field W as quantity of 'mass'",
+    "specCite": "docs/language/precept-language-spec.md:1116",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.3-typeref-grammar"
+  },
+  {
+    "id": "spec-parser/qual/to",
+    "desc": "to qualifier (exchangerate style)",
+    "exercise": "field Fx as exchangerate in 'USD/EUR'",
+    "specCite": "docs/language/precept-language-spec.md:1116",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.3-typeref-grammar"
+  },
+  {
+    "id": "spec-parser/qual/in-and-of-both",
+    "desc": "a field cannot use both in and of",
+    "exercise": "field W as quantity in 'kg' of 'mass'",
+    "specCite": "docs/language/precept-language-spec.md:1121",
+    "expected": "reject:any",
+    "source": "added",
+    "block": "2.3-typeref-grammar"
+  },
+  {
+    "id": "spec-parser/choice/basic",
+    "desc": "choice of string with values",
+    "exercise": "field Status as choice of string('a', 'b')",
+    "specCite": "docs/language/precept-language-spec.md:1113",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.3-typeref-grammar"
+  },
+  {
+    "id": "spec-parser/choice/integer",
+    "desc": "choice of integer with values",
+    "exercise": "field Level as choice of integer(1, 2, 3)",
+    "specCite": "docs/language/precept-language-spec.md:1113",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.3-typeref-grammar"
+  },
+  {
+    "id": "spec-parser/choice/ordered",
+    "desc": "choice with ordered modifier",
+    "exercise": "field Level as choice of integer(1, 2, 3) ordered",
+    "specCite": "docs/language/precept-language-spec.md:1113",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.3-typeref-grammar"
+  },
+  {
+    "id": "spec-parser/choice/empty",
+    "desc": "choice with empty argument list -> EmptyChoice",
+    "exercise": "field Status as choice of string()",
+    "specCite": "docs/language/precept-language-spec.md:1209",
+    "expected": "reject:EmptyChoice",
+    "source": "added",
+    "block": "2.3-typeref-grammar"
+  },
+  {
+    "id": "spec-parser/choice/missing-element-type",
+    "desc": "choice without of T -> ChoiceMissingElementType",
+    "exercise": "field Status as choice('a', 'b')",
+    "specCite": "docs/language/precept-language-spec.md:1210",
+    "expected": "reject:ChoiceMissingElementType",
+    "source": "added",
+    "block": "2.3-typeref-grammar"
+  },
+  {
+    "id": "spec-parser/choice/element-type-mismatch",
+    "desc": "choice value literal kind mismatch -> ChoiceElementTypeMismatch",
+    "exercise": "field Level as choice of integer('a', 'b')",
+    "specCite": "docs/language/precept-language-spec.md:1211",
+    "expected": "reject:ChoiceElementTypeMismatch",
+    "source": "added",
+    "block": "2.3-typeref-grammar"
+  },
+  {
+    "id": "spec-parser/cistring/field",
+    "desc": "~string valid in field declaration",
+    "exercise": "field Email as ~string",
+    "specCite": "docs/language/precept-language-spec.md:1125",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.3-cistring-note"
+  },
+  {
+    "id": "spec-parser/cistring/event-arg",
+    "desc": "~string valid in event argument declaration",
+    "exercise": "event Foo(Email as ~string)",
+    "specCite": "docs/language/precept-language-spec.md:1125",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.3-cistring-note"
+  },
+  {
+    "id": "spec-parser/cistring/choice-element",
+    "desc": "choice of ~string -> ExpectedToken parse error",
+    "exercise": "field Status as choice of ~string('a', 'b')",
+    "specCite": "docs/language/precept-language-spec.md:1119",
+    "expected": "reject:ExpectedToken",
+    "source": "added",
+    "block": "2.3-cistring-note"
+  },
+  {
+    "id": "spec-parser/cistring/nonstring-tilde",
+    "desc": "~ before a non-string type -> diagnostic",
+    "exercise": "field X as ~integer",
+    "specCite": "docs/language/precept-language-spec.md:1125",
+    "expected": "reject:any",
+    "source": "added",
+    "block": "2.3-cistring-note"
+  },
+  {
+    "id": "spec-parser/setdisambig/type-position",
+    "desc": "set in type position reinterpreted as SetType",
+    "exercise": "field Tags as set of string",
+    "specCite": "docs/language/precept-language-spec.md:1129",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.3-set-disambiguation"
+  },
+  {
+    "id": "spec-parser/setdisambig/action-position",
+    "desc": "set outside type position remains action keyword",
+    "exercise": "from Draft on Submit -> set Amount = 0 -> transition Final",
+    "specCite": "docs/language/precept-language-spec.md:1129",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.3-set-disambiguation"
+  },
+  {
+    "id": "spec-parser/innermod/notempty-string",
+    "desc": "set of string notempty (per-element non-empty)",
+    "exercise": "field Tags as set of string notempty",
+    "specCite": "docs/language/precept-language-spec.md:1123",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.3-inner-value-modifier-compat"
+  },
+  {
+    "id": "spec-parser/innermod/wrong-modifier-for-inner",
+    "desc": "maxlength on integer inner type -> InvalidModifierForType",
+    "exercise": "field Xs as set of integer maxlength 5",
+    "specCite": "docs/language/precept-language-spec.md:1123",
+    "expected": "reject:InvalidModifierForType",
+    "source": "added",
+    "block": "2.3-inner-value-modifier-compat"
+  },
+  {
+    "id": "spec-parser/mod/optional",
+    "desc": "optional flag modifier",
+    "exercise": "field Note as string optional",
+    "specCite": "docs/language/precept-language-spec.md:1144",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.4-field-modifiers"
+  },
+  {
+    "id": "spec-parser/mod/editable",
+    "desc": "editable flag modifier",
+    "exercise": "field Amount as number editable",
+    "specCite": "docs/language/precept-language-spec.md:1145",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.4-field-modifiers"
+  },
+  {
+    "id": "spec-parser/mod/ordered",
+    "desc": "ordered flag on choice",
+    "exercise": "field Level as choice of integer(1, 2) ordered",
+    "specCite": "docs/language/precept-language-spec.md:1146",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.4-field-modifiers"
+  },
+  {
+    "id": "spec-parser/mod/nonnegative",
+    "desc": "nonnegative flag modifier",
+    "exercise": "field Amount as number nonnegative",
+    "specCite": "docs/language/precept-language-spec.md:1147",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.4-field-modifiers"
+  },
+  {
+    "id": "spec-parser/mod/positive",
+    "desc": "positive flag modifier",
+    "exercise": "field Amount as number positive",
+    "specCite": "docs/language/precept-language-spec.md:1148",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.4-field-modifiers"
+  },
+  {
+    "id": "spec-parser/mod/nonzero",
+    "desc": "nonzero flag modifier",
+    "exercise": "field Amount as number nonzero",
+    "specCite": "docs/language/precept-language-spec.md:1149",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.4-field-modifiers"
+  },
+  {
+    "id": "spec-parser/mod/notempty",
+    "desc": "notempty flag modifier",
+    "exercise": "field Name as string notempty",
+    "specCite": "docs/language/precept-language-spec.md:1150",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.4-field-modifiers"
+  },
+  {
+    "id": "spec-parser/mod/notempty-optional-exclusive",
+    "desc": "notempty mutually exclusive with optional",
+    "exercise": "field Name as string notempty optional",
+    "specCite": "docs/language/precept-language-spec.md:1150",
+    "expected": "reject:any",
+    "source": "added",
+    "block": "2.4-field-modifiers"
+  },
+  {
+    "id": "spec-parser/mod/default",
+    "desc": "default value modifier",
+    "exercise": "field Amount as number default 0",
+    "specCite": "docs/language/precept-language-spec.md:1151",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.4-field-modifiers"
+  },
+  {
+    "id": "spec-parser/mod/min",
+    "desc": "min value modifier",
+    "exercise": "field Amount as number min 5",
+    "specCite": "docs/language/precept-language-spec.md:1152",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.4-field-modifiers"
+  },
+  {
+    "id": "spec-parser/mod/max",
+    "desc": "max value modifier",
+    "exercise": "field Amount as number max 100",
+    "specCite": "docs/language/precept-language-spec.md:1153",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.4-field-modifiers"
+  },
+  {
+    "id": "spec-parser/mod/minlength",
+    "desc": "minlength value modifier",
+    "exercise": "field Name as string minlength 1",
+    "specCite": "docs/language/precept-language-spec.md:1154",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.4-field-modifiers"
+  },
+  {
+    "id": "spec-parser/mod/maxlength",
+    "desc": "maxlength value modifier",
+    "exercise": "field Name as string maxlength 200",
+    "specCite": "docs/language/precept-language-spec.md:1155",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.4-field-modifiers"
+  },
+  {
+    "id": "spec-parser/mod/mincount",
+    "desc": "mincount value modifier",
+    "exercise": "field Tags as set of string mincount 1",
+    "specCite": "docs/language/precept-language-spec.md:1156",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.4-field-modifiers"
+  },
+  {
+    "id": "spec-parser/mod/maxcount",
+    "desc": "maxcount value modifier",
+    "exercise": "field Tags as set of string maxcount 10",
+    "specCite": "docs/language/precept-language-spec.md:1157",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.4-field-modifiers"
+  },
+  {
+    "id": "spec-parser/mod/maxplaces",
+    "desc": "maxplaces value modifier",
+    "exercise": "field Amount as decimal maxplaces 2",
+    "specCite": "docs/language/precept-language-spec.md:1158",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.4-field-modifiers"
+  },
+  {
+    "id": "spec-parser/mod/constraint-desugar",
+    "desc": "constraint modifier desugars to equivalent rule",
+    "exercise": "field Qty as number min 5",
+    "specCite": "docs/language/precept-language-spec.md:1135",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.4-field-modifiers"
+  },
+  {
+    "id": "spec-parser/mod/value-modifier-missing-expr",
+    "desc": "value modifier missing its expression -> ExpectedToken",
+    "exercise": "field Amount as number min",
+    "specCite": "docs/language/precept-language-spec.md:1152",
+    "expected": "reject:ExpectedToken",
+    "source": "added",
+    "block": "2.4-field-modifiers"
+  },
+  {
+    "id": "spec-parser/interp/string",
+    "desc": "interpolated string reassembled from segments",
+    "exercise": "field Msg as string default \"hi {Name}\"",
+    "specCite": "docs/language/precept-language-spec.md:1162",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.5-interpolation-reassembly"
+  },
+  {
+    "id": "spec-parser/interp/typed-constant",
+    "desc": "interpolated typed constant reassembled",
+    "exercise": "field P as money 'USD' <- '{n} USD'",
+    "specCite": "docs/language/precept-language-spec.md:1162",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.5-interpolation-reassembly"
+  },
+  {
+    "id": "spec-parser/interp/nested-depth-unaware",
+    "desc": "nested interpolation reassembles without depth tracking",
+    "exercise": "field Msg as string default \"a {if f then \\\"b {c}\\\" else \\\"d\\\"} e\"",
+    "specCite": "docs/language/precept-language-spec.md:1169",
+    "expected": "accept",
+    "source": "added",
+    "block": "2.5-interpolation-reassembly"
+  },
+  {
+    "id": "spec-parser/interp/empty-hole",
+    "desc": "empty interpolation hole is a syntax error (expected expression)",
+    "exercise": "field Msg as string default \"a {} b\"",
+    "specCite": "docs/language/precept-language-spec.md:1169",
+    "expected": "reject:any",
+    "source": "added",
+    "block": "2.5-interpolation-reassembly"
+  },
+  {
+    "id": "spec-parser/recovery/missing-node",
+    "desc": "missing expected token inserts IsMissing node and continues",
+    "exercise": "field Amount as\nfield Other as number",
+    "specCite": "docs/language/precept-language-spec.md:1177",
+    "expected": "reject:any",
+    "source": "added",
+    "block": "2.6-error-recovery"
+  },
+  {
+    "id": "spec-parser/recovery/runs-to-end",
+    "desc": "parser runs to end-of-source emitting diagnostics",
+    "exercise": "frobnicate\nfield Amount as number",
+    "specCite": "docs/language/precept-language-spec.md:1181",
+    "expected": "reject:any",
+    "source": "added",
+    "block": "2.6-error-recovery"
+  },
+  {
+    "id": "spec-parser/recovery/sync-resync",
+    "desc": "structurally-lost parser resyncs at a sync token",
+    "exercise": "field @@@ \nfield Amount as number",
+    "specCite": "docs/language/precept-language-spec.md:1181",
+    "expected": "reject:any",
+    "source": "added",
+    "block": "2.6-error-recovery"
+  },
+  {
+    "id": "spec-parser/recovery/continuation-not-sync",
+    "desc": "continuation tokens (when/-> etc.) are not sync points",
+    "exercise": "from Draft on Submit when when when",
+    "specCite": "docs/language/precept-language-spec.md:1195",
+    "expected": "reject:any",
+    "source": "added",
+    "block": "2.6-error-recovery"
+  },
+  {
+    "id": "spec-parser/diag/expected-token",
+    "desc": "ExpectedToken when expected token not found",
+    "exercise": "field Amount number",
+    "specCite": "docs/language/precept-language-spec.md:1201",
+    "expected": "reject:ExpectedToken",
+    "source": "added",
+    "block": "2.7-parser-diagnostics"
+  },
+  {
+    "id": "spec-parser/diag/unexpected-keyword",
+    "desc": "UnexpectedKeyword when keyword in value slot",
+    "exercise": "rule ensure > 0 because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:1202",
+    "expected": "reject:UnexpectedKeyword",
+    "source": "added",
+    "block": "2.7-parser-diagnostics"
+  },
+  {
+    "id": "spec-parser/diag/nonassociative-comparison",
+    "desc": "NonAssociativeComparison on chained comparison",
+    "exercise": "rule a == b == c because 'r'",
+    "specCite": "docs/language/precept-language-spec.md:1203",
+    "expected": "reject:NonAssociativeComparison",
+    "source": "added",
+    "block": "2.7-parser-diagnostics"
+  },
+  {
+    "id": "spec-parser/diag/invalid-call-target",
+    "desc": "InvalidCallTarget on non-callable followed by (",
+    "exercise": "field R as number <- 5(a)",
+    "specCite": "docs/language/precept-language-spec.md:1204",
+    "expected": "reject:InvalidCallTarget",
+    "source": "added",
+    "block": "2.7-parser-diagnostics"
+  },
+  {
+    "id": "spec-parser/diag/omit-does-not-support-guard",
+    "desc": "OmitDoesNotSupportGuard on omit with when",
+    "exercise": "in Draft when Active omit Amount",
+    "specCite": "docs/language/precept-language-spec.md:1205",
+    "expected": "reject:OmitDoesNotSupportGuard",
+    "source": "added",
+    "block": "2.7-parser-diagnostics"
+  },
+  {
+    "id": "spec-parser/diag/event-handler-no-guard",
+    "desc": "EventHandlerDoesNotSupportGuard on guarded handler",
+    "exercise": "on Submit when Active -> set Amount = 0",
+    "specCite": "docs/language/precept-language-spec.md:1206",
+    "expected": "reject:EventHandlerDoesNotSupportGuard",
+    "source": "added",
+    "block": "2.7-parser-diagnostics"
+  },
+  {
+    "id": "spec-parser/diag/pre-event-guard",
+    "desc": "PreEventGuardNotAllowed on transition-row pre-event when",
+    "exercise": "from Draft when Amount > 0 on Submit -> transition Final",
+    "specCite": "docs/language/precept-language-spec.md:1207",
+    "expected": "reject:PreEventGuardNotAllowed",
+    "source": "added",
+    "block": "2.7-parser-diagnostics"
+  },
+  {
+    "id": "spec-parser/diag/expected-outcome",
+    "desc": "ExpectedOutcome on transition row with no outcome",
+    "exercise": "from Draft on Submit -> set Amount = 0",
+    "specCite": "docs/language/precept-language-spec.md:1208",
+    "expected": "reject:ExpectedOutcome",
+    "source": "added",
+    "block": "2.7-parser-diagnostics"
+  },
+  {
+    "id": "spec-parser/diag/empty-choice",
+    "desc": "EmptyChoice on choice with empty value list",
+    "exercise": "field Status as choice of string()",
+    "specCite": "docs/language/precept-language-spec.md:1209",
+    "expected": "reject:EmptyChoice",
+    "source": "added",
+    "block": "2.7-parser-diagnostics"
+  },
+  {
+    "id": "spec-parser/diag/choice-missing-element-type",
+    "desc": "ChoiceMissingElementType on choice without of T",
+    "exercise": "field Status as choice('a', 'b')",
+    "specCite": "docs/language/precept-language-spec.md:1210",
+    "expected": "reject:ChoiceMissingElementType",
+    "source": "added",
+    "block": "2.7-parser-diagnostics"
+  },
+  {
+    "id": "spec-parser/diag/choice-element-type-mismatch",
+    "desc": "ChoiceElementTypeMismatch on literal kind mismatch",
+    "exercise": "field Level as choice of integer('a')",
+    "specCite": "docs/language/precept-language-spec.md:1211",
+    "expected": "reject:ChoiceElementTypeMismatch",
+    "source": "added",
+    "block": "2.7-parser-diagnostics"
+  }
+]

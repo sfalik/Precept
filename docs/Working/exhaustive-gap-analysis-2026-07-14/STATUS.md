@@ -20,18 +20,22 @@
 | `evidence/recovered-corpus.json` | The ~3,446-cell corpus recovered from the prior run's enumeration + text-extraction passes (`gid`, `id`, `exercise`, `expected`, `specCite`, `recovered_text`, `map_method`, `ambiguous`). This is a **starting DRAFT**, not yet imported/re-verified into `cells/`. |
 | `evidence/exhaustive-cell-probe-register-historical-leads.md` | Historical register of probe leads from an earlier (separate) probing pass — kept as leads to cross-check, not as verified verdicts. |
 | `evidence/compiler-crashes.md` | 6 cells that crashed the compiler on a D26 structural-invariant violation (`TypedErrorExpression present but no Error diagnostic`) rather than returning a diagnostic — all involve `choice of number(...)`/`choice of decimal(...)` domains with scientific-notation literals. Candidate real compiler bugs; not yet triaged or filed. |
-| `cells/` | Empty — Phase 1 populates this with the deterministically re-verified cell corpus (one file or entry per cell, calibration-gated, verdict derived from diagnostic codes, never from a summary). |
+| `assembled/all-cells.json` | Phase 1 output — the merged, globally-deduped cell corpus (4,592 cells, single JSON array, 0 id collisions). This is the Phase 2 input. |
+| `assembled/<unit>.cells.json` | Per-unit cell files (nine units) — concatenated into `all-cells.json`. |
+| `coverage/<unit>.md` | Per-unit block inventories (nine units) — one row per doc block with COVERED/ADDED/NO-BEHAVIOR disposition. |
+| `coverage-report.md` | Phase 1 merged rollup: per-unit block accounting, completeness proof, open stop-and-fix items, honest-limit statement. |
 | `STATUS.md` | This file. |
-| `coverage-report.md` | Stub — Phase 1 fills in per-doc coverage accounting. |
 
 ## Phase state
 
-**Phase 0: COMPLETE** (this consolidation). **Phase 1: NEXT.**
+**Phase 0: COMPLETE** (consolidation). **Phase 1: COMPLETE** — block→cell enumeration finished; 100% of blocks accounted in all nine units (`covered + added + no-behavior == total` for every unit); 4,592 cells merged into `assembled/all-cells.json` with zero id collisions. Two units carry **open stop-and-fix items** (doc-internal contradictions needing owner/author ruling before their affected cells can be verdicted — see `coverage-report.md § Open stop-and-fix`): `primitive-types` (integer-overflow stance; `pow` negative-exponent lane scope) and `business-domain` (stale Implementation Scope vs. retired D10; the `:1576` bounds-qualifier example). These do not block enumeration; they are inputs Phase 2 must resolve. **Phase 2: NEXT** — deterministic per-cell measurement of `all-cells.json` through the runner, verdict derived from diagnostic codes.
+
+See `coverage-report.md` for the full per-unit rollup and `assembled/all-cells.json` for the merged corpus.
 
 ## Counts
 
-- cells enumerated: 0 (the ~3,446-cell starting DRAFT lives in `evidence/recovered-corpus.json`, not yet imported)
-- cells checked: 0
+- cells enumerated: **4,592** (merged into `assembled/all-cells.json`; 3,413 `source:"draft"` + 1,179 `source:"added"`; 0 id collisions). Per-unit breakdown: spec-preamble-lexer 187, spec-parser 286, spec-typecheck 433, spec-semantics-proof 51, primitive-types 1,047, temporal 657, business-domain 852, collection 960, proof-engine-prevention 119. Blocks accounted: 888 total across the nine units.
+- cells checked: 0 (Phase 2)
 
 ## Scope
 

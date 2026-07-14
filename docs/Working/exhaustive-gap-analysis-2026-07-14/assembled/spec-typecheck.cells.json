@@ -1,0 +1,3955 @@
+[
+ {
+  "id": "spec-typecheck/widen/int-to-decimal-assign",
+  "desc": "integer widens to decimal on assignment",
+  "exercise": "field I as integer; field D as decimal; from S on E -> set D = I",
+  "specCite": "docs/language/precept-language-spec.md:1249",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.2-widen"
+ },
+ {
+  "id": "spec-typecheck/widen/int-to-number-assign",
+  "desc": "integer widens to number on assignment (direct)",
+  "exercise": "field I as integer; field N as number; from S on E -> set N = I",
+  "specCite": "docs/language/precept-language-spec.md:1250",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.2-widen"
+ },
+ {
+  "id": "spec-typecheck/widen/int-to-decimal-binary",
+  "desc": "integer widens to decimal in binary op, result decimal",
+  "exercise": "field I as integer; field D as decimal; rule I + D >= D",
+  "specCite": "docs/language/precept-language-spec.md:1263",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.2-widen"
+ },
+ {
+  "id": "spec-typecheck/widen/int-to-number-binary",
+  "desc": "integer widens to number in binary op",
+  "exercise": "field I as integer; field N as number; rule I + N >= N",
+  "specCite": "docs/language/precept-language-spec.md:1254",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.2-widen"
+ },
+ {
+  "id": "spec-typecheck/widen/int-to-decimal-funcarg",
+  "desc": "integer widens to decimal in function arg",
+  "exercise": "field I as integer; field D as decimal; rule min(I, D) >= D",
+  "specCite": "docs/language/precept-language-spec.md:1264",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.2-widen"
+ },
+ {
+  "id": "spec-typecheck/widen/int-to-decimal-default",
+  "desc": "integer literal widens to decimal in default",
+  "exercise": "field X as decimal default 42",
+  "specCite": "docs/language/precept-language-spec.md:1265",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.2-widen"
+ },
+ {
+  "id": "spec-typecheck/widen/int-to-decimal-comparison",
+  "desc": "integer widens to decimal in comparison",
+  "exercise": "field I as integer; field D as decimal; rule I > D",
+  "specCite": "docs/language/precept-language-spec.md:1266",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.2-widen"
+ },
+ {
+  "id": "spec-typecheck/widen/decimal-to-number-implicit-binary-error",
+  "desc": "decimal does NOT implicitly widen to number in binary op",
+  "exercise": "field D as decimal; field N as number; rule D + N >= N",
+  "specCite": "docs/language/precept-language-spec.md:1255",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.2-widen"
+ },
+ {
+  "id": "spec-typecheck/widen/decimal-to-number-assign-error",
+  "desc": "decimal cannot be assigned to number field without approximate()",
+  "exercise": "field D as decimal; field N as number; from S on E -> set N = D",
+  "specCite": "docs/language/precept-language-spec.md:1255",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.2-widen"
+ },
+ {
+  "id": "spec-typecheck/widen/decimal-to-number-comparison-error",
+  "desc": "decimal vs number comparison requires bridge",
+  "exercise": "field D as decimal; field N as number; rule D > N",
+  "specCite": "docs/language/precept-language-spec.md:1255",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.2-widen"
+ },
+ {
+  "id": "spec-typecheck/widen/number-to-integer-narrow-error",
+  "desc": "no implicit narrowing number to integer",
+  "exercise": "field N as number; field I as integer; from S on E -> set I = N",
+  "specCite": "docs/language/precept-language-spec.md:1256",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.2-widen"
+ },
+ {
+  "id": "spec-typecheck/widen/number-to-decimal-narrow-error",
+  "desc": "no implicit narrowing number to decimal",
+  "exercise": "field N as number; field D as decimal; from S on E -> set D = N",
+  "specCite": "docs/language/precept-language-spec.md:1256",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.2-widen"
+ },
+ {
+  "id": "spec-typecheck/numlit/whole-in-integer",
+  "desc": "whole-number literal resolves as integer in integer context",
+  "exercise": "field I as integer default 42",
+  "specCite": "docs/language/precept-language-spec.md:1282",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.3-numeric-literal"
+ },
+ {
+  "id": "spec-typecheck/numlit/whole-in-decimal",
+  "desc": "whole-number literal resolves as decimal in decimal context",
+  "exercise": "field D as decimal default 42",
+  "specCite": "docs/language/precept-language-spec.md:1282",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.3-numeric-literal"
+ },
+ {
+  "id": "spec-typecheck/numlit/whole-in-number",
+  "desc": "whole-number literal resolves as number in number context",
+  "exercise": "field N as number default 42",
+  "specCite": "docs/language/precept-language-spec.md:1282",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.3-numeric-literal"
+ },
+ {
+  "id": "spec-typecheck/numlit/whole-no-context-error",
+  "desc": "whole-number literal with no context -> diagnostic + ErrorType",
+  "exercise": "rule 42 and true",
+  "specCite": "docs/language/precept-language-spec.md:1274",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "3.3-numeric-literal"
+ },
+ {
+  "id": "spec-typecheck/numlit/fractional-in-decimal",
+  "desc": "fractional literal resolves as decimal",
+  "exercise": "field D as decimal default 3.14",
+  "specCite": "docs/language/precept-language-spec.md:1283",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.3-numeric-literal"
+ },
+ {
+  "id": "spec-typecheck/numlit/fractional-in-number",
+  "desc": "fractional literal resolves as number",
+  "exercise": "field N as number default 3.14",
+  "specCite": "docs/language/precept-language-spec.md:1283",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.3-numeric-literal"
+ },
+ {
+  "id": "spec-typecheck/numlit/fractional-in-integer-error",
+  "desc": "fractional literal in integer context is a type error",
+  "exercise": "field I as integer default 3.14",
+  "specCite": "docs/language/precept-language-spec.md:1283",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.3-numeric-literal"
+ },
+ {
+  "id": "spec-typecheck/numlit/exponent-in-number",
+  "desc": "exponent literal resolves as number",
+  "exercise": "field N as number default 1.5e2",
+  "specCite": "docs/language/precept-language-spec.md:1284",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.3-numeric-literal"
+ },
+ {
+  "id": "spec-typecheck/numlit/exponent-in-integer-error",
+  "desc": "exponent literal in integer context is a type error",
+  "exercise": "field I as integer default 1.5e2",
+  "specCite": "docs/language/precept-language-spec.md:1284",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.3-numeric-literal"
+ },
+ {
+  "id": "spec-typecheck/numlit/exponent-in-decimal-error",
+  "desc": "exponent literal in decimal context is a type error",
+  "exercise": "field D as decimal default 1.5e2",
+  "specCite": "docs/language/precept-language-spec.md:1284",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.3-numeric-literal"
+ },
+ {
+  "id": "spec-typecheck/typedconst/date-valid-content",
+  "desc": "valid date content accepted against context type",
+  "exercise": "field F as date default '2026-04-15'",
+  "specCite": "docs/language/precept-language-spec.md:1300",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.3-typed-constant"
+ },
+ {
+  "id": "spec-typecheck/typedconst/date-invalid-content",
+  "desc": "invalid date content is a compile error",
+  "exercise": "field F as date default '2026-13-99'",
+  "specCite": "docs/language/precept-language-spec.md:1293",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "3.3-typed-constant"
+ },
+ {
+  "id": "spec-typecheck/typedconst/time-valid-content",
+  "desc": "valid time content accepted against context type",
+  "exercise": "field F as time default '14:30:00'",
+  "specCite": "docs/language/precept-language-spec.md:1301",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.3-typed-constant"
+ },
+ {
+  "id": "spec-typecheck/typedconst/time-invalid-content",
+  "desc": "invalid time content is a compile error",
+  "exercise": "field F as time default '99:99:99'",
+  "specCite": "docs/language/precept-language-spec.md:1293",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "3.3-typed-constant"
+ },
+ {
+  "id": "spec-typecheck/typedconst/instant-valid-content",
+  "desc": "valid instant content accepted against context type",
+  "exercise": "field F as instant default '2026-04-15T14:30:00Z'",
+  "specCite": "docs/language/precept-language-spec.md:1302",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.3-typed-constant"
+ },
+ {
+  "id": "spec-typecheck/typedconst/instant-invalid-content",
+  "desc": "invalid instant content is a compile error",
+  "exercise": "field F as instant default '2026-04-15 14:30'",
+  "specCite": "docs/language/precept-language-spec.md:1293",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "3.3-typed-constant"
+ },
+ {
+  "id": "spec-typecheck/typedconst/datetime-valid-content",
+  "desc": "valid datetime content accepted against context type",
+  "exercise": "field F as datetime default '2026-04-15T14:30:00'",
+  "specCite": "docs/language/precept-language-spec.md:1303",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.3-typed-constant"
+ },
+ {
+  "id": "spec-typecheck/typedconst/datetime-invalid-content",
+  "desc": "invalid datetime content is a compile error",
+  "exercise": "field F as datetime default 'not-a-datetime'",
+  "specCite": "docs/language/precept-language-spec.md:1293",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "3.3-typed-constant"
+ },
+ {
+  "id": "spec-typecheck/typedconst/zoneddatetime-valid-content",
+  "desc": "valid zoneddatetime content accepted against context type",
+  "exercise": "field F as zoneddatetime default '2026-04-15T14:30:00[America/New_York]'",
+  "specCite": "docs/language/precept-language-spec.md:1304",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.3-typed-constant"
+ },
+ {
+  "id": "spec-typecheck/typedconst/zoneddatetime-invalid-content",
+  "desc": "invalid zoneddatetime content is a compile error",
+  "exercise": "field F as zoneddatetime default '2026-04-15T14:30:00'",
+  "specCite": "docs/language/precept-language-spec.md:1293",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "3.3-typed-constant"
+ },
+ {
+  "id": "spec-typecheck/typedconst/timezone-valid-content",
+  "desc": "valid timezone content accepted against context type",
+  "exercise": "field F as timezone default 'America/New_York'",
+  "specCite": "docs/language/precept-language-spec.md:1305",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.3-typed-constant"
+ },
+ {
+  "id": "spec-typecheck/typedconst/timezone-invalid-content",
+  "desc": "invalid timezone content is a compile error",
+  "exercise": "field F as timezone default 'Nowhere'",
+  "specCite": "docs/language/precept-language-spec.md:1293",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "3.3-typed-constant"
+ },
+ {
+  "id": "spec-typecheck/typedconst/duration-valid-content",
+  "desc": "valid duration content accepted against context type",
+  "exercise": "field F as duration default '72 hours'",
+  "specCite": "docs/language/precept-language-spec.md:1306",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.3-typed-constant"
+ },
+ {
+  "id": "spec-typecheck/typedconst/duration-invalid-content",
+  "desc": "invalid duration content is a compile error",
+  "exercise": "field F as duration default '72 bananas'",
+  "specCite": "docs/language/precept-language-spec.md:1293",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "3.3-typed-constant"
+ },
+ {
+  "id": "spec-typecheck/typedconst/period-valid-content",
+  "desc": "valid period content accepted against context type",
+  "exercise": "field F as period default '30 days'",
+  "specCite": "docs/language/precept-language-spec.md:1307",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.3-typed-constant"
+ },
+ {
+  "id": "spec-typecheck/typedconst/period-invalid-content",
+  "desc": "invalid period content is a compile error",
+  "exercise": "field F as period default '30 kilometers'",
+  "specCite": "docs/language/precept-language-spec.md:1293",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "3.3-typed-constant"
+ },
+ {
+  "id": "spec-typecheck/typedconst/money-valid-content",
+  "desc": "valid money content accepted against context type",
+  "exercise": "field F as money default '100 USD'",
+  "specCite": "docs/language/precept-language-spec.md:1308",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.3-typed-constant"
+ },
+ {
+  "id": "spec-typecheck/typedconst/money-invalid-content",
+  "desc": "invalid money content is a compile error",
+  "exercise": "field F as money default '100 ZZZ'",
+  "specCite": "docs/language/precept-language-spec.md:1293",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "3.3-typed-constant"
+ },
+ {
+  "id": "spec-typecheck/typedconst/quantity-valid-content",
+  "desc": "valid quantity content accepted against context type",
+  "exercise": "field F as quantity default '5 kg'",
+  "specCite": "docs/language/precept-language-spec.md:1309",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.3-typed-constant"
+ },
+ {
+  "id": "spec-typecheck/typedconst/quantity-invalid-content",
+  "desc": "invalid quantity content is a compile error",
+  "exercise": "field F as quantity default '5'",
+  "specCite": "docs/language/precept-language-spec.md:1293",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "3.3-typed-constant"
+ },
+ {
+  "id": "spec-typecheck/typedconst/price-valid-content",
+  "desc": "valid price content accepted against context type",
+  "exercise": "field F as price default '4.17 USD/each'",
+  "specCite": "docs/language/precept-language-spec.md:1310",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.3-typed-constant"
+ },
+ {
+  "id": "spec-typecheck/typedconst/price-invalid-content",
+  "desc": "invalid price content is a compile error",
+  "exercise": "field F as price default '4.17 USD'",
+  "specCite": "docs/language/precept-language-spec.md:1293",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "3.3-typed-constant"
+ },
+ {
+  "id": "spec-typecheck/typedconst/exchangerate-valid-content",
+  "desc": "valid exchangerate content accepted against context type",
+  "exercise": "field F as exchangerate default '1.08 USD/EUR'",
+  "specCite": "docs/language/precept-language-spec.md:1311",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.3-typed-constant"
+ },
+ {
+  "id": "spec-typecheck/typedconst/exchangerate-invalid-content",
+  "desc": "invalid exchangerate content is a compile error",
+  "exercise": "field F as exchangerate default '1.08 USD'",
+  "specCite": "docs/language/precept-language-spec.md:1293",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "3.3-typed-constant"
+ },
+ {
+  "id": "spec-typecheck/typedconst/currency-valid-content",
+  "desc": "valid currency content accepted against context type",
+  "exercise": "field F as currency default 'USD'",
+  "specCite": "docs/language/precept-language-spec.md:1312",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.3-typed-constant"
+ },
+ {
+  "id": "spec-typecheck/typedconst/currency-invalid-content",
+  "desc": "invalid currency content is a compile error",
+  "exercise": "field F as currency default 'DOLLAR'",
+  "specCite": "docs/language/precept-language-spec.md:1293",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "3.3-typed-constant"
+ },
+ {
+  "id": "spec-typecheck/typedconst/unitofmeasure-valid-content",
+  "desc": "valid unitofmeasure content accepted against context type",
+  "exercise": "field F as unitofmeasure default 'kg'",
+  "specCite": "docs/language/precept-language-spec.md:1313",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.3-typed-constant"
+ },
+ {
+  "id": "spec-typecheck/typedconst/unitofmeasure-invalid-content",
+  "desc": "invalid unitofmeasure content is a compile error",
+  "exercise": "field F as unitofmeasure default '5 kg'",
+  "specCite": "docs/language/precept-language-spec.md:1293",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "3.3-typed-constant"
+ },
+ {
+  "id": "spec-typecheck/typedconst/dimension-valid-content",
+  "desc": "valid dimension content accepted against context type",
+  "exercise": "field F as dimension default 'mass'",
+  "specCite": "docs/language/precept-language-spec.md:1314",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.3-typed-constant"
+ },
+ {
+  "id": "spec-typecheck/typedconst/dimension-invalid-content",
+  "desc": "invalid dimension content is a compile error",
+  "exercise": "field F as dimension default 'notadim'",
+  "specCite": "docs/language/precept-language-spec.md:1293",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "3.3-typed-constant"
+ },
+ {
+  "id": "spec-typecheck/typedconst/no-context-error",
+  "desc": "typed constant with no type expectation is a compile error",
+  "exercise": "rule 'USD' == 'USD'",
+  "specCite": "docs/language/precept-language-spec.md:1294",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "3.3-typed-constant"
+ },
+ {
+  "id": "spec-typecheck/name/duplicate-field",
+  "desc": "two field declarations with same name",
+  "exercise": "field X as integer; field X as string",
+  "specCite": "docs/language/precept-language-spec.md:1322",
+  "expected": "reject:DuplicateFieldName",
+  "source": "added",
+  "block": "3.4-name-resolution"
+ },
+ {
+  "id": "spec-typecheck/name/duplicate-state",
+  "desc": "two state entries with same name",
+  "exercise": "state Open initial; state Open",
+  "specCite": "docs/language/precept-language-spec.md:1323",
+  "expected": "reject:DuplicateStateName",
+  "source": "added",
+  "block": "3.4-name-resolution"
+ },
+ {
+  "id": "spec-typecheck/name/duplicate-event",
+  "desc": "two event declarations with same name",
+  "exercise": "event Pay(amt as integer); event Pay(x as integer)",
+  "specCite": "docs/language/precept-language-spec.md:1324",
+  "expected": "reject:DuplicateEventName",
+  "source": "added",
+  "block": "3.4-name-resolution"
+ },
+ {
+  "id": "spec-typecheck/name/duplicate-event-arg",
+  "desc": "two args in same event with same name",
+  "exercise": "event Pay(amt as integer, amt as integer)",
+  "specCite": "docs/language/precept-language-spec.md:1325",
+  "expected": "reject:DuplicateArgName",
+  "source": "added",
+  "block": "3.4-name-resolution"
+ },
+ {
+  "id": "spec-typecheck/name/undeclared-field",
+  "desc": "identifier resolves to no field name",
+  "exercise": "rule Missing > 0",
+  "specCite": "docs/language/precept-language-spec.md:1326",
+  "expected": "reject:UndeclaredField",
+  "source": "added",
+  "block": "3.4-name-resolution"
+ },
+ {
+  "id": "spec-typecheck/name/undeclared-state",
+  "desc": "transition target not a declared state",
+  "exercise": "state Open initial; from Open on E -> transition Ghost",
+  "specCite": "docs/language/precept-language-spec.md:1327",
+  "expected": "reject:UndeclaredState",
+  "source": "added",
+  "block": "3.4-name-resolution"
+ },
+ {
+  "id": "spec-typecheck/name/undeclared-event",
+  "desc": "event name in from...on not declared",
+  "exercise": "state Open initial; from Open on Ghost -> no transition",
+  "specCite": "docs/language/precept-language-spec.md:1328",
+  "expected": "reject:UndeclaredEvent",
+  "source": "added",
+  "block": "3.4-name-resolution"
+ },
+ {
+  "id": "spec-typecheck/name/multiple-initial-states",
+  "desc": "more than one state marked initial",
+  "exercise": "state A initial; state B initial",
+  "specCite": "docs/language/precept-language-spec.md:1329",
+  "expected": "reject:MultipleInitialStates",
+  "source": "added",
+  "block": "3.4-name-resolution"
+ },
+ {
+  "id": "spec-typecheck/name/no-initial-state",
+  "desc": "stateful precept with no initial state",
+  "exercise": "state A; state B",
+  "specCite": "docs/language/precept-language-spec.md:1330",
+  "expected": "reject:NoInitialState",
+  "source": "added",
+  "block": "3.4-name-resolution"
+ },
+ {
+  "id": "spec-typecheck/name/unqualified-event-arg",
+  "desc": "bare reference to in-scope event arg",
+  "exercise": "event E(amt as integer); state Open initial; from Open on E when amt > 0 -> no transition",
+  "specCite": "docs/language/precept-language-spec.md:1326",
+  "expected": "reject:UnqualifiedEventArgReference",
+  "source": "added",
+  "block": "3.4-name-resolution"
+ },
+ {
+  "id": "spec-typecheck/scope/forward-field-ref-rule",
+  "desc": "rule may reference a field declared later (order-independent)",
+  "exercise": "rule Later > 0; field Later as integer",
+  "specCite": "docs/language/precept-language-spec.md:1242",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.5-scope"
+ },
+ {
+  "id": "spec-typecheck/scope/transition-ref-later-state",
+  "desc": "transition row references a state declared after it",
+  "exercise": "state Open initial; from Open on E -> transition Closed; state Closed",
+  "specCite": "docs/language/precept-language-spec.md:1242",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.5-scope"
+ },
+ {
+  "id": "spec-typecheck/scope/default-forward-ref-error",
+  "desc": "default value cannot forward-reference a later field",
+  "exercise": "field A as integer default B; field B as integer",
+  "specCite": "docs/language/precept-language-spec.md:1350",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "3.5-scope"
+ },
+ {
+  "id": "spec-typecheck/scope/default-self-ref-error",
+  "desc": "default value cannot self-reference",
+  "exercise": "field A as integer default A",
+  "specCite": "docs/language/precept-language-spec.md:1350",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "3.5-scope"
+ },
+ {
+  "id": "spec-typecheck/scope/computed-any-field",
+  "desc": "computed expression may reference any non-cyclic field",
+  "exercise": "field A as integer <- B + 1; field B as integer",
+  "specCite": "docs/language/precept-language-spec.md:1351",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.5-scope"
+ },
+ {
+  "id": "spec-typecheck/scope/constraint-modifier-forward-ref",
+  "desc": "constraint modifier value may reference a field declared later",
+  "exercise": "field A as integer min B; field B as integer",
+  "specCite": "docs/language/precept-language-spec.md:1352",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.5-scope"
+ },
+ {
+  "id": "spec-typecheck/scope/constraint-modifier-mutual-ref",
+  "desc": "mutual constraint bounds conjoin, not a cycle",
+  "exercise": "field A as integer min B; field B as integer min A",
+  "specCite": "docs/language/precept-language-spec.md:1354",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.5-scope"
+ },
+ {
+  "id": "spec-typecheck/scope/omit-field-read",
+  "desc": "reading a field omitted in the anchoring state is a compile error",
+  "exercise": "field X as integer; state Open initial omit X; rule in Open X > 0",
+  "specCite": "docs/language/precept-language-spec.md:1356",
+  "expected": "reject:OmittedFieldReadInState",
+  "source": "added",
+  "block": "3.5-scope"
+ },
+ {
+  "id": "spec-typecheck/scope/binding-shadows-field",
+  "desc": "quantifier binding variable name collides with a field",
+  "exercise": "field item as integer; field Tags as set of string; rule each item in Tags (item == \"a\")",
+  "specCite": "docs/language/precept-language-spec.md:1366",
+  "expected": "reject:BindingShadowsField",
+  "source": "added",
+  "block": "3.5-scope"
+ },
+ {
+  "id": "spec-typecheck/scope/binding-reserved-keyword",
+  "desc": "binding variable name is a reserved keyword",
+  "exercise": "field Tags as set of string; rule each state in Tags (state == \"a\")",
+  "specCite": "docs/language/precept-language-spec.md:1367",
+  "expected": "reject:ExpectedIdentifier",
+  "source": "added",
+  "block": "3.5-scope"
+ },
+ {
+  "id": "spec-typecheck/scope/binding-ci-inheritance",
+  "desc": "binding var inherits ~string CI enforcement inside predicate",
+  "exercise": "field Tags as set of ~string; rule each item in Tags (item == \"admin\")",
+  "specCite": "docs/language/precept-language-spec.md:1368",
+  "expected": "reject:CaseInsensitiveFieldRequiresTildeEquals",
+  "source": "added",
+  "block": "3.5-scope"
+ },
+ {
+  "id": "spec-typecheck/scope/event-arg-dotted-access",
+  "desc": "event arg reached via dotted EventName.ArgName",
+  "exercise": "event E(amt as integer); state Open initial; from Open on E when E.amt > 0 -> no transition",
+  "specCite": "docs/language/precept-language-spec.md:1372",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.5-scope"
+ },
+ {
+  "id": "spec-typecheck/scope/event-arg-out-of-scope",
+  "desc": "referencing an arg of a different event than the one in scope",
+  "exercise": "event A(x as integer); event B(y as integer); state Open initial; from Open on A when B.y > 0 -> no transition",
+  "specCite": "docs/language/precept-language-spec.md:1378",
+  "expected": "reject:EventArgOutOfScope",
+  "source": "added",
+  "block": "3.5-scope"
+ },
+ {
+  "id": "spec-typecheck/arith/int-+-int",
+  "desc": "integer + integer accepted (numeric arithmetic)",
+  "exercise": "field A as integer; field B as integer; rule A + B >= 0",
+  "specCite": "docs/language/precept-language-spec.md:1388",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-binop-scalar"
+ },
+ {
+  "id": "spec-typecheck/arith/int---int",
+  "desc": "integer - integer accepted (numeric arithmetic)",
+  "exercise": "field A as integer; field B as integer; rule A - B >= 0",
+  "specCite": "docs/language/precept-language-spec.md:1388",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-binop-scalar"
+ },
+ {
+  "id": "spec-typecheck/arith/int-*-int",
+  "desc": "integer * integer accepted (numeric arithmetic)",
+  "exercise": "field A as integer; field B as integer; rule A * B >= 0",
+  "specCite": "docs/language/precept-language-spec.md:1388",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-binop-scalar"
+ },
+ {
+  "id": "spec-typecheck/arith/int-/-int",
+  "desc": "integer / integer accepted (numeric arithmetic)",
+  "exercise": "field A as integer; field B as integer; rule A / B >= 0",
+  "specCite": "docs/language/precept-language-spec.md:1388",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-binop-scalar"
+ },
+ {
+  "id": "spec-typecheck/arith/int-%-int",
+  "desc": "integer % integer accepted (numeric arithmetic)",
+  "exercise": "field A as integer; field B as integer; rule A % B >= 0",
+  "specCite": "docs/language/precept-language-spec.md:1388",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-binop-scalar"
+ },
+ {
+  "id": "spec-typecheck/arith/dec-plus-dec",
+  "desc": "decimal + decimal accepted",
+  "exercise": "field A as decimal; field B as decimal; rule A + B >= 0",
+  "specCite": "docs/language/precept-language-spec.md:1388",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-binop-scalar"
+ },
+ {
+  "id": "spec-typecheck/arith/num-mul-num",
+  "desc": "number * number accepted",
+  "exercise": "field A as number; field B as number; rule A * B >= 0",
+  "specCite": "docs/language/precept-language-spec.md:1388",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-binop-scalar"
+ },
+ {
+  "id": "spec-typecheck/concat/string-plus-string",
+  "desc": "string + string is concatenation -> string",
+  "exercise": "field A as string; field B as string; rule (A + B) == \"x\"",
+  "specCite": "docs/language/precept-language-spec.md:1389",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-binop-scalar"
+ },
+ {
+  "id": "spec-typecheck/concat/ci-plus-ci",
+  "desc": "~string + ~string concatenates to plain string (CI not preserved)",
+  "exercise": "field A as ~string; field B as ~string; rule (A + B) ~= \"x\"",
+  "specCite": "docs/language/precept-language-spec.md:1390",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-binop-scalar"
+ },
+ {
+  "id": "spec-typecheck/concat/ci-plus-string",
+  "desc": "~string + string concatenates to string",
+  "exercise": "field A as ~string; field B as string; rule (A + B) ~= \"x\"",
+  "specCite": "docs/language/precept-language-spec.md:1391",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-binop-scalar"
+ },
+ {
+  "id": "spec-typecheck/concat/string-plus-ci",
+  "desc": "string + ~string concatenates to string",
+  "exercise": "field A as string; field B as ~string; rule (A + B) ~= \"x\"",
+  "specCite": "docs/language/precept-language-spec.md:1392",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-binop-scalar"
+ },
+ {
+  "id": "spec-typecheck/arith/string-plus-boolean-error",
+  "desc": "string + boolean is a type error",
+  "exercise": "field A as string; field B as boolean; rule (A + B) == \"x\"",
+  "specCite": "docs/language/precept-language-spec.md:1627",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.6-binop-scalar"
+ },
+ {
+  "id": "spec-typecheck/arith/string-plus-integer-error",
+  "desc": "string + integer is a type error",
+  "exercise": "field A as string; field B as integer; rule (A + B) == \"x\"",
+  "specCite": "docs/language/precept-language-spec.md:1627",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.6-binop-scalar"
+ },
+ {
+  "id": "spec-typecheck/logic/boolean-plus-boolean-error",
+  "desc": "+ on boolean operands is a type error",
+  "exercise": "field A as boolean; field B as boolean; rule (A + B)",
+  "specCite": "docs/language/precept-language-spec.md:1627",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.6-binop-scalar"
+ },
+ {
+  "id": "spec-typecheck/eq/int-eq-int",
+  "desc": "integer == integer -> boolean",
+  "exercise": "field A as integer; field B as integer; rule A == B",
+  "specCite": "docs/language/precept-language-spec.md:1393",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-binop-equality"
+ },
+ {
+  "id": "spec-typecheck/eq/string-eq-string",
+  "desc": "string == string -> boolean",
+  "exercise": "field A as string; field B as string; rule A == B",
+  "specCite": "docs/language/precept-language-spec.md:1393",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-binop-equality"
+ },
+ {
+  "id": "spec-typecheck/eq/bool-eq-bool",
+  "desc": "boolean == boolean -> boolean",
+  "exercise": "field A as boolean; field B as boolean; rule A == B",
+  "specCite": "docs/language/precept-language-spec.md:1393",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-binop-equality"
+ },
+ {
+  "id": "spec-typecheck/eq/int-eq-decimal-widen",
+  "desc": "integer == decimal widens, valid",
+  "exercise": "field A as integer; field B as decimal; rule A == B",
+  "specCite": "docs/language/precept-language-spec.md:1393",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-binop-equality"
+ },
+ {
+  "id": "spec-typecheck/eq/decimal-eq-number-error",
+  "desc": "decimal == number is a type error",
+  "exercise": "field A as decimal; field B as number; rule A == B",
+  "specCite": "docs/language/precept-language-spec.md:1393",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.6-binop-equality"
+ },
+ {
+  "id": "spec-typecheck/eq/ci-eq-ci-error",
+  "desc": "~string == ~string is a compile error (use ~=)",
+  "exercise": "field A as ~string; field B as ~string; rule A == B",
+  "specCite": "docs/language/precept-language-spec.md:1393",
+  "expected": "reject:CaseInsensitiveFieldRequiresTildeEquals",
+  "source": "added",
+  "block": "3.6-binop-equality"
+ },
+ {
+  "id": "spec-typecheck/eq/ci-eq-string-error",
+  "desc": "~string == string is a compile error",
+  "exercise": "field A as ~string; field B as string; rule A == B",
+  "specCite": "docs/language/precept-language-spec.md:1393",
+  "expected": "reject:CaseInsensitiveFieldRequiresTildeEquals",
+  "source": "added",
+  "block": "3.6-binop-equality"
+ },
+ {
+  "id": "spec-typecheck/eq/string-eq-ci-error",
+  "desc": "string == ~string fires on either operand position",
+  "exercise": "field A as string; field B as ~string; rule A == B",
+  "specCite": "docs/language/precept-language-spec.md:1648",
+  "expected": "reject:CaseInsensitiveFieldRequiresTildeEquals",
+  "source": "added",
+  "block": "3.6-binop-equality"
+ },
+ {
+  "id": "spec-typecheck/neq/int-neq-int",
+  "desc": "integer != integer -> boolean",
+  "exercise": "field A as integer; field B as integer; rule A != B",
+  "specCite": "docs/language/precept-language-spec.md:1393",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-binop-equality"
+ },
+ {
+  "id": "spec-typecheck/neq/ci-neq-string-error",
+  "desc": "~string != string is a compile error",
+  "exercise": "field A as ~string; field B as string; rule A != B",
+  "specCite": "docs/language/precept-language-spec.md:1643",
+  "expected": "reject:CaseInsensitiveFieldRequiresTildeNotEquals",
+  "source": "added",
+  "block": "3.6-binop-equality"
+ },
+ {
+  "id": "spec-typecheck/citilde/string-tildeeq-string",
+  "desc": "string ~= string case-insensitive compare -> boolean",
+  "exercise": "field A as string; field B as string; rule A ~= B",
+  "specCite": "docs/language/precept-language-spec.md:1394",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-binop-ci-compare"
+ },
+ {
+  "id": "spec-typecheck/citilde/ci-tildeeq-ci",
+  "desc": "~string ~= ~string -> boolean",
+  "exercise": "field A as ~string; field B as ~string; rule A ~= B",
+  "specCite": "docs/language/precept-language-spec.md:1394",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-binop-ci-compare"
+ },
+ {
+  "id": "spec-typecheck/citilde/ci-tildeeq-string",
+  "desc": "~string ~= string -> boolean",
+  "exercise": "field A as ~string; field B as string; rule A ~= B",
+  "specCite": "docs/language/precept-language-spec.md:1394",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-binop-ci-compare"
+ },
+ {
+  "id": "spec-typecheck/citilde/tildeeq-nonstring-error",
+  "desc": "~= on non-string operands is a type error",
+  "exercise": "field A as integer; field B as integer; rule A ~= B",
+  "specCite": "docs/language/precept-language-spec.md:1394",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.6-binop-ci-compare"
+ },
+ {
+  "id": "spec-typecheck/citilde/tildeneq-string",
+  "desc": "string !~ string -> boolean",
+  "exercise": "field A as string; field B as string; rule A !~ B",
+  "specCite": "docs/language/precept-language-spec.md:1394",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-binop-ci-compare"
+ },
+ {
+  "id": "spec-typecheck/citilde/tildestartswith-op",
+  "desc": "~string ~startsWith string -> boolean",
+  "exercise": "field A as ~string; rule A ~startsWith \"ad\"",
+  "specCite": "docs/language/precept-language-spec.md:1395",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-binop-ci-compare"
+ },
+ {
+  "id": "spec-typecheck/citilde/tildestartswith-nonci-error",
+  "desc": "~startsWith first operand not ~string is a compile error",
+  "exercise": "field A as string; rule A ~startsWith \"ad\"",
+  "specCite": "docs/language/precept-language-spec.md:1395",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "3.6-binop-ci-compare"
+ },
+ {
+  "id": "spec-typecheck/citilde/tildeendswith-op",
+  "desc": "~string ~endsWith string -> boolean",
+  "exercise": "field A as ~string; rule A ~endsWith \"in\"",
+  "specCite": "docs/language/precept-language-spec.md:1396",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-binop-ci-compare"
+ },
+ {
+  "id": "spec-typecheck/citilde/tildeendswith-nonci-error",
+  "desc": "~endsWith first operand not ~string is a compile error",
+  "exercise": "field A as string; rule A ~endsWith \"in\"",
+  "specCite": "docs/language/precept-language-spec.md:1396",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "3.6-binop-ci-compare"
+ },
+ {
+  "id": "spec-typecheck/ord/int-lt-int",
+  "desc": "integer < integer -> boolean",
+  "exercise": "field A as integer; field B as integer; rule A < B",
+  "specCite": "docs/language/precept-language-spec.md:1397",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-binop-ordering"
+ },
+ {
+  "id": "spec-typecheck/ord/int-le-decimal-widen",
+  "desc": "integer <= decimal widens, valid",
+  "exercise": "field A as integer; field B as decimal; rule A <= B",
+  "specCite": "docs/language/precept-language-spec.md:1397",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-binop-ordering"
+ },
+ {
+  "id": "spec-typecheck/ord/decimal-lt-number-error",
+  "desc": "decimal < number is a type error",
+  "exercise": "field A as decimal; field B as number; rule A < B",
+  "specCite": "docs/language/precept-language-spec.md:1397",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.6-binop-ordering"
+ },
+ {
+  "id": "spec-typecheck/ord/choice-ordered-lt",
+  "desc": "ordered choice < ordered choice -> boolean",
+  "exercise": "field A as choice of string(\"Low\",\"High\") ordered; field B as choice of string(\"Low\",\"High\") ordered; rule A < B",
+  "specCite": "docs/language/precept-language-spec.md:1398",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-binop-ordering"
+ },
+ {
+  "id": "spec-typecheck/ord/choice-unordered-lt-error",
+  "desc": "comparison on choice without ordered modifier is a type error",
+  "exercise": "field A as choice of string(\"Low\",\"High\"); field B as choice of string(\"Low\",\"High\"); rule A < B",
+  "specCite": "docs/language/precept-language-spec.md:1628",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.6-binop-ordering"
+ },
+ {
+  "id": "spec-typecheck/ord/string-lt-string-error",
+  "desc": "string < string is a type error (string ordering out of scope)",
+  "exercise": "field A as string; field B as string; rule A < B",
+  "specCite": "docs/language/precept-language-spec.md:1399",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.6-binop-ordering"
+ },
+ {
+  "id": "spec-typecheck/ord/ci-lt-string-error",
+  "desc": "~string < any is a type error",
+  "exercise": "field A as ~string; field B as string; rule A < B",
+  "specCite": "docs/language/precept-language-spec.md:1399",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.6-binop-ordering"
+ },
+ {
+  "id": "spec-typecheck/logic/bool-and-bool",
+  "desc": "boolean and boolean -> boolean",
+  "exercise": "field A as boolean; field B as boolean; rule A and B",
+  "specCite": "docs/language/precept-language-spec.md:1400",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-binop-logical"
+ },
+ {
+  "id": "spec-typecheck/logic/bool-or-bool",
+  "desc": "boolean or boolean -> boolean",
+  "exercise": "field A as boolean; field B as boolean; rule A or B",
+  "specCite": "docs/language/precept-language-spec.md:1400",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-binop-logical"
+ },
+ {
+  "id": "spec-typecheck/logic/int-and-int-error",
+  "desc": "and on integer operands is a type error",
+  "exercise": "field A as integer; field B as integer; rule A and B",
+  "specCite": "docs/language/precept-language-spec.md:1400",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.6-binop-logical"
+ },
+ {
+  "id": "spec-typecheck/logic/and-nonbool-error",
+  "desc": "and with a non-boolean operand is a type error",
+  "exercise": "field A as boolean; field B as integer; rule A and B",
+  "specCite": "docs/language/precept-language-spec.md:1400",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.6-binop-logical"
+ },
+ {
+  "id": "spec-typecheck/common/int-op-decimal-result",
+  "desc": "integer op decimal -> decimal (common type)",
+  "exercise": "field I as integer; field D as decimal; field R as decimal <- I + D",
+  "specCite": "docs/language/precept-language-spec.md:1402",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-common-numeric"
+ },
+ {
+  "id": "spec-typecheck/common/int-op-number-result",
+  "desc": "integer op number -> number (common type)",
+  "exercise": "field I as integer; field N as number; field R as number <- I + N",
+  "specCite": "docs/language/precept-language-spec.md:1402",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-common-numeric"
+ },
+ {
+  "id": "spec-typecheck/common/decimal-op-number-error",
+  "desc": "decimal op number is a type error (no implicit bridge)",
+  "exercise": "field D as decimal; field N as number; rule (D * N) >= 0",
+  "specCite": "docs/language/precept-language-spec.md:1402",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.6-common-numeric"
+ },
+ {
+  "id": "spec-typecheck/temporal/date-plus-period",
+  "desc": "date +/- period of date -> date",
+  "exercise": "field D as date; field P as period of 'date'; rule (D + P) == D",
+  "specCite": "docs/language/precept-language-spec.md:1408",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-temporal-ops"
+ },
+ {
+  "id": "spec-typecheck/temporal/date-plus-unconstrained-period",
+  "desc": "date + unconstrained period -> UnqualifiedPeriodArithmetic",
+  "exercise": "field D as date; field P as period; rule (D + P) == D",
+  "specCite": "docs/language/precept-language-spec.md:1408",
+  "expected": "reject:UnqualifiedPeriodArithmetic",
+  "source": "added",
+  "block": "3.6-temporal-ops"
+ },
+ {
+  "id": "spec-typecheck/temporal/date-minus-date",
+  "desc": "date - date -> period (calendar distance)",
+  "exercise": "field A as date; field B as date; field R as period <- A - B",
+  "specCite": "docs/language/precept-language-spec.md:1409",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-temporal-ops"
+ },
+ {
+  "id": "spec-typecheck/temporal/date-plus-time",
+  "desc": "date + time -> datetime (commutative)",
+  "exercise": "field D as date; field T as time; field R as datetime <- D + T",
+  "specCite": "docs/language/precept-language-spec.md:1410",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-temporal-ops"
+ },
+ {
+  "id": "spec-typecheck/temporal/time-plus-period",
+  "desc": "time +/- period of time -> time",
+  "exercise": "field T as time; field P as period of 'time'; rule (T + P) == T",
+  "specCite": "docs/language/precept-language-spec.md:1411",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-temporal-ops"
+ },
+ {
+  "id": "spec-typecheck/temporal/time-plus-duration",
+  "desc": "time +/- duration -> time (wraps at midnight)",
+  "exercise": "field T as time; field U as duration; rule (T + U) == T",
+  "specCite": "docs/language/precept-language-spec.md:1412",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-temporal-ops"
+ },
+ {
+  "id": "spec-typecheck/temporal/time-minus-time",
+  "desc": "time - time -> period",
+  "exercise": "field A as time; field B as time; field R as period <- A - B",
+  "specCite": "docs/language/precept-language-spec.md:1413",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-temporal-ops"
+ },
+ {
+  "id": "spec-typecheck/temporal/instant-minus-instant",
+  "desc": "instant - instant -> duration",
+  "exercise": "field A as instant; field B as instant; field R as duration <- A - B",
+  "specCite": "docs/language/precept-language-spec.md:1414",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-temporal-ops"
+ },
+ {
+  "id": "spec-typecheck/temporal/instant-plus-duration",
+  "desc": "instant +/- duration -> instant",
+  "exercise": "field A as instant; field U as duration; rule (A + U) == A",
+  "specCite": "docs/language/precept-language-spec.md:1415",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-temporal-ops"
+ },
+ {
+  "id": "spec-typecheck/temporal/datetime-plus-period",
+  "desc": "datetime +/- period -> datetime",
+  "exercise": "field D as datetime; field P as period; rule (D + P) == D",
+  "specCite": "docs/language/precept-language-spec.md:1416",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-temporal-ops"
+ },
+ {
+  "id": "spec-typecheck/temporal/datetime-minus-datetime",
+  "desc": "datetime - datetime -> period",
+  "exercise": "field A as datetime; field B as datetime; field R as period <- A - B",
+  "specCite": "docs/language/precept-language-spec.md:1417",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-temporal-ops"
+ },
+ {
+  "id": "spec-typecheck/temporal/duration-plus-duration",
+  "desc": "duration +/- duration -> duration",
+  "exercise": "field A as duration; field B as duration; field R as duration <- A + B",
+  "specCite": "docs/language/precept-language-spec.md:1418",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-temporal-ops"
+ },
+ {
+  "id": "spec-typecheck/temporal/duration-mul-integer",
+  "desc": "duration * integer -> duration",
+  "exercise": "field U as duration; field I as integer; field R as duration <- U * I",
+  "specCite": "docs/language/precept-language-spec.md:1419",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-temporal-ops"
+ },
+ {
+  "id": "spec-typecheck/temporal/duration-mul-number",
+  "desc": "duration * number -> duration",
+  "exercise": "field U as duration; field N as number; field R as duration <- U * N",
+  "specCite": "docs/language/precept-language-spec.md:1419",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-temporal-ops"
+ },
+ {
+  "id": "spec-typecheck/temporal/duration-mul-decimal-error",
+  "desc": "duration * decimal is a type error",
+  "exercise": "field U as duration; field D as decimal; field R as duration <- U * D",
+  "specCite": "docs/language/precept-language-spec.md:1419",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.6-temporal-ops"
+ },
+ {
+  "id": "spec-typecheck/temporal/duration-div-duration",
+  "desc": "duration / duration -> number (ratio)",
+  "exercise": "field A as duration; field B as duration; field R as number <- A / B",
+  "specCite": "docs/language/precept-language-spec.md:1420",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-temporal-ops"
+ },
+ {
+  "id": "spec-typecheck/temporal/period-plus-period",
+  "desc": "period +/- period -> period",
+  "exercise": "field A as period; field B as period; field R as period <- A + B",
+  "specCite": "docs/language/precept-language-spec.md:1421",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-temporal-ops"
+ },
+ {
+  "id": "spec-typecheck/temporal/zdt-plus-duration",
+  "desc": "zoneddatetime +/- duration -> zoneddatetime",
+  "exercise": "field Z as zoneddatetime; field U as duration; rule (Z + U) == Z",
+  "specCite": "docs/language/precept-language-spec.md:1422",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-temporal-ops"
+ },
+ {
+  "id": "spec-typecheck/temporal/zdt-minus-zdt",
+  "desc": "zoneddatetime - zoneddatetime -> duration",
+  "exercise": "field A as zoneddatetime; field B as zoneddatetime; field R as duration <- A - B",
+  "specCite": "docs/language/precept-language-spec.md:1423",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-temporal-ops"
+ },
+ {
+  "id": "spec-typecheck/tcmp/date-lt-date",
+  "desc": "date ordering supported",
+  "exercise": "field A as date; field B as date; rule A < B",
+  "specCite": "docs/language/precept-language-spec.md:1425",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-temporal-compare"
+ },
+ {
+  "id": "spec-typecheck/tcmp/duration-lt-duration",
+  "desc": "duration ordering supported",
+  "exercise": "field A as duration; field B as duration; rule A < B",
+  "specCite": "docs/language/precept-language-spec.md:1425",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-temporal-compare"
+ },
+ {
+  "id": "spec-typecheck/tcmp/datetime-le-datetime",
+  "desc": "datetime ordering supported",
+  "exercise": "field A as datetime; field B as datetime; rule A <= B",
+  "specCite": "docs/language/precept-language-spec.md:1425",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-temporal-compare"
+ },
+ {
+  "id": "spec-typecheck/tcmp/period-lt-error",
+  "desc": "period ordering operators are a type error",
+  "exercise": "field A as period; field B as period; rule A < B",
+  "specCite": "docs/language/precept-language-spec.md:1425",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.6-temporal-compare"
+ },
+ {
+  "id": "spec-typecheck/tcmp/period-eq-ok",
+  "desc": "period == period supported",
+  "exercise": "field A as period; field B as period; rule A == B",
+  "specCite": "docs/language/precept-language-spec.md:1425",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-temporal-compare"
+ },
+ {
+  "id": "spec-typecheck/tcmp/timezone-lt-error",
+  "desc": "timezone ordering operators are a type error",
+  "exercise": "field A as timezone; field B as timezone; rule A < B",
+  "specCite": "docs/language/precept-language-spec.md:1425",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.6-temporal-compare"
+ },
+ {
+  "id": "spec-typecheck/tcmp/zdt-lt-error",
+  "desc": "zoneddatetime ordering operators are a type error",
+  "exercise": "field A as zoneddatetime; field B as zoneddatetime; rule A < B",
+  "specCite": "docs/language/precept-language-spec.md:1425",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.6-temporal-compare"
+ },
+ {
+  "id": "spec-typecheck/tcmp/cross-type-error",
+  "desc": "cross-type temporal comparison is a type error",
+  "exercise": "field A as date; field B as time; rule A < B",
+  "specCite": "docs/language/precept-language-spec.md:1425",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.6-temporal-compare"
+ },
+ {
+  "id": "spec-typecheck/biz/money-plus-money-same",
+  "desc": "money + money same currency -> money",
+  "exercise": "field A as money 'USD'; field B as money 'USD'; field R as money 'USD' <- A + B",
+  "specCite": "docs/language/precept-language-spec.md:1432",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-business-ops"
+ },
+ {
+  "id": "spec-typecheck/biz/money-plus-money-diff-error",
+  "desc": "money + money different currency is a type error",
+  "exercise": "field A as money 'USD'; field B as money 'EUR'; field R as money 'USD' <- A + B",
+  "specCite": "docs/language/precept-language-spec.md:1432",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "3.6-business-ops"
+ },
+ {
+  "id": "spec-typecheck/biz/money-mul-decimal",
+  "desc": "money * decimal -> money",
+  "exercise": "field A as money 'USD'; field D as decimal; field R as money 'USD' <- A * D",
+  "specCite": "docs/language/precept-language-spec.md:1432",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-business-ops"
+ },
+ {
+  "id": "spec-typecheck/biz/money-mul-number-error",
+  "desc": "money * number is a type error",
+  "exercise": "field A as money 'USD'; field N as number; field R as money 'USD' <- A * N",
+  "specCite": "docs/language/precept-language-spec.md:1432",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.6-business-ops"
+ },
+ {
+  "id": "spec-typecheck/biz/money-div-money-same",
+  "desc": "money / money same currency -> decimal",
+  "exercise": "field A as money 'USD'; field B as money 'USD'; field R as decimal <- A / B",
+  "specCite": "docs/language/precept-language-spec.md:1433",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-business-ops"
+ },
+ {
+  "id": "spec-typecheck/biz/money-div-money-diff",
+  "desc": "money / money different currency -> exchangerate",
+  "exercise": "field A as money 'USD'; field B as money 'EUR'; field R as exchangerate 'USD/EUR' <- A / B",
+  "specCite": "docs/language/precept-language-spec.md:1434",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-business-ops"
+ },
+ {
+  "id": "spec-typecheck/biz/money-div-quantity",
+  "desc": "money / quantity -> price",
+  "exercise": "field A as money 'USD'; field Q as quantity 'each'; field R as price 'USD/each' <- A / Q",
+  "specCite": "docs/language/precept-language-spec.md:1435",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-business-ops"
+ },
+ {
+  "id": "spec-typecheck/biz/quantity-plus-quantity-same",
+  "desc": "quantity + quantity same dimension -> quantity",
+  "exercise": "field A as quantity 'kg'; field B as quantity 'kg'; field R as quantity 'kg' <- A + B",
+  "specCite": "docs/language/precept-language-spec.md:1436",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-business-ops"
+ },
+ {
+  "id": "spec-typecheck/biz/quantity-plus-quantity-diff-error",
+  "desc": "quantity + quantity different dimension is a type error",
+  "exercise": "field A as quantity 'kg'; field B as quantity 'each'; field R as quantity 'kg' <- A + B",
+  "specCite": "docs/language/precept-language-spec.md:1436",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "3.6-business-ops"
+ },
+ {
+  "id": "spec-typecheck/biz/quantity-mul-decimal",
+  "desc": "quantity * decimal -> quantity",
+  "exercise": "field A as quantity 'kg'; field D as decimal; field R as quantity 'kg' <- A * D",
+  "specCite": "docs/language/precept-language-spec.md:1437",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-business-ops"
+ },
+ {
+  "id": "spec-typecheck/biz/quantity-div-quantity-same",
+  "desc": "quantity / quantity same dimension -> decimal",
+  "exercise": "field A as quantity 'kg'; field B as quantity 'kg'; field R as decimal <- A / B",
+  "specCite": "docs/language/precept-language-spec.md:1438",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-business-ops"
+ },
+ {
+  "id": "spec-typecheck/biz/quantity-div-quantity-diff",
+  "desc": "quantity / quantity different dimension -> compound quantity",
+  "exercise": "field A as quantity 'kg'; field B as quantity 'L'; field R as quantity 'kg/L' <- A / B",
+  "specCite": "docs/language/precept-language-spec.md:1439",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-business-ops"
+ },
+ {
+  "id": "spec-typecheck/biz/price-mul-quantity",
+  "desc": "price * quantity -> money (dimensional cancellation)",
+  "exercise": "field P as price 'USD/each'; field Q as quantity 'each'; field R as money 'USD' <- P * Q",
+  "specCite": "docs/language/precept-language-spec.md:1440",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-business-ops"
+ },
+ {
+  "id": "spec-typecheck/biz/price-mul-decimal",
+  "desc": "price * decimal -> price",
+  "exercise": "field P as price 'USD/each'; field D as decimal; field R as price 'USD/each' <- P * D",
+  "specCite": "docs/language/precept-language-spec.md:1441",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-business-ops"
+ },
+ {
+  "id": "spec-typecheck/biz/price-plus-price-same",
+  "desc": "price + price same currency and unit -> price",
+  "exercise": "field A as price 'USD/each'; field B as price 'USD/each'; field R as price 'USD/each' <- A + B",
+  "specCite": "docs/language/precept-language-spec.md:1442",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-business-ops"
+ },
+ {
+  "id": "spec-typecheck/biz/price-plus-price-diff-error",
+  "desc": "price + price different currency or unit is a type error",
+  "exercise": "field A as price 'USD/each'; field B as price 'EUR/each'; field R as price 'USD/each' <- A + B",
+  "specCite": "docs/language/precept-language-spec.md:1442",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "3.6-business-ops"
+ },
+ {
+  "id": "spec-typecheck/biz/exchangerate-mul-money",
+  "desc": "exchangerate * money -> money (currency conversion)",
+  "exercise": "field X as exchangerate 'USD/EUR'; field M as money 'EUR'; field R as money 'USD' <- X * M",
+  "specCite": "docs/language/precept-language-spec.md:1443",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-business-ops"
+ },
+ {
+  "id": "spec-typecheck/biz/exchangerate-mul-decimal",
+  "desc": "exchangerate * decimal -> exchangerate",
+  "exercise": "field X as exchangerate 'USD/EUR'; field D as decimal; field R as exchangerate 'USD/EUR' <- X * D",
+  "specCite": "docs/language/precept-language-spec.md:1444",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-business-ops"
+ },
+ {
+  "id": "spec-typecheck/bcmp/money-lt-money-same",
+  "desc": "money < money same currency supported",
+  "exercise": "field A as money 'USD'; field B as money 'USD'; rule A < B",
+  "specCite": "docs/language/precept-language-spec.md:1446",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-business-compare"
+ },
+ {
+  "id": "spec-typecheck/bcmp/money-lt-money-diff-error",
+  "desc": "money comparison requires matching currency",
+  "exercise": "field A as money 'USD'; field B as money 'EUR'; rule A < B",
+  "specCite": "docs/language/precept-language-spec.md:1446",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "3.6-business-compare"
+ },
+ {
+  "id": "spec-typecheck/bcmp/quantity-lt-quantity",
+  "desc": "quantity ordering supported (qualifier compatible)",
+  "exercise": "field A as quantity 'kg'; field B as quantity 'kg'; rule A < B",
+  "specCite": "docs/language/precept-language-spec.md:1446",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-business-compare"
+ },
+ {
+  "id": "spec-typecheck/bcmp/price-lt-price",
+  "desc": "price ordering supported",
+  "exercise": "field A as price 'USD/each'; field B as price 'USD/each'; rule A < B",
+  "specCite": "docs/language/precept-language-spec.md:1446",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-business-compare"
+ },
+ {
+  "id": "spec-typecheck/bcmp/exchangerate-lt-error",
+  "desc": "exchangerate ordering operators are a type error",
+  "exercise": "field A as exchangerate 'USD/EUR'; field B as exchangerate 'USD/EUR'; rule A < B",
+  "specCite": "docs/language/precept-language-spec.md:1446",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.6-business-compare"
+ },
+ {
+  "id": "spec-typecheck/bcmp/currency-lt-error",
+  "desc": "currency ordering operators are a type error",
+  "exercise": "field A as currency; field B as currency; rule A < B",
+  "specCite": "docs/language/precept-language-spec.md:1446",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.6-business-compare"
+ },
+ {
+  "id": "spec-typecheck/bcmp/cross-unit-count-error",
+  "desc": "static cross-unit comparison in shared count dimension requires explicit conversion",
+  "exercise": "field A as quantity 'box'; field B as quantity 'pallet'; rule A < B",
+  "specCite": "docs/language/precept-language-spec.md:1446",
+  "expected": "reject:PRE0137",
+  "source": "added",
+  "block": "3.6-business-compare"
+ },
+ {
+  "id": "spec-typecheck/unary/not-boolean",
+  "desc": "not boolean -> boolean",
+  "exercise": "field A as boolean; rule not A",
+  "specCite": "docs/language/precept-language-spec.md:1454",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-unary"
+ },
+ {
+  "id": "spec-typecheck/unary/not-integer-error",
+  "desc": "not on integer is a type error",
+  "exercise": "field A as integer; rule not A",
+  "specCite": "docs/language/precept-language-spec.md:1454",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.6-unary"
+ },
+ {
+  "id": "spec-typecheck/unary/negate-integer",
+  "desc": "-integer -> integer",
+  "exercise": "field A as integer; rule -A < 0",
+  "specCite": "docs/language/precept-language-spec.md:1455",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-unary"
+ },
+ {
+  "id": "spec-typecheck/unary/negate-decimal",
+  "desc": "-decimal -> decimal",
+  "exercise": "field A as decimal; rule -A < 0",
+  "specCite": "docs/language/precept-language-spec.md:1455",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-unary"
+ },
+ {
+  "id": "spec-typecheck/unary/negate-number",
+  "desc": "-number -> number",
+  "exercise": "field A as number; rule -A < 0",
+  "specCite": "docs/language/precept-language-spec.md:1455",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-unary"
+ },
+ {
+  "id": "spec-typecheck/unary/negate-duration",
+  "desc": "-duration -> duration",
+  "exercise": "field A as duration; field R as duration <- -A",
+  "specCite": "docs/language/precept-language-spec.md:1456",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-unary"
+ },
+ {
+  "id": "spec-typecheck/unary/negate-period",
+  "desc": "-period -> period (negates each component)",
+  "exercise": "field A as period; field R as period <- -A",
+  "specCite": "docs/language/precept-language-spec.md:1457",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-unary"
+ },
+ {
+  "id": "spec-typecheck/unary/negate-money",
+  "desc": "-money -> money (preserves currency)",
+  "exercise": "field A as money 'USD'; field R as money 'USD' <- -A",
+  "specCite": "docs/language/precept-language-spec.md:1458",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-unary"
+ },
+ {
+  "id": "spec-typecheck/unary/negate-quantity",
+  "desc": "-quantity -> quantity (preserves unit)",
+  "exercise": "field A as quantity 'kg'; field R as quantity 'kg' <- -A",
+  "specCite": "docs/language/precept-language-spec.md:1459",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-unary"
+ },
+ {
+  "id": "spec-typecheck/unary/negate-price",
+  "desc": "-price -> price (preserves currency/unit)",
+  "exercise": "field A as price 'USD/each'; field R as price 'USD/each' <- -A",
+  "specCite": "docs/language/precept-language-spec.md:1460",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-unary"
+ },
+ {
+  "id": "spec-typecheck/unary/negate-string-error",
+  "desc": "-string is a type error",
+  "exercise": "field A as string; rule (-A) == \"x\"",
+  "specCite": "docs/language/precept-language-spec.md:1455",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.6-unary"
+ },
+ {
+  "id": "spec-typecheck/unary/negate-boolean-error",
+  "desc": "-boolean is a type error",
+  "exercise": "field A as boolean; rule -A",
+  "specCite": "docs/language/precept-language-spec.md:1455",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.6-unary"
+ },
+ {
+  "id": "spec-typecheck/contains/set-of-t",
+  "desc": "set of T contains T -> boolean",
+  "exercise": "field S as set of integer; rule S contains 3",
+  "specCite": "docs/language/precept-language-spec.md:1466",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-contains"
+ },
+ {
+  "id": "spec-typecheck/contains/queue-of-t",
+  "desc": "queue of T contains T -> boolean",
+  "exercise": "field Q as queue of integer; rule Q contains 3",
+  "specCite": "docs/language/precept-language-spec.md:1467",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-contains"
+ },
+ {
+  "id": "spec-typecheck/contains/stack-of-t",
+  "desc": "stack of T contains T -> boolean",
+  "exercise": "field K as stack of integer; rule K contains 3",
+  "specCite": "docs/language/precept-language-spec.md:1468",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-contains"
+ },
+ {
+  "id": "spec-typecheck/contains/log-of-t",
+  "desc": "log of T contains T -> boolean value membership",
+  "exercise": "field L as log of integer; rule L contains 3",
+  "specCite": "docs/language/precept-language-spec.md:1469",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-contains"
+ },
+ {
+  "id": "spec-typecheck/contains/log-by-p-value",
+  "desc": "log of T by P contains T -> boolean value membership",
+  "exercise": "field L as log of integer by date; rule L contains 3",
+  "specCite": "docs/language/precept-language-spec.md:1470",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-contains"
+ },
+ {
+  "id": "spec-typecheck/contains/log-by-p-key",
+  "desc": "log of T by P contains P -> boolean key membership",
+  "exercise": "field L as log of integer by integer; rule L contains 7",
+  "specCite": "docs/language/precept-language-spec.md:1471",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-contains"
+ },
+ {
+  "id": "spec-typecheck/contains/bag-of-t",
+  "desc": "bag of T contains T -> boolean (count>=1)",
+  "exercise": "field G as bag of integer; rule G contains 3",
+  "specCite": "docs/language/precept-language-spec.md:1472",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-contains"
+ },
+ {
+  "id": "spec-typecheck/contains/list-of-t",
+  "desc": "list of T contains T -> boolean",
+  "exercise": "field L as list of integer; rule L contains 3",
+  "specCite": "docs/language/precept-language-spec.md:1473",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-contains"
+ },
+ {
+  "id": "spec-typecheck/contains/queue-by-p-value",
+  "desc": "queue of T by P contains T -> boolean value membership",
+  "exercise": "field Q as queue of integer by integer; rule Q contains 3",
+  "specCite": "docs/language/precept-language-spec.md:1474",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-contains"
+ },
+ {
+  "id": "spec-typecheck/contains/lookup-key",
+  "desc": "lookup of K to V contains K -> boolean key membership",
+  "exercise": "field M as lookup of string to integer; rule M contains \"k\"",
+  "specCite": "docs/language/precept-language-spec.md:1475",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-contains"
+ },
+ {
+  "id": "spec-typecheck/contains/non-collection-error",
+  "desc": "contains on a non-collection is a type error",
+  "exercise": "field X as integer; rule X contains 3",
+  "specCite": "docs/language/precept-language-spec.md:1476",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.6-contains"
+ },
+ {
+  "id": "spec-typecheck/contains/cs-collection-ci-value",
+  "desc": "set of string contains ~string -> CaseInsensitiveValueInCaseSensitiveContains",
+  "exercise": "field S as set of string; field V as ~string; rule S contains V",
+  "specCite": "docs/language/precept-language-spec.md:1478",
+  "expected": "reject:CaseInsensitiveValueInCaseSensitiveContains",
+  "source": "added",
+  "block": "3.6-contains"
+ },
+ {
+  "id": "spec-typecheck/contains/ci-collection-string-value",
+  "desc": "set of ~string contains string -> CI membership accepted",
+  "exercise": "field S as set of ~string; field V as string; rule S contains V",
+  "specCite": "docs/language/precept-language-spec.md:1478",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-contains"
+ },
+ {
+  "id": "spec-typecheck/isset/optional-field",
+  "desc": "is set on optional field -> boolean",
+  "exercise": "field X as integer optional; rule X is set",
+  "specCite": "docs/language/precept-language-spec.md:1484",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-is-set"
+ },
+ {
+  "id": "spec-typecheck/isset/non-optional-error",
+  "desc": "is set on non-optional field is a type error",
+  "exercise": "field X as integer; rule X is set",
+  "specCite": "docs/language/precept-language-spec.md:1485",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.6-is-set"
+ },
+ {
+  "id": "spec-typecheck/cond/compatible-same",
+  "desc": "if/then/else with same-type branches -> common type",
+  "exercise": "field C as boolean; field A as integer; field B as integer; rule (if C then A else B) > 0",
+  "specCite": "docs/language/precept-language-spec.md:1489",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-conditional"
+ },
+ {
+  "id": "spec-typecheck/cond/widening-branch",
+  "desc": "if/then/else branch widening (integer/decimal) -> decimal",
+  "exercise": "field C as boolean; field A as integer; field B as decimal; rule (if C then A else B) > 0",
+  "specCite": "docs/language/precept-language-spec.md:1489",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-conditional"
+ },
+ {
+  "id": "spec-typecheck/cond/incompatible-error",
+  "desc": "if/then/else with no common branch type -> TypeMismatch",
+  "exercise": "field C as boolean; field A as integer; field B as string; rule (if C then A else B) == 0",
+  "specCite": "docs/language/precept-language-spec.md:1629",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.6-conditional"
+ },
+ {
+  "id": "spec-typecheck/cond/ci-plus-ci",
+  "desc": "~string + ~string conditional -> ~string",
+  "exercise": "field C as boolean; field A as ~string; field B as ~string; rule (if C then A else B) ~= \"x\"",
+  "specCite": "docs/language/precept-language-spec.md:1495",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-conditional"
+ },
+ {
+  "id": "spec-typecheck/cond/ci-plus-string",
+  "desc": "~string + string conditional -> ~string (CI preserved by selection)",
+  "exercise": "field C as boolean; field A as ~string; field B as string; rule (if C then A else B) ~= \"x\"",
+  "specCite": "docs/language/precept-language-spec.md:1496",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-conditional"
+ },
+ {
+  "id": "spec-typecheck/cond/string-plus-string",
+  "desc": "string + string conditional -> string",
+  "exercise": "field C as boolean; field A as string; field B as string; rule (if C then A else B) == \"x\"",
+  "specCite": "docs/language/precept-language-spec.md:1497",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-conditional"
+ },
+ {
+  "id": "spec-typecheck/member/set-count",
+  "desc": "set of T .count -> integer",
+  "exercise": "field S as set of integer; rule S.count > 0",
+  "specCite": "docs/language/precept-language-spec.md:1507",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-member-access"
+ },
+ {
+  "id": "spec-typecheck/member/set-min",
+  "desc": "set of orderable T .min -> T (proof count>0)",
+  "exercise": "field S as set of integer; rule S.min > 0",
+  "specCite": "docs/language/precept-language-spec.md:1508",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-member-access"
+ },
+ {
+  "id": "spec-typecheck/member/set-max",
+  "desc": "set of orderable T .max -> T",
+  "exercise": "field S as set of integer; rule S.max > 0",
+  "specCite": "docs/language/precept-language-spec.md:1509",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-member-access"
+ },
+ {
+  "id": "spec-typecheck/member/queue-peek",
+  "desc": "queue of T .peek -> T",
+  "exercise": "field Q as queue of integer; rule Q.peek > 0",
+  "specCite": "docs/language/precept-language-spec.md:1511",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-member-access"
+ },
+ {
+  "id": "spec-typecheck/member/queue-by-peekby",
+  "desc": "queue of T by P .peekby -> P",
+  "exercise": "field Q as queue of integer by integer; rule Q.peekby > 0",
+  "specCite": "docs/language/precept-language-spec.md:1514",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-member-access"
+ },
+ {
+  "id": "spec-typecheck/member/stack-peek",
+  "desc": "stack of T .peek -> T",
+  "exercise": "field K as stack of integer; rule K.peek > 0",
+  "specCite": "docs/language/precept-language-spec.md:1516",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-member-access"
+ },
+ {
+  "id": "spec-typecheck/member/bag-countof",
+  "desc": "bag of T .countof(E) -> integer",
+  "exercise": "field G as bag of integer; rule G.countof(3) > 0",
+  "specCite": "docs/language/precept-language-spec.md:1518",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-member-access"
+ },
+ {
+  "id": "spec-typecheck/member/list-first",
+  "desc": "list of T .first -> T",
+  "exercise": "field L as list of integer; rule L.first > 0",
+  "specCite": "docs/language/precept-language-spec.md:1520",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-member-access"
+ },
+ {
+  "id": "spec-typecheck/member/list-last",
+  "desc": "list of T .last -> T",
+  "exercise": "field L as list of integer; rule L.last > 0",
+  "specCite": "docs/language/precept-language-spec.md:1521",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-member-access"
+ },
+ {
+  "id": "spec-typecheck/member/list-at",
+  "desc": "list of T .at(N) -> T",
+  "exercise": "field L as list of integer; rule L.at(0) > 0",
+  "specCite": "docs/language/precept-language-spec.md:1522",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-member-access"
+ },
+ {
+  "id": "spec-typecheck/member/log-first",
+  "desc": "log of T .first -> T",
+  "exercise": "field L as log of integer; rule L.first > 0",
+  "specCite": "docs/language/precept-language-spec.md:1525",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-member-access"
+ },
+ {
+  "id": "spec-typecheck/member/log-by-count",
+  "desc": "log of T by P .count -> integer",
+  "exercise": "field L as log of integer by date; rule L.count > 0",
+  "specCite": "docs/language/precept-language-spec.md:1527",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-member-access"
+ },
+ {
+  "id": "spec-typecheck/member/lookup-count",
+  "desc": "lookup of K to V .count -> integer",
+  "exercise": "field M as lookup of string to integer; rule M.count > 0",
+  "specCite": "docs/language/precept-language-spec.md:1531",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-member-access"
+ },
+ {
+  "id": "spec-typecheck/member/string-length",
+  "desc": "string .length -> integer",
+  "exercise": "field S as string; rule S.length > 0",
+  "specCite": "docs/language/precept-language-spec.md:1532",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-member-access"
+ },
+ {
+  "id": "spec-typecheck/member/invalid-member",
+  "desc": "member access on a type with no such member -> InvalidMemberAccess",
+  "exercise": "field X as integer; rule X.foo > 0",
+  "specCite": "docs/language/precept-language-spec.md:1541",
+  "expected": "reject:InvalidMemberAccess",
+  "source": "added",
+  "block": "3.6-member-access"
+ },
+ {
+  "id": "spec-typecheck/member/lookup-for",
+  "desc": "lookup 'for' operator: F for K -> V",
+  "exercise": "field M as lookup of string to integer; rule (M for \"k\") > 0",
+  "specCite": "docs/language/precept-language-spec.md:1535",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-member-access"
+ },
+ {
+  "id": "spec-typecheck/tmember/date-year",
+  "desc": "date .year -> integer",
+  "exercise": "field D as date; rule D.year > 2000",
+  "specCite": "docs/language/precept-language-spec.md:1537",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-member-temporal"
+ },
+ {
+  "id": "spec-typecheck/tmember/date-dayofweek",
+  "desc": "date .dayOfWeek -> integer",
+  "exercise": "field D as date; rule D.dayOfWeek > 0",
+  "specCite": "docs/language/precept-language-spec.md:1537",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-member-temporal"
+ },
+ {
+  "id": "spec-typecheck/tmember/time-hour",
+  "desc": "time .hour -> integer",
+  "exercise": "field T as time; rule T.hour >= 0",
+  "specCite": "docs/language/precept-language-spec.md:1537",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-member-temporal"
+ },
+ {
+  "id": "spec-typecheck/tmember/instant-inzone",
+  "desc": "instant .inZone(tz) -> zoneddatetime",
+  "exercise": "field I as instant; field R as zoneddatetime <- I.inZone('America/New_York')",
+  "specCite": "docs/language/precept-language-spec.md:1537",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-member-temporal"
+ },
+ {
+  "id": "spec-typecheck/tmember/instant-year-error",
+  "desc": "instant has no skip-level component accessors",
+  "exercise": "field I as instant; rule I.year > 2000",
+  "specCite": "docs/language/precept-language-spec.md:1537",
+  "expected": "reject:InvalidMemberAccess",
+  "source": "added",
+  "block": "3.6-member-temporal"
+ },
+ {
+  "id": "spec-typecheck/tmember/duration-totalhours",
+  "desc": "duration .totalHours -> number",
+  "exercise": "field U as duration; rule U.totalHours >= 0",
+  "specCite": "docs/language/precept-language-spec.md:1537",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-member-temporal"
+ },
+ {
+  "id": "spec-typecheck/tmember/period-years",
+  "desc": "period .years -> integer",
+  "exercise": "field P as period; rule P.years >= 0",
+  "specCite": "docs/language/precept-language-spec.md:1537",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-member-temporal"
+ },
+ {
+  "id": "spec-typecheck/tmember/period-hasdatecomponent",
+  "desc": "period .hasDateComponent -> boolean",
+  "exercise": "field P as period; rule P.hasDateComponent",
+  "specCite": "docs/language/precept-language-spec.md:1537",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-member-temporal"
+ },
+ {
+  "id": "spec-typecheck/tmember/period-basis",
+  "desc": "period .basis -> string",
+  "exercise": "field P as period; rule P.basis == \"date\"",
+  "specCite": "docs/language/precept-language-spec.md:1537",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-member-temporal"
+ },
+ {
+  "id": "spec-typecheck/tmember/period-dimension",
+  "desc": "period .dimension -> dimension",
+  "exercise": "field P as period; rule P.dimension == 'time'",
+  "specCite": "docs/language/precept-language-spec.md:1537",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-member-temporal"
+ },
+ {
+  "id": "spec-typecheck/tmember/datetime-date",
+  "desc": "datetime .date -> date",
+  "exercise": "field D as datetime; field R as date <- D.date",
+  "specCite": "docs/language/precept-language-spec.md:1537",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-member-temporal"
+ },
+ {
+  "id": "spec-typecheck/bmember/money-amount",
+  "desc": "money .amount -> decimal",
+  "exercise": "field M as money 'USD'; rule M.amount > 0",
+  "specCite": "docs/language/precept-language-spec.md:1539",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-member-business"
+ },
+ {
+  "id": "spec-typecheck/bmember/money-currency",
+  "desc": "money .currency -> currency",
+  "exercise": "field M as money 'USD'; rule M.currency == 'USD'",
+  "specCite": "docs/language/precept-language-spec.md:1539",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-member-business"
+ },
+ {
+  "id": "spec-typecheck/bmember/quantity-unit",
+  "desc": "quantity .unit -> unitofmeasure",
+  "exercise": "field Q as quantity 'kg'; rule Q.unit == 'kg'",
+  "specCite": "docs/language/precept-language-spec.md:1539",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-member-business"
+ },
+ {
+  "id": "spec-typecheck/bmember/quantity-dimension",
+  "desc": "quantity .dimension -> dimension",
+  "exercise": "field Q as quantity 'kg'; rule Q.dimension == 'mass'",
+  "specCite": "docs/language/precept-language-spec.md:1539",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-member-business"
+ },
+ {
+  "id": "spec-typecheck/bmember/price-unit",
+  "desc": "price .unit -> unitofmeasure",
+  "exercise": "field P as price 'USD/each'; rule P.unit == 'each'",
+  "specCite": "docs/language/precept-language-spec.md:1539",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-member-business"
+ },
+ {
+  "id": "spec-typecheck/bmember/exchangerate-from",
+  "desc": "exchangerate .from -> currency",
+  "exercise": "field X as exchangerate 'USD/EUR'; rule X.from == 'USD'",
+  "specCite": "docs/language/precept-language-spec.md:1539",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-member-business"
+ },
+ {
+  "id": "spec-typecheck/bmember/exchangerate-to",
+  "desc": "exchangerate .to -> currency",
+  "exercise": "field X as exchangerate 'USD/EUR'; rule X.to == 'EUR'",
+  "specCite": "docs/language/precept-language-spec.md:1539",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-member-business"
+ },
+ {
+  "id": "spec-typecheck/bmember/unitofmeasure-dimension",
+  "desc": "unitofmeasure .dimension -> dimension",
+  "exercise": "field U as unitofmeasure; rule U.dimension == 'mass'",
+  "specCite": "docs/language/precept-language-spec.md:1539",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-member-business"
+ },
+ {
+  "id": "spec-typecheck/interp/scalar-in-string",
+  "desc": "scalar type coercible to string in interpolation",
+  "exercise": "field P as money 'USD'; rule \"Total: {P}\".length > 0",
+  "specCite": "docs/language/precept-language-spec.md:1553",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-interpolation"
+ },
+ {
+  "id": "spec-typecheck/interp/collection-in-string-error",
+  "desc": "collection inside string interpolation is a type error",
+  "exercise": "field Tags as set of string; rule \"Tags: {Tags}\".length > 0",
+  "specCite": "docs/language/precept-language-spec.md:1553",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.6-interpolation"
+ },
+ {
+  "id": "spec-typecheck/interp/typed-constant-interp",
+  "desc": "expr inside typed-constant interpolation validated against context type",
+  "exercise": "field A as integer; field M as money 'USD' <- '{A} USD'",
+  "specCite": "docs/language/precept-language-spec.md:1557",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.6-interpolation"
+ },
+ {
+  "id": "spec-typecheck/fn/min-numeric",
+  "desc": "min(numeric,numeric) -> common numeric type",
+  "exercise": "field A as integer; field B as decimal; field R as decimal <- min(A, B)",
+  "specCite": "docs/language/precept-language-spec.md:1565",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.7-functions"
+ },
+ {
+  "id": "spec-typecheck/fn/min-money-same",
+  "desc": "min(money,money) same currency -> money",
+  "exercise": "field A as money 'USD'; field B as money 'USD'; field R as money 'USD' <- min(A, B)",
+  "specCite": "docs/language/precept-language-spec.md:1566",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.7-functions"
+ },
+ {
+  "id": "spec-typecheck/fn/min-money-diff-error",
+  "desc": "min(money,money) different currency is an error",
+  "exercise": "field A as money 'USD'; field B as money 'EUR'; field R as money 'USD' <- min(A, B)",
+  "specCite": "docs/language/precept-language-spec.md:1566",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "3.7-functions"
+ },
+ {
+  "id": "spec-typecheck/fn/min-quantity",
+  "desc": "min(quantity,quantity) same unit -> quantity",
+  "exercise": "field A as quantity 'kg'; field B as quantity 'kg'; field R as quantity 'kg' <- min(A, B)",
+  "specCite": "docs/language/precept-language-spec.md:1567",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.7-functions"
+ },
+ {
+  "id": "spec-typecheck/fn/min-string-error",
+  "desc": "min on string args is a type error",
+  "exercise": "field A as string; field B as string; rule min(A, B) == \"x\"",
+  "specCite": "docs/language/precept-language-spec.md:1613",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.7-functions"
+ },
+ {
+  "id": "spec-typecheck/fn/max-numeric",
+  "desc": "max(numeric,numeric) -> common numeric type",
+  "exercise": "field A as integer; field B as integer; field R as integer <- max(A, B)",
+  "specCite": "docs/language/precept-language-spec.md:1568",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.7-functions"
+ },
+ {
+  "id": "spec-typecheck/fn/abs-numeric",
+  "desc": "abs(numeric) -> same numeric type",
+  "exercise": "field A as decimal; field R as decimal <- abs(A)",
+  "specCite": "docs/language/precept-language-spec.md:1571",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.7-functions"
+ },
+ {
+  "id": "spec-typecheck/fn/abs-money",
+  "desc": "abs(money) -> money (preserves currency)",
+  "exercise": "field A as money 'USD'; field R as money 'USD' <- abs(A)",
+  "specCite": "docs/language/precept-language-spec.md:1572",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.7-functions"
+ },
+ {
+  "id": "spec-typecheck/fn/abs-string-error",
+  "desc": "abs on string is a type error",
+  "exercise": "field A as string; rule abs(A) == \"x\"",
+  "specCite": "docs/language/precept-language-spec.md:1571",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.7-functions"
+ },
+ {
+  "id": "spec-typecheck/fn/clamp-numeric",
+  "desc": "clamp(v,lo,hi) numeric -> common numeric type",
+  "exercise": "field A as integer; field R as integer <- clamp(A, 0, 10)",
+  "specCite": "docs/language/precept-language-spec.md:1574",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.7-functions"
+ },
+ {
+  "id": "spec-typecheck/fn/clamp-money-mismatch-error",
+  "desc": "clamp money with mismatched currency qualifiers is an error",
+  "exercise": "field A as money 'USD'; field L as money 'EUR'; field H as money 'USD'; field R as money 'USD' <- clamp(A, L, H)",
+  "specCite": "docs/language/precept-language-spec.md:1575",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "3.7-functions"
+ },
+ {
+  "id": "spec-typecheck/fn/floor-decimal",
+  "desc": "floor(decimal) -> integer",
+  "exercise": "field D as decimal; field R as integer <- floor(D)",
+  "specCite": "docs/language/precept-language-spec.md:1577",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.7-functions"
+ },
+ {
+  "id": "spec-typecheck/fn/floor-number",
+  "desc": "floor(number) -> integer",
+  "exercise": "field N as number; field R as integer <- floor(N)",
+  "specCite": "docs/language/precept-language-spec.md:1577",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.7-functions"
+ },
+ {
+  "id": "spec-typecheck/fn/ceil-decimal",
+  "desc": "ceil(decimal) -> integer",
+  "exercise": "field D as decimal; field R as integer <- ceil(D)",
+  "specCite": "docs/language/precept-language-spec.md:1578",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.7-functions"
+ },
+ {
+  "id": "spec-typecheck/fn/truncate-decimal",
+  "desc": "truncate(decimal) -> integer",
+  "exercise": "field D as decimal; field R as integer <- truncate(D)",
+  "specCite": "docs/language/precept-language-spec.md:1579",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.7-functions"
+ },
+ {
+  "id": "spec-typecheck/fn/round-no-places",
+  "desc": "round(value) -> integer (banker's rounding)",
+  "exercise": "field D as decimal; field R as integer <- round(D)",
+  "specCite": "docs/language/precept-language-spec.md:1580",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.7-functions"
+ },
+ {
+  "id": "spec-typecheck/fn/round-places-decimal",
+  "desc": "round(value, places) numeric -> decimal",
+  "exercise": "field N as number; field R as decimal <- round(N, 2)",
+  "specCite": "docs/language/precept-language-spec.md:1581",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.7-functions"
+ },
+ {
+  "id": "spec-typecheck/fn/round-places-negative-error",
+  "desc": "round with negative places -> FunctionArgConstraintViolation",
+  "exercise": "field N as number; field R as decimal <- round(N, -1)",
+  "specCite": "docs/language/precept-language-spec.md:1614",
+  "expected": "reject:FunctionArgConstraintViolation",
+  "source": "added",
+  "block": "3.7-functions"
+ },
+ {
+  "id": "spec-typecheck/fn/round-money-places",
+  "desc": "round(money, integer) -> money (preserves currency)",
+  "exercise": "field M as money 'USD'; field R as money 'USD' <- round(M, 2)",
+  "specCite": "docs/language/precept-language-spec.md:1582",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.7-functions"
+ },
+ {
+  "id": "spec-typecheck/fn/approximate-decimal",
+  "desc": "approximate(decimal) -> number (explicit bridge)",
+  "exercise": "field D as decimal; field R as number <- approximate(D)",
+  "specCite": "docs/language/precept-language-spec.md:1584",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.7-functions"
+ },
+ {
+  "id": "spec-typecheck/fn/pow-integer-exp",
+  "desc": "pow(base, integer) -> same numeric type as base",
+  "exercise": "field A as number; field R as number <- pow(A, 3)",
+  "specCite": "docs/language/precept-language-spec.md:1585",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.7-functions"
+ },
+ {
+  "id": "spec-typecheck/fn/pow-nonint-exp-error",
+  "desc": "pow exp must be integer",
+  "exercise": "field A as number; field E as decimal; field R as number <- pow(A, E)",
+  "specCite": "docs/language/precept-language-spec.md:1585",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "3.7-functions"
+ },
+ {
+  "id": "spec-typecheck/fn/pow-negative-exp-int-lane",
+  "desc": "pow negative exp on integer lane -> constraint violation",
+  "exercise": "field A as integer; field R as integer <- pow(A, -2)",
+  "specCite": "docs/language/precept-language-spec.md:1585",
+  "expected": "reject:FunctionArgConstraintViolation",
+  "source": "added",
+  "block": "3.7-functions"
+ },
+ {
+  "id": "spec-typecheck/fn/sqrt-number",
+  "desc": "sqrt(number) -> number",
+  "exercise": "field N as number; field R as number <- sqrt(N)",
+  "specCite": "docs/language/precept-language-spec.md:1586",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.7-functions"
+ },
+ {
+  "id": "spec-typecheck/fn/sqrt-decimal-error",
+  "desc": "sqrt(decimal) is a type error (no decimal overload)",
+  "exercise": "field D as decimal; field R as number <- sqrt(D)",
+  "specCite": "docs/language/precept-language-spec.md:1586",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.7-functions"
+ },
+ {
+  "id": "spec-typecheck/fn/sqrt-integer-widen",
+  "desc": "sqrt(integer) widens integer to number",
+  "exercise": "field I as integer; field R as number <- sqrt(I)",
+  "specCite": "docs/language/precept-language-spec.md:1586",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.7-functions"
+ },
+ {
+  "id": "spec-typecheck/fn/sqrt-possibly-negative-error",
+  "desc": "sqrt of possibly-negative value rejected by proof engine",
+  "exercise": "field N as number; field R as number <- sqrt(N)",
+  "specCite": "docs/language/precept-language-spec.md:1586",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "3.7-functions"
+ },
+ {
+  "id": "spec-typecheck/fn/trim-string",
+  "desc": "trim(string) -> string",
+  "exercise": "field S as string; rule trim(S) == \"x\"",
+  "specCite": "docs/language/precept-language-spec.md:1587",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.7-functions"
+ },
+ {
+  "id": "spec-typecheck/fn/trim-ci-string",
+  "desc": "trim accepts ~string via assignment compatibility",
+  "exercise": "field S as ~string; rule trim(S) ~= \"x\"",
+  "specCite": "docs/language/precept-language-spec.md:1601",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.7-functions"
+ },
+ {
+  "id": "spec-typecheck/fn/trim-integer-error",
+  "desc": "trim on integer is a type error",
+  "exercise": "field I as integer; rule trim(I) == \"x\"",
+  "specCite": "docs/language/precept-language-spec.md:1613",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.7-functions"
+ },
+ {
+  "id": "spec-typecheck/fn/startswith-string",
+  "desc": "startsWith(string,string) -> boolean (case-sensitive)",
+  "exercise": "field S as string; rule startsWith(S, \"a\")",
+  "specCite": "docs/language/precept-language-spec.md:1588",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.7-functions"
+ },
+ {
+  "id": "spec-typecheck/fn/startswith-ci-error",
+  "desc": "startsWith first arg ~string -> CaseInsensitiveFieldRequiresTildeStartsWith",
+  "exercise": "field S as ~string; rule startsWith(S, \"a\")",
+  "specCite": "docs/language/precept-language-spec.md:1588",
+  "expected": "reject:CaseInsensitiveFieldRequiresTildeStartsWith",
+  "source": "added",
+  "block": "3.7-functions"
+ },
+ {
+  "id": "spec-typecheck/fn/endswith-string",
+  "desc": "endsWith(string,string) -> boolean",
+  "exercise": "field S as string; rule endsWith(S, \"z\")",
+  "specCite": "docs/language/precept-language-spec.md:1589",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.7-functions"
+ },
+ {
+  "id": "spec-typecheck/fn/endswith-ci-error",
+  "desc": "endsWith first arg ~string -> CaseInsensitiveFieldRequiresTildeEndsWith",
+  "exercise": "field S as ~string; rule endsWith(S, \"z\")",
+  "specCite": "docs/language/precept-language-spec.md:1589",
+  "expected": "reject:CaseInsensitiveFieldRequiresTildeEndsWith",
+  "source": "added",
+  "block": "3.7-functions"
+ },
+ {
+  "id": "spec-typecheck/fn/tilde-startswith",
+  "desc": "~startsWith(~string,string) -> boolean",
+  "exercise": "field S as ~string; rule ~startsWith(S, \"a\")",
+  "specCite": "docs/language/precept-language-spec.md:1590",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.7-functions"
+ },
+ {
+  "id": "spec-typecheck/fn/tilde-startswith-nonci-error",
+  "desc": "~startsWith first arg not ~string is a compile error",
+  "exercise": "field S as string; rule ~startsWith(S, \"a\")",
+  "specCite": "docs/language/precept-language-spec.md:1590",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "3.7-functions"
+ },
+ {
+  "id": "spec-typecheck/fn/tilde-endswith",
+  "desc": "~endsWith(~string,string) -> boolean",
+  "exercise": "field S as ~string; rule ~endsWith(S, \"z\")",
+  "specCite": "docs/language/precept-language-spec.md:1591",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.7-functions"
+ },
+ {
+  "id": "spec-typecheck/fn/tolower-string",
+  "desc": "toLower(string) -> string",
+  "exercise": "field S as string; rule toLower(S) == \"x\"",
+  "specCite": "docs/language/precept-language-spec.md:1592",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.7-functions"
+ },
+ {
+  "id": "spec-typecheck/fn/toupper-string",
+  "desc": "toUpper(string) -> string",
+  "exercise": "field S as string; rule toUpper(S) == \"x\"",
+  "specCite": "docs/language/precept-language-spec.md:1593",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.7-functions"
+ },
+ {
+  "id": "spec-typecheck/fn/left-string",
+  "desc": "left(string,integer) -> string",
+  "exercise": "field S as string; rule left(S, 3) == \"x\"",
+  "specCite": "docs/language/precept-language-spec.md:1594",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.7-functions"
+ },
+ {
+  "id": "spec-typecheck/fn/right-string",
+  "desc": "right(string,integer) -> string",
+  "exercise": "field S as string; rule right(S, 3) == \"x\"",
+  "specCite": "docs/language/precept-language-spec.md:1595",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.7-functions"
+ },
+ {
+  "id": "spec-typecheck/fn/mid-string",
+  "desc": "mid(string,integer,integer) -> string",
+  "exercise": "field S as string; rule mid(S, 1, 3) == \"x\"",
+  "specCite": "docs/language/precept-language-spec.md:1596",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.7-functions"
+ },
+ {
+  "id": "spec-typecheck/fn/now",
+  "desc": "now() -> instant",
+  "exercise": "field T as instant <- now()",
+  "specCite": "docs/language/precept-language-spec.md:1597",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.7-functions"
+ },
+ {
+  "id": "spec-typecheck/fnval/unknown-function",
+  "desc": "unknown function name -> UndeclaredFunction",
+  "exercise": "field A as integer; rule foo(A) > 0",
+  "specCite": "docs/language/precept-language-spec.md:1611",
+  "expected": "reject:UndeclaredFunction",
+  "source": "added",
+  "block": "3.7-fn-validation"
+ },
+ {
+  "id": "spec-typecheck/fnval/wrong-arity-too-few",
+  "desc": "wrong arity (too few) -> FunctionArityMismatch",
+  "exercise": "field A as integer; rule min(A) > 0",
+  "specCite": "docs/language/precept-language-spec.md:1612",
+  "expected": "reject:FunctionArityMismatch",
+  "source": "added",
+  "block": "3.7-fn-validation"
+ },
+ {
+  "id": "spec-typecheck/fnval/wrong-arity-too-many",
+  "desc": "wrong arity (too many) -> FunctionArityMismatch",
+  "exercise": "field A as integer; rule min(A, A, A) > 0",
+  "specCite": "docs/language/precept-language-spec.md:1612",
+  "expected": "reject:FunctionArityMismatch",
+  "source": "added",
+  "block": "3.7-fn-validation"
+ },
+ {
+  "id": "spec-typecheck/fnval/arg-type-mismatch",
+  "desc": "arg type mismatch -> TypeMismatch",
+  "exercise": "field A as string; rule min(A, A) == \"x\"",
+  "specCite": "docs/language/precept-language-spec.md:1613",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.7-fn-validation"
+ },
+ {
+  "id": "spec-typecheck/fnval/arg-constraint-violation",
+  "desc": "arg constraint violation -> FunctionArgConstraintViolation",
+  "exercise": "field A as number; field R as decimal <- round(A, -1)",
+  "specCite": "docs/language/precept-language-spec.md:1614",
+  "expected": "reject:FunctionArgConstraintViolation",
+  "source": "added",
+  "block": "3.7-fn-validation"
+ },
+ {
+  "id": "spec-typecheck/compat/assignment-mismatch",
+  "desc": "set Field = Expr where Expr not assignable -> TypeMismatch",
+  "exercise": "field S as string; from St on E -> set S = 42",
+  "specCite": "docs/language/precept-language-spec.md:1622",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.8-type-compat"
+ },
+ {
+  "id": "spec-typecheck/compat/guard-not-boolean",
+  "desc": "when Expr where Expr not boolean -> TypeMismatch",
+  "exercise": "field N as integer; state Open initial; from Open on E when N -> no transition",
+  "specCite": "docs/language/precept-language-spec.md:1623",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.8-type-compat"
+ },
+ {
+  "id": "spec-typecheck/compat/rule-not-boolean",
+  "desc": "rule Expr where Expr not boolean -> TypeMismatch",
+  "exercise": "field N as integer; rule N",
+  "specCite": "docs/language/precept-language-spec.md:1624",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.8-type-compat"
+ },
+ {
+  "id": "spec-typecheck/compat/ensure-not-boolean",
+  "desc": "ensure Expr where Expr not boolean -> TypeMismatch",
+  "exercise": "field N as integer; event E(); on E ensure N because \"x\"",
+  "specCite": "docs/language/precept-language-spec.md:1625",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.8-type-compat"
+ },
+ {
+  "id": "spec-typecheck/compat/message-not-string",
+  "desc": "because/reject Expr where Expr not string -> TypeMismatch",
+  "exercise": "field N as integer; rule N > 0 because 42",
+  "specCite": "docs/language/precept-language-spec.md:1626",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.8-type-compat"
+ },
+ {
+  "id": "spec-typecheck/compat/binary-operator-type-error",
+  "desc": "operator on incompatible types -> TypeMismatch",
+  "exercise": "field A as string; field B as boolean; rule (A + B) == \"x\"",
+  "specCite": "docs/language/precept-language-spec.md:1627",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.8-type-compat"
+ },
+ {
+  "id": "spec-typecheck/compat/comparison-unordered-choice",
+  "desc": "comparison on choice without ordered -> TypeMismatch",
+  "exercise": "field A as choice of string(\"a\",\"b\"); rule A < A",
+  "specCite": "docs/language/precept-language-spec.md:1628",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.8-type-compat"
+ },
+ {
+  "id": "spec-typecheck/compat/conditional-branch-mismatch",
+  "desc": "if/then/else with no common type -> TypeMismatch",
+  "exercise": "field C as boolean; rule (if C then 1 else \"x\") == 1",
+  "specCite": "docs/language/precept-language-spec.md:1629",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.8-type-compat"
+ },
+ {
+  "id": "spec-typecheck/compat/default-value-mismatch",
+  "desc": "default Expr incompatible with field type -> TypeMismatch",
+  "exercise": "field S as string default 42",
+  "specCite": "docs/language/precept-language-spec.md:1630",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.8-type-compat"
+ },
+ {
+  "id": "spec-typecheck/compat/collection-element-mismatch",
+  "desc": "add Field Expr where Expr type mismatches element type -> TypeMismatch",
+  "exercise": "field S as set of integer; from St on E -> add S \"x\"",
+  "specCite": "docs/language/precept-language-spec.md:1631",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.8-type-compat"
+ },
+ {
+  "id": "spec-typecheck/compat/numeric-literal-incompatible",
+  "desc": "fractional literal in integer context -> TypeMismatch",
+  "exercise": "field I as integer default 3.14",
+  "specCite": "docs/language/precept-language-spec.md:1632",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.8-type-compat"
+ },
+ {
+  "id": "spec-typecheck/cienf/eq-either-operand",
+  "desc": "== with either operand ~string -> CaseInsensitiveFieldRequiresTildeEquals",
+  "exercise": "field E as ~string; rule \"admin\" == E",
+  "specCite": "docs/language/precept-language-spec.md:1642",
+  "expected": "reject:CaseInsensitiveFieldRequiresTildeEquals",
+  "source": "added",
+  "block": "3.8-cistring-enforcement"
+ },
+ {
+  "id": "spec-typecheck/cienf/neq-either-operand",
+  "desc": "!= with either operand ~string -> CaseInsensitiveFieldRequiresTildeNotEquals",
+  "exercise": "field E as ~string; rule E != \"admin\"",
+  "specCite": "docs/language/precept-language-spec.md:1643",
+  "expected": "reject:CaseInsensitiveFieldRequiresTildeNotEquals",
+  "source": "added",
+  "block": "3.8-cistring-enforcement"
+ },
+ {
+  "id": "spec-typecheck/cienf/contains-cs-collection",
+  "desc": "CS collection contains ~string value -> CaseInsensitiveValueInCaseSensitiveContains",
+  "exercise": "field S as set of string; field V as ~string; rule S contains V",
+  "specCite": "docs/language/precept-language-spec.md:1644",
+  "expected": "reject:CaseInsensitiveValueInCaseSensitiveContains",
+  "source": "added",
+  "block": "3.8-cistring-enforcement"
+ },
+ {
+  "id": "spec-typecheck/cienf/startswith-ci",
+  "desc": "startsWith with ~string first arg -> CaseInsensitiveFieldRequiresTildeStartsWith",
+  "exercise": "field S as ~string; rule startsWith(S, \"a\")",
+  "specCite": "docs/language/precept-language-spec.md:1645",
+  "expected": "reject:CaseInsensitiveFieldRequiresTildeStartsWith",
+  "source": "added",
+  "block": "3.8-cistring-enforcement"
+ },
+ {
+  "id": "spec-typecheck/cienf/endswith-ci",
+  "desc": "endsWith with ~string first arg -> CaseInsensitiveFieldRequiresTildeEndsWith",
+  "exercise": "field S as ~string; rule endsWith(S, \"z\")",
+  "specCite": "docs/language/precept-language-spec.md:1646",
+  "expected": "reject:CaseInsensitiveFieldRequiresTildeEndsWith",
+  "source": "added",
+  "block": "3.8-cistring-enforcement"
+ },
+ {
+  "id": "spec-typecheck/cienf/literal-lhs-position",
+  "desc": "enforcement fires when the ~string field is the right operand",
+  "exercise": "field E as ~string; rule \"admin@example.com\" == E",
+  "specCite": "docs/language/precept-language-spec.md:1648",
+  "expected": "reject:CaseInsensitiveFieldRequiresTildeEquals",
+  "source": "added",
+  "block": "3.8-cistring-enforcement"
+ },
+ {
+  "id": "spec-typecheck/cienf/assignment-not-fired",
+  "desc": "string/~string assignment is compatible, no enforcement",
+  "exercise": "field A as string; field B as ~string; from S on Ev -> set A = B",
+  "specCite": "docs/language/precept-language-spec.md:1650",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.8-cistring-enforcement"
+ },
+ {
+  "id": "spec-typecheck/quant/predicate-not-boolean",
+  "desc": "quantifier predicate resolves to non-boolean -> QuantifierPredicateNotBoolean",
+  "exercise": "field Tags as set of integer; rule each t in Tags (t + 1)",
+  "specCite": "docs/language/precept-language-spec.md:1656",
+  "expected": "reject:QuantifierPredicateNotBoolean",
+  "source": "added",
+  "block": "3.8-quantifier-predicate"
+ },
+ {
+  "id": "spec-typecheck/quant/target-not-collection",
+  "desc": "quantifier collection ref is a non-collection type -> InvalidQuantifierTarget",
+  "exercise": "field X as integer; rule each t in X (t > 0)",
+  "specCite": "docs/language/precept-language-spec.md:1657",
+  "expected": "reject:InvalidQuantifierTarget",
+  "source": "added",
+  "block": "3.8-quantifier-predicate"
+ },
+ {
+  "id": "spec-typecheck/quant/binding-reserved-keyword",
+  "desc": "binding variable is a reserved keyword -> ExpectedIdentifier",
+  "exercise": "field Tags as set of integer; rule each event in Tags (event > 0)",
+  "specCite": "docs/language/precept-language-spec.md:1658",
+  "expected": "reject:ExpectedIdentifier",
+  "source": "added",
+  "block": "3.8-quantifier-predicate"
+ },
+ {
+  "id": "spec-typecheck/quant/ci-enforcement-in-predicate",
+  "desc": "~string binding var used with == inside predicate -> CI enforcement",
+  "exercise": "field Tags as set of ~string; rule each t in Tags (t == \"admin\")",
+  "specCite": "docs/language/precept-language-spec.md:1659",
+  "expected": "reject:CaseInsensitiveFieldRequiresTildeEquals",
+  "source": "added",
+  "block": "3.8-quantifier-predicate"
+ },
+ {
+  "id": "spec-typecheck/mod/editable-normal",
+  "desc": "editable on a normal field is valid",
+  "exercise": "field X as integer editable",
+  "specCite": "docs/language/precept-language-spec.md:1667",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "id": "spec-typecheck/mod/editable-computed-error",
+  "desc": "editable on a computed field -> ComputedFieldNotWritable",
+  "exercise": "field Y as integer; field X as integer <- Y + 1 editable",
+  "specCite": "docs/language/precept-language-spec.md:1667",
+  "expected": "reject:ComputedFieldNotWritable",
+  "source": "added",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "id": "spec-typecheck/mod/editable-event-arg-error",
+  "desc": "editable on an event arg -> EditableOnEventArg",
+  "exercise": "event E(x as integer editable)",
+  "specCite": "docs/language/precept-language-spec.md:1667",
+  "expected": "reject:EditableOnEventArg",
+  "source": "added",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "id": "spec-typecheck/mod/nonnegative-integer",
+  "desc": "nonnegative on integer is valid",
+  "exercise": "field X as integer nonnegative",
+  "specCite": "docs/language/precept-language-spec.md:1668",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "id": "spec-typecheck/mod/nonnegative-money",
+  "desc": "nonnegative on money is valid",
+  "exercise": "field X as money 'USD' nonnegative",
+  "specCite": "docs/language/precept-language-spec.md:1668",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "id": "spec-typecheck/mod/nonnegative-duration",
+  "desc": "nonnegative on duration is valid",
+  "exercise": "field X as duration nonnegative",
+  "specCite": "docs/language/precept-language-spec.md:1668",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "id": "spec-typecheck/mod/nonnegative-period",
+  "desc": "nonnegative on period is valid",
+  "exercise": "field X as period nonnegative",
+  "specCite": "docs/language/precept-language-spec.md:1668",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "id": "spec-typecheck/mod/nonnegative-string-error",
+  "desc": "nonnegative on string -> InvalidModifierForType",
+  "exercise": "field X as string nonnegative",
+  "specCite": "docs/language/precept-language-spec.md:1668",
+  "expected": "reject:InvalidModifierForType",
+  "source": "added",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "id": "spec-typecheck/mod/nonnegative-boolean-error",
+  "desc": "nonnegative on boolean -> InvalidModifierForType",
+  "exercise": "field X as boolean nonnegative",
+  "specCite": "docs/language/precept-language-spec.md:1668",
+  "expected": "reject:InvalidModifierForType",
+  "source": "added",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "id": "spec-typecheck/mod/nonnegative-choice-error",
+  "desc": "nonnegative on choice -> InvalidModifierForType",
+  "exercise": "field X as choice of string(\"a\",\"b\") nonnegative",
+  "specCite": "docs/language/precept-language-spec.md:1668",
+  "expected": "reject:InvalidModifierForType",
+  "source": "added",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "id": "spec-typecheck/mod/nonnegative-date-error",
+  "desc": "nonnegative on non-magnitude temporal (date) -> InvalidModifierForType",
+  "exercise": "field X as date nonnegative",
+  "specCite": "docs/language/precept-language-spec.md:1668",
+  "expected": "reject:InvalidModifierForType",
+  "source": "added",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "id": "spec-typecheck/mod/positive-integer",
+  "desc": "positive on integer is valid",
+  "exercise": "field X as integer positive",
+  "specCite": "docs/language/precept-language-spec.md:1669",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "id": "spec-typecheck/mod/positive-string-error",
+  "desc": "positive on string -> InvalidModifierForType",
+  "exercise": "field X as string positive",
+  "specCite": "docs/language/precept-language-spec.md:1669",
+  "expected": "reject:InvalidModifierForType",
+  "source": "added",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "id": "spec-typecheck/mod/nonzero-integer",
+  "desc": "nonzero on integer is valid",
+  "exercise": "field X as integer nonzero",
+  "specCite": "docs/language/precept-language-spec.md:1670",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "id": "spec-typecheck/mod/nonzero-boolean-error",
+  "desc": "nonzero on boolean -> InvalidModifierForType",
+  "exercise": "field X as boolean nonzero",
+  "specCite": "docs/language/precept-language-spec.md:1670",
+  "expected": "reject:InvalidModifierForType",
+  "source": "added",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "id": "spec-typecheck/mod/notempty-string",
+  "desc": "notempty on string is valid",
+  "exercise": "field X as string notempty",
+  "specCite": "docs/language/precept-language-spec.md:1671",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "id": "spec-typecheck/mod/notempty-integer-error",
+  "desc": "notempty on integer -> InvalidModifierForType",
+  "exercise": "field X as integer notempty",
+  "specCite": "docs/language/precept-language-spec.md:1671",
+  "expected": "reject:InvalidModifierForType",
+  "source": "added",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "id": "spec-typecheck/mod/min-integer",
+  "desc": "min on integer is valid",
+  "exercise": "field X as integer min 0",
+  "specCite": "docs/language/precept-language-spec.md:1672",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "id": "spec-typecheck/mod/min-money",
+  "desc": "min on money is valid",
+  "exercise": "field X as money 'USD' min '0 USD'",
+  "specCite": "docs/language/precept-language-spec.md:1672",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "id": "spec-typecheck/mod/max-quantity",
+  "desc": "max on quantity is valid",
+  "exercise": "field X as quantity 'kg' max '10 kg'",
+  "specCite": "docs/language/precept-language-spec.md:1672",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "id": "spec-typecheck/mod/min-string-error",
+  "desc": "min on string -> InvalidModifierForType",
+  "exercise": "field X as string min 0",
+  "specCite": "docs/language/precept-language-spec.md:1672",
+  "expected": "reject:InvalidModifierForType",
+  "source": "added",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "id": "spec-typecheck/mod/min-exchangerate-error",
+  "desc": "min on exchangerate -> InvalidModifierForType (excluded)",
+  "exercise": "field X as exchangerate 'USD/EUR' min 0",
+  "specCite": "docs/language/precept-language-spec.md:1672",
+  "expected": "reject:InvalidModifierForType",
+  "source": "added",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "id": "spec-typecheck/mod/max-date-error",
+  "desc": "max on temporal (date) -> InvalidModifierForType",
+  "exercise": "field X as date max '2026-01-01'",
+  "specCite": "docs/language/precept-language-spec.md:1672",
+  "expected": "reject:InvalidModifierForType",
+  "source": "added",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "id": "spec-typecheck/mod/minlength-string",
+  "desc": "minlength on string is valid",
+  "exercise": "field X as string minlength 3",
+  "specCite": "docs/language/precept-language-spec.md:1673",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "id": "spec-typecheck/mod/minlength-integer-error",
+  "desc": "minlength on integer -> InvalidModifierForType",
+  "exercise": "field X as integer minlength 3",
+  "specCite": "docs/language/precept-language-spec.md:1673",
+  "expected": "reject:InvalidModifierForType",
+  "source": "added",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "id": "spec-typecheck/mod/maxlength-collection-error",
+  "desc": "maxlength on a collection field -> InvalidModifierForType",
+  "exercise": "field X as set of integer maxlength 3",
+  "specCite": "docs/language/precept-language-spec.md:1673",
+  "expected": "reject:InvalidModifierForType",
+  "source": "added",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "id": "spec-typecheck/mod/mincount-collection",
+  "desc": "mincount on a collection is valid",
+  "exercise": "field X as set of integer mincount 1",
+  "specCite": "docs/language/precept-language-spec.md:1674",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "id": "spec-typecheck/mod/mincount-scalar-error",
+  "desc": "mincount on a scalar -> InvalidModifierForType",
+  "exercise": "field X as integer mincount 1",
+  "specCite": "docs/language/precept-language-spec.md:1674",
+  "expected": "reject:InvalidModifierForType",
+  "source": "added",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "id": "spec-typecheck/mod/maxplaces-decimal",
+  "desc": "maxplaces on decimal is valid",
+  "exercise": "field X as decimal maxplaces 2",
+  "specCite": "docs/language/precept-language-spec.md:1675",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "id": "spec-typecheck/mod/maxplaces-money",
+  "desc": "maxplaces on money is valid",
+  "exercise": "field X as money 'USD' maxplaces 2",
+  "specCite": "docs/language/precept-language-spec.md:1675",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "id": "spec-typecheck/mod/maxplaces-integer-error",
+  "desc": "maxplaces on integer -> InvalidModifierForType",
+  "exercise": "field X as integer maxplaces 2",
+  "specCite": "docs/language/precept-language-spec.md:1675",
+  "expected": "reject:InvalidModifierForType",
+  "source": "added",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "id": "spec-typecheck/mod/maxplaces-number-error",
+  "desc": "maxplaces on number -> InvalidModifierForType",
+  "exercise": "field X as number maxplaces 2",
+  "specCite": "docs/language/precept-language-spec.md:1675",
+  "expected": "reject:InvalidModifierForType",
+  "source": "added",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "id": "spec-typecheck/mod/ordered-choice",
+  "desc": "ordered on choice is valid",
+  "exercise": "field X as choice of string(\"a\",\"b\") ordered",
+  "specCite": "docs/language/precept-language-spec.md:1676",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "id": "spec-typecheck/mod/ordered-noncchoice-error",
+  "desc": "ordered on non-choice -> InvalidModifierForType",
+  "exercise": "field X as integer ordered",
+  "specCite": "docs/language/precept-language-spec.md:1676",
+  "expected": "reject:InvalidModifierForType",
+  "source": "added",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "id": "spec-typecheck/mod/optional-any",
+  "desc": "optional is valid on any field type",
+  "exercise": "field X as integer optional",
+  "specCite": "docs/language/precept-language-spec.md:1677",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "id": "spec-typecheck/mod/per-element-inner-type",
+  "desc": "modifier in collection inner-type position consulted with element type",
+  "exercise": "field X as set of integer maxlength 5",
+  "specCite": "docs/language/precept-language-spec.md:1679",
+  "expected": "reject:InvalidModifierForType",
+  "source": "added",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "id": "spec-typecheck/mod/per-element-notempty-inner",
+  "desc": "notempty in collection inner-type position constrains each element",
+  "exercise": "field X as set of string notempty",
+  "specCite": "docs/language/precept-language-spec.md:1681",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "id": "spec-typecheck/mod/notempty-optional-exclusive",
+  "desc": "optional and notempty on same declaration -> ConflictingModifiers",
+  "exercise": "field X as string optional notempty",
+  "specCite": "docs/language/precept-language-spec.md:1683",
+  "expected": "reject:ConflictingModifiers",
+  "source": "added",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "id": "spec-typecheck/modval/min-gt-max",
+  "desc": "min value exceeds max -> InvalidModifierBounds",
+  "exercise": "field X as integer min 10 max 5",
+  "specCite": "docs/language/precept-language-spec.md:1689",
+  "expected": "reject:InvalidModifierBounds",
+  "source": "added",
+  "block": "3.8-modifier-value"
+ },
+ {
+  "id": "spec-typecheck/modval/minlength-gt-maxlength",
+  "desc": "minlength exceeds maxlength -> InvalidModifierBounds",
+  "exercise": "field X as string minlength 10 maxlength 5",
+  "specCite": "docs/language/precept-language-spec.md:1690",
+  "expected": "reject:InvalidModifierBounds",
+  "source": "added",
+  "block": "3.8-modifier-value"
+ },
+ {
+  "id": "spec-typecheck/modval/mincount-gt-maxcount",
+  "desc": "mincount exceeds maxcount -> InvalidModifierBounds",
+  "exercise": "field X as set of integer mincount 10 maxcount 5",
+  "specCite": "docs/language/precept-language-spec.md:1691",
+  "expected": "reject:InvalidModifierBounds",
+  "source": "added",
+  "block": "3.8-modifier-value"
+ },
+ {
+  "id": "spec-typecheck/modval/negative-length",
+  "desc": "negative minlength -> InvalidModifierValue",
+  "exercise": "field X as string minlength -1",
+  "specCite": "docs/language/precept-language-spec.md:1692",
+  "expected": "reject:InvalidModifierValue",
+  "source": "added",
+  "block": "3.8-modifier-value"
+ },
+ {
+  "id": "spec-typecheck/modval/negative-count",
+  "desc": "negative mincount -> InvalidModifierValue",
+  "exercise": "field X as set of integer mincount -1",
+  "specCite": "docs/language/precept-language-spec.md:1692",
+  "expected": "reject:InvalidModifierValue",
+  "source": "added",
+  "block": "3.8-modifier-value"
+ },
+ {
+  "id": "spec-typecheck/modval/negative-maxplaces",
+  "desc": "negative maxplaces -> InvalidModifierValue",
+  "exercise": "field X as decimal maxplaces -1",
+  "specCite": "docs/language/precept-language-spec.md:1692",
+  "expected": "reject:InvalidModifierValue",
+  "source": "added",
+  "block": "3.8-modifier-value"
+ },
+ {
+  "id": "spec-typecheck/modval/maxplaces-not-integer",
+  "desc": "maxplaces not a whole number -> InvalidModifierValue",
+  "exercise": "field X as decimal maxplaces 2.5",
+  "specCite": "docs/language/precept-language-spec.md:1693",
+  "expected": "reject:InvalidModifierValue",
+  "source": "added",
+  "block": "3.8-modifier-value"
+ },
+ {
+  "id": "spec-typecheck/modval/duplicate-modifier",
+  "desc": "same modifier applied twice -> DuplicateModifier",
+  "exercise": "field X as integer nonnegative nonnegative",
+  "specCite": "docs/language/precept-language-spec.md:1694",
+  "expected": "reject:DuplicateModifier",
+  "source": "added",
+  "block": "3.8-modifier-value"
+ },
+ {
+  "id": "spec-typecheck/modval/redundant-nonneg-positive",
+  "desc": "nonnegative and positive on same field -> RedundantModifier (warning)",
+  "exercise": "field X as integer nonnegative positive",
+  "specCite": "docs/language/precept-language-spec.md:1695",
+  "expected": "reject:RedundantModifier",
+  "source": "added",
+  "block": "3.8-modifier-value"
+ },
+ {
+  "id": "spec-typecheck/modval/conflicting-optional-notempty",
+  "desc": "optional and notempty -> ConflictingModifiers (C120)",
+  "exercise": "field X as string optional notempty",
+  "specCite": "docs/language/precept-language-spec.md:1696",
+  "expected": "reject:ConflictingModifiers",
+  "source": "added",
+  "block": "3.8-modifier-value"
+ },
+ {
+  "id": "spec-typecheck/act/set-scalar",
+  "desc": "set F = Expr on scalar field is valid",
+  "exercise": "field X as integer; from S on E -> set X = 5",
+  "specCite": "docs/language/precept-language-spec.md:1702",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.8-action-validation"
+ },
+ {
+  "id": "spec-typecheck/act/set-computed-error",
+  "desc": "set targeting a computed field -> ComputedFieldNotWritable",
+  "exercise": "field Y as integer; field X as integer <- Y + 1; from S on E -> set X = 5",
+  "specCite": "docs/language/precept-language-spec.md:1702",
+  "expected": "reject:ComputedFieldNotWritable",
+  "source": "added",
+  "block": "3.8-action-validation"
+ },
+ {
+  "id": "spec-typecheck/act/add-set",
+  "desc": "add F Expr on set of T is valid",
+  "exercise": "field X as set of integer; from S on E -> add X 3",
+  "specCite": "docs/language/precept-language-spec.md:1703",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.8-action-validation"
+ },
+ {
+  "id": "spec-typecheck/act/add-non-set-error",
+  "desc": "add on a non-set field is a type error",
+  "exercise": "field X as integer; from S on E -> add X 3",
+  "specCite": "docs/language/precept-language-spec.md:1717",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "3.8-action-validation"
+ },
+ {
+  "id": "spec-typecheck/act/remove-set",
+  "desc": "remove F Expr on set of T is valid",
+  "exercise": "field X as set of integer; from S on E -> remove X 3",
+  "specCite": "docs/language/precept-language-spec.md:1704",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.8-action-validation"
+ },
+ {
+  "id": "spec-typecheck/act/remove-lookup-key",
+  "desc": "remove F Expr on lookup removes by key K",
+  "exercise": "field X as lookup of string to integer; from S on E -> remove X \"k\"",
+  "specCite": "docs/language/precept-language-spec.md:1704",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.8-action-validation"
+ },
+ {
+  "id": "spec-typecheck/act/remove-at-list",
+  "desc": "remove F at N on list of T is valid",
+  "exercise": "field X as list of integer; from S on E -> remove X at 0",
+  "specCite": "docs/language/precept-language-spec.md:1705",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.8-action-validation"
+ },
+ {
+  "id": "spec-typecheck/act/remove-at-non-list-error",
+  "desc": "remove at N on a non-list field is a type error",
+  "exercise": "field X as set of integer; from S on E -> remove X at 0",
+  "specCite": "docs/language/precept-language-spec.md:1705",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "3.8-action-validation"
+ },
+ {
+  "id": "spec-typecheck/act/enqueue-queue",
+  "desc": "enqueue F Expr on queue of T is valid",
+  "exercise": "field X as queue of integer; from S on E -> enqueue X 3",
+  "specCite": "docs/language/precept-language-spec.md:1706",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.8-action-validation"
+ },
+ {
+  "id": "spec-typecheck/act/enqueue-by-queue-by-p",
+  "desc": "enqueue F Expr by Expr on queue of T by P is valid",
+  "exercise": "field X as queue of integer by integer; from S on E -> enqueue X 3 by 1",
+  "specCite": "docs/language/precept-language-spec.md:1707",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.8-action-validation"
+ },
+ {
+  "id": "spec-typecheck/act/enqueue-simple-on-queue-by-p-error",
+  "desc": "simple enqueue on queue of T by P is not valid",
+  "exercise": "field X as queue of integer by integer; from S on E -> enqueue X 3",
+  "specCite": "docs/language/precept-language-spec.md:1707",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "3.8-action-validation"
+ },
+ {
+  "id": "spec-typecheck/act/dequeue-unguarded",
+  "desc": "dequeue requires an emptiness proof -> UnguardedCollectionMutation",
+  "exercise": "field X as queue of integer; from S on E -> dequeue X",
+  "specCite": "docs/language/precept-language-spec.md:1708",
+  "expected": "reject:UnguardedCollectionMutation",
+  "source": "added",
+  "block": "3.8-action-validation"
+ },
+ {
+  "id": "spec-typecheck/act/push-stack",
+  "desc": "push F Expr on stack of T is valid",
+  "exercise": "field X as stack of integer; from S on E -> push X 3",
+  "specCite": "docs/language/precept-language-spec.md:1709",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.8-action-validation"
+ },
+ {
+  "id": "spec-typecheck/act/push-non-stack-error",
+  "desc": "push on a non-stack field is a type error",
+  "exercise": "field X as set of integer; from S on E -> push X 3",
+  "specCite": "docs/language/precept-language-spec.md:1717",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "3.8-action-validation"
+ },
+ {
+  "id": "spec-typecheck/act/pop-unguarded",
+  "desc": "pop requires an emptiness proof -> UnguardedCollectionMutation",
+  "exercise": "field X as stack of integer; from S on E -> pop X",
+  "specCite": "docs/language/precept-language-spec.md:1710",
+  "expected": "reject:UnguardedCollectionMutation",
+  "source": "added",
+  "block": "3.8-action-validation"
+ },
+ {
+  "id": "spec-typecheck/act/clear-collection",
+  "desc": "clear F on a collection is valid",
+  "exercise": "field X as set of integer; from S on E -> clear X",
+  "specCite": "docs/language/precept-language-spec.md:1711",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.8-action-validation"
+ },
+ {
+  "id": "spec-typecheck/act/clear-optional",
+  "desc": "clear F on an optional field resets to not set",
+  "exercise": "field X as integer optional; from S on E -> clear X",
+  "specCite": "docs/language/precept-language-spec.md:1711",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.8-action-validation"
+ },
+ {
+  "id": "spec-typecheck/act/clear-log-error",
+  "desc": "clear on a log (append-only) is not valid",
+  "exercise": "field X as log of integer; from S on E -> clear X",
+  "specCite": "docs/language/precept-language-spec.md:1711",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "3.8-action-validation"
+ },
+ {
+  "id": "spec-typecheck/act/append-log",
+  "desc": "append F Expr on log of T is valid",
+  "exercise": "field X as log of integer; from S on E -> append X 3",
+  "specCite": "docs/language/precept-language-spec.md:1712",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.8-action-validation"
+ },
+ {
+  "id": "spec-typecheck/act/append-list",
+  "desc": "append F Expr on list of T is valid",
+  "exercise": "field X as list of integer; from S on E -> append X 3",
+  "specCite": "docs/language/precept-language-spec.md:1712",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.8-action-validation"
+ },
+ {
+  "id": "spec-typecheck/act/append-by-log-by-p",
+  "desc": "append F Expr by Expr on log of T by P is valid",
+  "exercise": "field X as log of integer by integer; from S on E -> append X 3 by 1",
+  "specCite": "docs/language/precept-language-spec.md:1713",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.8-action-validation"
+ },
+ {
+  "id": "spec-typecheck/act/insert-at-list",
+  "desc": "insert F Expr at N on list of T is valid",
+  "exercise": "field X as list of integer; from S on E -> insert X 3 at 0",
+  "specCite": "docs/language/precept-language-spec.md:1714",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.8-action-validation"
+ },
+ {
+  "id": "spec-typecheck/act/put-lookup",
+  "desc": "put F K = V on lookup of K to V is valid",
+  "exercise": "field X as lookup of string to integer; from S on E -> put X \"k\" = 3",
+  "specCite": "docs/language/precept-language-spec.md:1715",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.8-action-validation"
+ },
+ {
+  "id": "spec-typecheck/acc/field-not-declared",
+  "desc": "access mode names an undeclared field -> UndeclaredField",
+  "exercise": "state Open initial modify Ghost editable",
+  "specCite": "docs/language/precept-language-spec.md:1723",
+  "expected": "reject:UndeclaredField",
+  "source": "added",
+  "block": "3.8-access-mode"
+ },
+ {
+  "id": "spec-typecheck/acc/state-not-declared",
+  "desc": "access mode scoped to an undeclared state -> UndeclaredState",
+  "exercise": "field X as integer; in Ghost modify X editable",
+  "specCite": "docs/language/precept-language-spec.md:1724",
+  "expected": "reject:UndeclaredState",
+  "source": "added",
+  "block": "3.8-access-mode"
+ },
+ {
+  "id": "spec-typecheck/acc/computed-in-editable-mode",
+  "desc": "computed field in modify...editable -> ComputedFieldNotWritable",
+  "exercise": "field Y as integer; field X as integer <- Y + 1; state Open initial modify X editable",
+  "specCite": "docs/language/precept-language-spec.md:1725",
+  "expected": "reject:ComputedFieldNotWritable",
+  "source": "added",
+  "block": "3.8-access-mode"
+ },
+ {
+  "id": "spec-typecheck/acc/editable-on-computed",
+  "desc": "computed field carries editable modifier -> ComputedFieldNotWritable",
+  "exercise": "field Y as integer; field X as integer <- Y + 1 editable",
+  "specCite": "docs/language/precept-language-spec.md:1726",
+  "expected": "reject:ComputedFieldNotWritable",
+  "source": "added",
+  "block": "3.8-access-mode"
+ },
+ {
+  "id": "spec-typecheck/acc/editable-on-event-arg",
+  "desc": "event arg carries editable modifier -> EditableOnEventArg",
+  "exercise": "event E(x as integer editable)",
+  "specCite": "docs/language/precept-language-spec.md:1727",
+  "expected": "reject:EditableOnEventArg",
+  "source": "added",
+  "block": "3.8-access-mode"
+ },
+ {
+  "id": "spec-typecheck/acc/conflicting-modes",
+  "desc": "field has both modify and omit in same state -> ConflictingAccessModes",
+  "exercise": "field X as integer; state Open initial modify X editable omit X",
+  "specCite": "docs/language/precept-language-spec.md:1728",
+  "expected": "reject:ConflictingAccessModes",
+  "source": "added",
+  "block": "3.8-access-mode"
+ },
+ {
+  "id": "spec-typecheck/acc/redundant-unguarded",
+  "desc": "modify F editable where baseline already editable -> RedundantAccessMode",
+  "exercise": "field X as integer editable; state Open initial; in Open modify X editable",
+  "specCite": "docs/language/precept-language-spec.md:1729",
+  "expected": "reject:RedundantAccessMode",
+  "source": "added",
+  "block": "3.8-access-mode"
+ },
+ {
+  "id": "spec-typecheck/acc/redundant-guarded",
+  "desc": "guarded modify F readonly where F already read-only -> RedundantAccessMode",
+  "exercise": "field X as integer; state Open initial; in Open when X > 0 modify X readonly",
+  "specCite": "docs/language/precept-language-spec.md:1730",
+  "expected": "reject:RedundantAccessMode",
+  "source": "added",
+  "block": "3.8-access-mode"
+ },
+ {
+  "id": "spec-typecheck/comp/self-reference",
+  "desc": "computed expression references its own field -> CircularComputedField",
+  "exercise": "field X as integer <- X + 1",
+  "specCite": "docs/language/precept-language-spec.md:1736",
+  "expected": "reject:CircularComputedField",
+  "source": "added",
+  "block": "3.8-computed-field"
+ },
+ {
+  "id": "spec-typecheck/comp/transitive-cycle",
+  "desc": "computed fields form a dependency cycle -> CircularComputedField",
+  "exercise": "field A as integer <- B + 1; field B as integer <- A + 1",
+  "specCite": "docs/language/precept-language-spec.md:1737",
+  "expected": "reject:CircularComputedField",
+  "source": "added",
+  "block": "3.8-computed-field"
+ },
+ {
+  "id": "spec-typecheck/comp/expr-type-mismatch",
+  "desc": "computed expression type doesn't match field type -> TypeMismatch",
+  "exercise": "field Y as string; field X as integer <- Y",
+  "specCite": "docs/language/precept-language-spec.md:1738",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.8-computed-field"
+ },
+ {
+  "id": "spec-typecheck/comp/with-default",
+  "desc": "field has both <- and default -> ComputedFieldWithDefault",
+  "exercise": "field Y as integer; field X as integer <- Y + 1 default 0",
+  "specCite": "docs/language/precept-language-spec.md:1739",
+  "expected": "reject:ComputedFieldWithDefault",
+  "source": "added",
+  "block": "3.8-computed-field"
+ },
+ {
+  "id": "spec-typecheck/comp/write-target",
+  "desc": "set action targets a computed field -> ComputedFieldNotWritable",
+  "exercise": "field Y as integer; field X as integer <- Y + 1; from S on E -> set X = 3",
+  "specCite": "docs/language/precept-language-spec.md:1740",
+  "expected": "reject:ComputedFieldNotWritable",
+  "source": "added",
+  "block": "3.8-computed-field"
+ },
+ {
+  "id": "spec-typecheck/choice/missing-element-type",
+  "desc": "choice(...) with no of T -> ChoiceMissingElementType",
+  "exercise": "field X as choice(\"a\",\"b\")",
+  "specCite": "docs/language/precept-language-spec.md:1746",
+  "expected": "reject:ChoiceMissingElementType",
+  "source": "added",
+  "block": "3.8-choice-validation"
+ },
+ {
+  "id": "spec-typecheck/choice/empty",
+  "desc": "choice of string() with no values -> EmptyChoice",
+  "exercise": "field X as choice of string()",
+  "specCite": "docs/language/precept-language-spec.md:1747",
+  "expected": "reject:EmptyChoice",
+  "source": "added",
+  "block": "3.8-choice-validation"
+ },
+ {
+  "id": "spec-typecheck/choice/duplicate-value",
+  "desc": "choice with a duplicate value -> DuplicateChoiceValue",
+  "exercise": "field X as choice of string(\"a\",\"a\")",
+  "specCite": "docs/language/precept-language-spec.md:1748",
+  "expected": "reject:DuplicateChoiceValue",
+  "source": "added",
+  "block": "3.8-choice-validation"
+ },
+ {
+  "id": "spec-typecheck/choice/wrong-literal-kind",
+  "desc": "choice of integer with a non-number literal -> ChoiceElementTypeMismatch",
+  "exercise": "field X as choice of integer(\"not-a-number\")",
+  "specCite": "docs/language/precept-language-spec.md:1749",
+  "expected": "reject:ChoiceElementTypeMismatch",
+  "source": "added",
+  "block": "3.8-choice-validation"
+ },
+ {
+  "id": "spec-typecheck/choice/non-choice-assigned",
+  "desc": "non-choice value assigned to a choice field -> NonChoiceAssignedToChoice",
+  "exercise": "field V as string; field P as choice of string(\"a\",\"b\"); from S on E -> set P = V",
+  "specCite": "docs/language/precept-language-spec.md:1750",
+  "expected": "reject:NonChoiceAssignedToChoice",
+  "source": "added",
+  "block": "3.8-choice-validation"
+ },
+ {
+  "id": "spec-typecheck/choice/literal-not-in-set",
+  "desc": "choice literal not in declared set -> ChoiceLiteralNotInSet",
+  "exercise": "field P as choice of string(\"a\",\"b\"); from S on E -> set P = \"Unknown\"",
+  "specCite": "docs/language/precept-language-spec.md:1751",
+  "expected": "reject:ChoiceLiteralNotInSet",
+  "source": "added",
+  "block": "3.8-choice-validation"
+ },
+ {
+  "id": "spec-typecheck/choice/arg-outside-field-set",
+  "desc": "choice arg values outside the field's set -> ChoiceArgOutsideFieldSet",
+  "exercise": "field P as choice of string(\"Low\",\"Med\",\"High\"); event E(p as choice of string(\"Nope\"))",
+  "specCite": "docs/language/precept-language-spec.md:1752",
+  "expected": "reject:ChoiceArgOutsideFieldSet",
+  "source": "added",
+  "block": "3.8-choice-validation"
+ },
+ {
+  "id": "spec-typecheck/choice/element-type-mismatch-arg",
+  "desc": "choice of integer arg to choice of string field -> ChoiceElementTypeMismatch",
+  "exercise": "field P as choice of string(\"a\"); event E(p as choice of integer(1))",
+  "specCite": "docs/language/precept-language-spec.md:1753",
+  "expected": "reject:ChoiceElementTypeMismatch",
+  "source": "added",
+  "block": "3.8-choice-validation"
+ },
+ {
+  "id": "spec-typecheck/choice/rank-conflict",
+  "desc": "choice arg order not preserved -> ChoiceRankConflict",
+  "exercise": "field P as choice of string(\"Low\",\"Med\",\"High\") ordered; event E(p as choice of string(\"Med\",\"Low\") ordered)",
+  "specCite": "docs/language/precept-language-spec.md:1754",
+  "expected": "reject:ChoiceRankConflict",
+  "source": "added",
+  "block": "3.8-choice-validation"
+ },
+ {
+  "id": "spec-typecheck/choice/negative-literals-ok",
+  "desc": "negative numeric choice literals supported (constant folding)",
+  "exercise": "field X as choice of integer(-1, 0, 1)",
+  "specCite": "docs/language/precept-language-spec.md:1756",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.8-choice-validation"
+ },
+ {
+  "id": "spec-typecheck/choice/nested-in-collection-ok",
+  "desc": "typed choice nested in collection element type supported",
+  "exercise": "field X as set of choice of string(\"Low\",\"High\") ordered",
+  "specCite": "docs/language/precept-language-spec.md:1756",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.8-choice-validation"
+ },
+ {
+  "id": "spec-typecheck/list/element-type-mismatch",
+  "desc": "list literal element type mismatch -> TypeMismatch",
+  "exercise": "field X as list of integer default [\"a\", \"b\"]",
+  "specCite": "docs/language/precept-language-spec.md:1762",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.8-list-literal"
+ },
+ {
+  "id": "spec-typecheck/list/outside-default",
+  "desc": "list literal outside a default clause -> ListLiteralOutsideDefault",
+  "exercise": "field X as list of integer; from S on E -> set X = [1, 2]",
+  "specCite": "docs/language/precept-language-spec.md:1763",
+  "expected": "reject:ListLiteralOutsideDefault",
+  "source": "added",
+  "block": "3.8-list-literal"
+ },
+ {
+  "id": "spec-typecheck/list/empty-as-default-ok",
+  "desc": "empty list as default is valid",
+  "exercise": "field X as list of integer default []",
+  "specCite": "docs/language/precept-language-spec.md:1764",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.8-list-literal"
+ },
+ {
+  "id": "spec-typecheck/trans/undeclared-target",
+  "desc": "transition to an undeclared state -> UndeclaredState",
+  "exercise": "state Open initial; from Open on E -> transition Ghost",
+  "specCite": "docs/language/precept-language-spec.md:1770",
+  "expected": "reject:UndeclaredState",
+  "source": "added",
+  "block": "3.8-transition-outcome"
+ },
+ {
+  "id": "spec-typecheck/trans/reject-not-string",
+  "desc": "reject Expr where Expr not string -> TypeMismatch",
+  "exercise": "state Open initial; from Open on E -> reject 42",
+  "specCite": "docs/language/precept-language-spec.md:1771",
+  "expected": "reject:TypeMismatch",
+  "source": "added",
+  "block": "3.8-transition-outcome"
+ },
+ {
+  "id": "spec-typecheck/cross/handler-with-states-error",
+  "desc": "event handler plus state declarations -> PRE0092",
+  "exercise": "state Open initial; event E(); on E -> set X = 1; field X as integer",
+  "specCite": "docs/language/precept-language-spec.md:1775",
+  "expected": "reject:PRE0092",
+  "source": "added",
+  "block": "3.8-stateless-stateful"
+ },
+ {
+  "id": "spec-typecheck/cross/construction-row-in-stateful-ok",
+  "desc": "construction row (on initial event) in a stateful precept is exempt from PRE0092",
+  "exercise": "state Open initial; event Create() initial; on Create -> set X = 1; field X as integer",
+  "specCite": "docs/language/precept-language-spec.md:1779",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.8-stateless-stateful"
+ },
+ {
+  "id": "spec-typecheck/cross/stateless-event-hooks-ok",
+  "desc": "stateless precept using only event hooks is valid",
+  "exercise": "event E(); on E -> set X = 1; field X as integer",
+  "specCite": "docs/language/precept-language-spec.md:1781",
+  "expected": "accept",
+  "source": "added",
+  "block": "3.8-stateless-stateful"
+ },
+ {
+  "gid": 9,
+  "id": "temporal/date/constraint/editable",
+  "exercise": "field DueDate as date default '2026-06-01' editable",
+  "expected": "accept",
+  "specCite": "docs/language/precept-language-spec.md:1667",
+  "recovered_text": "precept T9\n\nfield DueDate as date default '2026-06-01' editable\n",
+  "map_method": "name",
+  "ambiguous": false,
+  "num_candidates": 1,
+  "source": "draft",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "gid": 11,
+  "id": "temporal/date/constraint/positive-rejected",
+  "exercise": "field DueDate as date positive",
+  "expected": "reject:PRE0033",
+  "specCite": "docs/language/precept-language-spec.md:1669 (InvalidModifierForType=33, src/Precept/Language/DiagnosticCode.cs:81)",
+  "recovered_text": "precept T11\n\nfield DueDate as date positive\n",
+  "map_method": "name",
+  "ambiguous": false,
+  "num_candidates": 1,
+  "source": "draft",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "gid": 12,
+  "id": "temporal/date/constraint/nonzero-rejected",
+  "exercise": "field DueDate as date nonzero",
+  "expected": "reject:PRE0033",
+  "specCite": "docs/language/precept-language-spec.md:1670 (InvalidModifierForType=33, src/Precept/Language/DiagnosticCode.cs:81)",
+  "recovered_text": "precept T12\nfield DueDate as date nonzero",
+  "map_method": "name",
+  "ambiguous": true,
+  "num_candidates": 2,
+  "source": "draft",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "gid": 18,
+  "id": "temporal/date/constraint/notempty-rejected",
+  "exercise": "field DueDate as date notempty",
+  "expected": "reject:PRE0033",
+  "specCite": "docs/language/precept-language-spec.md:1671 (InvalidModifierForType=33, src/Precept/Language/DiagnosticCode.cs:81)",
+  "recovered_text": "precept Cell18\n\nfield DueDate as date notempty\n",
+  "map_method": "name",
+  "ambiguous": false,
+  "num_candidates": 1,
+  "source": "draft",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "gid": 147,
+  "id": "temporal/instant/field/nonnegative-modifier",
+  "exercise": "precept Example\nfield FiledAt as instant nonnegative",
+  "expected": "reject:PRE0033",
+  "specCite": "docs/language/precept-language-spec.md:1668 (non-magnitude temporals excluded)",
+  "recovered_text": "precept Example\nfield FiledAt as instant nonnegative\n",
+  "map_method": "content",
+  "ambiguous": false,
+  "num_candidates": 1,
+  "source": "draft",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "gid": 148,
+  "id": "temporal/instant/field/nonzero-modifier",
+  "exercise": "precept Example\nfield FiledAt as instant nonzero",
+  "expected": "reject:PRE0033",
+  "specCite": "docs/language/precept-language-spec.md:1668 (non-magnitude temporals excluded)",
+  "recovered_text": "precept Example\nfield FiledAt as instant nonzero\n",
+  "map_method": "content",
+  "ambiguous": false,
+  "num_candidates": 1,
+  "source": "draft",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "gid": 149,
+  "id": "temporal/instant/field/min-modifier",
+  "exercise": "precept Example\nfield FiledAt as instant min '2026-01-01T00:00:00Z'",
+  "expected": "reject:PRE0033",
+  "specCite": "docs/language/precept-language-spec.md:1672 (temporals excluded from min/max)",
+  "recovered_text": "precept Example\nfield FiledAt as instant min '2026-01-01T00:00:00Z'\n",
+  "map_method": "content",
+  "ambiguous": false,
+  "num_candidates": 1,
+  "source": "draft",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "gid": 150,
+  "id": "temporal/instant/field/max-modifier",
+  "exercise": "precept Example\nfield FiledAt as instant max '2026-12-31T23:59:59Z'",
+  "expected": "reject:PRE0033",
+  "specCite": "docs/language/precept-language-spec.md:1672 (temporals excluded from min/max)",
+  "recovered_text": "precept Example\nfield FiledAt as instant max '2026-12-31T23:59:59Z'\n",
+  "map_method": "content",
+  "ambiguous": false,
+  "num_candidates": 1,
+  "source": "draft",
+  "block": "3.8-modifier-applicability"
+ },
+ {
+  "gid": 186,
+  "id": "temporal/instant/op/plus-string",
+  "exercise": "precept Example\nfield FiledAt as instant\nrule FiledAt + \"tomorrow\" == FiledAt because \"n/a\"",
+  "expected": "reject:PRE0018",
+  "specCite": "docs/language/precept-language-spec.md:1627 (Binary operator type error)",
+  "recovered_text": "precept Example\nfield FiledAt as instant\nrule FiledAt + \"tomorrow\" == FiledAt because \"n/a\"",
+  "map_method": "content",
+  "ambiguous": false,
+  "num_candidates": 1,
+  "source": "draft",
+  "block": "3.8-type-compat"
+ },
+ {
+  "gid": 187,
+  "id": "temporal/instant/op/plus-boolean",
+  "exercise": "precept Example\nfield FiledAt as instant\nrule FiledAt + true == FiledAt because \"n/a\"",
+  "expected": "reject:PRE0018",
+  "specCite": "docs/language/precept-language-spec.md:1627",
+  "recovered_text": "precept Example\nfield FiledAt as instant\nrule FiledAt + true == FiledAt because \"n/a\"",
+  "map_method": "content",
+  "ambiguous": false,
+  "num_candidates": 1,
+  "source": "draft",
+  "block": "3.8-type-compat"
+ },
+ {
+  "gid": 238,
+  "id": "temporal/instant/zone/inzone-string-arg",
+  "exercise": "precept Example\nfield FiledAt as instant\nfield Zdt as zoneddatetime optional\n-> set Zdt = FiledAt.inZone(\"America/New_York\")",
+  "expected": "reject:PRE0018",
+  "specCite": "docs/language/precept-language-spec.md:1613 (Arg type mismatch)",
+  "recovered_text": null,
+  "map_method": "none",
+  "ambiguous": false,
+  "num_candidates": 0,
+  "source": "draft",
+  "block": "3.7-fn-validation"
+ },
+ {
+  "gid": 239,
+  "id": "temporal/instant/zone/inzone-integer-arg",
+  "exercise": "precept Example\nfield FiledAt as instant\nfield Zdt as zoneddatetime optional\n-> set Zdt = FiledAt.inZone(42)",
+  "expected": "reject:PRE0018",
+  "specCite": "docs/language/precept-language-spec.md:1613",
+  "recovered_text": null,
+  "map_method": "none",
+  "ambiguous": false,
+  "num_candidates": 0,
+  "source": "draft",
+  "block": "3.7-fn-validation"
+ },
+ {
+  "gid": 903,
+  "id": "quantity/fn/round-no-places-rejected",
+  "exercise": "field Weight as quantity in 'kg'\nfield C as quantity\nfrom S on E\n  -> set C = round(Weight)",
+  "expected": "reject:any",
+  "specCite": "docs/language/precept-language-spec.md:1580",
+  "recovered_text": null,
+  "map_method": "none",
+  "ambiguous": false,
+  "num_candidates": 0,
+  "source": "draft",
+  "block": "3.7-functions"
+ },
+ {
+  "gid": 1020,
+  "id": "exchangerate/constraint/nonnegative-allowed-no-warning",
+  "exercise": "field FxRate as exchangerate in 'USD/EUR' nonnegative",
+  "expected": "accept",
+  "specCite": "docs/language/precept-language-spec.md:1668",
+  "recovered_text": null,
+  "map_method": "none",
+  "ambiguous": false,
+  "num_candidates": 0,
+  "source": "draft",
+  "block": "3.8-modifier-applicability"
+ }
+]
