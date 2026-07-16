@@ -1,1689 +1,1685 @@
 [
-  {
-    "gid": 1457,
-    "id": "percentage/operator-percent-is-modulo/binary-percent-token",
-    "exercise": "field Remainder as integer <- OrderCount % 10",
-    "expected": "accept",
-    "specCite": "docs/language/precept-language-spec.md:512",
-    "recovered_text": "precept ModuloTest\n\nfield OrderCount as integer default 0 nonnegative editable\nfield Remainder as integer <- OrderCount % 10\n",
-    "map_method": "content",
-    "ambiguous": false,
-    "num_candidates": 1,
-    "source": "draft",
-    "block": "sec-1-1-operators"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/precept",
-    "desc": "reserved keyword 'precept' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field precept as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/field",
-    "desc": "reserved keyword 'field' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field field as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/as",
-    "desc": "reserved keyword 'as' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field as as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/default",
-    "desc": "reserved keyword 'default' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field default as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/optional",
-    "desc": "reserved keyword 'optional' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field optional as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/rule",
-    "desc": "reserved keyword 'rule' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field rule as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/because",
-    "desc": "reserved keyword 'because' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field because as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/state",
-    "desc": "reserved keyword 'state' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field state as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/initial",
-    "desc": "reserved keyword 'initial' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field initial as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/terminal",
-    "desc": "reserved keyword 'terminal' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field terminal as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/required",
-    "desc": "reserved keyword 'required' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field required as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/irreversible",
-    "desc": "reserved keyword 'irreversible' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field irreversible as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/event",
-    "desc": "reserved keyword 'event' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field event as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/ensure",
-    "desc": "reserved keyword 'ensure' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field ensure as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/success",
-    "desc": "reserved keyword 'success' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field success as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/warning",
-    "desc": "reserved keyword 'warning' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field warning as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/error",
-    "desc": "reserved keyword 'error' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field error as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/in",
-    "desc": "reserved keyword 'in' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field in as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/to",
-    "desc": "reserved keyword 'to' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field to as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/from",
-    "desc": "reserved keyword 'from' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field from as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/on",
-    "desc": "reserved keyword 'on' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field on as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/when",
-    "desc": "reserved keyword 'when' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field when as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/any",
-    "desc": "reserved keyword 'any' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field any as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/all",
-    "desc": "reserved keyword 'all' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field all as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/each",
-    "desc": "reserved keyword 'each' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field each as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/of",
-    "desc": "reserved keyword 'of' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field of as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/by",
-    "desc": "reserved keyword 'by' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field by as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/at",
-    "desc": "reserved keyword 'at' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field at as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/for",
-    "desc": "reserved keyword 'for' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field for as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/set",
-    "desc": "reserved keyword 'set' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field set as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/add",
-    "desc": "reserved keyword 'add' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field add as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/remove",
-    "desc": "reserved keyword 'remove' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field remove as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/enqueue",
-    "desc": "reserved keyword 'enqueue' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field enqueue as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/dequeue",
-    "desc": "reserved keyword 'dequeue' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field dequeue as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/push",
-    "desc": "reserved keyword 'push' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field push as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/pop",
-    "desc": "reserved keyword 'pop' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field pop as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/clear",
-    "desc": "reserved keyword 'clear' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field clear as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/into",
-    "desc": "reserved keyword 'into' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field into as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/append",
-    "desc": "reserved keyword 'append' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field append as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/insert",
-    "desc": "reserved keyword 'insert' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field insert as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/put",
-    "desc": "reserved keyword 'put' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field put as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/transition",
-    "desc": "reserved keyword 'transition' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field transition as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/no",
-    "desc": "reserved keyword 'no' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field no as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/reject",
-    "desc": "reserved keyword 'reject' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field reject as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/omit",
-    "desc": "reserved keyword 'omit' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field omit as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/modify",
-    "desc": "reserved keyword 'modify' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field modify as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/readonly",
-    "desc": "reserved keyword 'readonly' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field readonly as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/editable",
-    "desc": "reserved keyword 'editable' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field editable as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/string",
-    "desc": "reserved keyword 'string' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field string as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/number",
-    "desc": "reserved keyword 'number' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field number as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/boolean",
-    "desc": "reserved keyword 'boolean' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field boolean as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/integer",
-    "desc": "reserved keyword 'integer' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field integer as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/decimal",
-    "desc": "reserved keyword 'decimal' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field decimal as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/choice",
-    "desc": "reserved keyword 'choice' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field choice as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/maxplaces",
-    "desc": "reserved keyword 'maxplaces' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field maxplaces as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/ordered",
-    "desc": "reserved keyword 'ordered' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field ordered as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/queue",
-    "desc": "reserved keyword 'queue' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field queue as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/stack",
-    "desc": "reserved keyword 'stack' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field stack as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/bag",
-    "desc": "reserved keyword 'bag' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field bag as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/list",
-    "desc": "reserved keyword 'list' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field list as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/log",
-    "desc": "reserved keyword 'log' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field log as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/lookup",
-    "desc": "reserved keyword 'lookup' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field lookup as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/date",
-    "desc": "reserved keyword 'date' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field date as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/time",
-    "desc": "reserved keyword 'time' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field time as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/instant",
-    "desc": "reserved keyword 'instant' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field instant as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/duration",
-    "desc": "reserved keyword 'duration' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field duration as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/period",
-    "desc": "reserved keyword 'period' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field period as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/timezone",
-    "desc": "reserved keyword 'timezone' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field timezone as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/zoneddatetime",
-    "desc": "reserved keyword 'zoneddatetime' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field zoneddatetime as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/datetime",
-    "desc": "reserved keyword 'datetime' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field datetime as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/money",
-    "desc": "reserved keyword 'money' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field money as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/currency",
-    "desc": "reserved keyword 'currency' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field currency as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/quantity",
-    "desc": "reserved keyword 'quantity' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field quantity as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/unitofmeasure",
-    "desc": "reserved keyword 'unitofmeasure' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field unitofmeasure as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/dimension",
-    "desc": "reserved keyword 'dimension' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field dimension as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/price",
-    "desc": "reserved keyword 'price' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field price as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/exchangerate",
-    "desc": "reserved keyword 'exchangerate' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field exchangerate as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/true",
-    "desc": "reserved keyword 'true' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field true as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/false",
-    "desc": "reserved keyword 'false' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field false as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/and",
-    "desc": "reserved keyword 'and' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field and as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/or",
-    "desc": "reserved keyword 'or' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field or as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/not",
-    "desc": "reserved keyword 'not' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field not as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/contains",
-    "desc": "reserved keyword 'contains' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field contains as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/is",
-    "desc": "reserved keyword 'is' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field is as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/if",
-    "desc": "reserved keyword 'if' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field if as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/then",
-    "desc": "reserved keyword 'then' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field then as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/else",
-    "desc": "reserved keyword 'else' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field else as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/nonnegative",
-    "desc": "reserved keyword 'nonnegative' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field nonnegative as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/positive",
-    "desc": "reserved keyword 'positive' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field positive as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/nonzero",
-    "desc": "reserved keyword 'nonzero' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field nonzero as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/notempty",
-    "desc": "reserved keyword 'notempty' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field notempty as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/min",
-    "desc": "reserved keyword 'min' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field min as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/max",
-    "desc": "reserved keyword 'max' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field max as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/minlength",
-    "desc": "reserved keyword 'minlength' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field minlength as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/maxlength",
-    "desc": "reserved keyword 'maxlength' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field maxlength as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/mincount",
-    "desc": "reserved keyword 'mincount' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field mincount as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/maxcount",
-    "desc": "reserved keyword 'maxcount' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field maxcount as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/ascending",
-    "desc": "reserved keyword 'ascending' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field ascending as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/descending",
-    "desc": "reserved keyword 'descending' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field descending as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/countof",
-    "desc": "reserved keyword 'countof' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field countof as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/reserved-collision/peekby",
-    "desc": "reserved keyword 'peekby' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
-    "exercise": "field peekby as number",
-    "specCite": "docs/language/precept-language-spec.md:582",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/case-sensitive-identifier/from",
-    "desc": "'From' (capitalized) is a valid identifier because keywords are strictly lowercase",
-    "exercise": "field From as number",
-    "specCite": "docs/language/precept-language-spec.md:578",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/case-sensitive-identifier/field",
-    "desc": "'Field' (capitalized) is a valid identifier because keywords are strictly lowercase",
-    "exercise": "field Field as number",
-    "specCite": "docs/language/precept-language-spec.md:578",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/case-sensitive-identifier/rule",
-    "desc": "'Rule' (capitalized) is a valid identifier because keywords are strictly lowercase",
-    "exercise": "field Rule as number",
-    "specCite": "docs/language/precept-language-spec.md:578",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/case-sensitive-identifier/state",
-    "desc": "'State' (capitalized) is a valid identifier because keywords are strictly lowercase",
-    "exercise": "field State as number",
-    "specCite": "docs/language/precept-language-spec.md:578",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/case-sensitive-identifier/set",
-    "desc": "'Set' (capitalized) is a valid identifier because keywords are strictly lowercase",
-    "exercise": "field Set as number",
-    "specCite": "docs/language/precept-language-spec.md:578",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/case-sensitive-identifier/true",
-    "desc": "'True' (capitalized) is a valid identifier because keywords are strictly lowercase",
-    "exercise": "field True as number",
-    "specCite": "docs/language/precept-language-spec.md:578",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/case-sensitive-identifier/in",
-    "desc": "'In' (capitalized) is a valid identifier because keywords are strictly lowercase",
-    "exercise": "field In as number",
-    "specCite": "docs/language/precept-language-spec.md:578",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/case-sensitive-identifier/of",
-    "desc": "'Of' (capitalized) is a valid identifier because keywords are strictly lowercase",
-    "exercise": "field Of as number",
-    "specCite": "docs/language/precept-language-spec.md:578",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/v3-removed-not-reserved/write",
-    "desc": "'write' is no longer reserved in v3 and is an ordinary identifier",
-    "exercise": "field write as number",
-    "specCite": "docs/language/precept-language-spec.md:606",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/v3-removed-not-reserved/read",
-    "desc": "'read' is no longer reserved in v3 and is an ordinary identifier",
-    "exercise": "field read as number",
-    "specCite": "docs/language/precept-language-spec.md:606",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/v1-removed-not-reserved/nullable",
-    "desc": "'nullable' is not reserved in v2/v3 and is an ordinary identifier",
-    "exercise": "field nullable as number",
-    "specCite": "docs/language/precept-language-spec.md:610",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/v1-removed-not-reserved/null",
-    "desc": "'null' is not reserved in v2/v3 and is an ordinary identifier",
-    "exercise": "field null as number",
-    "specCite": "docs/language/precept-language-spec.md:610",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/v1-removed-not-reserved/edit",
-    "desc": "'edit' is not reserved in v2/v3 and is an ordinary identifier",
-    "exercise": "field edit as number",
-    "specCite": "docs/language/precept-language-spec.md:610",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-2-reserved"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/retired-not-reserved/writable",
-    "desc": "'writable' field-level modifier was retired; it is not a reserved word and is an ordinary identifier",
-    "exercise": "field writable as number",
-    "specCite": "docs/language/precept-language-spec.md:331",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-1-declaration"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/identifier/leading-underscore-rejected",
-    "desc": "leading underscores are not permitted in identifiers",
-    "exercise": "field _x as number",
-    "specCite": "docs/language/precept-language-spec.md:566",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-1-identifiers"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/identifier/internal-digit-and-underscore",
-    "desc": "an identifier may contain digits and underscores after the first letter (e.g. line_item_total, Phase1)",
-    "exercise": "field line_item_total as number",
-    "specCite": "docs/language/precept-language-spec.md:566",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-1-identifiers"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/identifier/leading-digit-rejected",
-    "desc": "an identifier must begin with a letter, not a digit",
-    "exercise": "field 1total as number",
-    "specCite": "docs/language/precept-language-spec.md:561",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-1-identifiers"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/numeric/valid/0",
-    "desc": "numeric literal '0' is a valid NumberLiteral form (assigned to a number field)",
-    "exercise": "field X as number default 0",
-    "specCite": "docs/language/precept-language-spec.md:621",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-3-numeric"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/numeric/valid/42",
-    "desc": "numeric literal '42' is a valid NumberLiteral form (assigned to a number field)",
-    "exercise": "field X as number default 42",
-    "specCite": "docs/language/precept-language-spec.md:621",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-3-numeric"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/numeric/valid/neg1",
-    "desc": "numeric literal '-1' is a valid NumberLiteral form (assigned to a number field)",
-    "exercise": "field X as number default -1",
-    "specCite": "docs/language/precept-language-spec.md:621",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-3-numeric"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/numeric/valid/3p14",
-    "desc": "numeric literal '3.14' is a valid NumberLiteral form (assigned to a number field)",
-    "exercise": "field X as number default 3.14",
-    "specCite": "docs/language/precept-language-spec.md:621",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-3-numeric"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/numeric/valid/neg3p14",
-    "desc": "numeric literal '-3.14' is a valid NumberLiteral form (assigned to a number field)",
-    "exercise": "field X as number default -3.14",
-    "specCite": "docs/language/precept-language-spec.md:621",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-3-numeric"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/numeric/valid/0p5",
-    "desc": "numeric literal '0.5' is a valid NumberLiteral form (assigned to a number field)",
-    "exercise": "field X as number default 0.5",
-    "specCite": "docs/language/precept-language-spec.md:621",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-3-numeric"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/numeric/valid/1p5e2",
-    "desc": "numeric literal '1.5e2' is a valid NumberLiteral form (assigned to a number field)",
-    "exercise": "field X as number default 1.5e2",
-    "specCite": "docs/language/precept-language-spec.md:621",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-3-numeric"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/numeric/valid/neg1e5",
-    "desc": "numeric literal '-1e5' is a valid NumberLiteral form (assigned to a number field)",
-    "exercise": "field X as number default -1e5",
-    "specCite": "docs/language/precept-language-spec.md:621",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-3-numeric"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/numeric/valid/1eneg5",
-    "desc": "numeric literal '1e-5' is a valid NumberLiteral form (assigned to a number field)",
-    "exercise": "field X as number default 1e-5",
-    "specCite": "docs/language/precept-language-spec.md:621",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-3-numeric"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/numeric/valid/3p0Epos10",
-    "desc": "numeric literal '3.0E+10' is a valid NumberLiteral form (assigned to a number field)",
-    "exercise": "field X as number default 3.0E+10",
-    "specCite": "docs/language/precept-language-spec.md:621",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-3-numeric"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/numeric/invalid/leading-plus",
-    "desc": "leading '+' is not permitted on numeric literals",
-    "exercise": "field X as number default +5",
-    "specCite": "docs/language/precept-language-spec.md:618",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-3-numeric"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/numeric/invalid/underscore-grouping",
-    "desc": "underscores / grouping separators are not permitted in numeric literals",
-    "exercise": "field X as number default 1_000",
-    "specCite": "docs/language/precept-language-spec.md:618",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-3-numeric"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/numeric/invalid/no-leading-digit",
-    "desc": "a numeric literal must start with a digit; '.5' has no integer part",
-    "exercise": "field X as number default .5",
-    "specCite": "docs/language/precept-language-spec.md:621",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-3-numeric"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/numeric/invalid/trailing-dot",
-    "desc": "the decimal part requires digits after '.'; '5.' is malformed",
-    "exercise": "field X as number default 5.",
-    "specCite": "docs/language/precept-language-spec.md:621",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-3-numeric"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/numeric/invalid/empty-exponent",
-    "desc": "the exponent part requires digits; '1e' is malformed",
-    "exercise": "field X as number default 1e",
-    "specCite": "docs/language/precept-language-spec.md:621",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-3-numeric"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/numeric/invalid/hex",
-    "desc": "hexadecimal notation is not a valid numeric literal form",
-    "exercise": "field X as number default 0x1F",
-    "specCite": "docs/language/precept-language-spec.md:621",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-3-numeric"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/numeric/exponent/number-ok",
-    "desc": "exponent notation is valid for the number type",
-    "exercise": "field X as number default 1e2",
-    "specCite": "docs/language/precept-language-spec.md:629",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-3-numeric"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/numeric/exponent/integer-rejected",
-    "desc": "exponent notation is a type error in an integer context",
-    "exercise": "field X as integer default 1e2",
-    "specCite": "docs/language/precept-language-spec.md:629",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-3-numeric"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/numeric/exponent/decimal-rejected",
-    "desc": "exponent notation is a type error in a decimal context",
-    "exercise": "field X as decimal default 1e2",
-    "specCite": "docs/language/precept-language-spec.md:629",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-3-numeric"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/string/plain",
-    "desc": "a double-quoted string with no interpolation is a single StringLiteral producing string type",
-    "exercise": "field Note as string default \"hello world\"",
-    "specCite": "docs/language/precept-language-spec.md:633",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-3-string"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/string/interpolation",
-    "desc": "a '{' inside a string opens interpolation; the expression references a field",
-    "exercise": "field Name as string\nfield Greeting as string <- \"Hello {Name}\"",
-    "specCite": "docs/language/precept-language-spec.md:637",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-3-string"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/string/escaped-open-brace",
-    "desc": "'{{' is the escape for a literal open brace inside a string",
-    "exercise": "field Note as string default \"a {{ b\"",
-    "specCite": "docs/language/precept-language-spec.md:644",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-3-string"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/string/escaped-close-brace",
-    "desc": "'}}' is the escape for a literal close brace inside a string",
-    "exercise": "field Note as string default \"a }} b\"",
-    "specCite": "docs/language/precept-language-spec.md:644",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-3-string"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/string/empty-interpolation-rejected",
-    "desc": "\"{}\" is lexically valid but the parser rejects empty interpolation (expected expression)",
-    "exercise": "field Note as string default \"{}\"",
-    "specCite": "docs/language/precept-language-spec.md:646",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-3-string"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/string/escape-sequences",
-    "desc": "recognized string escapes \\\" \\\\ \\n \\t are accepted",
-    "exercise": "field Note as string default \"a\\\"b\\\\c\\nd\\te\"",
-    "specCite": "docs/language/precept-language-spec.md:648",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-3-string"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/typed/plain-date",
-    "desc": "a single-quoted typed constant with no interpolation is a single TypedConstant; type from context",
-    "exercise": "field Due as date default '2026-04-23'",
-    "specCite": "docs/language/precept-language-spec.md:652",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-3-typed"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/typed/escape-single-quote",
-    "desc": "recognized typed-constant escapes include \\' and \\\\",
-    "exercise": "field S as string\nfield T as string <- 'it\\'s'",
-    "specCite": "docs/language/precept-language-spec.md:658",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-3-typed"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/typed/newline-escape-rejected",
-    "desc": "\\n is NOT a valid typed-constant escape (unlike in strings)",
-    "exercise": "field Due as date default '2026\\n01'",
-    "specCite": "docs/language/precept-language-spec.md:658",
-    "expected": "reject:UnrecognizedTypedConstantEscape",
-    "source": "added",
-    "block": "sec-1-3-typed"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/typed/tab-escape-rejected",
-    "desc": "\\t is NOT a valid typed-constant escape",
-    "exercise": "field Due as date default '2026\\t01'",
-    "specCite": "docs/language/precept-language-spec.md:658",
-    "expected": "reject:UnrecognizedTypedConstantEscape",
-    "source": "added",
-    "block": "sec-1-3-typed"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/typed/content-words-not-keywords/days",
-    "desc": "content words like 'days' inside a typed constant are not language keywords; validated by type checker",
-    "exercise": "field Grace as duration default '3 days'",
-    "specCite": "docs/language/precept-language-spec.md:660",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-3-typed"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/typed/content-words-not-keywords/currency",
-    "desc": "content words like 'USD' inside a typed constant are not keywords",
-    "exercise": "field Price as money default '10 USD'",
-    "specCite": "docs/language/precept-language-spec.md:660",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-3-typed"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/list/numbers",
-    "desc": "a list literal [1, 2, 3] tokenizes as bracket/number/comma punctuation assembled by the parser",
-    "exercise": "field Levels as choice of integer(1, 2, 3)",
-    "specCite": "docs/language/precept-language-spec.md:664",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-3-list"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/list/strings",
-    "desc": "a list literal [\"a\", \"b\"] tokenizes with string literals",
-    "exercise": "field Tags as choice of string(\"a\", \"b\")",
-    "specCite": "docs/language/precept-language-spec.md:664",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-3-list"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/comment/standalone",
-    "desc": "a '#' begins a comment to end of line; a standalone comment line is trivia",
-    "exercise": "# a comment\nfield Balance as number",
-    "specCite": "docs/language/precept-language-spec.md:676",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-4"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/comment/inline",
-    "desc": "a '#' comment may follow code on the same line",
-    "exercise": "field Balance as number  # inline comment",
-    "specCite": "docs/language/precept-language-spec.md:676",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-4"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/whitespace/indentation-cosmetic",
-    "desc": "leading indentation is cosmetic; it does not change meaning",
-    "exercise": "field A as number\n    field B as number",
-    "specCite": "docs/language/precept-language-spec.md:674",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-4"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/whitespace/multiline-declaration",
-    "desc": "a declaration may span multiple lines freely; newlines are trivia, keywords are the boundaries",
-    "exercise": "field\n  Balance\n  as number",
-    "specCite": "docs/language/precept-language-spec.md:685",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-4"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/operator/backarrow-not-lt-minus",
-    "desc": "'<-' scans as BackArrow (computed-field arrow), not '<' followed by '-'",
-    "exercise": "field A as number\nfield B as number <- A + 1",
-    "specCite": "docs/language/precept-language-spec.md:514",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-1-operators"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/operator/arrow",
-    "desc": "'->' scans as Arrow (action-chain / outcome separator)",
-    "exercise": "from Draft on Submit -> set A = 0 -> transition Approved",
-    "specCite": "docs/language/precept-language-spec.md:513",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-1-operators"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/operator/ci-equals-string",
-    "desc": "'~=' is case-insensitive equals, valid on string operands",
-    "exercise": "field A as string\nfield B as string\nrule R: A ~= B because \"ci compare\"",
-    "specCite": "docs/language/precept-language-spec.md:515",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-1-operators"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/operator/ci-equals-nonstring-rejected",
-    "desc": "'~=' is string-only; applying it to numeric operands is a type error",
-    "exercise": "field A as number\nfield B as number\nrule R: A ~= B because \"bad\"",
-    "specCite": "docs/language/precept-language-spec.md:515",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-1-operators"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/operator/ci-notequals-string",
-    "desc": "'!~' is case-insensitive not-equals, string-only",
-    "exercise": "field A as string\nfield B as string\nrule R: A !~ B because \"ci compare\"",
-    "specCite": "docs/language/precept-language-spec.md:516",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-1-operators"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/operator/tilde-string-qualifier",
-    "desc": "'~' before 'string' is the case-insensitive scalar field type qualifier",
-    "exercise": "field Email as ~string",
-    "specCite": "docs/language/precept-language-spec.md:517",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-1-operators"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/operator/tilde-nonstring-type-rejected",
-    "desc": "'~' before a non-string type is invalid (caught by parser/type checker)",
-    "exercise": "field X as ~number",
-    "specCite": "docs/language/precept-language-spec.md:519",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-1-operators"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/operator/tilde-startswith",
-    "desc": "'~startsWith' lexes as Tilde + identifier 'startsWith'; parser recognizes it as a CI function call",
-    "exercise": "field Name as string\nrule R: ~startsWith(Name, \"A\") because \"ci prefix\"",
-    "specCite": "docs/language/precept-language-spec.md:521",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-1-operators"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/operator/tilde-wrong-identifier-rejected",
-    "desc": "Tilde in prefix position before an identifier other than startsWith/endsWith emits ExpectedToken",
-    "exercise": "field Name as string\nrule R: ~contains(Name, \"A\") because \"bad\"",
-    "specCite": "docs/language/precept-language-spec.md:521",
-    "expected": "reject:ExpectedToken",
-    "source": "added",
-    "block": "sec-1-1-operators"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/operator/collection-inner-tilde",
-    "desc": "'~' before a collection inner type marks case-insensitive inner (set of ~string)",
-    "exercise": "field Labels as set of ~string",
-    "specCite": "docs/language/precept-language-spec.md:517",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-1-operators"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/dualuse/set-type-position",
-    "desc": "'set' after 'of'/'as' is reinterpreted as SetType (collection type)",
-    "exercise": "field Tags as set of string",
-    "specCite": "docs/language/precept-language-spec.md:721",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-6"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/dualuse/set-action-position",
-    "desc": "'set' after '->' is the Set action keyword",
-    "exercise": "from Draft on Go -> set Balance = 0 -> transition Done",
-    "specCite": "docs/language/precept-language-spec.md:721",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-6"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/dualuse/is-set-presence",
-    "desc": "'is set' composes from separate Is + Set tokens as a presence operator on optional fields",
-    "exercise": "field Note as string optional\nrule R: Note is set because \"must be present\"",
-    "specCite": "docs/language/precept-language-spec.md:719",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-6"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/dualuse/min-constraint",
-    "desc": "'min' followed by a number literal is the constraint keyword",
-    "exercise": "field Score as number min 0 max 100",
-    "specCite": "docs/language/precept-language-spec.md:727",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-6"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/dualuse/min-function",
-    "desc": "'min' followed by '(' is the built-in function call",
-    "exercise": "field A as number\nfield B as number\nfield C as number <- min(A, B)",
-    "specCite": "docs/language/precept-language-spec.md:727",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-6"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/dualuse/max-function",
-    "desc": "'max' followed by '(' is the built-in function call",
-    "exercise": "field A as number\nfield B as number\nfield C as number <- max(A, B)",
-    "specCite": "docs/language/precept-language-spec.md:727",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-6"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/dualuse/in-routing-preposition",
-    "desc": "'in' after a state name is a routing/scoping preposition",
-    "exercise": "field Amount as number\nin Draft ensure Amount > 0 because \"positive in draft\"",
-    "specCite": "docs/language/precept-language-spec.md:743",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-6"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/dualuse/in-unit-qualifier",
-    "desc": "'in' after a domain type is a unit type-qualifier",
-    "exercise": "field Amount as money in 'USD'",
-    "specCite": "docs/language/precept-language-spec.md:743",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-6"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/dualuse/of-collection-inner",
-    "desc": "'of' after a collection keyword is the collection inner type qualifier",
-    "exercise": "field Tags as set of string",
-    "specCite": "docs/language/precept-language-spec.md:743",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-6"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/dualuse/of-dimension-family",
-    "desc": "'of' after a domain type is a dimension-family qualifier",
-    "exercise": "field Distance as quantity of 'length'",
-    "specCite": "docs/language/precept-language-spec.md:743",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-6"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/dualuse/in-and-of-mutually-exclusive",
-    "desc": "a field may use 'in' or 'of' but not both (except price's two axes)",
-    "exercise": "field Amount as money in 'USD' of 'length'",
-    "specCite": "docs/language/precept-language-spec.md:743",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "sec-1-6"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/modes/nested-literal-in-interpolation",
-    "desc": "a string interpolation expression may contain a nested typed constant (mode stack push)",
-    "exercise": "field N as number\nfield S as string <- \"count {N}\"",
-    "specCite": "docs/language/precept-language-spec.md:771",
-    "expected": "accept",
-    "source": "added",
-    "block": "sec-1-7-modes"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/modes/nesting-depth-exceeded",
-    "desc": "mode-stack depth over 8 emits UnterminatedInterpolation and recovers",
-    "exercise": "field S as string default \"{\"{\"{\"{\"{\"{\"{\"{\"{x}\"}\"}\"}\"}\"}\"}\"}\"}\"}\"",
-    "specCite": "docs/language/precept-language-spec.md:774",
-    "expected": "reject:UnterminatedInterpolation",
-    "source": "added",
-    "block": "sec-1-7-modes"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/diag/input-too-large",
-    "desc": "source over 65536 characters aborts lexing with InputTooLarge and returns only EndOfSource",
-    "exercise": "# a source file exceeding 65,536 characters (Phase 2 supplies the oversized body)",
-    "specCite": "docs/language/precept-language-spec.md:784",
-    "expected": "reject:InputTooLarge",
-    "source": "added",
-    "block": "sec-1-8"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/diag/unterminated-string",
-    "desc": "an unterminated double-quoted string emits UnterminatedStringLiteral",
-    "exercise": "field Note as string default \"hello",
-    "specCite": "docs/language/precept-language-spec.md:785",
-    "expected": "reject:UnterminatedStringLiteral",
-    "source": "added",
-    "block": "sec-1-8"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/diag/unterminated-typed-constant",
-    "desc": "an unterminated single-quoted typed constant emits UnterminatedTypedConstant",
-    "exercise": "field Due as date default '2026-01-01",
-    "specCite": "docs/language/precept-language-spec.md:786",
-    "expected": "reject:UnterminatedTypedConstant",
-    "source": "added",
-    "block": "sec-1-8"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/diag/unterminated-interpolation",
-    "desc": "an interpolation with no closing '}' before end of line emits UnterminatedInterpolation",
-    "exercise": "field Name as string\nfield G as string <- \"hello {Name",
-    "specCite": "docs/language/precept-language-spec.md:787",
-    "expected": "reject:UnterminatedInterpolation",
-    "source": "added",
-    "block": "sec-1-8"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/diag/invalid-character",
-    "desc": "a character that is not part of any valid token emits InvalidCharacter",
-    "exercise": "field X as number @",
-    "specCite": "docs/language/precept-language-spec.md:788",
-    "expected": "reject:InvalidCharacter",
-    "source": "added",
-    "block": "sec-1-8"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/diag/unrecognized-string-escape",
-    "desc": "\\X inside a string where X is not \" \\ n or t emits UnrecognizedStringEscape",
-    "exercise": "field Note as string default \"bad\\q\"",
-    "specCite": "docs/language/precept-language-spec.md:789",
-    "expected": "reject:UnrecognizedStringEscape",
-    "source": "added",
-    "block": "sec-1-8"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/diag/unrecognized-typed-escape",
-    "desc": "\\X inside a typed constant where X is not ' or \\ emits UnrecognizedTypedConstantEscape",
-    "exercise": "field Due as date default '2026\\q01'",
-    "specCite": "docs/language/precept-language-spec.md:790",
-    "expected": "reject:UnrecognizedTypedConstantEscape",
-    "source": "added",
-    "block": "sec-1-8"
-  },
-  {
-    "id": "spec-preamble-lexer/lexer/diag/unescaped-brace",
-    "desc": "a lone '}' inside a string/typed constant that was not doubled emits UnescapedBraceInLiteral",
-    "exercise": "field Note as string default \"a } b\"",
-    "specCite": "docs/language/precept-language-spec.md:791",
-    "expected": "reject:UnescapedBraceInLiteral",
-    "source": "added",
-    "block": "sec-1-8"
-  }
+ {
+  "gid": 1457,
+  "id": "percentage/operator-percent-is-modulo/binary-percent-token",
+  "exercise": "field Remainder as integer <- OrderCount % 10",
+  "expected": "accept",
+  "specCite": "docs/language/precept-language-spec.md:512",
+  "source": "draft",
+  "block": "sec-1-1-operators"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/precept",
+  "desc": "reserved keyword 'precept' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field precept as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/field",
+  "desc": "reserved keyword 'field' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field field as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/as",
+  "desc": "reserved keyword 'as' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field as as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/default",
+  "desc": "reserved keyword 'default' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field default as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/optional",
+  "desc": "reserved keyword 'optional' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field optional as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/rule",
+  "desc": "reserved keyword 'rule' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field rule as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/because",
+  "desc": "reserved keyword 'because' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field because as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/state",
+  "desc": "reserved keyword 'state' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field state as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/initial",
+  "desc": "reserved keyword 'initial' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field initial as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/terminal",
+  "desc": "reserved keyword 'terminal' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field terminal as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/required",
+  "desc": "reserved keyword 'required' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field required as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/irreversible",
+  "desc": "reserved keyword 'irreversible' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field irreversible as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/event",
+  "desc": "reserved keyword 'event' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field event as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/ensure",
+  "desc": "reserved keyword 'ensure' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field ensure as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/success",
+  "desc": "reserved keyword 'success' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field success as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/warning",
+  "desc": "reserved keyword 'warning' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field warning as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/error",
+  "desc": "reserved keyword 'error' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field error as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/in",
+  "desc": "reserved keyword 'in' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field in as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/to",
+  "desc": "reserved keyword 'to' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field to as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/from",
+  "desc": "reserved keyword 'from' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field from as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/on",
+  "desc": "reserved keyword 'on' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field on as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/when",
+  "desc": "reserved keyword 'when' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field when as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/any",
+  "desc": "reserved keyword 'any' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field any as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/all",
+  "desc": "reserved keyword 'all' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field all as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/each",
+  "desc": "reserved keyword 'each' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field each as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/of",
+  "desc": "reserved keyword 'of' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field of as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/by",
+  "desc": "reserved keyword 'by' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field by as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/at",
+  "desc": "reserved keyword 'at' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field at as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/for",
+  "desc": "reserved keyword 'for' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field for as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/set",
+  "desc": "reserved keyword 'set' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field set as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/add",
+  "desc": "reserved keyword 'add' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field add as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/remove",
+  "desc": "reserved keyword 'remove' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field remove as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/enqueue",
+  "desc": "reserved keyword 'enqueue' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field enqueue as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/dequeue",
+  "desc": "reserved keyword 'dequeue' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field dequeue as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/push",
+  "desc": "reserved keyword 'push' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field push as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/pop",
+  "desc": "reserved keyword 'pop' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field pop as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/clear",
+  "desc": "reserved keyword 'clear' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field clear as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/into",
+  "desc": "reserved keyword 'into' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field into as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/append",
+  "desc": "reserved keyword 'append' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field append as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/insert",
+  "desc": "reserved keyword 'insert' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field insert as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/put",
+  "desc": "reserved keyword 'put' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field put as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/transition",
+  "desc": "reserved keyword 'transition' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field transition as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/no",
+  "desc": "reserved keyword 'no' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field no as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/reject",
+  "desc": "reserved keyword 'reject' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field reject as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/omit",
+  "desc": "reserved keyword 'omit' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field omit as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/modify",
+  "desc": "reserved keyword 'modify' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field modify as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/readonly",
+  "desc": "reserved keyword 'readonly' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field readonly as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/editable",
+  "desc": "reserved keyword 'editable' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field editable as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/string",
+  "desc": "reserved keyword 'string' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field string as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/number",
+  "desc": "reserved keyword 'number' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field number as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/boolean",
+  "desc": "reserved keyword 'boolean' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field boolean as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/integer",
+  "desc": "reserved keyword 'integer' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field integer as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/decimal",
+  "desc": "reserved keyword 'decimal' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field decimal as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/choice",
+  "desc": "reserved keyword 'choice' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field choice as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/maxplaces",
+  "desc": "reserved keyword 'maxplaces' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field maxplaces as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/ordered",
+  "desc": "reserved keyword 'ordered' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field ordered as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/queue",
+  "desc": "reserved keyword 'queue' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field queue as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/stack",
+  "desc": "reserved keyword 'stack' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field stack as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/bag",
+  "desc": "reserved keyword 'bag' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field bag as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/list",
+  "desc": "reserved keyword 'list' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field list as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/log",
+  "desc": "reserved keyword 'log' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field log as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/lookup",
+  "desc": "reserved keyword 'lookup' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field lookup as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/date",
+  "desc": "reserved keyword 'date' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field date as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/time",
+  "desc": "reserved keyword 'time' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field time as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/instant",
+  "desc": "reserved keyword 'instant' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field instant as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/duration",
+  "desc": "reserved keyword 'duration' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field duration as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/period",
+  "desc": "reserved keyword 'period' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field period as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/timezone",
+  "desc": "reserved keyword 'timezone' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field timezone as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/zoneddatetime",
+  "desc": "reserved keyword 'zoneddatetime' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field zoneddatetime as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/datetime",
+  "desc": "reserved keyword 'datetime' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field datetime as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/money",
+  "desc": "reserved keyword 'money' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field money as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/currency",
+  "desc": "reserved keyword 'currency' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field currency as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/quantity",
+  "desc": "reserved keyword 'quantity' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field quantity as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/unitofmeasure",
+  "desc": "reserved keyword 'unitofmeasure' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field unitofmeasure as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/dimension",
+  "desc": "reserved keyword 'dimension' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field dimension as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/price",
+  "desc": "reserved keyword 'price' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field price as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/exchangerate",
+  "desc": "reserved keyword 'exchangerate' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field exchangerate as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/true",
+  "desc": "reserved keyword 'true' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field true as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/false",
+  "desc": "reserved keyword 'false' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field false as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/and",
+  "desc": "reserved keyword 'and' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field and as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/or",
+  "desc": "reserved keyword 'or' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field or as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/not",
+  "desc": "reserved keyword 'not' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field not as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/contains",
+  "desc": "reserved keyword 'contains' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field contains as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/is",
+  "desc": "reserved keyword 'is' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field is as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/if",
+  "desc": "reserved keyword 'if' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field if as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/then",
+  "desc": "reserved keyword 'then' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field then as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/else",
+  "desc": "reserved keyword 'else' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field else as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/nonnegative",
+  "desc": "reserved keyword 'nonnegative' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field nonnegative as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/positive",
+  "desc": "reserved keyword 'positive' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field positive as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/nonzero",
+  "desc": "reserved keyword 'nonzero' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field nonzero as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/notempty",
+  "desc": "reserved keyword 'notempty' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field notempty as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/min",
+  "desc": "reserved keyword 'min' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field min as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/max",
+  "desc": "reserved keyword 'max' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field max as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/minlength",
+  "desc": "reserved keyword 'minlength' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field minlength as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/maxlength",
+  "desc": "reserved keyword 'maxlength' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field maxlength as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/mincount",
+  "desc": "reserved keyword 'mincount' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field mincount as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/maxcount",
+  "desc": "reserved keyword 'maxcount' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field maxcount as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/ascending",
+  "desc": "reserved keyword 'ascending' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field ascending as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/descending",
+  "desc": "reserved keyword 'descending' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field descending as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/countof",
+  "desc": "reserved keyword 'countof' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field countof as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/reserved-collision/peekby",
+  "desc": "reserved keyword 'peekby' cannot be used as a field identifier (it lexes as a keyword, not Identifier)",
+  "exercise": "field peekby as number",
+  "specCite": "docs/language/precept-language-spec.md:582",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/case-sensitive-identifier/from",
+  "desc": "'From' (capitalized) is a valid identifier because keywords are strictly lowercase",
+  "exercise": "field From as number",
+  "specCite": "docs/language/precept-language-spec.md:578",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/case-sensitive-identifier/field",
+  "desc": "'Field' (capitalized) is a valid identifier because keywords are strictly lowercase",
+  "exercise": "field Field as number",
+  "specCite": "docs/language/precept-language-spec.md:578",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/case-sensitive-identifier/rule",
+  "desc": "'Rule' (capitalized) is a valid identifier because keywords are strictly lowercase",
+  "exercise": "field Rule as number",
+  "specCite": "docs/language/precept-language-spec.md:578",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/case-sensitive-identifier/state",
+  "desc": "'State' (capitalized) is a valid identifier because keywords are strictly lowercase",
+  "exercise": "field State as number",
+  "specCite": "docs/language/precept-language-spec.md:578",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/case-sensitive-identifier/set",
+  "desc": "'Set' (capitalized) is a valid identifier because keywords are strictly lowercase",
+  "exercise": "field Set as number",
+  "specCite": "docs/language/precept-language-spec.md:578",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/case-sensitive-identifier/true",
+  "desc": "'True' (capitalized) is a valid identifier because keywords are strictly lowercase",
+  "exercise": "field True as number",
+  "specCite": "docs/language/precept-language-spec.md:578",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/case-sensitive-identifier/in",
+  "desc": "'In' (capitalized) is a valid identifier because keywords are strictly lowercase",
+  "exercise": "field In as number",
+  "specCite": "docs/language/precept-language-spec.md:578",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/case-sensitive-identifier/of",
+  "desc": "'Of' (capitalized) is a valid identifier because keywords are strictly lowercase",
+  "exercise": "field Of as number",
+  "specCite": "docs/language/precept-language-spec.md:578",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/v3-removed-not-reserved/write",
+  "desc": "'write' is no longer reserved in v3 and is an ordinary identifier",
+  "exercise": "field write as number",
+  "specCite": "docs/language/precept-language-spec.md:606",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/v3-removed-not-reserved/read",
+  "desc": "'read' is no longer reserved in v3 and is an ordinary identifier",
+  "exercise": "field read as number",
+  "specCite": "docs/language/precept-language-spec.md:606",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/v1-removed-not-reserved/nullable",
+  "desc": "'nullable' is not reserved in v2/v3 and is an ordinary identifier",
+  "exercise": "field nullable as number",
+  "specCite": "docs/language/precept-language-spec.md:610",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/v1-removed-not-reserved/null",
+  "desc": "'null' is not reserved in v2/v3 and is an ordinary identifier",
+  "exercise": "field null as number",
+  "specCite": "docs/language/precept-language-spec.md:610",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/v1-removed-not-reserved/edit",
+  "desc": "'edit' is not reserved in v2/v3 and is an ordinary identifier",
+  "exercise": "field edit as number",
+  "specCite": "docs/language/precept-language-spec.md:610",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-2-reserved"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/retired-not-reserved/writable",
+  "desc": "'writable' field-level modifier was retired; it is not a reserved word and is an ordinary identifier",
+  "exercise": "field writable as number",
+  "specCite": "docs/language/precept-language-spec.md:331",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-1-declaration"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/identifier/leading-underscore-rejected",
+  "desc": "leading underscores are not permitted in identifiers",
+  "exercise": "field _x as number",
+  "specCite": "docs/language/precept-language-spec.md:566",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-1-identifiers"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/identifier/internal-digit-and-underscore",
+  "desc": "an identifier may contain digits and underscores after the first letter (e.g. line_item_total, Phase1)",
+  "exercise": "field line_item_total as number",
+  "specCite": "docs/language/precept-language-spec.md:566",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-1-identifiers"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/identifier/leading-digit-rejected",
+  "desc": "an identifier must begin with a letter, not a digit",
+  "exercise": "field 1total as number",
+  "specCite": "docs/language/precept-language-spec.md:561",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-1-identifiers"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/numeric/valid/0",
+  "desc": "numeric literal '0' is a valid NumberLiteral form (assigned to a number field)",
+  "exercise": "field X as number default 0",
+  "specCite": "docs/language/precept-language-spec.md:621",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-3-numeric"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/numeric/valid/42",
+  "desc": "numeric literal '42' is a valid NumberLiteral form (assigned to a number field)",
+  "exercise": "field X as number default 42",
+  "specCite": "docs/language/precept-language-spec.md:621",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-3-numeric"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/numeric/valid/neg1",
+  "desc": "numeric literal '-1' is a valid NumberLiteral form (assigned to a number field)",
+  "exercise": "field X as number default -1",
+  "specCite": "docs/language/precept-language-spec.md:621",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-3-numeric"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/numeric/valid/3p14",
+  "desc": "numeric literal '3.14' is a valid NumberLiteral form (assigned to a number field)",
+  "exercise": "field X as number default 3.14",
+  "specCite": "docs/language/precept-language-spec.md:621",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-3-numeric"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/numeric/valid/neg3p14",
+  "desc": "numeric literal '-3.14' is a valid NumberLiteral form (assigned to a number field)",
+  "exercise": "field X as number default -3.14",
+  "specCite": "docs/language/precept-language-spec.md:621",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-3-numeric"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/numeric/valid/0p5",
+  "desc": "numeric literal '0.5' is a valid NumberLiteral form (assigned to a number field)",
+  "exercise": "field X as number default 0.5",
+  "specCite": "docs/language/precept-language-spec.md:621",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-3-numeric"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/numeric/valid/1p5e2",
+  "desc": "numeric literal '1.5e2' is a valid NumberLiteral form (assigned to a number field)",
+  "exercise": "field X as number default 1.5e2",
+  "specCite": "docs/language/precept-language-spec.md:621",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-3-numeric"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/numeric/valid/neg1e5",
+  "desc": "numeric literal '-1e5' is a valid NumberLiteral form (assigned to a number field)",
+  "exercise": "field X as number default -1e5",
+  "specCite": "docs/language/precept-language-spec.md:621",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-3-numeric"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/numeric/valid/1eneg5",
+  "desc": "numeric literal '1e-5' is a valid NumberLiteral form (assigned to a number field)",
+  "exercise": "field X as number default 1e-5",
+  "specCite": "docs/language/precept-language-spec.md:621",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-3-numeric"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/numeric/valid/3p0Epos10",
+  "desc": "numeric literal '3.0E+10' is a valid NumberLiteral form (assigned to a number field)",
+  "exercise": "field X as number default 3.0E+10",
+  "specCite": "docs/language/precept-language-spec.md:621",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-3-numeric"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/numeric/invalid/leading-plus",
+  "desc": "leading '+' is not permitted on numeric literals",
+  "exercise": "field X as number default +5",
+  "specCite": "docs/language/precept-language-spec.md:618",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-3-numeric"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/numeric/invalid/underscore-grouping",
+  "desc": "underscores / grouping separators are not permitted in numeric literals",
+  "exercise": "field X as number default 1_000",
+  "specCite": "docs/language/precept-language-spec.md:618",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-3-numeric"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/numeric/invalid/no-leading-digit",
+  "desc": "a numeric literal must start with a digit; '.5' has no integer part",
+  "exercise": "field X as number default .5",
+  "specCite": "docs/language/precept-language-spec.md:621",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-3-numeric"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/numeric/invalid/trailing-dot",
+  "desc": "the decimal part requires digits after '.'; '5.' is malformed",
+  "exercise": "field X as number default 5.",
+  "specCite": "docs/language/precept-language-spec.md:621",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-3-numeric"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/numeric/invalid/empty-exponent",
+  "desc": "the exponent part requires digits; '1e' is malformed",
+  "exercise": "field X as number default 1e",
+  "specCite": "docs/language/precept-language-spec.md:621",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-3-numeric"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/numeric/invalid/hex",
+  "desc": "hexadecimal notation is not a valid numeric literal form",
+  "exercise": "field X as number default 0x1F",
+  "specCite": "docs/language/precept-language-spec.md:621",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-3-numeric"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/numeric/exponent/number-ok",
+  "desc": "exponent notation is valid for the number type",
+  "exercise": "field X as number default 1e2",
+  "specCite": "docs/language/precept-language-spec.md:629",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-3-numeric"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/numeric/exponent/integer-rejected",
+  "desc": "exponent notation is a type error in an integer context",
+  "exercise": "field X as integer default 1e2",
+  "specCite": "docs/language/precept-language-spec.md:629",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-3-numeric"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/numeric/exponent/decimal-rejected",
+  "desc": "exponent notation is a type error in a decimal context",
+  "exercise": "field X as decimal default 1e2",
+  "specCite": "docs/language/precept-language-spec.md:629",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-3-numeric"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/string/plain",
+  "desc": "a double-quoted string with no interpolation is a single StringLiteral producing string type",
+  "exercise": "field Note as string default \"hello world\"",
+  "specCite": "docs/language/precept-language-spec.md:633",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-3-string"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/string/interpolation",
+  "desc": "a '{' inside a string opens interpolation; the expression references a field",
+  "exercise": "field Name as string\nfield Greeting as string <- \"Hello {Name}\"",
+  "specCite": "docs/language/precept-language-spec.md:637",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-3-string"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/string/escaped-open-brace",
+  "desc": "'{{' is the escape for a literal open brace inside a string",
+  "exercise": "field Note as string default \"a {{ b\"",
+  "specCite": "docs/language/precept-language-spec.md:644",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-3-string"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/string/escaped-close-brace",
+  "desc": "'}}' is the escape for a literal close brace inside a string",
+  "exercise": "field Note as string default \"a }} b\"",
+  "specCite": "docs/language/precept-language-spec.md:644",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-3-string"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/string/empty-interpolation-rejected",
+  "desc": "\"{}\" is lexically valid but the parser rejects empty interpolation (expected expression)",
+  "exercise": "field Note as string default \"{}\"",
+  "specCite": "docs/language/precept-language-spec.md:646",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-3-string"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/string/escape-sequences",
+  "desc": "recognized string escapes \\\" \\\\ \\n \\t are accepted",
+  "exercise": "field Note as string default \"a\\\"b\\\\c\\nd\\te\"",
+  "specCite": "docs/language/precept-language-spec.md:648",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-3-string"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/typed/plain-date",
+  "desc": "a single-quoted typed constant with no interpolation is a single TypedConstant; type from context",
+  "exercise": "field Due as date default '2026-04-23'",
+  "specCite": "docs/language/precept-language-spec.md:652",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-3-typed"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/typed/escape-single-quote",
+  "desc": "recognized typed-constant escapes include \\' and \\\\",
+  "exercise": "field S as string\nfield T as string <- 'it\\'s'",
+  "specCite": "docs/language/precept-language-spec.md:658",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-3-typed"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/typed/newline-escape-rejected",
+  "desc": "\\n is NOT a valid typed-constant escape (unlike in strings)",
+  "exercise": "field Due as date default '2026\\n01'",
+  "specCite": "docs/language/precept-language-spec.md:658",
+  "expected": "reject:UnrecognizedTypedConstantEscape",
+  "source": "added",
+  "block": "sec-1-3-typed"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/typed/tab-escape-rejected",
+  "desc": "\\t is NOT a valid typed-constant escape",
+  "exercise": "field Due as date default '2026\\t01'",
+  "specCite": "docs/language/precept-language-spec.md:658",
+  "expected": "reject:UnrecognizedTypedConstantEscape",
+  "source": "added",
+  "block": "sec-1-3-typed"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/typed/content-words-not-keywords/days",
+  "desc": "content words like 'days' inside a typed constant are not language keywords; validated by type checker",
+  "exercise": "field Grace as duration default '3 days'",
+  "specCite": "docs/language/precept-language-spec.md:660",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-3-typed"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/typed/content-words-not-keywords/currency",
+  "desc": "content words like 'USD' inside a typed constant are not keywords",
+  "exercise": "field Price as money default '10 USD'",
+  "specCite": "docs/language/precept-language-spec.md:660",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-3-typed"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/list/numbers",
+  "desc": "a list literal [1, 2, 3] tokenizes as bracket/number/comma punctuation assembled by the parser",
+  "exercise": "field Levels as choice of integer(1, 2, 3)",
+  "specCite": "docs/language/precept-language-spec.md:664",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-3-list"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/list/strings",
+  "desc": "a list literal [\"a\", \"b\"] tokenizes with string literals",
+  "exercise": "field Tags as choice of string(\"a\", \"b\")",
+  "specCite": "docs/language/precept-language-spec.md:664",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-3-list"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/comment/standalone",
+  "desc": "a '#' begins a comment to end of line; a standalone comment line is trivia",
+  "exercise": "# a comment\nfield Balance as number",
+  "specCite": "docs/language/precept-language-spec.md:676",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-4"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/comment/inline",
+  "desc": "a '#' comment may follow code on the same line",
+  "exercise": "field Balance as number  # inline comment",
+  "specCite": "docs/language/precept-language-spec.md:676",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-4"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/whitespace/indentation-cosmetic",
+  "desc": "leading indentation is cosmetic; it does not change meaning",
+  "exercise": "field A as number\n    field B as number",
+  "specCite": "docs/language/precept-language-spec.md:674",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-4"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/whitespace/multiline-declaration",
+  "desc": "a declaration may span multiple lines freely; newlines are trivia, keywords are the boundaries",
+  "exercise": "field\n  Balance\n  as number",
+  "specCite": "docs/language/precept-language-spec.md:685",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-4"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/operator/backarrow-not-lt-minus",
+  "desc": "'<-' scans as BackArrow (computed-field arrow), not '<' followed by '-'",
+  "exercise": "field A as number\nfield B as number <- A + 1",
+  "specCite": "docs/language/precept-language-spec.md:514",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-1-operators"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/operator/arrow",
+  "desc": "'->' scans as Arrow (action-chain / outcome separator)",
+  "exercise": "from Draft on Submit -> set A = 0 -> transition Approved",
+  "specCite": "docs/language/precept-language-spec.md:513",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-1-operators"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/operator/ci-equals-string",
+  "desc": "'~=' is case-insensitive equals, valid on string operands",
+  "exercise": "field A as string\nfield B as string\nrule R: A ~= B because \"ci compare\"",
+  "specCite": "docs/language/precept-language-spec.md:515",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-1-operators"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/operator/ci-equals-nonstring-rejected",
+  "desc": "'~=' is string-only; applying it to numeric operands is a type error",
+  "exercise": "field A as number\nfield B as number\nrule R: A ~= B because \"bad\"",
+  "specCite": "docs/language/precept-language-spec.md:515",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-1-operators"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/operator/ci-notequals-string",
+  "desc": "'!~' is case-insensitive not-equals, string-only",
+  "exercise": "field A as string\nfield B as string\nrule R: A !~ B because \"ci compare\"",
+  "specCite": "docs/language/precept-language-spec.md:516",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-1-operators"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/operator/tilde-string-qualifier",
+  "desc": "'~' before 'string' is the case-insensitive scalar field type qualifier",
+  "exercise": "field Email as ~string",
+  "specCite": "docs/language/precept-language-spec.md:517",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-1-operators"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/operator/tilde-nonstring-type-rejected",
+  "desc": "'~' before a non-string type is invalid (caught by parser/type checker)",
+  "exercise": "field X as ~number",
+  "specCite": "docs/language/precept-language-spec.md:519",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-1-operators"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/operator/tilde-startswith",
+  "desc": "'~startsWith' lexes as Tilde + identifier 'startsWith'; parser recognizes it as a CI function call",
+  "exercise": "field Name as string\nrule R: ~startsWith(Name, \"A\") because \"ci prefix\"",
+  "specCite": "docs/language/precept-language-spec.md:521",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-1-operators"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/operator/tilde-wrong-identifier-rejected",
+  "desc": "Tilde in prefix position before an identifier other than startsWith/endsWith emits ExpectedToken",
+  "exercise": "field Name as string\nrule R: ~contains(Name, \"A\") because \"bad\"",
+  "specCite": "docs/language/precept-language-spec.md:521",
+  "expected": "reject:ExpectedToken",
+  "source": "added",
+  "block": "sec-1-1-operators"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/operator/collection-inner-tilde",
+  "desc": "'~' before a collection inner type marks case-insensitive inner (set of ~string)",
+  "exercise": "field Labels as set of ~string",
+  "specCite": "docs/language/precept-language-spec.md:517",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-1-operators"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/dualuse/set-type-position",
+  "desc": "'set' after 'of'/'as' is reinterpreted as SetType (collection type)",
+  "exercise": "field Tags as set of string",
+  "specCite": "docs/language/precept-language-spec.md:721",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-6"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/dualuse/set-action-position",
+  "desc": "'set' after '->' is the Set action keyword",
+  "exercise": "from Draft on Go -> set Balance = 0 -> transition Done",
+  "specCite": "docs/language/precept-language-spec.md:721",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-6"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/dualuse/is-set-presence",
+  "desc": "'is set' composes from separate Is + Set tokens as a presence operator on optional fields",
+  "exercise": "field Note as string optional\nrule R: Note is set because \"must be present\"",
+  "specCite": "docs/language/precept-language-spec.md:719",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-6"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/dualuse/min-constraint",
+  "desc": "'min' followed by a number literal is the constraint keyword",
+  "exercise": "field Score as number min 0 max 100",
+  "specCite": "docs/language/precept-language-spec.md:727",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-6"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/dualuse/min-function",
+  "desc": "'min' followed by '(' is the built-in function call",
+  "exercise": "field A as number\nfield B as number\nfield C as number <- min(A, B)",
+  "specCite": "docs/language/precept-language-spec.md:727",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-6"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/dualuse/max-function",
+  "desc": "'max' followed by '(' is the built-in function call",
+  "exercise": "field A as number\nfield B as number\nfield C as number <- max(A, B)",
+  "specCite": "docs/language/precept-language-spec.md:727",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-6"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/dualuse/in-routing-preposition",
+  "desc": "'in' after a state name is a routing/scoping preposition",
+  "exercise": "field Amount as number\nin Draft ensure Amount > 0 because \"positive in draft\"",
+  "specCite": "docs/language/precept-language-spec.md:743",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-6"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/dualuse/in-unit-qualifier",
+  "desc": "'in' after a domain type is a unit type-qualifier",
+  "exercise": "field Amount as money in 'USD'",
+  "specCite": "docs/language/precept-language-spec.md:743",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-6"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/dualuse/of-collection-inner",
+  "desc": "'of' after a collection keyword is the collection inner type qualifier",
+  "exercise": "field Tags as set of string",
+  "specCite": "docs/language/precept-language-spec.md:743",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-6"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/dualuse/of-dimension-family",
+  "desc": "'of' after a domain type is a dimension-family qualifier",
+  "exercise": "field Distance as quantity of 'length'",
+  "specCite": "docs/language/precept-language-spec.md:743",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-6"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/dualuse/in-and-of-mutually-exclusive",
+  "desc": "a field may use 'in' or 'of' but not both (except price's two axes)",
+  "exercise": "field Amount as money in 'USD' of 'length'",
+  "specCite": "docs/language/precept-language-spec.md:743",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "sec-1-6"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/modes/nested-literal-in-interpolation",
+  "desc": "a string interpolation expression may contain a nested typed constant (mode stack push)",
+  "exercise": "field N as number\nfield S as string <- \"count {N}\"",
+  "specCite": "docs/language/precept-language-spec.md:771",
+  "expected": "accept",
+  "source": "added",
+  "block": "sec-1-7-modes"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/modes/nesting-depth-exceeded",
+  "desc": "mode-stack depth over 8 emits UnterminatedInterpolation and recovers",
+  "exercise": "field S as string default \"{\"{\"{\"{\"{\"{\"{\"{\"{x}\"}\"}\"}\"}\"}\"}\"}\"}\"}\"",
+  "specCite": "docs/language/precept-language-spec.md:774",
+  "expected": "reject:UnterminatedInterpolation",
+  "source": "added",
+  "block": "sec-1-7-modes"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/diag/input-too-large",
+  "desc": "source over 65536 characters aborts lexing with InputTooLarge and returns only EndOfSource",
+  "exercise": "# a source file exceeding 65,536 characters (Phase 2 supplies the oversized body)",
+  "specCite": "docs/language/precept-language-spec.md:784",
+  "expected": "reject:InputTooLarge",
+  "source": "added",
+  "block": "sec-1-8"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/diag/unterminated-string",
+  "desc": "an unterminated double-quoted string emits UnterminatedStringLiteral",
+  "exercise": "field Note as string default \"hello",
+  "specCite": "docs/language/precept-language-spec.md:785",
+  "expected": "reject:UnterminatedStringLiteral",
+  "source": "added",
+  "block": "sec-1-8"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/diag/unterminated-typed-constant",
+  "desc": "an unterminated single-quoted typed constant emits UnterminatedTypedConstant",
+  "exercise": "field Due as date default '2026-01-01",
+  "specCite": "docs/language/precept-language-spec.md:786",
+  "expected": "reject:UnterminatedTypedConstant",
+  "source": "added",
+  "block": "sec-1-8"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/diag/unterminated-interpolation",
+  "desc": "an interpolation with no closing '}' before end of line emits UnterminatedInterpolation",
+  "exercise": "field Name as string\nfield G as string <- \"hello {Name",
+  "specCite": "docs/language/precept-language-spec.md:787",
+  "expected": "reject:UnterminatedInterpolation",
+  "source": "added",
+  "block": "sec-1-8"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/diag/invalid-character",
+  "desc": "a character that is not part of any valid token emits InvalidCharacter",
+  "exercise": "field X as number @",
+  "specCite": "docs/language/precept-language-spec.md:788",
+  "expected": "reject:InvalidCharacter",
+  "source": "added",
+  "block": "sec-1-8"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/diag/unrecognized-string-escape",
+  "desc": "\\X inside a string where X is not \" \\ n or t emits UnrecognizedStringEscape",
+  "exercise": "field Note as string default \"bad\\q\"",
+  "specCite": "docs/language/precept-language-spec.md:789",
+  "expected": "reject:UnrecognizedStringEscape",
+  "source": "added",
+  "block": "sec-1-8"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/diag/unrecognized-typed-escape",
+  "desc": "\\X inside a typed constant where X is not ' or \\ emits UnrecognizedTypedConstantEscape",
+  "exercise": "field Due as date default '2026\\q01'",
+  "specCite": "docs/language/precept-language-spec.md:790",
+  "expected": "reject:UnrecognizedTypedConstantEscape",
+  "source": "added",
+  "block": "sec-1-8"
+ },
+ {
+  "id": "spec-preamble-lexer/lexer/diag/unescaped-brace",
+  "desc": "a lone '}' inside a string/typed constant that was not doubled emits UnescapedBraceInLiteral",
+  "exercise": "field Note as string default \"a } b\"",
+  "specCite": "docs/language/precept-language-spec.md:791",
+  "expected": "reject:UnescapedBraceInLiteral",
+  "source": "added",
+  "block": "sec-1-8"
+ }
 ]

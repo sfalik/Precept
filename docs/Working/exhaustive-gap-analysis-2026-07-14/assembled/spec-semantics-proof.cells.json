@@ -1,461 +1,461 @@
 [
-  {
-    "id": "spec-semantics-proof/rule-global-accept",
-    "desc": "A global `rule` expressing data truth after every mutation compiles.",
-    "exercise": "field Score as integer\nrule Score >= 680 because \"Credit score too low\"",
-    "specCite": "docs/language/precept-language-spec.md:1862",
-    "expected": "accept",
-    "source": "added",
-    "block": "B4-rules-example-1861"
-  },
-  {
-    "id": "spec-semantics-proof/rule-guarded-accept",
-    "desc": "A guarded rule (`rule ... when <cond> because ...`) applies conditionally and compiles.",
-    "exercise": "field DownPayment as currency in USD\nfield RequestedAmount as currency in USD\nfield LoanType as string\nrule DownPayment >= RequestedAmount * 0.20 when LoanType == \"conventional\" because \"Conventional loans require 20% down\"",
-    "specCite": "docs/language/precept-language-spec.md:1863",
-    "expected": "accept",
-    "source": "added",
-    "block": "B4-rules-example-1861"
-  },
-  {
-    "id": "spec-semantics-proof/rule-references-event-arg-rejected",
-    "desc": "Rules operate in field scope and cannot reference event arguments.",
-    "exercise": "event Submit(Amount as integer)\nrule Submit.Amount > 0 because \"...\"",
-    "specCite": "docs/language/precept-language-spec.md:1868",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "B3-rules-prose-1855"
-  },
-  {
-    "id": "spec-semantics-proof/ensure-in-state-accept",
-    "desc": "Residency ensure `in <State> ensure ...` compiles.",
-    "exercise": "state Review\nfield Reviewers as list of string\nin Review ensure Reviewers.count >= 2 because \"Review requires at least two reviewers\"",
-    "specCite": "docs/language/precept-language-spec.md:1884",
-    "expected": "accept",
-    "source": "added",
-    "block": "B6-ensures-example-1876"
-  },
-  {
-    "id": "spec-semantics-proof/ensure-to-state-accept",
-    "desc": "Entry ensure `to <State> ensure ...` checked on transitions into the state compiles.",
-    "exercise": "state Review\nfield Reviewers as list of string\nto Review ensure Reviewers.count >= 2 because \"...\"",
-    "specCite": "docs/language/precept-language-spec.md:1885",
-    "expected": "accept",
-    "source": "added",
-    "block": "B5-ensures-anchors-1882"
-  },
-  {
-    "id": "spec-semantics-proof/ensure-from-state-accept",
-    "desc": "Exit ensure `from <State> ensure ...` checked on transitions out of the state compiles.",
-    "exercise": "state Open\nfield Priority as integer\nfrom Open ensure Priority >= 1 because \"...\"",
-    "specCite": "docs/language/precept-language-spec.md:1886",
-    "expected": "accept",
-    "source": "added",
-    "block": "B5-ensures-anchors-1882"
-  },
-  {
-    "id": "spec-semantics-proof/ensure-on-event-accept",
-    "desc": "Event-argument ensure `on <Event> ensure ...` validating caller args compiles.",
-    "exercise": "event Submit(Type as string, Amount as integer)\non Submit when Submit.Type == \"payment\" ensure Submit.Amount > 0 because \"Payment amounts must be positive\"",
-    "specCite": "docs/language/precept-language-spec.md:1887",
-    "expected": "accept",
-    "source": "added",
-    "block": "B6-ensures-example-1876"
-  },
-  {
-    "id": "spec-semantics-proof/ensure-guarded-accept",
-    "desc": "A guarded state ensure `in <State> when <cond> ensure ...` compiles.",
-    "exercise": "state Open\nfield Escalated as boolean\nfield Priority as integer\nin Open when Escalated ensure Priority >= 3 because \"Escalated tickets must be high priority\"",
-    "specCite": "docs/language/precept-language-spec.md:1878",
-    "expected": "accept",
-    "source": "added",
-    "block": "B6-ensures-example-1876"
-  },
-  {
-    "id": "spec-semantics-proof/reject-row-accept",
-    "desc": "An authored `-> reject \"...\"` prohibition row is valid surface (authored prohibition, not constraint failure).",
-    "exercise": "state Draft\nevent Cancel\nfrom Draft on Cancel -> reject \"Cannot cancel a draft\"",
-    "specCite": "docs/language/precept-language-spec.md:1891",
-    "expected": "accept",
-    "source": "added",
-    "block": "B7-rejections-1889"
-  },
-  {
-    "id": "spec-semantics-proof/initial-modifier-accept",
-    "desc": "`initial` modifier on an event declaration designates the construction event and compiles.",
-    "exercise": "event Create(ApplicantName as string, Amount as currency in USD, CreditScore as integer) initial",
-    "specCite": "docs/language/precept-language-spec.md:1980",
-    "expected": "accept",
-    "source": "added",
-    "block": "B17-initial-event-example-1979"
-  },
-  {
-    "id": "spec-semantics-proof/initial-modifier-parameterless-accept",
-    "desc": "`initial` modifier appears after the event name for a parameterless initial event.",
-    "exercise": "event Start initial",
-    "specCite": "docs/language/precept-language-spec.md:1983",
-    "expected": "accept",
-    "source": "added",
-    "block": "B16-initial-event-prose-1977"
-  },
-  {
-    "id": "spec-semantics-proof/two-initial-events-rejected",
-    "desc": "Only one event per precept may carry `initial`; a second is rejected.",
-    "exercise": "event Create(A as integer) initial\nevent Start(B as integer) initial",
-    "specCite": "docs/language/precept-language-spec.md:1983",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "B16-initial-event-prose-1977"
-  },
-  {
-    "id": "spec-semantics-proof/construction-row-on-event-accept",
-    "desc": "Construction rows use the `on <InitialEvent>` form (not `from State on Event`) and compile.",
-    "exercise": "event Create(ApplicantName as string, Amount as currency in USD) initial\nfield ApplicantName as string\nfield RequestedAmount as currency in USD\non Create\n    -> set ApplicantName = Create.ApplicantName\n    -> set RequestedAmount = Create.Amount",
-    "specCite": "docs/language/precept-language-spec.md:1991",
-    "expected": "accept",
-    "source": "added",
-    "block": "B18-construction-row-example-1989"
-  },
-  {
-    "id": "spec-semantics-proof/construction-row-guarded-accept",
-    "desc": "A guarded construction row `on Create when <cond> -> ...` provides first-match intake routing and compiles.",
-    "exercise": "event Create(Amount as currency in USD) initial\nfield RequestedAmount as currency in USD\non Create when Create.Amount > '0.00 USD'\n    -> set RequestedAmount = Create.Amount",
-    "specCite": "docs/language/precept-language-spec.md:1996",
-    "expected": "accept",
-    "source": "added",
-    "block": "B18-construction-row-example-1989"
-  },
-  {
-    "id": "spec-semantics-proof/construction-row-reject-path-accept",
-    "desc": "A construction reject path `on Create when <cond> -> reject \"...\"` compiles.",
-    "exercise": "event Create(Amount as currency in USD) initial\non Create when Create.Amount <= '0.00 USD'\n    -> reject \"Loan amount must be positive\"",
-    "specCite": "docs/language/precept-language-spec.md:2001",
-    "expected": "accept",
-    "source": "added",
-    "block": "B18-construction-row-example-1989"
-  },
-  {
-    "id": "spec-semantics-proof/construction-transition-excluded-rejected",
-    "desc": "`transition` is structurally excluded from construction rows (grammar-level parse error).",
-    "exercise": "state Review\nevent Create(A as integer) initial\non Create -> transition Review",
-    "specCite": "docs/language/precept-language-spec.md:2014",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "B20-construction-vs-transition-table-2011"
-  },
-  {
-    "id": "spec-semantics-proof/construction-no-transition-excluded-rejected",
-    "desc": "`no transition` is structurally excluded from construction rows (grammar-level parse error).",
-    "exercise": "event Create(A as integer) initial\non Create -> no transition",
-    "specCite": "docs/language/precept-language-spec.md:2015",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "B20-construction-vs-transition-table-2011"
-  },
-  {
-    "id": "spec-semantics-proof/transition-row-transition-accept",
-    "desc": "A transition row `from State on Event -> transition <State>` permits `transition` and compiles.",
-    "exercise": "state Draft\nstate Review\nevent Submit\nfrom Draft on Submit -> transition Review",
-    "specCite": "docs/language/precept-language-spec.md:2014",
-    "expected": "accept",
-    "source": "added",
-    "block": "B20-construction-vs-transition-table-2011"
-  },
-  {
-    "id": "spec-semantics-proof/pattern-a-constructor-existential-accept",
-    "desc": "Pattern A: initial event populating birth-time existential fields via construction rows compiles.",
-    "exercise": "event Create(ApplicantName as string, Amount as currency in USD) initial\nfield ApplicantName as string\nfield RequestedAmount as currency in USD\non Create\n    -> set ApplicantName = Create.ApplicantName\n    -> set RequestedAmount = Create.Amount",
-    "specCite": "docs/language/precept-language-spec.md:2027",
-    "expected": "accept",
-    "source": "added",
-    "block": "B23-construction-idioms-table-2025"
-  },
-  {
-    "id": "spec-semantics-proof/pattern-b-free-construction-accept",
-    "desc": "Pattern B: no initial event, parameterless Create materializes a governed draft state with progressive enrichment; compiles.",
-    "exercise": "state Unlisted\nfield Title as string default \"\" editable\nfield Price as currency in USD default '0.00 USD' editable",
-    "specCite": "docs/language/precept-language-spec.md:2028",
-    "expected": "accept",
-    "source": "added",
-    "block": "B23-construction-idioms-table-2025"
-  },
-  {
-    "id": "spec-semantics-proof/pattern-b-required-birth-absent-field-rejected",
-    "desc": "Pattern B requires birth-time-absent fields to be optional or defaulted; a required non-optional non-default field with no initial event is rejected.",
-    "exercise": "state Unlisted\nfield Title as string\nfield Price as currency in USD default '0.00 USD'",
-    "specCite": "docs/language/precept-language-spec.md:2030",
-    "expected": "reject:RequiredFieldsNeedInitialEvent",
-    "source": "added",
-    "block": "B24-pattern-b-prose-2030"
-  },
-  {
-    "id": "spec-semantics-proof/no-initial-event-all-fields-defaulted-accept",
-    "desc": "With no initial event, `Create()` is parameterless and always succeeds when all fields have defaults or are optional.",
-    "exercise": "field Title as string default \"\"\nfield Count as integer default 0",
-    "specCite": "docs/language/precept-language-spec.md:2040",
-    "expected": "accept",
-    "source": "added",
-    "block": "B25-construction-semantics-2032"
-  },
-  {
-    "id": "spec-semantics-proof/required-fields-need-initial-event-rejected",
-    "desc": "A precept with required fields (non-optional, no default) but no initial event cannot produce a valid initial version.",
-    "exercise": "field ApplicantName as string\nfield RequestedAmount as currency in USD",
-    "specCite": "docs/language/precept-language-spec.md:2053",
-    "expected": "reject:RequiredFieldsNeedInitialEvent",
-    "source": "added",
-    "block": "B27-compiler-enforcement-2052"
-  },
-  {
-    "id": "spec-semantics-proof/initial-event-missing-assignments-rejected",
-    "desc": "Initial event does not assign all required fields that lack defaults.",
-    "exercise": "event Create(Name as string) initial\nfield Name as string\nfield RequestedAmount as currency in USD\non Create -> set Name = Create.Name",
-    "specCite": "docs/language/precept-language-spec.md:2054",
-    "expected": "reject:InitialEventMissingAssignments",
-    "source": "added",
-    "block": "B27-compiler-enforcement-2052"
-  },
-  {
-    "id": "spec-semantics-proof/uninitialized-field-self-read-rejected",
-    "desc": "A required no-default field read inside its own first initial-event assignment observes an undefined value.",
-    "exercise": "event Create initial\nfield Count as integer\non Create -> set Count = Count + 1",
-    "specCite": "docs/language/precept-language-spec.md:2055",
-    "expected": "reject:UninitializedFieldReadInInitialAssignment",
-    "source": "added",
-    "block": "B27-compiler-enforcement-2052"
-  },
-  {
-    "id": "spec-semantics-proof/uninitialized-cross-field-read-rejected",
-    "desc": "An initial-event assignment reads another required field before that field's first assignment in the same action chain.",
-    "exercise": "event Create(N as integer) initial\nfield A as integer\nfield B as integer\non Create\n    -> set A = B + 1\n    -> set B = Create.N",
-    "specCite": "docs/language/precept-language-spec.md:2056",
-    "expected": "reject:UninitializedCrossFieldReadInInitialAssignment",
-    "source": "added",
-    "block": "B27-compiler-enforcement-2052"
-  },
-  {
-    "id": "spec-semantics-proof/bare-on-event-non-initial-stateful-rejected",
-    "desc": "Non-initial events cannot use the bare `on <Event>` form in stateful precepts (must use `from State on Event`).",
-    "exercise": "state Open\nevent Touch\non Touch -> set Field = 1\nfield Field as integer default 0",
-    "specCite": "docs/language/precept-language-spec.md:2070",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "B34-non-initial-on-event-2070"
-  },
-  {
-    "id": "spec-semantics-proof/always-rejecting-initial-event-rejected",
-    "desc": "At least one construction row must be able to produce Created; an initial event whose rows always reject is rejected (AlwaysRejecting promoted to Error for initial events).",
-    "exercise": "event Create(Amount as integer) initial\non Create when Create.Amount > 0 -> reject \"no\"\non Create -> reject \"never valid\"",
-    "specCite": "docs/language/precept-language-spec.md:2093",
-    "expected": "reject:AlwaysRejecting",
-    "source": "added",
-    "block": "B38-construction-always-possible-2093"
-  },
-  {
-    "id": "spec-semantics-proof/initial-event-in-transition-row-rejected",
-    "desc": "The initial event cannot appear in a `from <State> on <InitialEvent>` transition row (fire-once guarantee).",
-    "exercise": "state Open\nevent Create(A as integer) initial\nfrom Open on Create -> no transition",
-    "specCite": "docs/language/precept-language-spec.md:2099",
-    "expected": "reject:InitialEventInTransitionRow",
-    "source": "added",
-    "block": "B39-fire-once-2095"
-  },
-  {
-    "id": "spec-semantics-proof/stateless-precept-no-states-accept",
-    "desc": "A precept that declares no states is first-class; State is null in the constructed version.",
-    "exercise": "field Amount as integer default 0\nrule Amount >= 0 because \"...\"",
-    "specCite": "docs/language/precept-language-spec.md:2103",
-    "expected": "accept",
-    "source": "added",
-    "block": "B40-stateless-precepts-2103"
-  },
-  {
-    "id": "spec-semantics-proof/stateless-with-initial-event-accept",
-    "desc": "A stateless precept with an initial event fires it through the standard pipeline and compiles.",
-    "exercise": "event Create(Amount as integer) initial\nfield Amount as integer\non Create -> set Amount = Create.Amount",
-    "specCite": "docs/language/precept-language-spec.md:2109",
-    "expected": "accept",
-    "source": "added",
-    "block": "B40-stateless-precepts-2103"
-  },
-  {
-    "id": "spec-semantics-proof/stateless-exempt-reachability-accept",
-    "desc": "The graph analyzer is exempt from initial-state reachability checks for stateless precepts (no false structural diagnostic).",
-    "exercise": "field Amount as integer default 0",
-    "specCite": "docs/language/precept-language-spec.md:2113",
-    "expected": "accept",
-    "source": "added",
-    "block": "B41-compiler-note-2113"
-  },
-  {
-    "id": "spec-semantics-proof/stateless-exempt-dead-end-accept",
-    "desc": "The graph analyzer is exempt from dead-end-state checks for stateless precepts.",
-    "exercise": "field Status as string default \"\"",
-    "specCite": "docs/language/precept-language-spec.md:2113",
-    "expected": "accept",
-    "source": "added",
-    "block": "B41-compiler-note-2113"
-  },
-  {
-    "id": "spec-semantics-proof/stateless-exempt-unreachable-accept",
-    "desc": "The graph analyzer is exempt from unreachable-state checks for stateless precepts.",
-    "exercise": "field Count as integer default 0",
-    "specCite": "docs/language/precept-language-spec.md:2113",
-    "expected": "accept",
-    "source": "added",
-    "block": "B41-compiler-note-2113"
-  },
-  {
-    "id": "spec-semantics-proof/dead-end-state-rejected",
-    "desc": "A reachable non-terminal state with no structural path to any terminal is a dead-end/sink and is rejected.",
-    "exercise": "state Draft\nstate Trap\nevent Go\nfrom Draft on Go -> transition Trap",
-    "specCite": "docs/language/precept-language-spec.md:2113",
-    "expected": "reject:PRE0119",
-    "source": "added",
-    "block": "B41-compiler-note-2113"
-  },
-  {
-    "id": "spec-semantics-proof/unreachable-state-rejected",
-    "desc": "A state with no incoming transitions (unreachable) is rejected by the unreachable-state check.",
-    "exercise": "state Draft\nstate Orphan\nevent Go\nfrom Draft on Go -> no transition",
-    "specCite": "docs/language/precept-language-spec.md:2113",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "B41-compiler-note-2113"
-  },
-  {
-    "id": "spec-semantics-proof/state-unreachable-from-initial-rejected",
-    "desc": "A state not reachable from the initial state fails the initial-state reachability check.",
-    "exercise": "state Draft\nstate Review\nstate Island\nevent Submit\nevent Hop\nfrom Draft on Submit -> transition Review\nfrom Island on Hop -> transition Review",
-    "specCite": "docs/language/precept-language-spec.md:2113",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "B41-compiler-note-2113"
-  },
-  {
-    "id": "spec-semantics-proof/initial-state-satisfiability-pre0115-rejected",
-    "desc": "The proof engine checks initial-state satisfiability against default values; an initial state whose ensures the defaults cannot satisfy is rejected (PRE0115).",
-    "exercise": "state Open\nfield Amount as integer default 0\nin Open ensure Amount >= 10 because \"...\"",
-    "specCite": "docs/language/precept-language-spec.md:2135",
-    "expected": "reject:PRE0115",
-    "source": "added",
-    "block": "B45-proof-engine-intro-2135"
-  },
-  {
-    "id": "spec-semantics-proof/pre0115-construction-exemption-accept",
-    "desc": "With an initial event and a construction row (IsConstruction), the proof engine skips the default-value satisfiability check for the initial state (no false PRE0115).",
-    "exercise": "state Open\nevent Create(Amount as integer) initial\nfield Amount as integer default 0\non Create -> set Amount = Create.Amount\nin Open ensure Amount >= 10 because \"...\"",
-    "specCite": "docs/language/precept-language-spec.md:2137",
-    "expected": "accept",
-    "source": "added",
-    "block": "B46-pre0115-construction-exemption-2137"
-  },
-  {
-    "id": "spec-semantics-proof/unprovable-qualifier-fact-rejected",
-    "desc": "The proof system is conservative: if it cannot prove the required qualifier fact, the program is rejected rather than accepted on a guess (prove-or-reject).",
-    "exercise": "field A as decimal\nfield B as decimal\nrule A / B > 1 because \"...\"",
-    "specCite": "docs/language/precept-language-spec.md:2139",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "B47-proved-conservative-2139"
-  },
-  {
-    "id": "spec-semantics-proof/proof-nonzero-obligation-rejected",
-    "desc": "Numeric nonzero obligation: division by a possibly-zero operand must be rejected unless proven nonzero.",
-    "exercise": "field Total as decimal\nfield Qty as decimal\nrule Total / Qty > 0 because \"...\"",
-    "specCite": "docs/language/precept-language-spec.md:2142",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "B48-qualifier-checks-2141"
-  },
-  {
-    "id": "spec-semantics-proof/proof-nonnegative-obligation-rejected",
-    "desc": "Numeric nonnegative obligation: sqrt of a possibly-negative operand must be rejected unless proven nonnegative.",
-    "exercise": "field X as decimal\nrule sqrt(X) > 0 because \"...\"",
-    "specCite": "docs/language/precept-language-spec.md:2142",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "B48-qualifier-checks-2141"
-  },
-  {
-    "id": "spec-semantics-proof/proof-currency-axis-compat-rejected",
-    "desc": "Currency-axis compatibility: arithmetic combining money of different currencies without conversion is rejected.",
-    "exercise": "field Usd as currency in USD\nfield Eur as currency in EUR\nrule Usd + Eur > '0.00 USD' because \"...\"",
-    "specCite": "docs/language/precept-language-spec.md:2143",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "B48-qualifier-checks-2141"
-  },
-  {
-    "id": "spec-semantics-proof/proof-currency-conversion-resolution-accept",
-    "desc": "Conversion-result currency resolution: a same-currency money operation with resolved currency axis compiles.",
-    "exercise": "field A as currency in USD\nfield B as currency in USD\nrule A + B >= '0.00 USD' because \"...\"",
-    "specCite": "docs/language/precept-language-spec.md:2143",
-    "expected": "accept",
-    "source": "added",
-    "block": "B48-qualifier-checks-2141"
-  },
-  {
-    "id": "spec-semantics-proof/proof-unit-compat-rejected",
-    "desc": "Unit compatibility: combining quantities with incompatible units is rejected.",
-    "exercise": "field Len as quantity in 'm'\nfield Mass as quantity in 'kg'\nrule Len + Mass > '0 m' because \"...\"",
-    "specCite": "docs/language/precept-language-spec.md:2144",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "B48-qualifier-checks-2141"
-  },
-  {
-    "id": "spec-semantics-proof/proof-dimension-compat-rejected",
-    "desc": "Dimension compatibility: an operation across incompatible physical dimensions is rejected.",
-    "exercise": "field Speed as quantity in 'm/s'\nfield Len as quantity in 'm'\nrule Speed == Len because \"...\"",
-    "specCite": "docs/language/precept-language-spec.md:2144",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "B48-qualifier-checks-2141"
-  },
-  {
-    "id": "spec-semantics-proof/proof-temporal-dimension-compat-rejected",
-    "desc": "Temporal-dimension compatibility: mismatched temporal dimensions in an operation are rejected.",
-    "exercise": "field D as date\nfield Dur as duration in 'h'\nrule D + Dur == D because \"...\"",
-    "specCite": "docs/language/precept-language-spec.md:2144",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "B48-qualifier-checks-2141"
-  },
-  {
-    "id": "spec-semantics-proof/proof-declaration-based-fact-accept",
-    "desc": "Declaration-based facts carried by qualifiers/modifiers/presence metadata can discharge an obligation, so the program compiles.",
-    "exercise": "field Total as decimal\nfield Qty as decimal min 1\nrule Total / Qty > 0 because \"...\"",
-    "specCite": "docs/language/precept-language-spec.md:2145",
-    "expected": "accept",
-    "source": "added",
-    "block": "B48-qualifier-checks-2141"
-  },
-  {
-    "id": "spec-semantics-proof/proof-cross-unit-interval-containment-accept",
-    "desc": "Interval-containment proofs normalize statically-convertible magnitudes to UCUM base units before comparison, so a cross-unit assignment within bounds is proved safe (no false NumericOverflow).",
-    "exercise": "field W as quantity in 'kg' max '5 kg'\non Set -> set W = '6 [lb_av]'\nevent Set",
-    "specCite": "docs/language/precept-language-spec.md:2147",
-    "expected": "accept",
-    "source": "added",
-    "block": "B49-interval-containment-2147"
-  },
-  {
-    "id": "spec-semantics-proof/proof-counting-unit-mismatch-not-proved-rejected",
-    "desc": "Explicit counting-unit mismatches (e.g. `each` vs `box`) are not meaningfully comparable without a conversion field and must not be proved by same-dimension fallback.",
-    "exercise": "field A as quantity in 'each'\nfield B as quantity in 'box' max '5 box'\non Set -> set B = A\nevent Set",
-    "specCite": "docs/language/precept-language-spec.md:2147",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "B49-interval-containment-2147"
-  },
-  {
-    "id": "spec-semantics-proof/unprovable-obligation-surfaces-diagnostic-rejected",
-    "desc": "An unprovable obligation is not treated as probably-fine; it surfaces a compile-time diagnostic requiring an added proof-bearing fact.",
-    "exercise": "field N as decimal\nrule 100 / N > 0 because \"...\"",
-    "specCite": "docs/language/precept-language-spec.md:2149",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "B50-unprovable-obligation-2149"
-  }
+ {
+  "id": "spec-semantics-proof/rule-global-accept",
+  "desc": "A global `rule` expressing data truth after every mutation compiles.",
+  "exercise": "field Score as integer\nrule Score >= 680 because \"Credit score too low\"",
+  "specCite": "docs/language/precept-language-spec.md:1862",
+  "expected": "accept",
+  "source": "added",
+  "block": "B4-rules-example-1861"
+ },
+ {
+  "id": "spec-semantics-proof/rule-guarded-accept",
+  "desc": "A guarded rule (`rule ... when <cond> because ...`) applies conditionally and compiles.",
+  "exercise": "field DownPayment as currency in USD\nfield RequestedAmount as currency in USD\nfield LoanType as string\nrule DownPayment >= RequestedAmount * 0.20 when LoanType == \"conventional\" because \"Conventional loans require 20% down\"",
+  "specCite": "docs/language/precept-language-spec.md:1863",
+  "expected": "accept",
+  "source": "added",
+  "block": "B4-rules-example-1861"
+ },
+ {
+  "id": "spec-semantics-proof/rule-references-event-arg-rejected",
+  "desc": "Rules operate in field scope and cannot reference event arguments.",
+  "exercise": "event Submit(Amount as integer)\nrule Submit.Amount > 0 because \"...\"",
+  "specCite": "docs/language/precept-language-spec.md:1868",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "B3-rules-prose-1855"
+ },
+ {
+  "id": "spec-semantics-proof/ensure-in-state-accept",
+  "desc": "Residency ensure `in <State> ensure ...` compiles.",
+  "exercise": "state Review\nfield Reviewers as list of string\nin Review ensure Reviewers.count >= 2 because \"Review requires at least two reviewers\"",
+  "specCite": "docs/language/precept-language-spec.md:1884",
+  "expected": "accept",
+  "source": "added",
+  "block": "B6-ensures-example-1876"
+ },
+ {
+  "id": "spec-semantics-proof/ensure-to-state-accept",
+  "desc": "Entry ensure `to <State> ensure ...` checked on transitions into the state compiles.",
+  "exercise": "state Review\nfield Reviewers as list of string\nto Review ensure Reviewers.count >= 2 because \"...\"",
+  "specCite": "docs/language/precept-language-spec.md:1885",
+  "expected": "accept",
+  "source": "added",
+  "block": "B5-ensures-anchors-1882"
+ },
+ {
+  "id": "spec-semantics-proof/ensure-from-state-accept",
+  "desc": "Exit ensure `from <State> ensure ...` checked on transitions out of the state compiles.",
+  "exercise": "state Open\nfield Priority as integer\nfrom Open ensure Priority >= 1 because \"...\"",
+  "specCite": "docs/language/precept-language-spec.md:1886",
+  "expected": "accept",
+  "source": "added",
+  "block": "B5-ensures-anchors-1882"
+ },
+ {
+  "id": "spec-semantics-proof/ensure-on-event-accept",
+  "desc": "Event-argument ensure `on <Event> ensure ...` validating caller args compiles.",
+  "exercise": "event Submit(Type as string, Amount as integer)\non Submit when Submit.Type == \"payment\" ensure Submit.Amount > 0 because \"Payment amounts must be positive\"",
+  "specCite": "docs/language/precept-language-spec.md:1887",
+  "expected": "accept",
+  "source": "added",
+  "block": "B6-ensures-example-1876"
+ },
+ {
+  "id": "spec-semantics-proof/ensure-guarded-accept",
+  "desc": "A guarded state ensure `in <State> when <cond> ensure ...` compiles.",
+  "exercise": "state Open\nfield Escalated as boolean\nfield Priority as integer\nin Open when Escalated ensure Priority >= 3 because \"Escalated tickets must be high priority\"",
+  "specCite": "docs/language/precept-language-spec.md:1878",
+  "expected": "accept",
+  "source": "added",
+  "block": "B6-ensures-example-1876"
+ },
+ {
+  "id": "spec-semantics-proof/reject-row-accept",
+  "desc": "An authored `-> reject \"...\"` prohibition row is valid surface (authored prohibition, not constraint failure).",
+  "exercise": "state Draft\nevent Cancel\nfrom Draft on Cancel -> reject \"Cannot cancel a draft\"",
+  "specCite": "docs/language/precept-language-spec.md:1891",
+  "expected": "accept",
+  "source": "added",
+  "block": "B7-rejections-1889"
+ },
+ {
+  "id": "spec-semantics-proof/initial-modifier-accept",
+  "desc": "`initial` modifier on an event declaration designates the construction event and compiles.",
+  "exercise": "event Create(ApplicantName as string, Amount as currency in USD, CreditScore as integer) initial",
+  "specCite": "docs/language/precept-language-spec.md:1980",
+  "expected": "accept",
+  "source": "added",
+  "block": "B17-initial-event-example-1979"
+ },
+ {
+  "id": "spec-semantics-proof/initial-modifier-parameterless-accept",
+  "desc": "`initial` modifier appears after the event name for a parameterless initial event.",
+  "exercise": "event Start initial",
+  "specCite": "docs/language/precept-language-spec.md:1983",
+  "expected": "accept",
+  "source": "added",
+  "block": "B16-initial-event-prose-1977"
+ },
+ {
+  "id": "spec-semantics-proof/two-initial-events-rejected",
+  "desc": "Only one event per precept may carry `initial`; a second is rejected.",
+  "exercise": "event Create(A as integer) initial\nevent Start(B as integer) initial",
+  "specCite": "docs/language/precept-language-spec.md:1983",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "B16-initial-event-prose-1977"
+ },
+ {
+  "id": "spec-semantics-proof/construction-row-on-event-accept",
+  "desc": "Construction rows use the `on <InitialEvent>` form (not `from State on Event`) and compile.",
+  "exercise": "event Create(ApplicantName as string, Amount as currency in USD) initial\nfield ApplicantName as string\nfield RequestedAmount as currency in USD\non Create\n    -> set ApplicantName = Create.ApplicantName\n    -> set RequestedAmount = Create.Amount",
+  "specCite": "docs/language/precept-language-spec.md:1991",
+  "expected": "accept",
+  "source": "added",
+  "block": "B18-construction-row-example-1989"
+ },
+ {
+  "id": "spec-semantics-proof/construction-row-guarded-accept",
+  "desc": "A guarded construction row `on Create when <cond> -> ...` provides first-match intake routing and compiles.",
+  "exercise": "event Create(Amount as currency in USD) initial\nfield RequestedAmount as currency in USD\non Create when Create.Amount > '0.00 USD'\n    -> set RequestedAmount = Create.Amount",
+  "specCite": "docs/language/precept-language-spec.md:1996",
+  "expected": "accept",
+  "source": "added",
+  "block": "B18-construction-row-example-1989"
+ },
+ {
+  "id": "spec-semantics-proof/construction-row-reject-path-accept",
+  "desc": "A construction reject path `on Create when <cond> -> reject \"...\"` compiles.",
+  "exercise": "event Create(Amount as currency in USD) initial\non Create when Create.Amount <= '0.00 USD'\n    -> reject \"Loan amount must be positive\"",
+  "specCite": "docs/language/precept-language-spec.md:2001",
+  "expected": "accept",
+  "source": "added",
+  "block": "B18-construction-row-example-1989"
+ },
+ {
+  "id": "spec-semantics-proof/construction-transition-excluded-rejected",
+  "desc": "`transition` is structurally excluded from construction rows (grammar-level parse error).",
+  "exercise": "state Review\nevent Create(A as integer) initial\non Create -> transition Review",
+  "specCite": "docs/language/precept-language-spec.md:2014",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "B20-construction-vs-transition-table-2011"
+ },
+ {
+  "id": "spec-semantics-proof/construction-no-transition-excluded-rejected",
+  "desc": "`no transition` is structurally excluded from construction rows (grammar-level parse error).",
+  "exercise": "event Create(A as integer) initial\non Create -> no transition",
+  "specCite": "docs/language/precept-language-spec.md:2015",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "B20-construction-vs-transition-table-2011"
+ },
+ {
+  "id": "spec-semantics-proof/transition-row-transition-accept",
+  "desc": "A transition row `from State on Event -> transition <State>` permits `transition` and compiles.",
+  "exercise": "state Draft\nstate Review\nevent Submit\nfrom Draft on Submit -> transition Review",
+  "specCite": "docs/language/precept-language-spec.md:2014",
+  "expected": "accept",
+  "source": "added",
+  "block": "B20-construction-vs-transition-table-2011"
+ },
+ {
+  "id": "spec-semantics-proof/pattern-a-constructor-existential-accept",
+  "desc": "Pattern A: initial event populating birth-time existential fields via construction rows compiles.",
+  "exercise": "event Create(ApplicantName as string, Amount as currency in USD) initial\nfield ApplicantName as string\nfield RequestedAmount as currency in USD\non Create\n    -> set ApplicantName = Create.ApplicantName\n    -> set RequestedAmount = Create.Amount",
+  "specCite": "docs/language/precept-language-spec.md:2027",
+  "expected": "accept",
+  "source": "added",
+  "block": "B23-construction-idioms-table-2025"
+ },
+ {
+  "id": "spec-semantics-proof/pattern-b-free-construction-accept",
+  "desc": "Pattern B: no initial event, parameterless Create materializes a governed draft state with progressive enrichment; compiles.",
+  "exercise": "state Unlisted\nfield Title as string default \"\" editable\nfield Price as currency in USD default '0.00 USD' editable",
+  "specCite": "docs/language/precept-language-spec.md:2028",
+  "expected": "accept",
+  "source": "added",
+  "block": "B23-construction-idioms-table-2025"
+ },
+ {
+  "id": "spec-semantics-proof/pattern-b-required-birth-absent-field-rejected",
+  "desc": "Pattern B requires birth-time-absent fields to be optional or defaulted; a required non-optional non-default field with no initial event is rejected.",
+  "exercise": "state Unlisted\nfield Title as string\nfield Price as currency in USD default '0.00 USD'",
+  "specCite": "docs/language/precept-language-spec.md:2030",
+  "expected": "reject:RequiredFieldsNeedInitialEvent",
+  "source": "added",
+  "block": "B24-pattern-b-prose-2030"
+ },
+ {
+  "id": "spec-semantics-proof/no-initial-event-all-fields-defaulted-accept",
+  "desc": "With no initial event, `Create()` is parameterless and always succeeds when all fields have defaults or are optional.",
+  "exercise": "field Title as string default \"\"\nfield Count as integer default 0",
+  "specCite": "docs/language/precept-language-spec.md:2040",
+  "expected": "accept",
+  "source": "added",
+  "block": "B25-construction-semantics-2032"
+ },
+ {
+  "id": "spec-semantics-proof/required-fields-need-initial-event-rejected",
+  "desc": "A precept with required fields (non-optional, no default) but no initial event cannot produce a valid initial version.",
+  "exercise": "field ApplicantName as string\nfield RequestedAmount as currency in USD",
+  "specCite": "docs/language/precept-language-spec.md:2053",
+  "expected": "reject:RequiredFieldsNeedInitialEvent",
+  "source": "added",
+  "block": "B27-compiler-enforcement-2052"
+ },
+ {
+  "id": "spec-semantics-proof/initial-event-missing-assignments-rejected",
+  "desc": "Initial event does not assign all required fields that lack defaults.",
+  "exercise": "event Create(Name as string) initial\nfield Name as string\nfield RequestedAmount as currency in USD\non Create -> set Name = Create.Name",
+  "specCite": "docs/language/precept-language-spec.md:2054",
+  "expected": "reject:InitialEventMissingAssignments",
+  "source": "added",
+  "block": "B27-compiler-enforcement-2052"
+ },
+ {
+  "id": "spec-semantics-proof/uninitialized-field-self-read-rejected",
+  "desc": "A required no-default field read inside its own first initial-event assignment observes an undefined value.",
+  "exercise": "event Create initial\nfield Count as integer\non Create -> set Count = Count + 1",
+  "specCite": "docs/language/precept-language-spec.md:2055",
+  "expected": "reject:UninitializedFieldReadInInitialAssignment",
+  "source": "added",
+  "block": "B27-compiler-enforcement-2052"
+ },
+ {
+  "id": "spec-semantics-proof/uninitialized-cross-field-read-rejected",
+  "desc": "An initial-event assignment reads another required field before that field's first assignment in the same action chain.",
+  "exercise": "event Create(N as integer) initial\nfield A as integer\nfield B as integer\non Create\n    -> set A = B + 1\n    -> set B = Create.N",
+  "specCite": "docs/language/precept-language-spec.md:2056",
+  "expected": "reject:UninitializedCrossFieldReadInInitialAssignment",
+  "source": "added",
+  "block": "B27-compiler-enforcement-2052"
+ },
+ {
+  "id": "spec-semantics-proof/bare-on-event-non-initial-stateful-rejected",
+  "desc": "Non-initial events cannot use the bare `on <Event>` form in stateful precepts (must use `from State on Event`).",
+  "exercise": "state Open\nevent Touch\non Touch -> set Field = 1\nfield Field as integer default 0",
+  "specCite": "docs/language/precept-language-spec.md:2070",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "B34-non-initial-on-event-2070"
+ },
+ {
+  "id": "spec-semantics-proof/always-rejecting-initial-event-rejected",
+  "desc": "At least one construction row must be able to produce Created; an initial event whose rows always reject is rejected (AlwaysRejecting promoted to Error for initial events).",
+  "exercise": "event Create(Amount as integer) initial\non Create when Create.Amount > 0 -> reject \"no\"\non Create -> reject \"never valid\"",
+  "specCite": "docs/language/precept-language-spec.md:2093",
+  "expected": "reject:AlwaysRejecting",
+  "source": "added",
+  "block": "B38-construction-always-possible-2093"
+ },
+ {
+  "id": "spec-semantics-proof/initial-event-in-transition-row-rejected",
+  "desc": "The initial event cannot appear in a `from <State> on <InitialEvent>` transition row (fire-once guarantee).",
+  "exercise": "state Open\nevent Create(A as integer) initial\nfrom Open on Create -> no transition",
+  "specCite": "docs/language/precept-language-spec.md:2099",
+  "expected": "reject:InitialEventInTransitionRow",
+  "source": "added",
+  "block": "B39-fire-once-2095"
+ },
+ {
+  "id": "spec-semantics-proof/stateless-precept-no-states-accept",
+  "desc": "A precept that declares no states is first-class; State is null in the constructed version.",
+  "exercise": "field Amount as integer default 0\nrule Amount >= 0 because \"...\"",
+  "specCite": "docs/language/precept-language-spec.md:2103",
+  "expected": "accept",
+  "source": "added",
+  "block": "B40-stateless-precepts-2103"
+ },
+ {
+  "id": "spec-semantics-proof/stateless-with-initial-event-accept",
+  "desc": "A stateless precept with an initial event fires it through the standard pipeline and compiles.",
+  "exercise": "event Create(Amount as integer) initial\nfield Amount as integer\non Create -> set Amount = Create.Amount",
+  "specCite": "docs/language/precept-language-spec.md:2109",
+  "expected": "accept",
+  "source": "added",
+  "block": "B40-stateless-precepts-2103"
+ },
+ {
+  "id": "spec-semantics-proof/stateless-exempt-reachability-accept",
+  "desc": "The graph analyzer is exempt from initial-state reachability checks for stateless precepts (no false structural diagnostic).",
+  "exercise": "field Amount as integer default 0",
+  "specCite": "docs/language/precept-language-spec.md:2113",
+  "expected": "accept",
+  "source": "added",
+  "block": "B41-compiler-note-2113"
+ },
+ {
+  "id": "spec-semantics-proof/stateless-exempt-dead-end-accept",
+  "desc": "The graph analyzer is exempt from dead-end-state checks for stateless precepts.",
+  "exercise": "field Status as string default \"\"",
+  "specCite": "docs/language/precept-language-spec.md:2113",
+  "expected": "accept",
+  "source": "added",
+  "block": "B41-compiler-note-2113"
+ },
+ {
+  "id": "spec-semantics-proof/stateless-exempt-unreachable-accept",
+  "desc": "The graph analyzer is exempt from unreachable-state checks for stateless precepts.",
+  "exercise": "field Count as integer default 0",
+  "specCite": "docs/language/precept-language-spec.md:2113",
+  "expected": "accept",
+  "source": "added",
+  "block": "B41-compiler-note-2113"
+ },
+ {
+  "id": "spec-semantics-proof/dead-end-state-rejected",
+  "desc": "A reachable non-terminal state with no structural path to any terminal is a dead-end/sink and is rejected.",
+  "exercise": "state Draft\nstate Trap\nevent Go\nfrom Draft on Go -> transition Trap",
+  "specCite": "docs/language/precept-language-spec.md:2113",
+  "expected": "reject:PRE0119",
+  "source": "added",
+  "block": "B41-compiler-note-2113"
+ },
+ {
+  "id": "spec-semantics-proof/unreachable-state-rejected",
+  "desc": "A state with no incoming transitions (unreachable) is rejected by the unreachable-state check.",
+  "exercise": "state Draft\nstate Orphan\nevent Go\nfrom Draft on Go -> no transition",
+  "specCite": "docs/language/precept-language-spec.md:2113",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "B41-compiler-note-2113"
+ },
+ {
+  "id": "spec-semantics-proof/state-unreachable-from-initial-rejected",
+  "desc": "A state not reachable from the initial state fails the initial-state reachability check.",
+  "exercise": "state Draft\nstate Review\nstate Island\nevent Submit\nevent Hop\nfrom Draft on Submit -> transition Review\nfrom Island on Hop -> transition Review",
+  "specCite": "docs/language/precept-language-spec.md:2113",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "B41-compiler-note-2113"
+ },
+ {
+  "id": "spec-semantics-proof/initial-state-satisfiability-pre0115-rejected",
+  "desc": "The proof engine checks initial-state satisfiability against default values; an initial state whose ensures the defaults cannot satisfy is rejected (PRE0115).",
+  "exercise": "state Open\nfield Amount as integer default 0\nin Open ensure Amount >= 10 because \"...\"",
+  "specCite": "docs/language/precept-language-spec.md:2135",
+  "expected": "reject:PRE0115",
+  "source": "added",
+  "block": "B45-proof-engine-intro-2135"
+ },
+ {
+  "id": "spec-semantics-proof/pre0115-construction-exemption-accept",
+  "desc": "With an initial event and a construction row (IsConstruction), the proof engine skips the default-value satisfiability check for the initial state (no false PRE0115).",
+  "exercise": "state Open\nevent Create(Amount as integer) initial\nfield Amount as integer default 0\non Create -> set Amount = Create.Amount\nin Open ensure Amount >= 10 because \"...\"",
+  "specCite": "docs/language/precept-language-spec.md:2137",
+  "expected": "accept",
+  "source": "added",
+  "block": "B46-pre0115-construction-exemption-2137"
+ },
+ {
+  "id": "spec-semantics-proof/unprovable-qualifier-fact-rejected",
+  "desc": "The proof system is conservative: if it cannot prove the required qualifier fact, the program is rejected rather than accepted on a guess (prove-or-reject).",
+  "exercise": "field A as decimal\nfield B as decimal\nrule A / B > 1 because \"...\"",
+  "specCite": "docs/language/precept-language-spec.md:2139",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "B47-proved-conservative-2139"
+ },
+ {
+  "id": "spec-semantics-proof/proof-nonzero-obligation-rejected",
+  "desc": "Numeric nonzero obligation: division by a possibly-zero operand must be rejected unless proven nonzero.",
+  "exercise": "field Total as decimal\nfield Qty as decimal\nrule Total / Qty > 0 because \"...\"",
+  "specCite": "docs/language/precept-language-spec.md:2142",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "B48-qualifier-checks-2141"
+ },
+ {
+  "id": "spec-semantics-proof/proof-nonnegative-obligation-rejected",
+  "desc": "Numeric nonnegative obligation: sqrt of a possibly-negative operand must be rejected unless proven nonnegative.",
+  "exercise": "field X as decimal\nrule sqrt(X) > 0 because \"...\"",
+  "specCite": "docs/language/precept-language-spec.md:2142",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "B48-qualifier-checks-2141"
+ },
+ {
+  "id": "spec-semantics-proof/proof-currency-axis-compat-rejected",
+  "desc": "Currency-axis compatibility: arithmetic combining money of different currencies without conversion is rejected.",
+  "exercise": "field Usd as currency in USD\nfield Eur as currency in EUR\nrule Usd + Eur > '0.00 USD' because \"...\"",
+  "specCite": "docs/language/precept-language-spec.md:2143",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "B48-qualifier-checks-2141"
+ },
+ {
+  "id": "spec-semantics-proof/proof-currency-conversion-resolution-accept",
+  "desc": "Conversion-result currency resolution: a same-currency money operation with resolved currency axis compiles.",
+  "exercise": "field A as currency in USD\nfield B as currency in USD\nrule A + B >= '0.00 USD' because \"...\"",
+  "specCite": "docs/language/precept-language-spec.md:2143",
+  "expected": "accept",
+  "source": "added",
+  "block": "B48-qualifier-checks-2141"
+ },
+ {
+  "id": "spec-semantics-proof/proof-unit-compat-rejected",
+  "desc": "Unit compatibility: combining quantities with incompatible units is rejected.",
+  "exercise": "field Len as quantity in 'm'\nfield Mass as quantity in 'kg'\nrule Len + Mass > '0 m' because \"...\"",
+  "specCite": "docs/language/precept-language-spec.md:2144",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "B48-qualifier-checks-2141"
+ },
+ {
+  "id": "spec-semantics-proof/proof-dimension-compat-rejected",
+  "desc": "Dimension compatibility: an operation across incompatible physical dimensions is rejected.",
+  "exercise": "field Speed as quantity in 'm/s'\nfield Len as quantity in 'm'\nrule Speed == Len because \"...\"",
+  "specCite": "docs/language/precept-language-spec.md:2144",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "B48-qualifier-checks-2141"
+ },
+ {
+  "id": "spec-semantics-proof/proof-temporal-dimension-compat-rejected",
+  "desc": "Temporal-dimension compatibility: mismatched temporal dimensions in an operation are rejected.",
+  "exercise": "field D as date\nfield Dur as duration in 'h'\nrule D + Dur == D because \"...\"",
+  "specCite": "docs/language/precept-language-spec.md:2144",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "B48-qualifier-checks-2141"
+ },
+ {
+  "id": "spec-semantics-proof/proof-declaration-based-fact-accept",
+  "desc": "Declaration-based facts carried by qualifiers/modifiers/presence metadata can discharge an obligation, so the program compiles.",
+  "exercise": "field Total as decimal\nfield Qty as decimal min 1\nrule Total / Qty > 0 because \"...\"",
+  "specCite": "docs/language/precept-language-spec.md:2145",
+  "expected": "accept",
+  "source": "added",
+  "block": "B48-qualifier-checks-2141"
+ },
+ {
+  "id": "spec-semantics-proof/proof-cross-unit-interval-containment-accept",
+  "desc": "Interval-containment proofs normalize statically-convertible magnitudes to UCUM base units before comparison, so a cross-unit assignment within bounds is proved safe (no false NumericOverflow).",
+  "exercise": "field W as quantity in 'kg' max '5 kg'\non Set -> set W = '6 [lb_av]'\nevent Set",
+  "specCite": "docs/language/precept-language-spec.md:2147",
+  "expected": "accept",
+  "source": "added",
+  "block": "B49-interval-containment-2147"
+ },
+ {
+  "id": "spec-semantics-proof/proof-counting-unit-mismatch-not-proved-rejected",
+  "desc": "Explicit counting-unit mismatches (e.g. `each` vs `box`) are not meaningfully comparable without a conversion field and must not be proved by same-dimension fallback.",
+  "exercise": "field A as quantity in 'each'\nfield B as quantity in 'box' max '5 box'\non Set -> set B = A\nevent Set",
+  "specCite": "docs/language/precept-language-spec.md:2147",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "B49-interval-containment-2147"
+ },
+ {
+  "id": "spec-semantics-proof/unprovable-obligation-surfaces-diagnostic-rejected",
+  "desc": "An unprovable obligation is not treated as probably-fine; it surfaces a compile-time diagnostic requiring an added proof-bearing fact.",
+  "exercise": "field N as decimal\nrule 100 / N > 0 because \"...\"",
+  "specCite": "docs/language/precept-language-spec.md:2149",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "B50-unprovable-obligation-2149"
+ }
 ]

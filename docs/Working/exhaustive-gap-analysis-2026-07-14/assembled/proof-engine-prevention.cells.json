@@ -1,1094 +1,1073 @@
 [
-  {
-    "id": "proof-engine-prevention/core-prove-safe-accepts",
-    "desc": "A fault-prone operation proven safe compiles clean (no runtime check needed).",
-    "exercise": "field Qty as positive integer; on E -> set R = Total / Qty",
-    "specCite": "docs/compiler/proof-engine.md:92",
-    "expected": "accept",
-    "source": "added",
-    "block": "s2-overview-core-guarantee"
-  },
-  {
-    "id": "proof-engine-prevention/core-proof-fails-rejects",
-    "desc": "When proof fails the compiler emits a diagnostic and the author must fix source before a model is produced (no silent pass).",
-    "exercise": "field Divisor as integer; on E -> set R = Total / Divisor",
-    "specCite": "docs/compiler/proof-engine.md:92",
-    "expected": "reject:DivisionByZero",
-    "source": "added",
-    "block": "s2-overview-core-guarantee"
-  },
-  {
-    "id": "proof-engine-prevention/never-guess-unprovable-rejects",
-    "desc": "The engine proves, rejects, or leaves explicitly unresolved — it never approximates hidden certainty; unprovable operation rejects.",
-    "exercise": "field N as integer; on E -> set R = 100 / N   // no modifier, no guard",
-    "specCite": "docs/compiler/proof-engine.md:18",
-    "expected": "reject:DivisionByZero",
-    "source": "added",
-    "block": "s1-non-negotiable-rules"
-  },
-  {
-    "id": "proof-engine-prevention/qty-normalization-exact-supported-units",
-    "desc": "Quantity-dependent proof obligations are exact for supported business-domain UCUM units (decimal magnitudes, no float drift).",
-    "exercise": "field W as quantity in 'kg' min '0 kg' max '100 kg'; on E -> set W = '50 kg'",
-    "specCite": "docs/compiler/proof-engine.md:110",
-    "expected": "accept",
-    "source": "added",
-    "block": "s2-qty-normalization-note"
-  },
-  {
-    "id": "proof-engine-prevention/qty-normalization-log-units-outside-guarantee",
-    "desc": "Logarithmic/reference-level units (dB, [pH]) are outside the exact-proof guarantee — obligations over them are not provably exact.",
-    "exercise": "field L as quantity in 'dB'; on E -> set R = L + L   // outside proof guarantee",
-    "specCite": "docs/compiler/proof-engine.md:110",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "s2-qty-normalization-note"
-  },
-
-  {
-    "id": "proof-engine-prevention/div-zero-literal-nonzero-safe",
-    "desc": "Division by a non-zero literal divisor discharges (Literal proof).",
-    "exercise": "on E -> set R = X / 2",
-    "specCite": "docs/compiler/proof-engine.md:717",
-    "expected": "accept",
-    "source": "added",
-    "block": "catalog-obligation-division"
-  },
-  {
-    "id": "proof-engine-prevention/div-zero-literal-zero-rejects",
-    "desc": "Division by a literal zero divisor is a proven violation.",
-    "exercise": "on E -> set R = X / 0",
-    "specCite": "docs/compiler/proof-engine.md:724",
-    "expected": "reject:DivisionByZero",
-    "source": "added",
-    "block": "catalog-obligation-division"
-  },
-  {
-    "id": "proof-engine-prevention/div-zero-unguarded-field-rejects",
-    "desc": "Division by an unconstrained field with no guard/modifier is not statically decidable → reject (unprovable=reject).",
-    "exercise": "field Divisor as integer; on E -> set R = Total / Divisor",
-    "specCite": "docs/compiler/proof-engine.md:521",
-    "expected": "reject:DivisionByZero",
-    "source": "added",
-    "block": "catalog-obligation-division"
-  },
-  {
-    "id": "proof-engine-prevention/div-zero-guard-nonzero-safe",
-    "desc": "A `when Divisor != 0` guard in the enclosing row discharges the divisor obligation (Guard-in-path).",
-    "exercise": "on Calculate when Divisor != 0 -> set Rate = Total / Divisor",
-    "specCite": "docs/compiler/proof-engine.md:1069",
-    "expected": "accept",
-    "source": "added",
-    "block": "catalog-obligation-division"
-  },
-  {
-    "id": "proof-engine-prevention/div-zero-guard-positive-safe",
-    "desc": "A `when Divisor > 0` guard subsumes `!= 0` and discharges the divisor obligation.",
-    "exercise": "on Submitted when Quantity > 0 -> set Rate = Amount / Quantity",
-    "specCite": "docs/compiler/proof-engine.md:800",
-    "expected": "accept",
-    "source": "added",
-    "block": "catalog-obligation-division"
-  },
-  {
-    "id": "proof-engine-prevention/div-zero-modifier-positive-safe",
-    "desc": "A `positive` modifier on the divisor field discharges the divisor obligation (Declaration-attribute proof).",
-    "exercise": "field Divisor as positive integer; on Calculate -> set Result = Total / Divisor",
-    "specCite": "docs/compiler/proof-engine.md:809",
-    "expected": "accept",
-    "source": "added",
-    "block": "catalog-obligation-division"
-  },
-  {
-    "id": "proof-engine-prevention/div-zero-modifier-nonzero-safe",
-    "desc": "A `nonzero` modifier on the divisor field discharges the divisor obligation.",
-    "exercise": "field Divisor as nonzero integer; on E -> set R = Total / Divisor",
-    "specCite": "docs/compiler/proof-engine.md:786",
-    "expected": "accept",
-    "source": "added",
-    "block": "catalog-obligation-division"
-  },
-  {
-    "id": "proof-engine-prevention/div-zero-in-rule-expression-rejects",
-    "desc": "A division whose divisor is unproven, appearing in a rule condition, rejects (context: rule expression).",
-    "exercise": "field Divisor as integer; rule Check: Total / Divisor > 0 because \"...\"",
-    "specCite": "docs/compiler/proof-engine.md:1116",
-    "expected": "reject:DivisionByZero",
-    "source": "added",
-    "block": "catalog-obligation-division"
-  },
-  {
-    "id": "proof-engine-prevention/div-zero-in-ensure-expression-rejects",
-    "desc": "A division with an unproven divisor in an ensure condition rejects (context: ensure expression).",
-    "exercise": "field Divisor as integer; ensure in Draft: Total / Divisor > 0 because \"...\"",
-    "specCite": "docs/compiler/proof-engine.md:1117",
-    "expected": "reject:DivisionByZero",
-    "source": "added",
-    "block": "catalog-obligation-division"
-  },
-  {
-    "id": "proof-engine-prevention/div-zero-in-computed-field-rejects",
-    "desc": "A division with an unproven divisor in a computed-field expression rejects (context: computed field).",
-    "exercise": "field Divisor as integer; field Rate as number <- Total / Divisor",
-    "specCite": "docs/compiler/proof-engine.md:2311",
-    "expected": "reject:DivisionByZero",
-    "source": "added",
-    "block": "catalog-obligation-division"
-  },
-  {
-    "id": "proof-engine-prevention/div-zero-reassignment-invalidates-guard",
-    "desc": "A guard fact is invalidated by a full-replacement write before the division; the divisor obligation after the reassignment rejects.",
-    "exercise": "on E when X != 0 -> set X = 0; set R = 100 / X",
-    "specCite": "docs/compiler/proof-engine.md:1251",
-    "expected": "reject:DivisionByZero",
-    "source": "added",
-    "block": "sequential-proof-flow"
-  },
-  {
-    "id": "proof-engine-prevention/div-zero-subtraction-divisor-relational-safe",
-    "desc": "A subtraction divisor `Z/(A-B)` under `when A > B` discharges (A>B implies A-B>0, no sign knowledge needed).",
-    "exercise": "on E when A > B -> set R = Z / (A - B)",
-    "specCite": "docs/compiler/proof-engine.md:1363",
-    "expected": "accept",
-    "source": "added",
-    "block": "strategy4-subtraction-table"
-  },
-  {
-    "id": "proof-engine-prevention/div-zero-barefield-divisor-relational-rejects",
-    "desc": "A bare-field divisor `Z/A` under `when A > B` is NOT provable (both could be negative) → reject.",
-    "exercise": "on E when A > B -> set R = Z / A",
-    "specCite": "docs/compiler/proof-engine.md:1362",
-    "expected": "reject:DivisionByZero",
-    "source": "added",
-    "block": "strategy4-subtraction-table"
-  },
-  {
-    "id": "proof-engine-prevention/div-zero-relational-contradiction-rejects",
-    "desc": "A relational rule that empties the divisor's declared interval (e.g. X>=Y with X max 5, Y min 10) contributes no discharge fact; the dependent division rejects at its own Error.",
-    "exercise": "field X as integer max 5; field Y as integer min 10; rule R: X >= Y because \"...\"; on E -> set Q = Z / X",
-    "specCite": "docs/compiler/proof-engine.md:1429",
-    "expected": "reject:DivisionByZero",
-    "source": "added",
-    "block": "strategy4-contradiction-guard"
-  },
-
-  {
-    "id": "proof-engine-prevention/mod-zero-literal-nonzero-safe",
-    "desc": "Modulo by a non-zero literal discharges.",
-    "exercise": "on E -> set R = X % 2",
-    "specCite": "docs/compiler/proof-engine.md:1888",
-    "expected": "accept",
-    "source": "added",
-    "block": "constant-folder-zero-denom"
-  },
-  {
-    "id": "proof-engine-prevention/mod-zero-literal-zero-rejects",
-    "desc": "Modulo by a literal zero is a proven violation (the folder refuses to evaluate through modulo-by-zero, same guard as division).",
-    "exercise": "on E -> set R = X % 0",
-    "specCite": "docs/compiler/proof-engine.md:1888",
-    "expected": "reject:DivisionByZero",
-    "source": "added",
-    "block": "constant-folder-zero-denom"
-  },
-  {
-    "id": "proof-engine-prevention/mod-zero-unguarded-field-rejects",
-    "desc": "Modulo by an unconstrained field with no guard/modifier is not statically decidable → reject.",
-    "exercise": "field Divisor as integer; on E -> set R = X % Divisor",
-    "specCite": "docs/compiler/proof-engine.md:1888",
-    "expected": "reject:DivisionByZero",
-    "source": "added",
-    "block": "constant-folder-zero-denom"
-  },
-  {
-    "id": "proof-engine-prevention/mod-zero-guard-nonzero-safe",
-    "desc": "A `when Divisor != 0` guard discharges the modulo divisor obligation.",
-    "exercise": "on E when Divisor != 0 -> set R = X % Divisor",
-    "specCite": "docs/compiler/proof-engine.md:1888",
-    "expected": "accept",
-    "source": "added",
-    "block": "constant-folder-zero-denom"
-  },
-
-  {
-    "id": "proof-engine-prevention/sqrt-neg-literal-nonneg-safe",
-    "desc": "sqrt of a non-negative literal discharges (Literal proof).",
-    "exercise": "on E -> set R = sqrt(4)",
-    "specCite": "docs/compiler/proof-engine.md:719",
-    "expected": "accept",
-    "source": "added",
-    "block": "catalog-obligation-sqrt"
-  },
-  {
-    "id": "proof-engine-prevention/sqrt-neg-literal-negative-rejects",
-    "desc": "sqrt of a negative literal is a proven violation.",
-    "exercise": "on E -> set R = sqrt(-1)",
-    "specCite": "docs/compiler/proof-engine.md:724",
-    "expected": "reject:SqrtOfNegative",
-    "source": "added",
-    "block": "catalog-obligation-sqrt"
-  },
-  {
-    "id": "proof-engine-prevention/sqrt-neg-unguarded-field-rejects",
-    "desc": "sqrt of an unconstrained field with no guard/modifier is not statically decidable → reject.",
-    "exercise": "field Value as decimal; on E -> set Root = sqrt(Value)",
-    "specCite": "docs/compiler/proof-engine.md:522",
-    "expected": "reject:SqrtOfNegative",
-    "source": "added",
-    "block": "catalog-obligation-sqrt"
-  },
-  {
-    "id": "proof-engine-prevention/sqrt-neg-guard-nonneg-safe",
-    "desc": "A `when Value >= 0` guard discharges the sqrt non-negative obligation.",
-    "exercise": "on Process when Value >= 0 -> set Root = sqrt(Value)",
-    "specCite": "docs/compiler/proof-engine.md:1074",
-    "expected": "accept",
-    "source": "added",
-    "block": "catalog-obligation-sqrt"
-  },
-  {
-    "id": "proof-engine-prevention/sqrt-neg-modifier-nonnegative-safe",
-    "desc": "A `nonnegative` modifier on the operand field discharges the sqrt obligation.",
-    "exercise": "field Value as nonnegative decimal; on E -> set Root = sqrt(Value)",
-    "specCite": "docs/compiler/proof-engine.md:785",
-    "expected": "accept",
-    "source": "added",
-    "block": "catalog-obligation-sqrt"
-  },
-  {
-    "id": "proof-engine-prevention/sqrt-neg-abs-return-nonneg-safe",
-    "desc": "sqrt(abs(X)) discharges because abs's overload declares ReturnNonnegative (FunctionReturnSatisfies), no intermediate modifier needed.",
-    "exercise": "field X as decimal; on E -> set Root = sqrt(abs(X))",
-    "specCite": "docs/compiler/proof-engine.md:777",
-    "expected": "accept",
-    "source": "added",
-    "block": "strategy2-nonneg-return-metadata"
-  },
-  {
-    "id": "proof-engine-prevention/sqrt-neg-in-computed-field-rejects",
-    "desc": "sqrt of an unproven operand in a computed-field expression rejects (context: computed field).",
-    "exercise": "field Value as decimal; field Root as number <- sqrt(Value)",
-    "specCite": "docs/compiler/proof-engine.md:2311",
-    "expected": "reject:SqrtOfNegative",
-    "source": "added",
-    "block": "catalog-obligation-sqrt"
-  },
-
-  {
-    "id": "proof-engine-prevention/pow-exp-literal-nonneg-safe",
-    "desc": "pow with a non-negative integer literal exponent discharges the exponent obligation.",
-    "exercise": "field X as decimal; on E -> set R = pow(X, 2)",
-    "specCite": "docs/compiler/proof-engine.md:523",
-    "expected": "accept",
-    "source": "added",
-    "block": "catalog-obligation-pow"
-  },
-  {
-    "id": "proof-engine-prevention/pow-exp-literal-negative-rejects",
-    "desc": "pow with a negative integer literal exponent is a proven violation of the `exp >= 0` obligation.",
-    "exercise": "field X as decimal; on E -> set R = pow(X, -1)",
-    "specCite": "docs/compiler/proof-engine.md:523",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "catalog-obligation-pow"
-  },
-  {
-    "id": "proof-engine-prevention/pow-exp-unguarded-field-rejects",
-    "desc": "pow with an unconstrained integer exponent field is not statically decidable → reject.",
-    "exercise": "field N as integer; field X as decimal; on E -> set R = pow(X, N)",
-    "specCite": "docs/compiler/proof-engine.md:523",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "catalog-obligation-pow"
-  },
-  {
-    "id": "proof-engine-prevention/pow-exp-guard-nonneg-safe",
-    "desc": "A `when N >= 0` guard discharges the pow exponent obligation.",
-    "exercise": "field N as integer; field X as decimal; on E when N >= 0 -> set R = pow(X, N)",
-    "specCite": "docs/compiler/proof-engine.md:523",
-    "expected": "accept",
-    "source": "added",
-    "block": "catalog-obligation-pow"
-  },
-
-  {
-    "id": "proof-engine-prevention/overflow-computed-bounded-operands-safe",
-    "desc": "A computed field over bounded operands whose result interval fits its own declared bounds discharges (IntervalContainment).",
-    "exercise": "field A as integer min 0 max 100; field B as integer min 0 max 100; field Avg as integer min 0 max 100 <- (A + B) / 2",
-    "specCite": "docs/compiler/proof-engine.md:604",
-    "expected": "accept",
-    "source": "added",
-    "block": "computed-field-bound-containment"
-  },
-  {
-    "id": "proof-engine-prevention/overflow-computed-unbounded-operands-rejects",
-    "desc": "A computed field with unbounded operands into a bounded field stays Unresolved and surfaces NumericOverflow (not vacuously satisfied).",
-    "exercise": "field A as integer; field B as integer; field Sum as integer min 0 max 100 <- A + B",
-    "specCite": "docs/compiler/proof-engine.md:604",
-    "expected": "reject:NumericOverflow",
-    "source": "added",
-    "block": "computed-field-bound-containment"
-  },
-  {
-    "id": "proof-engine-prevention/overflow-set-action-in-range-safe",
-    "desc": "A set-action assigning a provably in-range value to a min/max-bounded field discharges.",
-    "exercise": "field Level as integer min 0 max 10; on E when Level < 5 -> set Level = Level + 1",
-    "specCite": "docs/compiler/proof-engine.md:1703",
-    "expected": "accept",
-    "source": "added",
-    "block": "strategy8-interval-containment"
-  },
-  {
-    "id": "proof-engine-prevention/overflow-set-action-out-of-range-rejects",
-    "desc": "A set-action whose result interval exceeds the target field's declared bounds emits NumericOverflow.",
-    "exercise": "field Level as integer min 0 max 10; on E -> set Level = Level + 100",
-    "specCite": "docs/compiler/proof-engine.md:1703",
-    "expected": "reject:NumericOverflow",
-    "source": "added",
-    "block": "strategy8-interval-containment"
-  },
-  {
-    "id": "proof-engine-prevention/overflow-collection-element-write-in-range-safe",
-    "desc": "A numeric element written into a collection whose inner type declares min/max, in range, discharges the per-element containment obligation.",
-    "exercise": "field Scores as set of integer min 0 max 100; on E -> add Scores 50",
-    "specCite": "docs/compiler/proof-engine.md:1701",
-    "expected": "accept",
-    "source": "added",
-    "block": "strategy8-interval-containment"
-  },
-  {
-    "id": "proof-engine-prevention/overflow-collection-element-write-out-of-range-rejects",
-    "desc": "A numeric element written into a bounded-inner-type collection out of range emits NumericOverflow.",
-    "exercise": "field Scores as set of integer min 0 max 100; on E -> add Scores 500",
-    "specCite": "docs/compiler/proof-engine.md:1701",
-    "expected": "reject:NumericOverflow",
-    "source": "added",
-    "block": "strategy8-interval-containment"
-  },
-
-  {
-    "id": "proof-engine-prevention/oor-default-in-range-safe",
-    "desc": "A field default within its declared min/max discharges the default value-bound obligation.",
-    "exercise": "field X as integer min 0 max 10 default 5",
-    "specCite": "docs/compiler/proof-engine.md:1705",
-    "expected": "accept",
-    "source": "added",
-    "block": "numeric-default-outofrange"
-  },
-  {
-    "id": "proof-engine-prevention/oor-default-out-of-range-rejects",
-    "desc": "A field default violating a declared value-bounding modifier surfaces OutOfRange.",
-    "exercise": "field X as integer min 0 max 10 default 20",
-    "specCite": "docs/compiler/proof-engine.md:1705",
-    "expected": "reject:OutOfRange",
-    "source": "added",
-    "block": "numeric-default-outofrange"
-  },
-  {
-    "id": "proof-engine-prevention/oor-default-positive-zero-rejects",
-    "desc": "A `positive` field with default 0 violates the positive lower bound → OutOfRange.",
-    "exercise": "field X as positive integer default 0",
-    "specCite": "docs/compiler/proof-engine.md:1705",
-    "expected": "reject:OutOfRange",
-    "source": "added",
-    "block": "numeric-default-outofrange"
-  },
-  {
-    "id": "proof-engine-prevention/oor-default-unresolvable-not-checked",
-    "desc": "A genuinely unresolvable default magnitude is conservatively not range-checked (no false rejection).",
-    "exercise": "field A as integer; field X as integer min 0 max 10 default A   // non-constant default",
-    "specCite": "docs/compiler/proof-engine.md:1705",
-    "expected": "accept",
-    "source": "added",
-    "block": "numeric-default-outofrange"
-  },
-  {
-    "id": "proof-engine-prevention/oor-arg-default-out-of-range-rejects",
-    "desc": "An event-arg default violating a declared bound surfaces OutOfRange (context: arg default).",
-    "exercise": "on E(n as integer min 0 max 10 default 99) -> set X = n",
-    "specCite": "docs/compiler/proof-engine.md:1705",
-    "expected": "reject:OutOfRange",
-    "source": "added",
-    "block": "numeric-default-outofrange"
-  },
-
-  {
-    "id": "proof-engine-prevention/coll-first-literal-nonempty-safe",
-    "desc": "first() of a non-empty collection literal discharges the non-empty requirement.",
-    "exercise": "on E -> set FirstItem = first([1, 2, 3])",
-    "specCite": "docs/compiler/proof-engine.md:718",
-    "expected": "accept",
-    "source": "added",
-    "block": "catalog-obligation-accessors"
-  },
-  {
-    "id": "proof-engine-prevention/coll-first-empty-literal-rejects",
-    "desc": "first([]) of an empty collection literal is a proven violation.",
-    "exercise": "on E -> set FirstItem = first([])",
-    "specCite": "docs/compiler/proof-engine.md:723",
-    "expected": "reject:UnguardedCollectionAccess",
-    "source": "added",
-    "block": "catalog-obligation-accessors"
-  },
-  {
-    "id": "proof-engine-prevention/coll-first-unguarded-field-rejects",
-    "desc": "first(Items) on an unconstrained collection field with no guard is not statically decidable → reject.",
-    "exercise": "field Items as list of integer; on E -> set FirstItem = first(Items)",
-    "specCite": "docs/compiler/proof-engine.md:524",
-    "expected": "reject:UnguardedCollectionAccess",
-    "source": "added",
-    "block": "catalog-obligation-accessors"
-  },
-  {
-    "id": "proof-engine-prevention/coll-first-guard-count-fn-safe",
-    "desc": "A `when count(Items) > 0` guard discharges the non-empty requirement on first(Items).",
-    "exercise": "on Submitted when count(Items) > 0 -> set FirstItem = first(Items)",
-    "specCite": "docs/compiler/proof-engine.md:1064",
-    "expected": "accept",
-    "source": "added",
-    "block": "catalog-obligation-accessors"
-  },
-  {
-    "id": "proof-engine-prevention/coll-first-guard-count-member-safe",
-    "desc": "A `when Items.count > 0` member-access guard discharges the non-empty requirement.",
-    "exercise": "on E when Items.count > 0 -> set FirstItem = first(Items)",
-    "specCite": "docs/compiler/proof-engine.md:1086",
-    "expected": "accept",
-    "source": "added",
-    "block": "catalog-obligation-accessors"
-  },
-  {
-    "id": "proof-engine-prevention/coll-last-unguarded-rejects",
-    "desc": "last(Items) on an unguarded collection is not statically decidable → reject.",
-    "exercise": "field Items as list of integer; on E -> set LastItem = last(Items)",
-    "specCite": "docs/compiler/proof-engine.md:2124",
-    "expected": "reject:UnguardedCollectionAccess",
-    "source": "added",
-    "block": "collection-non-empty-sources"
-  },
-  {
-    "id": "proof-engine-prevention/coll-peek-unguarded-rejects",
-    "desc": "Queue/stack .peek on an unguarded collection is not statically decidable → reject.",
-    "exercise": "field Q as queue of integer; on E -> set Head = Q.peek",
-    "specCite": "docs/compiler/proof-engine.md:2125",
-    "expected": "reject:UnguardedCollectionAccess",
-    "source": "added",
-    "block": "collection-non-empty-sources"
-  },
-  {
-    "id": "proof-engine-prevention/coll-access-mincount-modifier-safe",
-    "desc": "A statically-literal mincount N (N>=1) discharges collection non-empty access requirements.",
-    "exercise": "field Items as list of integer mincount 1; on E -> set FirstItem = first(Items)",
-    "specCite": "docs/compiler/proof-engine.md:2133",
-    "expected": "accept",
-    "source": "added",
-    "block": "collection-non-empty-sources"
-  },
-  {
-    "id": "proof-engine-prevention/coll-access-after-grow-safe",
-    "desc": "A prior grow in the action chain establishes count>0, discharging a following accessor (CollectionGrowth Strategy 11).",
-    "exercise": "field Items as list of integer; on E -> add Items 1; set FirstItem = first(Items)",
-    "specCite": "docs/compiler/proof-engine.md:1252",
-    "expected": "accept",
-    "source": "added",
-    "block": "sequential-proof-flow"
-  },
-
-  {
-    "id": "proof-engine-prevention/coll-dequeue-unguarded-rejects",
-    "desc": "dequeue on an unguarded queue is not statically decidable → UnguardedCollectionMutation.",
-    "exercise": "field Q as queue of integer; on E -> dequeue Q",
-    "specCite": "docs/compiler/proof-engine.md:2131",
-    "expected": "reject:UnguardedCollectionMutation",
-    "source": "added",
-    "block": "collection-non-empty-sources"
-  },
-  {
-    "id": "proof-engine-prevention/coll-pop-unguarded-rejects",
-    "desc": "pop on an unguarded stack is not statically decidable → UnguardedCollectionMutation.",
-    "exercise": "field S as stack of integer; on E -> pop S",
-    "specCite": "docs/compiler/proof-engine.md:2127",
-    "expected": "reject:UnguardedCollectionMutation",
-    "source": "added",
-    "block": "collection-non-empty-sources"
-  },
-  {
-    "id": "proof-engine-prevention/coll-dequeue-guard-count-safe",
-    "desc": "A `when Q.count > 0` guard discharges the dequeue non-empty mutation obligation.",
-    "exercise": "field Q as queue of integer; on E when Q.count > 0 -> dequeue Q",
-    "specCite": "docs/compiler/proof-engine.md:2135",
-    "expected": "accept",
-    "source": "added",
-    "block": "collection-non-empty-sources"
-  },
-  {
-    "id": "proof-engine-prevention/coll-dequeue-after-grow-safe",
-    "desc": "An enqueue before a dequeue establishes count>0, discharging the dequeue (Strategy 11).",
-    "exercise": "field Q as queue of integer; on E -> enqueue Q 1; dequeue Q",
-    "specCite": "docs/compiler/proof-engine.md:1252",
-    "expected": "accept",
-    "source": "added",
-    "block": "sequential-proof-flow"
-  },
-  {
-    "id": "proof-engine-prevention/coll-dequeue-after-shrink-invalidates",
-    "desc": "A pre-shrink count>0 guard does not discharge a count>0 obligation after a shrink; the second dequeue rejects.",
-    "exercise": "field Q as queue of integer; on E when Q.count > 0 -> dequeue Q; dequeue Q",
-    "specCite": "docs/compiler/proof-engine.md:1253",
-    "expected": "reject:UnguardedCollectionMutation",
-    "source": "added",
-    "block": "sequential-proof-flow"
-  },
-
-  {
-    "id": "proof-engine-prevention/key-presence-unguarded-rejects",
-    "desc": "A lookup key access with no guard establishing key presence is not statically decidable → reject (KeyPresence via guard-derived bounds).",
-    "exercise": "field M as lookup of string to integer; on E -> set V = M['k']",
-    "specCite": "docs/compiler/proof-engine.md:628",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "requirement-dispatched-key-index"
-  },
-  {
-    "id": "proof-engine-prevention/key-presence-guard-safe",
-    "desc": "A guard establishing key presence discharges the key-lookup obligation.",
-    "exercise": "field M as lookup of string to integer; on E when M contains 'k' -> set V = M['k']",
-    "specCite": "docs/compiler/proof-engine.md:628",
-    "expected": "accept",
-    "source": "added",
-    "block": "requirement-dispatched-key-index"
-  },
-  {
-    "id": "proof-engine-prevention/index-bounds-unguarded-rejects",
-    "desc": "An indexed access with no guard establishing the index is within bounds is not statically decidable → reject (IndexBounds via guard-derived bounds).",
-    "exercise": "field Items as list of integer; field I as integer; on E -> set V = Items.at(I)",
-    "specCite": "docs/compiler/proof-engine.md:628",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "requirement-dispatched-key-index"
-  },
-  {
-    "id": "proof-engine-prevention/index-bounds-guard-safe",
-    "desc": "A guard establishing the index is within collection bounds discharges the index-bounds obligation.",
-    "exercise": "field Items as list of integer; field I as integer; on E when I >= 0 and I < Items.count -> set V = Items.at(I)",
-    "specCite": "docs/compiler/proof-engine.md:628",
-    "expected": "accept",
-    "source": "added",
-    "block": "requirement-dispatched-key-index"
-  },
-
-  {
-    "id": "proof-engine-prevention/presence-optional-unguarded-rejects",
-    "desc": "Access to an optional field with no presence guard is not statically decidable → UnprovedPresenceRequirement.",
-    "exercise": "field Note as optional string; on E -> set Copy = Note",
-    "specCite": "docs/compiler/proof-engine.md:2279",
-    "expected": "reject:UnprovedPresenceRequirement",
-    "source": "added",
-    "block": "presence-requirement"
-  },
-  {
-    "id": "proof-engine-prevention/presence-guard-is-set-safe",
-    "desc": "A `when Note is set` guard discharges the presence requirement.",
-    "exercise": "field Note as optional string; on E when Note is set -> set Copy = Note",
-    "specCite": "docs/compiler/proof-engine.md:1087",
-    "expected": "accept",
-    "source": "added",
-    "block": "presence-requirement"
-  },
-  {
-    "id": "proof-engine-prevention/presence-required-field-safe",
-    "desc": "A non-optional field carries a Guaranteed presence carrier — access discharges without a guard.",
-    "exercise": "field Name as string; on E -> set Copy = Name",
-    "specCite": "docs/compiler/proof-engine.md:983",
-    "expected": "accept",
-    "source": "added",
-    "block": "presence-requirement"
-  },
-  {
-    "id": "proof-engine-prevention/presence-notempty-optional-still-rejects",
-    "desc": "notempty does NOT satisfy presence — an optional notempty field may still be absent → reject.",
-    "exercise": "field Note as optional string notempty; on E -> set Copy = Note",
-    "specCite": "docs/compiler/proof-engine.md:985",
-    "expected": "reject:UnprovedPresenceRequirement",
-    "source": "added",
-    "block": "presence-requirement"
-  },
-  {
-    "id": "proof-engine-prevention/presence-reassign-clear-invalidates",
-    "desc": "A `clear` full-replacement write invalidates a prior presence guard; the following access rejects.",
-    "exercise": "field X as optional integer; on E when X is set -> clear X; set R = X + 1",
-    "specCite": "docs/compiler/proof-engine.md:1251",
-    "expected": "reject:UnprovedPresenceRequirement",
-    "source": "added",
-    "block": "sequential-proof-flow"
-  },
-
-  {
-    "id": "proof-engine-prevention/length-carried-bound-source-safe",
-    "desc": "A source bounded to maxlength N assigned into a destination of maxlength >= N discharges (length carries through composition).",
-    "exercise": "field Src as string maxlength 5; field Dest as string maxlength 10; on E -> set Dest = Src",
-    "specCite": "docs/compiler/proof-engine.md:1713",
-    "expected": "accept",
-    "source": "added",
-    "block": "strategy9-length-containment"
-  },
-  {
-    "id": "proof-engine-prevention/length-literal-in-bounds-safe",
-    "desc": "A string literal whose exact length fits the declared minlength/maxlength discharges.",
-    "exercise": "field Code as string minlength 2 maxlength 5; on E -> set Code = 'abc'",
-    "specCite": "docs/compiler/proof-engine.md:1717",
-    "expected": "accept",
-    "source": "added",
-    "block": "strategy9-length-containment"
-  },
-  {
-    "id": "proof-engine-prevention/length-literal-violating-rejects",
-    "desc": "A string literal whose length exceeds maxlength is a proven violation → LengthBoundViolation.",
-    "exercise": "field Code as string maxlength 3; on E -> set Code = 'abcdef'",
-    "specCite": "docs/compiler/proof-engine.md:1713",
-    "expected": "reject:LengthBoundViolation",
-    "source": "added",
-    "block": "strategy9-length-containment"
-  },
-  {
-    "id": "proof-engine-prevention/length-unbounded-source-rejects",
-    "desc": "An unbounded string source assigned into a capped field is unprovable (unbounded interval) → LengthBoundViolation (prove-or-reject).",
-    "exercise": "field Src as string; field Dest as string maxlength 10; on E -> set Dest = Src",
-    "specCite": "docs/compiler/proof-engine.md:1713",
-    "expected": "reject:LengthBoundViolation",
-    "source": "added",
-    "block": "strategy9-length-containment"
-  },
-  {
-    "id": "proof-engine-prevention/length-concat-within-bounds-safe",
-    "desc": "A concatenation whose summed length interval fits the destination bounds discharges.",
-    "exercise": "field A as string maxlength 3; field B as string maxlength 3; field Dest as string maxlength 10; on E -> set Dest = A + B",
-    "specCite": "docs/compiler/proof-engine.md:1719",
-    "expected": "accept",
-    "source": "added",
-    "block": "strategy9-length-containment"
-  },
-  {
-    "id": "proof-engine-prevention/length-concat-overflow-rejects",
-    "desc": "A concatenation whose summed length interval can exceed the destination maxlength rejects.",
-    "exercise": "field A as string maxlength 8; field B as string maxlength 8; field Dest as string maxlength 10; on E -> set Dest = A + B",
-    "specCite": "docs/compiler/proof-engine.md:1719",
-    "expected": "reject:LengthBoundViolation",
-    "source": "added",
-    "block": "strategy9-length-containment"
-  },
-  {
-    "id": "proof-engine-prevention/length-collection-element-write-rejects",
-    "desc": "An unbounded string introduced into a collection whose inner type declares maxlength rejects when not provably within the element bound.",
-    "exercise": "field Names as queue of string maxlength 200; field N as string; on E -> enqueue Names N",
-    "specCite": "docs/compiler/proof-engine.md:1711",
-    "expected": "reject:LengthBoundViolation",
-    "source": "added",
-    "block": "strategy9-length-containment"
-  },
-  {
-    "id": "proof-engine-prevention/length-string-default-violating-rejects",
-    "desc": "A string field default violating the declared minlength/maxlength surfaces LengthBoundViolation.",
-    "exercise": "field Code as string minlength 3 default 'a'",
-    "specCite": "docs/compiler/proof-engine.md:1711",
-    "expected": "reject:LengthBoundViolation",
-    "source": "added",
-    "block": "strategy9-length-containment"
-  },
-
-  {
-    "id": "proof-engine-prevention/count-grow-within-band-safe",
-    "desc": "A guarded grow that provably keeps count within maxcount discharges the count-containment obligation.",
-    "exercise": "field C as list of integer maxcount 5; on E when C.count < 5 -> add C 1",
-    "specCite": "docs/compiler/proof-engine.md:1733",
-    "expected": "accept",
-    "source": "added",
-    "block": "strategy10-count-containment"
-  },
-  {
-    "id": "proof-engine-prevention/count-grow-overflow-rejects",
-    "desc": "Two grows into maxcount 1 push the count interval past the cap → CountBoundViolation.",
-    "exercise": "field C as list of integer maxcount 1; on E -> add C 1; add C 2",
-    "specCite": "docs/compiler/proof-engine.md:1257",
-    "expected": "reject:CountBoundViolation",
-    "source": "added",
-    "block": "strategy10-count-containment"
-  },
-  {
-    "id": "proof-engine-prevention/count-unguarded-grow-unbounded-rejects",
-    "desc": "An unguarded grow whose upper bound was infinity-seeded is unprovable (post-hi = maxcount+1) → CountBoundViolation (no runtime deferral).",
-    "exercise": "field C as list of integer maxcount 5; on E -> add C 1",
-    "specCite": "docs/compiler/proof-engine.md:1731",
-    "expected": "reject:CountBoundViolation",
-    "source": "added",
-    "block": "strategy10-count-containment"
-  },
-  {
-    "id": "proof-engine-prevention/count-shrink-underflow-rejects",
-    "desc": "A shrink that can drop count below mincount rejects.",
-    "exercise": "field C as list of integer mincount 1; on E -> removeAt C 0",
-    "specCite": "docs/compiler/proof-engine.md:1257",
-    "expected": "reject:CountBoundViolation",
-    "source": "added",
-    "block": "strategy10-count-containment"
-  },
-  {
-    "id": "proof-engine-prevention/count-dedup-add-lower-delta-safe",
-    "desc": "Two adds into a dedup set maxcount 1 use +0 lower / +1 upper deltas; a guarded/room case discharges but an over-cap dedup chain is not falsely proved.",
-    "exercise": "field C as set of integer maxcount 1; on E -> add C 1; add C 1",
-    "specCite": "docs/compiler/proof-engine.md:1738",
-    "expected": "reject:CountBoundViolation",
-    "source": "added",
-    "block": "strategy10-count-delta-table"
-  },
-  {
-    "id": "proof-engine-prevention/count-default-literal-over-band-rejects",
-    "desc": "A `default [...]` literal whose exact element count exceeds maxcount rejects.",
-    "exercise": "field C as list of integer maxcount 2 default [1, 2, 3]",
-    "specCite": "docs/compiler/proof-engine.md:1742",
-    "expected": "reject:CountBoundViolation",
-    "source": "added",
-    "block": "strategy10-count-delta-table"
-  },
-
-  {
-    "id": "proof-engine-prevention/qual-currency-match-safe",
-    "desc": "money of same currency added discharges the qualifier-compatibility obligation.",
-    "exercise": "field A as money of 'USD'; field B as money of 'USD'; on E -> set S = A + B",
-    "specCite": "docs/compiler/proof-engine.md:1438",
-    "expected": "accept",
-    "source": "added",
-    "block": "strategy5-qualifier-compatibility"
-  },
-  {
-    "id": "proof-engine-prevention/qual-currency-mismatch-rejects",
-    "desc": "money of differing currencies added is a proven incompatibility → UnprovedQualifierCompatibility.",
-    "exercise": "field A as money of 'USD'; field B as money of 'EUR'; on E -> set S = A + B",
-    "specCite": "docs/compiler/proof-engine.md:1439",
-    "expected": "reject:UnprovedQualifierCompatibility",
-    "source": "added",
-    "block": "strategy5-qualifier-compatibility"
-  },
-  {
-    "id": "proof-engine-prevention/qual-unit-match-safe",
-    "desc": "quantity of same unit added discharges.",
-    "exercise": "field A as quantity in 'kg'; field B as quantity in 'kg'; on E -> set S = A + B",
-    "specCite": "docs/compiler/proof-engine.md:1438",
-    "expected": "accept",
-    "source": "added",
-    "block": "strategy5-qualifier-compatibility"
-  },
-  {
-    "id": "proof-engine-prevention/qual-unit-mismatch-rejects",
-    "desc": "quantity of differing units added → UnprovedQualifierCompatibility.",
-    "exercise": "field A as quantity in 'kg'; field B as quantity in 'miles'; on E -> set S = A + B",
-    "specCite": "docs/compiler/proof-engine.md:1439",
-    "expected": "reject:UnprovedQualifierCompatibility",
-    "source": "added",
-    "block": "strategy5-qualifier-compatibility"
-  },
-  {
-    "id": "proof-engine-prevention/qual-unqualified-unprovable-rejects",
-    "desc": "Unqualified quantity + quantity cannot be proven compatible → reject.",
-    "exercise": "field A as quantity; field B as quantity; on E -> set S = A + B",
-    "specCite": "docs/compiler/proof-engine.md:1440",
-    "expected": "reject:UnprovedQualifierCompatibility",
-    "source": "added",
-    "block": "strategy5-qualifier-compatibility"
-  },
-  {
-    "id": "proof-engine-prevention/qual-cross-unit-cancellation-known-gap",
-    "desc": "KNOWN GAP: price x quantity currently cancels for same-dimension but different-unit operands, silently dropping the UCUM conversion factor (unsound); doc flags this as undecided.",
-    "exercise": "field P as price in 'USD/kg'; field Q as quantity in 'g'; on E -> set M = P * Q",
-    "specCite": "docs/compiler/proof-engine.md:1790",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "qualifier-resolution-known-gap"
-  },
-
-  {
-    "id": "proof-engine-prevention/dim-product-curated-safe",
-    "desc": "A quantity x quantity product landing in the curated business-domain dimension set discharges.",
-    "exercise": "field L as quantity in 'm'; field W as quantity in 'm'; on E -> set Area = L * W",
-    "specCite": "docs/compiler/proof-engine.md:1472",
-    "expected": "accept",
-    "source": "added",
-    "block": "strategy6-dimensional-product"
-  },
-  {
-    "id": "proof-engine-prevention/dim-product-cancelling-safe",
-    "desc": "A cancelling pair (kg x 1/kg -> count) resolves to the dimensionless count alias and discharges.",
-    "exercise": "field A as quantity in 'kg'; field B as quantity in '/kg'; on E -> set N = A * B",
-    "specCite": "docs/compiler/proof-engine.md:1482",
-    "expected": "accept",
-    "source": "added",
-    "block": "strategy6-dimensional-product"
-  },
-  {
-    "id": "proof-engine-prevention/dim-product-outside-set-rejects",
-    "desc": "A product outside the curated set (kg x m -> mass*length) fails to discharge → IncompatibleDimensionalProduct.",
-    "exercise": "field A as quantity in 'kg'; field B as quantity in 'm'; on E -> set X = A * B",
-    "specCite": "docs/compiler/proof-engine.md:1482",
-    "expected": "reject:IncompatibleDimensionalProduct",
-    "source": "added",
-    "block": "strategy6-dimensional-product"
-  },
-
-  {
-    "id": "proof-engine-prevention/dim-req-declared-safe",
-    "desc": "A period operand with a declared/derived required dimension satisfies the dimension requirement.",
-    "exercise": "field D as period in 'days'; on E -> set Later = Start + D",
-    "specCite": "docs/compiler/proof-engine.md:557",
-    "expected": "accept",
-    "source": "added",
-    "block": "dimension-requirement"
-  },
-  {
-    "id": "proof-engine-prevention/dim-req-open-guard-safe",
-    "desc": "An open period whose dimension axis is narrowed by a `when X.dimension == 'date'` guard satisfies the dimension requirement.",
-    "exercise": "field P as period; on E when P.dimension == 'date' -> set Later = Start + P",
-    "specCite": "docs/compiler/proof-engine.md:769",
-    "expected": "accept",
-    "source": "added",
-    "block": "dimension-requirement"
-  },
-  {
-    "id": "proof-engine-prevention/dim-req-unproven-rejects",
-    "desc": "A period operand lacking the required dimension is not statically decidable → UnprovedDimensionRequirement.",
-    "exercise": "field P as period; on E -> set Later = Start + P",
-    "specCite": "docs/compiler/proof-engine.md:2276",
-    "expected": "reject:UnprovedDimensionRequirement",
-    "source": "added",
-    "block": "dimension-requirement"
-  },
-  {
-    "id": "proof-engine-prevention/dim-req-any-permissive-safe",
-    "desc": "PeriodDimension.Any (unqualified period, locked decision) permissively satisfies any dimension requirement.",
-    "exercise": "field P as period; on E -> set X = duration(P)   // Any satisfies dimension proof",
-    "specCite": "docs/compiler/proof-engine.md:883",
-    "expected": "accept",
-    "source": "added",
-    "block": "dimension-requirement"
-  },
-
-  {
-    "id": "proof-engine-prevention/mod-req-satisfied-safe",
-    "desc": "A field that declares the required modifier satisfies a ModifierRequirement (direct membership).",
-    "exercise": "field X as nonnegative integer; on E -> set R = requiresNonnegative(X)",
-    "specCite": "docs/compiler/proof-engine.md:894",
-    "expected": "accept",
-    "source": "added",
-    "block": "modifier-requirement"
-  },
-  {
-    "id": "proof-engine-prevention/mod-req-missing-rejects",
-    "desc": "A field lacking the required modifier cannot satisfy a ModifierRequirement → UnprovedModifierRequirement.",
-    "exercise": "field X as integer; on E -> set R = requiresNonnegative(X)",
-    "specCite": "docs/compiler/proof-engine.md:2275",
-    "expected": "reject:UnprovedModifierRequirement",
-    "source": "added",
-    "block": "modifier-requirement"
-  },
-
-  {
-    "id": "proof-engine-prevention/initstate-satisfiable-safe",
-    "desc": "Initial-state ensure satisfied by declared defaults discharges (no violation).",
-    "exercise": "field X as integer default 10; state Draft initial; ensure in Draft: X > 5 because \"...\"",
-    "specCite": "docs/compiler/proof-engine.md:2589",
-    "expected": "accept",
-    "source": "added",
-    "block": "initial-state-satisfiability"
-  },
-  {
-    "id": "proof-engine-prevention/initstate-unsatisfiable-rejects",
-    "desc": "An initial-state ensure provably false under declared defaults → UnsatisfiableInitialState.",
-    "exercise": "field X as integer default 0; state Draft initial; ensure in Draft: X > 5 because \"...\"",
-    "specCite": "docs/compiler/proof-engine.md:2589",
-    "expected": "reject:UnsatisfiableInitialState",
-    "source": "added",
-    "block": "initial-state-satisfiability"
-  },
-  {
-    "id": "proof-engine-prevention/initstate-unfoldable-conservative-safe",
-    "desc": "An unfoldable/non-literal default folds to Unknown → conservative pass (no false rejection).",
-    "exercise": "field Y as integer; field X as integer <- Y + 1; state Draft initial; ensure in Draft: X > 5 because \"...\"",
-    "specCite": "docs/compiler/proof-engine.md:2115",
-    "expected": "accept",
-    "source": "added",
-    "block": "initial-state-satisfiability"
-  },
-  {
-    "id": "proof-engine-prevention/initstate-guarded-ensure-skipped-safe",
-    "desc": "A guarded initial-state ensure is skipped (treated as vacuously satisfiable) — no rejection.",
-    "exercise": "field X as integer default 0; state Draft initial; ensure in Draft when X > 100: X > 5 because \"...\"",
-    "specCite": "docs/compiler/proof-engine.md:2111",
-    "expected": "accept",
-    "source": "added",
-    "block": "initial-state-satisfiability"
-  },
-  {
-    "id": "proof-engine-prevention/initstate-construction-event-suppressed-safe",
-    "desc": "A precept with an initial construction handler suppresses the rule/ensure-vs-default fold (placeholders overwritten), avoiding over-rejection.",
-    "exercise": "field X as integer default 0; state Draft initial; on initial(v as integer) -> set X = v; ensure in Draft: X > 5 because \"...\"",
-    "specCite": "docs/compiler/proof-engine.md:483",
-    "expected": "accept",
-    "source": "added",
-    "block": "rule-vs-default-fold"
-  },
-
-  {
-    "id": "proof-engine-prevention/rule-vs-default-violating-rejects",
-    "desc": "A global unguarded rule provably false against the field default environment → DefaultViolatesRule.",
-    "exercise": "field X as integer default 0; rule Positive: X > 5 because \"...\"",
-    "specCite": "docs/compiler/proof-engine.md:483",
-    "expected": "reject:DefaultViolatesRule",
-    "source": "added",
-    "block": "rule-vs-default-fold"
-  },
-  {
-    "id": "proof-engine-prevention/rule-vs-default-unknown-safe",
-    "desc": "A rule over a computed/non-constant/unknown default folds to null and never rejects (prove-or-reject: emit only on proven false).",
-    "exercise": "field Y as integer; field X as integer <- Y; rule Positive: X > 5 because \"...\"",
-    "specCite": "docs/compiler/proof-engine.md:483",
-    "expected": "accept",
-    "source": "added",
-    "block": "rule-vs-default-fold"
-  },
-  {
-    "id": "proof-engine-prevention/rule-vs-default-guarded-skipped-safe",
-    "desc": "A `when`-guarded rule is skipped by the rule-vs-default fold (not an unconditional invariant).",
-    "exercise": "field X as integer default 0; field Flag as boolean default false; rule Positive when Flag: X > 5 because \"...\"",
-    "specCite": "docs/compiler/proof-engine.md:483",
-    "expected": "accept",
-    "source": "added",
-    "block": "rule-vs-default-fold"
-  },
-
-  {
-    "id": "proof-engine-prevention/unsatisfiable-guard-rejects",
-    "desc": "A transition-row guard unsatisfiable under declared field bounds emits UnsatisfiableGuard (the row can never fire).",
-    "exercise": "field X as integer min 0 max 5; on E when X > 10 -> set Y = 1",
-    "specCite": "docs/compiler/proof-engine.md:438",
-    "expected": "reject:UnsatisfiableGuard",
-    "source": "added",
-    "block": "satisfiability-scan"
-  },
-  {
-    "id": "proof-engine-prevention/tautological-guard-rejects",
-    "desc": "A transition-row guard tautological under declared field bounds emits TautologicalGuard.",
-    "exercise": "field X as integer min 0 max 5; on E when X < 10 -> set Y = 1",
-    "specCite": "docs/compiler/proof-engine.md:439",
-    "expected": "reject:TautologicalGuard",
-    "source": "added",
-    "block": "satisfiability-scan"
-  },
-  {
-    "id": "proof-engine-prevention/unsatisfiable-rule-rejects",
-    "desc": "A rule impossible on its own field-declared bounds (empty interval) emits UnsatisfiableRule.",
-    "exercise": "field X as integer min 0 max 5; rule Impossible: X > 10 because \"...\"",
-    "specCite": "docs/compiler/proof-engine.md:442",
-    "expected": "reject:UnsatisfiableRule",
-    "source": "added",
-    "block": "satisfiability-scan"
-  },
-  {
-    "id": "proof-engine-prevention/vacuous-rule-rejects",
-    "desc": "A rule whose predicate is provably-true under field bounds emits VacuousRule.",
-    "exercise": "field X as integer min 0 max 5; rule Always: X < 100 because \"...\"",
-    "specCite": "docs/compiler/proof-engine.md:445",
-    "expected": "reject:VacuousRule",
-    "source": "added",
-    "block": "satisfiability-scan"
-  },
-  {
-    "id": "proof-engine-prevention/contradictory-rule-pair-rejects",
-    "desc": "Two rules whose interval intersection on a shared field is empty emit ContradictoryRule.",
-    "exercise": "field X as integer; rule Lo: X < 5 because \"...\"; rule Hi: X > 10 because \"...\"",
-    "specCite": "docs/compiler/proof-engine.md:446",
-    "expected": "reject:ContradictoryRule",
-    "source": "added",
-    "block": "satisfiability-scan"
-  },
-
-  {
-    "id": "proof-engine-prevention/obligation-completeness-declared-constraint-obligated",
-    "desc": "Every declared constraint with proof semantics produces an obligation on every applicable mutation path (Obligation Generation Contract) — a minlength field's assignment is checked.",
-    "exercise": "field X as string minlength 3; field Src as string; on E -> set X = Src",
-    "specCite": "docs/compiler/proof-engine.md:507",
-    "expected": "reject:LengthBoundViolation",
-    "source": "added",
-    "block": "obligation-generation-contract"
-  },
-  {
-    "id": "proof-engine-prevention/obligation-completeness-maxcount-obligated",
-    "desc": "A maxcount-declared collection produces a count-containment obligation on every growing mutation (Obligation Generation Contract).",
-    "exercise": "field C as set of string maxcount 10; field V as string; on E -> add C V",
-    "specCite": "docs/compiler/proof-engine.md:507",
-    "expected": "reject:CountBoundViolation",
-    "source": "added",
-    "block": "obligation-generation-contract"
-  },
-  {
-    "id": "proof-engine-prevention/prove-or-reject-no-runtime-deferral",
-    "desc": "When the compiler cannot prove a computed value stays inside its declared limit it rejects the definition rather than deferring to a runtime check (prove-or-reject MVP).",
-    "exercise": "field A as integer; field Capped as integer min 0 max 100 <- A",
-    "specCite": "docs/compiler/proof-engine.md:2609",
-    "expected": "reject:NumericOverflow",
-    "source": "added",
-    "block": "prove-or-reject-mvp"
-  },
-  {
-    "id": "proof-engine-prevention/reject-names-remediating-fix",
-    "desc": "When an obligation cannot be discharged the compiler rejects AND names what would make the operation provably safe (remediation guidance in the diagnostic).",
-    "exercise": "field Divisor as integer; on E -> set R = Total / Divisor   // diagnostic should name the guard/modifier that discharges",
-    "specCite": "docs/compiler/proof-engine.md:2659",
-    "expected": "reject:DivisionByZero",
-    "source": "added",
-    "block": "deliberate-exclusion-no-opaque-solver"
-  },
-  {
-    "id": "proof-engine-prevention/no-multi-hop-fact-chaining-rejects",
-    "desc": "A bound requiring transitive combination of two separate facts (allocations<=commitments + commitments<=plan) is out of scope — single-hop only — so it stays unproven and rejects.",
-    "exercise": "field Alloc as integer; field Commit as integer; field Plan as integer; rule R1: Alloc <= Commit because \"...\"; rule R2: Commit <= Plan because \"...\"; on E -> set R = Plan / (Plan - Alloc)",
-    "specCite": "docs/compiler/proof-engine.md:2617",
-    "expected": "reject:DivisionByZero",
-    "source": "added",
-    "block": "deferred-multi-fact"
-  },
-  {
-    "id": "proof-engine-prevention/no-cross-transition-dataflow-rejects",
-    "desc": "General dataflow across transitions is out of scope — a value made safe only by a prior transition's action is not tracked, so a dependent fault-prone op in a later transition rejects.",
-    "exercise": "state A initial; state B; on Setup from A to B -> set X = 5; on Use from B -> set R = Total / X",
-    "specCite": "docs/compiler/proof-engine.md:2685",
-    "expected": "reject:DivisionByZero",
-    "source": "added",
-    "block": "deliberate-exclusion-no-dataflow"
-  },
-
-  {
-    "id": "proof-engine-prevention/error-tainted-obligation-suppressed",
-    "desc": "An obligation whose site contains a type-error operand emits NO proof diagnostic (root cause already reported upstream; no cascading proof diagnostic).",
-    "exercise": "field Divisor as integer; on E -> set R = Total / (Divisor + undefinedName)",
-    "specCite": "docs/compiler/proof-engine.md:2360",
-    "expected": "reject:any",
-    "source": "added",
-    "block": "upstream-error-handling"
-  },
-  {
-    "id": "proof-engine-prevention/unreachable-state-suppresses-obligation",
-    "desc": "A transition originating from an unreachable state has its proof obligations vacuously satisfied (the transition can never fire) — no proof diagnostic from that row.",
-    "exercise": "state A initial; state Orphan; state B; on E from Orphan to B -> set R = Total / 0",
-    "specCite": "docs/compiler/proof-engine.md:2143",
-    "expected": "accept",
-    "source": "added",
-    "block": "forwarding-fact-consumption"
-  },
-  {
-    "id": "proof-engine-prevention/stateless-precept-proof-runs-rejects",
-    "desc": "The proof engine runs for stateless precepts — a fault-prone op in an event handler still rejects when unproven.",
-    "exercise": "field Divisor as integer; on Compute -> set R = Total / Divisor   // stateless, no states",
-    "specCite": "docs/compiler/proof-engine.md:2151",
-    "expected": "reject:DivisionByZero",
-    "source": "added",
-    "block": "stateless-precept-handling"
-  }
+ {
+  "id": "proof-engine-prevention/core-prove-safe-accepts",
+  "desc": "A fault-prone operation proven safe compiles clean (no runtime check needed).",
+  "exercise": "field Qty as positive integer; on E -> set R = Total / Qty",
+  "specCite": "docs/compiler/proof-engine.md:92",
+  "expected": "accept",
+  "source": "added",
+  "block": "s2-overview-core-guarantee"
+ },
+ {
+  "id": "proof-engine-prevention/core-proof-fails-rejects",
+  "desc": "When proof fails the compiler emits a diagnostic and the author must fix source before a model is produced (no silent pass).",
+  "exercise": "field Divisor as integer; on E -> set R = Total / Divisor",
+  "specCite": "docs/compiler/proof-engine.md:92",
+  "expected": "reject:DivisionByZero",
+  "source": "added",
+  "block": "s2-overview-core-guarantee"
+ },
+ {
+  "id": "proof-engine-prevention/never-guess-unprovable-rejects",
+  "desc": "The engine proves, rejects, or leaves explicitly unresolved \u2014 it never approximates hidden certainty; unprovable operation rejects.",
+  "exercise": "field N as integer; on E -> set R = 100 / N   // no modifier, no guard",
+  "specCite": "docs/compiler/proof-engine.md:18",
+  "expected": "reject:DivisionByZero",
+  "source": "added",
+  "block": "s1-non-negotiable-rules"
+ },
+ {
+  "id": "proof-engine-prevention/qty-normalization-exact-supported-units",
+  "desc": "Quantity-dependent proof obligations are exact for supported business-domain UCUM units (decimal magnitudes, no float drift).",
+  "exercise": "field W as quantity in 'kg' min '0 kg' max '100 kg'; on E -> set W = '50 kg'",
+  "specCite": "docs/compiler/proof-engine.md:110",
+  "expected": "accept",
+  "source": "added",
+  "block": "s2-qty-normalization-note"
+ },
+ {
+  "id": "proof-engine-prevention/qty-normalization-log-units-outside-guarantee",
+  "desc": "Logarithmic/reference-level units (dB, [pH]) are outside the exact-proof guarantee \u2014 obligations over them are not provably exact.",
+  "exercise": "field L as quantity in 'dB'; on E -> set R = L + L   // outside proof guarantee",
+  "specCite": "docs/compiler/proof-engine.md:110",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "s2-qty-normalization-note"
+ },
+ {
+  "id": "proof-engine-prevention/div-zero-literal-nonzero-safe",
+  "desc": "Division by a non-zero literal divisor discharges (Literal proof).",
+  "exercise": "on E -> set R = X / 2",
+  "specCite": "docs/compiler/proof-engine.md:717",
+  "expected": "accept",
+  "source": "added",
+  "block": "catalog-obligation-division"
+ },
+ {
+  "id": "proof-engine-prevention/div-zero-literal-zero-rejects",
+  "desc": "Division by a literal zero divisor is a proven violation.",
+  "exercise": "on E -> set R = X / 0",
+  "specCite": "docs/compiler/proof-engine.md:724",
+  "expected": "reject:DivisionByZero",
+  "source": "added",
+  "block": "catalog-obligation-division"
+ },
+ {
+  "id": "proof-engine-prevention/div-zero-unguarded-field-rejects",
+  "desc": "Division by an unconstrained field with no guard/modifier is not statically decidable \u2192 reject (unprovable=reject).",
+  "exercise": "field Divisor as integer; on E -> set R = Total / Divisor",
+  "specCite": "docs/compiler/proof-engine.md:521",
+  "expected": "reject:DivisionByZero",
+  "source": "added",
+  "block": "catalog-obligation-division"
+ },
+ {
+  "id": "proof-engine-prevention/div-zero-guard-nonzero-safe",
+  "desc": "A `when Divisor != 0` guard in the enclosing row discharges the divisor obligation (Guard-in-path).",
+  "exercise": "on Calculate when Divisor != 0 -> set Rate = Total / Divisor",
+  "specCite": "docs/compiler/proof-engine.md:1069",
+  "expected": "accept",
+  "source": "added",
+  "block": "catalog-obligation-division"
+ },
+ {
+  "id": "proof-engine-prevention/div-zero-guard-positive-safe",
+  "desc": "A `when Divisor > 0` guard subsumes `!= 0` and discharges the divisor obligation.",
+  "exercise": "on Submitted when Quantity > 0 -> set Rate = Amount / Quantity",
+  "specCite": "docs/compiler/proof-engine.md:800",
+  "expected": "accept",
+  "source": "added",
+  "block": "catalog-obligation-division"
+ },
+ {
+  "id": "proof-engine-prevention/div-zero-modifier-positive-safe",
+  "desc": "A `positive` modifier on the divisor field discharges the divisor obligation (Declaration-attribute proof).",
+  "exercise": "field Divisor as positive integer; on Calculate -> set Result = Total / Divisor",
+  "specCite": "docs/compiler/proof-engine.md:809",
+  "expected": "accept",
+  "source": "added",
+  "block": "catalog-obligation-division"
+ },
+ {
+  "id": "proof-engine-prevention/div-zero-modifier-nonzero-safe",
+  "desc": "A `nonzero` modifier on the divisor field discharges the divisor obligation.",
+  "exercise": "field Divisor as nonzero integer; on E -> set R = Total / Divisor",
+  "specCite": "docs/compiler/proof-engine.md:786",
+  "expected": "accept",
+  "source": "added",
+  "block": "catalog-obligation-division"
+ },
+ {
+  "id": "proof-engine-prevention/div-zero-in-rule-expression-rejects",
+  "desc": "A division whose divisor is unproven, appearing in a rule condition, rejects (context: rule expression).",
+  "exercise": "field Divisor as integer; rule Check: Total / Divisor > 0 because \"...\"",
+  "specCite": "docs/compiler/proof-engine.md:1116",
+  "expected": "reject:DivisionByZero",
+  "source": "added",
+  "block": "catalog-obligation-division"
+ },
+ {
+  "id": "proof-engine-prevention/div-zero-in-ensure-expression-rejects",
+  "desc": "A division with an unproven divisor in an ensure condition rejects (context: ensure expression).",
+  "exercise": "field Divisor as integer; ensure in Draft: Total / Divisor > 0 because \"...\"",
+  "specCite": "docs/compiler/proof-engine.md:1117",
+  "expected": "reject:DivisionByZero",
+  "source": "added",
+  "block": "catalog-obligation-division"
+ },
+ {
+  "id": "proof-engine-prevention/div-zero-in-computed-field-rejects",
+  "desc": "A division with an unproven divisor in a computed-field expression rejects (context: computed field).",
+  "exercise": "field Divisor as integer; field Rate as number <- Total / Divisor",
+  "specCite": "docs/compiler/proof-engine.md:2311",
+  "expected": "reject:DivisionByZero",
+  "source": "added",
+  "block": "catalog-obligation-division"
+ },
+ {
+  "id": "proof-engine-prevention/div-zero-reassignment-invalidates-guard",
+  "desc": "A guard fact is invalidated by a full-replacement write before the division; the divisor obligation after the reassignment rejects.",
+  "exercise": "on E when X != 0 -> set X = 0; set R = 100 / X",
+  "specCite": "docs/compiler/proof-engine.md:1251",
+  "expected": "reject:DivisionByZero",
+  "source": "added",
+  "block": "sequential-proof-flow"
+ },
+ {
+  "id": "proof-engine-prevention/div-zero-subtraction-divisor-relational-safe",
+  "desc": "A subtraction divisor `Z/(A-B)` under `when A > B` discharges (A>B implies A-B>0, no sign knowledge needed).",
+  "exercise": "on E when A > B -> set R = Z / (A - B)",
+  "specCite": "docs/compiler/proof-engine.md:1363",
+  "expected": "accept",
+  "source": "added",
+  "block": "strategy4-subtraction-table"
+ },
+ {
+  "id": "proof-engine-prevention/div-zero-barefield-divisor-relational-rejects",
+  "desc": "A bare-field divisor `Z/A` under `when A > B` is NOT provable (both could be negative) \u2192 reject.",
+  "exercise": "on E when A > B -> set R = Z / A",
+  "specCite": "docs/compiler/proof-engine.md:1362",
+  "expected": "reject:DivisionByZero",
+  "source": "added",
+  "block": "strategy4-subtraction-table"
+ },
+ {
+  "id": "proof-engine-prevention/div-zero-relational-contradiction-rejects",
+  "desc": "A relational rule that empties the divisor's declared interval (e.g. X>=Y with X max 5, Y min 10) contributes no discharge fact; the dependent division rejects at its own Error.",
+  "exercise": "field X as integer max 5; field Y as integer min 10; rule R: X >= Y because \"...\"; on E -> set Q = Z / X",
+  "specCite": "docs/compiler/proof-engine.md:1429",
+  "expected": "reject:DivisionByZero",
+  "source": "added",
+  "block": "strategy4-contradiction-guard"
+ },
+ {
+  "id": "proof-engine-prevention/mod-zero-literal-nonzero-safe",
+  "desc": "Modulo by a non-zero literal discharges.",
+  "exercise": "on E -> set R = X % 2",
+  "specCite": "docs/compiler/proof-engine.md:1888",
+  "expected": "accept",
+  "source": "added",
+  "block": "constant-folder-zero-denom"
+ },
+ {
+  "id": "proof-engine-prevention/mod-zero-literal-zero-rejects",
+  "desc": "Modulo by a literal zero is a proven violation (the folder refuses to evaluate through modulo-by-zero, same guard as division).",
+  "exercise": "on E -> set R = X % 0",
+  "specCite": "docs/compiler/proof-engine.md:1888",
+  "expected": "reject:DivisionByZero",
+  "source": "added",
+  "block": "constant-folder-zero-denom"
+ },
+ {
+  "id": "proof-engine-prevention/mod-zero-unguarded-field-rejects",
+  "desc": "Modulo by an unconstrained field with no guard/modifier is not statically decidable \u2192 reject.",
+  "exercise": "field Divisor as integer; on E -> set R = X % Divisor",
+  "specCite": "docs/compiler/proof-engine.md:1888",
+  "expected": "reject:DivisionByZero",
+  "source": "added",
+  "block": "constant-folder-zero-denom"
+ },
+ {
+  "id": "proof-engine-prevention/mod-zero-guard-nonzero-safe",
+  "desc": "A `when Divisor != 0` guard discharges the modulo divisor obligation.",
+  "exercise": "on E when Divisor != 0 -> set R = X % Divisor",
+  "specCite": "docs/compiler/proof-engine.md:1888",
+  "expected": "accept",
+  "source": "added",
+  "block": "constant-folder-zero-denom"
+ },
+ {
+  "id": "proof-engine-prevention/sqrt-neg-literal-nonneg-safe",
+  "desc": "sqrt of a non-negative literal discharges (Literal proof).",
+  "exercise": "on E -> set R = sqrt(4)",
+  "specCite": "docs/compiler/proof-engine.md:719",
+  "expected": "accept",
+  "source": "added",
+  "block": "catalog-obligation-sqrt"
+ },
+ {
+  "id": "proof-engine-prevention/sqrt-neg-literal-negative-rejects",
+  "desc": "sqrt of a negative literal is a proven violation.",
+  "exercise": "on E -> set R = sqrt(-1)",
+  "specCite": "docs/compiler/proof-engine.md:724",
+  "expected": "reject:SqrtOfNegative",
+  "source": "added",
+  "block": "catalog-obligation-sqrt"
+ },
+ {
+  "id": "proof-engine-prevention/sqrt-neg-unguarded-field-rejects",
+  "desc": "sqrt of an unconstrained field with no guard/modifier is not statically decidable \u2192 reject.",
+  "exercise": "field Value as decimal; on E -> set Root = sqrt(Value)",
+  "specCite": "docs/compiler/proof-engine.md:522",
+  "expected": "reject:SqrtOfNegative",
+  "source": "added",
+  "block": "catalog-obligation-sqrt"
+ },
+ {
+  "id": "proof-engine-prevention/sqrt-neg-guard-nonneg-safe",
+  "desc": "A `when Value >= 0` guard discharges the sqrt non-negative obligation.",
+  "exercise": "on Process when Value >= 0 -> set Root = sqrt(Value)",
+  "specCite": "docs/compiler/proof-engine.md:1074",
+  "expected": "accept",
+  "source": "added",
+  "block": "catalog-obligation-sqrt"
+ },
+ {
+  "id": "proof-engine-prevention/sqrt-neg-modifier-nonnegative-safe",
+  "desc": "A `nonnegative` modifier on the operand field discharges the sqrt obligation.",
+  "exercise": "field Value as nonnegative decimal; on E -> set Root = sqrt(Value)",
+  "specCite": "docs/compiler/proof-engine.md:785",
+  "expected": "accept",
+  "source": "added",
+  "block": "catalog-obligation-sqrt"
+ },
+ {
+  "id": "proof-engine-prevention/sqrt-neg-abs-return-nonneg-safe",
+  "desc": "sqrt(abs(X)) discharges because abs's overload declares ReturnNonnegative (FunctionReturnSatisfies), no intermediate modifier needed.",
+  "exercise": "field X as decimal; on E -> set Root = sqrt(abs(X))",
+  "specCite": "docs/compiler/proof-engine.md:777",
+  "expected": "accept",
+  "source": "added",
+  "block": "strategy2-nonneg-return-metadata"
+ },
+ {
+  "id": "proof-engine-prevention/sqrt-neg-in-computed-field-rejects",
+  "desc": "sqrt of an unproven operand in a computed-field expression rejects (context: computed field).",
+  "exercise": "field Value as decimal; field Root as number <- sqrt(Value)",
+  "specCite": "docs/compiler/proof-engine.md:2311",
+  "expected": "reject:SqrtOfNegative",
+  "source": "added",
+  "block": "catalog-obligation-sqrt"
+ },
+ {
+  "id": "proof-engine-prevention/pow-exp-literal-nonneg-safe",
+  "desc": "pow with a non-negative integer literal exponent discharges the exponent obligation.",
+  "exercise": "field X as decimal; on E -> set R = pow(X, 2)",
+  "specCite": "docs/compiler/proof-engine.md:523",
+  "expected": "accept",
+  "source": "added",
+  "block": "catalog-obligation-pow"
+ },
+ {
+  "id": "proof-engine-prevention/pow-exp-literal-negative-rejects",
+  "desc": "pow with a negative integer literal exponent is a proven violation of the `exp >= 0` obligation.",
+  "exercise": "field X as decimal; on E -> set R = pow(X, -1)",
+  "specCite": "docs/compiler/proof-engine.md:523",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "catalog-obligation-pow"
+ },
+ {
+  "id": "proof-engine-prevention/pow-exp-unguarded-field-rejects",
+  "desc": "pow with an unconstrained integer exponent field is not statically decidable \u2192 reject.",
+  "exercise": "field N as integer; field X as decimal; on E -> set R = pow(X, N)",
+  "specCite": "docs/compiler/proof-engine.md:523",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "catalog-obligation-pow"
+ },
+ {
+  "id": "proof-engine-prevention/pow-exp-guard-nonneg-safe",
+  "desc": "A `when N >= 0` guard discharges the pow exponent obligation.",
+  "exercise": "field N as integer; field X as decimal; on E when N >= 0 -> set R = pow(X, N)",
+  "specCite": "docs/compiler/proof-engine.md:523",
+  "expected": "accept",
+  "source": "added",
+  "block": "catalog-obligation-pow"
+ },
+ {
+  "id": "proof-engine-prevention/overflow-computed-bounded-operands-safe",
+  "desc": "A computed field over bounded operands whose result interval fits its own declared bounds discharges (IntervalContainment).",
+  "exercise": "field A as integer min 0 max 100; field B as integer min 0 max 100; field Avg as integer min 0 max 100 <- (A + B) / 2",
+  "specCite": "docs/compiler/proof-engine.md:604",
+  "expected": "accept",
+  "source": "added",
+  "block": "computed-field-bound-containment"
+ },
+ {
+  "id": "proof-engine-prevention/overflow-computed-unbounded-operands-rejects",
+  "desc": "A computed field with unbounded operands into a bounded field stays Unresolved and surfaces NumericOverflow (not vacuously satisfied).",
+  "exercise": "field A as integer; field B as integer; field Sum as integer min 0 max 100 <- A + B",
+  "specCite": "docs/compiler/proof-engine.md:604",
+  "expected": "reject:NumericOverflow",
+  "source": "added",
+  "block": "computed-field-bound-containment"
+ },
+ {
+  "id": "proof-engine-prevention/overflow-set-action-in-range-safe",
+  "desc": "A set-action assigning a provably in-range value to a min/max-bounded field discharges.",
+  "exercise": "field Level as integer min 0 max 10; on E when Level < 5 -> set Level = Level + 1",
+  "specCite": "docs/compiler/proof-engine.md:1703",
+  "expected": "accept",
+  "source": "added",
+  "block": "strategy8-interval-containment"
+ },
+ {
+  "id": "proof-engine-prevention/overflow-set-action-out-of-range-rejects",
+  "desc": "A set-action whose result interval exceeds the target field's declared bounds emits NumericOverflow.",
+  "exercise": "field Level as integer min 0 max 10; on E -> set Level = Level + 100",
+  "specCite": "docs/compiler/proof-engine.md:1703",
+  "expected": "reject:NumericOverflow",
+  "source": "added",
+  "block": "strategy8-interval-containment"
+ },
+ {
+  "id": "proof-engine-prevention/overflow-collection-element-write-in-range-safe",
+  "desc": "A numeric element written into a collection whose inner type declares min/max, in range, discharges the per-element containment obligation.",
+  "exercise": "field Scores as set of integer min 0 max 100; on E -> add Scores 50",
+  "specCite": "docs/compiler/proof-engine.md:1701",
+  "expected": "accept",
+  "source": "added",
+  "block": "strategy8-interval-containment"
+ },
+ {
+  "id": "proof-engine-prevention/overflow-collection-element-write-out-of-range-rejects",
+  "desc": "A numeric element written into a bounded-inner-type collection out of range emits NumericOverflow.",
+  "exercise": "field Scores as set of integer min 0 max 100; on E -> add Scores 500",
+  "specCite": "docs/compiler/proof-engine.md:1701",
+  "expected": "reject:NumericOverflow",
+  "source": "added",
+  "block": "strategy8-interval-containment"
+ },
+ {
+  "id": "proof-engine-prevention/oor-default-in-range-safe",
+  "desc": "A field default within its declared min/max discharges the default value-bound obligation.",
+  "exercise": "field X as integer min 0 max 10 default 5",
+  "specCite": "docs/compiler/proof-engine.md:1705",
+  "expected": "accept",
+  "source": "added",
+  "block": "numeric-default-outofrange"
+ },
+ {
+  "id": "proof-engine-prevention/oor-default-out-of-range-rejects",
+  "desc": "A field default violating a declared value-bounding modifier surfaces OutOfRange.",
+  "exercise": "field X as integer min 0 max 10 default 20",
+  "specCite": "docs/compiler/proof-engine.md:1705",
+  "expected": "reject:OutOfRange",
+  "source": "added",
+  "block": "numeric-default-outofrange"
+ },
+ {
+  "id": "proof-engine-prevention/oor-default-positive-zero-rejects",
+  "desc": "A `positive` field with default 0 violates the positive lower bound \u2192 OutOfRange.",
+  "exercise": "field X as positive integer default 0",
+  "specCite": "docs/compiler/proof-engine.md:1705",
+  "expected": "reject:OutOfRange",
+  "source": "added",
+  "block": "numeric-default-outofrange"
+ },
+ {
+  "id": "proof-engine-prevention/oor-default-unresolvable-not-checked",
+  "desc": "A genuinely unresolvable default magnitude is conservatively not range-checked (no false rejection).",
+  "exercise": "field A as integer; field X as integer min 0 max 10 default A   // non-constant default",
+  "specCite": "docs/compiler/proof-engine.md:1705",
+  "expected": "accept",
+  "source": "added",
+  "block": "numeric-default-outofrange"
+ },
+ {
+  "id": "proof-engine-prevention/oor-arg-default-out-of-range-rejects",
+  "desc": "An event-arg default violating a declared bound surfaces OutOfRange (context: arg default).",
+  "exercise": "on E(n as integer min 0 max 10 default 99) -> set X = n",
+  "specCite": "docs/compiler/proof-engine.md:1705",
+  "expected": "reject:OutOfRange",
+  "source": "added",
+  "block": "numeric-default-outofrange"
+ },
+ {
+  "id": "proof-engine-prevention/coll-first-literal-nonempty-safe",
+  "desc": "first() of a non-empty collection literal discharges the non-empty requirement.",
+  "exercise": "on E -> set FirstItem = first([1, 2, 3])",
+  "specCite": "docs/compiler/proof-engine.md:718",
+  "expected": "accept",
+  "source": "added",
+  "block": "catalog-obligation-accessors"
+ },
+ {
+  "id": "proof-engine-prevention/coll-first-empty-literal-rejects",
+  "desc": "first([]) of an empty collection literal is a proven violation.",
+  "exercise": "on E -> set FirstItem = first([])",
+  "specCite": "docs/compiler/proof-engine.md:723",
+  "expected": "reject:UnguardedCollectionAccess",
+  "source": "added",
+  "block": "catalog-obligation-accessors"
+ },
+ {
+  "id": "proof-engine-prevention/coll-first-unguarded-field-rejects",
+  "desc": "first(Items) on an unconstrained collection field with no guard is not statically decidable \u2192 reject.",
+  "exercise": "field Items as list of integer; on E -> set FirstItem = first(Items)",
+  "specCite": "docs/compiler/proof-engine.md:524",
+  "expected": "reject:UnguardedCollectionAccess",
+  "source": "added",
+  "block": "catalog-obligation-accessors"
+ },
+ {
+  "id": "proof-engine-prevention/coll-first-guard-count-fn-safe",
+  "desc": "A `when count(Items) > 0` guard discharges the non-empty requirement on first(Items).",
+  "exercise": "on Submitted when count(Items) > 0 -> set FirstItem = first(Items)",
+  "specCite": "docs/compiler/proof-engine.md:1064",
+  "expected": "accept",
+  "source": "added",
+  "block": "catalog-obligation-accessors"
+ },
+ {
+  "id": "proof-engine-prevention/coll-first-guard-count-member-safe",
+  "desc": "A `when Items.count > 0` member-access guard discharges the non-empty requirement.",
+  "exercise": "on E when Items.count > 0 -> set FirstItem = first(Items)",
+  "specCite": "docs/compiler/proof-engine.md:1086",
+  "expected": "accept",
+  "source": "added",
+  "block": "catalog-obligation-accessors"
+ },
+ {
+  "id": "proof-engine-prevention/coll-last-unguarded-rejects",
+  "desc": "last(Items) on an unguarded collection is not statically decidable \u2192 reject.",
+  "exercise": "field Items as list of integer; on E -> set LastItem = last(Items)",
+  "specCite": "docs/compiler/proof-engine.md:2124",
+  "expected": "reject:UnguardedCollectionAccess",
+  "source": "added",
+  "block": "collection-non-empty-sources"
+ },
+ {
+  "id": "proof-engine-prevention/coll-peek-unguarded-rejects",
+  "desc": "Queue/stack .peek on an unguarded collection is not statically decidable \u2192 reject.",
+  "exercise": "field Q as queue of integer; on E -> set Head = Q.peek",
+  "specCite": "docs/compiler/proof-engine.md:2125",
+  "expected": "reject:UnguardedCollectionAccess",
+  "source": "added",
+  "block": "collection-non-empty-sources"
+ },
+ {
+  "id": "proof-engine-prevention/coll-access-mincount-modifier-safe",
+  "desc": "A statically-literal mincount N (N>=1) discharges collection non-empty access requirements.",
+  "exercise": "field Items as list of integer mincount 1; on E -> set FirstItem = first(Items)",
+  "specCite": "docs/compiler/proof-engine.md:2133",
+  "expected": "accept",
+  "source": "added",
+  "block": "collection-non-empty-sources"
+ },
+ {
+  "id": "proof-engine-prevention/coll-access-after-grow-safe",
+  "desc": "A prior grow in the action chain establishes count>0, discharging a following accessor (CollectionGrowth Strategy 11).",
+  "exercise": "field Items as list of integer; on E -> add Items 1; set FirstItem = first(Items)",
+  "specCite": "docs/compiler/proof-engine.md:1252",
+  "expected": "accept",
+  "source": "added",
+  "block": "sequential-proof-flow"
+ },
+ {
+  "id": "proof-engine-prevention/coll-dequeue-unguarded-rejects",
+  "desc": "dequeue on an unguarded queue is not statically decidable \u2192 UnguardedCollectionMutation.",
+  "exercise": "field Q as queue of integer; on E -> dequeue Q",
+  "specCite": "docs/compiler/proof-engine.md:2131",
+  "expected": "reject:UnguardedCollectionMutation",
+  "source": "added",
+  "block": "collection-non-empty-sources"
+ },
+ {
+  "id": "proof-engine-prevention/coll-pop-unguarded-rejects",
+  "desc": "pop on an unguarded stack is not statically decidable \u2192 UnguardedCollectionMutation.",
+  "exercise": "field S as stack of integer; on E -> pop S",
+  "specCite": "docs/compiler/proof-engine.md:2127",
+  "expected": "reject:UnguardedCollectionMutation",
+  "source": "added",
+  "block": "collection-non-empty-sources"
+ },
+ {
+  "id": "proof-engine-prevention/coll-dequeue-guard-count-safe",
+  "desc": "A `when Q.count > 0` guard discharges the dequeue non-empty mutation obligation.",
+  "exercise": "field Q as queue of integer; on E when Q.count > 0 -> dequeue Q",
+  "specCite": "docs/compiler/proof-engine.md:2135",
+  "expected": "accept",
+  "source": "added",
+  "block": "collection-non-empty-sources"
+ },
+ {
+  "id": "proof-engine-prevention/coll-dequeue-after-grow-safe",
+  "desc": "An enqueue before a dequeue establishes count>0, discharging the dequeue (Strategy 11).",
+  "exercise": "field Q as queue of integer; on E -> enqueue Q 1; dequeue Q",
+  "specCite": "docs/compiler/proof-engine.md:1252",
+  "expected": "accept",
+  "source": "added",
+  "block": "sequential-proof-flow"
+ },
+ {
+  "id": "proof-engine-prevention/coll-dequeue-after-shrink-invalidates",
+  "desc": "A pre-shrink count>0 guard does not discharge a count>0 obligation after a shrink; the second dequeue rejects.",
+  "exercise": "field Q as queue of integer; on E when Q.count > 0 -> dequeue Q; dequeue Q",
+  "specCite": "docs/compiler/proof-engine.md:1253",
+  "expected": "reject:UnguardedCollectionMutation",
+  "source": "added",
+  "block": "sequential-proof-flow"
+ },
+ {
+  "id": "proof-engine-prevention/key-presence-unguarded-rejects",
+  "desc": "A lookup key access with no guard establishing key presence is not statically decidable \u2192 reject (KeyPresence via guard-derived bounds).",
+  "exercise": "field M as lookup of string to integer; on E -> set V = M['k']",
+  "specCite": "docs/compiler/proof-engine.md:628",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "requirement-dispatched-key-index"
+ },
+ {
+  "id": "proof-engine-prevention/key-presence-guard-safe",
+  "desc": "A guard establishing key presence discharges the key-lookup obligation.",
+  "exercise": "field M as lookup of string to integer; on E when M contains 'k' -> set V = M['k']",
+  "specCite": "docs/compiler/proof-engine.md:628",
+  "expected": "accept",
+  "source": "added",
+  "block": "requirement-dispatched-key-index"
+ },
+ {
+  "id": "proof-engine-prevention/index-bounds-unguarded-rejects",
+  "desc": "An indexed access with no guard establishing the index is within bounds is not statically decidable \u2192 reject (IndexBounds via guard-derived bounds).",
+  "exercise": "field Items as list of integer; field I as integer; on E -> set V = Items.at(I)",
+  "specCite": "docs/compiler/proof-engine.md:628",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "requirement-dispatched-key-index"
+ },
+ {
+  "id": "proof-engine-prevention/index-bounds-guard-safe",
+  "desc": "A guard establishing the index is within collection bounds discharges the index-bounds obligation.",
+  "exercise": "field Items as list of integer; field I as integer; on E when I >= 0 and I < Items.count -> set V = Items.at(I)",
+  "specCite": "docs/compiler/proof-engine.md:628",
+  "expected": "accept",
+  "source": "added",
+  "block": "requirement-dispatched-key-index"
+ },
+ {
+  "id": "proof-engine-prevention/presence-optional-unguarded-rejects",
+  "desc": "Access to an optional field with no presence guard is not statically decidable \u2192 UnprovedPresenceRequirement.",
+  "exercise": "field Note as optional string; on E -> set Copy = Note",
+  "specCite": "docs/compiler/proof-engine.md:2279",
+  "expected": "reject:UnprovedPresenceRequirement",
+  "source": "added",
+  "block": "presence-requirement"
+ },
+ {
+  "id": "proof-engine-prevention/presence-guard-is-set-safe",
+  "desc": "A `when Note is set` guard discharges the presence requirement.",
+  "exercise": "field Note as optional string; on E when Note is set -> set Copy = Note",
+  "specCite": "docs/compiler/proof-engine.md:1087",
+  "expected": "accept",
+  "source": "added",
+  "block": "presence-requirement"
+ },
+ {
+  "id": "proof-engine-prevention/presence-required-field-safe",
+  "desc": "A non-optional field carries a Guaranteed presence carrier \u2014 access discharges without a guard.",
+  "exercise": "field Name as string; on E -> set Copy = Name",
+  "specCite": "docs/compiler/proof-engine.md:983",
+  "expected": "accept",
+  "source": "added",
+  "block": "presence-requirement"
+ },
+ {
+  "id": "proof-engine-prevention/presence-notempty-optional-still-rejects",
+  "desc": "notempty does NOT satisfy presence \u2014 an optional notempty field may still be absent \u2192 reject.",
+  "exercise": "field Note as optional string notempty; on E -> set Copy = Note",
+  "specCite": "docs/compiler/proof-engine.md:985",
+  "expected": "reject:UnprovedPresenceRequirement",
+  "source": "added",
+  "block": "presence-requirement"
+ },
+ {
+  "id": "proof-engine-prevention/presence-reassign-clear-invalidates",
+  "desc": "A `clear` full-replacement write invalidates a prior presence guard; the following access rejects.",
+  "exercise": "field X as optional integer; on E when X is set -> clear X; set R = X + 1",
+  "specCite": "docs/compiler/proof-engine.md:1251",
+  "expected": "reject:UnprovedPresenceRequirement",
+  "source": "added",
+  "block": "sequential-proof-flow"
+ },
+ {
+  "id": "proof-engine-prevention/length-carried-bound-source-safe",
+  "desc": "A source bounded to maxlength N assigned into a destination of maxlength >= N discharges (length carries through composition).",
+  "exercise": "field Src as string maxlength 5; field Dest as string maxlength 10; on E -> set Dest = Src",
+  "specCite": "docs/compiler/proof-engine.md:1713",
+  "expected": "accept",
+  "source": "added",
+  "block": "strategy9-length-containment"
+ },
+ {
+  "id": "proof-engine-prevention/length-literal-in-bounds-safe",
+  "desc": "A string literal whose exact length fits the declared minlength/maxlength discharges.",
+  "exercise": "field Code as string minlength 2 maxlength 5; on E -> set Code = 'abc'",
+  "specCite": "docs/compiler/proof-engine.md:1717",
+  "expected": "accept",
+  "source": "added",
+  "block": "strategy9-length-containment"
+ },
+ {
+  "id": "proof-engine-prevention/length-literal-violating-rejects",
+  "desc": "A string literal whose length exceeds maxlength is a proven violation \u2192 LengthBoundViolation.",
+  "exercise": "field Code as string maxlength 3; on E -> set Code = 'abcdef'",
+  "specCite": "docs/compiler/proof-engine.md:1713",
+  "expected": "reject:LengthBoundViolation",
+  "source": "added",
+  "block": "strategy9-length-containment"
+ },
+ {
+  "id": "proof-engine-prevention/length-unbounded-source-rejects",
+  "desc": "An unbounded string source assigned into a capped field is unprovable (unbounded interval) \u2192 LengthBoundViolation (prove-or-reject).",
+  "exercise": "field Src as string; field Dest as string maxlength 10; on E -> set Dest = Src",
+  "specCite": "docs/compiler/proof-engine.md:1713",
+  "expected": "reject:LengthBoundViolation",
+  "source": "added",
+  "block": "strategy9-length-containment"
+ },
+ {
+  "id": "proof-engine-prevention/length-concat-within-bounds-safe",
+  "desc": "A concatenation whose summed length interval fits the destination bounds discharges.",
+  "exercise": "field A as string maxlength 3; field B as string maxlength 3; field Dest as string maxlength 10; on E -> set Dest = A + B",
+  "specCite": "docs/compiler/proof-engine.md:1719",
+  "expected": "accept",
+  "source": "added",
+  "block": "strategy9-length-containment"
+ },
+ {
+  "id": "proof-engine-prevention/length-concat-overflow-rejects",
+  "desc": "A concatenation whose summed length interval can exceed the destination maxlength rejects.",
+  "exercise": "field A as string maxlength 8; field B as string maxlength 8; field Dest as string maxlength 10; on E -> set Dest = A + B",
+  "specCite": "docs/compiler/proof-engine.md:1719",
+  "expected": "reject:LengthBoundViolation",
+  "source": "added",
+  "block": "strategy9-length-containment"
+ },
+ {
+  "id": "proof-engine-prevention/length-collection-element-write-rejects",
+  "desc": "An unbounded string introduced into a collection whose inner type declares maxlength rejects when not provably within the element bound.",
+  "exercise": "field Names as queue of string maxlength 200; field N as string; on E -> enqueue Names N",
+  "specCite": "docs/compiler/proof-engine.md:1711",
+  "expected": "reject:LengthBoundViolation",
+  "source": "added",
+  "block": "strategy9-length-containment"
+ },
+ {
+  "id": "proof-engine-prevention/length-string-default-violating-rejects",
+  "desc": "A string field default violating the declared minlength/maxlength surfaces LengthBoundViolation.",
+  "exercise": "field Code as string minlength 3 default 'a'",
+  "specCite": "docs/compiler/proof-engine.md:1711",
+  "expected": "reject:LengthBoundViolation",
+  "source": "added",
+  "block": "strategy9-length-containment"
+ },
+ {
+  "id": "proof-engine-prevention/count-grow-within-band-safe",
+  "desc": "A guarded grow that provably keeps count within maxcount discharges the count-containment obligation.",
+  "exercise": "field C as list of integer maxcount 5; on E when C.count < 5 -> add C 1",
+  "specCite": "docs/compiler/proof-engine.md:1733",
+  "expected": "accept",
+  "source": "added",
+  "block": "strategy10-count-containment"
+ },
+ {
+  "id": "proof-engine-prevention/count-grow-overflow-rejects",
+  "desc": "Two grows into maxcount 1 push the count interval past the cap \u2192 CountBoundViolation.",
+  "exercise": "field C as list of integer maxcount 1; on E -> add C 1; add C 2",
+  "specCite": "docs/compiler/proof-engine.md:1257",
+  "expected": "reject:CountBoundViolation",
+  "source": "added",
+  "block": "strategy10-count-containment"
+ },
+ {
+  "id": "proof-engine-prevention/count-unguarded-grow-unbounded-rejects",
+  "desc": "An unguarded grow whose upper bound was infinity-seeded is unprovable (post-hi = maxcount+1) \u2192 CountBoundViolation (no runtime deferral).",
+  "exercise": "field C as list of integer maxcount 5; on E -> add C 1",
+  "specCite": "docs/compiler/proof-engine.md:1731",
+  "expected": "reject:CountBoundViolation",
+  "source": "added",
+  "block": "strategy10-count-containment"
+ },
+ {
+  "id": "proof-engine-prevention/count-shrink-underflow-rejects",
+  "desc": "A shrink that can drop count below mincount rejects.",
+  "exercise": "field C as list of integer mincount 1; on E -> removeAt C 0",
+  "specCite": "docs/compiler/proof-engine.md:1257",
+  "expected": "reject:CountBoundViolation",
+  "source": "added",
+  "block": "strategy10-count-containment"
+ },
+ {
+  "id": "proof-engine-prevention/count-dedup-add-lower-delta-safe",
+  "desc": "Two adds into a dedup set maxcount 1 use +0 lower / +1 upper deltas; a guarded/room case discharges but an over-cap dedup chain is not falsely proved.",
+  "exercise": "field C as set of integer maxcount 1; on E -> add C 1; add C 1",
+  "specCite": "docs/compiler/proof-engine.md:1738",
+  "expected": "reject:CountBoundViolation",
+  "source": "added",
+  "block": "strategy10-count-delta-table"
+ },
+ {
+  "id": "proof-engine-prevention/count-default-literal-over-band-rejects",
+  "desc": "A `default [...]` literal whose exact element count exceeds maxcount rejects.",
+  "exercise": "field C as list of integer maxcount 2 default [1, 2, 3]",
+  "specCite": "docs/compiler/proof-engine.md:1742",
+  "expected": "reject:CountBoundViolation",
+  "source": "added",
+  "block": "strategy10-count-delta-table"
+ },
+ {
+  "id": "proof-engine-prevention/qual-currency-match-safe",
+  "desc": "money of same currency added discharges the qualifier-compatibility obligation.",
+  "exercise": "field A as money of 'USD'; field B as money of 'USD'; on E -> set S = A + B",
+  "specCite": "docs/compiler/proof-engine.md:1438",
+  "expected": "accept",
+  "source": "added",
+  "block": "strategy5-qualifier-compatibility"
+ },
+ {
+  "id": "proof-engine-prevention/qual-currency-mismatch-rejects",
+  "desc": "money of differing currencies added is a proven incompatibility \u2192 UnprovedQualifierCompatibility.",
+  "exercise": "field A as money of 'USD'; field B as money of 'EUR'; on E -> set S = A + B",
+  "specCite": "docs/compiler/proof-engine.md:1439",
+  "expected": "reject:UnprovedQualifierCompatibility",
+  "source": "added",
+  "block": "strategy5-qualifier-compatibility"
+ },
+ {
+  "id": "proof-engine-prevention/qual-unit-match-safe",
+  "desc": "quantity of same unit added discharges.",
+  "exercise": "field A as quantity in 'kg'; field B as quantity in 'kg'; on E -> set S = A + B",
+  "specCite": "docs/compiler/proof-engine.md:1438",
+  "expected": "accept",
+  "source": "added",
+  "block": "strategy5-qualifier-compatibility"
+ },
+ {
+  "id": "proof-engine-prevention/qual-unit-mismatch-rejects",
+  "desc": "quantity of differing units added \u2192 UnprovedQualifierCompatibility.",
+  "exercise": "field A as quantity in 'kg'; field B as quantity in 'miles'; on E -> set S = A + B",
+  "specCite": "docs/compiler/proof-engine.md:1439",
+  "expected": "reject:UnprovedQualifierCompatibility",
+  "source": "added",
+  "block": "strategy5-qualifier-compatibility"
+ },
+ {
+  "id": "proof-engine-prevention/qual-unqualified-unprovable-rejects",
+  "desc": "Unqualified quantity + quantity cannot be proven compatible \u2192 reject.",
+  "exercise": "field A as quantity; field B as quantity; on E -> set S = A + B",
+  "specCite": "docs/compiler/proof-engine.md:1440",
+  "expected": "reject:UnprovedQualifierCompatibility",
+  "source": "added",
+  "block": "strategy5-qualifier-compatibility"
+ },
+ {
+  "id": "proof-engine-prevention/qual-cross-unit-cancellation-known-gap",
+  "desc": "KNOWN GAP: price x quantity currently cancels for same-dimension but different-unit operands, silently dropping the UCUM conversion factor (unsound); doc flags this as undecided.",
+  "exercise": "field P as price in 'USD/kg'; field Q as quantity in 'g'; on E -> set M = P * Q",
+  "specCite": "docs/compiler/proof-engine.md:1790",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "qualifier-resolution-known-gap"
+ },
+ {
+  "id": "proof-engine-prevention/dim-product-curated-safe",
+  "desc": "A quantity x quantity product landing in the curated business-domain dimension set discharges.",
+  "exercise": "field L as quantity in 'm'; field W as quantity in 'm'; on E -> set Area = L * W",
+  "specCite": "docs/compiler/proof-engine.md:1472",
+  "expected": "accept",
+  "source": "added",
+  "block": "strategy6-dimensional-product"
+ },
+ {
+  "id": "proof-engine-prevention/dim-product-cancelling-safe",
+  "desc": "A cancelling pair (kg x 1/kg -> count) resolves to the dimensionless count alias and discharges.",
+  "exercise": "field A as quantity in 'kg'; field B as quantity in '/kg'; on E -> set N = A * B",
+  "specCite": "docs/compiler/proof-engine.md:1482",
+  "expected": "accept",
+  "source": "added",
+  "block": "strategy6-dimensional-product"
+ },
+ {
+  "id": "proof-engine-prevention/dim-product-outside-set-rejects",
+  "desc": "A product outside the curated set (kg x m -> mass*length) fails to discharge \u2192 IncompatibleDimensionalProduct.",
+  "exercise": "field A as quantity in 'kg'; field B as quantity in 'm'; on E -> set X = A * B",
+  "specCite": "docs/compiler/proof-engine.md:1482",
+  "expected": "reject:IncompatibleDimensionalProduct",
+  "source": "added",
+  "block": "strategy6-dimensional-product"
+ },
+ {
+  "id": "proof-engine-prevention/dim-req-declared-safe",
+  "desc": "A period operand with a declared/derived required dimension satisfies the dimension requirement.",
+  "exercise": "field D as period in 'days'; on E -> set Later = Start + D",
+  "specCite": "docs/compiler/proof-engine.md:557",
+  "expected": "accept",
+  "source": "added",
+  "block": "dimension-requirement"
+ },
+ {
+  "id": "proof-engine-prevention/dim-req-open-guard-safe",
+  "desc": "An open period whose dimension axis is narrowed by a `when X.dimension == 'date'` guard satisfies the dimension requirement.",
+  "exercise": "field P as period; on E when P.dimension == 'date' -> set Later = Start + P",
+  "specCite": "docs/compiler/proof-engine.md:769",
+  "expected": "accept",
+  "source": "added",
+  "block": "dimension-requirement"
+ },
+ {
+  "id": "proof-engine-prevention/dim-req-unproven-rejects",
+  "desc": "A period operand lacking the required dimension is not statically decidable \u2192 UnprovedDimensionRequirement.",
+  "exercise": "field P as period; on E -> set Later = Start + P",
+  "specCite": "docs/compiler/proof-engine.md:2276",
+  "expected": "reject:UnprovedDimensionRequirement",
+  "source": "added",
+  "block": "dimension-requirement"
+ },
+ {
+  "id": "proof-engine-prevention/dim-req-any-permissive-safe",
+  "desc": "PeriodDimension.Any (unqualified period, locked decision) permissively satisfies any dimension requirement.",
+  "exercise": "field P as period; on E -> set X = duration(P)   // Any satisfies dimension proof",
+  "specCite": "docs/compiler/proof-engine.md:883",
+  "expected": "accept",
+  "source": "added",
+  "block": "dimension-requirement"
+ },
+ {
+  "id": "proof-engine-prevention/mod-req-satisfied-safe",
+  "desc": "A field that declares the required modifier satisfies a ModifierRequirement (direct membership).",
+  "exercise": "field X as nonnegative integer; on E -> set R = requiresNonnegative(X)",
+  "specCite": "docs/compiler/proof-engine.md:894",
+  "expected": "accept",
+  "source": "added",
+  "block": "modifier-requirement"
+ },
+ {
+  "id": "proof-engine-prevention/mod-req-missing-rejects",
+  "desc": "A field lacking the required modifier cannot satisfy a ModifierRequirement \u2192 UnprovedModifierRequirement.",
+  "exercise": "field X as integer; on E -> set R = requiresNonnegative(X)",
+  "specCite": "docs/compiler/proof-engine.md:2275",
+  "expected": "reject:UnprovedModifierRequirement",
+  "source": "added",
+  "block": "modifier-requirement"
+ },
+ {
+  "id": "proof-engine-prevention/initstate-satisfiable-safe",
+  "desc": "Initial-state ensure satisfied by declared defaults discharges (no violation).",
+  "exercise": "field X as integer default 10; state Draft initial; ensure in Draft: X > 5 because \"...\"",
+  "specCite": "docs/compiler/proof-engine.md:2589",
+  "expected": "accept",
+  "source": "added",
+  "block": "initial-state-satisfiability"
+ },
+ {
+  "id": "proof-engine-prevention/initstate-unsatisfiable-rejects",
+  "desc": "An initial-state ensure provably false under declared defaults \u2192 UnsatisfiableInitialState.",
+  "exercise": "field X as integer default 0; state Draft initial; ensure in Draft: X > 5 because \"...\"",
+  "specCite": "docs/compiler/proof-engine.md:2589",
+  "expected": "reject:UnsatisfiableInitialState",
+  "source": "added",
+  "block": "initial-state-satisfiability"
+ },
+ {
+  "id": "proof-engine-prevention/initstate-unfoldable-conservative-safe",
+  "desc": "An unfoldable/non-literal default folds to Unknown \u2192 conservative pass (no false rejection).",
+  "exercise": "field Y as integer; field X as integer <- Y + 1; state Draft initial; ensure in Draft: X > 5 because \"...\"",
+  "specCite": "docs/compiler/proof-engine.md:2115",
+  "expected": "accept",
+  "source": "added",
+  "block": "initial-state-satisfiability"
+ },
+ {
+  "id": "proof-engine-prevention/initstate-guarded-ensure-skipped-safe",
+  "desc": "A guarded initial-state ensure is skipped (treated as vacuously satisfiable) \u2014 no rejection.",
+  "exercise": "field X as integer default 0; state Draft initial; ensure in Draft when X > 100: X > 5 because \"...\"",
+  "specCite": "docs/compiler/proof-engine.md:2111",
+  "expected": "accept",
+  "source": "added",
+  "block": "initial-state-satisfiability"
+ },
+ {
+  "id": "proof-engine-prevention/initstate-construction-event-suppressed-safe",
+  "desc": "A precept with an initial construction handler suppresses the rule/ensure-vs-default fold (placeholders overwritten), avoiding over-rejection.",
+  "exercise": "field X as integer default 0; state Draft initial; on initial(v as integer) -> set X = v; ensure in Draft: X > 5 because \"...\"",
+  "specCite": "docs/compiler/proof-engine.md:483",
+  "expected": "accept",
+  "source": "added",
+  "block": "rule-vs-default-fold"
+ },
+ {
+  "id": "proof-engine-prevention/rule-vs-default-violating-rejects",
+  "desc": "A global unguarded rule provably false against the field default environment \u2192 DefaultViolatesRule.",
+  "exercise": "field X as integer default 0; rule Positive: X > 5 because \"...\"",
+  "specCite": "docs/compiler/proof-engine.md:483",
+  "expected": "reject:DefaultViolatesRule",
+  "source": "added",
+  "block": "rule-vs-default-fold"
+ },
+ {
+  "id": "proof-engine-prevention/rule-vs-default-unknown-safe",
+  "desc": "A rule over a computed/non-constant/unknown default folds to null and never rejects (prove-or-reject: emit only on proven false).",
+  "exercise": "field Y as integer; field X as integer <- Y; rule Positive: X > 5 because \"...\"",
+  "specCite": "docs/compiler/proof-engine.md:483",
+  "expected": "accept",
+  "source": "added",
+  "block": "rule-vs-default-fold"
+ },
+ {
+  "id": "proof-engine-prevention/rule-vs-default-guarded-skipped-safe",
+  "desc": "A `when`-guarded rule is skipped by the rule-vs-default fold (not an unconditional invariant).",
+  "exercise": "field X as integer default 0; field Flag as boolean default false; rule Positive when Flag: X > 5 because \"...\"",
+  "specCite": "docs/compiler/proof-engine.md:483",
+  "expected": "accept",
+  "source": "added",
+  "block": "rule-vs-default-fold"
+ },
+ {
+  "id": "proof-engine-prevention/unsatisfiable-guard-rejects",
+  "desc": "A transition-row guard unsatisfiable under declared field bounds emits UnsatisfiableGuard (the row can never fire).",
+  "exercise": "field X as integer min 0 max 5; on E when X > 10 -> set Y = 1",
+  "specCite": "docs/compiler/proof-engine.md:438",
+  "expected": "reject:UnsatisfiableGuard",
+  "source": "added",
+  "block": "satisfiability-scan"
+ },
+ {
+  "id": "proof-engine-prevention/tautological-guard-rejects",
+  "desc": "A transition-row guard tautological under declared field bounds emits TautologicalGuard.",
+  "exercise": "field X as integer min 0 max 5; on E when X < 10 -> set Y = 1",
+  "specCite": "docs/compiler/proof-engine.md:439",
+  "expected": "reject:TautologicalGuard",
+  "source": "added",
+  "block": "satisfiability-scan"
+ },
+ {
+  "id": "proof-engine-prevention/unsatisfiable-rule-rejects",
+  "desc": "A rule impossible on its own field-declared bounds (empty interval) emits UnsatisfiableRule.",
+  "exercise": "field X as integer min 0 max 5; rule Impossible: X > 10 because \"...\"",
+  "specCite": "docs/compiler/proof-engine.md:442",
+  "expected": "reject:UnsatisfiableRule",
+  "source": "added",
+  "block": "satisfiability-scan"
+ },
+ {
+  "id": "proof-engine-prevention/vacuous-rule-rejects",
+  "desc": "A rule whose predicate is provably-true under field bounds emits VacuousRule.",
+  "exercise": "field X as integer min 0 max 5; rule Always: X < 100 because \"...\"",
+  "specCite": "docs/compiler/proof-engine.md:445",
+  "expected": "reject:VacuousRule",
+  "source": "added",
+  "block": "satisfiability-scan"
+ },
+ {
+  "id": "proof-engine-prevention/contradictory-rule-pair-rejects",
+  "desc": "Two rules whose interval intersection on a shared field is empty emit ContradictoryRule.",
+  "exercise": "field X as integer; rule Lo: X < 5 because \"...\"; rule Hi: X > 10 because \"...\"",
+  "specCite": "docs/compiler/proof-engine.md:446",
+  "expected": "reject:ContradictoryRule",
+  "source": "added",
+  "block": "satisfiability-scan"
+ },
+ {
+  "id": "proof-engine-prevention/obligation-completeness-declared-constraint-obligated",
+  "desc": "Every declared constraint with proof semantics produces an obligation on every applicable mutation path (Obligation Generation Contract) \u2014 a minlength field's assignment is checked.",
+  "exercise": "field X as string minlength 3; field Src as string; on E -> set X = Src",
+  "specCite": "docs/compiler/proof-engine.md:507",
+  "expected": "reject:LengthBoundViolation",
+  "source": "added",
+  "block": "obligation-generation-contract"
+ },
+ {
+  "id": "proof-engine-prevention/obligation-completeness-maxcount-obligated",
+  "desc": "A maxcount-declared collection produces a count-containment obligation on every growing mutation (Obligation Generation Contract).",
+  "exercise": "field C as set of string maxcount 10; field V as string; on E -> add C V",
+  "specCite": "docs/compiler/proof-engine.md:507",
+  "expected": "reject:CountBoundViolation",
+  "source": "added",
+  "block": "obligation-generation-contract"
+ },
+ {
+  "id": "proof-engine-prevention/prove-or-reject-no-runtime-deferral",
+  "desc": "When the compiler cannot prove a computed value stays inside its declared limit it rejects the definition rather than deferring to a runtime check (prove-or-reject MVP).",
+  "exercise": "field A as integer; field Capped as integer min 0 max 100 <- A",
+  "specCite": "docs/compiler/proof-engine.md:2609",
+  "expected": "reject:NumericOverflow",
+  "source": "added",
+  "block": "prove-or-reject-mvp"
+ },
+ {
+  "id": "proof-engine-prevention/reject-names-remediating-fix",
+  "desc": "When an obligation cannot be discharged the compiler rejects AND names what would make the operation provably safe (remediation guidance in the diagnostic).",
+  "exercise": "field Divisor as integer; on E -> set R = Total / Divisor   // diagnostic should name the guard/modifier that discharges",
+  "specCite": "docs/compiler/proof-engine.md:2659",
+  "expected": "reject:DivisionByZero",
+  "source": "added",
+  "block": "deliberate-exclusion-no-opaque-solver"
+ },
+ {
+  "id": "proof-engine-prevention/no-multi-hop-fact-chaining-rejects",
+  "desc": "A bound requiring transitive combination of two separate facts (allocations<=commitments + commitments<=plan) is out of scope \u2014 single-hop only \u2014 so it stays unproven and rejects.",
+  "exercise": "field Alloc as integer; field Commit as integer; field Plan as integer; rule R1: Alloc <= Commit because \"...\"; rule R2: Commit <= Plan because \"...\"; on E -> set R = Plan / (Plan - Alloc)",
+  "specCite": "docs/compiler/proof-engine.md:2617",
+  "expected": "reject:DivisionByZero",
+  "source": "added",
+  "block": "deferred-multi-fact"
+ },
+ {
+  "id": "proof-engine-prevention/no-cross-transition-dataflow-rejects",
+  "desc": "General dataflow across transitions is out of scope \u2014 a value made safe only by a prior transition's action is not tracked, so a dependent fault-prone op in a later transition rejects.",
+  "exercise": "state A initial; state B; on Setup from A to B -> set X = 5; on Use from B -> set R = Total / X",
+  "specCite": "docs/compiler/proof-engine.md:2685",
+  "expected": "reject:DivisionByZero",
+  "source": "added",
+  "block": "deliberate-exclusion-no-dataflow"
+ },
+ {
+  "id": "proof-engine-prevention/error-tainted-obligation-suppressed",
+  "desc": "An obligation whose site contains a type-error operand emits NO proof diagnostic (root cause already reported upstream; no cascading proof diagnostic).",
+  "exercise": "field Divisor as integer; on E -> set R = Total / (Divisor + undefinedName)",
+  "specCite": "docs/compiler/proof-engine.md:2360",
+  "expected": "reject:any",
+  "source": "added",
+  "block": "upstream-error-handling"
+ },
+ {
+  "id": "proof-engine-prevention/unreachable-state-suppresses-obligation",
+  "desc": "A transition originating from an unreachable state has its proof obligations vacuously satisfied (the transition can never fire) \u2014 no proof diagnostic from that row.",
+  "exercise": "state A initial; state Orphan; state B; on E from Orphan to B -> set R = Total / 0",
+  "specCite": "docs/compiler/proof-engine.md:2143",
+  "expected": "accept",
+  "source": "added",
+  "block": "forwarding-fact-consumption"
+ },
+ {
+  "id": "proof-engine-prevention/stateless-precept-proof-runs-rejects",
+  "desc": "The proof engine runs for stateless precepts \u2014 a fault-prone op in an event handler still rejects when unproven.",
+  "exercise": "field Divisor as integer; on Compute -> set R = Total / Divisor   // stateless, no states",
+  "specCite": "docs/compiler/proof-engine.md:2151",
+  "expected": "reject:DivisionByZero",
+  "source": "added",
+  "block": "stateless-precept-handling"
+ }
 ]
