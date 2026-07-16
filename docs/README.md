@@ -16,7 +16,7 @@ Design documents for the Precept compiler pipeline, language surface, runtime AP
 |------|-------------|----------------|
 | Philosophy | [`philosophy.md`](philosophy.md) | Core commitments — prevention, determinism, honesty about approximation, governance model |
 | **Language surface** | **[`language/README.md`](language/README.md)** | **Grammar, formal spec, canonical type system, catalog as source of truth — the primary substance** |
-| Architecture overview | [`compiler-and-runtime-design.md`](compiler-and-runtime-design.md) | Full pipeline + runtime surfaces; read before any pipeline or architecture work |
+| Architecture overview | [`compiler-and-runtime-design.md`](compiler-and-runtime-design.md) | Full pipeline + runtime surfaces; read before any pipeline or architecture work. §1 is where *what Precept guarantees and how it's delivered end-to-end* (the prove-or-reject walk from fault-prone site to committed guarantee) is told. |
 | Compiler pipeline | [`compiler/README.md`](compiler/README.md) | Stage docs (lexer → parser → type checker → graph analyzer → proof engine), diagnostic system, literal system |
 | Runtime API | [`runtime/README.md`](runtime/README.md) | Public API, result types, fault system, Evaluator, Precept Builder |
 | Tooling | [`tooling/README.md`](tooling/README.md) | Language server, MCP server, VS Code extension |
