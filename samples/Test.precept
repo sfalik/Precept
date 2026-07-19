@@ -3,9 +3,11 @@ precept BankAccountInvariant
 field OverdraftLimit as decimal nonnegative
 field Balance as decimal
 field MonthlyRepayment as decimal optional nonnegative
+field RepaymentCapPercent as decimal default 0.25 positive max 1.0 editable
 field DailyWithdrawalLimit as decimal default 500.0 positive max 10000.0
 
 rule Balance >= -OverdraftLimit because "Balance cannot go below the account's overdraft limit"
+rule MonthlyRepayment <= OverdraftLimit * RepaymentCapPercent when MonthlyRepayment is set because "A planned repayment may not exceed the capped fraction of the overdraft facility"
 
 state Active initial
 state Frozen
@@ -33,16 +35,20 @@ from Active on Withdraw
   -> reject "Withdrawing {Withdraw.Amount} would exceed the overdraft limit (balance {Balance}, limit {OverdraftLimit})"
 
 event PlanRepayment(Months as integer positive)
-from Active on PlanRepayment when Balance < 0.0
+from Active on PlanRepayment when Balance < 0.0 and -Balance / PlanRepayment.Months <= OverdraftLimit * RepaymentCapPercent
   -> set MonthlyRepayment = -Balance / PlanRepayment.Months
   -> no transition
+from Active on PlanRepayment when Balance < 0.0
+  -> reject "A monthly repayment of {-Balance / PlanRepayment.Months} would exceed the capped fraction ({RepaymentCapPercent}) of the overdraft facility (limit {OverdraftLimit})"
 
 event ReduceLimit(NewLimit as decimal nonnegative)
-from Active on ReduceLimit when Balance >= -ReduceLimit.NewLimit
+from Active on ReduceLimit when Balance >= -ReduceLimit.NewLimit and MonthlyRepayment <= ReduceLimit.NewLimit * RepaymentCapPercent
   -> set OverdraftLimit = ReduceLimit.NewLimit
   -> no transition
-from Active on ReduceLimit
+from Active on ReduceLimit when Balance < -ReduceLimit.NewLimit
   -> reject "Cannot reduce the overdraft limit to {ReduceLimit.NewLimit} while the balance is {Balance}"
+from Active on ReduceLimit
+  -> reject "Cannot reduce the overdraft limit to {ReduceLimit.NewLimit}: a planned repayment of {MonthlyRepayment} would exceed the capped fraction ({RepaymentCapPercent}) of the reduced facility"
 
 event Freeze
 from Active on Freeze

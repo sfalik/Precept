@@ -1,0 +1,13 @@
+field Total as decimal max 1000 default 0.0
+
+event Add1(Amount1 as decimal positive, Amount2 as decimal positive)
+on Add1 when Add1.Amount1 + Add1.Amount2 <= 1000
+  -> set Total =  Add1.Amount1 + Add1.Amount2
+
+event Add2(Amount1 as decimal max 250, Amount2 as decimal max 750)
+on Add2
+  -> set Total = Add2.Amount1 + Add2.Amount2
+
+event Subtract(Amount as decimal nonnegative)
+on Subtract
+  -> set Total = Total - Subtract.Amount
