@@ -1,15 +1,59 @@
-precept TotalCostInvariant
+precept BankAccountInvariant
 
-field AvgCost as money in 'USD' editable optional
-field Quantity as integer editable optional
-field TotalCost as money in 'USD' max '1000 USD' optional
+field OverdraftLimit as decimal nonnegative
+field Balance as decimal
+field MonthlyRepayment as decimal optional nonnegative
+field DailyWithdrawalLimit as decimal default 500.0 positive max 10000.0
 
-event testEvent
-on testEvent
-    when Quantity is set and AvgCost is set
-    -> set TotalCost = AvgCost * Quantity
+rule Balance >= -OverdraftLimit because "Balance cannot go below the account's overdraft limit"
 
-event testEvent2
-on testEvent2
-    when AvgCost is set
-    -> set TotalCost = AvgCost + AvgCost
+state Active initial
+state Frozen
+state Closed terminal
+
+in Active modify DailyWithdrawalLimit editable
+
+event OpenAccount(OpeningBalance as decimal min 0.0, OverdraftLimit as decimal nonnegative) initial
+on OpenAccount
+  -> set Balance = OpenAccount.OpeningBalance
+  -> set OverdraftLimit = OpenAccount.OverdraftLimit
+
+event Deposit(Amount as decimal nonnegative)
+from Active on Deposit
+  -> set Balance = Balance + Deposit.Amount
+  -> no transition
+
+event Withdraw(Amount as decimal)
+from Active on Withdraw when Balance - Withdraw.Amount >= -OverdraftLimit and Withdraw.Amount <= DailyWithdrawalLimit
+  -> set Balance = Balance - Withdraw.Amount
+  -> no transition
+from Active on Withdraw when Withdraw.Amount > DailyWithdrawalLimit
+  -> reject "Withdrawal of {Withdraw.Amount} exceeds the daily limit of {DailyWithdrawalLimit}"
+from Active on Withdraw
+  -> reject "Withdrawing {Withdraw.Amount} would exceed the overdraft limit (balance {Balance}, limit {OverdraftLimit})"
+
+event PlanRepayment(Months as integer positive)
+from Active on PlanRepayment when Balance < 0.0
+  -> set MonthlyRepayment = -Balance / PlanRepayment.Months
+  -> no transition
+
+event ReduceLimit(NewLimit as decimal nonnegative)
+from Active on ReduceLimit when Balance >= -ReduceLimit.NewLimit
+  -> set OverdraftLimit = ReduceLimit.NewLimit
+  -> no transition
+from Active on ReduceLimit
+  -> reject "Cannot reduce the overdraft limit to {ReduceLimit.NewLimit} while the balance is {Balance}"
+
+event Freeze
+from Active on Freeze
+  -> transition Frozen
+
+event Unfreeze
+from Frozen on Unfreeze
+  -> transition Active
+
+event CloseAccount
+from Active on CloseAccount when Balance == 0.0
+  -> transition Closed
+from Active on CloseAccount
+  -> reject "Cannot close the account while the balance is {Balance} - settle to exactly zero first"
