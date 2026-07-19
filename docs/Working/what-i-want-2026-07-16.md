@@ -33,9 +33,11 @@ precept BankAccountInvariant
 field OverdraftLimit as decimal nonnegative
 field Balance as decimal
 field MonthlyRepayment as decimal optional nonnegative
+field RepaymentCapPercent as decimal default 0.25 positive max 1.0 editable
 field DailyWithdrawalLimit as decimal default 500.0 positive max 10000.0
 
 rule Balance >= -OverdraftLimit because "Balance cannot go below the account's overdraft limit"
+rule MonthlyRepayment <= OverdraftLimit * RepaymentCapPercent when MonthlyRepayment is set because "A planned repayment may not exceed the capped fraction of the overdraft facility"
 
 state Active initial
 state Frozen
@@ -63,16 +65,20 @@ from Active on Withdraw
   -> reject "Withdrawing {Withdraw.Amount} would exceed the overdraft limit (balance {Balance}, limit {OverdraftLimit})"
 
 event PlanRepayment(Months as integer positive)
-from Active on PlanRepayment when Balance < 0.0
+from Active on PlanRepayment when Balance < 0.0 and -Balance / PlanRepayment.Months <= OverdraftLimit * RepaymentCapPercent
   -> set MonthlyRepayment = -Balance / PlanRepayment.Months
   -> no transition
+from Active on PlanRepayment when Balance < 0.0
+  -> reject "A monthly repayment of {-Balance / PlanRepayment.Months} would exceed the capped fraction ({RepaymentCapPercent}) of the overdraft facility (limit {OverdraftLimit})"
 
 event ReduceLimit(NewLimit as decimal nonnegative)
-from Active on ReduceLimit when Balance >= -ReduceLimit.NewLimit
+from Active on ReduceLimit when Balance >= -ReduceLimit.NewLimit and MonthlyRepayment <= ReduceLimit.NewLimit * RepaymentCapPercent
   -> set OverdraftLimit = ReduceLimit.NewLimit
   -> no transition
-from Active on ReduceLimit
+from Active on ReduceLimit when Balance < -ReduceLimit.NewLimit
   -> reject "Cannot reduce the overdraft limit to {ReduceLimit.NewLimit} while the balance is {Balance}"
+from Active on ReduceLimit
+  -> reject "Cannot reduce the overdraft limit to {ReduceLimit.NewLimit}: a planned repayment of {MonthlyRepayment} would exceed the capped fraction ({RepaymentCapPercent}) of the reduced facility"
 
 event Freeze
 from Active on Freeze
@@ -96,6 +102,7 @@ Every handler is provable, and each one needs a different premise class:
 - **`Withdraw`** — the guard is the proof: `Balance − Amount >= −OverdraftLimit` is literally the post-state rule. The fallback row rejects with an explanation and writes nothing.
 - **`ReduceLimit`** — the symmetric write site. The rule is relational, so lowering `OverdraftLimit` threatens it even though `Balance` is untouched — a case authors naturally miss, because they think of the rule as "about Balance." Without the guard, the ideal compiler rejects this handler ("cannot prove `Balance >= -NewLimit`; add a guard"); with it, the proof closes by substitution.
 - **`PlanRepayment`** — the fault family. Business rules are not the only obligations: faults (division by zero, overflow, out-of-range) get the identical premise-and-certificate treatment. Here the divide-by-zero obligation is closed by the arg constraint (`Months positive` — the divisor is provably non-zero), and the `nonnegative` bound on `MonthlyRepayment` is closed by the guard (`Balance < 0.0` makes `-Balance` positive). At runtime there is no zero-check anywhere — the ingress validation of the arg is what makes the division safe, and the certificate records that dependency.
+- **`RepaymentCapPercent`** — the non-linear obligation. The added rule `MonthlyRepayment <= OverdraftLimit * RepaymentCapPercent` multiplies two fields, so no single write closes it by substitution the way `Withdraw`'s guard closes the linear rule. `PlanRepayment` sets `MonthlyRepayment` to a *quotient* and the obligation compares it against a *product* — four free variables and nothing to cancel — so premise class (c) has to carry it: the guard restates the post-state condition verbatim (`-Balance / PlanRepayment.Months <= OverdraftLimit * RepaymentCapPercent`) and the proof closes against what the author wrote, not against algebra the compiler won't attempt. And because the rule mentions `OverdraftLimit`, `ReduceLimit` inherits the same obligation from the other side — lowering the limit shrinks the product even though `MonthlyRepayment` is untouched, so it too must restate the condition (`MonthlyRepayment <= ReduceLimit.NewLimit * RepaymentCapPercent`) or be rejected. This is the symmetric write site again, but non-linear: substitution alone never closes it, and the ideal compiler rejects any unguarded non-linear rule rather than reach for a solver it does not carry.
 - **`DailyWithdrawalLimit`** — the remaining premise sources. Its `default 500.0` is a genuine business value (accounts start with it; no constructor arg sets it), so the base case has a default to evaluate: `500.0` must satisfy `positive` and `max 10000.0`. And it is the sample's editable-field ingress: `in Active modify … editable` opens that ingress only while `Active` — writes are validated against the field's modifier-rules at the ingress point, and the editing window closes structurally the moment the account freezes or closes.
 
 ### What must not compile
@@ -111,6 +118,9 @@ The example is accepted *because of* its declared premises — so the rejection 
 | Remove `nonnegative` from `OpenAccount`'s `OverdraftLimit` arg | The write to `OverdraftLimit` cannot satisfy the field's `nonnegative`, and a negative limit breaks the rule's establishment |
 | Remove `positive` from `PlanRepayment`'s `Months` | Divisor can be zero — the division is unsafe |
 | Remove `PlanRepayment`'s guard (`Balance < 0.0`) | Cannot prove `MonthlyRepayment` `nonnegative`: `-Balance` can be negative |
+| Remove `PlanRepayment`'s cap conjunct (`-Balance / Months <= OverdraftLimit * RepaymentCapPercent`) | Cannot prove `MonthlyRepayment <= OverdraftLimit * RepaymentCapPercent` after `set MonthlyRepayment = -Balance / Months` — the quotient is unbounded above; restate the post-state condition in the guard |
+| Remove `ReduceLimit`'s cap conjunct (`MonthlyRepayment <= NewLimit * RepaymentCapPercent`) | Cannot prove `MonthlyRepayment <= OverdraftLimit * RepaymentCapPercent` — the rule mentions `OverdraftLimit`, so lowering it carries the obligation even though `MonthlyRepayment` is untouched; restate it in the guard |
+| Guard `PlanRepayment` on `Balance < 0.0` alone, dropping the restating conjunct | Cannot prove the cap rule: the product is non-linear, so substitution can't close it and no post-mutation sweep or solver stands behind it — the guard must state the post-state condition directly, or the rule must be linearized |
 | Change the default to `20000.0` | Default value violates `max 10000.0` — the base case has a counterexample |
 | Add `state Suspended` with no inbound row | Unreachable state |
 | Delete the `Unfreeze` rows | `Frozen` is a dead end — enterable, not exitable, not marked `terminal` |
@@ -121,6 +131,8 @@ One deliberate omission: there is no deletion row for `DailyWithdrawalLimit`'s m
 This table is the promise in operational form: an accepted file demonstrates nothing by itself — the compiler's power is visible only in what it refuses. Every premise class in the example has its deletion row here; a compiler that accepts any of these mutations is not the compiler this document asks for.
 
 This is also where the feasibility question will concentrate: the practicality of this proof is exactly what the follow-on study has to establish.
+
+On non-linear rules I want the line drawn in the open. A relational rule whose post-state condition is non-linear — a product or quotient of fields, like the repayment cap above — is proven only when a guard or arg constraint makes that condition directly checkable, so the proof closes against what the author wrote. Where no such premise exists, the compiler rejects the rule with a teachable message and names the guard that would close it. It is never governed by a post-mutation sweep, and never deferred to a solver the compiler doesn't carry. This is the same discipline as everywhere else in this document — prove from a declared premise or reject — I'm only saying it out loud for the non-linear case, because substitution closes the linear rules so quietly that it could leave the impression the harder ones come along for free. They do not: the author guards them, linearizes them, or the compiler refuses them.
 
 The language was designed with this goal: simple, not Turing-complete, no loops, no functions. It is not a general-purpose programming language, and I want to leverage that simplicity to provide strong proof at compile time. Whether the current surface actually delivers tractable proof everywhere is a feasibility question — where it doesn't, the surface is the negotiable part.
 
@@ -139,7 +151,7 @@ The proof engine's half of the promise governs data; the **graph analyzer** gove
 - **Every state is reachable.** In the example: `Frozen` via `Freeze`, `Closed` via `CloseAccount`. A state no path reaches is rejected.
 - **No dead ends.** Every non-terminal state has an exit — `Frozen` exits via `Unfreeze`. A state you can enter but never leave is rejected, unless the author deliberately marked it `terminal` (`Closed`): an end on purpose is a declaration, not a defect.
 - **Absence of a row is the enforcement.** Depositing into a frozen account is impossible because no transition row exists for `Deposit` in `Frozen` — not because a runtime check refuses it. There is nothing to bypass. This is prevention-not-detection in its purest form.
-- **Inapplicability vs. refusal.** The same principle applies at guard level: `PlanRepayment` has no fallback row, so on a healthy balance the event is simply inapplicable (Unmatched — the operation is not offered), while `Withdraw` over the limit gets an explained `reject`. Absence expresses *inapplicability*; `reject` is reserved for *resolvable refusals*. Explanations are for things the user can act on, not for things that simply don't apply.
+- **Inapplicability vs. refusal.** The same principle applies at guard level: `PlanRepayment` offers no row on a healthy balance, so there the event is simply inapplicable (Unmatched — the operation is not offered), while `Withdraw` over the limit gets an explained `reject`. Absence expresses *inapplicability*; `reject` is reserved for *resolvable refusals*. Explanations are for things the user can act on, not for things that simply don't apply.
 - **Dead rows are structural defects too.** A row whose guard can never be true given the declared constraints is unreachable — and whatever state it leads to may be unreachable in consequence. The ideal compiler rejects it with an explanation (e.g., a guard comparing a 0-to-1 ratio against `75` instead of `0.75` can never fire — and the total-loss path it guards silently never happens).
 
 ## The runtime's role

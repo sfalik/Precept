@@ -23,6 +23,12 @@
 - He then authored `docs/Working/frank-go-forward-posture-replay-2026-07-14-v2.md`, a materially strengthened rewrite with 13 sections, 17 tracked changes (C1-C17), and a changelog appendix, informed by five independent inputs: citation audit, devil's-advocate memo, coverage matrix, blind reconstruction, and self-critique.
 - George's independent follow-up check judged v2 ready for Shane's sign-off, with one explicit owner-gated open item: M3, where the separate canonical-capture recommendation still carries the overruled “proof-carrying vs. not” framing and needs Shane's correction before Step 1 runs.
 
+### 2026-07-19T03:56:26Z — `what-i-want-2026-07-16` advisory review logged
+
+- Produced `docs/Working/frank-review-what-i-want-2026-07-16-opinion.md` for Shane.
+- Verdict: **REWORK-then-GO**.
+- Closed the two open forensic forks and most adversarial/collation findings, but flagged the missing scope line / stopping rule, the live canon contradiction around deleting the post-mutation sweep, an overflow honesty gap, and two philosophy escalations.
+
 ## Learnings
 
 - A strengthening review needs independent pressure from multiple angles (citation integrity, coverage completeness, adversarial gaps, blind reconstruction, and self-critique), not just a single audit memo.

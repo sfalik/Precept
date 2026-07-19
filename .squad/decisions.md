@@ -19,23 +19,6 @@
 
 ---
 
-### 2026-06-16T13:06:00Z: Architectural Review: Compiler Readiness Plan (2026-06-11)
-
-**By:** Frank
-**To:** Shane
-**Status:** Merged from `.squad/decisions/inbox/frank-compiler-readiness-plan-review.md`.
-**Target:** `docs/Working/compiler-readiness-plan-2026-06-11.md`
-**Review:** `docs/Working/compiler-readiness-plan-2026-06-11-frank-review.md`
-**Companion research:** research/architecture/compiler/fault-floor-definition-2026-06-11.md; docs/Working/compile-time-niche-decision-packet-2026-06-10.md
-
-- Verdict: Sound with required revisions.
-- Blocking findings: B1 GATE-F under-enumerates the owner-gated canon-amendment set; B2 `DesugarsToRule` is not literally zero-consumer today but has zero `src/Precept/` consumers; B3 28-vs-32 prior-docs provenance mismatch.
-- Advisory findings: A1–A7 folded into the review.
-- Verified all 13 load-bearing claims against source.
-- Coordinator note: `.squad/config.json` model overrides for Frank and Elaine were bumped to `claude-opus-4.8`.
-
----
-
 ### Compiler-Readiness Plan 06-16 — Amendment Verification (B1 Clearance)
 
 **By:** Frank
@@ -325,3 +308,98 @@ When the user asks the team to review a PR, reviewer agents (e.g. Frank, Soup Na
 **Precedent:** Follows the same repo pattern as other `squad.agent.md` customizations: apply the local section, then back it with a durable decision record so the behavior survives future upgrades.
 
 **Tradeoff accepted:** This remains a local customization until upstream actually ships the code, so it must be re-verified during future Squad upgrades.
+
+---
+
+**Merged from:** `.squad/decisions/inbox/frank-business-domain-1576-qualifier-fix.md` on 2026-07-19T03:56:26Z.
+
+# Frank — business-domain-types.md line 1576 qualifier fix
+
+## What
+- Updated `docs/language/business-domain-types.md` constraint table example from `field Score as quantity max 100` to `field Score as quantity in 'each' max 100`.
+- Added a resolution note under stop-and-fix item 3 in `docs/Working/exhaustive-gap-analysis-2026-07-14/coverage-report.md`.
+
+## Why
+- `PRE0133 BoundsRequireQualifier` requires `quantity` fields with `min`/`max` bounds to declare qualifier context via `in <unit>` or `of <dimension>`.
+- The previously suggested fix text (`in 'points'`) is not valid because `'points'` is not a recognized unit. The corrected example uses `in 'each'`, which is already the doc's canonical count-quantity example form.
+
+## Evidence
+- Sample convention checked: `samples/unit-of-measure-reference.precept` and `samples/Test.precept`.
+- Diagnostic lookup: `PRE0133` = "Bounds declared with '{0}' on {1} fields require qualifier {2}".
+- Empirical compile results via `precept_compile`:
+  - `precept Example\nfield Score as quantity max 100`
+    - emits `PRE0018 Expected a quantity value here, but got 'integer'`
+    - emits `PRE0133 Bounds declared with 'max' on quantity fields require qualifier 'in' or 'of'`
+  - `precept Example\nfield Score as quantity in 'points' max 100`
+    - emits `PRE0075 'points' is not a valid unit`
+  - `precept Example\nfield Score as quantity in 'each' max 100`
+    - no PRE0133; only unrelated lifecycle diagnostics (`PRE0093`, `PRE0158`) from the minimal no-event wrapper
+  - `precept Example\nfield Score as quantity in 'each' max 100 default '0 each'`
+    - `success: true`; warning-only `PRE0158`; numeric proof obligation for the bound is `Proved`
+
+## Files touched
+- `docs/language/business-domain-types.md`
+- `docs/Working/exhaustive-gap-analysis-2026-07-14/coverage-report.md`
+
+---
+
+**Merged from:** `.squad/decisions/inbox/frank-pow-negative-exponent-lane-ruling.md` on 2026-07-19T03:56:26Z.
+
+# Frank ruling — `pow` negative-exponent lane scope
+
+- **Date:** 2026-07-14
+- **Author:** Frank
+- **Status:** Closed as Tier 1 precedent application
+- **Topic:** Whether `pow(base, exp)` may accept negative integer exponents for decimal/number lanes when `docs/language/primitive-types.md:613` only says "`exp` must be non-negative for integer lane".
+
+## What
+
+The ambiguity is resolved by existing locked precedent. `pow`'s admissible exponent domain must be the **non-negative-integer domain across lanes**, not merely for integer bases.
+
+## Why
+
+The locked rule at `docs/language/primitive-types.md:677` states:
+
+> A function keeps its `decimal` overload if and only if the mathematical operation is **closed over finite decimals** — meaning decimal input always produces a result exactly representable as a finite decimal.
+
+That same rule classifies:
+
+> **Closed:** `abs`, `min`, `max`, `clamp`, `pow` (integer exponent), `round`, `floor`, `ceil`, `truncate` — these all have `decimal` overloads.
+
+The immediately adjacent precedent at `docs/language/primitive-types.md:614` keeps `sqrt` in the number lane only:
+
+> **Number-lane only.** `sqrt(decimal)` is a type error — use `sqrt(approximate(value))`.
+
+Negative exponents break decimal-lane closure in general. Example: `pow(3m, -1)` requires `1/3`, which is not exactly representable as a finite decimal. Therefore the only reading consistent with the retained decimal overload and the locked function-lane-integrity rule is that `pow`'s supported exponent domain is the non-negative-integer domain. If negative exponents were intended, `pow` would cease to be closed over finite decimals and would need a different lane design.
+
+## Runtime/catalog observation
+
+Current catalog/runtime metadata in `src/Precept/Language/Functions.cs` attach the non-negative proof only to the integer-base overload:
+
+- `integer, integer -> integer` has proof `exp >= 0`
+- `decimal, integer -> decimal` has no proof
+- `number, integer -> number` has no proof
+
+So the coverage finding identified a real **doc/catalog clarity drift**, but not an unresolved language-design question.
+
+## Precedent cited
+
+- `docs/language/primitive-types.md:613` — current `pow` signature note
+- `docs/language/primitive-types.md:614` — `sqrt` is number-lane-only when not closed
+- `docs/language/primitive-types.md:677` — locked Function lane integrity rule
+
+## Tradeoff accepted
+
+This reading rejects some mathematically valid negative-exponent cases (for example `pow(2.0m, -1) -> 0.5m`) in order to preserve a simple, lane-wide closure rule and avoid value-dependent lane switching or overload semantics. If the product later wants approximate reciprocal powers, that is new language-surface design work, not an interpretation of the current spec.
+
+---
+
+**Merged from:** `.squad/decisions/inbox/shane-authorized-overclaiming-unshipped-features-as-live.md` on 2026-07-19T03:56:26Z.
+
+### 2026-07-16T00-12-44: Authorized: overclaiming unshipped features as "live" is acceptable in posture v2 docs when scoped to MVP
+**By:** shane
+**What:** Authorized: overclaiming unshipped features as "live" is acceptable in posture v2 docs when scoped to MVP
+**References:** frank, docs/Working/posture-v2-support/hybrid-model-draft-D-adversarial-review-2026-07-14.md
+**Why:** Shane authorized an exception to the general "don't overclaim unshipped features as live" review finding: in the hybrid model / posture v2 rewrite, describing a feature as live/shipped is acceptable **as long as the feature is MVP scope**. This narrows (does not eliminate) the adversarial review's "overclaims live reality" objection to Draft D — non-MVP scope claims of "live" status remain a defect to fix in the rewrite.
+
+Context: this followed Frank's read of docs/Working/posture-v2-support/hybrid-model-draft-D-adversarial-review-2026-07-14.md, where he recommended rewriting Draft D from the canonical spine rather than patching it, citing (1) unauthorized shift from the settled two-route+parked-overflow model to a four-disposition frame, (2) overclaiming unshipped features as live, and (3) fabricated/misread example citations. This directive resolves objection (2) for MVP-scope items; objections (1) and (3) still require correction in the rewrite.

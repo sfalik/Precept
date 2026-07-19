@@ -93639,3 +93639,29 @@ Replace it with something like:
 - **D4 (reframed):** fix qualifier propagation for scalar operations on qualifier-bearing types so syntax-reference money/price examples compile cleanly.
 
 That matches the actual failure and preserves the correct `UnitPrice` default example.
+
+---
+
+## Archive Batch — 2026-07-19T03:56:26Z
+
+- Archived 1 active decision entry older than 30 days while processing the what-i-want review batch.
+
+---
+
+### 2026-06-16T13:06:00Z: Architectural Review: Compiler Readiness Plan (2026-06-11)
+
+**By:** Frank
+**To:** Shane
+**Status:** Merged from `.squad/decisions/inbox/frank-compiler-readiness-plan-review.md`.
+**Target:** `docs/Working/compiler-readiness-plan-2026-06-11.md`
+**Review:** `docs/Working/compiler-readiness-plan-2026-06-11-frank-review.md`
+**Companion research:** research/architecture/compiler/fault-floor-definition-2026-06-11.md; docs/Working/compile-time-niche-decision-packet-2026-06-10.md
+
+- Verdict: Sound with required revisions.
+- Blocking findings: B1 GATE-F under-enumerates the owner-gated canon-amendment set; B2 `DesugarsToRule` is not literally zero-consumer today but has zero `src/Precept/` consumers; B3 28-vs-32 prior-docs provenance mismatch.
+- Advisory findings: A1–A7 folded into the review.
+- Verified all 13 load-bearing claims against source.
+- Coordinator note: `.squad/config.json` model overrides for Frank and Elaine were bumped to `claude-opus-4.8`.
+
+---
+
