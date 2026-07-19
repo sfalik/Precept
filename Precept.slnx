@@ -6,11 +6,13 @@
   <Folder Name="/src/" />
   <Folder Name="/tools/">
     <Project Path="tools/Precept.GrammarGen/Precept.GrammarGen.csproj" />
+    <Project Path="tools/Precept.MatrixTools/Precept.MatrixTools.csproj" />
   </Folder>
   <Project Path="src/Precept.Analyzers/Precept.Analyzers.csproj" />
   <Project Path="test/Precept.LanguageServer.Tests/Precept.LanguageServer.Tests.csproj" />
   <Project Path="test/Precept.Tests/Precept.Tests.csproj" />
   <Project Path="test/Precept.Mcp.Tests/Precept.Mcp.Tests.csproj" />
+  <Project Path="test/Precept.MatrixTools.Tests/Precept.MatrixTools.Tests.csproj" />
   <Project Path="test/Precept.Analyzers.Tests/Precept.Analyzers.Tests.csproj" />
   <Project Path="tools/Precept.LanguageServer/Precept.LanguageServer.csproj" />
   <Project Path="tools/Precept.Mcp/Precept.Mcp.csproj" />
