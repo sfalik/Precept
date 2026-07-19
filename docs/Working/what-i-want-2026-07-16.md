@@ -5,7 +5,7 @@
 
 ## Scope
 
-What Precept should *be* is already defined at a high level in `docs/philosophy.md` — this document does not redo that. What it clears up is **how Precept achieves it**: specifically, how far the compiler should go, and where the line sits between **compile-time proof** and **runtime governance**. The proof engine especially, but also the whole compiler.
+What Precept should *be* is already defined at a high level in `docs/philosophy.md` — this document does not redo that. What it clears up is **how Precept achieves it**: specifically, how far the compiler should go, and where the line sits between **compile-time proof** and **runtime governance** — the proof engine especially, but the whole compiler too.
 
 The goal here is a clear description of what I would want **in an ideal world**. The task after that will be to understand whether that ideal is feasible for one person with a team of agents to build. If not, we will find a balance — but the balancing comes later, and it is done against a stated ideal, not instead of one. And whatever balance we strike, **we cannot dilute the value proposition in the process of practicality**.
 
@@ -23,7 +23,7 @@ What "prove" means here is **proof by induction over reachable configurations** 
 
 **Rejection** means the proof for some handler cannot close, and the diagnostic names the missing premise: bound the arg, or add a guard. **Acceptance** means: given everything the author declared, no reachable operation can violate any rule — the rules are proven theorems.
 
-The premises are what the runtime enforces: it validates args against their declared constraints and evaluates guards against live data. That is governance, not deferred proof — the compiler has proven that these checks are *sufficient*.
+The premises are also what the runtime enforces — governance, not deferred proof, because the compiler has proven those checks *sufficient*.
 
 ### Worked example
 
@@ -95,8 +95,8 @@ Every handler is provable, and each one needs a different premise class:
 - **`Deposit`** — the inductive hypothesis: `Balance + Amount` with `Amount ≥ 0` preserves the rule *only if the rule held before the event*. No guard or arg bound alone gets there.
 - **`Withdraw`** — the guard is the proof: `Balance − Amount >= −OverdraftLimit` is literally the post-state rule. The fallback row rejects with an explanation and writes nothing.
 - **`ReduceLimit`** — the symmetric write site. The rule is relational, so lowering `OverdraftLimit` threatens it even though `Balance` is untouched — a case authors naturally miss, because they think of the rule as "about Balance." Without the guard, the ideal compiler rejects this handler ("cannot prove `Balance >= -NewLimit`; add a guard"); with it, the proof closes by substitution.
-- **`PlanRepayment`** — the fault family. Business rules are not the only obligations: faults (division by zero, overflow, out-of-range) get the identical premise-and-certificate treatment. Here the divide-by-zero obligation is closed by the arg constraint (`Months positive` — the divisor is provably non-zero), and the `nonnegative` bound on `MonthlyRepayment` is closed by the guard (`Balance < 0.0` makes `-Balance` positive). At runtime there is no zero-check anywhere — the arg validation at the door is what makes the division safe, and the certificate records that dependency.
-- **`DailyWithdrawalLimit`** — the remaining two doors. Its `default 500.0` is a genuine business value (accounts start with it; no constructor arg sets it), so the base case has a default to evaluate: `500.0` must satisfy `positive` and `max 10000.0`. And it is the sample's editable-field ingress: `in Active modify … editable` opens the door only while `Active` — writes are validated against the field's modifier-rules at the door, and the editing window closes structurally the moment the account freezes or closes.
+- **`PlanRepayment`** — the fault family. Business rules are not the only obligations: faults (division by zero, overflow, out-of-range) get the identical premise-and-certificate treatment. Here the divide-by-zero obligation is closed by the arg constraint (`Months positive` — the divisor is provably non-zero), and the `nonnegative` bound on `MonthlyRepayment` is closed by the guard (`Balance < 0.0` makes `-Balance` positive). At runtime there is no zero-check anywhere — the ingress validation of the arg is what makes the division safe, and the certificate records that dependency.
+- **`DailyWithdrawalLimit`** — the remaining premise sources. Its `default 500.0` is a genuine business value (accounts start with it; no constructor arg sets it), so the base case has a default to evaluate: `500.0` must satisfy `positive` and `max 10000.0`. And it is the sample's editable-field ingress: `in Active modify … editable` opens that ingress only while `Active` — writes are validated against the field's modifier-rules at the ingress point, and the editing window closes structurally the moment the account freezes or closes.
 
 ### What must not compile
 
@@ -116,7 +116,7 @@ The example is accepted *because of* its declared premises — so the rejection 
 | Delete the `Unfreeze` rows | `Frozen` is a dead end — enterable, not exitable, not marked `terminal` |
 | Change `CloseAccount`'s guard to `Balance < -OverdraftLimit` | Dead row: the guard contradicts the rule, so it can never be true — and `Closed` becomes unreachable in consequence |
 
-One deliberate omission: there is no deletion row for `DailyWithdrawalLimit`'s modifiers. They *are* proven unviolable — the default is checked statically, the editable door evaluates them on every write (that door check is the declared premise, and the certificate marks it load-bearing), and no other write path exists. But no *other* proof in the file consumes them: `Withdraw`'s guard reads the field's live value, not its bounds. So deleting them breaks no proof — it just weakens the specification to an unconstrained cap, which is the author saying less, not the compiler proving less. The asymmetry in miniature: deleting a consumed premise makes a file unprovable; deleting a rule nobody consumes merely makes it a weaker spec.
+One deliberate omission: there is no deletion row for `DailyWithdrawalLimit`'s modifiers. They *are* proven unviolable — the default is checked statically, the editable-field ingress evaluates them on every write (that ingress check is the declared premise, and the certificate marks it load-bearing), and no other write path exists. But no *other* proof in the file consumes them: `Withdraw`'s guard reads the field's live value, not its bounds. So deleting them breaks no proof — it just weakens the specification to an unconstrained cap, which is the author saying less, not the compiler proving less. The asymmetry in miniature: deleting a consumed premise makes a file unprovable; deleting a rule nobody consumes merely makes it a weaker spec.
 
 This table is the promise in operational form: an accepted file demonstrates nothing by itself — the compiler's power is visible only in what it refuses. Every premise class in the example has its deletion row here; a compiler that accepts any of these mutations is not the compiler this document asks for.
 
@@ -124,13 +124,13 @@ This is also where the feasibility question will concentrate: the practicality o
 
 The language was designed with this goal: simple, not Turing-complete, no loops, no functions. It is not a general-purpose programming language, and I want to leverage that simplicity to provide strong proof at compile time. Whether the current surface actually delivers tractable proof everywhere is a feasibility question — where it doesn't, the surface is the negotiable part.
 
-At ingress, I expect the compiler to **require the author to extend constraints to the entry points**, so that the runtime can perform simple validation against those constraints. I believe this forces authors to be more explicit — and that leads to better precepts.
+At ingress, I expect the compiler to **require the author to extend constraints to the entry points**, so that ingress validation stays simple. I believe this forces authors to be more explicit — and that leads to better precepts.
 
-Ingress is exactly two doors: **event args** (including on initial/construction events) and **editable-field writes**. Restore/rehydration is *not* ingress — data coming back from persistence is trusted and unchecked, because it was governed when it was written (post-MVP, this expands to include schema evolution). Cross-entity data is out of scope for now.
+Ingress is exactly two points: **event args** (including on initial/construction events) and **editable-field writes**. Restore/rehydration is *not* ingress — data coming back from persistence is trusted and unchecked, because it was governed when it was written. (Post-MVP, the restore path itself expands to handle schema evolution — data written under an older definition.)
 
-What validation at the door means: the applicable **rules** are evaluated — however they were spelled, as modifiers or as rule statements, since modifiers are sugar for rules. For an arg, that's its modifier-rules; anything relational an event needs lives in its guards. For an editable-field write, it's the field's modifier-rules *and* every rule that mentions the field — an edit is an arbitrary incoming value that no static proof can cover, so evaluating those rules at the door is exactly the premise that closes the editable write sites in the compiler's proof.
+What ingress validation means: the applicable **rules** are evaluated — however they were spelled, as modifiers or as rule statements. For an arg, that's its modifier-rules; anything relational an event needs lives in its guards. For an editable-field write, it's the field's modifier-rules *and* every rule that mentions the field — an edit is an arbitrary incoming value that no static proof can cover, so evaluating those rules at the ingress point is exactly the premise that closes the editable write sites in the compiler's proof.
 
-This largely involves the proof engine, but it is not limited to it. The graph analyzer also plays a key role, and I'm open to additional compiler stages and techniques if needed.
+This work largely lands in the proof engine, but not only there: the graph analyzer also plays a key role, and I'm open to additional compiler stages and techniques if needed.
 
 ## Structural integrity
 
@@ -139,36 +139,36 @@ The proof engine's half of the promise governs data; the **graph analyzer** gove
 - **Every state is reachable.** In the example: `Frozen` via `Freeze`, `Closed` via `CloseAccount`. A state no path reaches is rejected.
 - **No dead ends.** Every non-terminal state has an exit — `Frozen` exits via `Unfreeze`. A state you can enter but never leave is rejected, unless the author deliberately marked it `terminal` (`Closed`): an end on purpose is a declaration, not a defect.
 - **Absence of a row is the enforcement.** Depositing into a frozen account is impossible because no transition row exists for `Deposit` in `Frozen` — not because a runtime check refuses it. There is nothing to bypass. This is prevention-not-detection in its purest form.
-- **Two different silences.** The same principle applies at guard level: `PlanRepayment` has no fallback row, so on a healthy balance the event is simply inapplicable (Unmatched — the affordance doesn't exist), while `Withdraw` over the limit gets an explained `reject`. Absence expresses *inapplicability*; `reject` is reserved for *resolvable refusals*. Explanations are for things the user can act on, not for things that simply don't apply.
-- **Dead rows are structural defects too.** A row whose guard can never be true given the declared constraints is unreachable code wearing a business rule's clothes — and whatever state it leads to may be unreachable in consequence. The ideal compiler rejects it with an explanation (e.g., a guard comparing a 0-to-1 ratio against `75` instead of `0.75` can never fire — and the total-loss path it guards silently never happens).
+- **Inapplicability vs. refusal.** The same principle applies at guard level: `PlanRepayment` has no fallback row, so on a healthy balance the event is simply inapplicable (Unmatched — the operation is not offered), while `Withdraw` over the limit gets an explained `reject`. Absence expresses *inapplicability*; `reject` is reserved for *resolvable refusals*. Explanations are for things the user can act on, not for things that simply don't apply.
+- **Dead rows are structural defects too.** A row whose guard can never be true given the declared constraints is unreachable — and whatever state it leads to may be unreachable in consequence. The ideal compiler rejects it with an explanation (e.g., a guard comparing a 0-to-1 ratio against `75` instead of `0.75` can never fire — and the total-loss path it guards silently never happens).
 
 ## The runtime's role
 
 Runtime governance is more than just validating ingress against declared constraints. It provides:
 
 - the **inspect** mechanism — reasoning about an event before it fires
-- respecting the business process defined by the precept
+- respect for the business process the precept defines
 - strict immutable versioning and write guarantees (as defined in `docs/runtime/runtime-api.md`: `Version` is an immutable snapshot; every operation returns a new `Version`, never mutating its input)
 
-But the runtime **can be made lighter due to the complete nature of the compiler** — it should trust that the compiler did its job. "Lighter" means concretely: **fault-prevention checks are omitted at evaluation time**. No divide-by-zero tests, no overflow guards, no re-checking of proven bounds on writes — the evaluator just computes. What runs at runtime are the declared premises (ingress validation of args and editable fields, guards) that the compiler's proofs depend on, and nothing beyond them. The division in `PlanRepayment` executes with no zero-check anywhere, because `Months positive` was validated at the door and the certificate records that this is sufficient.
+But the runtime **can be lighter, because the compiler's work is complete** — it should trust that the compiler did its job, a trust it establishes by verification, once, at load (see Certificates). "Lighter" means concretely: **fault-prevention checks are omitted at evaluation time**. No divide-by-zero tests, no overflow guards, no re-checking of proven bounds on writes — the evaluator just computes. What runs at runtime are the declared premises (ingress validation of args and editable fields, guards) that the compiler's proofs depend on, and nothing beyond them. The worked example's `PlanRepayment` division is exactly this: no zero-check anywhere, because `Months positive` was validated at ingress.
 
 And the real advantage is not runtime economy: **the compiler finds problems at the time when it's cheapest to fix them**.
 
 ## No deferral
 
-In an ideal world there is **no deferral**. A business rule whose enforcement the compiler cannot prove complete is rejected — never handed to the runtime on the compiler's own initiative. The runtime still has its own governance duties (ingress validation, inspect, process enforcement, strict immutable versioning and write guarantees — not an exhaustive list); what it never does is pick up proof work the compiler couldn't finish.
+In an ideal world there is **no deferral**. A business rule whose enforcement the compiler cannot prove complete is rejected — never handed to the runtime on the compiler's own initiative. The runtime keeps the governance duties described above (not an exhaustive list); what it never does is pick up proof work the compiler couldn't finish.
 
-I want Precept's guarantees to be **easy to understand and trust for authors** — this is a big part of Precept's value proposition. Authors should not have to understand the difference between things checked at compile time vs things governed at runtime. To be precise: the **guarantee is uniform** — a rule holds, period; there is no author-facing distinction between "compile-time-checked rule" and "runtime-governed rule," no tiers of trustworthiness to reason about. The mechanisms differ and are visible (diagnostics teach them, refusals reveal them) — what the author is spared is not seeing the machinery, but ever having to ask "how strongly is this rule held?"
+I want Precept's guarantees to be **easy for authors to understand and trust** — this is a big part of Precept's value proposition. Authors should not have to understand the difference between things checked at compile time vs things governed at runtime. To be precise: the **guarantee is uniform** — a rule holds, period; there is no author-facing distinction between "compile-time-checked rule" and "runtime-governed rule," no tiers of trustworthiness to reason about. The mechanisms differ and are visible (diagnostics teach them, refusals reveal them) — what the author is spared is not seeing the machinery, but ever having to ask "how strongly is this rule held?"
 
 ## Clear explanations
 
-We have always strived for a strong developer experience, and the same applies at runtime. **Clear explanations are critical** — a rejection is not just a verdict. This holds on both sides of the boundary: compile-time rejections and runtime refusals alike must explain themselves clearly.
+We have always strived for a strong developer experience, and **clear explanations are critical** to it — a rejection is not just a verdict. This holds on both sides of the boundary: compile-time rejections and runtime refusals alike must explain themselves clearly.
 
-When a proof cannot close, the compiler **suggests the missing premise with a teachable message**: it computes the guard or arg constraint that would close the proof and shows it — "cannot prove `Balance >= -NewLimit` after this write; adding `when Balance >= -ReduceLimit.NewLimit` would make it provable" — and explains *why* the premise is needed, so the author learns the model rather than just obeying the tool. It never inserts the premise itself. The author writes it, deliberately: a premise the author never wrote is deferral wearing an authored costume.
+When a proof cannot close, the compiler **suggests the missing premise with a teachable message**: it computes the guard or arg constraint that would close the proof and shows it — "cannot prove `Balance >= -NewLimit` after this write; adding `when Balance >= -ReduceLimit.NewLimit` would make it provable" — and explains *why* the premise is needed, so the author learns the model rather than just obeying the tool. It never inserts the premise itself. The author writes it, deliberately: a premise the author never wrote is deferral relabeled as authorship.
 
 ## Expressibility trades for proof
 
-We have already shrunk the language once. Whether prove-or-reject is actually feasible is exactly what this document sets up exploring — but for now we are thinking ideal world.
+We have already shrunk the language once. Whether prove-or-reject is actually feasible is exactly the question this document sets up — but for now we are thinking ideal world.
 
 In that ideal world, I'm happy to **trade off some expressibility to gain proof**, as long as we are still providing a valuable tool that fits the kinds of business problems we intend to solve.
 
@@ -182,14 +182,9 @@ For now, the promise stops at the edge of a single precept, and cross-entity dat
 
 After the MVP, I envision adding the capability for one precept to invoke an event on another (message passing), and **saga precepts** that govern across multiple precepts. That is not MVP scope.
 
-## Open questions
-
-- **Time-referencing rules.** A rule like `ExpiryDate > today` can become false with no event in flight — nothing writes `today`, there is no ingress door for it, and the inductive model has no step where pure passage of time fits. Do rules that reference the current moment exist at all, or does time belong only in guards (evaluated at event time, like any other premise)? Deliberately left open.
-- **The promise across precepts.** Whether and how prove-or-reject and no-deferral extend across precepts (message passing, saga precepts) is undefined; the MVP proof boundary is the single precept. Deliberately left open until that capability is designed.
-
 ## Certificates — lighter runtime, with confidence
 
-Once the compiler has proven every rule, the runtime does **not** re-evaluate rules against the post-mutation configuration. But it does not blindly trust the compiler either. The compiler emits, alongside the compiled definition, a **certificate**: a checkable record of the proof — per obligation, the theorem, the premises used (which guard, which arg constraint, which pre-state rule), and the derivation.
+Once the compiler has proven every rule, the runtime does **not** re-evaluate them against the post-mutation configuration — but it does not blindly trust the compiler either. Alongside the compiled definition, the compiler emits a **certificate**: a checkable record of the proof — per obligation, the theorem, the premises used (which guard, which arg constraint, which pre-state rule), and the derivation.
 
 One small checker component, two call sites:
 
@@ -206,4 +201,9 @@ Two further things fall out:
 Precedent: proof-carrying code (Necula & Lee), and the small-trusted-kernel discipline of proof assistants — the thing you must trust stays tiny and auditable even when the prover is large.
 
 **Philosophy flag (not resolved here):** `docs/philosophy.md` currently describes Fire as "evaluates all applicable constraints against the resulting configuration, and commits only if every constraint holds." Under this want, that sentence needs a deliberate, owner-approved rewording — the constraint evaluation moves to proof-plus-premise-checks, verified by certificate.
+
+## Open questions
+
+- **Time-referencing rules.** A rule like `ExpiryDate > today` can become false with no event in flight — nothing writes `today`, there is no ingress point for it, and the inductive model has no step where pure passage of time fits. Do rules that reference the current moment exist at all, or does time belong only in guards (evaluated at event time, like any other premise)? Deliberately left open.
+- **The promise across precepts.** Whether and how prove-or-reject and no-deferral extend across precepts (message passing, saga precepts) is undefined; the MVP proof boundary is the single precept. Deliberately left open until that capability is designed.
 
