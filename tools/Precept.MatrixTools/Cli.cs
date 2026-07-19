@@ -24,10 +24,15 @@ public static class Cli
             Console.WriteLine($"[{diagnostic.Severity}] {diagnostic.Code}: {diagnostic.Message}");
 
         var semantics = compilation.Semantics;
-        var obligations = ObligationEnumerator.Enumerate(semantics);
-        if (obligations.IsEmpty)
+        var entries = ObligationEnumerator.Enumerate(semantics);
+        var obligations = entries.OfType<ObligationSpec>().ToArray();
+
+        foreach (var skipped in entries.OfType<ObligationSkipped>())
+            Console.WriteLine($"[skipped obligation] {skipped.Label}: {skipped.Reason}");
+
+        if (obligations.Length == 0)
         {
-            Console.WriteLine("no obligations (no rules and no desugaring modifiers).");
+            Console.WriteLine("no computable obligations (no rules and no desugaring modifiers in scope).");
             return compilation.HasErrors ? 1 : 0;
         }
 

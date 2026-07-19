@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Globalization;
 using Precept.Language;
 using Precept.Pipeline;
 
@@ -91,10 +92,18 @@ public static class Canonicalizer
 
         TypedTypedConstant t => new CanonTypedConst(
             t.ResultType.ToString(),
-            t.ParsedValue?.ToString() ?? t.RawText),
+            t.ParsedValue is IFormattable formattable
+                ? formattable.ToString(null, CultureInfo.InvariantCulture)
+                : t.ParsedValue?.ToString() ?? t.RawText),
 
-        InterpolatedTypedConstant itc => new CanonInterp(
-            [.. itc.Slots.Select(slot => Walk(slot.Expression, s, bindings))]),
+        // Interpolated typed constants key by result type + static parts
+        // (text/magnitude/qualifier) + per-slot semantic kind: '{X} USD' and
+        // '{X} EUR' are different constants even with identical hole expressions.
+        InterpolatedTypedConstant itc => new CanonCall(
+            InterpolatedConstantTag(itc),
+            [.. itc.Slots.Select(slot => (CanonExpr)new CanonCall(
+                "slot:" + slot.SlotKind,
+                [Walk(slot.Expression, s, bindings)]))]),
 
         TypedListLiteral ll => new CanonList(
             [.. ll.Elements.Select(el => Walk(el, s, bindings))]),
@@ -103,6 +112,25 @@ public static class Canonicalizer
 
         _ => throw new NotSupportedException($"no canonical form for {e.GetType().Name}"),
     };
+
+    private static string InterpolatedConstantTag(InterpolatedTypedConstant itc)
+    {
+        var tag = "iconst:" + itc.ResultType;
+        if (itc.StaticText is not null)
+            tag += ":text=" + itc.StaticText;
+        if (itc.StaticMagnitude is not null)
+            tag += ":mag=" + itc.StaticMagnitude.Value.ToString("G29", CultureInfo.InvariantCulture);
+        if (itc.StaticQualifier is not null)
+            tag += ":q=" + (itc.StaticQualifier switch
+            {
+                StaticCurrencyQualifier c => c.CurrencyCode,
+                StaticUnitQualifier u => u.Unit.ToString(),
+                StaticCurrencyAndUnitQualifier cu => cu.CurrencyCode + "/" + cu.Unit,
+                StaticFromToCurrenciesQualifier ft => ft.FromCode + ">" + ft.ToCode,
+                var q => q.ToString(),
+            });
+        return tag;
+    }
 
     private static CanonExpr Literal(TypedLiteral l) => l.Value switch
     {
@@ -119,11 +147,15 @@ public static class Canonicalizer
     /// <summary>
     /// The type kinds whose values form an additive/multiplicative group for
     /// normalization purposes: subtraction rewrites to addition of the negation,
-    /// and + / * commute. Mixed-kind temporal arithmetic (date + period, …) and
-    /// string concatenation stay ordered.
+    /// and + / * commute and reassociate. <see cref="TypeKind.Number"/> is
+    /// deliberately excluded: IEEE doubles commute under + and * but do NOT
+    /// reassociate — (1e16 + -1e16) + 1 is 1 while 1e16 + (-1e16 + 1) is 0 —
+    /// so reordering/flattening would equate spellings with different runtime
+    /// values. Number arithmetic routes through the ordered residue, as do
+    /// mixed-kind temporal arithmetic (date + period, …) and string concatenation.
     /// </summary>
     private static bool IsNumericLike(TypeKind kind) => kind is
-        TypeKind.Integer or TypeKind.Decimal or TypeKind.Number or
+        TypeKind.Integer or TypeKind.Decimal or
         TypeKind.Money or TypeKind.Quantity or TypeKind.Price or
         TypeKind.Duration or TypeKind.Period or TypeKind.ExchangeRate;
 

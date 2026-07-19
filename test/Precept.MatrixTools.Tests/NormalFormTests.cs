@@ -6,7 +6,7 @@ namespace Precept.MatrixTools.Tests;
 /// <summary>
 /// One test region per adopted normal-form rule (positive and negative cases),
 /// plus the documented non-rules — equivalences the normal form deliberately
-/// does NOT admit. See NORMAL-FORM-DRAFT.md.
+/// does NOT admit.
 /// </summary>
 public class NormalFormTests
 {
@@ -88,7 +88,8 @@ public class NormalFormTests
     [Fact]
     public void Idem_DuplicateDisjunctCollapses() => Px.Eq("A <= B or A <= B", "A <= B").Should().BeTrue();
 
-    // ── N9: constant folding (FLAGGED open item — see NORMAL-FORM-DRAFT.md) ──
+    // ── N9: constant folding (FLAGGED: an owner-review item — it widens the
+    //        licensed guard set; striking it is a calculator code change) ──────
 
     [Fact]
     public void Fold_LiteralAddition() => Px.Eq("A <= 500 + 500", "A <= 1000").Should().BeTrue();
@@ -145,4 +146,29 @@ public class NormalFormTests
     [Fact]
     public void NonRule_NotIsNotPushedThroughComparisons() =>
         Px.Eq("not (A <= B)", "B < A").Should().BeFalse();
+
+    // ── The number lane is excluded from the group treatment ─────────────────
+    //
+    // IEEE doubles commute under + and * but do NOT reassociate: with
+    // X = 1e16, Y = -1e16, Z = 1, (X + Y) + Z is 1 while X + (Y + Z) is 0.
+    // Reordering/flattening would equate spellings with different runtime
+    // values, so number arithmetic keeps its written shape (ordered residue).
+
+    private const string NumberDecls = """
+        field A as number default 0.0
+        field B as number default 0.0
+        field C as number default 0.0
+        """;
+
+    [Fact]
+    public void NumberLane_ReassociationIsNotAnEquivalence() =>
+        WpCalculator.AreNormalFormEqual(
+            Px.Rule(NumberDecls, "(A + B) + C <= 10"),
+            Px.Rule(NumberDecls, "A + (B + C) <= 10")).Should().BeFalse();
+
+    [Fact]
+    public void NumberLane_IdenticalSpellingStillMatchesItself() =>
+        WpCalculator.AreNormalFormEqual(
+            Px.Rule(NumberDecls, "(A + B) + C <= 10"),
+            Px.Rule(NumberDecls, "(A + B) + C <= 10")).Should().BeTrue();
 }

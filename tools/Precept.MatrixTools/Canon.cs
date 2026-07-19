@@ -4,11 +4,11 @@ namespace Precept.MatrixTools;
 
 /// <summary>
 /// Normalizing factory for canonical nodes. Every normal-form rule that acts at
-/// construction time lives here (see NORMAL-FORM-DRAFT.md for the rule list):
-/// flattening + operand sorting for commutative operators, subtraction as added
-/// negation, double-negation cancellation, numeric-literal folding, presence
-/// evaluation over substituted values. Implications are never folded — vacuity
-/// semantics belongs to the discharge contracts, not to normalization.
+/// construction time lives here: flattening + operand sorting for commutative
+/// operators, subtraction as added negation, double-negation cancellation,
+/// numeric-literal folding, presence evaluation over substituted values.
+/// Implications are never folded — vacuity semantics belongs to the discharge
+/// contracts, not to normalization.
 /// </summary>
 public static class Canon
 {

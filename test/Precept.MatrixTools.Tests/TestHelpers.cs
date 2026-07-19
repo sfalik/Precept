@@ -35,7 +35,9 @@ internal static class Px
             .First(r => r.EventName == eventName && !r.Actions.IsEmpty);
 
     public static ObligationSpec Obligation(Compilation c, string label) =>
-        ObligationEnumerator.Enumerate(c.Semantics).Single(o => o.Label == label);
+        ObligationEnumerator.Enumerate(c.Semantics)
+            .OfType<ObligationSpec>()
+            .Single(o => o.Label == label);
 
     public static WpComputed Wp(this WpResult result) =>
         result is WpComputed computed

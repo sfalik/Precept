@@ -8,9 +8,7 @@ namespace Precept.MatrixTools;
 //  Produced by Canonicalizer from the pipeline's TypedExpression DU
 //  (src/Precept/Pipeline/SemanticIndex.cs). Two source expressions are
 //  normal-form-equal iff their CanonExpr Keys are identical strings.
-//  The normalization rules applied during construction are documented in
-//  NORMAL-FORM-DRAFT.md (pending owner review / integration into the
-//  obligation-discharge matrix).
+//  The normalization rules applied during construction live in Canon.cs.
 //
 //  Equality contract: compare via Key, not record equality — several nodes
 //  carry ImmutableArray members, whose record equality is referential.
@@ -111,5 +109,9 @@ public sealed record CanonList(ImmutableArray<CanonExpr> Elements) : CanonExpr;
 /// <summary>Interpolated string — literal and hole segments in order.</summary>
 public sealed record CanonInterp(ImmutableArray<CanonExpr> Segments) : CanonExpr;
 
-/// <summary>Residue of a TypedErrorExpression — compares equal only to itself structurally.</summary>
+/// <summary>
+/// Residue of a TypedErrorExpression. All error residues share one key, so any
+/// two error-bearing expressions compare "equal" — callers must treat
+/// comparisons involving errors as meaningless, not as matches.
+/// </summary>
 public sealed record CanonError : CanonExpr;

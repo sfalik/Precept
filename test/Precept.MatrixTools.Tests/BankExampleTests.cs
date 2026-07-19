@@ -6,13 +6,13 @@ using Xunit;
 namespace Precept.MatrixTools.Tests;
 
 /// <summary>
-/// The want doc's worked BankAccountInvariant example
-/// (docs/Working/what-i-want-2026-07-16.md § Worked example) as a known-answer
+/// A bank-account invariant precept in which every handler needs a different
+/// premise class (arg bounds, the inductive hypothesis, guard restatement,
+/// symmetric write sites, non-linear guard restatement) — the known-answer
 /// source for preservation WPs, guard matching, and the multi-write gate.
 /// </summary>
 public class BankExampleTests
 {
-    // Verbatim from the want doc's worked example.
     internal const string Bank = """
         precept BankAccountInvariant
 
@@ -121,7 +121,7 @@ public class BankExampleTests
     [Fact]
     public void ReduceLimit_NearMiss_GuardingTheOldLimitDoesNotCover()
     {
-        // Near-miss from matrix sketch Family 2: the guard reads the *old* limit.
+        // Near-miss: the guard reads the *old* limit instead of the incoming one.
         var nearMiss = Bank.Replace(
             "when Balance >= -ReduceLimit.NewLimit and",
             "when Balance >= -OverdraftLimit and");
@@ -200,7 +200,7 @@ public class BankExampleTests
         wp.Wp.Key.Should().Be(WpCalculator.Canonicalize(ob.Condition).Key);
     }
 
-    // ── The Q1 gate: multi-write plans are not composed ──────────────────────
+    // ── The multi-write gate: sequential composition is not implemented ──────
 
     [Fact]
     public void OpenAccount_TwoWritePlan_IsNotSupported()

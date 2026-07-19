@@ -24,7 +24,7 @@ namespace Precept.MatrixTools;
 public sealed record ObligationSpec(
     string Label,
     TypedExpression Condition,
-    TypedExpression? ActivationCondition);
+    TypedExpression? ActivationCondition) : ObligationEntry(Label);
 
 /// <summary>Result of a WP computation.</summary>
 public abstract record WpResult;

@@ -14,7 +14,7 @@ public class EstablishmentTests
     private static WpComputed DefaultsWp(Compilation c, string obligation) =>
         WpCalculator.ComputeEstablishmentWp(c.Semantics, [], Px.Obligation(c, obligation)).Wp();
 
-    // ── The want doc's default checks ────────────────────────────────────────
+    // ── Default-value checks: declared defaults must satisfy the field's rules ──
 
     [Fact]
     public void Bank_DailyWithdrawalLimitDefault_SatisfiesPositive()
@@ -41,8 +41,8 @@ public class EstablishmentTests
     [Fact]
     public void Bank_ViolatingDefault_FoldsToFalse()
     {
-        // The want doc's "change the default to 20000.0" mutation: the base case
-        // has a counterexample, and the establishment WP evaluates to false.
+        // A default violating its own max: the base case has a counterexample,
+        // and the establishment WP evaluates to false.
         var c = Px.Compile(BankExampleTests.Bank.Replace("default 500.0", "default 20000.0"));
         DefaultsWp(c, "DailyWithdrawalLimit:max").Wp.Should().Be(new CanonBool(false));
     }
@@ -56,6 +56,26 @@ public class EstablishmentTests
         var wp = DefaultsWp(c, "rule[0]");
         wp.Wp.Should().NotBeOfType<CanonBool>();
         wp.Wp.Key.Should().Contain("unset");
+    }
+
+    [Fact]
+    public void OptionalFieldModifier_EstablishmentIsPresenceConditioned()
+    {
+        // A modifier on an optional field constrains the value only when one is
+        // present, so its desugared rule activates on `Field is set`. Over the
+        // default configuration of an optional no-default field, the activation
+        // folds to false and the implication survives (vacuous discharge is the
+        // discharge contract's call, not the calculator's).
+        var c = Px.Compile("""
+            field Total as decimal default 0.0
+            field Extra as decimal optional nonnegative
+            event Touch(Amount as decimal)
+            on Touch -> set Total = Touch.Amount
+            """);
+
+        var implies = DefaultsWp(c, "Extra:nonnegative").Wp
+            .Should().BeOfType<CanonImplies>().Subject;
+        implies.Antecedent.Should().Be(new CanonBool(false));
     }
 
     [Fact]

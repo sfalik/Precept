@@ -5,8 +5,9 @@ using Xunit;
 namespace Precept.MatrixTools.Tests;
 
 /// <summary>
-/// Matrix Witness Family 1 — numeric single-field, handler set
-/// (docs/Working/obligation-discharge-matrix-2026-07-19.md, three RHS read-set classes).
+/// Numeric single-field witnesses for a handler set write: one rule, three RHS
+/// read-set classes (args only; reads the written field, decrease; reads the
+/// written field, increase) — each with its licensed guard and near-misses.
 /// The obligation is the modifier-desugared rule Total &lt;= 1000 (max on Total).
 /// </summary>
 public class WitnessFamily1Tests
@@ -57,8 +58,8 @@ public class WitnessFamily1Tests
     [Fact]
     public void BaseA_PerTermBoundGuardIsNotASubstitutionMatch()
     {
-        // Owner ruling: per-term bound conjuncts (term-compare-constant) are a
-        // LICENSED premise — they discharge via the bound-extraction /
+        // Per-term bound conjuncts (term-compare-constant) are a LICENSED
+        // premise — they discharge via the bound-extraction /
         // interval-arithmetic derivation, exactly like arg max bounds. They are
         // still NOT normal-form-equal to the WP: the whole-condition match is
         // only one derivation, and this guard is genuinely a different statement.
