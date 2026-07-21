@@ -1,0 +1,645 @@
+{
+ "productSize": 9292,
+ "axes": {
+  "proofRequirementSites": 101,
+  "evaluationSiteCategories": 23,
+  "typeFamilies": [
+   "primitive",
+   "temporal",
+   "business-domain",
+   "collection"
+  ]
+ },
+ "dispositionCounts": {
+  "defined": 992,
+  "empty": 7047,
+  "conflicted": 52,
+  "deferred": 441,
+  "open": 760
+ },
+ "groups": [
+  {
+   "groupId": "g01",
+   "title": "Division and remainder by zero in the primitive numeric lanes, at a transition-row write",
+   "fileName": "fault-1-division-primitive-transition-write.cells.json",
+   "cellCount": 10,
+   "siteIds": [
+    "op/DecimalDivideDecimal/numeric-0",
+    "op/DecimalModuloDecimal/numeric-0",
+    "op/IntegerDivideDecimal/numeric-0",
+    "op/IntegerDivideInteger/numeric-0",
+    "op/IntegerDivideNumber/numeric-0",
+    "op/IntegerModuloDecimal/numeric-0",
+    "op/IntegerModuloInteger/numeric-0",
+    "op/IntegerModuloNumber/numeric-0",
+    "op/NumberDivideNumber/numeric-0",
+    "op/NumberModuloNumber/numeric-0"
+   ],
+   "evaluationSiteCategories": [
+    "transition-row-action-operand"
+   ],
+   "typeFamilies": [
+    "primitive"
+   ],
+   "sharedSetting": "One stateless-plus-stateful precept holding a decimal running total, an integer part count, and an event carrying a divisor argument; a single transition row writes `set PerPart = Total / Parts` (and the remainder variant) with the row's guard, the event's arg modifiers, and the field modifiers all available as premises. Every cell varies only which numeric lane the two operands sit in - integer/integer, integer/decimal, integer/number, decimal/decimal, number/number - times divide and modulo.",
+   "authoringNotes": "One cell per catalog site, so ten cells. The lane matters and must not be collapsed: the matrix's arg-bound interval-arithmetic validity argument (obligation-discharge-matrix-2026-07-19.md:206) explicitly covers the exact lanes only and names the `number` lane's IEEE rounding as an unstated open dependency, so the `number` cells inherit a weaker argument than the `integer`/`decimal` ones and must say so rather than reuse the exact-lane text. This is the group whose discharge story is already written in the matrix (Family 4, division with arg-constraint discharge), so it is the natural first file and the precedent the other division groups should match. Hazard: some evaluation-site categories in this group's region make premise class (d) (constraints holding in the pre-state) available, which means a discharge can run through a business `rule` used as a premise. Slice 2 verified at HEAD that such a discharge can be a false proof - `rule PlannedQuantity > 0` discharges a divide-by-zero via the CompositionalConstraint strategy while another handler sets the field to 0, and the whole file compiles clean (authored-expressiveness-gaps.md, Part 3, Defect B). So for any witness in this group whose discharge cites a `rule`, record builtStatus as unverified with that reason named, never as confirmed-by-clean-compile. Guard-based and modifier-based discharges in the same group are unaffected and may be recorded normally.",
+   "productCoordinatesCovered": 10
+  },
+  {
+   "groupId": "g02",
+   "title": "Division by zero at a construction row and at a state entry/exit hook",
+   "fileName": "fault-2-division-primitive-construction-and-state-hook.cells.json",
+   "cellCount": 10,
+   "siteIds": [
+    "op/DecimalDivideDecimal/numeric-0",
+    "op/DecimalModuloDecimal/numeric-0",
+    "op/IntegerDivideDecimal/numeric-0",
+    "op/IntegerDivideInteger/numeric-0",
+    "op/IntegerDivideNumber/numeric-0",
+    "op/IntegerModuloDecimal/numeric-0",
+    "op/IntegerModuloInteger/numeric-0",
+    "op/IntegerModuloNumber/numeric-0",
+    "op/NumberDivideNumber/numeric-0",
+    "op/NumberModuloNumber/numeric-0"
+   ],
+   "evaluationSiteCategories": [
+    "construction-row-action-operand",
+    "state-hook-action-operand"
+   ],
+   "typeFamilies": [
+    "primitive"
+   ],
+   "sharedSetting": "The same numeric setting as group 1, re-sited twice: once inside the handler of an `initial` event, where there is no pre-state at all, and once inside a `to S ->` / `from S ->` hook, where there is a pre-state but no event args. Five representative lane sites at each of the two categories.",
+   "authoringNotes": "The whole point of this group is the two mirror-image premise asymmetries, and they must be stated as derivations, not as observations: at a construction row class (d) is structurally unavailable because no pre-state exists, so only arg constraints and already-materialised field modifiers can discharge; at a state hook class (b) is structurally unavailable because the hook fires on every inbound edge and the triggering event varies, so no arg is in scope. The matrix records as open whether the residency fact itself (the entity is in S) is a premise and under which class - carry that as an openDependency on every state-hook cell rather than assuming either answer. Hazard: some evaluation-site categories in this group's region make premise class (d) (constraints holding in the pre-state) available, which means a discharge can run through a business `rule` used as a premise. Slice 2 verified at HEAD that such a discharge can be a false proof - `rule PlannedQuantity > 0` discharges a divide-by-zero via the CompositionalConstraint strategy while another handler sets the field to 0, and the whole file compiles clean (authored-expressiveness-gaps.md, Part 3, Defect B). So for any witness in this group whose discharge cites a `rule`, record builtStatus as unverified with that reason named, never as confirmed-by-clean-compile. Guard-based and modifier-based discharges in the same group are unaffected and may be recorded normally.",
+   "productCoordinatesCovered": 20
+  },
+  {
+   "groupId": "g03",
+   "title": "Division by zero inside a guard, where the guard cannot discharge itself",
+   "fileName": "fault-3-division-primitive-guard-positions.cells.json",
+   "cellCount": 10,
+   "siteIds": [
+    "op/DecimalDivideDecimal/numeric-0",
+    "op/DecimalModuloDecimal/numeric-0",
+    "op/IntegerDivideDecimal/numeric-0",
+    "op/IntegerDivideInteger/numeric-0",
+    "op/IntegerDivideNumber/numeric-0",
+    "op/IntegerModuloDecimal/numeric-0",
+    "op/IntegerModuloInteger/numeric-0",
+    "op/IntegerModuloNumber/numeric-0",
+    "op/NumberDivideNumber/numeric-0",
+    "op/NumberModuloNumber/numeric-0"
+   ],
+   "evaluationSiteCategories": [
+    "access-mode-guard",
+    "ensure-activation-guard",
+    "rule-activation-guard",
+    "state-hook-guard",
+    "transition-row-guard"
+   ],
+   "typeFamilies": [
+    "primitive"
+   ],
+   "sharedSetting": "One precept carrying the same decimal-over-integer division, written into each of the five guard positions in turn: a transition row's `when`, a state hook's `when`, an access-mode declaration's `when`, an ensure's `when`, and a conditional rule's `when`. Two representative lane sites at each.",
+   "authoringNotes": "The headline asymmetry: premise class (c) is unavailable at every cell in this group, because a guard cannot supply facts to an obligation arising inside itself. Say that as the cell's derivation - it is what makes these cells different from group 1's, where the identical expression text discharges from (c). Two open dependencies to carry, not answer: whether an earlier conjunct of the same guard is a premise for a later one (`when Go.Parts != 0 and Total / Go.Parts > 1.0`), and whether a conditional rule's `when` can discharge a fault inside the rule's own condition. Both are recorded as missing rules by the evaluation-site enumeration. Built-status warning: the evaluation-site enumeration measured this position at HEAD (commit e1a14d91) and found it mints NO fault obligation at all. Base witnesses here must be recorded modelStatus provable / builtStatus unresolved-today - do not read a clean compile as acceptance of the program; it is the site not minting. All five guard positions are in the measured no-mint set. Hazard: some evaluation-site categories in this group's region make premise class (d) (constraints holding in the pre-state) available, which means a discharge can run through a business `rule` used as a premise. Slice 2 verified at HEAD that such a discharge can be a false proof - `rule PlannedQuantity > 0` discharges a divide-by-zero via the CompositionalConstraint strategy while another handler sets the field to 0, and the whole file compiles clean (authored-expressiveness-gaps.md, Part 3, Defect B). So for any witness in this group whose discharge cites a `rule`, record builtStatus as unverified with that reason named, never as confirmed-by-clean-compile. Guard-based and modifier-based discharges in the same group are unaffected and may be recorded normally.",
+   "productCoordinatesCovered": 50
+  },
+  {
+   "groupId": "g04",
+   "title": "Division by zero in a constraint condition or a computed field, quantified over every configuration",
+   "fileName": "fault-4-division-primitive-constraint-positions.cells.json",
+   "cellCount": 10,
+   "siteIds": [
+    "op/DecimalDivideDecimal/numeric-0",
+    "op/DecimalModuloDecimal/numeric-0",
+    "op/IntegerDivideDecimal/numeric-0",
+    "op/IntegerDivideInteger/numeric-0",
+    "op/IntegerDivideNumber/numeric-0",
+    "op/IntegerModuloDecimal/numeric-0",
+    "op/IntegerModuloInteger/numeric-0",
+    "op/IntegerModuloNumber/numeric-0",
+    "op/NumberDivideNumber/numeric-0",
+    "op/NumberModuloNumber/numeric-0"
+   ],
+   "evaluationSiteCategories": [
+    "computed-field-expression",
+    "event-ensure-condition",
+    "quantifier-predicate",
+    "rule-condition",
+    "state-ensure-condition"
+   ],
+   "typeFamilies": [
+    "primitive"
+   ],
+   "sharedSetting": "A precept whose rule condition, state ensure, event ensure, computed-field expression, and quantifier predicate each carry the same division. Two representative lane sites at each of the five categories.",
+   "authoringNotes": "These sites are not anchored to a handler, so the obligation must hold in every reachable configuration rather than at one write. Only class (a), field modifiers, is available without a further ruling, and the enumeration is explicit that the broader reading - treating 'other constraints hold in this configuration' as class (d) - is exactly what goes wrong at HEAD in the Part 3 defect, so it must NOT be adopted here. Write the applicable-class set as {(a)} and record the widening as an open dependency. The quantifier-predicate cells are the one place a premise source appears that no host site has - the binding variable takes the collection's inner type, so the inner-type value modifiers bound the subject; and they also sit against the open question of whether quantified constraints are proof surface at all (obligation-discharge-matrix-2026-07-19.md:312), which is an openDependency, not a reason to skip the cell. No false-proof hazard in this group: the rule-condition, computed-field and quantifier-predicate categories lack premise class (d), so no discharge here can run through a business rule used as a premise. Clean-compile confirmation of a modifier- or constant-fold-based discharge is admissible. The state-ensure and event-ensure categories in this region DO carry class (d); Hazard: some evaluation-site categories in this group's region make premise class (d) (constraints holding in the pre-state) available, which means a discharge can run through a business `rule` used as a premise. Slice 2 verified at HEAD that such a discharge can be a false proof - `rule PlannedQuantity > 0` discharges a divide-by-zero via the CompositionalConstraint strategy while another handler sets the field to 0, and the whole file compiles clean (authored-expressiveness-gaps.md, Part 3, Defect B). So for any witness in this group whose discharge cites a `rule`, record builtStatus as unverified with that reason named, never as confirmed-by-clean-compile. Guard-based and modifier-based discharges in the same group are unaffected and may be recorded normally.",
+   "productCoordinatesCovered": 50
+  },
+  {
+   "groupId": "g05",
+   "title": "Division by zero in a declaration-position value expression",
+   "fileName": "fault-5-division-primitive-declaration-positions.cells.json",
+   "cellCount": 10,
+   "siteIds": [
+    "op/DecimalDivideDecimal/numeric-0",
+    "op/DecimalModuloDecimal/numeric-0",
+    "op/IntegerDivideDecimal/numeric-0",
+    "op/IntegerDivideInteger/numeric-0",
+    "op/IntegerDivideNumber/numeric-0",
+    "op/IntegerModuloDecimal/numeric-0",
+    "op/IntegerModuloInteger/numeric-0",
+    "op/IntegerModuloNumber/numeric-0",
+    "op/NumberDivideNumber/numeric-0",
+    "op/NumberModuloNumber/numeric-0"
+   ],
+   "evaluationSiteCategories": [
+    "collection-inner-type-modifier-value-expression",
+    "event-arg-modifier-value-expression",
+    "field-default-value-expression",
+    "field-modifier-value-expression",
+    "type-qualifier-expression"
+   ],
+   "typeFamilies": [
+    "primitive"
+   ],
+   "sharedSetting": "A precept whose field `default`, field constraint-modifier bound, event-arg constraint-modifier bound, collection inner-type modifier bound, and type qualifier each carry an expression that divides. Two representative lane sites at each of the five categories.",
+   "authoringNotes": "The shared discharge story is constant folding plus declaration-order scope: nothing but class (a) is in scope, and at `field-default-value-expression` the scope is narrower still - only fields declared above, because a forward reference is impossible in the grammar rather than merely disallowed. That narrowing is the cell's derivation and must be written, not assumed. Built-status warning: the evaluation-site enumeration measured this position at HEAD (commit e1a14d91) and found it mints NO fault obligation at all. Base witnesses here must be recorded modelStatus provable / builtStatus unresolved-today - do not read a clean compile as acceptance of the program; it is the site not minting. Field default, field modifier bound, and event-arg modifier bound are all in the measured no-mint set; the field-modifier one additionally reported `[skipped obligation] bound is not a literal declared value`, which is a second, entangled gap worth recording separately. `type-qualifier-expression` and `collection-inner-type-modifier-value-expression` were NOT measured at HEAD - record their built status as unmeasured, never inferred from the scalar case. No false-proof hazard in this group: every evaluation-site category in its region lacks premise class (d), so no discharge here can run through a business rule used as a premise. Clean-compile confirmation of a modifier- or constant-fold-based discharge is admissible.",
+   "productCoordinatesCovered": 50
+  },
+  {
+   "groupId": "g06",
+   "title": "Division by zero inside a refusal message or a constraint rationale",
+   "fileName": "fault-6-division-primitive-message-interpolation.cells.json",
+   "cellCount": 8,
+   "siteIds": [
+    "op/DecimalDivideDecimal/numeric-0",
+    "op/DecimalModuloDecimal/numeric-0",
+    "op/IntegerDivideDecimal/numeric-0",
+    "op/IntegerDivideInteger/numeric-0",
+    "op/IntegerDivideNumber/numeric-0",
+    "op/IntegerModuloDecimal/numeric-0",
+    "op/IntegerModuloInteger/numeric-0",
+    "op/IntegerModuloNumber/numeric-0",
+    "op/NumberDivideNumber/numeric-0",
+    "op/NumberModuloNumber/numeric-0"
+   ],
+   "evaluationSiteCategories": [
+    "constraint-rationale-interpolation",
+    "reject-message-interpolation"
+   ],
+   "typeFamilies": [
+    "primitive"
+   ],
+   "sharedSetting": "A precept with a `-> reject \"...{Total / Parts}...\"` outcome row and a rule whose `because` string interpolates the same division. Four representative lane sites at each of the two categories.",
+   "authoringNotes": "This is the site the want doc puts forward as the reason the fault axis cannot reuse the write-site axis - a row that writes nothing and still evaluates arbitrary arithmetic (what-i-want-2026-07-16.md:72). Getting it into the definition is the point of the group. Premise availability differs between the two categories and must be derived, not shared: a reject row matched, so its own guard holds and is class (c), and the event's args are in scope; a `because` on a rule or state ensure has neither. Open dependency to carry rather than answer: whether the failure context is itself a premise (the constraint is false when the message renders, and for a conditional rule its `when` is true) - no premise class covers that today. Built-status warning: the evaluation-site enumeration measured this position at HEAD (commit e1a14d91) and found it mints NO fault obligation at all. Base witnesses here must be recorded modelStatus provable / builtStatus unresolved-today - do not read a clean compile as acceptance of the program; it is the site not minting. Both positions are in the measured no-mint set, and the reject-message one is the most pointed gap the enumeration found. Hazard: some evaluation-site categories in this group's region make premise class (d) (constraints holding in the pre-state) available, which means a discharge can run through a business `rule` used as a premise. Slice 2 verified at HEAD that such a discharge can be a false proof - `rule PlannedQuantity > 0` discharges a divide-by-zero via the CompositionalConstraint strategy while another handler sets the field to 0, and the whole file compiles clean (authored-expressiveness-gaps.md, Part 3, Defect B). So for any witness in this group whose discharge cites a `rule`, record builtStatus as unverified with that reason named, never as confirmed-by-clean-compile. Guard-based and modifier-based discharges in the same group are unaffected and may be recorded normally.",
+   "productCoordinatesCovered": 20
+  },
+  {
+   "groupId": "g07",
+   "title": "Division by zero with money, quantity, price and exchange-rate operands, at a transition-row write",
+   "fileName": "fault-7-division-business-transition-write.cells.json",
+   "cellCount": 11,
+   "siteIds": [
+    "op/ExchangeRateDivideDecimal/numeric-0",
+    "op/MoneyDivideDecimal/numeric-0",
+    "op/MoneyDivideMoneyCrossCurrency/numeric-0",
+    "op/MoneyDivideMoneySameCurrency/numeric-0",
+    "op/MoneyDividePrice/numeric-1",
+    "op/MoneyDivideQuantity/numeric-0",
+    "op/PriceDivideDecimal/numeric-0",
+    "op/PriceDivideQuantity/numeric-0",
+    "op/QuantityDivideDecimal/numeric-0",
+    "op/QuantityDivideQuantityCrossDimension/numeric-0",
+    "op/QuantityDivideQuantitySameDimension/numeric-0"
+   ],
+   "evaluationSiteCategories": [
+    "transition-row-action-operand"
+   ],
+   "typeFamilies": [
+    "business-domain",
+    "primitive"
+   ],
+   "sharedSetting": "A billing precept holding a money subtotal with a currency qualifier, a quantity with a unit qualifier, a unit price, and an exchange rate; one transition row divides each of them by a divisor carried on the event. One cell per catalog site.",
+   "authoringNotes": "The obligation and the discharge are the same interval story as group 1 - the divisor's interval must exclude zero - and the cells must say so rather than invent a business-domain-specific derivation. What is genuinely different is the type-family coordinate: these sites are live in both the business-domain and the primitive family, because entries such as `money / decimal` range over a business-domain numerator and a primitive divisor. State which operand the requirement's subject is (the divisor) so the family coordinate is not read as ambiguous. Do NOT pull the currency- and unit-matching requirements of these same operations into this group: those are a separate requirement kind and are dispositioned open, because no premise class supplies qualifier facts. Hazard: some evaluation-site categories in this group's region make premise class (d) (constraints holding in the pre-state) available, which means a discharge can run through a business `rule` used as a premise. Slice 2 verified at HEAD that such a discharge can be a false proof - `rule PlannedQuantity > 0` discharges a divide-by-zero via the CompositionalConstraint strategy while another handler sets the field to 0, and the whole file compiles clean (authored-expressiveness-gaps.md, Part 3, Defect B). So for any witness in this group whose discharge cites a `rule`, record builtStatus as unverified with that reason named, never as confirmed-by-clean-compile. Guard-based and modifier-based discharges in the same group are unaffected and may be recorded normally.",
+   "productCoordinatesCovered": 15
+  },
+  {
+   "groupId": "g08",
+   "title": "Business-domain division by zero at a construction row and at a state hook",
+   "fileName": "fault-8-division-business-construction-and-state-hook.cells.json",
+   "cellCount": 8,
+   "siteIds": [
+    "op/ExchangeRateDivideDecimal/numeric-0",
+    "op/MoneyDivideDecimal/numeric-0",
+    "op/MoneyDivideMoneyCrossCurrency/numeric-0",
+    "op/MoneyDivideMoneySameCurrency/numeric-0",
+    "op/MoneyDividePrice/numeric-1",
+    "op/MoneyDivideQuantity/numeric-0",
+    "op/PriceDivideDecimal/numeric-0",
+    "op/PriceDivideQuantity/numeric-0",
+    "op/QuantityDivideDecimal/numeric-0",
+    "op/QuantityDivideQuantityCrossDimension/numeric-0",
+    "op/QuantityDivideQuantitySameDimension/numeric-0"
+   ],
+   "evaluationSiteCategories": [
+    "construction-row-action-operand",
+    "state-hook-action-operand"
+   ],
+   "typeFamilies": [
+    "business-domain",
+    "primitive"
+   ],
+   "sharedSetting": "The billing setting of group 7, re-sited into an `initial` event's handler and into a state entry hook. Four representative sites at each of the two categories.",
+   "authoringNotes": "Same two premise asymmetries as group 2 (no pre-state at construction, no args at a state hook), applied to qualified numeric operands. One thing to check rather than assume: a money or quantity field's `default` must carry a qualifier, so the construction-row cells interact with the qualifier machinery even though the obligation is purely about the divisor. Keep that in notes; it is not a licence to answer the open qualifier question. Hazard: some evaluation-site categories in this group's region make premise class (d) (constraints holding in the pre-state) available, which means a discharge can run through a business `rule` used as a premise. Slice 2 verified at HEAD that such a discharge can be a false proof - `rule PlannedQuantity > 0` discharges a divide-by-zero via the CompositionalConstraint strategy while another handler sets the field to 0, and the whole file compiles clean (authored-expressiveness-gaps.md, Part 3, Defect B). So for any witness in this group whose discharge cites a `rule`, record builtStatus as unverified with that reason named, never as confirmed-by-clean-compile. Guard-based and modifier-based discharges in the same group are unaffected and may be recorded normally.",
+   "productCoordinatesCovered": 30
+  },
+  {
+   "groupId": "g09",
+   "title": "Business-domain division by zero inside a guard",
+   "fileName": "fault-9-division-business-guard-positions.cells.json",
+   "cellCount": 10,
+   "siteIds": [
+    "op/ExchangeRateDivideDecimal/numeric-0",
+    "op/MoneyDivideDecimal/numeric-0",
+    "op/MoneyDivideMoneyCrossCurrency/numeric-0",
+    "op/MoneyDivideMoneySameCurrency/numeric-0",
+    "op/MoneyDividePrice/numeric-1",
+    "op/MoneyDivideQuantity/numeric-0",
+    "op/PriceDivideDecimal/numeric-0",
+    "op/PriceDivideQuantity/numeric-0",
+    "op/QuantityDivideDecimal/numeric-0",
+    "op/QuantityDivideQuantityCrossDimension/numeric-0",
+    "op/QuantityDivideQuantitySameDimension/numeric-0"
+   ],
+   "evaluationSiteCategories": [
+    "access-mode-guard",
+    "ensure-activation-guard",
+    "rule-activation-guard",
+    "state-hook-guard",
+    "transition-row-guard"
+   ],
+   "typeFamilies": [
+    "business-domain",
+    "primitive"
+   ],
+   "sharedSetting": "The billing setting written into each of the five guard positions. Two representative sites at each.",
+   "authoringNotes": "Mirror of group 3 on qualified operands: class (c) unavailable, same two open dependencies about conjunct ordering and rule activation guards. Built-status warning: the evaluation-site enumeration measured this position at HEAD (commit e1a14d91) and found it mints NO fault obligation at all. Base witnesses here must be recorded modelStatus provable / builtStatus unresolved-today - do not read a clean compile as acceptance of the program; it is the site not minting. All five guard positions mint nothing at HEAD. Hazard: some evaluation-site categories in this group's region make premise class (d) (constraints holding in the pre-state) available, which means a discharge can run through a business `rule` used as a premise. Slice 2 verified at HEAD that such a discharge can be a false proof - `rule PlannedQuantity > 0` discharges a divide-by-zero via the CompositionalConstraint strategy while another handler sets the field to 0, and the whole file compiles clean (authored-expressiveness-gaps.md, Part 3, Defect B). So for any witness in this group whose discharge cites a `rule`, record builtStatus as unverified with that reason named, never as confirmed-by-clean-compile. Guard-based and modifier-based discharges in the same group are unaffected and may be recorded normally.",
+   "productCoordinatesCovered": 75
+  },
+  {
+   "groupId": "g10",
+   "title": "Business-domain division by zero in constraint conditions and in explanatory messages",
+   "fileName": "fault-10-division-business-constraint-and-message.cells.json",
+   "cellCount": 12,
+   "siteIds": [
+    "op/ExchangeRateDivideDecimal/numeric-0",
+    "op/MoneyDivideDecimal/numeric-0",
+    "op/MoneyDivideMoneyCrossCurrency/numeric-0",
+    "op/MoneyDivideMoneySameCurrency/numeric-0",
+    "op/MoneyDividePrice/numeric-1",
+    "op/MoneyDivideQuantity/numeric-0",
+    "op/PriceDivideDecimal/numeric-0",
+    "op/PriceDivideQuantity/numeric-0",
+    "op/QuantityDivideDecimal/numeric-0",
+    "op/QuantityDivideQuantityCrossDimension/numeric-0",
+    "op/QuantityDivideQuantitySameDimension/numeric-0"
+   ],
+   "evaluationSiteCategories": [
+    "computed-field-expression",
+    "constraint-rationale-interpolation",
+    "event-ensure-condition",
+    "quantifier-predicate",
+    "reject-message-interpolation",
+    "rule-condition",
+    "state-ensure-condition"
+   ],
+   "typeFamilies": [
+    "business-domain",
+    "primitive"
+   ],
+   "sharedSetting": "The billing setting with the division placed in a rule condition, a state ensure, an event ensure, a computed field, a quantifier predicate, a reject message, and a `because` rationale.",
+   "authoringNotes": "Merges the all-configurations story with the message-rendering story because both are no-write positions on qualified operands and share one setting; keep the premise sets distinct per cell all the same - the interpolation cells have (b) and sometimes (c), the constraint conditions have neither. `money / money` in a computed field is the most realistic shape in the corpus and is the one to lead with. Hazard: some evaluation-site categories in this group's region make premise class (d) (constraints holding in the pre-state) available, which means a discharge can run through a business `rule` used as a premise. Slice 2 verified at HEAD that such a discharge can be a false proof - `rule PlannedQuantity > 0` discharges a divide-by-zero via the CompositionalConstraint strategy while another handler sets the field to 0, and the whole file compiles clean (authored-expressiveness-gaps.md, Part 3, Defect B). So for any witness in this group whose discharge cites a `rule`, record builtStatus as unverified with that reason named, never as confirmed-by-clean-compile. Guard-based and modifier-based discharges in the same group are unaffected and may be recorded normally.",
+   "productCoordinatesCovered": 105
+  },
+  {
+   "groupId": "g11",
+   "title": "Business-domain division by zero in declaration-position value expressions",
+   "fileName": "fault-11-division-business-declaration-positions.cells.json",
+   "cellCount": 10,
+   "siteIds": [
+    "op/ExchangeRateDivideDecimal/numeric-0",
+    "op/MoneyDivideDecimal/numeric-0",
+    "op/MoneyDivideMoneyCrossCurrency/numeric-0",
+    "op/MoneyDivideMoneySameCurrency/numeric-0",
+    "op/MoneyDividePrice/numeric-1",
+    "op/MoneyDivideQuantity/numeric-0",
+    "op/PriceDivideDecimal/numeric-0",
+    "op/PriceDivideQuantity/numeric-0",
+    "op/QuantityDivideDecimal/numeric-0",
+    "op/QuantityDivideQuantityCrossDimension/numeric-0",
+    "op/QuantityDivideQuantitySameDimension/numeric-0"
+   ],
+   "evaluationSiteCategories": [
+    "collection-inner-type-modifier-value-expression",
+    "event-arg-modifier-value-expression",
+    "field-default-value-expression",
+    "field-modifier-value-expression",
+    "type-qualifier-expression"
+   ],
+   "typeFamilies": [
+    "business-domain",
+    "primitive"
+   ],
+   "sharedSetting": "The billing setting with the division placed in a field `default`, a field bound, an event-arg bound, a collection inner-type bound, and a type qualifier. Two representative sites at each.",
+   "authoringNotes": "Same constant-fold-plus-declaration-scope story as group 5. The type-qualifier cells are where this group earns its keep: a qualifier such as `money in '{CurrencyCode}'` is an interpolated typed constant reading another field, so it is an ordinary expression position, and an unsafe operation can sit in the hole. That position was NOT measured at HEAD - record unmeasured. No false-proof hazard in this group: every evaluation-site category in its region lacks premise class (d), so no discharge here can run through a business rule used as a premise. Clean-compile confirmation of a modifier- or constant-fold-based discharge is admissible.",
+   "productCoordinatesCovered": 75
+  },
+  {
+   "groupId": "g12",
+   "title": "Function preconditions: square root of a negative, and a negative integer exponent",
+   "fileName": "fault-12-function-preconditions.cells.json",
+   "cellCount": 12,
+   "siteIds": [
+    "fn/Pow/overload-0/numeric-0",
+    "fn/Sqrt/overload-0/numeric-0"
+   ],
+   "evaluationSiteCategories": [
+    "access-mode-guard",
+    "collection-inner-type-modifier-value-expression",
+    "computed-field-expression",
+    "constraint-rationale-interpolation",
+    "construction-row-action-operand",
+    "ensure-activation-guard",
+    "event-arg-modifier-value-expression",
+    "event-ensure-condition",
+    "field-default-value-expression",
+    "field-modifier-value-expression",
+    "quantifier-predicate",
+    "reject-message-interpolation",
+    "rule-activation-guard",
+    "rule-condition",
+    "state-ensure-condition",
+    "state-hook-action-operand",
+    "state-hook-guard",
+    "transition-row-action-operand",
+    "transition-row-guard",
+    "type-qualifier-expression"
+   ],
+   "typeFamilies": [
+    "primitive"
+   ],
+   "sharedSetting": "One precept with a decimal measurement field and an integer exponent field, calling `sqrt(...)` and `pow(..., ...)` from each of the six premise settings in turn - a transition-row write, a construction row, a state hook, a guard, a constraint condition, and a declaration position.",
+   "authoringNotes": "Only two catalog sites exist, so the group's variation is entirely along the evaluation-site axis - which makes it the cleanest place to show that the same catalog requirement yields six different applicable-class sets. The two requirements are not the same shape and must not share one derivation: sqrt's is a non-negativity interval on the argument, pow's is a non-negativity interval on the exponent only for the integer overload, so the cell must state which overload it is about. Hazard: some evaluation-site categories in this group's region make premise class (d) (constraints holding in the pre-state) available, which means a discharge can run through a business `rule` used as a premise. Slice 2 verified at HEAD that such a discharge can be a false proof - `rule PlannedQuantity > 0` discharges a divide-by-zero via the CompositionalConstraint strategy while another handler sets the field to 0, and the whole file compiles clean (authored-expressiveness-gaps.md, Part 3, Defect B). So for any witness in this group whose discharge cites a `rule`, record builtStatus as unverified with that reason named, never as confirmed-by-clean-compile. Guard-based and modifier-based discharges in the same group are unaffected and may be recorded normally.",
+   "productCoordinatesCovered": 40
+  },
+  {
+   "groupId": "g13",
+   "title": "Reading from a collection that may be empty, at a write site",
+   "fileName": "fault-13-collection-non-empty-write-sites.cells.json",
+   "cellCount": 15,
+   "siteIds": [
+    "accessor/List/at/numeric-0",
+    "accessor/List/first/numeric-0",
+    "accessor/List/last/numeric-0",
+    "accessor/Log/at/numeric-0",
+    "accessor/Log/first/numeric-0",
+    "accessor/Log/last/numeric-0",
+    "accessor/LogBy/at/numeric-0",
+    "accessor/LogBy/first/numeric-0",
+    "accessor/LogBy/last/numeric-0",
+    "accessor/Queue/peek/numeric-0",
+    "accessor/QueueBy/peek/numeric-0",
+    "accessor/QueueBy/peekby/numeric-0",
+    "accessor/Set/max/numeric-0",
+    "accessor/Set/min/numeric-0",
+    "accessor/Stack/peek/numeric-0"
+   ],
+   "evaluationSiteCategories": [
+    "construction-row-action-operand",
+    "state-hook-action-operand",
+    "transition-row-action-operand"
+   ],
+   "typeFamilies": [
+    "collection"
+   ],
+   "sharedSetting": "One precept declaring a list, a log, a keyed log, a queue, a keyed queue, a stack, and a set, with a transition row that copies from each accessor into a scalar field. One cell per accessor site.",
+   "authoringNotes": "The obligation is `count > 0` on the collection, and the discharge is the same interval story as division, with the collection's cardinality modifiers (`notempty`, `mincount`) as class (a) and a guard restating `F.count > 0` as class (c). Write it as that one story - fifteen accessors, one derivation - and let the cells differ only in which accessor and which collection type. Note honestly that `.at` mints two requirements at once (non-empty and index bounds); this group owns the non-empty one and group 17 owns the index one, and each cell should say so, because the matrix's base-minimality rule requires a base that rejects for the target obligation only. Hazard: some evaluation-site categories in this group's region make premise class (d) (constraints holding in the pre-state) available, which means a discharge can run through a business `rule` used as a premise. Slice 2 verified at HEAD that such a discharge can be a false proof - `rule PlannedQuantity > 0` discharges a divide-by-zero via the CompositionalConstraint strategy while another handler sets the field to 0, and the whole file compiles clean (authored-expressiveness-gaps.md, Part 3, Defect B). So for any witness in this group whose discharge cites a `rule`, record builtStatus as unverified with that reason named, never as confirmed-by-clean-compile. Guard-based and modifier-based discharges in the same group are unaffected and may be recorded normally.",
+   "productCoordinatesCovered": 45
+  },
+  {
+   "groupId": "g14",
+   "title": "Reading from a possibly-empty collection inside a guard",
+   "fileName": "fault-14-collection-non-empty-guard-positions.cells.json",
+   "cellCount": 10,
+   "siteIds": [
+    "accessor/List/at/numeric-0",
+    "accessor/List/first/numeric-0",
+    "accessor/List/last/numeric-0",
+    "accessor/Log/at/numeric-0",
+    "accessor/Log/first/numeric-0",
+    "accessor/Log/last/numeric-0",
+    "accessor/LogBy/at/numeric-0",
+    "accessor/LogBy/first/numeric-0",
+    "accessor/LogBy/last/numeric-0",
+    "accessor/Queue/peek/numeric-0",
+    "accessor/QueueBy/peek/numeric-0",
+    "accessor/QueueBy/peekby/numeric-0",
+    "accessor/Set/max/numeric-0",
+    "accessor/Set/min/numeric-0",
+    "accessor/Stack/peek/numeric-0"
+   ],
+   "evaluationSiteCategories": [
+    "access-mode-guard",
+    "ensure-activation-guard",
+    "rule-activation-guard",
+    "state-hook-guard",
+    "transition-row-guard"
+   ],
+   "typeFamilies": [
+    "collection"
+   ],
+   "sharedSetting": "The collection setting of group 13, with the accessor read moved into each of the five guard positions. Two representative accessors at each.",
+   "authoringNotes": "Class (c) unavailable, same as groups 3 and 9. The natural author spelling here is exactly the self-referential one - `when Items.count > 0 and Items.first > 10` - so the conjunct-ordering open question bites harder in this group than anywhere else, and the cells must record it as an open dependency with that concrete spelling rather than quietly licensing it. Built-status warning: the evaluation-site enumeration measured this position at HEAD (commit e1a14d91) and found it mints NO fault obligation at all. Base witnesses here must be recorded modelStatus provable / builtStatus unresolved-today - do not read a clean compile as acceptance of the program; it is the site not minting. Hazard: some evaluation-site categories in this group's region make premise class (d) (constraints holding in the pre-state) available, which means a discharge can run through a business `rule` used as a premise. Slice 2 verified at HEAD that such a discharge can be a false proof - `rule PlannedQuantity > 0` discharges a divide-by-zero via the CompositionalConstraint strategy while another handler sets the field to 0, and the whole file compiles clean (authored-expressiveness-gaps.md, Part 3, Defect B). So for any witness in this group whose discharge cites a `rule`, record builtStatus as unverified with that reason named, never as confirmed-by-clean-compile. Guard-based and modifier-based discharges in the same group are unaffected and may be recorded normally.",
+   "productCoordinatesCovered": 75
+  },
+  {
+   "groupId": "g15",
+   "title": "Reading from a possibly-empty collection in a constraint condition or a message",
+   "fileName": "fault-15-collection-non-empty-constraint-and-message.cells.json",
+   "cellCount": 12,
+   "siteIds": [
+    "accessor/List/at/numeric-0",
+    "accessor/List/first/numeric-0",
+    "accessor/List/last/numeric-0",
+    "accessor/Log/at/numeric-0",
+    "accessor/Log/first/numeric-0",
+    "accessor/Log/last/numeric-0",
+    "accessor/LogBy/at/numeric-0",
+    "accessor/LogBy/first/numeric-0",
+    "accessor/LogBy/last/numeric-0",
+    "accessor/Queue/peek/numeric-0",
+    "accessor/QueueBy/peek/numeric-0",
+    "accessor/QueueBy/peekby/numeric-0",
+    "accessor/Set/max/numeric-0",
+    "accessor/Set/min/numeric-0",
+    "accessor/Stack/peek/numeric-0"
+   ],
+   "evaluationSiteCategories": [
+    "computed-field-expression",
+    "constraint-rationale-interpolation",
+    "event-ensure-condition",
+    "quantifier-predicate",
+    "reject-message-interpolation",
+    "rule-condition",
+    "state-ensure-condition"
+   ],
+   "typeFamilies": [
+    "collection"
+   ],
+   "sharedSetting": "The collection setting with accessor reads in a rule condition, a state ensure, an event ensure, a computed field, a quantifier predicate, a reject message, and a `because` rationale.",
+   "authoringNotes": "The quantifier-predicate cells are the most substantive in the whole collection story and should be authored first: `each n in Nums (Total / n < 100.0)` was measured at HEAD raising DivisionByZero with the binding variable correctly identified as the subject, so there is a live witness. Carry the Q10 open dependency (whether quantified constraints are proof surface) without answering it. Hazard: some evaluation-site categories in this group's region make premise class (d) (constraints holding in the pre-state) available, which means a discharge can run through a business `rule` used as a premise. Slice 2 verified at HEAD that such a discharge can be a false proof - `rule PlannedQuantity > 0` discharges a divide-by-zero via the CompositionalConstraint strategy while another handler sets the field to 0, and the whole file compiles clean (authored-expressiveness-gaps.md, Part 3, Defect B). So for any witness in this group whose discharge cites a `rule`, record builtStatus as unverified with that reason named, never as confirmed-by-clean-compile. Guard-based and modifier-based discharges in the same group are unaffected and may be recorded normally.",
+   "productCoordinatesCovered": 105
+  },
+  {
+   "groupId": "g16",
+   "title": "Reading from a possibly-empty collection in a declaration-position value expression",
+   "fileName": "fault-16-collection-non-empty-declaration-positions.cells.json",
+   "cellCount": 10,
+   "siteIds": [
+    "accessor/List/at/numeric-0",
+    "accessor/List/first/numeric-0",
+    "accessor/List/last/numeric-0",
+    "accessor/Log/at/numeric-0",
+    "accessor/Log/first/numeric-0",
+    "accessor/Log/last/numeric-0",
+    "accessor/LogBy/at/numeric-0",
+    "accessor/LogBy/first/numeric-0",
+    "accessor/LogBy/last/numeric-0",
+    "accessor/Queue/peek/numeric-0",
+    "accessor/QueueBy/peek/numeric-0",
+    "accessor/QueueBy/peekby/numeric-0",
+    "accessor/Set/max/numeric-0",
+    "accessor/Set/min/numeric-0",
+    "accessor/Stack/peek/numeric-0"
+   ],
+   "evaluationSiteCategories": [
+    "collection-inner-type-modifier-value-expression",
+    "event-arg-modifier-value-expression",
+    "field-default-value-expression",
+    "field-modifier-value-expression",
+    "type-qualifier-expression"
+   ],
+   "typeFamilies": [
+    "collection"
+   ],
+   "sharedSetting": "The collection setting with accessor reads in a field `default`, a field bound, an event-arg bound, a collection inner-type bound, and a type qualifier. Two representative accessors at each.",
+   "authoringNotes": "The field-default cells carry a derivation that is easy to get wrong and is the reason this group is separate: a default may read only fields declared above it, so a default reading a collection accessor is only well-formed when the collection is declared earlier, and the collection's own default is empty - which means the base witness here is one where the obligation is provably violated by the default configuration, not merely unproven. Say which of those two it is. No false-proof hazard in this group: every evaluation-site category in its region lacks premise class (d), so no discharge here can run through a business rule used as a premise. Clean-compile confirmation of a modifier- or constant-fold-based discharge is admissible.",
+   "productCoordinatesCovered": 75
+  },
+  {
+   "groupId": "g17",
+   "title": "Indexed access out of bounds",
+   "fileName": "fault-17-collection-index-bounds.cells.json",
+   "cellCount": 12,
+   "siteIds": [
+    "accessor/List/at/indexbounds-1",
+    "accessor/Log/at/indexbounds-1",
+    "accessor/LogBy/at/indexbounds-1"
+   ],
+   "evaluationSiteCategories": [
+    "access-mode-guard",
+    "collection-inner-type-modifier-value-expression",
+    "computed-field-expression",
+    "constraint-rationale-interpolation",
+    "construction-row-action-operand",
+    "ensure-activation-guard",
+    "event-arg-modifier-value-expression",
+    "event-ensure-condition",
+    "field-default-value-expression",
+    "field-modifier-value-expression",
+    "quantifier-predicate",
+    "reject-message-interpolation",
+    "rule-activation-guard",
+    "rule-condition",
+    "state-ensure-condition",
+    "state-hook-action-operand",
+    "state-hook-guard",
+    "transition-row-action-operand",
+    "transition-row-guard",
+    "type-qualifier-expression"
+   ],
+   "typeFamilies": [
+    "collection"
+   ],
+   "sharedSetting": "One precept with a list, a log, and a keyed log, each read with `.at(i)` where the index comes from an event argument, placed across the write, guard, constraint, message and declaration settings. Three sites times four representative categories.",
+   "authoringNotes": "The obligation has two sides and the cells must carry both: the index needs an interval with a non-negative lower bound, and it needs an upper bound below the collection's count - which means the discharge consumes a cardinality fact about the collection as well as a bound on the index. That is a two-premise derivation, unlike every other group here, and the matrix's Family 4 decision procedure does not cover it; derive it from the interval machinery and say plainly which part is new. If the two-sided derivation turns out not to be derivable from what the matrix currently writes, that is a missing rule to report, not a gap to fill. Hazard: some evaluation-site categories in this group's region make premise class (d) (constraints holding in the pre-state) available, which means a discharge can run through a business `rule` used as a premise. Slice 2 verified at HEAD that such a discharge can be a false proof - `rule PlannedQuantity > 0` discharges a divide-by-zero via the CompositionalConstraint strategy while another handler sets the field to 0, and the whole file compiles clean (authored-expressiveness-gaps.md, Part 3, Defect B). So for any witness in this group whose discharge cites a `rule`, record builtStatus as unverified with that reason named, never as confirmed-by-clean-compile. Guard-based and modifier-based discharges in the same group are unaffected and may be recorded normally.",
+   "productCoordinatesCovered": 60
+  },
+  {
+   "groupId": "g18",
+   "title": "Collection actions with a safety precondition",
+   "fileName": "fault-18-collection-action-preconditions.cells.json",
+   "cellCount": 12,
+   "siteIds": [
+    "action/Dequeue/numeric-0",
+    "action/DequeueBy/numeric-0",
+    "action/Insert/indexbounds-0",
+    "action/Pop/numeric-0",
+    "action/RemoveAt/indexbounds-1",
+    "action/RemoveAt/numeric-0"
+   ],
+   "evaluationSiteCategories": [
+    "construction-row-action-operand",
+    "operand-free-action-precondition",
+    "state-hook-action-operand",
+    "transition-row-action-operand"
+   ],
+   "typeFamilies": [
+    "collection"
+   ],
+   "sharedSetting": "One precept with a queue, a keyed queue, a stack and a list, and rows that `dequeue`, `pop`, `insert ... at`, and `remove at` - across a transition row, a construction row, and a state hook.",
+   "authoringNotes": "Two sub-stories share this file and must stay distinguishable. `insert at` and `remove at` carry an authored index operand and behave like group 17. `dequeue` and `pop` carry NO authored operand at all - their ActionMeta requirement names the collection field as the subject - which is why the evaluation-site axis has a category for them; the cells must not describe them as operand cells. Both sub-stories mint at HEAD (measured: `UnguardedCollectionMutation` for dequeue and pop, `IndexBoundsGuard` for insert-at), so this is the group with the strongest built-status evidence. Hazard: some evaluation-site categories in this group's region make premise class (d) (constraints holding in the pre-state) available, which means a discharge can run through a business `rule` used as a premise. Slice 2 verified at HEAD that such a discharge can be a false proof - `rule PlannedQuantity > 0` discharges a divide-by-zero via the CompositionalConstraint strategy while another handler sets the field to 0, and the whole file compiles clean (authored-expressiveness-gaps.md, Part 3, Defect B). So for any witness in this group whose discharge cites a `rule`, record builtStatus as unverified with that reason named, never as confirmed-by-clean-compile. Guard-based and modifier-based discharges in the same group are unaffected and may be recorded normally.",
+   "productCoordinatesCovered": 12
+  },
+  {
+   "groupId": "g19",
+   "title": "Comparing choice values that were never declared ordered",
+   "fileName": "fault-19-choice-ordering-modifier.cells.json",
+   "cellCount": 12,
+   "siteIds": [
+    "op/ChoiceGreaterThanChoice/modifier-0",
+    "op/ChoiceGreaterThanOrEqualChoice/modifier-0",
+    "op/ChoiceLessThanChoice/modifier-0",
+    "op/ChoiceLessThanOrEqualChoice/modifier-0"
+   ],
+   "evaluationSiteCategories": [
+    "access-mode-guard",
+    "collection-inner-type-modifier-value-expression",
+    "computed-field-expression",
+    "constraint-rationale-interpolation",
+    "construction-row-action-operand",
+    "ensure-activation-guard",
+    "event-arg-modifier-value-expression",
+    "event-ensure-condition",
+    "field-default-value-expression",
+    "field-modifier-value-expression",
+    "quantifier-predicate",
+    "reject-message-interpolation",
+    "rule-activation-guard",
+    "rule-condition",
+    "state-ensure-condition",
+    "state-hook-action-operand",
+    "state-hook-guard",
+    "transition-row-action-operand",
+    "transition-row-guard",
+    "type-qualifier-expression"
+   ],
+   "typeFamilies": [
+    "primitive"
+   ],
+   "sharedSetting": "One precept with two `choice of string` fields, one declared `ordered` and one not, compared with `<`, `<=`, `>`, `>=` across the write, guard, constraint, message and declaration settings.",
+   "authoringNotes": "This is the only requirement kind in the defined region that is discharged by a declaration attribute rather than by interval arithmetic: the fact consumed is the `ordered` modifier on both operands, which is squarely premise class (a), so the discharge contract is a finite lookup and the decision procedure is 'both operands' declared modifier sets contain `ordered`'. Because the premise is a modifier and not a value bound, the applicable-class set is {(a)} at every evaluation-site category in the region - the class set does NOT vary along the site axis here, which is the opposite of every other group and should be stated as the cell's derivation. Note the near-miss is unusual: there is no way to weaken `ordered` short of removing it, so the near-miss is the one-sided declaration (only one operand ordered). No false-proof hazard in this group: every evaluation-site category in its region lacks premise class (d), so no discharge here can run through a business rule used as a premise. Clean-compile confirmation of a modifier- or constant-fold-based discharge is admissible.",
+   "productCoordinatesCovered": 80
+  }
+ ]
+}
