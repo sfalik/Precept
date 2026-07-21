@@ -655,7 +655,18 @@ Rounding and bridge functions must define behavior at boundaries:
 | `-∞` | Runtime fault — integer overflow | Runtime fault — cannot round infinity |
 | `NaN` | Runtime fault — NaN is not a number | Runtime fault — NaN is not a number |
 
-Non-finite values cannot reach `decimal`-lane rounding (since `decimal` has no infinity/NaN representation). They can only occur in the `number` lane. The proof engine may be able to prove non-finiteness is impossible for specific expressions, but the runtime must handle it defensively.
+Non-finite values cannot reach `decimal`-lane rounding (since `decimal` has no infinity/NaN representation). They can only occur in the `number` lane. The table above states what the runtime does if a non-finite value ever reaches a rounding function; it is not the enforcement model. Per Principle 10 (`precept-language-spec.md:110`), a fault-prone operation is proven safe or the definition is rejected — a runtime trap is defensive redundancy, never the primary mechanism.
+
+**How non-finiteness is prevented (owner ruling, 2026-07-21).** The two cases are separated because their entry paths differ.
+
+- **`NaN` is prevented.** Every path to it is closed or already carries an obligation. `approximate()` cannot produce one — `decimal` has no `NaN` representation, and its range sits far inside `double`'s, so the bridge is total. `sqrt` of a negative is already a stamped precondition (see the function table above). `0.0 / 0.0` is already the divisor-non-zero obligation. The one remaining path is a non-finite value arriving from outside the definition — an event argument or an editable-field write — and that is what ingress governance covers. **On the `number` lane the qualifier modifiers `nonzero`, `positive`, and `nonnegative` therefore establish the predicate *and* not-`NaN`, checked where the value enters.** Without the added clause the modifier would establish nothing usable: `NaN != 0` evaluates true, so a `nonzero` divisor could be `NaN` and pass.
+- **`+∞` / `-∞` are deferred, under the arithmetic overflow model below.** Their remaining path is arithmetic — finite operands can produce an infinity, which no ingress check reaches because the value is manufactured mid-expression. That is the overflow failure mode on the approximate lane, and it is deferred with it rather than settled separately, exactly as temporal arithmetic is. A `NaN` arising *from* an infinity (`∞ - ∞`, `∞ / ∞`) follows the infinity arm, not the `NaN` arm.
+
+**Tradeoff accepted**: a qualifier modifier's meaning becomes lane-dependent — `nonzero` on `decimal` and `nonzero` on `number` establish different facts. This is a visible wart in the modifier surface, accepted in preference to narrowing Principle 10.
+
+**Open, not covered by either arm — underflow.** Two non-zero finite `number` operands can multiply to exactly `0.0`. That is neither `NaN` nor an infinity, so neither case above reaches it, and it breaks divisor safety directly: `nonzero` on every operand does not yield a non-zero product. Recorded as an open question, not yet routed.
+
+The change to what a qualifier modifier establishes on the `number` lane is a modifier-semantics change and is designed before it ships; this section states the target.
 
 **Integer conversion overflow:** `floor(1e20)` produces a value outside `integer` range. This is a runtime fault — the value exceeds `long.MaxValue` / `long.MinValue`. The same applies to `ceil`, `truncate`, and `round` on very large `number` or `decimal` values. Statically preventable when the proof engine can bound the expression range.
 
@@ -684,6 +695,8 @@ A function keeps its `decimal` overload if and only if the mathematical operatio
 ## Open Questions / Implementation Notes
 
 **Arithmetic overflow model (deferred, post-MVP).** `integer` is fixed-width 64-bit. Whether arithmetic overflow is handled by compile-time proof-or-reject (prove no operation can exceed the representable range, else reject the definition) or by adopting an arbitrary-precision representation (removing overflow as a failure mode) is a post-MVP decision, not yet ruled. Until it is, `integer` arithmetic that could exceed the 64-bit range carries no live compile-time guarantee.
+
+**Approximate-lane infinity rides with this deferral.** `number` arithmetic on finite operands can produce `+∞` or `-∞` — the same class of failure at a different type, and the reason the infinity arm of the non-finite ruling above is deferred rather than settled. One difference worth recording for whoever rules it: `integer` can adopt an arbitrary-precision representation, which removes overflow as a failure mode outright. `number` has no such option — it *is* the approximate lane, and the exact lane already exists as `decimal` — so the approximate arm can only be closed by proof-or-reject, not by changing the representation.
 
 **Temporal arithmetic rides with this deferral.** `instant ± duration` can push a result outside the representable temporal range, which is the same class of failure at a different type ([temporal-type-system.md](temporal-type-system.md) § instant arithmetic). It is deferred under this same open decision, not settled separately, and it is not an accepted edge case: whichever way the overflow model is ruled, the temporal arm follows it. One difference worth recording for whoever rules it — `integer` can carry `min`/`max` constraints that bound an operand, while temporal point types reject those constraints today, so a proof-or-reject answer needs a premise source for temporal operands (bound vocabulary on temporal types, guard-only closure, or a declared representable-range axiom).
 
