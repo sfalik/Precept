@@ -69,10 +69,18 @@ public class CellValidatorTests
 
         // The standing establishment cell records no rejecting base program, so
         // there is nothing to recompute the WP from — a named skip, not silence.
-        report.Skips.Should().ContainSingle().Which.Should().Match<CellSkip>(s =>
-            s.Check == "wp-recompute"
-            && s.Location.Contains("wf1/establishment-defaults")
-            && s.Reason.Contains("no base witness program"));
+        // Other families contribute their own named skips; this asserts the
+        // establishment cell's skip specifically, not that it is the only one.
+        report.Skips.Where(s => s.Location.Contains("wf1/establishment-defaults"))
+            .Should().ContainSingle().Which.Should().Match<CellSkip>(s =>
+                s.Check == "wp-recompute"
+                && s.Reason.Contains("no base witness program"));
+
+        // Every skip names its own specific reason — none is generic or empty.
+        report.Skips.Should().OnlyContain(s =>
+            !string.IsNullOrWhiteSpace(s.Check)
+            && !string.IsNullOrWhiteSpace(s.Location)
+            && !string.IsNullOrWhiteSpace(s.Reason));
     }
 
     [Fact]

@@ -1,0 +1,1647 @@
+{
+  "$schema": "./cell.schema.json",
+  "familyId": "fault-6-division-primitive-message-interpolation",
+  "title": "Fault group 6 — division/modulo by zero inside a refusal message or a constraint rationale, primitive lanes",
+  "caseShape": "fault",
+  "definitionVersion": "obligation-discharge-matrix-2026-07-19 rev 7 (2026-07-20, draft)",
+  "citations": [
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The cell"
+    },
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+      "note": "the Fault family row, naming the reject-row/no-write evaluation site explicitly"
+    },
+    {
+      "kind": "want-doc",
+      "ref": "docs/Working/what-i-want-2026-07-16.md:72",
+      "note": "the reject-row division example the want doc uses"
+    },
+    {
+      "kind": "want-doc",
+      "ref": "docs/Working/what-i-want-2026-07-16.md:104",
+      "note": "fault prevention as an obligation family"
+    }
+  ],
+  "respellability": {
+    "verdict": "yes",
+    "evidence": "model-derived",
+    "corpusMeasurement": "pending",
+    "citations": [
+      {
+        "kind": "matrix",
+        "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+        "note": "the Respellable bullet"
+      },
+      {
+        "kind": "matrix",
+        "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Ratification protocol",
+        "note": "layer 4: corpus measurement is the hard gate; a family verdict ratifies only when it agrees with the classified sample corpus"
+      }
+    ],
+    "notes": [
+      "Both evaluation-site categories in this group inherit the verdict; neither cell states an override.",
+      "The verdict covers only the licensed (c)/(a) contract entries; it says nothing about the open class-(d) question, which is a missing-rule item, not a spelling question."
+    ]
+  },
+  "cells": [
+    {
+      "id": "fault6/reject-message/int-divide",
+      "label": "Reject-message interpolation — integer / integer",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "IntegerDivideInteger",
+        "evaluationSiteCategory": "reject-message-interpolation",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "want-doc",
+            "ref": "docs/Working/what-i-want-2026-07-16.md:72",
+            "note": "the reject-row interpolation the want doc uses as the reason the fault axis needs a no-write evaluation-site category"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+            "note": "the Fault family row: 'the site may sit in a guard or a reject-row interpolation with no write at all'"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Parts != 0",
+        "metavariables": [
+          {
+            "name": "Total",
+            "standsFor": "the dividend the reject message interpolates"
+          },
+          {
+            "name": "Parts",
+            "standsFor": "the divisor the reject message interpolates"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "Parts != 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "c"
+      ],
+      "premiseAvailability": "Parts is a field written by a separate handler (AdjustParts), not an event arg of ComputePerPart, so class (b) has nothing to instantiate at this site (arg constraints are enforced on ComputePerPart's own args, and Parts is not one of them). The reject row matched to render its message, so its own guard is available as class (c) over exactly the pre-state Parts reads (want-doc :72; matrix § Per-family case shapes, Fault family row). Class (d) is listed as available at this evaluation-site category (pre-state constraints), but no contract entry here cites it: the matrix's § Validity arguments carries no argument for 'a pre-state rule directly discharges a fault-family divisor obligation', so citing it would violate the rule-validity gate (§ Rule validity: 'no cell ratifies whose derivation cites an argument-less rule'). Recorded as a missing rule, not answered here — see notes.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "derivation": "guard fact normal-form-equal to the WP -> guard-match, read at the reject row itself: the row matched, so its guard evaluated true over the same pre-state the message string is interpolated against, and nothing writes between the guard's evaluation and the message's (the row writes nothing at all)",
+          "validityArguments": [
+            "Guard normal-form match"
+          ],
+          "decisionProcedure": "First: normal-form match of the divisor-nonzero WP against the reject row's own guard conjuncts (a finite set) — Family 1's class-(c) procedure. Failing that: collect the guard's per-term bound conjuncts over the divisor and run the same exact-lane interval exclusion Family 4 states for arg bounds (a term whose bound excludes zero discharges; no matching term, or a bound admitting zero, fails the derivation). If both fail, reject, naming class (c).",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "Guard normal-form match — the argument's reasoning (guards select, evaluation is pure and deterministic, the same pre-state is read) does not depend on a write existing between the guard and the re-evaluation; applied here to a no-write evaluation site as a strict subcase, not a re-derivation"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:299",
+              "note": "Family 4's stated decision procedure (arg-bound interval arithmetic over a divisor), reused here for the guard-spelled variant per the band ruling that per-term bound conjuncts feed the same interval derivation wherever they are spelled"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "schema": "add a guard normal-form-equal to <WP>, or a per-term bound conjunct on the divisor that excludes zero",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "field Total as integer default 0\nfield Parts as integer default 1\n\nstate Active initial\n\nevent Create initial\nevent AdjustParts(NewParts as integer)\nevent ComputePerPart(Threshold as integer)\n\non Create\n    -> set Total = 0\n    -> set Parts = 1\n\nfrom Active on AdjustParts\n    -> set Parts = AdjustParts.NewParts\n    -> no transition\n\nfrom Active on ComputePerPart when ComputePerPart.Threshold > 0\n    -> no transition\nfrom Active on ComputePerPart\n    -> reject \"Cannot compute: per-part total is {Total / Parts}\"\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "c"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools",
+            "date": "2026-07-21",
+            "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+          }
+        },
+        "discharges": [
+          {
+            "id": "guard-nf",
+            "kind": "guard",
+            "addition": "when Parts != 0",
+            "application": {
+              "locus": "row-guard",
+              "eventName": "ComputePerPart"
+            },
+            "premiseClasses": [
+              "c"
+            ],
+            "derivation": "guard fact normal-form-equal to the WP -> guard-match, at a no-write evaluation site",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "the evaluation-site enumeration measured this category at HEAD and found it mints no fault obligation at all, so the compile is clean regardless of the addition — it confirms the no-mint gap, not that the guard was consumed as a genuine premise",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Measured: adding `when Parts != 0` to the base's reject row compiles with zero diagnostics at HEAD (e1a14d91) — the same clean result as the base, because the site never mints a diagnostic to discharge in the first place."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "guard-nf",
+            "addition": "when Parts >= 0",
+            "application": {
+              "locus": "row-guard",
+              "eventName": "ComputePerPart"
+            },
+            "whyStillRejects": "Parts >= 0 admits zero — must still reject, same obligation, under the model",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "want-doc",
+          "ref": "docs/Working/what-i-want-2026-07-16.md:72"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+          "note": "the Fault family row"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Operations.cs:119",
+          "note": "OperationKind.IntegerDivideInteger declaration"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Operations.cs:125",
+          "note": "the 'Divisor must be non-zero' NumericProofRequirement"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md § Rejections"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md § 2.5 Interpolation Reassembly"
+        },
+        {
+          "kind": "code",
+          "ref": "samples/travel-reimbursement.precept:61",
+          "note": "a shipped precedent of division inside a reject-row interpolation"
+        }
+      ],
+      "notes": [
+        "Built-status gap, live-measured: base compiled clean at HEAD (e1a14d91, 2026-07-21, Precept.MatrixTools) with zero diagnostics — no DivisionByZero-shaped fault, contradicting the model's required rejection. This is the position's no-mint gap (the evaluation-site enumeration found the same for both categories in this group), not evidence the base is sound; base and near-miss provenance are marked live-verified to report the literal (clean) result honestly, not to claim it confirms the required reject outcome.",
+        "The WP calculator (tools/Precept.MatrixTools) computes weakest preconditions through write plans; this evaluation site has no write plan at all (the row writes nothing), so no canonical key is pinned here — a named skip, not a silent omission, consistent with the day-one validator's design (docs/Working/obligation-discharge-matrix-2026-07-19.md § Storage).",
+        "Missing rule, not answered here: whether premise class (d) — a `rule` holding in the pre-state — can license a fault-family divisor-nonzero obligation directly has no written validity argument in the matrix. Measured 2026-07-21 (Precept.MatrixTools, commit e1a14d91): adding `rule Parts != 0 because \"...\"` to this base, with AdjustParts still able to set Parts to 0 with nothing checking it (Defect A — `rule` mints no write-site obligation at HEAD), compiles with zero diagnostics. That is the same shape as the false proof docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md Part 3 (Defect B) verifies for the write-site fault family: a `rule` consumed as a premise while nothing establishes or preserves it. Not recorded as a licensed discharge here — doing so would cite a rule with no validity argument, which the rule-validity gate forbids.",
+        "Open dependency carried, not answered (per the group's authoring notes): whether the failure context itself — the fact that the row matched and is in the middle of refusing — is a premise in its own right is not settled by anything the matrix currently states."
+      ]
+    },
+    {
+      "id": "fault6/reject-message/dec-divide",
+      "label": "Reject-message interpolation — decimal / decimal",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "DecimalDivideDecimal",
+        "evaluationSiteCategory": "reject-message-interpolation",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "want-doc",
+            "ref": "docs/Working/what-i-want-2026-07-16.md:72",
+            "note": "the reject-row interpolation the want doc uses as the reason the fault axis needs a no-write evaluation-site category"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+            "note": "the Fault family row: 'the site may sit in a guard or a reject-row interpolation with no write at all'"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Parts != 0",
+        "metavariables": [
+          {
+            "name": "Total",
+            "standsFor": "the dividend the reject message interpolates"
+          },
+          {
+            "name": "Parts",
+            "standsFor": "the divisor the reject message interpolates"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "Parts != 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "c"
+      ],
+      "premiseAvailability": "Parts is a field written by a separate handler (AdjustParts), not an event arg of ComputePerPart, so class (b) has nothing to instantiate at this site (arg constraints are enforced on ComputePerPart's own args, and Parts is not one of them). The reject row matched to render its message, so its own guard is available as class (c) over exactly the pre-state Parts reads (want-doc :72; matrix § Per-family case shapes, Fault family row). Class (d) is listed as available at this evaluation-site category (pre-state constraints), but no contract entry here cites it: the matrix's § Validity arguments carries no argument for 'a pre-state rule directly discharges a fault-family divisor obligation', so citing it would violate the rule-validity gate (§ Rule validity: 'no cell ratifies whose derivation cites an argument-less rule'). Recorded as a missing rule, not answered here — see notes.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "derivation": "guard fact normal-form-equal to the WP -> guard-match, read at the reject row itself: the row matched, so its guard evaluated true over the same pre-state the message string is interpolated against, and nothing writes between the guard's evaluation and the message's (the row writes nothing at all)",
+          "validityArguments": [
+            "Guard normal-form match"
+          ],
+          "decisionProcedure": "First: normal-form match of the divisor-nonzero WP against the reject row's own guard conjuncts (a finite set) — Family 1's class-(c) procedure. Failing that: collect the guard's per-term bound conjuncts over the divisor and run the same exact-lane interval exclusion Family 4 states for arg bounds (a term whose bound excludes zero discharges; no matching term, or a bound admitting zero, fails the derivation). If both fail, reject, naming class (c).",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "Guard normal-form match — the argument's reasoning (guards select, evaluation is pure and deterministic, the same pre-state is read) does not depend on a write existing between the guard and the re-evaluation; applied here to a no-write evaluation site as a strict subcase, not a re-derivation"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:299",
+              "note": "Family 4's stated decision procedure (arg-bound interval arithmetic over a divisor), reused here for the guard-spelled variant per the band ruling that per-term bound conjuncts feed the same interval derivation wherever they are spelled"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "schema": "add a guard normal-form-equal to <WP>, or a per-term bound conjunct on the divisor that excludes zero",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "field Total as decimal default 0.0\nfield Parts as decimal default 1.0\n\nstate Active initial\n\nevent Create initial\nevent AdjustParts(NewParts as decimal)\nevent ComputePerPart(Threshold as decimal)\n\non Create\n    -> set Total = 0.0\n    -> set Parts = 1.0\n\nfrom Active on AdjustParts\n    -> set Parts = AdjustParts.NewParts\n    -> no transition\n\nfrom Active on ComputePerPart when ComputePerPart.Threshold > 0\n    -> no transition\nfrom Active on ComputePerPart\n    -> reject \"Cannot compute: per-part total is {Total / Parts}\"\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "c"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools",
+            "date": "2026-07-21",
+            "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+          }
+        },
+        "discharges": [
+          {
+            "id": "guard-nf",
+            "kind": "guard",
+            "addition": "when Parts != 0",
+            "application": {
+              "locus": "row-guard",
+              "eventName": "ComputePerPart"
+            },
+            "premiseClasses": [
+              "c"
+            ],
+            "derivation": "guard fact normal-form-equal to the WP -> guard-match, at a no-write evaluation site",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "the evaluation-site enumeration measured this category at HEAD and found it mints no fault obligation at all, so the compile is clean regardless of the addition — it confirms the no-mint gap, not that the guard was consumed as a genuine premise",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Measured: adding `when Parts != 0` to the base's reject row compiles with zero diagnostics at HEAD (e1a14d91) — the same clean result as the base, because the site never mints a diagnostic to discharge in the first place."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "guard-nf",
+            "addition": "when Parts >= 0",
+            "application": {
+              "locus": "row-guard",
+              "eventName": "ComputePerPart"
+            },
+            "whyStillRejects": "Parts >= 0 admits zero — must still reject, same obligation, under the model",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "want-doc",
+          "ref": "docs/Working/what-i-want-2026-07-16.md:72"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+          "note": "the Fault family row"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Operations.cs:150",
+          "note": "OperationKind.DecimalDivideDecimal declaration"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Operations.cs:156",
+          "note": "the 'Divisor must be non-zero' NumericProofRequirement"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md § Rejections"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md § 2.5 Interpolation Reassembly"
+        },
+        {
+          "kind": "code",
+          "ref": "samples/travel-reimbursement.precept:61",
+          "note": "a shipped precedent of division inside a reject-row interpolation"
+        }
+      ],
+      "notes": [
+        "Built-status gap, live-measured: base compiled clean at HEAD (e1a14d91, 2026-07-21, Precept.MatrixTools) with zero diagnostics — no DivisionByZero-shaped fault, contradicting the model's required rejection. This is the position's no-mint gap (the evaluation-site enumeration found the same for both categories in this group), not evidence the base is sound; base and near-miss provenance are marked live-verified to report the literal (clean) result honestly, not to claim it confirms the required reject outcome.",
+        "The WP calculator (tools/Precept.MatrixTools) computes weakest preconditions through write plans; this evaluation site has no write plan at all (the row writes nothing), so no canonical key is pinned here — a named skip, not a silent omission, consistent with the day-one validator's design (docs/Working/obligation-discharge-matrix-2026-07-19.md § Storage).",
+        "Missing rule, not answered here: whether premise class (d) — a `rule` holding in the pre-state — can license a fault-family divisor-nonzero obligation directly has no written validity argument in the matrix. Measured 2026-07-21 (Precept.MatrixTools, commit e1a14d91): adding `rule Parts != 0 because \"...\"` to this base, with AdjustParts still able to set Parts to 0 with nothing checking it (Defect A — `rule` mints no write-site obligation at HEAD), compiles with zero diagnostics. That is the same shape as the false proof docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md Part 3 (Defect B) verifies for the write-site fault family: a `rule` consumed as a premise while nothing establishes or preserves it. Not recorded as a licensed discharge here — doing so would cite a rule with no validity argument, which the rule-validity gate forbids.",
+        "Open dependency carried, not answered (per the group's authoring notes): whether the failure context itself — the fact that the row matched and is in the middle of refusing — is a premise in its own right is not settled by anything the matrix currently states."
+      ]
+    },
+    {
+      "id": "fault6/reject-message/num-divide",
+      "label": "Reject-message interpolation — number / number",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "NumberDivideNumber",
+        "evaluationSiteCategory": "reject-message-interpolation",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "want-doc",
+            "ref": "docs/Working/what-i-want-2026-07-16.md:72",
+            "note": "the reject-row interpolation the want doc uses as the reason the fault axis needs a no-write evaluation-site category"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+            "note": "the Fault family row: 'the site may sit in a guard or a reject-row interpolation with no write at all'"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Parts != 0",
+        "metavariables": [
+          {
+            "name": "Total",
+            "standsFor": "the dividend the reject message interpolates"
+          },
+          {
+            "name": "Parts",
+            "standsFor": "the divisor the reject message interpolates"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "Parts != 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "c"
+      ],
+      "premiseAvailability": "Parts is a field written by a separate handler (AdjustParts), not an event arg of ComputePerPart, so class (b) has nothing to instantiate at this site (arg constraints are enforced on ComputePerPart's own args, and Parts is not one of them). The reject row matched to render its message, so its own guard is available as class (c) over exactly the pre-state Parts reads (want-doc :72; matrix § Per-family case shapes, Fault family row). Class (d) is listed as available at this evaluation-site category (pre-state constraints), but no contract entry here cites it: the matrix's § Validity arguments carries no argument for 'a pre-state rule directly discharges a fault-family divisor obligation', so citing it would violate the rule-validity gate (§ Rule validity: 'no cell ratifies whose derivation cites an argument-less rule'). Recorded as a missing rule, not answered here — see notes.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "derivation": "guard fact normal-form-equal to the WP -> guard-match, read at the reject row itself: the row matched, so its guard evaluated true over the same pre-state the message string is interpolated against, and nothing writes between the guard's evaluation and the message's (the row writes nothing at all)",
+          "validityArguments": [
+            "Guard normal-form match"
+          ],
+          "decisionProcedure": "First: normal-form match of the divisor-nonzero WP against the reject row's own guard conjuncts (a finite set) — Family 1's class-(c) procedure. Failing that: collect the guard's per-term bound conjuncts over the divisor and run the same exact-lane interval exclusion Family 4 states for arg bounds (a term whose bound excludes zero discharges; no matching term, or a bound admitting zero, fails the derivation). If both fail, reject, naming class (c).",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "Guard normal-form match — the argument's reasoning (guards select, evaluation is pure and deterministic, the same pre-state is read) does not depend on a write existing between the guard and the re-evaluation; applied here to a no-write evaluation site as a strict subcase, not a re-derivation"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:299",
+              "note": "Family 4's stated decision procedure (arg-bound interval arithmetic over a divisor), reused here for the guard-spelled variant per the band ruling that per-term bound conjuncts feed the same interval derivation wherever they are spelled"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "schema": "add a guard normal-form-equal to <WP>, or a per-term bound conjunct on the divisor that excludes zero",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "field Total as number default 0\nfield Parts as number default 1\n\nstate Active initial\n\nevent Create initial\nevent AdjustParts(NewParts as number)\nevent ComputePerPart(Threshold as number)\n\non Create\n    -> set Total = 0\n    -> set Parts = 1\n\nfrom Active on AdjustParts\n    -> set Parts = AdjustParts.NewParts\n    -> no transition\n\nfrom Active on ComputePerPart when ComputePerPart.Threshold > 0\n    -> no transition\nfrom Active on ComputePerPart\n    -> reject \"Cannot compute: per-part total is {Total / Parts}\"\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "c"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools",
+            "date": "2026-07-21",
+            "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+          }
+        },
+        "discharges": [
+          {
+            "id": "guard-nf",
+            "kind": "guard",
+            "addition": "when Parts != 0",
+            "application": {
+              "locus": "row-guard",
+              "eventName": "ComputePerPart"
+            },
+            "premiseClasses": [
+              "c"
+            ],
+            "derivation": "guard fact normal-form-equal to the WP -> guard-match, at a no-write evaluation site",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "the evaluation-site enumeration measured this category at HEAD and found it mints no fault obligation at all, so the compile is clean regardless of the addition — it confirms the no-mint gap, not that the guard was consumed as a genuine premise",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Measured: adding `when Parts != 0` to the base's reject row compiles with zero diagnostics at HEAD (e1a14d91) — the same clean result as the base, because the site never mints a diagnostic to discharge in the first place."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "guard-nf",
+            "addition": "when Parts >= 0",
+            "application": {
+              "locus": "row-guard",
+              "eventName": "ComputePerPart"
+            },
+            "whyStillRejects": "Parts >= 0 admits zero — must still reject, same obligation, under the model",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "want-doc",
+          "ref": "docs/Working/what-i-want-2026-07-16.md:72"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+          "note": "the Fault family row"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Operations.cs:181",
+          "note": "OperationKind.NumberDivideNumber declaration"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Operations.cs:187",
+          "note": "the 'Divisor must be non-zero' NumericProofRequirement"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md § Rejections"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md § 2.5 Interpolation Reassembly"
+        },
+        {
+          "kind": "code",
+          "ref": "samples/travel-reimbursement.precept:61",
+          "note": "a shipped precedent of division inside a reject-row interpolation"
+        }
+      ],
+      "notes": [
+        "Built-status gap, live-measured: base compiled clean at HEAD (e1a14d91, 2026-07-21, Precept.MatrixTools) with zero diagnostics — no DivisionByZero-shaped fault, contradicting the model's required rejection. This is the position's no-mint gap (the evaluation-site enumeration found the same for both categories in this group), not evidence the base is sound; base and near-miss provenance are marked live-verified to report the literal (clean) result honestly, not to claim it confirms the required reject outcome.",
+        "The WP calculator (tools/Precept.MatrixTools) computes weakest preconditions through write plans; this evaluation site has no write plan at all (the row writes nothing), so no canonical key is pinned here — a named skip, not a silent omission, consistent with the day-one validator's design (docs/Working/obligation-discharge-matrix-2026-07-19.md § Storage).",
+        "Missing rule, not answered here: whether premise class (d) — a `rule` holding in the pre-state — can license a fault-family divisor-nonzero obligation directly has no written validity argument in the matrix. Measured 2026-07-21 (Precept.MatrixTools, commit e1a14d91): adding `rule Parts != 0 because \"...\"` to this base, with AdjustParts still able to set Parts to 0 with nothing checking it (Defect A — `rule` mints no write-site obligation at HEAD), compiles with zero diagnostics. That is the same shape as the false proof docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md Part 3 (Defect B) verifies for the write-site fault family: a `rule` consumed as a premise while nothing establishes or preserves it. Not recorded as a licensed discharge here — doing so would cite a rule with no validity argument, which the rule-validity gate forbids.",
+        "Open dependency carried, not answered (per the group's authoring notes): whether the failure context itself — the fact that the row matched and is in the middle of refusing — is a premise in its own right is not settled by anything the matrix currently states."
+      ]
+    },
+    {
+      "id": "fault6/reject-message/decmod-modulo",
+      "label": "Reject-message interpolation — decimal % decimal",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "DecimalModuloDecimal",
+        "evaluationSiteCategory": "reject-message-interpolation",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "want-doc",
+            "ref": "docs/Working/what-i-want-2026-07-16.md:72",
+            "note": "the reject-row interpolation the want doc uses as the reason the fault axis needs a no-write evaluation-site category"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+            "note": "the Fault family row: 'the site may sit in a guard or a reject-row interpolation with no write at all'"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Parts != 0",
+        "metavariables": [
+          {
+            "name": "Total",
+            "standsFor": "the dividend the reject message interpolates"
+          },
+          {
+            "name": "Parts",
+            "standsFor": "the divisor the reject message interpolates"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "Parts != 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "c"
+      ],
+      "premiseAvailability": "Parts is a field written by a separate handler (AdjustParts), not an event arg of ComputePerPart, so class (b) has nothing to instantiate at this site (arg constraints are enforced on ComputePerPart's own args, and Parts is not one of them). The reject row matched to render its message, so its own guard is available as class (c) over exactly the pre-state Parts reads (want-doc :72; matrix § Per-family case shapes, Fault family row). Class (d) is listed as available at this evaluation-site category (pre-state constraints), but no contract entry here cites it: the matrix's § Validity arguments carries no argument for 'a pre-state rule directly discharges a fault-family divisor obligation', so citing it would violate the rule-validity gate (§ Rule validity: 'no cell ratifies whose derivation cites an argument-less rule'). Recorded as a missing rule, not answered here — see notes.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "derivation": "guard fact normal-form-equal to the WP -> guard-match, read at the reject row itself: the row matched, so its guard evaluated true over the same pre-state the message string is interpolated against, and nothing writes between the guard's evaluation and the message's (the row writes nothing at all)",
+          "validityArguments": [
+            "Guard normal-form match"
+          ],
+          "decisionProcedure": "First: normal-form match of the divisor-nonzero WP against the reject row's own guard conjuncts (a finite set) — Family 1's class-(c) procedure. Failing that: collect the guard's per-term bound conjuncts over the divisor and run the same exact-lane interval exclusion Family 4 states for arg bounds (a term whose bound excludes zero discharges; no matching term, or a bound admitting zero, fails the derivation). If both fail, reject, naming class (c).",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "Guard normal-form match — the argument's reasoning (guards select, evaluation is pure and deterministic, the same pre-state is read) does not depend on a write existing between the guard and the re-evaluation; applied here to a no-write evaluation site as a strict subcase, not a re-derivation"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:299",
+              "note": "Family 4's stated decision procedure (arg-bound interval arithmetic over a divisor), reused here for the guard-spelled variant per the band ruling that per-term bound conjuncts feed the same interval derivation wherever they are spelled"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "schema": "add a guard normal-form-equal to <WP>, or a per-term bound conjunct on the divisor that excludes zero",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "field Total as decimal default 0.0\nfield Parts as decimal default 1.0\n\nstate Active initial\n\nevent Create initial\nevent AdjustParts(NewParts as decimal)\nevent ComputePerPart(Threshold as decimal)\n\non Create\n    -> set Total = 0.0\n    -> set Parts = 1.0\n\nfrom Active on AdjustParts\n    -> set Parts = AdjustParts.NewParts\n    -> no transition\n\nfrom Active on ComputePerPart when ComputePerPart.Threshold > 0\n    -> no transition\nfrom Active on ComputePerPart\n    -> reject \"Cannot compute: per-part total is {Total % Parts}\"\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "c"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools",
+            "date": "2026-07-21",
+            "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+          }
+        },
+        "discharges": [
+          {
+            "id": "guard-nf",
+            "kind": "guard",
+            "addition": "when Parts != 0",
+            "application": {
+              "locus": "row-guard",
+              "eventName": "ComputePerPart"
+            },
+            "premiseClasses": [
+              "c"
+            ],
+            "derivation": "guard fact normal-form-equal to the WP -> guard-match, at a no-write evaluation site",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "the evaluation-site enumeration measured this category at HEAD and found it mints no fault obligation at all, so the compile is clean regardless of the addition — it confirms the no-mint gap, not that the guard was consumed as a genuine premise",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Measured: adding `when Parts != 0` to the base's reject row compiles with zero diagnostics at HEAD (e1a14d91) — the same clean result as the base, because the site never mints a diagnostic to discharge in the first place."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "guard-nf",
+            "addition": "when Parts >= 0",
+            "application": {
+              "locus": "row-guard",
+              "eventName": "ComputePerPart"
+            },
+            "whyStillRejects": "Parts >= 0 admits zero — must still reject, same obligation, under the model",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "want-doc",
+          "ref": "docs/Working/what-i-want-2026-07-16.md:72"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+          "note": "the Fault family row"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Operations.cs:159",
+          "note": "OperationKind.DecimalModuloDecimal declaration"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Operations.cs:165",
+          "note": "the 'Divisor must be non-zero' NumericProofRequirement"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md § Rejections"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md § 2.5 Interpolation Reassembly"
+        },
+        {
+          "kind": "code",
+          "ref": "samples/travel-reimbursement.precept:61",
+          "note": "a shipped precedent of division inside a reject-row interpolation"
+        }
+      ],
+      "notes": [
+        "Built-status gap, live-measured: base compiled clean at HEAD (e1a14d91, 2026-07-21, Precept.MatrixTools) with zero diagnostics — no DivisionByZero-shaped fault, contradicting the model's required rejection. This is the position's no-mint gap (the evaluation-site enumeration found the same for both categories in this group), not evidence the base is sound; base and near-miss provenance are marked live-verified to report the literal (clean) result honestly, not to claim it confirms the required reject outcome.",
+        "The WP calculator (tools/Precept.MatrixTools) computes weakest preconditions through write plans; this evaluation site has no write plan at all (the row writes nothing), so no canonical key is pinned here — a named skip, not a silent omission, consistent with the day-one validator's design (docs/Working/obligation-discharge-matrix-2026-07-19.md § Storage).",
+        "Missing rule, not answered here: whether premise class (d) — a `rule` holding in the pre-state — can license a fault-family divisor-nonzero obligation directly has no written validity argument in the matrix. Measured 2026-07-21 (Precept.MatrixTools, commit e1a14d91): adding `rule Parts != 0 because \"...\"` to this base, with AdjustParts still able to set Parts to 0 with nothing checking it (Defect A — `rule` mints no write-site obligation at HEAD), compiles with zero diagnostics. That is the same shape as the false proof docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md Part 3 (Defect B) verifies for the write-site fault family: a `rule` consumed as a premise while nothing establishes or preserves it. Not recorded as a licensed discharge here — doing so would cite a rule with no validity argument, which the rule-validity gate forbids.",
+        "Open dependency carried, not answered (per the group's authoring notes): whether the failure context itself — the fact that the row matched and is in the middle of refusing — is a premise in its own right is not settled by anything the matrix currently states."
+      ]
+    },
+    {
+      "id": "fault6/constraint-rationale/int-divide",
+      "label": "Constraint-rationale interpolation — integer / integer",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "IntegerDivideInteger",
+        "evaluationSiteCategory": "constraint-rationale-interpolation",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+            "note": "the Fault family row: a no-write evaluation site"
+          },
+          {
+            "kind": "spec",
+            "ref": "docs/language/precept-language-spec.md:288",
+            "note": "mandatory `because` clauses — every `rule` carries one, so the interpolation site always exists wherever a rule's rationale contains arithmetic"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Parts != 0",
+        "metavariables": [
+          {
+            "name": "Total",
+            "standsFor": "the dividend the rule's `because` string interpolates"
+          },
+          {
+            "name": "Parts",
+            "standsFor": "the divisor the rule's `because` string interpolates"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "Parts != 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a"
+      ],
+      "premiseAvailability": "This cell's setting is a plain top-level `rule` (not a state or event ensure), so no event is in scope and class (b) (argument constraints) has nothing to instantiate — a rule's condition and `because` string read fields only. Class (c) (the handler's guard) does not apply either: a `rule` is not attached to a row. A rule's own `when` activation clause is not treated as a premise for its own message here — that is an open question the matrix does not resolve (see notes), not an assumed 'no'. Class (a), the divisor field's own declared modifier, is available: Parts is `editable`, so the modifier is continuously ingress-enforced at the editable-field door, the same discharge mechanism that makes class (b) true for event args (matrix § Vocabulary, Discharge mechanisms: 'by the same symmetry the editable-field door makes premises (a) and (d) true for that field downstream').",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "ingress evaluation at the editable-field door continuously enforces the field's declared modifier (matrix § Vocabulary, Discharge mechanisms, the class-(a)/class-(b) symmetry) -> the divisor's declared bound excludes zero",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "Discharge mechanisms: 'the editable-field door makes premises (a) and (d) true for that field downstream' — the argument written for class (b) at ingress is cited here for class (a) under that stated symmetry, since both are ingress-enforced declared bounds; the matrix carries no separate class-(a) argument text"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:299",
+              "note": "Family 4's stated decision procedure (arg-bound interval arithmetic over a divisor), applied to a field modifier instead of an arg modifier"
+            }
+          ],
+          "decisionProcedure": "Compute the divisor field's interval from its declared modifiers (a finite set); zero inside the interval, or no bound excluding it, rejects — Family 4's procedure, read against the field's declaration rather than an event arg's."
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "declare the divisor field's modifier such that its interval satisfies <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet, adapted from arg bounds to field modifiers"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "field Total as integer default 0 editable\nfield Parts as integer default 1 editable\n\nrule Total >= 0 because \"Per-part total is currently {Total / Parts}\"\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools",
+            "date": "2026-07-21",
+            "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+          }
+        },
+        "discharges": [
+          {
+            "id": "field-modifier-positive",
+            "kind": "other",
+            "addition": "field Parts as integer default 1 positive editable",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "field modifier `positive` on Parts -> interval (0, +inf) excludes zero, at a no-write evaluation site",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "the evaluation-site enumeration measured this category at HEAD and found it mints no fault obligation at all, so the compile is clean regardless of the addition",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "No `application` locus is stated: the schema's application DU covers row-guard and event-arg-declaration additions only, not a field declaration's own modifier list — recorded as an honest schema gap rather than a forced fit."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "field-modifier-positive",
+            "addition": "field Parts as integer default 1 nonnegative editable",
+            "whyStillRejects": "nonnegative admits zero — must still reject, same obligation, under the model",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md:288",
+          "note": "mandatory `because` clauses"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+          "note": "the Fault family row"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Operations.cs:119",
+          "note": "OperationKind.IntegerDivideInteger declaration"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Operations.cs:125",
+          "note": "the 'Divisor must be non-zero' NumericProofRequirement"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md § 2.5 Interpolation Reassembly"
+        },
+        {
+          "kind": "code",
+          "ref": "samples/loan-application.precept:38",
+          "note": "a shipped precedent of arithmetic inside a rule's `because` string"
+        }
+      ],
+      "notes": [
+        "Built-status gap, live-measured: base compiled clean at HEAD (e1a14d91, 2026-07-21, Precept.MatrixTools) with zero diagnostics, contradicting the model's required rejection — the same no-mint gap as the reject-message category. Base and near-miss provenance are marked live-verified to report the literal result honestly, not to claim confirmation of the required outcome.",
+        "This cell's witness deliberately avoids a fractional numeric literal (e.g. `0.0`) inside a `number`-typed rule's condition: measured at HEAD, `rule Total >= 0.0` on a `number` field raises `TypeMismatch: Expected a number value here, but got 'decimal'`, while the whole-number literal `rule Total >= 0` does not. This looks like a real type-resolution gap on the `number` lane inside rule conditions specifically (comparisons elsewhere resolve a fractional literal against a `number` peer correctly per docs/language/primitive-types.md), but it is outside this group's scope (division-by-zero at a message-interpolation site) and is recorded here only to explain why the `number`-lane and `integer`-lane witnesses use whole-number defaults throughout, not as a finding of this cell.",
+        "No canonical WP key is pinned: the WP calculator computes weakest preconditions through write plans, and a rule's `because` string is a no-write evaluation site — a named skip, consistent with docs/Working/obligation-discharge-matrix-2026-07-19.md § Storage.",
+        "Open dependency carried, not answered: whether a rule's own condition (or, for a conditional rule, its `when`) is available as a premise for its own `because` message is not settled by anything the matrix currently states — the matrix's own text observes only that 'the `because` message renders only when the constraint is false', which is a fact about when the site evaluates, not about what premises are available there."
+      ]
+    },
+    {
+      "id": "fault6/constraint-rationale/dec-divide",
+      "label": "Constraint-rationale interpolation — decimal / decimal",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "DecimalDivideDecimal",
+        "evaluationSiteCategory": "constraint-rationale-interpolation",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+            "note": "the Fault family row: a no-write evaluation site"
+          },
+          {
+            "kind": "spec",
+            "ref": "docs/language/precept-language-spec.md:288",
+            "note": "mandatory `because` clauses — every `rule` carries one, so the interpolation site always exists wherever a rule's rationale contains arithmetic"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Parts != 0",
+        "metavariables": [
+          {
+            "name": "Total",
+            "standsFor": "the dividend the rule's `because` string interpolates"
+          },
+          {
+            "name": "Parts",
+            "standsFor": "the divisor the rule's `because` string interpolates"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "Parts != 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a"
+      ],
+      "premiseAvailability": "This cell's setting is a plain top-level `rule` (not a state or event ensure), so no event is in scope and class (b) (argument constraints) has nothing to instantiate — a rule's condition and `because` string read fields only. Class (c) (the handler's guard) does not apply either: a `rule` is not attached to a row. A rule's own `when` activation clause is not treated as a premise for its own message here — that is an open question the matrix does not resolve (see notes), not an assumed 'no'. Class (a), the divisor field's own declared modifier, is available: Parts is `editable`, so the modifier is continuously ingress-enforced at the editable-field door, the same discharge mechanism that makes class (b) true for event args (matrix § Vocabulary, Discharge mechanisms: 'by the same symmetry the editable-field door makes premises (a) and (d) true for that field downstream').",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "ingress evaluation at the editable-field door continuously enforces the field's declared modifier (matrix § Vocabulary, Discharge mechanisms, the class-(a)/class-(b) symmetry) -> the divisor's declared bound excludes zero",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "Discharge mechanisms: 'the editable-field door makes premises (a) and (d) true for that field downstream' — the argument written for class (b) at ingress is cited here for class (a) under that stated symmetry, since both are ingress-enforced declared bounds; the matrix carries no separate class-(a) argument text"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:299",
+              "note": "Family 4's stated decision procedure (arg-bound interval arithmetic over a divisor), applied to a field modifier instead of an arg modifier"
+            }
+          ],
+          "decisionProcedure": "Compute the divisor field's interval from its declared modifiers (a finite set); zero inside the interval, or no bound excluding it, rejects — Family 4's procedure, read against the field's declaration rather than an event arg's."
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "declare the divisor field's modifier such that its interval satisfies <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet, adapted from arg bounds to field modifiers"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "field Total as decimal default 0.0 editable\nfield Parts as decimal default 1.0 editable\n\nrule Total >= 0.0 because \"Per-part total is currently {Total / Parts}\"\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools",
+            "date": "2026-07-21",
+            "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+          }
+        },
+        "discharges": [
+          {
+            "id": "field-modifier-positive",
+            "kind": "other",
+            "addition": "field Parts as decimal default 1.0 positive editable",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "field modifier `positive` on Parts -> interval (0, +inf) excludes zero, at a no-write evaluation site",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "the evaluation-site enumeration measured this category at HEAD and found it mints no fault obligation at all, so the compile is clean regardless of the addition",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "No `application` locus is stated: the schema's application DU covers row-guard and event-arg-declaration additions only, not a field declaration's own modifier list — recorded as an honest schema gap rather than a forced fit."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "field-modifier-positive",
+            "addition": "field Parts as decimal default 1.0 nonnegative editable",
+            "whyStillRejects": "nonnegative admits zero — must still reject, same obligation, under the model",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md:288",
+          "note": "mandatory `because` clauses"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+          "note": "the Fault family row"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Operations.cs:150",
+          "note": "OperationKind.DecimalDivideDecimal declaration"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Operations.cs:156",
+          "note": "the 'Divisor must be non-zero' NumericProofRequirement"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md § 2.5 Interpolation Reassembly"
+        },
+        {
+          "kind": "code",
+          "ref": "samples/loan-application.precept:38",
+          "note": "a shipped precedent of arithmetic inside a rule's `because` string"
+        }
+      ],
+      "notes": [
+        "Built-status gap, live-measured: base compiled clean at HEAD (e1a14d91, 2026-07-21, Precept.MatrixTools) with zero diagnostics, contradicting the model's required rejection — the same no-mint gap as the reject-message category. Base and near-miss provenance are marked live-verified to report the literal result honestly, not to claim confirmation of the required outcome.",
+        "This cell's witness deliberately avoids a fractional numeric literal (e.g. `0.0`) inside a `number`-typed rule's condition: measured at HEAD, `rule Total >= 0.0` on a `number` field raises `TypeMismatch: Expected a number value here, but got 'decimal'`, while the whole-number literal `rule Total >= 0` does not. This looks like a real type-resolution gap on the `number` lane inside rule conditions specifically (comparisons elsewhere resolve a fractional literal against a `number` peer correctly per docs/language/primitive-types.md), but it is outside this group's scope (division-by-zero at a message-interpolation site) and is recorded here only to explain why the `number`-lane and `integer`-lane witnesses use whole-number defaults throughout, not as a finding of this cell.",
+        "No canonical WP key is pinned: the WP calculator computes weakest preconditions through write plans, and a rule's `because` string is a no-write evaluation site — a named skip, consistent with docs/Working/obligation-discharge-matrix-2026-07-19.md § Storage.",
+        "Open dependency carried, not answered: whether a rule's own condition (or, for a conditional rule, its `when`) is available as a premise for its own `because` message is not settled by anything the matrix currently states — the matrix's own text observes only that 'the `because` message renders only when the constraint is false', which is a fact about when the site evaluates, not about what premises are available there."
+      ]
+    },
+    {
+      "id": "fault6/constraint-rationale/num-divide",
+      "label": "Constraint-rationale interpolation — number / number",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "NumberDivideNumber",
+        "evaluationSiteCategory": "constraint-rationale-interpolation",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+            "note": "the Fault family row: a no-write evaluation site"
+          },
+          {
+            "kind": "spec",
+            "ref": "docs/language/precept-language-spec.md:288",
+            "note": "mandatory `because` clauses — every `rule` carries one, so the interpolation site always exists wherever a rule's rationale contains arithmetic"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Parts != 0",
+        "metavariables": [
+          {
+            "name": "Total",
+            "standsFor": "the dividend the rule's `because` string interpolates"
+          },
+          {
+            "name": "Parts",
+            "standsFor": "the divisor the rule's `because` string interpolates"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "Parts != 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a"
+      ],
+      "premiseAvailability": "This cell's setting is a plain top-level `rule` (not a state or event ensure), so no event is in scope and class (b) (argument constraints) has nothing to instantiate — a rule's condition and `because` string read fields only. Class (c) (the handler's guard) does not apply either: a `rule` is not attached to a row. A rule's own `when` activation clause is not treated as a premise for its own message here — that is an open question the matrix does not resolve (see notes), not an assumed 'no'. Class (a), the divisor field's own declared modifier, is available: Parts is `editable`, so the modifier is continuously ingress-enforced at the editable-field door, the same discharge mechanism that makes class (b) true for event args (matrix § Vocabulary, Discharge mechanisms: 'by the same symmetry the editable-field door makes premises (a) and (d) true for that field downstream').",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "ingress evaluation at the editable-field door continuously enforces the field's declared modifier (matrix § Vocabulary, Discharge mechanisms, the class-(a)/class-(b) symmetry) -> the divisor's declared bound excludes zero",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "Discharge mechanisms: 'the editable-field door makes premises (a) and (d) true for that field downstream' — the argument written for class (b) at ingress is cited here for class (a) under that stated symmetry, since both are ingress-enforced declared bounds; the matrix carries no separate class-(a) argument text"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:299",
+              "note": "Family 4's stated decision procedure (arg-bound interval arithmetic over a divisor), applied to a field modifier instead of an arg modifier"
+            }
+          ],
+          "decisionProcedure": "Compute the divisor field's interval from its declared modifiers (a finite set); zero inside the interval, or no bound excluding it, rejects — Family 4's procedure, read against the field's declaration rather than an event arg's."
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "declare the divisor field's modifier such that its interval satisfies <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet, adapted from arg bounds to field modifiers"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "field Total as number default 0 editable\nfield Parts as number default 1 editable\n\nrule Total >= 0 because \"Per-part total is currently {Total / Parts}\"\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools",
+            "date": "2026-07-21",
+            "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+          }
+        },
+        "discharges": [
+          {
+            "id": "field-modifier-positive",
+            "kind": "other",
+            "addition": "field Parts as number default 1 positive editable",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "field modifier `positive` on Parts -> interval (0, +inf) excludes zero, at a no-write evaluation site",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "the evaluation-site enumeration measured this category at HEAD and found it mints no fault obligation at all, so the compile is clean regardless of the addition",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "No `application` locus is stated: the schema's application DU covers row-guard and event-arg-declaration additions only, not a field declaration's own modifier list — recorded as an honest schema gap rather than a forced fit."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "field-modifier-positive",
+            "addition": "field Parts as number default 1 nonnegative editable",
+            "whyStillRejects": "nonnegative admits zero — must still reject, same obligation, under the model",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md:288",
+          "note": "mandatory `because` clauses"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+          "note": "the Fault family row"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Operations.cs:181",
+          "note": "OperationKind.NumberDivideNumber declaration"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Operations.cs:187",
+          "note": "the 'Divisor must be non-zero' NumericProofRequirement"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md § 2.5 Interpolation Reassembly"
+        },
+        {
+          "kind": "code",
+          "ref": "samples/loan-application.precept:38",
+          "note": "a shipped precedent of arithmetic inside a rule's `because` string"
+        }
+      ],
+      "notes": [
+        "Built-status gap, live-measured: base compiled clean at HEAD (e1a14d91, 2026-07-21, Precept.MatrixTools) with zero diagnostics, contradicting the model's required rejection — the same no-mint gap as the reject-message category. Base and near-miss provenance are marked live-verified to report the literal result honestly, not to claim confirmation of the required outcome.",
+        "This cell's witness deliberately avoids a fractional numeric literal (e.g. `0.0`) inside a `number`-typed rule's condition: measured at HEAD, `rule Total >= 0.0` on a `number` field raises `TypeMismatch: Expected a number value here, but got 'decimal'`, while the whole-number literal `rule Total >= 0` does not. This looks like a real type-resolution gap on the `number` lane inside rule conditions specifically (comparisons elsewhere resolve a fractional literal against a `number` peer correctly per docs/language/primitive-types.md), but it is outside this group's scope (division-by-zero at a message-interpolation site) and is recorded here only to explain why the `number`-lane and `integer`-lane witnesses use whole-number defaults throughout, not as a finding of this cell.",
+        "No canonical WP key is pinned: the WP calculator computes weakest preconditions through write plans, and a rule's `because` string is a no-write evaluation site — a named skip, consistent with docs/Working/obligation-discharge-matrix-2026-07-19.md § Storage.",
+        "Open dependency carried, not answered: whether a rule's own condition (or, for a conditional rule, its `when`) is available as a premise for its own `because` message is not settled by anything the matrix currently states — the matrix's own text observes only that 'the `because` message renders only when the constraint is false', which is a fact about when the site evaluates, not about what premises are available there."
+      ]
+    },
+    {
+      "id": "fault6/constraint-rationale/decmod-modulo",
+      "label": "Constraint-rationale interpolation — decimal % decimal",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "DecimalModuloDecimal",
+        "evaluationSiteCategory": "constraint-rationale-interpolation",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+            "note": "the Fault family row: a no-write evaluation site"
+          },
+          {
+            "kind": "spec",
+            "ref": "docs/language/precept-language-spec.md:288",
+            "note": "mandatory `because` clauses — every `rule` carries one, so the interpolation site always exists wherever a rule's rationale contains arithmetic"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Parts != 0",
+        "metavariables": [
+          {
+            "name": "Total",
+            "standsFor": "the dividend the rule's `because` string interpolates"
+          },
+          {
+            "name": "Parts",
+            "standsFor": "the divisor the rule's `because` string interpolates"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "Parts != 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a"
+      ],
+      "premiseAvailability": "This cell's setting is a plain top-level `rule` (not a state or event ensure), so no event is in scope and class (b) (argument constraints) has nothing to instantiate — a rule's condition and `because` string read fields only. Class (c) (the handler's guard) does not apply either: a `rule` is not attached to a row. A rule's own `when` activation clause is not treated as a premise for its own message here — that is an open question the matrix does not resolve (see notes), not an assumed 'no'. Class (a), the divisor field's own declared modifier, is available: Parts is `editable`, so the modifier is continuously ingress-enforced at the editable-field door, the same discharge mechanism that makes class (b) true for event args (matrix § Vocabulary, Discharge mechanisms: 'by the same symmetry the editable-field door makes premises (a) and (d) true for that field downstream').",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "ingress evaluation at the editable-field door continuously enforces the field's declared modifier (matrix § Vocabulary, Discharge mechanisms, the class-(a)/class-(b) symmetry) -> the divisor's declared bound excludes zero",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "Discharge mechanisms: 'the editable-field door makes premises (a) and (d) true for that field downstream' — the argument written for class (b) at ingress is cited here for class (a) under that stated symmetry, since both are ingress-enforced declared bounds; the matrix carries no separate class-(a) argument text"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:299",
+              "note": "Family 4's stated decision procedure (arg-bound interval arithmetic over a divisor), applied to a field modifier instead of an arg modifier"
+            }
+          ],
+          "decisionProcedure": "Compute the divisor field's interval from its declared modifiers (a finite set); zero inside the interval, or no bound excluding it, rejects — Family 4's procedure, read against the field's declaration rather than an event arg's."
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "declare the divisor field's modifier such that its interval satisfies <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet, adapted from arg bounds to field modifiers"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "field Total as decimal default 0.0 editable\nfield Parts as decimal default 1.0 editable\n\nrule Total >= 0.0 because \"Per-part total is currently {Total % Parts}\"\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools",
+            "date": "2026-07-21",
+            "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+          }
+        },
+        "discharges": [
+          {
+            "id": "field-modifier-positive",
+            "kind": "other",
+            "addition": "field Parts as decimal default 1.0 positive editable",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "field modifier `positive` on Parts -> interval (0, +inf) excludes zero, at a no-write evaluation site",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "the evaluation-site enumeration measured this category at HEAD and found it mints no fault obligation at all, so the compile is clean regardless of the addition",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "No `application` locus is stated: the schema's application DU covers row-guard and event-arg-declaration additions only, not a field declaration's own modifier list — recorded as an honest schema gap rather than a forced fit."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "field-modifier-positive",
+            "addition": "field Parts as decimal default 1.0 nonnegative editable",
+            "whyStillRejects": "nonnegative admits zero — must still reject, same obligation, under the model",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md:288",
+          "note": "mandatory `because` clauses"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+          "note": "the Fault family row"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Operations.cs:159",
+          "note": "OperationKind.DecimalModuloDecimal declaration"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Operations.cs:165",
+          "note": "the 'Divisor must be non-zero' NumericProofRequirement"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md § 2.5 Interpolation Reassembly"
+        },
+        {
+          "kind": "code",
+          "ref": "samples/loan-application.precept:38",
+          "note": "a shipped precedent of arithmetic inside a rule's `because` string"
+        }
+      ],
+      "notes": [
+        "Built-status gap, live-measured: base compiled clean at HEAD (e1a14d91, 2026-07-21, Precept.MatrixTools) with zero diagnostics, contradicting the model's required rejection — the same no-mint gap as the reject-message category. Base and near-miss provenance are marked live-verified to report the literal result honestly, not to claim confirmation of the required outcome.",
+        "This cell's witness deliberately avoids a fractional numeric literal (e.g. `0.0`) inside a `number`-typed rule's condition: measured at HEAD, `rule Total >= 0.0` on a `number` field raises `TypeMismatch: Expected a number value here, but got 'decimal'`, while the whole-number literal `rule Total >= 0` does not. This looks like a real type-resolution gap on the `number` lane inside rule conditions specifically (comparisons elsewhere resolve a fractional literal against a `number` peer correctly per docs/language/primitive-types.md), but it is outside this group's scope (division-by-zero at a message-interpolation site) and is recorded here only to explain why the `number`-lane and `integer`-lane witnesses use whole-number defaults throughout, not as a finding of this cell.",
+        "No canonical WP key is pinned: the WP calculator computes weakest preconditions through write plans, and a rule's `because` string is a no-write evaluation site — a named skip, consistent with docs/Working/obligation-discharge-matrix-2026-07-19.md § Storage.",
+        "Open dependency carried, not answered: whether a rule's own condition (or, for a conditional rule, its `when`) is available as a premise for its own `because` message is not settled by anything the matrix currently states — the matrix's own text observes only that 'the `because` message renders only when the constraint is false', which is a fact about when the site evaluates, not about what premises are available there."
+      ]
+    }
+  ]
+}

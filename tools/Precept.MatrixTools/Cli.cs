@@ -26,10 +26,14 @@ public static class Cli
             return RunManifest(args.Skip(1).ToArray());
         if (args.Length >= 1 && args[0] == "measure-corpus")
             return MeasureCorpus(args.Skip(1).ToArray());
+        if (args.Length >= 1 && args[0] == "measure-corpus-faults")
+            return MeasureCorpusFaults(args.Skip(1).ToArray());
         if (args.Length >= 1 && args[0] == "render-cells")
             return RenderCells(args.Skip(1).ToArray());
         if (args.Length >= 1 && args[0] == "validate-cells")
             return ValidateCells(args.Skip(1).ToArray());
+        if (args.Length >= 1 && args[0] == "fault-axis")
+            return FaultAxis(args.Skip(1).ToArray());
 
         if (args.Length != 1)
         {
@@ -37,8 +41,10 @@ public static class Cli
             Console.Error.WriteLine("       precept-matrixtools convert-cells <family.cells.json> [<out.manifest.json>]");
             Console.Error.WriteLine("       precept-matrixtools run-manifest <manifest.json> [<out.results.json>]");
             Console.Error.WriteLine("       precept-matrixtools measure-corpus <corpus-dir> [<out.json> [<out.md>]]");
+            Console.Error.WriteLine("       precept-matrixtools measure-corpus-faults <corpus-dir> [<out.json> [<out.md>]]");
             Console.Error.WriteLine("       precept-matrixtools render-cells <cells-dir>");
             Console.Error.WriteLine("       precept-matrixtools validate-cells <cells-dir> [<repo-root>]");
+            Console.Error.WriteLine("       precept-matrixtools fault-axis [<out.json>]");
             return 2;
         }
 
@@ -146,6 +152,35 @@ public static class Cli
         return report.HasErrors ? 1 : 0;
     }
 
+    /// <summary>
+    /// Emits every catalog-declared proof-requirement site as JSON — the denominator for the
+    /// matrix's fault family. With no argument the JSON goes to stdout; with one argument it is
+    /// written to that path and a one-line summary goes to stdout.
+    /// </summary>
+    private static int FaultAxis(string[] args)
+    {
+        if (args.Length > 1)
+        {
+            Console.Error.WriteLine("usage: precept-matrixtools fault-axis [<out.json>]");
+            return 2;
+        }
+
+        var sites = FaultAxisEnumerator.Enumerate();
+        var json = FaultAxisEnumerator.ToJson(sites);
+
+        if (args.Length == 1)
+        {
+            File.WriteAllText(args[0], json);
+            Console.WriteLine($"{sites.Length} catalog-declared proof-requirement sites → {args[0]}");
+        }
+        else
+        {
+            Console.WriteLine(json);
+        }
+
+        return 0;
+    }
+
     private static int RenderCells(string[] args)
     {
         if (args.Length != 1)
@@ -203,6 +238,39 @@ public static class Cli
         if (args.Length == 3)
         {
             File.WriteAllText(args[2], CorpusMeasurement.ToMarkdown(report));
+            Console.WriteLine($"summary written to {args[2]}");
+        }
+
+        return 0;
+    }
+
+    private static int MeasureCorpusFaults(string[] args)
+    {
+        if (args.Length is < 1 or > 3)
+        {
+            Console.Error.WriteLine("usage: precept-matrixtools measure-corpus-faults <corpus-dir> [<out.json> [<out.md>]]");
+            return 2;
+        }
+
+        var report = FaultCorpusMeasurement.MeasureDirectory(args[0]);
+
+        Console.WriteLine($"files: {report.FileCount} measured, {report.FilesWithFaultObligations} minting at least one obligation, "
+            + $"{report.FilesWithErrorDiagnostics} with error diagnostics");
+        Console.WriteLine($"obligations minted: {report.Rows.Length}");
+        foreach (var (kind, count) in report.KindTotals)
+            Console.WriteLine($"  {count,6}  {kind}");
+        Console.WriteLine("requirement kinds the corpus never exercises:");
+        foreach (var kind in report.CatalogKindsNeverExercised)
+            Console.WriteLine($"          {kind}");
+
+        if (args.Length >= 2)
+        {
+            File.WriteAllText(args[1], FaultCorpusMeasurement.ToJson(report));
+            Console.WriteLine($"report written to {args[1]}");
+        }
+        if (args.Length == 3)
+        {
+            File.WriteAllText(args[2], FaultCorpusMeasurement.ToMarkdown(report));
             Console.WriteLine($"summary written to {args[2]}");
         }
 

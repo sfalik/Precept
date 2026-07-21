@@ -1,0 +1,83 @@
+{
+  "familyId": "fault-13-collection-non-empty-write-sites",
+  "definitionVersion": "obligation-discharge-matrix-2026-07-19 rev 7 (2026-07-20, draft)",
+  "sourceFile": "fault-13-collection-non-empty-write-sites.cells.json",
+  "rows": [],
+  "skips": [
+    {
+      "cellId": "g13/list-first",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g13/list-last",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g13/log-first",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g13/log-last",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g13/logby-first",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g13/logby-last",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g13/queue-peek",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g13/queueby-peek",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g13/queueby-peekby",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g13/stack-peek",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g13/set-min",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g13/set-max",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g13/list-at",
+      "item": "cell",
+      "reason": "disposition is \u0027open\u0027 \u2014 only defined cells state the reject/discharge/near-miss triple the conversion needs"
+    },
+    {
+      "cellId": "g13/log-at",
+      "item": "cell",
+      "reason": "disposition is \u0027open\u0027 \u2014 only defined cells state the reject/discharge/near-miss triple the conversion needs"
+    },
+    {
+      "cellId": "g13/logby-at",
+      "item": "cell",
+      "reason": "disposition is \u0027open\u0027 \u2014 only defined cells state the reject/discharge/near-miss triple the conversion needs"
+    }
+  ]
+}

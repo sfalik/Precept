@@ -1,0 +1,2361 @@
+{
+  "$schema": "./cell.schema.json",
+  "familyId": "fault-10-division-business-constraint-and-message",
+  "title": "Fault group 10 — business-domain division by zero in constraint conditions and in explanatory messages",
+  "caseShape": "fault",
+  "definitionVersion": "obligation-discharge-matrix-2026-07-19 rev 7 (2026-07-20, draft)",
+  "citations": [
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+      "note": "Family 4 — fault family, arg-constraint discharge: the fault-family decision-procedure precedent this file's cells follow"
+    },
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+      "note": "fault-family row: catalog-declared safety precondition at the evaluation site; premise classes (b)/(c)/(a) per catalog ProofSatisfactions"
+    },
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+      "note": "the four premise classes (a)-(d); the discharge-contract exactness rule; the decision-procedure requirement"
+    },
+    {
+      "kind": "code",
+      "ref": "src/Precept/Language/Operations.cs:442",
+      "note": "MoneyDivideDecimal, MoneyDivideMoneySameCurrency, QuantityDivideDecimal, PriceDivideQuantity catalog entries and their NumericProofRequirement divisor subjects"
+    },
+    {
+      "kind": "code",
+      "ref": "src/Precept/Language/Modifiers.cs:96",
+      "note": "positive/nonnegative/nonzero ProofSatisfaction.Numeric entries"
+    },
+    {
+      "kind": "review",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md",
+      "note": "Part 3, Defect A and Defect B — the verified HEAD defects this file's hazard flags and mint-gap notes rest on"
+    }
+  ],
+  "respellability": {
+    "verdict": "yes",
+    "evidence": "model-derived",
+    "corpusMeasurement": "pending",
+    "citations": [
+      {
+        "kind": "matrix",
+        "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+        "note": "Respellable bullet — the sound-but-unprovable band and the yes/no verdict definition"
+      }
+    ],
+    "notes": [
+      "No band member is exhibited in this file: every base witness's divisor is discharged by a declared modifier (nonzero/positive/nonnegative) or a guard/when conjunct restating the same fact — both are the licensed spellings Family 4 already states, so nothing here forces an author into an unprovable spelling. A model-derived yes is recorded rather than asserting corpus agreement; corpus measurement per the ratification protocol is pending, same as every other family in this folder."
+    ]
+  },
+  "cells": [
+    {
+      "id": "g10/computed-field-money-divide-money",
+      "label": "Computed field — money ÷ money (same currency), dimensionless ratio",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "op/MoneyDivideMoneySameCurrency/numeric-0",
+        "evaluationSiteCategory": "computed-field-expression",
+        "typeFamily": "business-domain"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "want-doc",
+            "ref": "docs/Working/what-i-want-2026-07-16.md:104",
+            "note": "fault-prevention obligation family"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The minting rule",
+            "note": "fault minting: catalog-stamped at evaluation sites, settled and shipped"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "GrossRevenue != '0.00 USD'",
+        "metavariables": [
+          {
+            "name": "GrossRevenue",
+            "standsFor": "the money field occupying the catalog's divisor slot of MoneyDivideMoneySameCurrency"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "GrossRevenue != '0.00 USD'"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a"
+      ],
+      "premiseAvailability": "A computed field's `<-` expression has no handler, no guard, and no event args in scope — it is evaluated over the final configuration in every configuration the entity can occupy (matrix § Per-family case shapes, fault-family row; the site's own read set is the input fields' declared modifiers only). Class (d) is not available here per the group's own scoping (rule-condition, computed-field, quantifier-predicate and rationale sites are free of class (d) — a pre-state constraint about a field is a different kind of fact from a field's own static modifier, and nothing anchors an inductive step at a `<-` expression since it is never a write site).",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "field modifier `nonzero` (or `positive`/`negative`) on GrossRevenue -> interval excludes zero -> IntervalContainment",
+          "strategy": "IntervalContainment",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "Compute the divisor's interval from its declared field modifiers (nonzero/positive/negative/min/max — a finite set per site, matrix Family 4). Zero inside the computed interval, or no modifier excluding it, rejects.",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+              "note": "Family 4's decision procedure, restated for a field-modifier divisor rather than an arg-modifier one"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "declare <Divisor> nonzero (or positive/negative) so its interval satisfies <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet, adapted to a field-modifier premise"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept MarginComputedBase\nfield NetRevenue as money in 'USD' default '0.00 USD' editable\nfield GrossRevenue as money in 'USD' default '0.00 USD' editable\nfield MarginRatio as decimal <- NetRevenue / GrossRevenue",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools.dll (temp/slice3/bin/Precept.MatrixTools/release)",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        },
+        "discharges": [
+          {
+            "id": "nonzero-modifier",
+            "kind": "arg-modifier",
+            "addition": "field GrossRevenue as money in 'USD' default '1.00 USD' editable nonzero",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "field modifier nonzero on GrossRevenue -> interval excludes zero -> IntervalContainment",
+            "strategy": "IntervalContainment",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools.dll (temp/slice3/bin/Precept.MatrixTools/release)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Default raised to '1.00 USD' because a default of '0.00 USD' itself violates the declared nonzero modifier (OutOfRange) — a separate, correctly-firing obligation, not the one this cell tests.",
+              "No `application` locus fits: the schema's application DU covers row-guard and event-arg-declarations only; a field-declaration modifier addition has neither. Applied by hand here; flagged in missingRules as a cell→test conversion gap.",
+              "Strategy name inferred from source reading of ProofEngine.Strategies.cs's dispatch order (TryIntervalContainmentProofNarrowed), not confirmed via CLI output — the CLI tool used for these witnesses prints WP text for rule obligations only, no strategy tag for fault obligations."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "nonzero-modifier",
+            "addition": "field GrossRevenue as money in 'USD' default '0.00 USD' editable nonnegative",
+            "whyStillRejects": "nonnegative admits zero — the interval [0, +inf) still contains the forbidden value, so the same obligation still rejects",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools.dll (temp/slice3/bin/Precept.MatrixTools/release)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+          "note": "Family 4"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Operations.cs:452",
+          "note": "MoneyDivideMoneySameCurrency catalog entry"
+        },
+        {
+          "kind": "code",
+          "ref": "samples/saas-usage-metering-and-billing.precept:36",
+          "note": "the corpus's IsFullyPaid computed field shows the same money-arithmetic idiom this cell's setting is drawn from"
+        }
+      ],
+      "notes": [
+        "wp.canonicalKey/canonicalKeySource omitted for every cell in this file: tools/Precept.MatrixTools's WpCalculator computes rule-family establishment/preservation WPs only (Cli.cs — 'Establishment'/'Preservation over the default configuration' sections); it has no fault-family mode, so no mechanized canonical key exists for a fault obligation. Named skip, not silently absent — recorded once here rather than in every cell.",
+        "[dischargeContract premiseClasses=['a']] No validity argument in the matrix's § Validity arguments is written for the fault family; all seven named arguments are scoped to Witness Families 1/2/5 (rule establishment/preservation). 'Arg-bound interval arithmetic' is cited here by mechanism-similarity (governance-enforced modifier truth, exact extraction, business-domain-types.md:426) rather than because the matrix names it for this shape — flagged in missingRules, not invented as a fresh argument."
+      ]
+    },
+    {
+      "id": "g10/computed-field-quantity-divide-decimal",
+      "label": "Computed field — quantity ÷ decimal, scaling",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "op/QuantityDivideDecimal/numeric-0",
+        "evaluationSiteCategory": "computed-field-expression",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "want-doc",
+            "ref": "docs/Working/what-i-want-2026-07-16.md:104"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The minting rule"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "UnitCount != 0.0",
+        "metavariables": [
+          {
+            "name": "UnitCount",
+            "standsFor": "the decimal field occupying the catalog's divisor slot of QuantityDivideDecimal"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary"
+          }
+        ],
+        "wp": {
+          "statement": "UnitCount != 0.0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a"
+      ],
+      "premiseAvailability": "Same reasoning as g10/computed-field-money-divide-money: no handler, no guard, no event args, no premise (d) at a `<-` expression.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "field modifier nonzero on UnitCount -> interval excludes zero -> IntervalContainment",
+          "strategy": "IntervalContainment",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "Compute the divisor's interval from its declared field modifiers; zero inside the computed interval, or no modifier excluding it, rejects."
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "declare <Divisor> nonzero (or positive/negative) so its interval satisfies <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept AvgWeightBase\nfield TotalWeight as quantity in 'kg' default '0 kg' editable\nfield UnitCount as decimal default 1.0 editable\nfield AvgWeight as quantity in 'kg' <- TotalWeight / UnitCount",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools.dll (temp/slice3/bin/Precept.MatrixTools/release)",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        },
+        "discharges": [
+          {
+            "id": "nonzero-modifier",
+            "kind": "arg-modifier",
+            "addition": "field UnitCount as decimal default 1.0 editable nonzero",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "field modifier nonzero on UnitCount -> interval excludes zero -> IntervalContainment",
+            "strategy": "IntervalContainment",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools.dll (temp/slice3/bin/Precept.MatrixTools/release)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "The declared default 1.0 already satisfies nonzero, so no separate OutOfRange fired here (contrast the money lead cell, which needed the default raised).",
+              "No `application` locus fits (field-declaration modifier addition) — same gap noted on the lead cell."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "nonzero-modifier",
+            "addition": "field UnitCount as decimal default 1.0 editable nonnegative",
+            "whyStillRejects": "nonnegative admits zero — must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools.dll (temp/slice3/bin/Precept.MatrixTools/release)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+          "note": "Family 4"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Operations.cs:543",
+          "note": "QuantityDivideDecimal catalog entry"
+        }
+      ],
+      "notes": [
+        "[dischargeContract premiseClasses=['a']] Same missing-validity-argument gap as the lead cell: 'Arg-bound interval arithmetic' is the closest written argument, not a fault-family-specific one."
+      ]
+    },
+    {
+      "id": "g10/rule-condition-price-divide-quantity",
+      "label": "Rule condition — price ÷ compound-quantity, dimension elevation",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "op/PriceDivideQuantity/numeric-0",
+        "evaluationSiteCategory": "rule-condition",
+        "typeFamily": "business-domain"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "want-doc",
+            "ref": "docs/Working/what-i-want-2026-07-16.md:104"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The minting rule"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "ConvFactor != 0",
+        "metavariables": [
+          {
+            "name": "ConvFactor",
+            "standsFor": "the quantity field occupying the catalog's divisor slot of PriceDivideQuantity"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary"
+          }
+        ],
+        "wp": {
+          "statement": "ConvFactor != 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a"
+      ],
+      "premiseAvailability": "A `rule` condition is evaluated against the complete working copy at every checkpoint, in every reachable configuration — not anchored to any handler, so no guard and no event args are in scope (matrix § Per-family case shapes, rule-condition entry in the group's own site sweep). Class (d) is excluded per the group's scoping note (rule-condition sites are free of class (d)).",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "field modifier nonzero on ConvFactor -> interval excludes zero -> IntervalContainment",
+          "strategy": "IntervalContainment",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "Compute the divisor's interval from its declared field modifiers; zero inside the computed interval, or no modifier excluding it, rejects."
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "declare <Divisor> nonzero (or positive/negative) so its interval satisfies <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept ElevatedPriceBase\nfield ListPrice as price in 'USD' of 'mass' default '1.00 USD/kg' editable\nfield ConvFactor as quantity in 'each/kg' default '1 each/kg' editable\nfield MaxElevatedPrice as price in 'USD/each' default '100.00 USD/each' editable\nrule ListPrice / ConvFactor <= MaxElevatedPrice because \"Elevated per-each price capped\"",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools.dll (temp/slice3/bin/Precept.MatrixTools/release)",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        },
+        "discharges": [
+          {
+            "id": "nonzero-modifier",
+            "kind": "arg-modifier",
+            "addition": "field ConvFactor as quantity in 'each/kg' default '1 each/kg' editable nonzero",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "field modifier nonzero on ConvFactor -> interval excludes zero -> IntervalContainment",
+            "strategy": "IntervalContainment",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools.dll (temp/slice3/bin/Precept.MatrixTools/release)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Confirms the PriceDivideQuantity dimension-elevation shape type-checks as specified (test/Precept.Tests/TypeChecker/PriceDivideCompoundQuantityTests.cs: price[C,X] / quantity[Y/X] -> price[C,Y]) — mass cancels, 'each' from ConvFactor's denominator becomes the result unit, comparable to MaxElevatedPrice's 'USD/each'.",
+              "No `application` locus fits (field-declaration modifier addition)."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "nonzero-modifier",
+            "addition": "field ConvFactor as quantity in 'each/kg' default '1 each/kg' editable nonnegative",
+            "whyStillRejects": "nonnegative admits zero — must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools.dll (temp/slice3/bin/Precept.MatrixTools/release)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+          "note": "Family 4"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Operations.cs:691",
+          "note": "PriceDivideQuantity catalog entry"
+        },
+        {
+          "kind": "code",
+          "ref": "test/Precept.Tests/TypeChecker/PriceDivideCompoundQuantityTests.cs:14",
+          "note": "the price/compound-quantity dimension-elevation shape this witness follows"
+        }
+      ],
+      "notes": [
+        "[dischargeContract premiseClasses=['a']] Same missing-validity-argument gap as the other cells in this file."
+      ]
+    },
+    {
+      "id": "g10/quantifier-predicate-quantity-divide-decimal",
+      "label": "Quantifier predicate — quantity ÷ decimal, hosted in a rule's each-binding",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "op/QuantityDivideDecimal/numeric-0",
+        "evaluationSiteCategory": "quantifier-predicate",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "want-doc",
+            "ref": "docs/Working/what-i-want-2026-07-16.md:104"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The minting rule"
+          },
+          {
+            "kind": "spec",
+            "ref": "docs/language/collection-types.md:800"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "d != 0",
+        "metavariables": [
+          {
+            "name": "d",
+            "standsFor": "the quantifier's binding variable, ranging over Divisors' elements"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary"
+          }
+        ],
+        "wp": {
+          "statement": "d != 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a"
+      ],
+      "premiseAvailability": "The quantifier predicate's own premise floor is field modifiers only — the binding variable takes the collection's declared inner type, so an inner-type value modifier bounds the subject (docs/language/collection-types.md:628: 'A quantifier binding ... likewise carries the element bound on x inside the predicate'). Hosted here inside a `rule` condition, which per this file's other rule-condition cell is itself free of guard/args/(d), so no host classes are added.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "inner-type value modifier nonzero on the collection's element type -> the binding variable's interval excludes zero -> IntervalContainment",
+          "strategy": "IntervalContainment",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "Compute the binding variable's interval from the collection's declared inner-type value modifier (docs/language/collection-types.md § Element value modifiers); zero inside the computed interval, or no modifier excluding it, rejects."
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "declare the collection's inner type nonzero (or positive/negative) so the binding variable's interval satisfies <WP>",
+          "citations": [
+            {
+              "kind": "spec",
+              "ref": "docs/language/collection-types.md § Element value modifiers"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept SplitWeightBase\nfield TotalWeight as quantity in 'kg' default '0 kg' editable\nfield Divisors as set of decimal\nevent AddDivisor(Value as decimal)\non AddDivisor\n    -> add Divisors AddDivisor.Value\nrule each d in Divisors (TotalWeight / d < '1000 kg') because \"each split share must stay under 1000 kg\"",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools.dll (temp/slice3/bin/Precept.MatrixTools/release)",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        },
+        "discharges": [
+          {
+            "id": "nonzero-element-modifier",
+            "kind": "arg-modifier",
+            "addition": "field Divisors as set of decimal nonzero",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "inner-type value modifier nonzero -> binding variable's interval excludes zero -> IntervalContainment",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "Live-verified: compiling base + this addition still raises DivisionByZero on 'd' at the rule's quantifier predicate. The element-value modifier is accepted syntactically (no diagnostic complains about the declaration itself) but is not consulted by the quantifier fault-check at HEAD. Consistent with docs/language/collection-types.md:10 recording quantifier predicates as 'Not yet built' in the implementation-state table — this is a genuine, currently-open gap between the committed model (docs/language/collection-types.md:628) and the shipped engine, not a false proof and not a minting gap: the site correctly mints the obligation, it simply does not yet consult the one premise class the model says is available.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools.dll (temp/slice3/bin/Precept.MatrixTools/release)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "No `application` locus fits (field-declaration modifier addition on a collection field).",
+              "The compiler output also carries an unrelated obligation on this same file — the rule's own PRESERVATION obligation at the 'on AddDivisor' write site (mentioned via the mention-set rule, since Divisors is mentioned in the rule's condition) reports 'NOT SUPPORTED — plan contains a non-set action (Add on Divisors); only scalar set writes are in the single-write calculator's scope' from the WP calculator. That is a different obligation (rule preservation, not this cell's fault obligation) and a named skip of the WP calculator, not a fault-family result; noted for transparency, not folded into this cell's disposition."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "nonzero-element-modifier",
+            "addition": "field Divisors as set of decimal nonnegative",
+            "whyStillRejects": "nonnegative admits zero — still rejects with DivisionByZero (live-verified); same obligation, and consistent either way given the modifier is not yet consulted at HEAD regardless of which one is declared",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools.dll (temp/slice3/bin/Precept.MatrixTools/release)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "cell-override",
+        "overrideVerdict": "no",
+        "bandMember": "field Divisors as set of decimal nonzero (the licensed model-derived spelling)",
+        "citations": [
+          {
+            "kind": "spec",
+            "ref": "docs/language/collection-types.md:800",
+            "note": "'Not yet built' implementation status"
+          }
+        ],
+        "notes": [
+          "Overridden to no because the gap here is not a spelling limitation an author can work around within the surface (per the model, the nonzero modifier IS the licensed spelling) — it is a build gap in the shipped engine's quantifier fault-check. No respelling exists that discharges this obligation at HEAD today; the family-level yes verdict does not apply to this cell."
+        ]
+      },
+      "openDependencies": [
+        "Q10"
+      ],
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Relationship to other work",
+          "note": "Q10 — whether quantified constraints are proof surface at all is still gating"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/collection-types.md:800"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Operations.cs:543",
+          "note": "QuantityDivideDecimal catalog entry"
+        }
+      ],
+      "notes": [
+        "Carries the Q10 open item per the authoring notes: whether a quantified constraint (`rule each/any/no ... (...)`) is proof surface at all is open (matrix § Relationship to other work, 'Still gating'). This cell's own obligation — the divisor-safety fault inside the predicate — mints and is answerable regardless of Q10's outcome (fault minting is settled and shipped independently of whether the ENCLOSING quantified rule construct itself is provable as an invariant); Q10 bears on the host construct's own establishment/preservation story, not on this fault cell's discharge contract. Recorded as a carried dependency, not resolved here.",
+        "[dischargeContract premiseClasses=['a']] Same missing-validity-argument gap as the other cells in this file — additionally, this is the one contract entry in the file whose licensed derivation is NOT built at HEAD (see the discharge witness below); the model-derived/built-unresolved split is load-bearing here in a way it is not for the other cells."
+      ]
+    },
+    {
+      "id": "g10/rationale-rule-anchored-money-divide-decimal",
+      "label": "Constraint rationale — money ÷ decimal, rule-anchored `because` interpolation",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "op/MoneyDivideDecimal/numeric-0",
+        "evaluationSiteCategory": "constraint-rationale-interpolation",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "want-doc",
+            "ref": "docs/Working/what-i-want-2026-07-16.md:104"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The minting rule"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "UnitCount != 0.0",
+        "metavariables": [
+          {
+            "name": "UnitCount",
+            "standsFor": "the decimal field occupying the catalog's divisor slot of MoneyDivideDecimal, read inside a rule's because-interpolation"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary"
+          }
+        ],
+        "wp": {
+          "statement": "UnitCount != 0.0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a"
+      ],
+      "premiseAvailability": "A rule's `because` interpolation hangs off the constraint, not a row — no event args are in scope on the rule-anchored form (unlike an event-ensure-anchored rationale, which sees the anchoring event's args). Free of class (d) per the group's own scoping (rationale cells are free of (d) throughout this file).",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "field modifier nonzero on UnitCount -> interval excludes zero -> IntervalContainment (per the model; not built at HEAD for this site — see notes)",
+          "strategy": "IntervalContainment",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "Compute the divisor's interval from its declared field modifiers; zero inside the computed interval, or no modifier excluding it, rejects."
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "declare <Divisor> nonzero (or positive/negative) so its interval satisfies <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept AvgRationaleRuleBase\nfield TotalRevenue as money in 'USD' default '0.00 USD' editable\nfield UnitCount as decimal default 1.0 editable\nrule TotalRevenue >= '0.00 USD' because \"Average per unit {TotalRevenue / UnitCount} must stay non-negative\"",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools.dll (temp/slice3/bin/Precept.MatrixTools/release)",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        },
+        "discharges": [
+          {
+            "id": "nonzero-modifier",
+            "kind": "arg-modifier",
+            "addition": "field UnitCount as decimal default 1.0 editable nonzero",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "field modifier nonzero on UnitCount -> interval excludes zero -> IntervalContainment (model-committed derivation)",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "Live-verified: this exact rationale interpolation ('Average per unit {TotalRevenue / UnitCount}...') mints NO diagnostic at HEAD regardless of the divisor's modifiers — base, this discharge, and the near-miss below all compile with zero diagnostics. This is a live minting gap, not this discharge failing: the rule's CONDITION (TotalRevenue >= '0.00 USD') carries no division and compiles clean as expected; the division lives only in the because-text, and the constraint-rationale-interpolation evaluation site does not raise DivisionByZero at HEAD at all. See matrix § The cell, 'Open design hole — nothing detects an obligation that was never minted' (lines 88-101) for the general shape of this failure mode, and authored-expressiveness-gaps.md's own measurement of the identical shape (b.precept: 'rule Total > 0.0 because \"Per-part {Total / Parts} must stay positive\"' compiled with no fault diagnostic while the same division in the condition raised DivisionByZero).",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools.dll (temp/slice3/bin/Precept.MatrixTools/release)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "No `application` locus fits (field-declaration modifier addition).",
+              "Because the site never mints, this 'discharge' and the base are compiler-indistinguishable today — both simply compile clean. The distinction recorded here is entirely modelStatus/builtStatus, per the matrix's own instruction that a live-verified mark beside builtStatus unresolved-today is a legitimate and useful record."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "nonzero-modifier",
+            "addition": "field UnitCount as decimal default 1.0 editable nonnegative",
+            "whyStillRejects": "Under the model this must still reject (nonnegative admits zero, same obligation). At HEAD it does not reject — nothing does, because the site never mints (see the discharge's builtStatusNote). Recorded as the model's committed near-miss outcome; the built behaviour is the same live gap, not a separate finding.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools.dll (temp/slice3/bin/Precept.MatrixTools/release)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "cell-override",
+        "overrideVerdict": "no",
+        "citations": [
+          {
+            "kind": "review",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md",
+            "note": "the minting-gap measurement this override rests on"
+          }
+        ],
+        "notes": [
+          "Overridden to no for the same reason as the quantifier-predicate cell: there is no author-writable spelling that gets this obligation checked at HEAD today, because the site does not mint at all — not a surface-expressiveness question the family verdict is meant to answer."
+        ]
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+          "note": "Family 4, adapted to the interpolation site"
+        },
+        {
+          "kind": "review",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md",
+          "note": "the b.precept measurement of the identical shape on a primitive decimal field"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Operations.cs:442",
+          "note": "MoneyDivideDecimal catalog entry"
+        }
+      ],
+      "notes": [
+        "[dischargeContract premiseClasses=['a']] Same missing-validity-argument gap as the other cells in this file. Additionally: this decision procedure cannot be exercised at HEAD at all today because the site mints no obligation to decide (see witness notes) — the contract states the model's committed answer, not a built check."
+      ]
+    },
+    {
+      "id": "g10/rationale-event-ensure-anchored-money-divide-money",
+      "label": "Constraint rationale — money ÷ money, event-ensure-anchored `because` interpolation",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "op/MoneyDivideMoneySameCurrency/numeric-0",
+        "evaluationSiteCategory": "constraint-rationale-interpolation",
+        "typeFamily": "business-domain"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "want-doc",
+            "ref": "docs/Working/what-i-want-2026-07-16.md:104"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The minting rule"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Adjust.Amount != '0.00 USD'",
+        "metavariables": [
+          {
+            "name": "Adjust",
+            "standsFor": "the event anchoring the ensure"
+          },
+          {
+            "name": "Adjust.Amount",
+            "standsFor": "the event arg occupying the catalog's divisor slot of MoneyDivideMoneySameCurrency, read inside the ensure's because-interpolation"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary"
+          }
+        ],
+        "wp": {
+          "statement": "Adjust.Amount != '0.00 USD'"
+        }
+      },
+      "applicablePremiseClasses": [
+        "b"
+      ],
+      "premiseAvailability": "Unlike the rule-anchored rationale cell, an event-ensure's because-interpolation sees the anchoring event's args, so class (b) is available. Class (a) does not apply here because the divisor is the event arg itself, not a field. Class (c) would become available if the anchoring event ensure carried its own optional `when` guard restating the divisor fact (grammar permits `on E when G ensure BoolExpr`) — not exercised in this witness, so not counted as applicable for this specific cell. Free of class (d), consistent with rationale cells throughout this file.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "b"
+          ],
+          "derivation": "arg modifier nonzero on Adjust.Amount -> interval excludes zero -> IntervalContainment (per the model; not built at HEAD for this site — see notes)",
+          "strategy": "IntervalContainment",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "Compute the divisor's interval from its declared arg modifiers; zero inside the computed interval, or no modifier excluding it, rejects."
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "b"
+          ],
+          "schema": "declare <Divisor> nonzero (or positive/negative) on the event arg so its interval satisfies <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept RationaleEventEnsureBase\nfield TotalRevenue as money in 'USD' default '0.00 USD' editable\nevent Adjust(Amount as money in 'USD')\non Adjust ensure Adjust.Amount > '0.00 USD' because \"Adjustment ratio {TotalRevenue / Adjust.Amount} recorded\"",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "b"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools.dll (temp/slice3/bin/Precept.MatrixTools/release)",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        },
+        "discharges": [
+          {
+            "id": "nonzero-arg-modifier",
+            "kind": "arg-modifier",
+            "addition": "Amount as money in 'USD' nonzero",
+            "application": {
+              "locus": "event-arg-declarations",
+              "replacements": [
+                {
+                  "eventName": "Adjust",
+                  "argName": "Amount",
+                  "declaration": "Amount as money in 'USD' nonzero"
+                }
+              ]
+            },
+            "premiseClasses": [
+              "b"
+            ],
+            "derivation": "arg modifier nonzero on Adjust.Amount -> interval excludes zero -> IntervalContainment (model-committed derivation)",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "Live-verified: base, this discharge, and the near-miss below all compile with zero diagnostics — the ensure's own condition (Adjust.Amount > '0.00 USD') already type-checks and carries no division, and the because-interpolation's division mints nothing at HEAD regardless of the arg's modifiers. Same live minting gap as the rule-anchored rationale cell, now confirmed on a business-domain (money/money) shape rather than a primitive one.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools.dll (temp/slice3/bin/Precept.MatrixTools/release)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "nonzero-arg-modifier",
+            "addition": "Amount as money in 'USD' nonnegative",
+            "application": {
+              "locus": "event-arg-declarations",
+              "replacements": [
+                {
+                  "eventName": "Adjust",
+                  "argName": "Amount",
+                  "declaration": "Amount as money in 'USD' nonnegative"
+                }
+              ]
+            },
+            "whyStillRejects": "Under the model this must still reject (nonnegative admits zero). At HEAD nothing rejects here either way, per the same minting gap.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools.dll (temp/slice3/bin/Precept.MatrixTools/release)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "cell-override",
+        "overrideVerdict": "no",
+        "citations": [
+          {
+            "kind": "review",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md"
+          }
+        ],
+        "notes": [
+          "Same override reason as the rule-anchored rationale cell: the gap is a minting gap, not a surface-expressiveness question."
+        ]
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+          "note": "Family 4, adapted to the interpolation site"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Operations.cs:452",
+          "note": "MoneyDivideMoneySameCurrency catalog entry"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md:1879",
+          "note": "on E when G ensure BoolExpr grammar, cited for the (c)-availability note even though not exercised in this witness"
+        }
+      ],
+      "notes": [
+        "[dischargeContract premiseClasses=['b']] Same missing-validity-argument gap as the other cells in this file. Same not-built-at-HEAD caveat as the rule-anchored rationale cell — see witness notes."
+      ]
+    },
+    {
+      "id": "g10/state-ensure-money-divide-decimal",
+      "label": "State-anchored ensure — money ÷ decimal, primitive-lane divisor",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "op/MoneyDivideDecimal/numeric-0",
+        "evaluationSiteCategory": "state-ensure-condition",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "want-doc",
+            "ref": "docs/Working/what-i-want-2026-07-16.md:104"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The minting rule"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "UnitCount != 0.0",
+        "metavariables": [
+          {
+            "name": "UnitCount",
+            "standsFor": "the decimal field occupying the catalog's divisor slot of MoneyDivideDecimal, read inside an in-S-ensure condition"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary"
+          }
+        ],
+        "wp": {
+          "statement": "UnitCount != 0.0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a",
+        "c",
+        "d"
+      ],
+      "premiseAvailability": "A state-anchored ensure's condition sees field names and the ensure's own optional pre-verb `when` (class (c)); it does not see event args (spec's scope table gives ensure conditions field names only). Because the divisor here IS the field the ensure's own condition reads, all three of (a) a direct field modifier, (c) a when-guard restating the divisor fact, and (d) a pre-state rule about the same field are live candidates for discharging this specific obligation.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "field modifier nonzero on UnitCount -> interval excludes zero -> IntervalContainment",
+          "strategy": "IntervalContainment",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "Compute the divisor's interval from its declared field modifiers and the ensure's in-scope when-guard conjuncts (a finite set per site, matrix Family 4); zero inside the computed interval, or no bound excluding it, rejects."
+        },
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "derivation": "a when-guard on the ensure restating UnitCount != 0.0 (or a stronger positive/negative bound) -> the same interval computation as class (a), fed from the guard conjunct instead of the field modifier",
+          "validityArguments": [
+            "Guard normal-form match"
+          ],
+          "decisionProcedure": "Same decision procedure as the (a) entry; not separately witnessed in this cell (model-derived only) — the mechanism is identical to the class-(a) case with the fact sourced from the ensure's own when-guard rather than the field's declared modifier."
+        },
+        {
+          "premiseClasses": [
+            "d"
+          ],
+          "derivation": "a `rule` mentioning UnitCount (e.g. `rule UnitCount > 0.0`) consumed as a pre-state constraint fact via the CompositionalConstraint strategy",
+          "strategy": "CompositionalConstraint",
+          "validityArguments": [
+            "Inductive hypothesis plus sign monotonicity"
+          ],
+          "decisionProcedure": "Consult the field's currently-declared rule conjuncts mentioning the divisor as an additional interval fact, using the same interval combination as class (a).",
+          "citations": [
+            {
+              "kind": "review",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md",
+              "note": "Part 3, Defect B — the verified false-proof hazard this entry's witness is flagged against"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "declare <Divisor> nonzero (or positive/negative) so its interval satisfies <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "schema": "add a when-guard on the ensure normal-form-equal to <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept StateEnsureAvgBase\nfield TotalRevenue as money in 'USD' default '0.00 USD' editable\nfield UnitCount as decimal default 1.0 editable\nstate Draft initial\nstate Closed terminal\nevent Open initial\nevent Close\non Open\n  -> set TotalRevenue = '0.00 USD'\nin Closed ensure TotalRevenue / UnitCount >= '0.00 USD' because \"Average per unit must stay non-negative while closed\"\nfrom Draft on Close\n  -> transition Closed",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a",
+              "c"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools.dll (temp/slice3/bin/Precept.MatrixTools/release)",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        },
+        "discharges": [
+          {
+            "id": "nonzero-modifier",
+            "kind": "arg-modifier",
+            "addition": "field UnitCount as decimal default 1.0 editable nonzero",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "field modifier nonzero on UnitCount -> interval excludes zero -> IntervalContainment",
+            "strategy": "IntervalContainment",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools.dll (temp/slice3/bin/Precept.MatrixTools/release)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "No `application` locus fits (field-declaration modifier addition)."
+            ]
+          },
+          {
+            "id": "rule-premise-hazard",
+            "kind": "other",
+            "addition": "rule UnitCount > 0.0 because \"unit count must stay positive\"",
+            "premiseClasses": [
+              "d"
+            ],
+            "derivation": "rule UnitCount > 0.0 consumed as a pre-state fact via CompositionalConstraint",
+            "strategy": "CompositionalConstraint",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "Live-verified: base + this addition compiles with zero diagnostics — the compiler treats the declared rule as sufficient to discharge the divisor-safety obligation. Per the owner's ruling for this slice, this is recorded as unresolved-today (not proven-today) despite the clean compile: nothing in the file establishes or preserves 'UnitCount > 0.0' as an invariant (Defect A — a `rule` mints no write-site obligation at HEAD), so the discharge is a false proof in exactly the shape authored-expressiveness-gaps.md Part 3 Defect B demonstrates. A reachable violation exists in principle (any handler setting UnitCount to a non-positive value while the rule text remains unchanged would go uncaught), though no such handler is included in this minimal witness — the point being tested is the fail-open acceptance itself, not a further reachability chain.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools.dll (temp/slice3/bin/Precept.MatrixTools/release)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "No `application` locus fits (a top-level rule addition; the schema's application DU has no locus for adding a new top-level declaration).",
+              "Listed in unverifiableWitnesses per instruction."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "nonzero-modifier",
+            "addition": "field UnitCount as decimal default 1.0 editable nonnegative",
+            "whyStillRejects": "nonnegative admits zero — must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools.dll (temp/slice3/bin/Precept.MatrixTools/release)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          },
+          {
+            "pairsWith": "rule-premise-hazard",
+            "addition": "rule UnitCount >= 0.0 because \"unit count must stay non-negative\"",
+            "whyStillRejects": "Live-verified: this weakened rule (allows zero) still correctly rejects with DivisionByZero — the CompositionalConstraint strategy does read the rule's actual comparison operator rather than merely detecting that some rule mentions the field. This shows the unsoundness is specifically 'a positivity-stating rule is trusted without establishment/preservation checking', not 'any rule mentioning the field is treated as sufficient regardless of content'.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools.dll (temp/slice3/bin/Precept.MatrixTools/release)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited",
+        "notes": [
+          "Applies to the (a)/(c) portion of this cell's contract. The (d) rule-premise entry is a hazard, not a respellability question — no respelling is recommended for it (see the dischargeContract entry's notes)."
+        ]
+      },
+      "openDependencies": [
+        "S4"
+      ],
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+          "note": "Family 4"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+          "note": "Inductive hypothesis plus sign monotonicity, and its open dependency naming S4 (the mention-set completeness the hypothesis rests on)"
+        },
+        {
+          "kind": "review",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md",
+          "note": "Part 3, Defect A and Defect B"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Operations.cs:442",
+          "note": "MoneyDivideDecimal catalog entry"
+        }
+      ],
+      "notes": [
+        "[dischargeContract premiseClasses=['a']] Same missing-validity-argument gap as the other cells in this file.",
+        "[dischargeContract premiseClasses=['c']] Model-derived, no separate compile recorded for this exact shape in this cell; the mechanism is exercised live for the event-ensure-condition sibling cell's guard discharge (g10/event-ensure-money-divide-decimal), which is structurally the same 'guard conjunct restates the divisor fact' derivation.",
+        "[dischargeContract premiseClasses=['d']] HAZARD, per the owner's ruling for this slice: this discharge is consumed through a `rule` used as a premise. Slice 2 verified at HEAD that this path can be a false proof — a `rule` mints no preservation obligation of its own (Defect A), so the CompositionalConstraint strategy consumes an unestablished, unpreserved fact. The witness below records that the compile clean-passes, and separately records builtStatus as unresolved-today with the reason named, per instruction — a clean compile here is NOT confirmation the discharge is sound.",
+        "[dischargeContract premiseClasses=['d']] 'Inductive hypothesis plus sign monotonicity' is cited as the model's stated intent for this shape (matching Witness Family 1 Base B's own citation of the identical argument for a (d)+(b) case), not as an endorsement that the argument's own precondition currently holds: the argument's text requires 'every handler carries a preservation obligation' (matrix § Validity arguments), which Defect A shows is false for a bare `rule` construct at HEAD today.",
+        "Carried per the authoring notes: the matrix records as open whether the residency fact itself — that the entity is in state Closed — is available as a premise, and under which class (docs/Working/obligation-discharge-matrix-2026-07-19.md:150, the in-S-ensure case-shape row). This cell's own discharges (field modifier, guard, rule-premise) do not consume the residency fact, so this cell's answers do not depend on that open item resolving either way — but the item is carried here because the authoring instructions name state-ensure cells as its landing site. No Q/S identifier is assigned to this open item in the matrix text (unlike Q7/Q10/Q13/Q14a, which are all numbered); that absence is itself worth surfacing rather than assigning one here."
+      ]
+    },
+    {
+      "id": "g10/state-ensure-money-divide-money",
+      "label": "State-anchored ensure — money ÷ money, business-domain-lane divisor",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "op/MoneyDivideMoneySameCurrency/numeric-0",
+        "evaluationSiteCategory": "state-ensure-condition",
+        "typeFamily": "business-domain"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "want-doc",
+            "ref": "docs/Working/what-i-want-2026-07-16.md:104"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The minting rule"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "GrossRevenue != '0.00 USD'",
+        "metavariables": [
+          {
+            "name": "GrossRevenue",
+            "standsFor": "the money field occupying the catalog's divisor slot of MoneyDivideMoneySameCurrency, read inside an in-S-ensure condition"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary"
+          }
+        ],
+        "wp": {
+          "statement": "GrossRevenue != '0.00 USD'"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a",
+        "c",
+        "d"
+      ],
+      "premiseAvailability": "Same reasoning as g10/state-ensure-money-divide-decimal, on the business-domain lane: the divisor is the field the ensure's own condition reads, so (a)/(c)/(d) are all live candidates; no event args are in scope.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "field modifier nonzero on GrossRevenue -> interval excludes zero -> IntervalContainment",
+          "strategy": "IntervalContainment",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "Compute the divisor's interval from its declared field modifiers and the ensure's in-scope when-guard conjuncts; zero inside the computed interval, or no bound excluding it, rejects."
+        },
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "derivation": "a when-guard on the ensure restating GrossRevenue != '0.00 USD' -> same interval computation as class (a)",
+          "validityArguments": [
+            "Guard normal-form match"
+          ],
+          "decisionProcedure": "Same decision procedure as the (a) entry; not separately witnessed in this cell (model-derived only)."
+        },
+        {
+          "premiseClasses": [
+            "d"
+          ],
+          "derivation": "a `rule` mentioning GrossRevenue consumed as a pre-state constraint fact via CompositionalConstraint",
+          "strategy": "CompositionalConstraint",
+          "validityArguments": [
+            "Inductive hypothesis plus sign monotonicity"
+          ],
+          "decisionProcedure": "Consult the field's currently-declared rule conjuncts mentioning the divisor as an additional interval fact, using the same interval combination as class (a).",
+          "citations": [
+            {
+              "kind": "review",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md",
+              "note": "Part 3, Defect B"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "declare <Divisor> nonzero (or positive/negative) so its interval satisfies <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "schema": "add a when-guard on the ensure normal-form-equal to <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept StateEnsureRatioBase\nfield NetRevenue as money in 'USD' default '0.00 USD' editable\nfield GrossRevenue as money in 'USD' default '0.00 USD' editable\nstate Draft initial\nstate Closed terminal\nevent Open initial\nevent Close\non Open\n  -> set NetRevenue = '0.00 USD'\nin Closed ensure NetRevenue / GrossRevenue >= 0.0 because \"Margin ratio must stay non-negative while closed\"\nfrom Draft on Close\n  -> transition Closed",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a",
+              "c"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools.dll (temp/slice3/bin/Precept.MatrixTools/release)",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        },
+        "discharges": [
+          {
+            "id": "nonzero-modifier",
+            "kind": "arg-modifier",
+            "addition": "field GrossRevenue as money in 'USD' default '1.00 USD' editable nonzero",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "field modifier nonzero on GrossRevenue -> interval excludes zero -> IntervalContainment",
+            "strategy": "IntervalContainment",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools.dll (temp/slice3/bin/Precept.MatrixTools/release)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Default raised to '1.00 USD' for the same OutOfRange reason as the computed-field lead cell.",
+              "No `application` locus fits (field-declaration modifier addition)."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "nonzero-modifier",
+            "addition": "field GrossRevenue as money in 'USD' default '0.00 USD' editable nonnegative",
+            "whyStillRejects": "nonnegative admits zero — must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools.dll (temp/slice3/bin/Precept.MatrixTools/release)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited",
+        "notes": [
+          "Same scoping as the primitive-lane sibling cell: applies to the (a)/(c) portion only; the (d) entry is a hazard, not a respellability question."
+        ]
+      },
+      "openDependencies": [
+        "S4"
+      ],
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+          "note": "Family 4"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Operations.cs:452",
+          "note": "MoneyDivideMoneySameCurrency catalog entry"
+        }
+      ],
+      "notes": [
+        "[dischargeContract premiseClasses=['a']] Same missing-validity-argument gap as the other cells in this file.",
+        "[dischargeContract premiseClasses=['c']] Model-derived; see the primitive-lane sibling cell's note for where this mechanism is exercised live.",
+        "[dischargeContract premiseClasses=['d']] Same hazard as the primitive-lane sibling cell (g10/state-ensure-money-divide-decimal). Not separately live-witnessed here to avoid redundant compiles — the hazard is reproduced once, at that cell, and applies analogously to this business-domain lane by the same mechanism (a bare `rule` mints no preservation obligation regardless of the field's type family).",
+        "Carries the same residency-fact open item as the primitive-lane sibling cell (docs/Working/obligation-discharge-matrix-2026-07-19.md:150) — see that cell's note for the full statement; not repeated in full here to avoid duplication."
+      ]
+    },
+    {
+      "id": "g10/event-ensure-money-divide-decimal",
+      "label": "Event ensure — money ÷ decimal, primitive-lane divisor, ingress door",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "op/MoneyDivideDecimal/numeric-0",
+        "evaluationSiteCategory": "event-ensure-condition",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "want-doc",
+            "ref": "docs/Working/what-i-want-2026-07-16.md:104"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The minting rule"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Finalize.Divisor != 0.0",
+        "metavariables": [
+          {
+            "name": "Finalize",
+            "standsFor": "the event this ensure anchors"
+          },
+          {
+            "name": "Finalize.Divisor",
+            "standsFor": "the event arg occupying the catalog's divisor slot of MoneyDivideDecimal"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary"
+          }
+        ],
+        "wp": {
+          "statement": "Finalize.Divisor != 0.0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "b",
+        "c"
+      ],
+      "premiseAvailability": "The divisor here is Finalize's own event arg, not a field, so class (a) (a field modifier) does not apply to it, and class (d) (a pre-state rule about a field) does not apply either — a rule cannot hold of a value that does not exist until the event fires. The two live classes are (b) an arg modifier on Divisor, and (c) the ensure's own optional when-guard restating the divisor fact. This is the event door the matrix names as making premise (b) true in the first place (matrix § Vocabulary, Discharge mechanisms bullet; § Per-family case shapes, on-E-ensure row) — the ensure's condition runs after ingress governance has already validated the args, which is why an arg modifier is a trustworthy premise here.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "b"
+          ],
+          "derivation": "arg modifier nonzero on Finalize.Divisor -> interval excludes zero -> IntervalContainment",
+          "strategy": "IntervalContainment",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "Compute the divisor's interval from its declared arg modifiers and the ensure's in-scope when-guard conjuncts; zero inside the computed interval, or no bound excluding it, rejects."
+        },
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "derivation": "a when-guard on the ensure restating Finalize.Divisor != 0.0 -> same interval computation, fed from the guard conjunct instead of the arg modifier",
+          "validityArguments": [
+            "Guard normal-form match"
+          ],
+          "decisionProcedure": "Same decision procedure as the (b) entry.",
+          "citations": [
+            {
+              "kind": "spec",
+              "ref": "docs/language/precept-language-spec.md:1879",
+              "note": "on E when G ensure BoolExpr grammar"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "b"
+          ],
+          "schema": "declare <Divisor> nonzero (or positive/negative) on the event arg so its interval satisfies <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "schema": "add a when-guard on the ensure normal-form-equal to <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept EventEnsureAvgBase\nfield TotalRevenue as money in 'USD' default '0.00 USD' editable\nevent Finalize(Divisor as decimal)\non Finalize ensure TotalRevenue / Finalize.Divisor >= '0.00 USD' because \"average must stay non-negative at finalize\"",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "b",
+              "c"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools.dll (temp/slice3/bin/Precept.MatrixTools/release)",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        },
+        "discharges": [
+          {
+            "id": "nonzero-arg-modifier",
+            "kind": "arg-modifier",
+            "addition": "Divisor as decimal nonzero",
+            "application": {
+              "locus": "event-arg-declarations",
+              "replacements": [
+                {
+                  "eventName": "Finalize",
+                  "argName": "Divisor",
+                  "declaration": "Divisor as decimal nonzero"
+                }
+              ]
+            },
+            "premiseClasses": [
+              "b"
+            ],
+            "derivation": "arg modifier nonzero on Finalize.Divisor -> interval excludes zero -> IntervalContainment",
+            "strategy": "IntervalContainment",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools.dll (temp/slice3/bin/Precept.MatrixTools/release)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          },
+          {
+            "id": "guard-nf",
+            "kind": "guard",
+            "addition": "when Finalize.Divisor != 0.0",
+            "application": {
+              "locus": "row-guard",
+              "eventName": "Finalize"
+            },
+            "premiseClasses": [
+              "c"
+            ],
+            "derivation": "when-guard on the ensure restating Finalize.Divisor != 0.0 -> same interval computation, guard-sourced",
+            "strategy": "IntervalContainment",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools.dll (temp/slice3/bin/Precept.MatrixTools/release)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "The `row-guard` application locus is used loosely here: the schema's own description ('the addition text is inserted as the row's when clause') fits an `on E when G ensure ...` hook as well as a transition row, since both are keyed by eventName and both admit exactly one when clause. Flagged in case the intended reading is transition-rows-only."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "nonzero-arg-modifier",
+            "addition": "Divisor as decimal nonnegative",
+            "application": {
+              "locus": "event-arg-declarations",
+              "replacements": [
+                {
+                  "eventName": "Finalize",
+                  "argName": "Divisor",
+                  "declaration": "Divisor as decimal nonnegative"
+                }
+              ]
+            },
+            "whyStillRejects": "nonnegative admits zero — must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools.dll (temp/slice3/bin/Precept.MatrixTools/release)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          },
+          {
+            "pairsWith": "guard-nf",
+            "addition": "when Finalize.Divisor >= 0.0",
+            "application": {
+              "locus": "row-guard",
+              "eventName": "Finalize"
+            },
+            "whyStillRejects": "guard admits zero — must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools.dll (temp/slice3/bin/Precept.MatrixTools/release)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+          "note": "Family 4"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+          "note": "Discharge mechanisms bullet — ingress evaluation is what makes premise (b) true at the event door"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Operations.cs:442",
+          "note": "MoneyDivideDecimal catalog entry"
+        }
+      ],
+      "notes": [
+        "[dischargeContract premiseClasses=['b']] Same missing-validity-argument gap as the other cells in this file."
+      ]
+    },
+    {
+      "id": "g10/event-ensure-price-divide-quantity",
+      "label": "Event ensure — price ÷ compound-quantity, business-domain-lane divisor",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "op/PriceDivideQuantity/numeric-0",
+        "evaluationSiteCategory": "event-ensure-condition",
+        "typeFamily": "business-domain"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "want-doc",
+            "ref": "docs/Working/what-i-want-2026-07-16.md:104"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The minting rule"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Convert.Factor != 0",
+        "metavariables": [
+          {
+            "name": "Convert",
+            "standsFor": "the event this ensure anchors"
+          },
+          {
+            "name": "Convert.Factor",
+            "standsFor": "the event arg occupying the catalog's divisor slot of PriceDivideQuantity"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary"
+          }
+        ],
+        "wp": {
+          "statement": "Convert.Factor != 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "b",
+        "c"
+      ],
+      "premiseAvailability": "Same reasoning as g10/event-ensure-money-divide-decimal: the divisor is the anchoring event's own arg, so (a)/(d) do not apply; (b) and (c) are the live classes.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "b"
+          ],
+          "derivation": "arg modifier nonzero on Convert.Factor -> interval excludes zero -> IntervalContainment",
+          "strategy": "IntervalContainment",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "Compute the divisor's interval from its declared arg modifiers and the ensure's in-scope when-guard conjuncts; zero inside the computed interval, or no bound excluding it, rejects."
+        },
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "derivation": "a when-guard on the ensure restating Convert.Factor != 0 -> same interval computation, guard-sourced",
+          "validityArguments": [
+            "Guard normal-form match"
+          ],
+          "decisionProcedure": "Same decision procedure as the (b) entry."
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "b"
+          ],
+          "schema": "declare <Divisor> nonzero (or positive/negative) on the event arg so its interval satisfies <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept EventEnsureElevatedBase\nfield ListPrice as price in 'USD' of 'mass' default '1.00 USD/kg' editable\nfield MaxElevatedPrice as price in 'USD/each' default '100.00 USD/each' editable\nevent Convert(Factor as quantity in 'each/kg')\non Convert ensure ListPrice / Convert.Factor <= MaxElevatedPrice because \"elevated per-each price must stay capped at convert\"",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "b",
+              "c"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools.dll (temp/slice3/bin/Precept.MatrixTools/release)",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        },
+        "discharges": [
+          {
+            "id": "nonzero-arg-modifier",
+            "kind": "arg-modifier",
+            "addition": "Factor as quantity in 'each/kg' nonzero",
+            "application": {
+              "locus": "event-arg-declarations",
+              "replacements": [
+                {
+                  "eventName": "Convert",
+                  "argName": "Factor",
+                  "declaration": "Factor as quantity in 'each/kg' nonzero"
+                }
+              ]
+            },
+            "premiseClasses": [
+              "b"
+            ],
+            "derivation": "arg modifier nonzero on Convert.Factor -> interval excludes zero -> IntervalContainment",
+            "strategy": "IntervalContainment",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools.dll (temp/slice3/bin/Precept.MatrixTools/release)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "nonzero-arg-modifier",
+            "addition": "Factor as quantity in 'each/kg' nonnegative",
+            "application": {
+              "locus": "event-arg-declarations",
+              "replacements": [
+                {
+                  "eventName": "Convert",
+                  "argName": "Factor",
+                  "declaration": "Factor as quantity in 'each/kg' nonnegative"
+                }
+              ]
+            },
+            "whyStillRejects": "nonnegative admits zero — must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools.dll (temp/slice3/bin/Precept.MatrixTools/release)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+          "note": "Family 4"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Operations.cs:691",
+          "note": "PriceDivideQuantity catalog entry"
+        }
+      ],
+      "notes": [
+        "[dischargeContract premiseClasses=['b']] Same missing-validity-argument gap as the other cells in this file.",
+        "[dischargeContract premiseClasses=['c']] Model-derived; not separately witnessed in this cell — the identical mechanism is live-witnessed on the primitive-lane sibling cell (g10/event-ensure-money-divide-decimal)."
+      ]
+    },
+    {
+      "id": "g10/reject-message-money-divide-decimal",
+      "label": "Reject message — money ÷ decimal, primitive-lane divisor",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "op/MoneyDivideDecimal/numeric-0",
+        "evaluationSiteCategory": "reject-message-interpolation",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "want-doc",
+            "ref": "docs/Working/what-i-want-2026-07-16.md:72",
+            "note": "the want doc's own example of a reject-row interpolation carrying arithmetic ({-Balance / PlanRepayment.Months})"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The minting rule"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "UnitCount != 0.0",
+        "metavariables": [
+          {
+            "name": "UnitCount",
+            "standsFor": "the decimal field occupying the catalog's divisor slot of MoneyDivideDecimal, read inside a reject row's message interpolation"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary"
+          }
+        ],
+        "wp": {
+          "statement": "UnitCount != 0.0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a",
+        "c",
+        "d"
+      ],
+      "premiseAvailability": "The reject row's own guard, if any, and the triggering event's args are in scope (matrix § Per-family case shapes, fault-family row; want :72 names this exact site as the reason the fault axis cannot reuse the write-site axis). In this witness the divisor is a field (not the triggering event's arg), so (a) a field modifier and (d) a pre-state rule are the field-facing classes, and (c) the row's own guard is available structurally (no guard is declared in this witness, so it is listed as applicable-but-unexercised, matching the site's general availability). No (b) here because Note carries no args in this witness.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "field modifier nonzero on UnitCount -> interval excludes zero -> IntervalContainment (per the model; not built at HEAD for this site — see notes)",
+          "strategy": "IntervalContainment",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "Compute the divisor's interval from its declared field modifiers and the row's in-scope guard conjuncts; zero inside the computed interval, or no bound excluding it, rejects."
+        },
+        {
+          "premiseClasses": [
+            "d"
+          ],
+          "derivation": "a `rule` mentioning UnitCount consumed as a pre-state constraint fact via CompositionalConstraint",
+          "strategy": "CompositionalConstraint",
+          "validityArguments": [
+            "Inductive hypothesis plus sign monotonicity"
+          ],
+          "decisionProcedure": "Consult the field's currently-declared rule conjuncts mentioning the divisor as an additional interval fact, using the same interval combination as class (a).",
+          "citations": [
+            {
+              "kind": "review",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md",
+              "note": "Part 3, Defect B"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "declare <Divisor> nonzero (or positive/negative) so its interval satisfies <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept RejectMessageAvgBase\nfield TotalRevenue as money in 'USD' default '0.00 USD' editable\nfield UnitCount as decimal default 1.0 editable\nstate Draft initial\nstate Done terminal\nevent Open initial\nevent Note\nevent Finish\non Open\n  -> set TotalRevenue = '0.00 USD'\nfrom Draft on Note\n  -> reject \"average per unit is {TotalRevenue / UnitCount}\"\nfrom Draft on Finish\n  -> transition Done",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools.dll (temp/slice3/bin/Precept.MatrixTools/release)",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        },
+        "discharges": [
+          {
+            "id": "nonzero-modifier",
+            "kind": "arg-modifier",
+            "addition": "field UnitCount as decimal default 1.0 editable nonzero",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "field modifier nonzero on UnitCount -> interval excludes zero -> IntervalContainment (model-committed derivation)",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "Live-verified: base, this discharge, and the near-miss below all compile with only a pre-existing 'StateAlwaysRejects'/'AlwaysRejecting' structural warning (Note has a single unconditional reject row — an artifact of this minimal witness's shape, present identically in the group's own rj.precept measurement, not related to this obligation) and NO DivisionByZero at all, regardless of the divisor's modifiers. This is the live minting gap the want doc's own example site (want :72) turns out to have at HEAD: the reject-row interpolation position mints nothing today. See authored-expressiveness-gaps.md's identical measurement (rj.precept: `-> reject \"per part {Total / Parts}\"` with unconstrained Parts compiled clean) and matrix § The cell, 'Open design hole — nothing detects an obligation that was never minted.'",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools.dll (temp/slice3/bin/Precept.MatrixTools/release)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "No `application` locus fits (field-declaration modifier addition)."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "nonzero-modifier",
+            "addition": "field UnitCount as decimal default 1.0 editable nonnegative",
+            "whyStillRejects": "Under the model this must still reject. At HEAD nothing rejects either way, per the same minting gap.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools.dll (temp/slice3/bin/Precept.MatrixTools/release)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "cell-override",
+        "overrideVerdict": "no",
+        "citations": [
+          {
+            "kind": "review",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md"
+          }
+        ],
+        "notes": [
+          "Same minting-gap override reason as the rationale cells."
+        ]
+      },
+      "citations": [
+        {
+          "kind": "want-doc",
+          "ref": "docs/Working/what-i-want-2026-07-16.md:72"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+          "note": "Family 4"
+        },
+        {
+          "kind": "review",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md",
+          "note": "rj.precept — the identical measurement on a primitive shape"
+        }
+      ],
+      "notes": [
+        "[dischargeContract premiseClasses=['a']] Same missing-validity-argument gap as the other cells in this file. This decision procedure cannot be exercised at HEAD today because the site mints no obligation to decide (see witness notes).",
+        "[dischargeContract premiseClasses=['d']] HAZARD, per the owner's ruling for this slice. Not separately live-witnessed in this cell (the site mints nothing at all regardless, so a rule-premise witness here would be indistinguishable from the modifier witness — both simply compile clean for the same reason: the minting gap, not a strategy discharge). The hazard's live reproduction lives at g10/state-ensure-money-divide-decimal; here the more load-bearing finding is the minting gap itself (see witness notes), which subsumes the hazard question for this cell — there is no obligation for a false proof to attach to."
+      ]
+    },
+    {
+      "id": "g10/reject-message-money-divide-money",
+      "label": "Reject message — money ÷ money, business-domain-lane divisor",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "op/MoneyDivideMoneySameCurrency/numeric-0",
+        "evaluationSiteCategory": "reject-message-interpolation",
+        "typeFamily": "business-domain"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "want-doc",
+            "ref": "docs/Working/what-i-want-2026-07-16.md:72"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The minting rule"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "GrossRevenue != '0.00 USD'",
+        "metavariables": [
+          {
+            "name": "GrossRevenue",
+            "standsFor": "the money field occupying the catalog's divisor slot of MoneyDivideMoneySameCurrency, read inside a reject row's message interpolation"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary"
+          }
+        ],
+        "wp": {
+          "statement": "GrossRevenue != '0.00 USD'"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a",
+        "c",
+        "d"
+      ],
+      "premiseAvailability": "Same reasoning as g10/reject-message-money-divide-decimal, on the business-domain lane.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "field modifier nonzero on GrossRevenue -> interval excludes zero -> IntervalContainment (per the model; not built at HEAD for this site)",
+          "strategy": "IntervalContainment",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "Compute the divisor's interval from its declared field modifiers and the row's in-scope guard conjuncts; zero inside the computed interval, or no bound excluding it, rejects."
+        },
+        {
+          "premiseClasses": [
+            "d"
+          ],
+          "derivation": "a `rule` mentioning GrossRevenue consumed as a pre-state constraint fact via CompositionalConstraint",
+          "strategy": "CompositionalConstraint",
+          "validityArguments": [
+            "Inductive hypothesis plus sign monotonicity"
+          ],
+          "decisionProcedure": "Consult the field's currently-declared rule conjuncts mentioning the divisor as an additional interval fact.",
+          "citations": [
+            {
+              "kind": "review",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md",
+              "note": "Part 3, Defect B"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "declare <Divisor> nonzero (or positive/negative) so its interval satisfies <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept RejectMessageRatioBase\nfield NetRevenue as money in 'USD' default '0.00 USD' editable\nfield GrossRevenue as money in 'USD' default '0.00 USD' editable\nstate Draft initial\nstate Done terminal\nevent Open initial\nevent Note\nevent Finish\non Open\n  -> set NetRevenue = '0.00 USD'\nfrom Draft on Note\n  -> reject \"margin ratio is {NetRevenue / GrossRevenue}\"\nfrom Draft on Finish\n  -> transition Done",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools.dll (temp/slice3/bin/Precept.MatrixTools/release)",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        },
+        "discharges": [
+          {
+            "id": "nonzero-modifier",
+            "kind": "arg-modifier",
+            "addition": "field GrossRevenue as money in 'USD' default '1.00 USD' editable nonzero",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "field modifier nonzero on GrossRevenue -> interval excludes zero -> IntervalContainment (model-committed derivation)",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "Live-verified: base, this discharge, and the near-miss below all compile with only the same pre-existing structural warning noted on the primitive-lane sibling cell, and NO DivisionByZero at all. Same live minting gap, confirmed here on the business-domain (money/money) lane.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools.dll (temp/slice3/bin/Precept.MatrixTools/release)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "No `application` locus fits (field-declaration modifier addition)."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "nonzero-modifier",
+            "addition": "field GrossRevenue as money in 'USD' default '0.00 USD' editable nonnegative",
+            "whyStillRejects": "Under the model this must still reject. At HEAD nothing rejects either way, per the same minting gap.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools.dll (temp/slice3/bin/Precept.MatrixTools/release)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "cell-override",
+        "overrideVerdict": "no",
+        "citations": [
+          {
+            "kind": "review",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md"
+          }
+        ]
+      },
+      "citations": [
+        {
+          "kind": "want-doc",
+          "ref": "docs/Working/what-i-want-2026-07-16.md:72"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+          "note": "Family 4"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Operations.cs:452",
+          "note": "MoneyDivideMoneySameCurrency catalog entry"
+        }
+      ],
+      "notes": [
+        "[dischargeContract premiseClasses=['a']] Same missing-validity-argument gap as the other cells in this file.",
+        "[dischargeContract premiseClasses=['d']] Same hazard and same not-separately-witnessed reasoning as the primitive-lane sibling cell."
+      ]
+    }
+  ]
+}

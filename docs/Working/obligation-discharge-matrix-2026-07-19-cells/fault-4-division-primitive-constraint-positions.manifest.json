@@ -1,0 +1,58 @@
+{
+  "familyId": "fault-4-division-primitive-constraint-positions",
+  "definitionVersion": "obligation-discharge-matrix-2026-07-19 rev 7 (2026-07-20, draft)",
+  "sourceFile": "fault-4-division-primitive-constraint-positions.cells.json",
+  "rows": [],
+  "skips": [
+    {
+      "cellId": "fault-4/rule-condition-integer",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "fault-4/rule-condition-decimal",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "fault-4/state-ensure-condition-integer",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "fault-4/state-ensure-condition-decimal",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "fault-4/event-ensure-condition-integer",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "fault-4/event-ensure-condition-decimal",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "fault-4/computed-field-expression-integer",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "fault-4/computed-field-expression-decimal",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "fault-4/quantifier-predicate-integer",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "fault-4/quantifier-predicate-decimal",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    }
+  ]
+}

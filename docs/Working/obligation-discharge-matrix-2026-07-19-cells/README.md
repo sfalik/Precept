@@ -68,8 +68,40 @@ Every file beside the cell data is generated from it. None is hand-edited; each 
 | `generated/<family>.md` | the human-readable cell table (the matrix's Storage ruling: tables are generated from the data, drift-checked by a test) | `dotnet run --project tools/Precept.MatrixTools -- render-cells docs/Working/obligation-discharge-matrix-2026-07-19-cells` |
 | `<family>.manifest.json` | the test manifest: one row per base, discharge, and near-miss, each carrying the structural obligation key the runner matches ledger records against | `dotnet run --project tools/Precept.MatrixTools -- convert-cells docs/Working/obligation-discharge-matrix-2026-07-19-cells/<family>.cells.json docs/Working/obligation-discharge-matrix-2026-07-19-cells/<family>.manifest.json` |
 | `<family>.manifest-results.json` | what HEAD actually does with each manifest row | `dotnet run --project tools/Precept.MatrixTools -- run-manifest docs/Working/obligation-discharge-matrix-2026-07-19-cells/<family>.manifest.json docs/Working/obligation-discharge-matrix-2026-07-19-cells/<family>.manifest-results.json` |
+| `corpus-measurement-family-1.md` | how the rule × write-site family's contracts classify every such obligation in `samples/` | `dotnet run --project tools/Precept.MatrixTools -- measure-corpus samples/ <out.json> <out.md>` |
+| `corpus-measurement-fault-family.md` | what fault-family obligations the shipped engine mints across `samples/`, by requirement kind, evaluation context, disposition and strategy | `dotnet run --project tools/Precept.MatrixTools -- measure-corpus-faults samples/ <out.json> <out.md>` (the tables; the scoping prose above them is hand-written and carries the matrix's ratification-protocol limits forward) |
+| `slice-3-boundary-report.md` | the owner-facing report on what slice 3 defined, what it could not answer, and what verification found | hand-written; not generated |
 
 The validator runs over the whole folder with `dotnet run --project tools/Precept.MatrixTools -- validate-cells docs/Working/obligation-discharge-matrix-2026-07-19-cells .` (exit 1 on any error).
+
+### Cell files in this folder
+
+| File | Family | Cells |
+|---|---|---|
+| `family-1-numeric-single-field.cells.json` | rule-write: a decimal field with a maximum of 1000 | 4 |
+| `fault-1-division-primitive-transition-write.cells.json` | fault: divide/modulo by zero, primitive operands, transition-row write | 10 |
+| `fault-2-division-primitive-construction-and-state-hook.cells.json` | fault: same, at construction rows and state hooks | 10 |
+| `fault-3-division-primitive-guard-positions.cells.json` | fault: same, in the five guard positions | 10 |
+| `fault-4-division-primitive-constraint-positions.cells.json` | fault: same, in rule / ensure / computed-field / quantifier positions | 10 |
+| `fault-5-division-primitive-declaration-positions.cells.json` | fault: same, in the five declaration positions | 10 |
+| `fault-6-division-primitive-message-interpolation.cells.json` | fault: same, in reject-message and `because` rationale interpolation | 8 |
+| `fault-7-division-business-transition-write.cells.json` | fault: divide by zero, money/quantity/price/exchange-rate operands, transition-row write | 11 |
+| `fault-8-division-business-construction-and-state-hook.cells.json` | fault: same, at construction rows and state hooks | 8 |
+| `fault-9-division-business-guard-positions.cells.json` | fault: same, in the five guard positions | 10 |
+| `fault-10-division-business-constraint-and-message.cells.json` | fault: same, in constraint and message positions | 12 |
+| `fault-11-division-business-declaration-positions.cells.json` | fault: same, in the five declaration positions | 10 |
+| `fault-12-function-preconditions.cells.json` | fault: `sqrt` of a negative, `pow` with a negative exponent | 12 |
+| `fault-13-collection-non-empty-write-sites.cells.json` | fault: accessor on a possibly-empty collection, at write sites | 15 |
+| `fault-14-collection-non-empty-guard-positions.cells.json` | fault: same, in the five guard positions | 10 |
+| `fault-15-collection-non-empty-constraint-and-message.cells.json` | fault: same, in constraint and message positions | 10 |
+| `fault-16-collection-non-empty-declaration-positions.cells.json` | fault: same, in the five declaration positions | 10 |
+| `fault-17-collection-index-bounds.cells.json` | fault: `.at(N)` index out of bounds | 12 |
+| `fault-18-collection-action-preconditions.cells.json` | fault: action preconditions (`dequeue`/`pop`/`removeAt`/`insert`) | 12 |
+| `fault-19-choice-ordering-modifier.cells.json` | fault: comparing choice values that are not declared `ordered` | 12 |
+
+The fault axis these cells are indexed against is enumerated mechanically by `dotnet run --project tools/Precept.MatrixTools -- fault-axis [<out.json>]`, which walks the four requirement-declaring catalogs and emits one row per declared `ProofRequirement` (tests: `test/Precept.MatrixTools.Tests/FaultAxisEnumeratorTests.cs`).
+
+**Read `slice-3-boundary-report.md` before treating any fault cell as ratifiable.** Adversarial verification of these nineteen files returned thirteen unsound verdicts and six needing rework — none passed; the report states each finding and the specific owner rulings the fault family is blocked on.
 
 Two requirements the manifest carries but **cannot check at HEAD**, recorded per row (`unverifiableAtHead`) rather than dropped: the rejecting diagnostic naming all applicable missing-premise classes (diagnostics carry no premise-class structure), and the accepting compile recording its premise list (`ProofObligation` carries no premise list). A results reader sees these named as unverified.
 

@@ -1,0 +1,58 @@
+{
+  "familyId": "fault-11-division-business-declaration-positions",
+  "definitionVersion": "obligation-discharge-matrix-2026-07-19 rev 7 (2026-07-20, draft)",
+  "sourceFile": "fault-11-division-business-declaration-positions.cells.json",
+  "rows": [],
+  "skips": [
+    {
+      "cellId": "g11/field-default-money",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g11/field-default-quantity",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g11/field-modifier-money",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g11/field-modifier-quantity",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g11/event-arg-modifier-money",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g11/event-arg-modifier-quantity",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g11/collection-inner-type-money",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g11/collection-inner-type-quantity",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g11/type-qualifier-money",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g11/type-qualifier-quantity",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    }
+  ]
+}

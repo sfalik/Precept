@@ -1,0 +1,1516 @@
+{
+  "$schema": "./cell.schema.json",
+  "familyId": "fault-17-collection-index-bounds",
+  "title": "Fault family — indexed access out of bounds, .at(N) on list / log / log-by (group 17)",
+  "caseShape": "fault",
+  "definitionVersion": "obligation-discharge-matrix-2026-07-19 rev 7 (2026-07-20, draft)",
+  "citations": [
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The cell",
+      "note": "the fault-family cell definition and base-minimality clause"
+    },
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+      "note": "premise classes, discharge mechanisms, suggestion schema, Validity arguments closed list"
+    },
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+      "note": "the Fault family row"
+    },
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Sketch witnesses",
+      "note": "Family 4 — the group's own authoring notes point at this as the only written fault decision procedure, and this file's central finding is that it does not reach this group's obligation"
+    },
+    {
+      "kind": "spec",
+      "ref": "docs/language/collection-types.md § `list of T`"
+    },
+    {
+      "kind": "spec",
+      "ref": "docs/language/collection-types.md § `log of T`"
+    },
+    {
+      "kind": "spec",
+      "ref": "docs/language/collection-types.md § `log of T by P`"
+    },
+    {
+      "kind": "code",
+      "ref": "src/Precept/Language/Types.cs:183",
+      "note": "the collection accessor ProofRequirement catalog begins here"
+    },
+    {
+      "kind": "code",
+      "ref": "src/Precept/Pipeline/ProofEngine.Strategies.cs:390",
+      "note": "TryIndexBoundsProof, the built discharge mechanism this file's missing-rule finding concerns"
+    },
+    {
+      "kind": "owner-ruling",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md § Defect B",
+      "note": "the false-proof hazard for rule-premise discharges (premise class d)",
+      "date": "2026-07-20"
+    }
+  ],
+  "respellability": {
+    "verdict": "no",
+    "evidence": "model-derived",
+    "corpusMeasurement": "pending",
+    "licensedNonBandExamples": [],
+    "citations": [
+      {
+        "kind": "matrix",
+        "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Ratification protocol",
+        "note": "layer 4: corpus measurement is the hard gate"
+      }
+    ],
+    "notes": [
+      "Family-level verdict recorded 'no' provisionally, not as a surface-shrink decision: with every cell in this group disposition 'open' (no licensed discharge contract exists to measure sound-but-unprovable spellings against), there is no defined contract for a respellability verdict to be measured against yet. 'No' is the honest placeholder pending the missing-rule report below being resolved, not the Vocabulary's surface-shrink 'no' (docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary, the Respellable bullet)."
+    ]
+  },
+  "cells": [
+    {
+      "id": "g17/list-write",
+      "label": "list accessor .at(integer) — write site, index from an event argument",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "list accessor .at(integer)",
+        "evaluationSiteCategory": "transition-row-action-operand",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "open",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Sketch witnesses",
+            "note": "Family 4 — the only written fault decision procedure, and the single-operand shape it is limited to"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+            "note": "the closed list of seven named arguments; none names a cross-subject two-premise decomposition"
+          },
+          {
+            "kind": "code",
+            "ref": "src/Precept/Pipeline/ProofEngine.Strategies.cs:390",
+            "note": "TryIndexBoundsProof / \"Strategy 3: Guard-in-Path Proof\" — the actual built mechanism, unnamed in the matrix"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "0 <= Index and Index < Items.count",
+        "metavariables": [
+          {
+            "name": "Items",
+            "standsFor": "the collection field the .at() accessor reads"
+          },
+          {
+            "name": "Index",
+            "standsFor": "the index expression passed to .at()"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "0 <= Index and Index < Items.count"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a",
+        "b",
+        "c",
+        "d"
+      ],
+      "premiseAvailability": "Full write-site availability, matching the fault-family case-shape row and this group's own hazard note (docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes; group authoring notes). The obligation has two independent subjects, and premise availability differs per subject: the index (an event arg here) draws (b) from its own declared modifiers (live-verified: a `nonnegative` arg modifier supplies its lower bound); the collection's cardinality draws (a) from the field's own mincount/maxcount modifiers when both are literal, or (d) from a rule holding of the collection in the pre-state (the false-proof hazard applies here — see notes) when the write plan does not touch the collection. Class (c), the row's guard, is the only route confirmed live to supply the *relational* fact linking the two subjects (`Index < F.count`), since neither (a) nor (b) alone can express one field's value bounded by another's live cardinality. This cell's representative site (transition-row-action-operand) carries all four classes; construction-row-action-operand structurally lacks (d) (no pre-state) and (per the general handler-scope rule) construction rows also lack a residency guard fact of the kind the group's own field description assumes — folded here as an analogous but not identical write occasion, flagged, not asserted uniform.",
+      "witnesses": {
+        "base": {
+          "program": "precept ListWriteBase\n\nfield Items as list of decimal\nfield Entry as decimal default 0.0\n\nevent Create(Seed as decimal) initial\nevent Pick(Index as integer)\n\non Create\n    -> append Items Create.Seed\n\non Pick\n    -> set Entry = Items.at(Pick.Index)\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a",
+              "b",
+              "c",
+              "d"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        },
+        "discharges": [
+          {
+            "id": "nonneg-arg-plus-guard",
+            "kind": "guard",
+            "addition": "Index as integer nonnegative   (event arg declaration, replacing `Index as integer`)\nwhen Index < Items.count and Items.count > 0   (row guard on the Pick row)",
+            "application": {
+              "locus": "row-guard",
+              "eventName": "Pick"
+            },
+            "premiseClasses": [
+              "b",
+              "c"
+            ],
+            "derivation": "empirically: Strategy 3 (Guard-in-Path Proof, src/Precept/Pipeline/ProofEngine.Strategies.cs:390) takes the lower bound from the arg's own `nonnegative` modifier (type-derived, no guard needed for that half) and the upper bound from a guard branch comparing the index against F.count; not named by any matrix validityArguments entry",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "No single `application` locus captures this addition: it spans BOTH an event-arg-declaration replacement (adding `nonnegative` to the Index arg) AND a row-guard addition (`Index < Items.count and Items.count > 0`). The schema's application DU admits only one locus per discharge entry; `application` above records the row-guard half only (the more novel half — the arg-modifier half is the same `nonnegative`-on-an-arg shape Witness Family 1 already covers). A schema-vocabulary gap for two-locus additions, not invented around here — same shape of gap fault-13 already flagged for its own field-declaration-locus addition.",
+              "Live-verified 2026-07-21 at HEAD e1a14d91: base + this addition compiles with zero diagnostics (witness-g17/list-write-discharge.precept). The `Items.count > 0` conjunct is NOT part of this group's own obligation — it independently discharges the accessor's separate, catalog-declared non-empty NumericProofRequirement (identical to fault-13's obligation; src/Precept/Language/Types.cs:309), which mints at the same site under the same diagnostic code (IndexBoundsGuard) and must be discharged too or its own error survives. builtStatus is proven-today for the empirical outcome; modelStatus is deliberately omitted — no named validity argument licenses the derivation (see cell-level missing-rule note)."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "nonneg-arg-plus-guard",
+            "addition": "when Index < Items.count   (row guard on the Pick row, `Items.count > 0` conjunct dropped; the arg-declaration `nonnegative` half is unchanged)",
+            "application": {
+              "locus": "row-guard",
+              "eventName": "Pick"
+            },
+            "whyStillRejects": "live-verified: with `F.count > 0` removed, the compile still raises IndexBoundsGuard (witness-g17/list-write-nearmiss.precept) — must still reject, same obligation. This specific near-miss demonstrates the built strategy requires both conjuncts even though 0 <= Index < F.count logically already entails F.count > 0; a built-power quirk, recorded rather than smoothed over.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "cell-override",
+        "overrideVerdict": "no",
+        "notes": [
+          "Overrides the family verdict rather than inheriting it: with disposition open and no licensed derivation named, 'is every sound program in the band respellable' cannot be answered yet either — there is no defined contract to respell against. Recorded no (not yet resolvable) rather than left silently defaulted to the family's yes, since that verdict presumes a defined contract this cell does not have."
+        ]
+      },
+      "citations": [
+        {
+          "kind": "spec",
+          "ref": "docs/language/collection-types.md:1056",
+          "note": "Items.at(N) — `list of T`"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Types.cs:309",
+          "note": "list accessor .at(integer) catalog declaration: NumericProofRequirement(count>0) plus IndexBoundsProofRequirement(0<=Index<count), Parameters:[PCollectionIndex]"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+          "note": "Fault family row"
+        }
+      ],
+      "notes": [
+        "MISSING RULE, reported rather than filled: this obligation (`0 <= Index and Index < F.count`) relates two DIFFERENT subjects — the index and a separate field's live cardinality — not one operand's own interval. The matrix's only written fault decision procedure (Family 4, docs/Working/obligation-discharge-matrix-2026-07-19.md § Sketch witnesses) computes a single operand's interval from its own declared modifiers and in-scope guard facts; it does not state a derivation for comparing that operand against a second, independently-varying subject. Direct testing this session (src/Precept/Pipeline/ProofEngine.Strategies.cs:390, TryIndexBoundsProof, \"Strategy 3: Guard-in-Path Proof\") confirms the shipped compiler discharges this obligation through dedicated code — decomposing it into an independently-checked lower bound (type-derived from a `nonnegative`/`positive` modifier, or a matching guard branch) and an independently-checked upper bound (a guard branch comparing the index against the collection's `.count`) — but no paragraph under docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments names this decomposition, and none of its seven closed `validityArguments` entries covers a cross-subject relational comparison discharged by splitting a conjunction across two premise classes. A verbatim whole-condition guard match (`when Index >= 0 and Index < F.count`, tested directly) does NOT discharge at HEAD either (live-verified below), which rules out reading the existing 'Guard normal-form match' argument as already covering this obligation by extension. Disposition is `open`, not `defined`, on every cell in this group for this reason — never invented past what is written.",
+        "This position mints the catalog-declared obligation at HEAD (live-verified).",
+        "Coordinates name transition-row-action-operand as the representative evaluation-site category for this cell. Folded under the same representative (authoring-economy compression across this group's twenty raw categories, not a claim of identical premise availability in every case — see premiseAvailability above for exactly what differs): construction-row-action-operand, state-hook-action-operand.",
+        "Full triple live-verified this session at HEAD e1a14d91: list-write-base.precept, list-write-discharge.precept, list-write-nearmiss.precept under witness-g17/."
+      ]
+    },
+    {
+      "id": "g17/list-guard",
+      "label": "list accessor .at(integer) — guard position, index from an event argument",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "list accessor .at(integer)",
+        "evaluationSiteCategory": "transition-row-guard",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "open",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Sketch witnesses",
+            "note": "Family 4 — the only written fault decision procedure, and the single-operand shape it is limited to"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+            "note": "the closed list of seven named arguments; none names a cross-subject two-premise decomposition"
+          },
+          {
+            "kind": "code",
+            "ref": "src/Precept/Pipeline/ProofEngine.Strategies.cs:390",
+            "note": "TryIndexBoundsProof / \"Strategy 3: Guard-in-Path Proof\" — the actual built mechanism, unnamed in the matrix"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "0 <= Index and Index < Items.count",
+        "metavariables": [
+          {
+            "name": "Items",
+            "standsFor": "the collection field the .at() accessor reads"
+          },
+          {
+            "name": "Index",
+            "standsFor": "the index expression passed to .at()"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "0 <= Index and Index < Items.count"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a",
+        "b",
+        "d"
+      ],
+      "premiseAvailability": "Class (c) is structurally unavailable: by the same reasoning the 'Guard normal-form match' validity argument states (docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments — \"a row's actions execute only if its guard evaluated true\"), the guard's own truth is exactly what is undetermined while the guard itself is being evaluated, so it cannot supply itself as a premise for an obligation minted inside it. Classes (a) and (b) remain available (the index's own declared modifiers, whichever kind of expression supplies it in this position); (d) is available wherever a pre-state exists for the guard's anchor. This cell folds six raw evaluation-site categories under one representative (transition-row-guard): the other five guard/interpolation positions in this group's region share the same 'cannot discharge itself' / 'no mutation here' shape but were not all independently exercised — see notes for exactly which were.",
+      "witnesses": {
+        "base": {
+          "program": "precept TestGuardPosition\n\nfield Items as list of decimal\nfield Flag as boolean default false\n\nevent Create(Seed as decimal) initial\nevent Check(Index as integer)\n\non Create\n    -> append Items Create.Seed\n\non Check when Items.at(Check.Index) > 0.0\n    -> set Flag = true\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a",
+              "b",
+              "d"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "model-derived"
+          }
+        }
+      },
+      "respellability": {
+        "resolution": "cell-override",
+        "overrideVerdict": "no",
+        "notes": [
+          "Overrides the family verdict rather than inheriting it: with disposition open and no licensed derivation named, 'is every sound program in the band respellable' cannot be answered yet either — there is no defined contract to respell against. Recorded no (not yet resolvable) rather than left silently defaulted to the family's yes, since that verdict presumes a defined contract this cell does not have."
+        ]
+      },
+      "citations": [
+        {
+          "kind": "spec",
+          "ref": "docs/language/collection-types.md:1056",
+          "note": "Items.at(N) — `list of T`"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Types.cs:309",
+          "note": "list accessor .at(integer) catalog declaration: NumericProofRequirement(count>0) plus IndexBoundsProofRequirement(0<=Index<count), Parameters:[PCollectionIndex]"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+          "note": "Fault family row"
+        }
+      ],
+      "notes": [
+        "MISSING RULE, reported rather than filled: this obligation (`0 <= Index and Index < F.count`) relates two DIFFERENT subjects — the index and a separate field's live cardinality — not one operand's own interval. The matrix's only written fault decision procedure (Family 4, docs/Working/obligation-discharge-matrix-2026-07-19.md § Sketch witnesses) computes a single operand's interval from its own declared modifiers and in-scope guard facts; it does not state a derivation for comparing that operand against a second, independently-varying subject. Direct testing this session (src/Precept/Pipeline/ProofEngine.Strategies.cs:390, TryIndexBoundsProof, \"Strategy 3: Guard-in-Path Proof\") confirms the shipped compiler discharges this obligation through dedicated code — decomposing it into an independently-checked lower bound (type-derived from a `nonnegative`/`positive` modifier, or a matching guard branch) and an independently-checked upper bound (a guard branch comparing the index against the collection's `.count`) — but no paragraph under docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments names this decomposition, and none of its seven closed `validityArguments` entries covers a cross-subject relational comparison discharged by splitting a conjunction across two premise classes. A verbatim whole-condition guard match (`when Index >= 0 and Index < F.count`, tested directly) does NOT discharge at HEAD either (live-verified below), which rules out reading the existing 'Guard normal-form match' argument as already covering this obligation by extension. Disposition is `open`, not `defined`, on every cell in this group for this reason — never invented past what is written.",
+        "This position does NOT mint the catalog-declared obligation at HEAD (live-verified) — a built-power gap, independent of the missing-rule finding below.",
+        "Coordinates name transition-row-guard as the representative evaluation-site category for this cell. Folded under the same representative (authoring-economy compression across this group's twenty raw categories, not a claim of identical premise availability in every case — see premiseAvailability above for exactly what differs): state-hook-guard, access-mode-guard, ensure-activation-guard, rule-activation-guard, reject-message-interpolation, constraint-rationale-interpolation.",
+        "Live-verified 2026-07-21 at HEAD e1a14d91: this exact program (an out-of-bounds-capable index read inside the row's own `when` clause, with no modifier or other fact anywhere) compiles with ZERO diagnostics — the model's committed rejection is NOT confirmed by this run, so provenance on the base above is recorded model-derived rather than live-verified, per the provenance field's meaning (it attests only what a run actually confirmed). The position mints no fault obligation at HEAD for this catalog site — a built-power gap, independent of the discharge question this cell is otherwise open on. No discharge/near-miss witnesses are recorded: since the base already compiles clean, there is nothing an addition could be shown to change."
+      ]
+    },
+    {
+      "id": "g17/list-constraint",
+      "label": "list accessor .at(integer) — constraint condition, index from an event argument",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "list accessor .at(integer)",
+        "evaluationSiteCategory": "rule-condition",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "open",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Sketch witnesses",
+            "note": "Family 4 — the only written fault decision procedure, and the single-operand shape it is limited to"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+            "note": "the closed list of seven named arguments; none names a cross-subject two-premise decomposition"
+          },
+          {
+            "kind": "code",
+            "ref": "src/Precept/Pipeline/ProofEngine.Strategies.cs:390",
+            "note": "TryIndexBoundsProof / \"Strategy 3: Guard-in-Path Proof\" — the actual built mechanism, unnamed in the matrix"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "0 <= Index and Index < Items.count",
+        "metavariables": [
+          {
+            "name": "Items",
+            "standsFor": "the collection field the .at() accessor reads"
+          },
+          {
+            "name": "Index",
+            "standsFor": "the index expression passed to .at()"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "0 <= Index and Index < Items.count"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a"
+      ],
+      "premiseAvailability": "A bare `rule` condition is not anchored to any handler: it is evaluated against the complete working copy at every checkpoint, in every reachable configuration (docs/Working/obligation-discharge-matrix-2026-07-19.md § Axes, constraint-structure framing; docs/language/precept-language-spec.md on rule declarations). No guard is in scope (there is none), no event args are in scope (no event fired), and there is no single pre-state to appeal to (the condition must hold over every configuration, not a particular predecessor). Only class (a), field modifiers, is available without further ruling. This cell folds four other raw categories under this representative — state-ensure-condition and event-ensure-condition in fact carry a wider class set (their own optional `when` supplies class (c), and event-ensure additionally has (b)) per the general per-category scope table; this representative (rule-condition) is the NARROWEST of the five, and the folding is a representativeness compression, not a claim that all five share identical availability — flagged in notes, not silently absorbed.",
+      "witnesses": {
+        "base": {
+          "program": "precept TestRuleCondition\n\nfield Items as list of decimal\nfield Watched as integer default 0\n\nrule Items.at(Watched) > 0.0 because \"watched slot must stay positive\"\n\nevent Create(Seed as decimal) initial\non Create\n    -> append Items Create.Seed\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        }
+      },
+      "respellability": {
+        "resolution": "cell-override",
+        "overrideVerdict": "no",
+        "notes": [
+          "Overrides the family verdict rather than inheriting it: with disposition open and no licensed derivation named, 'is every sound program in the band respellable' cannot be answered yet either — there is no defined contract to respell against. Recorded no (not yet resolvable) rather than left silently defaulted to the family's yes, since that verdict presumes a defined contract this cell does not have."
+        ]
+      },
+      "citations": [
+        {
+          "kind": "spec",
+          "ref": "docs/language/collection-types.md:1056",
+          "note": "Items.at(N) — `list of T`"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Types.cs:309",
+          "note": "list accessor .at(integer) catalog declaration: NumericProofRequirement(count>0) plus IndexBoundsProofRequirement(0<=Index<count), Parameters:[PCollectionIndex]"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+          "note": "Fault family row"
+        }
+      ],
+      "notes": [
+        "MISSING RULE, reported rather than filled: this obligation (`0 <= Index and Index < F.count`) relates two DIFFERENT subjects — the index and a separate field's live cardinality — not one operand's own interval. The matrix's only written fault decision procedure (Family 4, docs/Working/obligation-discharge-matrix-2026-07-19.md § Sketch witnesses) computes a single operand's interval from its own declared modifiers and in-scope guard facts; it does not state a derivation for comparing that operand against a second, independently-varying subject. Direct testing this session (src/Precept/Pipeline/ProofEngine.Strategies.cs:390, TryIndexBoundsProof, \"Strategy 3: Guard-in-Path Proof\") confirms the shipped compiler discharges this obligation through dedicated code — decomposing it into an independently-checked lower bound (type-derived from a `nonnegative`/`positive` modifier, or a matching guard branch) and an independently-checked upper bound (a guard branch comparing the index against the collection's `.count`) — but no paragraph under docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments names this decomposition, and none of its seven closed `validityArguments` entries covers a cross-subject relational comparison discharged by splitting a conjunction across two premise classes. A verbatim whole-condition guard match (`when Index >= 0 and Index < F.count`, tested directly) does NOT discharge at HEAD either (live-verified below), which rules out reading the existing 'Guard normal-form match' argument as already covering this obligation by extension. Disposition is `open`, not `defined`, on every cell in this group for this reason — never invented past what is written.",
+        "This position mints the catalog-declared obligation at HEAD (live-verified).",
+        "Coordinates name rule-condition as the representative evaluation-site category for this cell. Folded under the same representative (authoring-economy compression across this group's twenty raw categories, not a claim of identical premise availability in every case — see premiseAvailability above for exactly what differs): state-ensure-condition, event-ensure-condition, computed-field-expression, quantifier-predicate.",
+        "Live-verified 2026-07-21 at HEAD e1a14d91: this program raises IndexBoundsGuard (site mints here, unlike the guard/declaration buckets). A further live test this session — the same rule condition with BOTH the collection's cardinality pinned by literal `mincount`/`maxcount` and the index field bounded by a literal `nonnegative max` — still raises IndexBoundsGuard (witness-g17/test-rulecond-static.precept): no discharge mechanism reaches a bare rule condition at HEAD (TryIndexBoundsProof requires a handler guard, which a rule condition does not have). No discharge witness is recorded for this bucket: none is known to exist, at any premise combination, model or built."
+      ]
+    },
+    {
+      "id": "g17/list-declaration",
+      "label": "list accessor .at(integer) — declaration-position expression, index from an earlier-declared field",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "list accessor .at(integer)",
+        "evaluationSiteCategory": "field-default-value-expression",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "open",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Sketch witnesses",
+            "note": "Family 4 — the only written fault decision procedure, and the single-operand shape it is limited to"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+            "note": "the closed list of seven named arguments; none names a cross-subject two-premise decomposition"
+          },
+          {
+            "kind": "code",
+            "ref": "src/Precept/Pipeline/ProofEngine.Strategies.cs:390",
+            "note": "TryIndexBoundsProof / \"Strategy 3: Guard-in-Path Proof\" — the actual built mechanism, unnamed in the matrix"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "0 <= Index and Index < Items.count",
+        "metavariables": [
+          {
+            "name": "Items",
+            "standsFor": "the collection field the .at() accessor reads"
+          },
+          {
+            "name": "Index",
+            "standsFor": "the index expression passed to .at()"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "0 <= Index and Index < Items.count"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a"
+      ],
+      "premiseAvailability": "A field's `default` expression is materialised once, during construction, and its scope is restricted to fields declared above it in the file — a forward reference is impossible, not merely disallowed (docs/language/precept-language-spec.md:1352, the modifier/default value-expression scope row). No event is in scope at all (declarations are not anchored to any event), so the group's own shared setting ('the index comes from an event argument') cannot literally hold here — the index this cell tests is a second, earlier-declared field's default value instead. No guard, no event args, no pre-state; only class (a), the modifiers of fields declared earlier, is available. This cell folds four other declaration-position categories under this representative; they share the same no-event/no-guard/no-pre-state shape by the same spec citation, but were not all independently exercised.",
+      "witnesses": {
+        "base": {
+          "program": "precept TestDeclDefault\n\nfield Items as list of decimal default [1.0, 2.0, 3.0]\nfield DefaultIndex as integer default 5\nfield Selected as decimal default Items.at(DefaultIndex)\n\nevent Touch()\n\non Touch\n    -> set Selected = Selected\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "model-derived"
+          }
+        }
+      },
+      "respellability": {
+        "resolution": "cell-override",
+        "overrideVerdict": "no",
+        "notes": [
+          "Overrides the family verdict rather than inheriting it: with disposition open and no licensed derivation named, 'is every sound program in the band respellable' cannot be answered yet either — there is no defined contract to respell against. Recorded no (not yet resolvable) rather than left silently defaulted to the family's yes, since that verdict presumes a defined contract this cell does not have."
+        ]
+      },
+      "citations": [
+        {
+          "kind": "spec",
+          "ref": "docs/language/collection-types.md:1056",
+          "note": "Items.at(N) — `list of T`"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Types.cs:309",
+          "note": "list accessor .at(integer) catalog declaration: NumericProofRequirement(count>0) plus IndexBoundsProofRequirement(0<=Index<count), Parameters:[PCollectionIndex]"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+          "note": "Fault family row"
+        }
+      ],
+      "notes": [
+        "MISSING RULE, reported rather than filled: this obligation (`0 <= Index and Index < F.count`) relates two DIFFERENT subjects — the index and a separate field's live cardinality — not one operand's own interval. The matrix's only written fault decision procedure (Family 4, docs/Working/obligation-discharge-matrix-2026-07-19.md § Sketch witnesses) computes a single operand's interval from its own declared modifiers and in-scope guard facts; it does not state a derivation for comparing that operand against a second, independently-varying subject. Direct testing this session (src/Precept/Pipeline/ProofEngine.Strategies.cs:390, TryIndexBoundsProof, \"Strategy 3: Guard-in-Path Proof\") confirms the shipped compiler discharges this obligation through dedicated code — decomposing it into an independently-checked lower bound (type-derived from a `nonnegative`/`positive` modifier, or a matching guard branch) and an independently-checked upper bound (a guard branch comparing the index against the collection's `.count`) — but no paragraph under docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments names this decomposition, and none of its seven closed `validityArguments` entries covers a cross-subject relational comparison discharged by splitting a conjunction across two premise classes. A verbatim whole-condition guard match (`when Index >= 0 and Index < F.count`, tested directly) does NOT discharge at HEAD either (live-verified below), which rules out reading the existing 'Guard normal-form match' argument as already covering this obligation by extension. Disposition is `open`, not `defined`, on every cell in this group for this reason — never invented past what is written.",
+        "This position does NOT mint the catalog-declared obligation at HEAD (live-verified) — a built-power gap, independent of the missing-rule finding below.",
+        "Coordinates name field-default-value-expression as the representative evaluation-site category for this cell. Folded under the same representative (authoring-economy compression across this group's twenty raw categories, not a claim of identical premise availability in every case — see premiseAvailability above for exactly what differs): field-modifier-value-expression, event-arg-modifier-value-expression, collection-inner-type-modifier-value-expression, type-qualifier-expression.",
+        "Live-verified 2026-07-21 at HEAD e1a14d91: this program declares `DefaultIndex default 5` against a 3-element default list literal — an index that is out of bounds by the declaration's own literal facts — and compiles with ZERO diagnostics. The model's committed rejection is NOT confirmed by this run; provenance on the base is recorded model-derived accordingly. The position mints no fault obligation at HEAD for this catalog site regardless of the value's actual safety — a built-power gap distinct from the missing-rule question this cell is otherwise open on.",
+        "A further, only-sketched possibility (not tested, not claimed): where BOTH the collection's default and the index field's default are literal, the whole obligation reduces to a pure compile-time fold with no cross-subject relational proof needed at all, potentially reachable under the existing 'Literal constant-fold for defaults' validity argument. Left unexplored and unclaimed here — worth a follow-up probe, not folded into this cell's disposition."
+      ]
+    },
+    {
+      "id": "g17/log-write",
+      "label": "log accessor .at(integer) — write site, index from an event argument",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "log accessor .at(integer)",
+        "evaluationSiteCategory": "transition-row-action-operand",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "open",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Sketch witnesses",
+            "note": "Family 4 — the only written fault decision procedure, and the single-operand shape it is limited to"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+            "note": "the closed list of seven named arguments; none names a cross-subject two-premise decomposition"
+          },
+          {
+            "kind": "code",
+            "ref": "src/Precept/Pipeline/ProofEngine.Strategies.cs:390",
+            "note": "TryIndexBoundsProof / \"Strategy 3: Guard-in-Path Proof\" — the actual built mechanism, unnamed in the matrix"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "0 <= Index and Index < History.count",
+        "metavariables": [
+          {
+            "name": "History",
+            "standsFor": "the collection field the .at() accessor reads"
+          },
+          {
+            "name": "Index",
+            "standsFor": "the index expression passed to .at()"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "0 <= Index and Index < History.count"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a",
+        "b",
+        "c",
+        "d"
+      ],
+      "premiseAvailability": "Full write-site availability, matching the fault-family case-shape row and this group's own hazard note (docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes; group authoring notes). The obligation has two independent subjects, and premise availability differs per subject: the index (an event arg here) draws (b) from its own declared modifiers (live-verified: a `nonnegative` arg modifier supplies its lower bound); the collection's cardinality draws (a) from the field's own mincount/maxcount modifiers when both are literal, or (d) from a rule holding of the collection in the pre-state (the false-proof hazard applies here — see notes) when the write plan does not touch the collection. Class (c), the row's guard, is the only route confirmed live to supply the *relational* fact linking the two subjects (`Index < F.count`), since neither (a) nor (b) alone can express one field's value bounded by another's live cardinality. This cell's representative site (transition-row-action-operand) carries all four classes; construction-row-action-operand structurally lacks (d) (no pre-state) and (per the general handler-scope rule) construction rows also lack a residency guard fact of the kind the group's own field description assumes — folded here as an analogous but not identical write occasion, flagged, not asserted uniform.",
+      "witnesses": {
+        "base": {
+          "program": "precept LogWriteBase\n\nfield History as log of decimal\nfield Entry as decimal default 0.0\n\nevent Create(Seed as decimal) initial\nevent Pick(Index as integer)\n\non Create\n    -> append History Create.Seed\n\non Pick\n    -> set Entry = History.at(Pick.Index)\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a",
+              "b",
+              "c",
+              "d"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        },
+        "discharges": [
+          {
+            "id": "nonneg-arg-plus-guard",
+            "kind": "guard",
+            "addition": "Index as integer nonnegative   (event arg declaration, replacing `Index as integer`)\nwhen Index < History.count and History.count > 0   (row guard on the Pick row)",
+            "application": {
+              "locus": "row-guard",
+              "eventName": "Pick"
+            },
+            "premiseClasses": [
+              "b",
+              "c"
+            ],
+            "derivation": "empirically: Strategy 3 (Guard-in-Path Proof, src/Precept/Pipeline/ProofEngine.Strategies.cs:390) takes the lower bound from the arg's own `nonnegative` modifier (type-derived, no guard needed for that half) and the upper bound from a guard branch comparing the index against F.count; not named by any matrix validityArguments entry",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "No single `application` locus captures this addition: it spans BOTH an event-arg-declaration replacement (adding `nonnegative` to the Index arg) AND a row-guard addition (`Index < History.count and History.count > 0`). The schema's application DU admits only one locus per discharge entry; `application` above records the row-guard half only (the more novel half — the arg-modifier half is the same `nonnegative`-on-an-arg shape Witness Family 1 already covers). A schema-vocabulary gap for two-locus additions, not invented around here — same shape of gap fault-13 already flagged for its own field-declaration-locus addition.",
+              "Live-verified 2026-07-21 at HEAD e1a14d91: base + this addition compiles with zero diagnostics (witness-g17/log-write-discharge.precept). The `History.count > 0` conjunct is NOT part of this group's own obligation — it independently discharges the accessor's separate, catalog-declared non-empty NumericProofRequirement (identical to fault-13's obligation; src/Precept/Language/Types.cs:239), which mints at the same site under the same diagnostic code (IndexBoundsGuard) and must be discharged too or its own error survives. builtStatus is proven-today for the empirical outcome; modelStatus is deliberately omitted — no named validity argument licenses the derivation (see cell-level missing-rule note)."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "nonneg-arg-plus-guard",
+            "addition": "when Index < History.count   (row guard on the Pick row, `History.count > 0` conjunct dropped; the arg-declaration `nonnegative` half is unchanged)",
+            "application": {
+              "locus": "row-guard",
+              "eventName": "Pick"
+            },
+            "whyStillRejects": "live-verified: with `F.count > 0` removed, the compile still raises IndexBoundsGuard (witness-g17/log-write-nearmiss.precept) — must still reject, same obligation. This specific near-miss demonstrates the built strategy requires both conjuncts even though 0 <= Index < F.count logically already entails F.count > 0; a built-power quirk, recorded rather than smoothed over.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "cell-override",
+        "overrideVerdict": "no",
+        "notes": [
+          "Overrides the family verdict rather than inheriting it: with disposition open and no licensed derivation named, 'is every sound program in the band respellable' cannot be answered yet either — there is no defined contract to respell against. Recorded no (not yet resolvable) rather than left silently defaulted to the family's yes, since that verdict presumes a defined contract this cell does not have."
+        ]
+      },
+      "citations": [
+        {
+          "kind": "spec",
+          "ref": "docs/language/collection-types.md:337",
+          "note": "History.at(N) — `log of T`"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Types.cs:239",
+          "note": "log accessor .at(integer) catalog declaration: NumericProofRequirement(count>0) plus IndexBoundsProofRequirement(0<=Index<count), Parameters:[PCollectionIndex]"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+          "note": "Fault family row"
+        }
+      ],
+      "notes": [
+        "MISSING RULE, reported rather than filled: this obligation (`0 <= Index and Index < F.count`) relates two DIFFERENT subjects — the index and a separate field's live cardinality — not one operand's own interval. The matrix's only written fault decision procedure (Family 4, docs/Working/obligation-discharge-matrix-2026-07-19.md § Sketch witnesses) computes a single operand's interval from its own declared modifiers and in-scope guard facts; it does not state a derivation for comparing that operand against a second, independently-varying subject. Direct testing this session (src/Precept/Pipeline/ProofEngine.Strategies.cs:390, TryIndexBoundsProof, \"Strategy 3: Guard-in-Path Proof\") confirms the shipped compiler discharges this obligation through dedicated code — decomposing it into an independently-checked lower bound (type-derived from a `nonnegative`/`positive` modifier, or a matching guard branch) and an independently-checked upper bound (a guard branch comparing the index against the collection's `.count`) — but no paragraph under docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments names this decomposition, and none of its seven closed `validityArguments` entries covers a cross-subject relational comparison discharged by splitting a conjunction across two premise classes. A verbatim whole-condition guard match (`when Index >= 0 and Index < F.count`, tested directly) does NOT discharge at HEAD either (live-verified below), which rules out reading the existing 'Guard normal-form match' argument as already covering this obligation by extension. Disposition is `open`, not `defined`, on every cell in this group for this reason — never invented past what is written.",
+        "This position mints the catalog-declared obligation at HEAD (live-verified).",
+        "Coordinates name transition-row-action-operand as the representative evaluation-site category for this cell. Folded under the same representative (authoring-economy compression across this group's twenty raw categories, not a claim of identical premise availability in every case — see premiseAvailability above for exactly what differs): construction-row-action-operand, state-hook-action-operand.",
+        "Full triple live-verified this session at HEAD e1a14d91: log-write-base.precept, log-write-discharge.precept, log-write-nearmiss.precept under witness-g17/."
+      ]
+    },
+    {
+      "id": "g17/log-guard",
+      "label": "log accessor .at(integer) — guard position, index from an event argument",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "log accessor .at(integer)",
+        "evaluationSiteCategory": "transition-row-guard",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "open",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Sketch witnesses",
+            "note": "Family 4 — the only written fault decision procedure, and the single-operand shape it is limited to"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+            "note": "the closed list of seven named arguments; none names a cross-subject two-premise decomposition"
+          },
+          {
+            "kind": "code",
+            "ref": "src/Precept/Pipeline/ProofEngine.Strategies.cs:390",
+            "note": "TryIndexBoundsProof / \"Strategy 3: Guard-in-Path Proof\" — the actual built mechanism, unnamed in the matrix"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "0 <= Index and Index < History.count",
+        "metavariables": [
+          {
+            "name": "History",
+            "standsFor": "the collection field the .at() accessor reads"
+          },
+          {
+            "name": "Index",
+            "standsFor": "the index expression passed to .at()"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "0 <= Index and Index < History.count"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a",
+        "b",
+        "d"
+      ],
+      "premiseAvailability": "Class (c) is structurally unavailable: by the same reasoning the 'Guard normal-form match' validity argument states (docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments — \"a row's actions execute only if its guard evaluated true\"), the guard's own truth is exactly what is undetermined while the guard itself is being evaluated, so it cannot supply itself as a premise for an obligation minted inside it. Classes (a) and (b) remain available (the index's own declared modifiers, whichever kind of expression supplies it in this position); (d) is available wherever a pre-state exists for the guard's anchor. This cell folds six raw evaluation-site categories under one representative (transition-row-guard): the other five guard/interpolation positions in this group's region share the same 'cannot discharge itself' / 'no mutation here' shape but were not all independently exercised — see notes for exactly which were.",
+      "witnesses": {
+        "base": {
+          "program": "precept LogGuardBase\n\nfield History as log of decimal\nfield Flag as boolean default false\n\nevent Create(Seed as decimal) initial\nevent Check(Index as integer)\n\non Create\n    -> append History Create.Seed\n\non Check when History.at(Check.Index) > 0.0\n    -> set Flag = true\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a",
+              "b",
+              "d"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "model-derived"
+          }
+        }
+      },
+      "respellability": {
+        "resolution": "cell-override",
+        "overrideVerdict": "no",
+        "notes": [
+          "Overrides the family verdict rather than inheriting it: with disposition open and no licensed derivation named, 'is every sound program in the band respellable' cannot be answered yet either — there is no defined contract to respell against. Recorded no (not yet resolvable) rather than left silently defaulted to the family's yes, since that verdict presumes a defined contract this cell does not have."
+        ]
+      },
+      "citations": [
+        {
+          "kind": "spec",
+          "ref": "docs/language/collection-types.md:337",
+          "note": "History.at(N) — `log of T`"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Types.cs:239",
+          "note": "log accessor .at(integer) catalog declaration: NumericProofRequirement(count>0) plus IndexBoundsProofRequirement(0<=Index<count), Parameters:[PCollectionIndex]"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+          "note": "Fault family row"
+        }
+      ],
+      "notes": [
+        "MISSING RULE, reported rather than filled: this obligation (`0 <= Index and Index < F.count`) relates two DIFFERENT subjects — the index and a separate field's live cardinality — not one operand's own interval. The matrix's only written fault decision procedure (Family 4, docs/Working/obligation-discharge-matrix-2026-07-19.md § Sketch witnesses) computes a single operand's interval from its own declared modifiers and in-scope guard facts; it does not state a derivation for comparing that operand against a second, independently-varying subject. Direct testing this session (src/Precept/Pipeline/ProofEngine.Strategies.cs:390, TryIndexBoundsProof, \"Strategy 3: Guard-in-Path Proof\") confirms the shipped compiler discharges this obligation through dedicated code — decomposing it into an independently-checked lower bound (type-derived from a `nonnegative`/`positive` modifier, or a matching guard branch) and an independently-checked upper bound (a guard branch comparing the index against the collection's `.count`) — but no paragraph under docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments names this decomposition, and none of its seven closed `validityArguments` entries covers a cross-subject relational comparison discharged by splitting a conjunction across two premise classes. A verbatim whole-condition guard match (`when Index >= 0 and Index < F.count`, tested directly) does NOT discharge at HEAD either (live-verified below), which rules out reading the existing 'Guard normal-form match' argument as already covering this obligation by extension. Disposition is `open`, not `defined`, on every cell in this group for this reason — never invented past what is written.",
+        "This position does NOT mint the catalog-declared obligation at HEAD (live-verified) — a built-power gap, independent of the missing-rule finding below.",
+        "Coordinates name transition-row-guard as the representative evaluation-site category for this cell. Folded under the same representative (authoring-economy compression across this group's twenty raw categories, not a claim of identical premise availability in every case — see premiseAvailability above for exactly what differs): state-hook-guard, access-mode-guard, ensure-activation-guard, rule-activation-guard, reject-message-interpolation, constraint-rationale-interpolation.",
+        "Live-verified 2026-07-21 at HEAD e1a14d91: this exact program (an out-of-bounds-capable index read inside the row's own `when` clause, with no modifier or other fact anywhere) compiles with ZERO diagnostics — the model's committed rejection is NOT confirmed by this run, so provenance on the base above is recorded model-derived rather than live-verified, per the provenance field's meaning (it attests only what a run actually confirmed). The position mints no fault obligation at HEAD for this catalog site — a built-power gap, independent of the discharge question this cell is otherwise open on. No discharge/near-miss witnesses are recorded: since the base already compiles clean, there is nothing an addition could be shown to change."
+      ]
+    },
+    {
+      "id": "g17/log-constraint",
+      "label": "log accessor .at(integer) — constraint condition, index from an event argument",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "log accessor .at(integer)",
+        "evaluationSiteCategory": "rule-condition",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "open",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Sketch witnesses",
+            "note": "Family 4 — the only written fault decision procedure, and the single-operand shape it is limited to"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+            "note": "the closed list of seven named arguments; none names a cross-subject two-premise decomposition"
+          },
+          {
+            "kind": "code",
+            "ref": "src/Precept/Pipeline/ProofEngine.Strategies.cs:390",
+            "note": "TryIndexBoundsProof / \"Strategy 3: Guard-in-Path Proof\" — the actual built mechanism, unnamed in the matrix"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "0 <= Index and Index < History.count",
+        "metavariables": [
+          {
+            "name": "History",
+            "standsFor": "the collection field the .at() accessor reads"
+          },
+          {
+            "name": "Index",
+            "standsFor": "the index expression passed to .at()"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "0 <= Index and Index < History.count"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a"
+      ],
+      "premiseAvailability": "A bare `rule` condition is not anchored to any handler: it is evaluated against the complete working copy at every checkpoint, in every reachable configuration (docs/Working/obligation-discharge-matrix-2026-07-19.md § Axes, constraint-structure framing; docs/language/precept-language-spec.md on rule declarations). No guard is in scope (there is none), no event args are in scope (no event fired), and there is no single pre-state to appeal to (the condition must hold over every configuration, not a particular predecessor). Only class (a), field modifiers, is available without further ruling. This cell folds four other raw categories under this representative — state-ensure-condition and event-ensure-condition in fact carry a wider class set (their own optional `when` supplies class (c), and event-ensure additionally has (b)) per the general per-category scope table; this representative (rule-condition) is the NARROWEST of the five, and the folding is a representativeness compression, not a claim that all five share identical availability — flagged in notes, not silently absorbed.",
+      "witnesses": {
+        "base": {
+          "program": "precept LogRuleCondBase\n\nfield History as log of decimal\nfield Watched as integer default 0\n\nrule History.at(Watched) > 0.0 because \"watched slot must stay positive\"\n\nevent Create(Seed as decimal) initial\non Create\n    -> append History Create.Seed\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        }
+      },
+      "respellability": {
+        "resolution": "cell-override",
+        "overrideVerdict": "no",
+        "notes": [
+          "Overrides the family verdict rather than inheriting it: with disposition open and no licensed derivation named, 'is every sound program in the band respellable' cannot be answered yet either — there is no defined contract to respell against. Recorded no (not yet resolvable) rather than left silently defaulted to the family's yes, since that verdict presumes a defined contract this cell does not have."
+        ]
+      },
+      "citations": [
+        {
+          "kind": "spec",
+          "ref": "docs/language/collection-types.md:337",
+          "note": "History.at(N) — `log of T`"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Types.cs:239",
+          "note": "log accessor .at(integer) catalog declaration: NumericProofRequirement(count>0) plus IndexBoundsProofRequirement(0<=Index<count), Parameters:[PCollectionIndex]"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+          "note": "Fault family row"
+        }
+      ],
+      "notes": [
+        "MISSING RULE, reported rather than filled: this obligation (`0 <= Index and Index < F.count`) relates two DIFFERENT subjects — the index and a separate field's live cardinality — not one operand's own interval. The matrix's only written fault decision procedure (Family 4, docs/Working/obligation-discharge-matrix-2026-07-19.md § Sketch witnesses) computes a single operand's interval from its own declared modifiers and in-scope guard facts; it does not state a derivation for comparing that operand against a second, independently-varying subject. Direct testing this session (src/Precept/Pipeline/ProofEngine.Strategies.cs:390, TryIndexBoundsProof, \"Strategy 3: Guard-in-Path Proof\") confirms the shipped compiler discharges this obligation through dedicated code — decomposing it into an independently-checked lower bound (type-derived from a `nonnegative`/`positive` modifier, or a matching guard branch) and an independently-checked upper bound (a guard branch comparing the index against the collection's `.count`) — but no paragraph under docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments names this decomposition, and none of its seven closed `validityArguments` entries covers a cross-subject relational comparison discharged by splitting a conjunction across two premise classes. A verbatim whole-condition guard match (`when Index >= 0 and Index < F.count`, tested directly) does NOT discharge at HEAD either (live-verified below), which rules out reading the existing 'Guard normal-form match' argument as already covering this obligation by extension. Disposition is `open`, not `defined`, on every cell in this group for this reason — never invented past what is written.",
+        "This position mints the catalog-declared obligation at HEAD (live-verified).",
+        "Coordinates name rule-condition as the representative evaluation-site category for this cell. Folded under the same representative (authoring-economy compression across this group's twenty raw categories, not a claim of identical premise availability in every case — see premiseAvailability above for exactly what differs): state-ensure-condition, event-ensure-condition, computed-field-expression, quantifier-predicate.",
+        "Live-verified 2026-07-21 at HEAD e1a14d91: this program raises IndexBoundsGuard (site mints here, unlike the guard/declaration buckets). A further live test this session — the same rule condition with BOTH the collection's cardinality pinned by literal `mincount`/`maxcount` and the index field bounded by a literal `nonnegative max` — still raises IndexBoundsGuard (witness-g17/test-rulecond-static.precept): no discharge mechanism reaches a bare rule condition at HEAD (TryIndexBoundsProof requires a handler guard, which a rule condition does not have). No discharge witness is recorded for this bucket: none is known to exist, at any premise combination, model or built."
+      ]
+    },
+    {
+      "id": "g17/log-declaration",
+      "label": "log accessor .at(integer) — declaration-position expression, index from an earlier-declared field",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "log accessor .at(integer)",
+        "evaluationSiteCategory": "field-default-value-expression",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "open",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Sketch witnesses",
+            "note": "Family 4 — the only written fault decision procedure, and the single-operand shape it is limited to"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+            "note": "the closed list of seven named arguments; none names a cross-subject two-premise decomposition"
+          },
+          {
+            "kind": "code",
+            "ref": "src/Precept/Pipeline/ProofEngine.Strategies.cs:390",
+            "note": "TryIndexBoundsProof / \"Strategy 3: Guard-in-Path Proof\" — the actual built mechanism, unnamed in the matrix"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "0 <= Index and Index < History.count",
+        "metavariables": [
+          {
+            "name": "History",
+            "standsFor": "the collection field the .at() accessor reads"
+          },
+          {
+            "name": "Index",
+            "standsFor": "the index expression passed to .at()"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "0 <= Index and Index < History.count"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a"
+      ],
+      "premiseAvailability": "A field's `default` expression is materialised once, during construction, and its scope is restricted to fields declared above it in the file — a forward reference is impossible, not merely disallowed (docs/language/precept-language-spec.md:1352, the modifier/default value-expression scope row). No event is in scope at all (declarations are not anchored to any event), so the group's own shared setting ('the index comes from an event argument') cannot literally hold here — the index this cell tests is a second, earlier-declared field's default value instead. No guard, no event args, no pre-state; only class (a), the modifiers of fields declared earlier, is available. This cell folds four other declaration-position categories under this representative; they share the same no-event/no-guard/no-pre-state shape by the same spec citation, but were not all independently exercised.",
+      "witnesses": {
+        "base": {
+          "program": "precept LogG17DeclDefault\n\nfield History as log of decimal\nfield DefaultIndex as integer default 5\nfield Selected as decimal default History.at(DefaultIndex)\n\nevent Touch()\n\non Touch\n    -> set Selected = Selected\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "model-derived"
+          }
+        }
+      },
+      "respellability": {
+        "resolution": "cell-override",
+        "overrideVerdict": "no",
+        "notes": [
+          "Overrides the family verdict rather than inheriting it: with disposition open and no licensed derivation named, 'is every sound program in the band respellable' cannot be answered yet either — there is no defined contract to respell against. Recorded no (not yet resolvable) rather than left silently defaulted to the family's yes, since that verdict presumes a defined contract this cell does not have."
+        ]
+      },
+      "citations": [
+        {
+          "kind": "spec",
+          "ref": "docs/language/collection-types.md:337",
+          "note": "History.at(N) — `log of T`"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Types.cs:239",
+          "note": "log accessor .at(integer) catalog declaration: NumericProofRequirement(count>0) plus IndexBoundsProofRequirement(0<=Index<count), Parameters:[PCollectionIndex]"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+          "note": "Fault family row"
+        }
+      ],
+      "notes": [
+        "MISSING RULE, reported rather than filled: this obligation (`0 <= Index and Index < F.count`) relates two DIFFERENT subjects — the index and a separate field's live cardinality — not one operand's own interval. The matrix's only written fault decision procedure (Family 4, docs/Working/obligation-discharge-matrix-2026-07-19.md § Sketch witnesses) computes a single operand's interval from its own declared modifiers and in-scope guard facts; it does not state a derivation for comparing that operand against a second, independently-varying subject. Direct testing this session (src/Precept/Pipeline/ProofEngine.Strategies.cs:390, TryIndexBoundsProof, \"Strategy 3: Guard-in-Path Proof\") confirms the shipped compiler discharges this obligation through dedicated code — decomposing it into an independently-checked lower bound (type-derived from a `nonnegative`/`positive` modifier, or a matching guard branch) and an independently-checked upper bound (a guard branch comparing the index against the collection's `.count`) — but no paragraph under docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments names this decomposition, and none of its seven closed `validityArguments` entries covers a cross-subject relational comparison discharged by splitting a conjunction across two premise classes. A verbatim whole-condition guard match (`when Index >= 0 and Index < F.count`, tested directly) does NOT discharge at HEAD either (live-verified below), which rules out reading the existing 'Guard normal-form match' argument as already covering this obligation by extension. Disposition is `open`, not `defined`, on every cell in this group for this reason — never invented past what is written.",
+        "This position does NOT mint the catalog-declared obligation at HEAD (live-verified) — a built-power gap, independent of the missing-rule finding below.",
+        "Coordinates name field-default-value-expression as the representative evaluation-site category for this cell. Folded under the same representative (authoring-economy compression across this group's twenty raw categories, not a claim of identical premise availability in every case — see premiseAvailability above for exactly what differs): field-modifier-value-expression, event-arg-modifier-value-expression, collection-inner-type-modifier-value-expression, type-qualifier-expression.",
+        "NOT independently run this session for History — analogous program shown for completeness, carried from the List representative (g17/list-declaration) by the identical catalog ProofRequirement shape across all three accessors (src/Precept/Language/Types.cs). Recorded as unmeasured for this site, not assumed to match, per the group's own honesty duty."
+      ]
+    },
+    {
+      "id": "g17/logby-write",
+      "label": "log by accessor .at(integer) — write site, index from an event argument",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "log by accessor .at(integer)",
+        "evaluationSiteCategory": "transition-row-action-operand",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "open",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Sketch witnesses",
+            "note": "Family 4 — the only written fault decision procedure, and the single-operand shape it is limited to"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+            "note": "the closed list of seven named arguments; none names a cross-subject two-premise decomposition"
+          },
+          {
+            "kind": "code",
+            "ref": "src/Precept/Pipeline/ProofEngine.Strategies.cs:390",
+            "note": "TryIndexBoundsProof / \"Strategy 3: Guard-in-Path Proof\" — the actual built mechanism, unnamed in the matrix"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "0 <= Index and Index < AuditByKey.count",
+        "metavariables": [
+          {
+            "name": "AuditByKey",
+            "standsFor": "the collection field the .at() accessor reads"
+          },
+          {
+            "name": "Index",
+            "standsFor": "the index expression passed to .at()"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "0 <= Index and Index < AuditByKey.count"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a",
+        "b",
+        "c",
+        "d"
+      ],
+      "premiseAvailability": "Full write-site availability, matching the fault-family case-shape row and this group's own hazard note (docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes; group authoring notes). The obligation has two independent subjects, and premise availability differs per subject: the index (an event arg here) draws (b) from its own declared modifiers (live-verified: a `nonnegative` arg modifier supplies its lower bound); the collection's cardinality draws (a) from the field's own mincount/maxcount modifiers when both are literal, or (d) from a rule holding of the collection in the pre-state (the false-proof hazard applies here — see notes) when the write plan does not touch the collection. Class (c), the row's guard, is the only route confirmed live to supply the *relational* fact linking the two subjects (`Index < F.count`), since neither (a) nor (b) alone can express one field's value bounded by another's live cardinality. This cell's representative site (transition-row-action-operand) carries all four classes; construction-row-action-operand structurally lacks (d) (no pre-state) and (per the general handler-scope rule) construction rows also lack a residency guard fact of the kind the group's own field description assumes — folded here as an analogous but not identical write occasion, flagged, not asserted uniform.",
+      "witnesses": {
+        "base": {
+          "program": "precept LogByWriteBase\n\nfield AuditByKey as log of decimal by integer\nfield Entry as decimal default 0.0\n\nevent Create initial\nevent Seed(Value as decimal, Seq as integer)\nevent Pick(Index as integer)\n\non Create\n    -> set Entry = 0.0\n\non Seed when not (AuditByKey contains Seed.Seq)\n    -> append AuditByKey Seed.Value by Seed.Seq\n\non Pick\n    -> set Entry = AuditByKey.at(Pick.Index)\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a",
+              "b",
+              "c",
+              "d"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        },
+        "discharges": [
+          {
+            "id": "nonneg-arg-plus-guard",
+            "kind": "guard",
+            "addition": "Index as integer nonnegative   (event arg declaration, replacing `Index as integer`)\nwhen Index < AuditByKey.count and AuditByKey.count > 0   (row guard on the Pick row)",
+            "application": {
+              "locus": "row-guard",
+              "eventName": "Pick"
+            },
+            "premiseClasses": [
+              "b",
+              "c"
+            ],
+            "derivation": "empirically: Strategy 3 (Guard-in-Path Proof, src/Precept/Pipeline/ProofEngine.Strategies.cs:390) takes the lower bound from the arg's own `nonnegative` modifier (type-derived, no guard needed for that half) and the upper bound from a guard branch comparing the index against F.count; not named by any matrix validityArguments entry",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "No single `application` locus captures this addition: it spans BOTH an event-arg-declaration replacement (adding `nonnegative` to the Index arg) AND a row-guard addition (`Index < AuditByKey.count and AuditByKey.count > 0`). The schema's application DU admits only one locus per discharge entry; `application` above records the row-guard half only (the more novel half — the arg-modifier half is the same `nonnegative`-on-an-arg shape Witness Family 1 already covers). A schema-vocabulary gap for two-locus additions, not invented around here — same shape of gap fault-13 already flagged for its own field-declaration-locus addition.",
+              "Live-verified 2026-07-21 at HEAD e1a14d91: base + this addition compiles with zero diagnostics (witness-g17/logby-write-discharge.precept). The `AuditByKey.count > 0` conjunct is NOT part of this group's own obligation — it independently discharges the accessor's separate, catalog-declared non-empty NumericProofRequirement (identical to fault-13's obligation; src/Precept/Language/Types.cs:267), which mints at the same site under the same diagnostic code (IndexBoundsGuard) and must be discharged too or its own error survives. builtStatus is proven-today for the empirical outcome; modelStatus is deliberately omitted — no named validity argument licenses the derivation (see cell-level missing-rule note)."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "nonneg-arg-plus-guard",
+            "addition": "when Index < AuditByKey.count   (row guard on the Pick row, `AuditByKey.count > 0` conjunct dropped; the arg-declaration `nonnegative` half is unchanged)",
+            "application": {
+              "locus": "row-guard",
+              "eventName": "Pick"
+            },
+            "whyStillRejects": "live-verified: with `F.count > 0` removed, the compile still raises IndexBoundsGuard (witness-g17/logby-write-nearmiss.precept) — must still reject, same obligation. This specific near-miss demonstrates the built strategy requires both conjuncts even though 0 <= Index < F.count logically already entails F.count > 0; a built-power quirk, recorded rather than smoothed over.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "cell-override",
+        "overrideVerdict": "no",
+        "notes": [
+          "Overrides the family verdict rather than inheriting it: with disposition open and no licensed derivation named, 'is every sound program in the band respellable' cannot be answered yet either — there is no defined contract to respell against. Recorded no (not yet resolvable) rather than left silently defaulted to the family's yes, since that verdict presumes a defined contract this cell does not have."
+        ]
+      },
+      "citations": [
+        {
+          "kind": "spec",
+          "ref": "docs/language/collection-types.md:417",
+          "note": "AuditByKey.at(N) — `log of T by P`"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Types.cs:267",
+          "note": "log by accessor .at(integer) catalog declaration: NumericProofRequirement(count>0) plus IndexBoundsProofRequirement(0<=Index<count), Parameters:[PCollectionIndex]"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+          "note": "Fault family row"
+        }
+      ],
+      "notes": [
+        "MISSING RULE, reported rather than filled: this obligation (`0 <= Index and Index < F.count`) relates two DIFFERENT subjects — the index and a separate field's live cardinality — not one operand's own interval. The matrix's only written fault decision procedure (Family 4, docs/Working/obligation-discharge-matrix-2026-07-19.md § Sketch witnesses) computes a single operand's interval from its own declared modifiers and in-scope guard facts; it does not state a derivation for comparing that operand against a second, independently-varying subject. Direct testing this session (src/Precept/Pipeline/ProofEngine.Strategies.cs:390, TryIndexBoundsProof, \"Strategy 3: Guard-in-Path Proof\") confirms the shipped compiler discharges this obligation through dedicated code — decomposing it into an independently-checked lower bound (type-derived from a `nonnegative`/`positive` modifier, or a matching guard branch) and an independently-checked upper bound (a guard branch comparing the index against the collection's `.count`) — but no paragraph under docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments names this decomposition, and none of its seven closed `validityArguments` entries covers a cross-subject relational comparison discharged by splitting a conjunction across two premise classes. A verbatim whole-condition guard match (`when Index >= 0 and Index < F.count`, tested directly) does NOT discharge at HEAD either (live-verified below), which rules out reading the existing 'Guard normal-form match' argument as already covering this obligation by extension. Disposition is `open`, not `defined`, on every cell in this group for this reason — never invented past what is written.",
+        "This position mints the catalog-declared obligation at HEAD (live-verified).",
+        "Coordinates name transition-row-action-operand as the representative evaluation-site category for this cell. Folded under the same representative (authoring-economy compression across this group's twenty raw categories, not a claim of identical premise availability in every case — see premiseAvailability above for exactly what differs): construction-row-action-operand, state-hook-action-operand.",
+        "Full triple live-verified this session at HEAD e1a14d91: logby-write-base.precept, logby-write-discharge.precept, logby-write-nearmiss.precept under witness-g17/."
+      ]
+    },
+    {
+      "id": "g17/logby-guard",
+      "label": "log by accessor .at(integer) — guard position, index from an event argument",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "log by accessor .at(integer)",
+        "evaluationSiteCategory": "transition-row-guard",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "open",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Sketch witnesses",
+            "note": "Family 4 — the only written fault decision procedure, and the single-operand shape it is limited to"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+            "note": "the closed list of seven named arguments; none names a cross-subject two-premise decomposition"
+          },
+          {
+            "kind": "code",
+            "ref": "src/Precept/Pipeline/ProofEngine.Strategies.cs:390",
+            "note": "TryIndexBoundsProof / \"Strategy 3: Guard-in-Path Proof\" — the actual built mechanism, unnamed in the matrix"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "0 <= Index and Index < AuditByKey.count",
+        "metavariables": [
+          {
+            "name": "AuditByKey",
+            "standsFor": "the collection field the .at() accessor reads"
+          },
+          {
+            "name": "Index",
+            "standsFor": "the index expression passed to .at()"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "0 <= Index and Index < AuditByKey.count"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a",
+        "b",
+        "d"
+      ],
+      "premiseAvailability": "Class (c) is structurally unavailable: by the same reasoning the 'Guard normal-form match' validity argument states (docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments — \"a row's actions execute only if its guard evaluated true\"), the guard's own truth is exactly what is undetermined while the guard itself is being evaluated, so it cannot supply itself as a premise for an obligation minted inside it. Classes (a) and (b) remain available (the index's own declared modifiers, whichever kind of expression supplies it in this position); (d) is available wherever a pre-state exists for the guard's anchor. This cell folds six raw evaluation-site categories under one representative (transition-row-guard): the other five guard/interpolation positions in this group's region share the same 'cannot discharge itself' / 'no mutation here' shape but were not all independently exercised — see notes for exactly which were.",
+      "witnesses": {
+        "base": {
+          "program": "precept LogByGuardBase\n\nfield AuditByKey as log of decimal by integer\nfield Flag as boolean default false\n\nevent Create initial\nevent Seed(Value as decimal, Seq as integer)\nevent Check(Index as integer)\n\non Create\n    -> set Flag = false\n\non Seed when not (AuditByKey contains Seed.Seq)\n    -> append AuditByKey Seed.Value by Seed.Seq\n\non Check when AuditByKey.at(Check.Index) > 0.0\n    -> set Flag = true\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a",
+              "b",
+              "d"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "model-derived"
+          }
+        }
+      },
+      "respellability": {
+        "resolution": "cell-override",
+        "overrideVerdict": "no",
+        "notes": [
+          "Overrides the family verdict rather than inheriting it: with disposition open and no licensed derivation named, 'is every sound program in the band respellable' cannot be answered yet either — there is no defined contract to respell against. Recorded no (not yet resolvable) rather than left silently defaulted to the family's yes, since that verdict presumes a defined contract this cell does not have."
+        ]
+      },
+      "citations": [
+        {
+          "kind": "spec",
+          "ref": "docs/language/collection-types.md:417",
+          "note": "AuditByKey.at(N) — `log of T by P`"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Types.cs:267",
+          "note": "log by accessor .at(integer) catalog declaration: NumericProofRequirement(count>0) plus IndexBoundsProofRequirement(0<=Index<count), Parameters:[PCollectionIndex]"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+          "note": "Fault family row"
+        }
+      ],
+      "notes": [
+        "MISSING RULE, reported rather than filled: this obligation (`0 <= Index and Index < F.count`) relates two DIFFERENT subjects — the index and a separate field's live cardinality — not one operand's own interval. The matrix's only written fault decision procedure (Family 4, docs/Working/obligation-discharge-matrix-2026-07-19.md § Sketch witnesses) computes a single operand's interval from its own declared modifiers and in-scope guard facts; it does not state a derivation for comparing that operand against a second, independently-varying subject. Direct testing this session (src/Precept/Pipeline/ProofEngine.Strategies.cs:390, TryIndexBoundsProof, \"Strategy 3: Guard-in-Path Proof\") confirms the shipped compiler discharges this obligation through dedicated code — decomposing it into an independently-checked lower bound (type-derived from a `nonnegative`/`positive` modifier, or a matching guard branch) and an independently-checked upper bound (a guard branch comparing the index against the collection's `.count`) — but no paragraph under docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments names this decomposition, and none of its seven closed `validityArguments` entries covers a cross-subject relational comparison discharged by splitting a conjunction across two premise classes. A verbatim whole-condition guard match (`when Index >= 0 and Index < F.count`, tested directly) does NOT discharge at HEAD either (live-verified below), which rules out reading the existing 'Guard normal-form match' argument as already covering this obligation by extension. Disposition is `open`, not `defined`, on every cell in this group for this reason — never invented past what is written.",
+        "This position does NOT mint the catalog-declared obligation at HEAD (live-verified) — a built-power gap, independent of the missing-rule finding below.",
+        "Coordinates name transition-row-guard as the representative evaluation-site category for this cell. Folded under the same representative (authoring-economy compression across this group's twenty raw categories, not a claim of identical premise availability in every case — see premiseAvailability above for exactly what differs): state-hook-guard, access-mode-guard, ensure-activation-guard, rule-activation-guard, reject-message-interpolation, constraint-rationale-interpolation.",
+        "Live-verified 2026-07-21 at HEAD e1a14d91: this exact program (an out-of-bounds-capable index read inside the row's own `when` clause, with no modifier or other fact anywhere) compiles with ZERO diagnostics — the model's committed rejection is NOT confirmed by this run, so provenance on the base above is recorded model-derived rather than live-verified, per the provenance field's meaning (it attests only what a run actually confirmed). The position mints no fault obligation at HEAD for this catalog site — a built-power gap, independent of the discharge question this cell is otherwise open on. No discharge/near-miss witnesses are recorded: since the base already compiles clean, there is nothing an addition could be shown to change."
+      ]
+    },
+    {
+      "id": "g17/logby-constraint",
+      "label": "log by accessor .at(integer) — constraint condition, index from an event argument",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "log by accessor .at(integer)",
+        "evaluationSiteCategory": "rule-condition",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "open",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Sketch witnesses",
+            "note": "Family 4 — the only written fault decision procedure, and the single-operand shape it is limited to"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+            "note": "the closed list of seven named arguments; none names a cross-subject two-premise decomposition"
+          },
+          {
+            "kind": "code",
+            "ref": "src/Precept/Pipeline/ProofEngine.Strategies.cs:390",
+            "note": "TryIndexBoundsProof / \"Strategy 3: Guard-in-Path Proof\" — the actual built mechanism, unnamed in the matrix"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "0 <= Index and Index < AuditByKey.count",
+        "metavariables": [
+          {
+            "name": "AuditByKey",
+            "standsFor": "the collection field the .at() accessor reads"
+          },
+          {
+            "name": "Index",
+            "standsFor": "the index expression passed to .at()"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "0 <= Index and Index < AuditByKey.count"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a"
+      ],
+      "premiseAvailability": "A bare `rule` condition is not anchored to any handler: it is evaluated against the complete working copy at every checkpoint, in every reachable configuration (docs/Working/obligation-discharge-matrix-2026-07-19.md § Axes, constraint-structure framing; docs/language/precept-language-spec.md on rule declarations). No guard is in scope (there is none), no event args are in scope (no event fired), and there is no single pre-state to appeal to (the condition must hold over every configuration, not a particular predecessor). Only class (a), field modifiers, is available without further ruling. This cell folds four other raw categories under this representative — state-ensure-condition and event-ensure-condition in fact carry a wider class set (their own optional `when` supplies class (c), and event-ensure additionally has (b)) per the general per-category scope table; this representative (rule-condition) is the NARROWEST of the five, and the folding is a representativeness compression, not a claim that all five share identical availability — flagged in notes, not silently absorbed.",
+      "witnesses": {
+        "base": {
+          "program": "precept LogByRuleCondBase\n\nfield AuditByKey as log of decimal by integer\nfield Watched as integer default 0\n\nrule AuditByKey.at(Watched) > 0.0 because \"watched slot must stay positive\"\n\nevent Create initial\nevent Seed(Value as decimal, Seq as integer)\n\non Create\n    -> set Watched = 0\n\non Seed when not (AuditByKey contains Seed.Seq)\n    -> append AuditByKey Seed.Value by Seed.Seq\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        }
+      },
+      "respellability": {
+        "resolution": "cell-override",
+        "overrideVerdict": "no",
+        "notes": [
+          "Overrides the family verdict rather than inheriting it: with disposition open and no licensed derivation named, 'is every sound program in the band respellable' cannot be answered yet either — there is no defined contract to respell against. Recorded no (not yet resolvable) rather than left silently defaulted to the family's yes, since that verdict presumes a defined contract this cell does not have."
+        ]
+      },
+      "citations": [
+        {
+          "kind": "spec",
+          "ref": "docs/language/collection-types.md:417",
+          "note": "AuditByKey.at(N) — `log of T by P`"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Types.cs:267",
+          "note": "log by accessor .at(integer) catalog declaration: NumericProofRequirement(count>0) plus IndexBoundsProofRequirement(0<=Index<count), Parameters:[PCollectionIndex]"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+          "note": "Fault family row"
+        }
+      ],
+      "notes": [
+        "MISSING RULE, reported rather than filled: this obligation (`0 <= Index and Index < F.count`) relates two DIFFERENT subjects — the index and a separate field's live cardinality — not one operand's own interval. The matrix's only written fault decision procedure (Family 4, docs/Working/obligation-discharge-matrix-2026-07-19.md § Sketch witnesses) computes a single operand's interval from its own declared modifiers and in-scope guard facts; it does not state a derivation for comparing that operand against a second, independently-varying subject. Direct testing this session (src/Precept/Pipeline/ProofEngine.Strategies.cs:390, TryIndexBoundsProof, \"Strategy 3: Guard-in-Path Proof\") confirms the shipped compiler discharges this obligation through dedicated code — decomposing it into an independently-checked lower bound (type-derived from a `nonnegative`/`positive` modifier, or a matching guard branch) and an independently-checked upper bound (a guard branch comparing the index against the collection's `.count`) — but no paragraph under docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments names this decomposition, and none of its seven closed `validityArguments` entries covers a cross-subject relational comparison discharged by splitting a conjunction across two premise classes. A verbatim whole-condition guard match (`when Index >= 0 and Index < F.count`, tested directly) does NOT discharge at HEAD either (live-verified below), which rules out reading the existing 'Guard normal-form match' argument as already covering this obligation by extension. Disposition is `open`, not `defined`, on every cell in this group for this reason — never invented past what is written.",
+        "This position mints the catalog-declared obligation at HEAD (live-verified).",
+        "Coordinates name rule-condition as the representative evaluation-site category for this cell. Folded under the same representative (authoring-economy compression across this group's twenty raw categories, not a claim of identical premise availability in every case — see premiseAvailability above for exactly what differs): state-ensure-condition, event-ensure-condition, computed-field-expression, quantifier-predicate.",
+        "Live-verified 2026-07-21 at HEAD e1a14d91: this program raises IndexBoundsGuard (site mints here, unlike the guard/declaration buckets). A further live test this session — the same rule condition with BOTH the collection's cardinality pinned by literal `mincount`/`maxcount` and the index field bounded by a literal `nonnegative max` — still raises IndexBoundsGuard (witness-g17/test-rulecond-static.precept): no discharge mechanism reaches a bare rule condition at HEAD (TryIndexBoundsProof requires a handler guard, which a rule condition does not have). No discharge witness is recorded for this bucket: none is known to exist, at any premise combination, model or built."
+      ]
+    },
+    {
+      "id": "g17/logby-declaration",
+      "label": "log by accessor .at(integer) — declaration-position expression, index from an earlier-declared field",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "log by accessor .at(integer)",
+        "evaluationSiteCategory": "field-default-value-expression",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "open",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Sketch witnesses",
+            "note": "Family 4 — the only written fault decision procedure, and the single-operand shape it is limited to"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+            "note": "the closed list of seven named arguments; none names a cross-subject two-premise decomposition"
+          },
+          {
+            "kind": "code",
+            "ref": "src/Precept/Pipeline/ProofEngine.Strategies.cs:390",
+            "note": "TryIndexBoundsProof / \"Strategy 3: Guard-in-Path Proof\" — the actual built mechanism, unnamed in the matrix"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "0 <= Index and Index < AuditByKey.count",
+        "metavariables": [
+          {
+            "name": "AuditByKey",
+            "standsFor": "the collection field the .at() accessor reads"
+          },
+          {
+            "name": "Index",
+            "standsFor": "the index expression passed to .at()"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "0 <= Index and Index < AuditByKey.count"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a"
+      ],
+      "premiseAvailability": "A field's `default` expression is materialised once, during construction, and its scope is restricted to fields declared above it in the file — a forward reference is impossible, not merely disallowed (docs/language/precept-language-spec.md:1352, the modifier/default value-expression scope row). No event is in scope at all (declarations are not anchored to any event), so the group's own shared setting ('the index comes from an event argument') cannot literally hold here — the index this cell tests is a second, earlier-declared field's default value instead. No guard, no event args, no pre-state; only class (a), the modifiers of fields declared earlier, is available. This cell folds four other declaration-position categories under this representative; they share the same no-event/no-guard/no-pre-state shape by the same spec citation, but were not all independently exercised.",
+      "witnesses": {
+        "base": {
+          "program": "precept LogByG17DeclDefault\n\nfield AuditByKey as log of decimal by integer\nfield DefaultIndex as integer default 5\nfield Selected as decimal default AuditByKey.at(DefaultIndex)\n\nevent Touch()\n\non Touch\n    -> set Selected = Selected\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "model-derived"
+          }
+        }
+      },
+      "respellability": {
+        "resolution": "cell-override",
+        "overrideVerdict": "no",
+        "notes": [
+          "Overrides the family verdict rather than inheriting it: with disposition open and no licensed derivation named, 'is every sound program in the band respellable' cannot be answered yet either — there is no defined contract to respell against. Recorded no (not yet resolvable) rather than left silently defaulted to the family's yes, since that verdict presumes a defined contract this cell does not have."
+        ]
+      },
+      "citations": [
+        {
+          "kind": "spec",
+          "ref": "docs/language/collection-types.md:417",
+          "note": "AuditByKey.at(N) — `log of T by P`"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Types.cs:267",
+          "note": "log by accessor .at(integer) catalog declaration: NumericProofRequirement(count>0) plus IndexBoundsProofRequirement(0<=Index<count), Parameters:[PCollectionIndex]"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+          "note": "Fault family row"
+        }
+      ],
+      "notes": [
+        "MISSING RULE, reported rather than filled: this obligation (`0 <= Index and Index < F.count`) relates two DIFFERENT subjects — the index and a separate field's live cardinality — not one operand's own interval. The matrix's only written fault decision procedure (Family 4, docs/Working/obligation-discharge-matrix-2026-07-19.md § Sketch witnesses) computes a single operand's interval from its own declared modifiers and in-scope guard facts; it does not state a derivation for comparing that operand against a second, independently-varying subject. Direct testing this session (src/Precept/Pipeline/ProofEngine.Strategies.cs:390, TryIndexBoundsProof, \"Strategy 3: Guard-in-Path Proof\") confirms the shipped compiler discharges this obligation through dedicated code — decomposing it into an independently-checked lower bound (type-derived from a `nonnegative`/`positive` modifier, or a matching guard branch) and an independently-checked upper bound (a guard branch comparing the index against the collection's `.count`) — but no paragraph under docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments names this decomposition, and none of its seven closed `validityArguments` entries covers a cross-subject relational comparison discharged by splitting a conjunction across two premise classes. A verbatim whole-condition guard match (`when Index >= 0 and Index < F.count`, tested directly) does NOT discharge at HEAD either (live-verified below), which rules out reading the existing 'Guard normal-form match' argument as already covering this obligation by extension. Disposition is `open`, not `defined`, on every cell in this group for this reason — never invented past what is written.",
+        "This position does NOT mint the catalog-declared obligation at HEAD (live-verified) — a built-power gap, independent of the missing-rule finding below.",
+        "Coordinates name field-default-value-expression as the representative evaluation-site category for this cell. Folded under the same representative (authoring-economy compression across this group's twenty raw categories, not a claim of identical premise availability in every case — see premiseAvailability above for exactly what differs): field-modifier-value-expression, event-arg-modifier-value-expression, collection-inner-type-modifier-value-expression, type-qualifier-expression.",
+        "NOT independently run this session for AuditByKey — analogous program shown for completeness, carried from the List representative (g17/list-declaration) by the identical catalog ProofRequirement shape across all three accessors (src/Precept/Language/Types.cs). Recorded as unmeasured for this site, not assumed to match, per the group's own honesty duty."
+      ]
+    }
+  ]
+}

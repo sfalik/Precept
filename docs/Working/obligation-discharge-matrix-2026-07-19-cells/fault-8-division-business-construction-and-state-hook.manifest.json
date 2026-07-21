@@ -1,0 +1,48 @@
+{
+  "familyId": "fault-8-division-business-construction-and-state-hook",
+  "definitionVersion": "obligation-discharge-matrix-2026-07-19 rev 7 (2026-07-20, draft)",
+  "sourceFile": "fault-8-division-business-construction-and-state-hook.cells.json",
+  "rows": [],
+  "skips": [
+    {
+      "cellId": "g08/mdd-construction-row",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g08/mdd-state-hook",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g08/mdq-construction-row",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g08/mdq-state-hook",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g08/qdd-construction-row",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g08/qdd-state-hook",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g08/pdq-construction-row",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g08/pdq-state-hook",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    }
+  ]
+}

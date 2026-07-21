@@ -1,0 +1,58 @@
+{
+  "familyId": "fault-3-division-primitive-guard-positions",
+  "definitionVersion": "obligation-discharge-matrix-2026-07-19 rev 7 (2026-07-20, draft)",
+  "sourceFile": "fault-3-division-primitive-guard-positions.cells.json",
+  "rows": [],
+  "skips": [
+    {
+      "cellId": "g03/transition-row-guard-int",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g03/transition-row-guard-dec",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g03/state-hook-guard-int",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g03/state-hook-guard-dec",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g03/access-mode-guard-int",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g03/access-mode-guard-dec",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g03/ensure-activation-guard-int",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g03/ensure-activation-guard-dec",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g03/rule-activation-guard-int",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g03/rule-activation-guard-dec",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    }
+  ]
+}

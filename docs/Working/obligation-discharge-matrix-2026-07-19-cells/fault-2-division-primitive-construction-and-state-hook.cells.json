@@ -1,0 +1,3095 @@
+{
+  "$schema": "./cell.schema.json",
+  "familyId": "fault-2-division-construction-and-state-hook",
+  "title": "Fault family — division/modulo by zero, primitive lanes, construction row and state entry/exit hook",
+  "caseShape": "fault",
+  "definitionVersion": "obligation-discharge-matrix-2026-07-19 rev 7 (2026-07-20, draft)",
+  "citations": [
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+      "note": "the Fault family row"
+    },
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:186",
+      "note": "fault minting is catalog-stamped at evaluation sites"
+    },
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:299",
+      "note": "Family 4 — fault family, arg-constraint discharge (the matrix's own worked precedent for this group's class-(b) story)"
+    },
+    {
+      "kind": "spec",
+      "ref": "docs/language/precept-language-spec.md:205",
+      "note": "two-tier divisor safety"
+    },
+    {
+      "kind": "code",
+      "ref": "src/Precept/Language/Operations.cs:119",
+      "note": "the ten catalog `OperationKind` entries this group covers, each carrying a `NumericProofRequirement(... NotEquals, 0m, \"Divisor must be non-zero\")`"
+    }
+  ],
+  "respellability": {
+    "verdict": "yes",
+    "evidence": "model-derived",
+    "corpusMeasurement": "pending",
+    "citations": [
+      {
+        "kind": "matrix",
+        "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+        "note": "the Respellable bullet"
+      },
+      {
+        "kind": "matrix",
+        "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Ratification protocol",
+        "note": "layer 4: corpus measurement is the hard gate"
+      }
+    ],
+    "notes": [
+      "Every near-miss in this group weakens a `positive`/`nonzero` bound to a `nonnegative` one (or a strict guard/rule to a non-strict one) — in every case the licensed respelling is simply the stricter bound, guard, or rule the contract already names, spelled directly rather than approximated. No band member requiring algebraic rearrangement or multi-fact combination was found while authoring this group; not corpus-measured, so the verdict rests on this pass's own worked witnesses only, per the ratification protocol's evidence standard."
+    ]
+  },
+  "cells": [
+    {
+      "id": "fault2/cr-intdiv",
+      "label": "Integer division by zero, construction row",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "IntegerDivideInteger",
+        "evaluationSiteCategory": "construction-row-action-operand",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+            "note": "the Fault family row: catalog-declared safety precondition at the evaluation site"
+          },
+          {
+            "kind": "spec",
+            "ref": "docs/language/precept-language-spec.md:205",
+            "note": "two-tier divisor safety: a proven-zero divisor is a hard error; an unproven divisor is an obligation the author discharges with nonzero, positive, a rule, or a guard"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Divisor != 0",
+        "metavariables": [
+          {
+            "name": "Divisor",
+            "standsFor": "the divisor operand at this evaluation site — an event arg of the firing construction row, or a field the row does not write"
+          },
+          {
+            "name": "0",
+            "standsFor": "the integer zero value"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "Divisor != 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a",
+        "b"
+      ],
+      "premiseAvailability": "There is no pre-state at a construction row — the entity does not yet exist in any state when the initial event fires (spec § Stateless/stateful cross-validation; spec:2064: 'Construction is a special case (the entity is not yet in any state)') — so premise (d) is structurally unavailable: there is nothing for the inductive hypothesis to range over. The handler's own guard (c) does not exist either: construction rows are the `on <Event> initial` form, not a guarded transition row. What remains is whichever of the two classes matches the divisor's own syntactic kind: (b) when the divisor is the firing event's own arg (governed at ingress before this row's actions run, spec:268), and (a) when the divisor is a field the row does not write, whose own declared modifier is established over the default configuration by the same reasoning as any other unwritten field (matrix § Validity arguments, 'Establishment over defaults').",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "b"
+          ],
+          "derivation": "governance enforces the event arg's declared modifier at ingress, before this row's actions read it (spec:268); the declared modifier gives an interval on the divisor that excludes zero",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "look up the divisor arg's declared modifiers (a finite set — the modifier-to-ProofSatisfaction table, matrix § Witness Family 1 Base B decision procedure); an interval that excludes zero discharges, otherwise reject naming class (b).",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:299",
+              "note": "Family 4 — fault family, arg-constraint discharge: the same divisor-arg-positive pattern, already worked as the matrix's own fault-family precedent"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "the divisor field carries its own declared modifier (e.g. `positive`/`nonzero`); the firing construction row does not write this field, so its post-construction value is exactly its declared default (matrix § Validity arguments, 'Establishment over defaults'); the modifier's own establishment obligation over that default constant-folds (matrix § Validity arguments, 'Literal constant-fold for defaults')",
+          "validityArguments": [
+            "Establishment over defaults",
+            "Literal constant-fold for defaults"
+          ],
+          "decisionProcedure": "for a divisor field with no write site in the firing construction row, constant-fold the field's declared modifier over its literal default (the fold terminates — expressions are finite, loop-free trees, spec § 0.4); a fold excluding zero discharges, otherwise reject naming class (a).",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "Establishment over defaults (the pre-configuration rule)"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "declare a modifier on the divisor field (`positive`, `nonzero`, or an equivalent bound) that the firing construction row does not overwrite, so its established default satisfies <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "b"
+          ],
+          "schema": "bound the divisor arg (`positive`, `nonzero`, or an equivalent bound) such that its declared interval satisfies <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept ConstructIntdiv\n\nfield Result as integer default 0\n\nevent Init(Numerator as integer, Divisor as integer) initial\n\non Init -> set Result = Init.Numerator / Init.Divisor",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a",
+              "b"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+            "date": "2026-07-21",
+            "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+          }
+        },
+        "discharges": [
+          {
+            "id": "b-arg-positive",
+            "kind": "arg-modifier",
+            "addition": "Divisor as integer positive",
+            "application": {
+              "locus": "event-arg-declarations",
+              "replacements": [
+                {
+                  "eventName": "Init",
+                  "argName": "Divisor",
+                  "declaration": "Divisor as integer positive"
+                }
+              ]
+            },
+            "premiseClasses": [
+              "b"
+            ],
+            "derivation": "governance enforces `Divisor positive` at ingress before the row reads it; the interval (0, +inf) excludes zero",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          },
+          {
+            "id": "a-field-default-positive",
+            "kind": "structural-edit",
+            "addition": "replace `event Init(Numerator as integer, Divisor as integer) initial` and `on Init -> set Result = Init.Numerator / Init.Divisor` with:\nfield Divisor as integer positive default 5\nevent Init(Numerator as integer) initial\non Init -> set Result = Init.Numerator / Divisor",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "Divisor is unwritten by the construction row, so its post-construction value is its declared default; the field's own `positive` modifier constant-folds over that literal default to true, and the fold excludes zero",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "notes": [
+              "This discharge changes which expression fills the divisor slot (an unwritten field, not the firing event's own arg) rather than adding a line to the stated base's own shape — recorded as `structural-edit` per the schema's own kind vocabulary for this reason.",
+              "The `application` DU (cell.schema.json # application) has no locus for this edit: it only models (i) appending a guard to a named event row via `row-guard` (which requires an `eventName`, and this edit attaches to a state target or a bare field/rule declaration, not an event row) and (ii) replacing a named event-arg declaration. Recording the edit in `addition` and leaving `application` absent, per the same open-vocabulary-item treatment the README already uses for `construction-defaults`."
+            ],
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "b-arg-positive",
+            "addition": "Divisor as integer nonnegative",
+            "application": {
+              "locus": "event-arg-declarations",
+              "replacements": [
+                {
+                  "eventName": "Init",
+                  "argName": "Divisor",
+                  "declaration": "Divisor as integer nonnegative"
+                }
+              ]
+            },
+            "whyStillRejects": "nonnegative admits zero — the interval [0, +inf) does not exclude it — must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          },
+          {
+            "pairsWith": "a-field-default-positive",
+            "addition": "replace the same two rows with:\nfield Divisor as integer nonnegative default 0\nevent Init(Numerator as integer) initial\non Init -> set Result = Init.Numerator / Divisor",
+            "whyStillRejects": "the field's own default is now the zero literal itself, admitted by `nonnegative` — must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+          "note": "the Fault family row"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:186",
+          "note": "fault minting is catalog-stamped at evaluation sites"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md:2064",
+          "note": "construction is a special case — the entity is not yet in any state"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md:1987",
+          "note": "construction rows use `on <EventName>`, not `from <State> on <Event>`, because no state exists yet"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "fault2/sh-intdiv",
+      "label": "Integer division by zero, state entry/exit hook",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "IntegerDivideInteger",
+        "evaluationSiteCategory": "state-hook-action-operand",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+            "note": "the Fault family row"
+          },
+          {
+            "kind": "spec",
+            "ref": "docs/language/precept-language-spec.md:205",
+            "note": "two-tier divisor safety"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Divisor != 0",
+        "metavariables": [
+          {
+            "name": "Divisor",
+            "standsFor": "the divisor operand at this evaluation site — a field read by a `to S ->` / `from S ->` hook's own action list"
+          },
+          {
+            "name": "0",
+            "standsFor": "the integer zero value"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "Divisor != 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a",
+        "c",
+        "d"
+      ],
+      "premiseAvailability": "A state hook fires on every inbound or outbound edge into/out of its named state, regardless of which row or event triggered the transition (spec § State action); the hook's own scope gives it field names only, no event args (spec:1348, the scope table's 'State action guard / actions | All field names' row) — so premise (b) is structurally unavailable: there is no arg in scope to bound. What is available: (c), the hook's own optional `when` guard, evaluated the same way any guard is (guards select, spec:1897); (d), a pre-state constraint — the hook fires with a real pre-state, so the standing inductive hypothesis over the entity's reachable-configuration history applies; and (a), the divisor field's own declared modifier, carried into the hook's read whenever the hook's own action list does not write the field first. Classes (a) and (d) rest on the identical inductive mechanism here — the only difference is whether the zero-exclusion fact was declared as a modifier on the field or as a standalone `rule` — so both are argued from the same validity-argument text below, with a note on the narrower scope of its stated arithmetic.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "derivation": "the hook's own `when` guard, evaluated before its actions run, restates the zero-exclusion fact directly",
+          "validityArguments": [
+            "Guard normal-form match"
+          ],
+          "decisionProcedure": "normal-form match of `Divisor != <zero>` against the hook's own guard conjuncts (a finite set); no match rejects naming class (c).",
+          "citations": [
+            {
+              "kind": "spec",
+              "ref": "docs/language/precept-language-spec.md:1016",
+              "note": "state actions support an optional `when` guard between the state target and the action chain"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "Guard normal-form match"
+            }
+          ],
+          "openDependencies": []
+        },
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "the divisor field carries its own declared modifier (e.g. `nonzero`); that modifier is proven to hold across every write site of the field (a rule-establishment/preservation obligation on the field itself, a separate rule-write-family concern) and this hook's own action list does not write the field before the divisor is read, so the modifier's standing guarantee carries unchanged into the read — the same inductive mechanism premise (d) uses, without needing the sign-monotonicity half of that argument's text (there is no arithmetic transform here, only an unwritten read)",
+          "validityArguments": [
+            "Inductive hypothesis plus sign monotonicity"
+          ],
+          "decisionProcedure": "if the divisor field is not written by this hook's own action list before the read, look up its declared modifiers (the same finite modifier-to-ProofSatisfaction table class (b)/(a) use elsewhere); an interval excluding zero discharges, otherwise reject naming class (a).",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "Inductive hypothesis plus sign monotonicity — reused here for its inductive-hypothesis half only; the sign-monotonicity half is inapplicable and unneeded, since no write transforms the divisor between establishment and this read"
+            }
+          ],
+          "notes": [
+            "This premise's soundness depends on the divisor field's own establishment/preservation proof holding across every one of its write sites elsewhere in the file — exactly the dependency the matrix already names for premise (d) ('the hypothesis is only as sound as the minting rule is complete... a missed write site voids the hypothesis'). Recorded as a dependency, not re-derived here."
+          ]
+        },
+        {
+          "premiseClasses": [
+            "d"
+          ],
+          "derivation": "an explicit `rule` states the divisor's zero-exclusion; that rule holds in the pre-state by the standing inductive hypothesis (establishment at construction, preservation at every write site of every mentioned field, atomic commit, spec:1967), and this hook's own action list does not write the divisor before the read, so the pre-state fact carries unchanged into the read",
+          "validityArguments": [
+            "Inductive hypothesis plus sign monotonicity"
+          ],
+          "decisionProcedure": "if the divisor field is not written by this hook's own action list before the read, look up a rule holding of it in the pre-state that excludes zero (the standing inductive hypothesis); none found rejects naming class (d).",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "Inductive hypothesis plus sign monotonicity — inductive-hypothesis half only, as for class (a) above"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:88",
+              "note": "Open design hole: nothing detects an obligation that was never minted — the same dependency this premise rests on"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:94",
+              "note": "the verified false-proof instance: a `rule` premise consumed via CompositionalConstraint while a different handler violates it, with zero diagnostics"
+            },
+            {
+              "kind": "code",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md",
+              "note": "Part 3, Defect B — the same verified defect, worked in full"
+            }
+          ],
+          "notes": [
+            "HAZARD: this contract entry is consumed via a business `rule` used as a premise. Slice 2 verified at HEAD that this exact discharge shape (a rule stating a field's sign, consumed as premise (d) for an unrelated obligation) can be a false proof when a different handler sets the field to zero elsewhere in the file (matrix:94; authored-expressiveness-gaps.md Part 3, Defect B). This group's witness below has no such violating handler, so its clean compile is not itself an instance of the defect — but the discharge mechanism it exercises is the same one the defect implicates, so its builtStatus is recorded unresolved-today rather than proven-today, per this group's authoring instruction, regardless of the observed clean compile."
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "schema": "add a guard normal-form-equal to <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "declare a modifier on the divisor field (`positive`, `nonzero`, or an equivalent bound) that this hook does not overwrite, so its standing guarantee satisfies <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "d"
+          ],
+          "schema": "state a rule that the divisor satisfies <WP>, holding in the pre-state and not written by this hook before the read",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept StateHookIntdiv\n\nstate Start initial\nstate Done terminal\n\nfield Divisor as integer default 0\nfield Result as integer default 0\n\nevent Init initial\nevent Finish\n\non Init -> set Divisor = 0\n\nfrom Start on Finish -> transition Done\n\nto Done -> set Result = 100 / Divisor",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a",
+              "c",
+              "d"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+            "date": "2026-07-21",
+            "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+          }
+        },
+        "discharges": [
+          {
+            "id": "c-hook-guard",
+            "kind": "guard",
+            "addition": "when Divisor != 0",
+            "premiseClasses": [
+              "c"
+            ],
+            "derivation": "the hook's own guard normal-form-equal to the WP discharges by guard-match, the same mechanism as a transition row's guard, generalized to a state hook's `when` (spec § State action)",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "notes": [
+              "The `application` DU's only guard locus (`row-guard`) requires an `eventName`, which a state hook does not have (it is anchored to a state target, spec § State action) — `application` is left absent for this reason, per the same open-vocabulary-item treatment the README uses elsewhere; the addition text is recorded in prose instead."
+            ],
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          },
+          {
+            "id": "a-field-nonzero-unwritten",
+            "kind": "other",
+            "addition": "field Divisor as integer nonzero default 5  (replacing the base's unconstrained `field Divisor as integer default 0`; the construction row's own `set Divisor = 0` is changed to `set Divisor = 5` to keep the row internally consistent with the field's own modifier)",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "Divisor's own `nonzero` modifier is established at construction (over the literal it is set to) and this hook does not write Divisor before the read, so the modifier's standing guarantee carries unchanged into the read",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "notes": [
+              "The `application` DU (cell.schema.json # application) has no locus for this edit: it only models (i) appending a guard to a named event row via `row-guard` (which requires an `eventName`, and this edit attaches to a state target or a bare field/rule declaration, not an event row) and (ii) replacing a named event-arg declaration. Recording the edit in `addition` and leaving `application` absent, per the same open-vocabulary-item treatment the README already uses for `construction-defaults`."
+            ],
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          },
+          {
+            "id": "d-rule-nonzero-unwritten",
+            "kind": "other",
+            "addition": "rule Divisor != 0 because \"Divisor must never be zero — a zero divisor would make every downstream rate calculation undefined\"  (with the field's own default changed from 0 to 5 and the construction row's `set Divisor = 5`, so the rule is establishable)",
+            "premiseClasses": [
+              "d"
+            ],
+            "derivation": "the rule holds in the pre-state by the standing inductive hypothesis and this hook does not write Divisor before the read, so the pre-state fact carries unchanged into the read",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "HAZARD, per this group's authoring instruction: this discharge is consumed via a business `rule` premise, the same discharge shape the verified false-proof defect implicates (matrix:94; authored-expressiveness-gaps.md Part 3, Defect B — CompositionalConstraint accepting a rule as a premise with no check that some other handler violates it). The live run below in fact compiled clean (no DivisionByZero), but per the authoring instruction this is recorded as unresolved-today, not proven-today, because the discharge mechanism is not certified sound in general, even though this specific witness has no violating handler.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "notes": [
+              "The `application` DU (cell.schema.json # application) has no locus for this edit: it only models (i) appending a guard to a named event row via `row-guard` (which requires an `eventName`, and this edit attaches to a state target or a bare field/rule declaration, not an event row) and (ii) replacing a named event-arg declaration. Recording the edit in `addition` and leaving `application` absent, per the same open-vocabulary-item treatment the README already uses for `construction-defaults`."
+            ],
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "c-hook-guard",
+            "addition": "when Divisor >= 0",
+            "whyStillRejects": "the guard admits zero — does not imply the WP — must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          },
+          {
+            "pairsWith": "a-field-nonzero-unwritten",
+            "addition": "field Divisor as integer nonnegative default 0  (construction row keeps `set Divisor = 0`)",
+            "whyStillRejects": "nonnegative admits the field's own default of zero — must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          },
+          {
+            "pairsWith": "d-rule-nonzero-unwritten",
+            "addition": "rule Divisor >= 0 because \"Divisor must never be negative...\"  (field default kept at 0)",
+            "whyStillRejects": "the rule admits zero — must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+          "note": "the Fault family row"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md § State action",
+          "note": "the state-action grammar and its optional `when` guard"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md:1348",
+          "note": "the scope table: state action guard / actions see all field names, nothing else"
+        }
+      ],
+      "openDependencies": [],
+      "notes": [
+        "The matrix records as open whether the residency fact itself (the entity is in state S) is a premise, and under which class (matrix:150, the `in S ensure` case-shape row's Open bullet). This cell's own divisor obligation does not depend on residency — the discharges above rest on the field's own history, not on which state the entity is in — but the group's authoring instruction is to carry this open item on every state-hook cell rather than assume either answer, so it is recorded here. No packet Q/S identifier has been minted for this specific open item as of this pass (checked: review-1 through review-6 under obligation-discharge-matrix-2026-07-19-reviews/, and the want-analysis decision packet); `openDependencies` is left empty rather than filled with a fabricated identifier, and this note carries the dependency in prose instead."
+      ]
+    },
+    {
+      "id": "fault2/cr-intmod",
+      "label": "Integer modulo by zero, construction row",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "IntegerModuloInteger",
+        "evaluationSiteCategory": "construction-row-action-operand",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+            "note": "the Fault family row: catalog-declared safety precondition at the evaluation site"
+          },
+          {
+            "kind": "spec",
+            "ref": "docs/language/precept-language-spec.md:205",
+            "note": "two-tier divisor safety: a proven-zero divisor is a hard error; an unproven divisor is an obligation the author discharges with nonzero, positive, a rule, or a guard"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Divisor != 0",
+        "metavariables": [
+          {
+            "name": "Divisor",
+            "standsFor": "the divisor operand at this evaluation site — an event arg of the firing construction row, or a field the row does not write"
+          },
+          {
+            "name": "0",
+            "standsFor": "the integer zero value"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "Divisor != 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a",
+        "b"
+      ],
+      "premiseAvailability": "There is no pre-state at a construction row — the entity does not yet exist in any state when the initial event fires (spec § Stateless/stateful cross-validation; spec:2064: 'Construction is a special case (the entity is not yet in any state)') — so premise (d) is structurally unavailable: there is nothing for the inductive hypothesis to range over. The handler's own guard (c) does not exist either: construction rows are the `on <Event> initial` form, not a guarded transition row. What remains is whichever of the two classes matches the divisor's own syntactic kind: (b) when the divisor is the firing event's own arg (governed at ingress before this row's actions run, spec:268), and (a) when the divisor is a field the row does not write, whose own declared modifier is established over the default configuration by the same reasoning as any other unwritten field (matrix § Validity arguments, 'Establishment over defaults').",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "b"
+          ],
+          "derivation": "governance enforces the event arg's declared modifier at ingress, before this row's actions read it (spec:268); the declared modifier gives an interval on the divisor that excludes zero",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "look up the divisor arg's declared modifiers (a finite set — the modifier-to-ProofSatisfaction table, matrix § Witness Family 1 Base B decision procedure); an interval that excludes zero discharges, otherwise reject naming class (b).",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:299",
+              "note": "Family 4 — fault family, arg-constraint discharge: the same divisor-arg-positive pattern, already worked as the matrix's own fault-family precedent"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "the divisor field carries its own declared modifier (e.g. `positive`/`nonzero`); the firing construction row does not write this field, so its post-construction value is exactly its declared default (matrix § Validity arguments, 'Establishment over defaults'); the modifier's own establishment obligation over that default constant-folds (matrix § Validity arguments, 'Literal constant-fold for defaults')",
+          "validityArguments": [
+            "Establishment over defaults",
+            "Literal constant-fold for defaults"
+          ],
+          "decisionProcedure": "for a divisor field with no write site in the firing construction row, constant-fold the field's declared modifier over its literal default (the fold terminates — expressions are finite, loop-free trees, spec § 0.4); a fold excluding zero discharges, otherwise reject naming class (a).",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "Establishment over defaults (the pre-configuration rule)"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "declare a modifier on the divisor field (`positive`, `nonzero`, or an equivalent bound) that the firing construction row does not overwrite, so its established default satisfies <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "b"
+          ],
+          "schema": "bound the divisor arg (`positive`, `nonzero`, or an equivalent bound) such that its declared interval satisfies <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept ConstructIntmod\n\nfield Result as integer default 0\n\nevent Init(Numerator as integer, Divisor as integer) initial\n\non Init -> set Result = Init.Numerator % Init.Divisor",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a",
+              "b"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+            "date": "2026-07-21",
+            "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+          }
+        },
+        "discharges": [
+          {
+            "id": "b-arg-positive",
+            "kind": "arg-modifier",
+            "addition": "Divisor as integer positive",
+            "application": {
+              "locus": "event-arg-declarations",
+              "replacements": [
+                {
+                  "eventName": "Init",
+                  "argName": "Divisor",
+                  "declaration": "Divisor as integer positive"
+                }
+              ]
+            },
+            "premiseClasses": [
+              "b"
+            ],
+            "derivation": "governance enforces `Divisor positive` at ingress before the row reads it; the interval (0, +inf) excludes zero",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          },
+          {
+            "id": "a-field-default-positive",
+            "kind": "structural-edit",
+            "addition": "replace `event Init(Numerator as integer, Divisor as integer) initial` and `on Init -> set Result = Init.Numerator % Init.Divisor` with:\nfield Divisor as integer positive default 5\nevent Init(Numerator as integer) initial\non Init -> set Result = Init.Numerator % Divisor",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "Divisor is unwritten by the construction row, so its post-construction value is its declared default; the field's own `positive` modifier constant-folds over that literal default to true, and the fold excludes zero",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "notes": [
+              "This discharge changes which expression fills the divisor slot (an unwritten field, not the firing event's own arg) rather than adding a line to the stated base's own shape — recorded as `structural-edit` per the schema's own kind vocabulary for this reason.",
+              "The `application` DU (cell.schema.json # application) has no locus for this edit: it only models (i) appending a guard to a named event row via `row-guard` (which requires an `eventName`, and this edit attaches to a state target or a bare field/rule declaration, not an event row) and (ii) replacing a named event-arg declaration. Recording the edit in `addition` and leaving `application` absent, per the same open-vocabulary-item treatment the README already uses for `construction-defaults`."
+            ],
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "b-arg-positive",
+            "addition": "Divisor as integer nonnegative",
+            "application": {
+              "locus": "event-arg-declarations",
+              "replacements": [
+                {
+                  "eventName": "Init",
+                  "argName": "Divisor",
+                  "declaration": "Divisor as integer nonnegative"
+                }
+              ]
+            },
+            "whyStillRejects": "nonnegative admits zero — the interval [0, +inf) does not exclude it — must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          },
+          {
+            "pairsWith": "a-field-default-positive",
+            "addition": "replace the same two rows with:\nfield Divisor as integer nonnegative default 0\nevent Init(Numerator as integer) initial\non Init -> set Result = Init.Numerator % Divisor",
+            "whyStillRejects": "the field's own default is now the zero literal itself, admitted by `nonnegative` — must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+          "note": "the Fault family row"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:186",
+          "note": "fault minting is catalog-stamped at evaluation sites"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md:2064",
+          "note": "construction is a special case — the entity is not yet in any state"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md:1987",
+          "note": "construction rows use `on <EventName>`, not `from <State> on <Event>`, because no state exists yet"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "fault2/sh-intmod",
+      "label": "Integer modulo by zero, state entry/exit hook",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "IntegerModuloInteger",
+        "evaluationSiteCategory": "state-hook-action-operand",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+            "note": "the Fault family row"
+          },
+          {
+            "kind": "spec",
+            "ref": "docs/language/precept-language-spec.md:205",
+            "note": "two-tier divisor safety"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Divisor != 0",
+        "metavariables": [
+          {
+            "name": "Divisor",
+            "standsFor": "the divisor operand at this evaluation site — a field read by a `to S ->` / `from S ->` hook's own action list"
+          },
+          {
+            "name": "0",
+            "standsFor": "the integer zero value"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "Divisor != 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a",
+        "c",
+        "d"
+      ],
+      "premiseAvailability": "A state hook fires on every inbound or outbound edge into/out of its named state, regardless of which row or event triggered the transition (spec § State action); the hook's own scope gives it field names only, no event args (spec:1348, the scope table's 'State action guard / actions | All field names' row) — so premise (b) is structurally unavailable: there is no arg in scope to bound. What is available: (c), the hook's own optional `when` guard, evaluated the same way any guard is (guards select, spec:1897); (d), a pre-state constraint — the hook fires with a real pre-state, so the standing inductive hypothesis over the entity's reachable-configuration history applies; and (a), the divisor field's own declared modifier, carried into the hook's read whenever the hook's own action list does not write the field first. Classes (a) and (d) rest on the identical inductive mechanism here — the only difference is whether the zero-exclusion fact was declared as a modifier on the field or as a standalone `rule` — so both are argued from the same validity-argument text below, with a note on the narrower scope of its stated arithmetic.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "derivation": "the hook's own `when` guard, evaluated before its actions run, restates the zero-exclusion fact directly",
+          "validityArguments": [
+            "Guard normal-form match"
+          ],
+          "decisionProcedure": "normal-form match of `Divisor != <zero>` against the hook's own guard conjuncts (a finite set); no match rejects naming class (c).",
+          "citations": [
+            {
+              "kind": "spec",
+              "ref": "docs/language/precept-language-spec.md:1016",
+              "note": "state actions support an optional `when` guard between the state target and the action chain"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "Guard normal-form match"
+            }
+          ],
+          "openDependencies": []
+        },
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "the divisor field carries its own declared modifier (e.g. `nonzero`); that modifier is proven to hold across every write site of the field (a rule-establishment/preservation obligation on the field itself, a separate rule-write-family concern) and this hook's own action list does not write the field before the divisor is read, so the modifier's standing guarantee carries unchanged into the read — the same inductive mechanism premise (d) uses, without needing the sign-monotonicity half of that argument's text (there is no arithmetic transform here, only an unwritten read)",
+          "validityArguments": [
+            "Inductive hypothesis plus sign monotonicity"
+          ],
+          "decisionProcedure": "if the divisor field is not written by this hook's own action list before the read, look up its declared modifiers (the same finite modifier-to-ProofSatisfaction table class (b)/(a) use elsewhere); an interval excluding zero discharges, otherwise reject naming class (a).",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "Inductive hypothesis plus sign monotonicity — reused here for its inductive-hypothesis half only; the sign-monotonicity half is inapplicable and unneeded, since no write transforms the divisor between establishment and this read"
+            }
+          ],
+          "notes": [
+            "This premise's soundness depends on the divisor field's own establishment/preservation proof holding across every one of its write sites elsewhere in the file — exactly the dependency the matrix already names for premise (d) ('the hypothesis is only as sound as the minting rule is complete... a missed write site voids the hypothesis'). Recorded as a dependency, not re-derived here."
+          ]
+        },
+        {
+          "premiseClasses": [
+            "d"
+          ],
+          "derivation": "an explicit `rule` states the divisor's zero-exclusion; that rule holds in the pre-state by the standing inductive hypothesis (establishment at construction, preservation at every write site of every mentioned field, atomic commit, spec:1967), and this hook's own action list does not write the divisor before the read, so the pre-state fact carries unchanged into the read",
+          "validityArguments": [
+            "Inductive hypothesis plus sign monotonicity"
+          ],
+          "decisionProcedure": "if the divisor field is not written by this hook's own action list before the read, look up a rule holding of it in the pre-state that excludes zero (the standing inductive hypothesis); none found rejects naming class (d).",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "Inductive hypothesis plus sign monotonicity — inductive-hypothesis half only, as for class (a) above"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:88",
+              "note": "Open design hole: nothing detects an obligation that was never minted — the same dependency this premise rests on"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:94",
+              "note": "the verified false-proof instance: a `rule` premise consumed via CompositionalConstraint while a different handler violates it, with zero diagnostics"
+            },
+            {
+              "kind": "code",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md",
+              "note": "Part 3, Defect B — the same verified defect, worked in full"
+            }
+          ],
+          "notes": [
+            "HAZARD: this contract entry is consumed via a business `rule` used as a premise. Slice 2 verified at HEAD that this exact discharge shape (a rule stating a field's sign, consumed as premise (d) for an unrelated obligation) can be a false proof when a different handler sets the field to zero elsewhere in the file (matrix:94; authored-expressiveness-gaps.md Part 3, Defect B). This group's witness below has no such violating handler, so its clean compile is not itself an instance of the defect — but the discharge mechanism it exercises is the same one the defect implicates, so its builtStatus is recorded unresolved-today rather than proven-today, per this group's authoring instruction, regardless of the observed clean compile."
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "schema": "add a guard normal-form-equal to <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "declare a modifier on the divisor field (`positive`, `nonzero`, or an equivalent bound) that this hook does not overwrite, so its standing guarantee satisfies <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "d"
+          ],
+          "schema": "state a rule that the divisor satisfies <WP>, holding in the pre-state and not written by this hook before the read",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept StateHookIntmod\n\nstate Start initial\nstate Done terminal\n\nfield Divisor as integer default 0\nfield Result as integer default 0\n\nevent Init initial\nevent Finish\n\non Init -> set Divisor = 0\n\nfrom Start on Finish -> transition Done\n\nto Done -> set Result = 100 % Divisor",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a",
+              "c",
+              "d"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+            "date": "2026-07-21",
+            "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+          }
+        },
+        "discharges": [
+          {
+            "id": "c-hook-guard",
+            "kind": "guard",
+            "addition": "when Divisor != 0",
+            "premiseClasses": [
+              "c"
+            ],
+            "derivation": "the hook's own guard normal-form-equal to the WP discharges by guard-match, the same mechanism as a transition row's guard, generalized to a state hook's `when` (spec § State action)",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "notes": [
+              "The `application` DU's only guard locus (`row-guard`) requires an `eventName`, which a state hook does not have (it is anchored to a state target, spec § State action) — `application` is left absent for this reason, per the same open-vocabulary-item treatment the README uses elsewhere; the addition text is recorded in prose instead."
+            ],
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          },
+          {
+            "id": "a-field-nonzero-unwritten",
+            "kind": "other",
+            "addition": "field Divisor as integer nonzero default 5  (replacing the base's unconstrained `field Divisor as integer default 0`; the construction row's own `set Divisor = 0` is changed to `set Divisor = 5` to keep the row internally consistent with the field's own modifier)",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "Divisor's own `nonzero` modifier is established at construction (over the literal it is set to) and this hook does not write Divisor before the read, so the modifier's standing guarantee carries unchanged into the read",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "notes": [
+              "The `application` DU (cell.schema.json # application) has no locus for this edit: it only models (i) appending a guard to a named event row via `row-guard` (which requires an `eventName`, and this edit attaches to a state target or a bare field/rule declaration, not an event row) and (ii) replacing a named event-arg declaration. Recording the edit in `addition` and leaving `application` absent, per the same open-vocabulary-item treatment the README already uses for `construction-defaults`."
+            ],
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          },
+          {
+            "id": "d-rule-nonzero-unwritten",
+            "kind": "other",
+            "addition": "rule Divisor != 0 because \"Divisor must never be zero — a zero divisor would make every downstream rate calculation undefined\"  (with the field's own default changed from 0 to 5 and the construction row's `set Divisor = 5`, so the rule is establishable)",
+            "premiseClasses": [
+              "d"
+            ],
+            "derivation": "the rule holds in the pre-state by the standing inductive hypothesis and this hook does not write Divisor before the read, so the pre-state fact carries unchanged into the read",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "HAZARD, per this group's authoring instruction: this discharge is consumed via a business `rule` premise, the same discharge shape the verified false-proof defect implicates (matrix:94; authored-expressiveness-gaps.md Part 3, Defect B — CompositionalConstraint accepting a rule as a premise with no check that some other handler violates it). The live run below in fact compiled clean (no DivisionByZero), but per the authoring instruction this is recorded as unresolved-today, not proven-today, because the discharge mechanism is not certified sound in general, even though this specific witness has no violating handler.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "notes": [
+              "The `application` DU (cell.schema.json # application) has no locus for this edit: it only models (i) appending a guard to a named event row via `row-guard` (which requires an `eventName`, and this edit attaches to a state target or a bare field/rule declaration, not an event row) and (ii) replacing a named event-arg declaration. Recording the edit in `addition` and leaving `application` absent, per the same open-vocabulary-item treatment the README already uses for `construction-defaults`."
+            ],
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "c-hook-guard",
+            "addition": "when Divisor >= 0",
+            "whyStillRejects": "the guard admits zero — does not imply the WP — must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          },
+          {
+            "pairsWith": "a-field-nonzero-unwritten",
+            "addition": "field Divisor as integer nonnegative default 0  (construction row keeps `set Divisor = 0`)",
+            "whyStillRejects": "nonnegative admits the field's own default of zero — must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          },
+          {
+            "pairsWith": "d-rule-nonzero-unwritten",
+            "addition": "rule Divisor >= 0 because \"Divisor must never be negative...\"  (field default kept at 0)",
+            "whyStillRejects": "the rule admits zero — must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+          "note": "the Fault family row"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md § State action",
+          "note": "the state-action grammar and its optional `when` guard"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md:1348",
+          "note": "the scope table: state action guard / actions see all field names, nothing else"
+        }
+      ],
+      "openDependencies": [],
+      "notes": [
+        "The matrix records as open whether the residency fact itself (the entity is in state S) is a premise, and under which class (matrix:150, the `in S ensure` case-shape row's Open bullet). This cell's own divisor obligation does not depend on residency — the discharges above rest on the field's own history, not on which state the entity is in — but the group's authoring instruction is to carry this open item on every state-hook cell rather than assume either answer, so it is recorded here. No packet Q/S identifier has been minted for this specific open item as of this pass (checked: review-1 through review-6 under obligation-discharge-matrix-2026-07-19-reviews/, and the want-analysis decision packet); `openDependencies` is left empty rather than filled with a fabricated identifier, and this note carries the dependency in prose instead."
+      ]
+    },
+    {
+      "id": "fault2/cr-decdiv",
+      "label": "Decimal division by zero, construction row",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "DecimalDivideDecimal",
+        "evaluationSiteCategory": "construction-row-action-operand",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+            "note": "the Fault family row: catalog-declared safety precondition at the evaluation site"
+          },
+          {
+            "kind": "spec",
+            "ref": "docs/language/precept-language-spec.md:205",
+            "note": "two-tier divisor safety: a proven-zero divisor is a hard error; an unproven divisor is an obligation the author discharges with nonzero, positive, a rule, or a guard"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Divisor != 0.0",
+        "metavariables": [
+          {
+            "name": "Divisor",
+            "standsFor": "the divisor operand at this evaluation site — an event arg of the firing construction row, or a field the row does not write"
+          },
+          {
+            "name": "0.0",
+            "standsFor": "the decimal zero value"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "Divisor != 0.0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a",
+        "b"
+      ],
+      "premiseAvailability": "There is no pre-state at a construction row — the entity does not yet exist in any state when the initial event fires (spec § Stateless/stateful cross-validation; spec:2064: 'Construction is a special case (the entity is not yet in any state)') — so premise (d) is structurally unavailable: there is nothing for the inductive hypothesis to range over. The handler's own guard (c) does not exist either: construction rows are the `on <Event> initial` form, not a guarded transition row. What remains is whichever of the two classes matches the divisor's own syntactic kind: (b) when the divisor is the firing event's own arg (governed at ingress before this row's actions run, spec:268), and (a) when the divisor is a field the row does not write, whose own declared modifier is established over the default configuration by the same reasoning as any other unwritten field (matrix § Validity arguments, 'Establishment over defaults').",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "b"
+          ],
+          "derivation": "governance enforces the event arg's declared modifier at ingress, before this row's actions read it (spec:268); the declared modifier gives an interval on the divisor that excludes zero",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "look up the divisor arg's declared modifiers (a finite set — the modifier-to-ProofSatisfaction table, matrix § Witness Family 1 Base B decision procedure); an interval that excludes zero discharges, otherwise reject naming class (b).",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:299",
+              "note": "Family 4 — fault family, arg-constraint discharge: the same divisor-arg-positive pattern, already worked as the matrix's own fault-family precedent"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "the divisor field carries its own declared modifier (e.g. `positive`/`nonzero`); the firing construction row does not write this field, so its post-construction value is exactly its declared default (matrix § Validity arguments, 'Establishment over defaults'); the modifier's own establishment obligation over that default constant-folds (matrix § Validity arguments, 'Literal constant-fold for defaults')",
+          "validityArguments": [
+            "Establishment over defaults",
+            "Literal constant-fold for defaults"
+          ],
+          "decisionProcedure": "for a divisor field with no write site in the firing construction row, constant-fold the field's declared modifier over its literal default (the fold terminates — expressions are finite, loop-free trees, spec § 0.4); a fold excluding zero discharges, otherwise reject naming class (a).",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "Establishment over defaults (the pre-configuration rule)"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "declare a modifier on the divisor field (`positive`, `nonzero`, or an equivalent bound) that the firing construction row does not overwrite, so its established default satisfies <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "b"
+          ],
+          "schema": "bound the divisor arg (`positive`, `nonzero`, or an equivalent bound) such that its declared interval satisfies <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept ConstructDecdiv\n\nfield Result as decimal default 0.0\n\nevent Init(Numerator as decimal, Divisor as decimal) initial\n\non Init -> set Result = Init.Numerator / Init.Divisor",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a",
+              "b"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+            "date": "2026-07-21",
+            "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+          }
+        },
+        "discharges": [
+          {
+            "id": "b-arg-positive",
+            "kind": "arg-modifier",
+            "addition": "Divisor as decimal positive",
+            "application": {
+              "locus": "event-arg-declarations",
+              "replacements": [
+                {
+                  "eventName": "Init",
+                  "argName": "Divisor",
+                  "declaration": "Divisor as decimal positive"
+                }
+              ]
+            },
+            "premiseClasses": [
+              "b"
+            ],
+            "derivation": "governance enforces `Divisor positive` at ingress before the row reads it; the interval (0, +inf) excludes zero",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          },
+          {
+            "id": "a-field-default-positive",
+            "kind": "structural-edit",
+            "addition": "replace `event Init(Numerator as decimal, Divisor as decimal) initial` and `on Init -> set Result = Init.Numerator / Init.Divisor` with:\nfield Divisor as decimal positive default 5.0\nevent Init(Numerator as decimal) initial\non Init -> set Result = Init.Numerator / Divisor",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "Divisor is unwritten by the construction row, so its post-construction value is its declared default; the field's own `positive` modifier constant-folds over that literal default to true, and the fold excludes zero",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "notes": [
+              "This discharge changes which expression fills the divisor slot (an unwritten field, not the firing event's own arg) rather than adding a line to the stated base's own shape — recorded as `structural-edit` per the schema's own kind vocabulary for this reason.",
+              "The `application` DU (cell.schema.json # application) has no locus for this edit: it only models (i) appending a guard to a named event row via `row-guard` (which requires an `eventName`, and this edit attaches to a state target or a bare field/rule declaration, not an event row) and (ii) replacing a named event-arg declaration. Recording the edit in `addition` and leaving `application` absent, per the same open-vocabulary-item treatment the README already uses for `construction-defaults`."
+            ],
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "b-arg-positive",
+            "addition": "Divisor as decimal nonnegative",
+            "application": {
+              "locus": "event-arg-declarations",
+              "replacements": [
+                {
+                  "eventName": "Init",
+                  "argName": "Divisor",
+                  "declaration": "Divisor as decimal nonnegative"
+                }
+              ]
+            },
+            "whyStillRejects": "nonnegative admits zero — the interval [0, +inf) does not exclude it — must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          },
+          {
+            "pairsWith": "a-field-default-positive",
+            "addition": "replace the same two rows with:\nfield Divisor as decimal nonnegative default 0.0\nevent Init(Numerator as decimal) initial\non Init -> set Result = Init.Numerator / Divisor",
+            "whyStillRejects": "the field's own default is now the zero literal itself, admitted by `nonnegative` — must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+          "note": "the Fault family row"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:186",
+          "note": "fault minting is catalog-stamped at evaluation sites"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md:2064",
+          "note": "construction is a special case — the entity is not yet in any state"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md:1987",
+          "note": "construction rows use `on <EventName>`, not `from <State> on <Event>`, because no state exists yet"
+        }
+      ],
+      "notes": [
+        "This cell also covers op/IntegerDivideDecimal/numeric-0: each declares the identical `NumericProofRequirement(ParamSubject(PDecimal), NotEquals, 0m, \"Divisor must be non-zero\")` on the same divisor-type-family subject as DecimalDivideDecimal (src/Precept/Language/Operations.cs), so the obligation schema, applicable-class set, and decision procedures below are identical up to which side of the operator widens; no separate cell is authored for them under the matrix's schema-unification criterion (matrix § The cell, item 1: 'Two programs sit in the same cell iff ... their minted obligations unify with this schema')."
+      ]
+    },
+    {
+      "id": "fault2/sh-decdiv",
+      "label": "Decimal division by zero, state entry/exit hook",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "DecimalDivideDecimal",
+        "evaluationSiteCategory": "state-hook-action-operand",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+            "note": "the Fault family row"
+          },
+          {
+            "kind": "spec",
+            "ref": "docs/language/precept-language-spec.md:205",
+            "note": "two-tier divisor safety"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Divisor != 0.0",
+        "metavariables": [
+          {
+            "name": "Divisor",
+            "standsFor": "the divisor operand at this evaluation site — a field read by a `to S ->` / `from S ->` hook's own action list"
+          },
+          {
+            "name": "0.0",
+            "standsFor": "the decimal zero value"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "Divisor != 0.0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a",
+        "c",
+        "d"
+      ],
+      "premiseAvailability": "A state hook fires on every inbound or outbound edge into/out of its named state, regardless of which row or event triggered the transition (spec § State action); the hook's own scope gives it field names only, no event args (spec:1348, the scope table's 'State action guard / actions | All field names' row) — so premise (b) is structurally unavailable: there is no arg in scope to bound. What is available: (c), the hook's own optional `when` guard, evaluated the same way any guard is (guards select, spec:1897); (d), a pre-state constraint — the hook fires with a real pre-state, so the standing inductive hypothesis over the entity's reachable-configuration history applies; and (a), the divisor field's own declared modifier, carried into the hook's read whenever the hook's own action list does not write the field first. Classes (a) and (d) rest on the identical inductive mechanism here — the only difference is whether the zero-exclusion fact was declared as a modifier on the field or as a standalone `rule` — so both are argued from the same validity-argument text below, with a note on the narrower scope of its stated arithmetic.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "derivation": "the hook's own `when` guard, evaluated before its actions run, restates the zero-exclusion fact directly",
+          "validityArguments": [
+            "Guard normal-form match"
+          ],
+          "decisionProcedure": "normal-form match of `Divisor != <zero>` against the hook's own guard conjuncts (a finite set); no match rejects naming class (c).",
+          "citations": [
+            {
+              "kind": "spec",
+              "ref": "docs/language/precept-language-spec.md:1016",
+              "note": "state actions support an optional `when` guard between the state target and the action chain"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "Guard normal-form match"
+            }
+          ],
+          "openDependencies": []
+        },
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "the divisor field carries its own declared modifier (e.g. `nonzero`); that modifier is proven to hold across every write site of the field (a rule-establishment/preservation obligation on the field itself, a separate rule-write-family concern) and this hook's own action list does not write the field before the divisor is read, so the modifier's standing guarantee carries unchanged into the read — the same inductive mechanism premise (d) uses, without needing the sign-monotonicity half of that argument's text (there is no arithmetic transform here, only an unwritten read)",
+          "validityArguments": [
+            "Inductive hypothesis plus sign monotonicity"
+          ],
+          "decisionProcedure": "if the divisor field is not written by this hook's own action list before the read, look up its declared modifiers (the same finite modifier-to-ProofSatisfaction table class (b)/(a) use elsewhere); an interval excluding zero discharges, otherwise reject naming class (a).",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "Inductive hypothesis plus sign monotonicity — reused here for its inductive-hypothesis half only; the sign-monotonicity half is inapplicable and unneeded, since no write transforms the divisor between establishment and this read"
+            }
+          ],
+          "notes": [
+            "This premise's soundness depends on the divisor field's own establishment/preservation proof holding across every one of its write sites elsewhere in the file — exactly the dependency the matrix already names for premise (d) ('the hypothesis is only as sound as the minting rule is complete... a missed write site voids the hypothesis'). Recorded as a dependency, not re-derived here."
+          ]
+        },
+        {
+          "premiseClasses": [
+            "d"
+          ],
+          "derivation": "an explicit `rule` states the divisor's zero-exclusion; that rule holds in the pre-state by the standing inductive hypothesis (establishment at construction, preservation at every write site of every mentioned field, atomic commit, spec:1967), and this hook's own action list does not write the divisor before the read, so the pre-state fact carries unchanged into the read",
+          "validityArguments": [
+            "Inductive hypothesis plus sign monotonicity"
+          ],
+          "decisionProcedure": "if the divisor field is not written by this hook's own action list before the read, look up a rule holding of it in the pre-state that excludes zero (the standing inductive hypothesis); none found rejects naming class (d).",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "Inductive hypothesis plus sign monotonicity — inductive-hypothesis half only, as for class (a) above"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:88",
+              "note": "Open design hole: nothing detects an obligation that was never minted — the same dependency this premise rests on"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:94",
+              "note": "the verified false-proof instance: a `rule` premise consumed via CompositionalConstraint while a different handler violates it, with zero diagnostics"
+            },
+            {
+              "kind": "code",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md",
+              "note": "Part 3, Defect B — the same verified defect, worked in full"
+            }
+          ],
+          "notes": [
+            "HAZARD: this contract entry is consumed via a business `rule` used as a premise. Slice 2 verified at HEAD that this exact discharge shape (a rule stating a field's sign, consumed as premise (d) for an unrelated obligation) can be a false proof when a different handler sets the field to zero elsewhere in the file (matrix:94; authored-expressiveness-gaps.md Part 3, Defect B). This group's witness below has no such violating handler, so its clean compile is not itself an instance of the defect — but the discharge mechanism it exercises is the same one the defect implicates, so its builtStatus is recorded unresolved-today rather than proven-today, per this group's authoring instruction, regardless of the observed clean compile."
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "schema": "add a guard normal-form-equal to <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "declare a modifier on the divisor field (`positive`, `nonzero`, or an equivalent bound) that this hook does not overwrite, so its standing guarantee satisfies <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "d"
+          ],
+          "schema": "state a rule that the divisor satisfies <WP>, holding in the pre-state and not written by this hook before the read",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept StateHookDecdiv\n\nstate Start initial\nstate Done terminal\n\nfield Divisor as decimal default 0.0\nfield Result as decimal default 0.0\n\nevent Init initial\nevent Finish\n\non Init -> set Divisor = 0.0\n\nfrom Start on Finish -> transition Done\n\nto Done -> set Result = 100 / Divisor",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a",
+              "c",
+              "d"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+            "date": "2026-07-21",
+            "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+          }
+        },
+        "discharges": [
+          {
+            "id": "c-hook-guard",
+            "kind": "guard",
+            "addition": "when Divisor != 0.0",
+            "premiseClasses": [
+              "c"
+            ],
+            "derivation": "the hook's own guard normal-form-equal to the WP discharges by guard-match, the same mechanism as a transition row's guard, generalized to a state hook's `when` (spec § State action)",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "notes": [
+              "The `application` DU's only guard locus (`row-guard`) requires an `eventName`, which a state hook does not have (it is anchored to a state target, spec § State action) — `application` is left absent for this reason, per the same open-vocabulary-item treatment the README uses elsewhere; the addition text is recorded in prose instead."
+            ],
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          },
+          {
+            "id": "a-field-nonzero-unwritten",
+            "kind": "other",
+            "addition": "field Divisor as decimal nonzero default 5.0  (replacing the base's unconstrained `field Divisor as decimal default 0.0`; the construction row's own `set Divisor = 0.0` is changed to `set Divisor = 5.0` to keep the row internally consistent with the field's own modifier)",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "Divisor's own `nonzero` modifier is established at construction (over the literal it is set to) and this hook does not write Divisor before the read, so the modifier's standing guarantee carries unchanged into the read",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "notes": [
+              "The `application` DU (cell.schema.json # application) has no locus for this edit: it only models (i) appending a guard to a named event row via `row-guard` (which requires an `eventName`, and this edit attaches to a state target or a bare field/rule declaration, not an event row) and (ii) replacing a named event-arg declaration. Recording the edit in `addition` and leaving `application` absent, per the same open-vocabulary-item treatment the README already uses for `construction-defaults`."
+            ],
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          },
+          {
+            "id": "d-rule-nonzero-unwritten",
+            "kind": "other",
+            "addition": "rule Divisor != 0.0 because \"Divisor must never be zero — a zero divisor would make every downstream rate calculation undefined\"  (with the field's own default changed from 0.0 to 5.0 and the construction row's `set Divisor = 5.0`, so the rule is establishable)",
+            "premiseClasses": [
+              "d"
+            ],
+            "derivation": "the rule holds in the pre-state by the standing inductive hypothesis and this hook does not write Divisor before the read, so the pre-state fact carries unchanged into the read",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "HAZARD, per this group's authoring instruction: this discharge is consumed via a business `rule` premise, the same discharge shape the verified false-proof defect implicates (matrix:94; authored-expressiveness-gaps.md Part 3, Defect B — CompositionalConstraint accepting a rule as a premise with no check that some other handler violates it). The live run below in fact compiled clean (no DivisionByZero), but per the authoring instruction this is recorded as unresolved-today, not proven-today, because the discharge mechanism is not certified sound in general, even though this specific witness has no violating handler.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "notes": [
+              "The `application` DU (cell.schema.json # application) has no locus for this edit: it only models (i) appending a guard to a named event row via `row-guard` (which requires an `eventName`, and this edit attaches to a state target or a bare field/rule declaration, not an event row) and (ii) replacing a named event-arg declaration. Recording the edit in `addition` and leaving `application` absent, per the same open-vocabulary-item treatment the README already uses for `construction-defaults`."
+            ],
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "c-hook-guard",
+            "addition": "when Divisor >= 0.0",
+            "whyStillRejects": "the guard admits zero — does not imply the WP — must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          },
+          {
+            "pairsWith": "a-field-nonzero-unwritten",
+            "addition": "field Divisor as decimal nonnegative default 0.0  (construction row keeps `set Divisor = 0.0`)",
+            "whyStillRejects": "nonnegative admits the field's own default of zero — must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          },
+          {
+            "pairsWith": "d-rule-nonzero-unwritten",
+            "addition": "rule Divisor >= 0.0 because \"Divisor must never be negative...\"  (field default kept at 0.0)",
+            "whyStillRejects": "the rule admits zero — must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+          "note": "the Fault family row"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md § State action",
+          "note": "the state-action grammar and its optional `when` guard"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md:1348",
+          "note": "the scope table: state action guard / actions see all field names, nothing else"
+        }
+      ],
+      "openDependencies": [],
+      "notes": [
+        "This cell also covers op/IntegerDivideDecimal/numeric-0: each declares the identical `NumericProofRequirement(ParamSubject(PDecimal), NotEquals, 0m, \"Divisor must be non-zero\")` on the same divisor-type-family subject as DecimalDivideDecimal (src/Precept/Language/Operations.cs), so the obligation schema, applicable-class set, and decision procedures below are identical up to which side of the operator widens; no separate cell is authored for them under the matrix's schema-unification criterion (matrix § The cell, item 1: 'Two programs sit in the same cell iff ... their minted obligations unify with this schema').",
+        "The matrix records as open whether the residency fact itself (the entity is in state S) is a premise, and under which class (matrix:150, the `in S ensure` case-shape row's Open bullet). This cell's own divisor obligation does not depend on residency — the discharges above rest on the field's own history, not on which state the entity is in — but the group's authoring instruction is to carry this open item on every state-hook cell rather than assume either answer, so it is recorded here. No packet Q/S identifier has been minted for this specific open item as of this pass (checked: review-1 through review-6 under obligation-discharge-matrix-2026-07-19-reviews/, and the want-analysis decision packet); `openDependencies` is left empty rather than filled with a fabricated identifier, and this note carries the dependency in prose instead."
+      ]
+    },
+    {
+      "id": "fault2/cr-decmod",
+      "label": "Decimal modulo by zero, construction row",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "DecimalModuloDecimal",
+        "evaluationSiteCategory": "construction-row-action-operand",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+            "note": "the Fault family row: catalog-declared safety precondition at the evaluation site"
+          },
+          {
+            "kind": "spec",
+            "ref": "docs/language/precept-language-spec.md:205",
+            "note": "two-tier divisor safety: a proven-zero divisor is a hard error; an unproven divisor is an obligation the author discharges with nonzero, positive, a rule, or a guard"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Divisor != 0.0",
+        "metavariables": [
+          {
+            "name": "Divisor",
+            "standsFor": "the divisor operand at this evaluation site — an event arg of the firing construction row, or a field the row does not write"
+          },
+          {
+            "name": "0.0",
+            "standsFor": "the decimal zero value"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "Divisor != 0.0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a",
+        "b"
+      ],
+      "premiseAvailability": "There is no pre-state at a construction row — the entity does not yet exist in any state when the initial event fires (spec § Stateless/stateful cross-validation; spec:2064: 'Construction is a special case (the entity is not yet in any state)') — so premise (d) is structurally unavailable: there is nothing for the inductive hypothesis to range over. The handler's own guard (c) does not exist either: construction rows are the `on <Event> initial` form, not a guarded transition row. What remains is whichever of the two classes matches the divisor's own syntactic kind: (b) when the divisor is the firing event's own arg (governed at ingress before this row's actions run, spec:268), and (a) when the divisor is a field the row does not write, whose own declared modifier is established over the default configuration by the same reasoning as any other unwritten field (matrix § Validity arguments, 'Establishment over defaults').",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "b"
+          ],
+          "derivation": "governance enforces the event arg's declared modifier at ingress, before this row's actions read it (spec:268); the declared modifier gives an interval on the divisor that excludes zero",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "look up the divisor arg's declared modifiers (a finite set — the modifier-to-ProofSatisfaction table, matrix § Witness Family 1 Base B decision procedure); an interval that excludes zero discharges, otherwise reject naming class (b).",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:299",
+              "note": "Family 4 — fault family, arg-constraint discharge: the same divisor-arg-positive pattern, already worked as the matrix's own fault-family precedent"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "the divisor field carries its own declared modifier (e.g. `positive`/`nonzero`); the firing construction row does not write this field, so its post-construction value is exactly its declared default (matrix § Validity arguments, 'Establishment over defaults'); the modifier's own establishment obligation over that default constant-folds (matrix § Validity arguments, 'Literal constant-fold for defaults')",
+          "validityArguments": [
+            "Establishment over defaults",
+            "Literal constant-fold for defaults"
+          ],
+          "decisionProcedure": "for a divisor field with no write site in the firing construction row, constant-fold the field's declared modifier over its literal default (the fold terminates — expressions are finite, loop-free trees, spec § 0.4); a fold excluding zero discharges, otherwise reject naming class (a).",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "Establishment over defaults (the pre-configuration rule)"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "declare a modifier on the divisor field (`positive`, `nonzero`, or an equivalent bound) that the firing construction row does not overwrite, so its established default satisfies <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "b"
+          ],
+          "schema": "bound the divisor arg (`positive`, `nonzero`, or an equivalent bound) such that its declared interval satisfies <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept ConstructDecmod\n\nfield Result as decimal default 0.0\n\nevent Init(Numerator as decimal, Divisor as decimal) initial\n\non Init -> set Result = Init.Numerator % Init.Divisor",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a",
+              "b"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+            "date": "2026-07-21",
+            "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+          }
+        },
+        "discharges": [
+          {
+            "id": "b-arg-positive",
+            "kind": "arg-modifier",
+            "addition": "Divisor as decimal positive",
+            "application": {
+              "locus": "event-arg-declarations",
+              "replacements": [
+                {
+                  "eventName": "Init",
+                  "argName": "Divisor",
+                  "declaration": "Divisor as decimal positive"
+                }
+              ]
+            },
+            "premiseClasses": [
+              "b"
+            ],
+            "derivation": "governance enforces `Divisor positive` at ingress before the row reads it; the interval (0, +inf) excludes zero",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          },
+          {
+            "id": "a-field-default-positive",
+            "kind": "structural-edit",
+            "addition": "replace `event Init(Numerator as decimal, Divisor as decimal) initial` and `on Init -> set Result = Init.Numerator % Init.Divisor` with:\nfield Divisor as decimal positive default 5.0\nevent Init(Numerator as decimal) initial\non Init -> set Result = Init.Numerator % Divisor",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "Divisor is unwritten by the construction row, so its post-construction value is its declared default; the field's own `positive` modifier constant-folds over that literal default to true, and the fold excludes zero",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "notes": [
+              "This discharge changes which expression fills the divisor slot (an unwritten field, not the firing event's own arg) rather than adding a line to the stated base's own shape — recorded as `structural-edit` per the schema's own kind vocabulary for this reason.",
+              "The `application` DU (cell.schema.json # application) has no locus for this edit: it only models (i) appending a guard to a named event row via `row-guard` (which requires an `eventName`, and this edit attaches to a state target or a bare field/rule declaration, not an event row) and (ii) replacing a named event-arg declaration. Recording the edit in `addition` and leaving `application` absent, per the same open-vocabulary-item treatment the README already uses for `construction-defaults`."
+            ],
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "b-arg-positive",
+            "addition": "Divisor as decimal nonnegative",
+            "application": {
+              "locus": "event-arg-declarations",
+              "replacements": [
+                {
+                  "eventName": "Init",
+                  "argName": "Divisor",
+                  "declaration": "Divisor as decimal nonnegative"
+                }
+              ]
+            },
+            "whyStillRejects": "nonnegative admits zero — the interval [0, +inf) does not exclude it — must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          },
+          {
+            "pairsWith": "a-field-default-positive",
+            "addition": "replace the same two rows with:\nfield Divisor as decimal nonnegative default 0.0\nevent Init(Numerator as decimal) initial\non Init -> set Result = Init.Numerator % Divisor",
+            "whyStillRejects": "the field's own default is now the zero literal itself, admitted by `nonnegative` — must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+          "note": "the Fault family row"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:186",
+          "note": "fault minting is catalog-stamped at evaluation sites"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md:2064",
+          "note": "construction is a special case — the entity is not yet in any state"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md:1987",
+          "note": "construction rows use `on <EventName>`, not `from <State> on <Event>`, because no state exists yet"
+        }
+      ],
+      "notes": [
+        "This cell also covers op/IntegerModuloDecimal/numeric-0: each declares the identical `NumericProofRequirement(ParamSubject(PDecimal), NotEquals, 0m, \"Divisor must be non-zero\")` on the same divisor-type-family subject as DecimalModuloDecimal (src/Precept/Language/Operations.cs), so the obligation schema, applicable-class set, and decision procedures below are identical up to which side of the operator widens; no separate cell is authored for them under the matrix's schema-unification criterion (matrix § The cell, item 1: 'Two programs sit in the same cell iff ... their minted obligations unify with this schema')."
+      ]
+    },
+    {
+      "id": "fault2/sh-decmod",
+      "label": "Decimal modulo by zero, state entry/exit hook",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "DecimalModuloDecimal",
+        "evaluationSiteCategory": "state-hook-action-operand",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+            "note": "the Fault family row"
+          },
+          {
+            "kind": "spec",
+            "ref": "docs/language/precept-language-spec.md:205",
+            "note": "two-tier divisor safety"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Divisor != 0.0",
+        "metavariables": [
+          {
+            "name": "Divisor",
+            "standsFor": "the divisor operand at this evaluation site — a field read by a `to S ->` / `from S ->` hook's own action list"
+          },
+          {
+            "name": "0.0",
+            "standsFor": "the decimal zero value"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "Divisor != 0.0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a",
+        "c",
+        "d"
+      ],
+      "premiseAvailability": "A state hook fires on every inbound or outbound edge into/out of its named state, regardless of which row or event triggered the transition (spec § State action); the hook's own scope gives it field names only, no event args (spec:1348, the scope table's 'State action guard / actions | All field names' row) — so premise (b) is structurally unavailable: there is no arg in scope to bound. What is available: (c), the hook's own optional `when` guard, evaluated the same way any guard is (guards select, spec:1897); (d), a pre-state constraint — the hook fires with a real pre-state, so the standing inductive hypothesis over the entity's reachable-configuration history applies; and (a), the divisor field's own declared modifier, carried into the hook's read whenever the hook's own action list does not write the field first. Classes (a) and (d) rest on the identical inductive mechanism here — the only difference is whether the zero-exclusion fact was declared as a modifier on the field or as a standalone `rule` — so both are argued from the same validity-argument text below, with a note on the narrower scope of its stated arithmetic.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "derivation": "the hook's own `when` guard, evaluated before its actions run, restates the zero-exclusion fact directly",
+          "validityArguments": [
+            "Guard normal-form match"
+          ],
+          "decisionProcedure": "normal-form match of `Divisor != <zero>` against the hook's own guard conjuncts (a finite set); no match rejects naming class (c).",
+          "citations": [
+            {
+              "kind": "spec",
+              "ref": "docs/language/precept-language-spec.md:1016",
+              "note": "state actions support an optional `when` guard between the state target and the action chain"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "Guard normal-form match"
+            }
+          ],
+          "openDependencies": []
+        },
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "the divisor field carries its own declared modifier (e.g. `nonzero`); that modifier is proven to hold across every write site of the field (a rule-establishment/preservation obligation on the field itself, a separate rule-write-family concern) and this hook's own action list does not write the field before the divisor is read, so the modifier's standing guarantee carries unchanged into the read — the same inductive mechanism premise (d) uses, without needing the sign-monotonicity half of that argument's text (there is no arithmetic transform here, only an unwritten read)",
+          "validityArguments": [
+            "Inductive hypothesis plus sign monotonicity"
+          ],
+          "decisionProcedure": "if the divisor field is not written by this hook's own action list before the read, look up its declared modifiers (the same finite modifier-to-ProofSatisfaction table class (b)/(a) use elsewhere); an interval excluding zero discharges, otherwise reject naming class (a).",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "Inductive hypothesis plus sign monotonicity — reused here for its inductive-hypothesis half only; the sign-monotonicity half is inapplicable and unneeded, since no write transforms the divisor between establishment and this read"
+            }
+          ],
+          "notes": [
+            "This premise's soundness depends on the divisor field's own establishment/preservation proof holding across every one of its write sites elsewhere in the file — exactly the dependency the matrix already names for premise (d) ('the hypothesis is only as sound as the minting rule is complete... a missed write site voids the hypothesis'). Recorded as a dependency, not re-derived here."
+          ]
+        },
+        {
+          "premiseClasses": [
+            "d"
+          ],
+          "derivation": "an explicit `rule` states the divisor's zero-exclusion; that rule holds in the pre-state by the standing inductive hypothesis (establishment at construction, preservation at every write site of every mentioned field, atomic commit, spec:1967), and this hook's own action list does not write the divisor before the read, so the pre-state fact carries unchanged into the read",
+          "validityArguments": [
+            "Inductive hypothesis plus sign monotonicity"
+          ],
+          "decisionProcedure": "if the divisor field is not written by this hook's own action list before the read, look up a rule holding of it in the pre-state that excludes zero (the standing inductive hypothesis); none found rejects naming class (d).",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "Inductive hypothesis plus sign monotonicity — inductive-hypothesis half only, as for class (a) above"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:88",
+              "note": "Open design hole: nothing detects an obligation that was never minted — the same dependency this premise rests on"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:94",
+              "note": "the verified false-proof instance: a `rule` premise consumed via CompositionalConstraint while a different handler violates it, with zero diagnostics"
+            },
+            {
+              "kind": "code",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md",
+              "note": "Part 3, Defect B — the same verified defect, worked in full"
+            }
+          ],
+          "notes": [
+            "HAZARD: this contract entry is consumed via a business `rule` used as a premise. Slice 2 verified at HEAD that this exact discharge shape (a rule stating a field's sign, consumed as premise (d) for an unrelated obligation) can be a false proof when a different handler sets the field to zero elsewhere in the file (matrix:94; authored-expressiveness-gaps.md Part 3, Defect B). This group's witness below has no such violating handler, so its clean compile is not itself an instance of the defect — but the discharge mechanism it exercises is the same one the defect implicates, so its builtStatus is recorded unresolved-today rather than proven-today, per this group's authoring instruction, regardless of the observed clean compile."
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "schema": "add a guard normal-form-equal to <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "declare a modifier on the divisor field (`positive`, `nonzero`, or an equivalent bound) that this hook does not overwrite, so its standing guarantee satisfies <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "d"
+          ],
+          "schema": "state a rule that the divisor satisfies <WP>, holding in the pre-state and not written by this hook before the read",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept StateHookDecmod\n\nstate Start initial\nstate Done terminal\n\nfield Divisor as decimal default 0.0\nfield Result as decimal default 0.0\n\nevent Init initial\nevent Finish\n\non Init -> set Divisor = 0.0\n\nfrom Start on Finish -> transition Done\n\nto Done -> set Result = 100 % Divisor",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a",
+              "c",
+              "d"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+            "date": "2026-07-21",
+            "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+          }
+        },
+        "discharges": [
+          {
+            "id": "c-hook-guard",
+            "kind": "guard",
+            "addition": "when Divisor != 0.0",
+            "premiseClasses": [
+              "c"
+            ],
+            "derivation": "the hook's own guard normal-form-equal to the WP discharges by guard-match, the same mechanism as a transition row's guard, generalized to a state hook's `when` (spec § State action)",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "notes": [
+              "The `application` DU's only guard locus (`row-guard`) requires an `eventName`, which a state hook does not have (it is anchored to a state target, spec § State action) — `application` is left absent for this reason, per the same open-vocabulary-item treatment the README uses elsewhere; the addition text is recorded in prose instead."
+            ],
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          },
+          {
+            "id": "a-field-nonzero-unwritten",
+            "kind": "other",
+            "addition": "field Divisor as decimal nonzero default 5.0  (replacing the base's unconstrained `field Divisor as decimal default 0.0`; the construction row's own `set Divisor = 0.0` is changed to `set Divisor = 5.0` to keep the row internally consistent with the field's own modifier)",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "Divisor's own `nonzero` modifier is established at construction (over the literal it is set to) and this hook does not write Divisor before the read, so the modifier's standing guarantee carries unchanged into the read",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "notes": [
+              "The `application` DU (cell.schema.json # application) has no locus for this edit: it only models (i) appending a guard to a named event row via `row-guard` (which requires an `eventName`, and this edit attaches to a state target or a bare field/rule declaration, not an event row) and (ii) replacing a named event-arg declaration. Recording the edit in `addition` and leaving `application` absent, per the same open-vocabulary-item treatment the README already uses for `construction-defaults`."
+            ],
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          },
+          {
+            "id": "d-rule-nonzero-unwritten",
+            "kind": "other",
+            "addition": "rule Divisor != 0.0 because \"Divisor must never be zero — a zero divisor would make every downstream rate calculation undefined\"  (with the field's own default changed from 0.0 to 5.0 and the construction row's `set Divisor = 5.0`, so the rule is establishable)",
+            "premiseClasses": [
+              "d"
+            ],
+            "derivation": "the rule holds in the pre-state by the standing inductive hypothesis and this hook does not write Divisor before the read, so the pre-state fact carries unchanged into the read",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "HAZARD, per this group's authoring instruction: this discharge is consumed via a business `rule` premise, the same discharge shape the verified false-proof defect implicates (matrix:94; authored-expressiveness-gaps.md Part 3, Defect B — CompositionalConstraint accepting a rule as a premise with no check that some other handler violates it). The live run below in fact compiled clean (no DivisionByZero), but per the authoring instruction this is recorded as unresolved-today, not proven-today, because the discharge mechanism is not certified sound in general, even though this specific witness has no violating handler.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "notes": [
+              "The `application` DU (cell.schema.json # application) has no locus for this edit: it only models (i) appending a guard to a named event row via `row-guard` (which requires an `eventName`, and this edit attaches to a state target or a bare field/rule declaration, not an event row) and (ii) replacing a named event-arg declaration. Recording the edit in `addition` and leaving `application` absent, per the same open-vocabulary-item treatment the README already uses for `construction-defaults`."
+            ],
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "c-hook-guard",
+            "addition": "when Divisor >= 0.0",
+            "whyStillRejects": "the guard admits zero — does not imply the WP — must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          },
+          {
+            "pairsWith": "a-field-nonzero-unwritten",
+            "addition": "field Divisor as decimal nonnegative default 0.0  (construction row keeps `set Divisor = 0.0`)",
+            "whyStillRejects": "nonnegative admits the field's own default of zero — must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          },
+          {
+            "pairsWith": "d-rule-nonzero-unwritten",
+            "addition": "rule Divisor >= 0.0 because \"Divisor must never be negative...\"  (field default kept at 0.0)",
+            "whyStillRejects": "the rule admits zero — must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+          "note": "the Fault family row"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md § State action",
+          "note": "the state-action grammar and its optional `when` guard"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md:1348",
+          "note": "the scope table: state action guard / actions see all field names, nothing else"
+        }
+      ],
+      "openDependencies": [],
+      "notes": [
+        "This cell also covers op/IntegerModuloDecimal/numeric-0: each declares the identical `NumericProofRequirement(ParamSubject(PDecimal), NotEquals, 0m, \"Divisor must be non-zero\")` on the same divisor-type-family subject as DecimalModuloDecimal (src/Precept/Language/Operations.cs), so the obligation schema, applicable-class set, and decision procedures below are identical up to which side of the operator widens; no separate cell is authored for them under the matrix's schema-unification criterion (matrix § The cell, item 1: 'Two programs sit in the same cell iff ... their minted obligations unify with this schema').",
+        "The matrix records as open whether the residency fact itself (the entity is in state S) is a premise, and under which class (matrix:150, the `in S ensure` case-shape row's Open bullet). This cell's own divisor obligation does not depend on residency — the discharges above rest on the field's own history, not on which state the entity is in — but the group's authoring instruction is to carry this open item on every state-hook cell rather than assume either answer, so it is recorded here. No packet Q/S identifier has been minted for this specific open item as of this pass (checked: review-1 through review-6 under obligation-discharge-matrix-2026-07-19-reviews/, and the want-analysis decision packet); `openDependencies` is left empty rather than filled with a fabricated identifier, and this note carries the dependency in prose instead."
+      ]
+    },
+    {
+      "id": "fault2/cr-numdiv",
+      "label": "Number division by zero, construction row",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "NumberDivideNumber",
+        "evaluationSiteCategory": "construction-row-action-operand",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+            "note": "the Fault family row: catalog-declared safety precondition at the evaluation site"
+          },
+          {
+            "kind": "spec",
+            "ref": "docs/language/precept-language-spec.md:205",
+            "note": "two-tier divisor safety: a proven-zero divisor is a hard error; an unproven divisor is an obligation the author discharges with nonzero, positive, a rule, or a guard"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Divisor != 0.0",
+        "metavariables": [
+          {
+            "name": "Divisor",
+            "standsFor": "the divisor operand at this evaluation site — an event arg of the firing construction row, or a field the row does not write"
+          },
+          {
+            "name": "0.0",
+            "standsFor": "the number zero value"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "Divisor != 0.0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a",
+        "b"
+      ],
+      "premiseAvailability": "There is no pre-state at a construction row — the entity does not yet exist in any state when the initial event fires (spec § Stateless/stateful cross-validation; spec:2064: 'Construction is a special case (the entity is not yet in any state)') — so premise (d) is structurally unavailable: there is nothing for the inductive hypothesis to range over. The handler's own guard (c) does not exist either: construction rows are the `on <Event> initial` form, not a guarded transition row. What remains is whichever of the two classes matches the divisor's own syntactic kind: (b) when the divisor is the firing event's own arg (governed at ingress before this row's actions run, spec:268), and (a) when the divisor is a field the row does not write, whose own declared modifier is established over the default configuration by the same reasoning as any other unwritten field (matrix § Validity arguments, 'Establishment over defaults').",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "b"
+          ],
+          "derivation": "governance enforces the event arg's declared modifier at ingress, before this row's actions read it (spec:268); the declared modifier gives an interval on the divisor that excludes zero",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "look up the divisor arg's declared modifiers (a finite set — the modifier-to-ProofSatisfaction table, matrix § Witness Family 1 Base B decision procedure); an interval that excludes zero discharges, otherwise reject naming class (b).",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:299",
+              "note": "Family 4 — fault family, arg-constraint discharge: the same divisor-arg-positive pattern, already worked as the matrix's own fault-family precedent"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "the divisor field carries its own declared modifier (e.g. `positive`/`nonzero`); the firing construction row does not write this field, so its post-construction value is exactly its declared default (matrix § Validity arguments, 'Establishment over defaults'); the modifier's own establishment obligation over that default constant-folds (matrix § Validity arguments, 'Literal constant-fold for defaults')",
+          "validityArguments": [
+            "Establishment over defaults",
+            "Literal constant-fold for defaults"
+          ],
+          "decisionProcedure": "for a divisor field with no write site in the firing construction row, constant-fold the field's declared modifier over its literal default (the fold terminates — expressions are finite, loop-free trees, spec § 0.4); a fold excluding zero discharges, otherwise reject naming class (a).",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "Establishment over defaults (the pre-configuration rule)"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "declare a modifier on the divisor field (`positive`, `nonzero`, or an equivalent bound) that the firing construction row does not overwrite, so its established default satisfies <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "b"
+          ],
+          "schema": "bound the divisor arg (`positive`, `nonzero`, or an equivalent bound) such that its declared interval satisfies <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept ConstructNumdiv\n\nfield Result as number default 0.0\n\nevent Init(Numerator as number, Divisor as number) initial\n\non Init -> set Result = Init.Numerator / Init.Divisor",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a",
+              "b"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+            "date": "2026-07-21",
+            "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+          }
+        },
+        "discharges": [
+          {
+            "id": "b-arg-positive",
+            "kind": "arg-modifier",
+            "addition": "Divisor as number positive",
+            "application": {
+              "locus": "event-arg-declarations",
+              "replacements": [
+                {
+                  "eventName": "Init",
+                  "argName": "Divisor",
+                  "declaration": "Divisor as number positive"
+                }
+              ]
+            },
+            "premiseClasses": [
+              "b"
+            ],
+            "derivation": "governance enforces `Divisor positive` at ingress before the row reads it; the interval (0, +inf) excludes zero",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          },
+          {
+            "id": "a-field-default-positive",
+            "kind": "structural-edit",
+            "addition": "replace `event Init(Numerator as number, Divisor as number) initial` and `on Init -> set Result = Init.Numerator / Init.Divisor` with:\nfield Divisor as number positive default 5.0\nevent Init(Numerator as number) initial\non Init -> set Result = Init.Numerator / Divisor",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "Divisor is unwritten by the construction row, so its post-construction value is its declared default; the field's own `positive` modifier constant-folds over that literal default to true, and the fold excludes zero",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "notes": [
+              "This discharge changes which expression fills the divisor slot (an unwritten field, not the firing event's own arg) rather than adding a line to the stated base's own shape — recorded as `structural-edit` per the schema's own kind vocabulary for this reason.",
+              "The `application` DU (cell.schema.json # application) has no locus for this edit: it only models (i) appending a guard to a named event row via `row-guard` (which requires an `eventName`, and this edit attaches to a state target or a bare field/rule declaration, not an event row) and (ii) replacing a named event-arg declaration. Recording the edit in `addition` and leaving `application` absent, per the same open-vocabulary-item treatment the README already uses for `construction-defaults`."
+            ],
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "b-arg-positive",
+            "addition": "Divisor as number nonnegative",
+            "application": {
+              "locus": "event-arg-declarations",
+              "replacements": [
+                {
+                  "eventName": "Init",
+                  "argName": "Divisor",
+                  "declaration": "Divisor as number nonnegative"
+                }
+              ]
+            },
+            "whyStillRejects": "nonnegative admits zero — the interval [0, +inf) does not exclude it — must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          },
+          {
+            "pairsWith": "a-field-default-positive",
+            "addition": "replace the same two rows with:\nfield Divisor as number nonnegative default 0.0\nevent Init(Numerator as number) initial\non Init -> set Result = Init.Numerator / Divisor",
+            "whyStillRejects": "the field's own default is now the zero literal itself, admitted by `nonnegative` — must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+          "note": "the Fault family row"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:186",
+          "note": "fault minting is catalog-stamped at evaluation sites"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md:2064",
+          "note": "construction is a special case — the entity is not yet in any state"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md:1987",
+          "note": "construction rows use `on <EventName>`, not `from <State> on <Event>`, because no state exists yet"
+        }
+      ],
+      "notes": [
+        "This cell also covers op/IntegerDivideNumber/numeric-0, op/NumberModuloNumber/numeric-0, op/IntegerModuloNumber/numeric-0: each declares the identical `NumericProofRequirement(ParamSubject(PNumber), NotEquals, 0m, \"Divisor must be non-zero\")` on the same divisor-type-family subject as NumberDivideNumber (src/Precept/Language/Operations.cs), so the obligation schema, applicable-class set, and decision procedures below are identical up to which side of the operator widens; no separate cell is authored for them under the matrix's schema-unification criterion (matrix § The cell, item 1: 'Two programs sit in the same cell iff ... their minted obligations unify with this schema')."
+      ]
+    },
+    {
+      "id": "fault2/sh-numdiv",
+      "label": "Number division by zero, state entry/exit hook",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "NumberDivideNumber",
+        "evaluationSiteCategory": "state-hook-action-operand",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+            "note": "the Fault family row"
+          },
+          {
+            "kind": "spec",
+            "ref": "docs/language/precept-language-spec.md:205",
+            "note": "two-tier divisor safety"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Divisor != 0.0",
+        "metavariables": [
+          {
+            "name": "Divisor",
+            "standsFor": "the divisor operand at this evaluation site — a field read by a `to S ->` / `from S ->` hook's own action list"
+          },
+          {
+            "name": "0.0",
+            "standsFor": "the number zero value"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "Divisor != 0.0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a",
+        "c",
+        "d"
+      ],
+      "premiseAvailability": "A state hook fires on every inbound or outbound edge into/out of its named state, regardless of which row or event triggered the transition (spec § State action); the hook's own scope gives it field names only, no event args (spec:1348, the scope table's 'State action guard / actions | All field names' row) — so premise (b) is structurally unavailable: there is no arg in scope to bound. What is available: (c), the hook's own optional `when` guard, evaluated the same way any guard is (guards select, spec:1897); (d), a pre-state constraint — the hook fires with a real pre-state, so the standing inductive hypothesis over the entity's reachable-configuration history applies; and (a), the divisor field's own declared modifier, carried into the hook's read whenever the hook's own action list does not write the field first. Classes (a) and (d) rest on the identical inductive mechanism here — the only difference is whether the zero-exclusion fact was declared as a modifier on the field or as a standalone `rule` — so both are argued from the same validity-argument text below, with a note on the narrower scope of its stated arithmetic.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "derivation": "the hook's own `when` guard, evaluated before its actions run, restates the zero-exclusion fact directly",
+          "validityArguments": [
+            "Guard normal-form match"
+          ],
+          "decisionProcedure": "normal-form match of `Divisor != <zero>` against the hook's own guard conjuncts (a finite set); no match rejects naming class (c).",
+          "citations": [
+            {
+              "kind": "spec",
+              "ref": "docs/language/precept-language-spec.md:1016",
+              "note": "state actions support an optional `when` guard between the state target and the action chain"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "Guard normal-form match"
+            }
+          ],
+          "openDependencies": []
+        },
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "the divisor field carries its own declared modifier (e.g. `nonzero`); that modifier is proven to hold across every write site of the field (a rule-establishment/preservation obligation on the field itself, a separate rule-write-family concern) and this hook's own action list does not write the field before the divisor is read, so the modifier's standing guarantee carries unchanged into the read — the same inductive mechanism premise (d) uses, without needing the sign-monotonicity half of that argument's text (there is no arithmetic transform here, only an unwritten read)",
+          "validityArguments": [
+            "Inductive hypothesis plus sign monotonicity"
+          ],
+          "decisionProcedure": "if the divisor field is not written by this hook's own action list before the read, look up its declared modifiers (the same finite modifier-to-ProofSatisfaction table class (b)/(a) use elsewhere); an interval excluding zero discharges, otherwise reject naming class (a).",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "Inductive hypothesis plus sign monotonicity — reused here for its inductive-hypothesis half only; the sign-monotonicity half is inapplicable and unneeded, since no write transforms the divisor between establishment and this read"
+            }
+          ],
+          "notes": [
+            "This premise's soundness depends on the divisor field's own establishment/preservation proof holding across every one of its write sites elsewhere in the file — exactly the dependency the matrix already names for premise (d) ('the hypothesis is only as sound as the minting rule is complete... a missed write site voids the hypothesis'). Recorded as a dependency, not re-derived here."
+          ]
+        },
+        {
+          "premiseClasses": [
+            "d"
+          ],
+          "derivation": "an explicit `rule` states the divisor's zero-exclusion; that rule holds in the pre-state by the standing inductive hypothesis (establishment at construction, preservation at every write site of every mentioned field, atomic commit, spec:1967), and this hook's own action list does not write the divisor before the read, so the pre-state fact carries unchanged into the read",
+          "validityArguments": [
+            "Inductive hypothesis plus sign monotonicity"
+          ],
+          "decisionProcedure": "if the divisor field is not written by this hook's own action list before the read, look up a rule holding of it in the pre-state that excludes zero (the standing inductive hypothesis); none found rejects naming class (d).",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "Inductive hypothesis plus sign monotonicity — inductive-hypothesis half only, as for class (a) above"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:88",
+              "note": "Open design hole: nothing detects an obligation that was never minted — the same dependency this premise rests on"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:94",
+              "note": "the verified false-proof instance: a `rule` premise consumed via CompositionalConstraint while a different handler violates it, with zero diagnostics"
+            },
+            {
+              "kind": "code",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md",
+              "note": "Part 3, Defect B — the same verified defect, worked in full"
+            }
+          ],
+          "notes": [
+            "HAZARD: this contract entry is consumed via a business `rule` used as a premise. Slice 2 verified at HEAD that this exact discharge shape (a rule stating a field's sign, consumed as premise (d) for an unrelated obligation) can be a false proof when a different handler sets the field to zero elsewhere in the file (matrix:94; authored-expressiveness-gaps.md Part 3, Defect B). This group's witness below has no such violating handler, so its clean compile is not itself an instance of the defect — but the discharge mechanism it exercises is the same one the defect implicates, so its builtStatus is recorded unresolved-today rather than proven-today, per this group's authoring instruction, regardless of the observed clean compile."
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "schema": "add a guard normal-form-equal to <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "declare a modifier on the divisor field (`positive`, `nonzero`, or an equivalent bound) that this hook does not overwrite, so its standing guarantee satisfies <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "d"
+          ],
+          "schema": "state a rule that the divisor satisfies <WP>, holding in the pre-state and not written by this hook before the read",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept StateHookNumdiv\n\nstate Start initial\nstate Done terminal\n\nfield Divisor as number default 0.0\nfield Result as number default 0.0\n\nevent Init initial\nevent Finish\n\non Init -> set Divisor = 0.0\n\nfrom Start on Finish -> transition Done\n\nto Done -> set Result = 100 / Divisor",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a",
+              "c",
+              "d"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+            "date": "2026-07-21",
+            "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+          }
+        },
+        "discharges": [
+          {
+            "id": "c-hook-guard",
+            "kind": "guard",
+            "addition": "when Divisor != 0",
+            "premiseClasses": [
+              "c"
+            ],
+            "derivation": "the hook's own guard normal-form-equal to the WP discharges by guard-match, the same mechanism as a transition row's guard, generalized to a state hook's `when` (spec § State action)",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "notes": [
+              "The `application` DU's only guard locus (`row-guard`) requires an `eventName`, which a state hook does not have (it is anchored to a state target, spec § State action) — `application` is left absent for this reason, per the same open-vocabulary-item treatment the README uses elsewhere; the addition text is recorded in prose instead."
+            ],
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          },
+          {
+            "id": "a-field-nonzero-unwritten",
+            "kind": "other",
+            "addition": "field Divisor as number nonzero default 5.0  (replacing the base's unconstrained `field Divisor as number default 0.0`; the construction row's own `set Divisor = 0.0` is changed to `set Divisor = 5.0` to keep the row internally consistent with the field's own modifier)",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "Divisor's own `nonzero` modifier is established at construction (over the literal it is set to) and this hook does not write Divisor before the read, so the modifier's standing guarantee carries unchanged into the read",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "notes": [
+              "The `application` DU (cell.schema.json # application) has no locus for this edit: it only models (i) appending a guard to a named event row via `row-guard` (which requires an `eventName`, and this edit attaches to a state target or a bare field/rule declaration, not an event row) and (ii) replacing a named event-arg declaration. Recording the edit in `addition` and leaving `application` absent, per the same open-vocabulary-item treatment the README already uses for `construction-defaults`."
+            ],
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          },
+          {
+            "id": "d-rule-nonzero-unwritten",
+            "kind": "other",
+            "addition": "rule Divisor != 0 because \"Divisor must never be zero — a zero divisor would make every downstream rate calculation undefined\"  (with the field's own default changed from 0.0 to 5.0 and the construction row's `set Divisor = 5.0`, so the rule is establishable)",
+            "premiseClasses": [
+              "d"
+            ],
+            "derivation": "the rule holds in the pre-state by the standing inductive hypothesis and this hook does not write Divisor before the read, so the pre-state fact carries unchanged into the read",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "HAZARD, per this group's authoring instruction: this discharge is consumed via a business `rule` premise, the same discharge shape the verified false-proof defect implicates (matrix:94; authored-expressiveness-gaps.md Part 3, Defect B — CompositionalConstraint accepting a rule as a premise with no check that some other handler violates it). The live run below in fact compiled clean (no DivisionByZero), but per the authoring instruction this is recorded as unresolved-today, not proven-today, because the discharge mechanism is not certified sound in general, even though this specific witness has no violating handler.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "notes": [
+              "The `application` DU (cell.schema.json # application) has no locus for this edit: it only models (i) appending a guard to a named event row via `row-guard` (which requires an `eventName`, and this edit attaches to a state target or a bare field/rule declaration, not an event row) and (ii) replacing a named event-arg declaration. Recording the edit in `addition` and leaving `application` absent, per the same open-vocabulary-item treatment the README already uses for `construction-defaults`."
+            ],
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "c-hook-guard",
+            "addition": "when Divisor >= 0",
+            "whyStillRejects": "the guard admits zero — does not imply the WP — must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          },
+          {
+            "pairsWith": "a-field-nonzero-unwritten",
+            "addition": "field Divisor as number nonnegative default 0.0  (construction row keeps `set Divisor = 0.0`)",
+            "whyStillRejects": "nonnegative admits the field's own default of zero — must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          },
+          {
+            "pairsWith": "d-rule-nonzero-unwritten",
+            "addition": "rule Divisor >= 0 because \"Divisor must never be negative...\"  (field default kept at 0.0)",
+            "whyStillRejects": "the rule admits zero — must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (release build, temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91ddfb5eda44b9f64a4ba86559459a10c0"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+          "note": "the Fault family row"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md § State action",
+          "note": "the state-action grammar and its optional `when` guard"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md:1348",
+          "note": "the scope table: state action guard / actions see all field names, nothing else"
+        }
+      ],
+      "openDependencies": [],
+      "notes": [
+        "This cell also covers op/IntegerDivideNumber/numeric-0, op/NumberModuloNumber/numeric-0, op/IntegerModuloNumber/numeric-0: each declares the identical `NumericProofRequirement(ParamSubject(PNumber), NotEquals, 0m, \"Divisor must be non-zero\")` on the same divisor-type-family subject as NumberDivideNumber (src/Precept/Language/Operations.cs), so the obligation schema, applicable-class set, and decision procedures below are identical up to which side of the operator widens; no separate cell is authored for them under the matrix's schema-unification criterion (matrix § The cell, item 1: 'Two programs sit in the same cell iff ... their minted obligations unify with this schema').",
+        "The matrix records as open whether the residency fact itself (the entity is in state S) is a premise, and under which class (matrix:150, the `in S ensure` case-shape row's Open bullet). This cell's own divisor obligation does not depend on residency — the discharges above rest on the field's own history, not on which state the entity is in — but the group's authoring instruction is to carry this open item on every state-hook cell rather than assume either answer, so it is recorded here. No packet Q/S identifier has been minted for this specific open item as of this pass (checked: review-1 through review-6 under obligation-discharge-matrix-2026-07-19-reviews/, and the want-analysis decision packet); `openDependencies` is left empty rather than filled with a fabricated identifier, and this note carries the dependency in prose instead."
+      ]
+    }
+  ]
+}

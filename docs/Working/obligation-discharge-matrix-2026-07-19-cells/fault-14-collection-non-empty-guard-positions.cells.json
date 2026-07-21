@@ -1,0 +1,2800 @@
+{
+  "$schema": "./cell.schema.json",
+  "familyId": "fault-14-collection-non-empty-guard-positions",
+  "title": "Reading from a possibly-empty collection inside a guard",
+  "caseShape": "fault",
+  "definitionVersion": "obligation-discharge-matrix-2026-07-19 rev 7 (2026-07-20, draft)",
+  "citations": [
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+      "note": "fault family case shape"
+    },
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+      "note": "the four premise classes"
+    },
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+      "note": "sound-but-unprovable band and respellable verdict definitions"
+    },
+    {
+      "kind": "code",
+      "ref": "src/Precept/Language/Types.cs:205",
+      "note": "queue accessor .peek — Numeric requirement"
+    },
+    {
+      "kind": "code",
+      "ref": "src/Precept/Language/Types.cs:297",
+      "note": "list accessor .first — Numeric requirement"
+    },
+    {
+      "kind": "code",
+      "ref": "src/Precept/Language/Modifiers.cs:195",
+      "note": "Mincount ProofSatisfaction"
+    }
+  ],
+  "respellability": {
+    "verdict": "yes",
+    "evidence": "model-derived",
+    "corpusMeasurement": "pending",
+    "citations": [
+      {
+        "kind": "matrix",
+        "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+        "note": "the respellable verdict definition"
+      },
+      {
+        "kind": "matrix",
+        "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Ratification protocol",
+        "note": "layer 4 — corpus measurement is the hard gate"
+      }
+    ],
+    "notes": [
+      "Every band member identified in this family (the self-referential same-guard spelling) has at least one always-available respelling: declare the field's `mincount` modifier, or state a top-level `rule` the induction can consume once built. Neither respelling has been measured against the sample corpus.",
+      "This verdict covers the ten authored cells; it does not extend a claim over the un-authored 65 remaining coordinates in this group's region (13 catalog sites x 5 categories minus the 2 sites x 5 categories authored here)."
+    ]
+  },
+  "cells": [
+    {
+      "id": "g14/list-first-transition-row-guard",
+      "label": "List.first read inside a transition row's `when` clause",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "accessor/List/first/numeric-0",
+        "evaluationSiteCategory": "transition-row-guard",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+            "note": "fault family case shape"
+          },
+          {
+            "kind": "spec",
+            "ref": "docs/language/precept-language-spec.md § Transition row"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Items.count > 0",
+        "metavariables": [
+          {
+            "name": "Items",
+            "standsFor": "the list field the accessor reads"
+          },
+          {
+            "name": "0",
+            "standsFor": "the fixed non-emptiness threshold — the catalog's declared condition, never authored"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          },
+          {
+            "kind": "normal-form-draft",
+            "ref": "docs/Working/normal-form-draft-2026-07-19.md"
+          }
+        ],
+        "wp": {
+          "statement": "Items.count > 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a",
+        "d"
+      ],
+      "premiseAvailability": "No write occurs at a transition row's `when` clause (it decides applicability/writability; it does not mutate). Class (c) is unavailable — the guard cannot supply a premise to an obligation arising inside itself, the headline asymmetry of this evaluation-site region. Class (b) is unavailable — no event argument represents the collection's cardinality, so no arg constraint can instantiate this obligation. Class (a) (the field's own declared `mincount`) is always in scope. Class (d) is available at this category (pre-state constraints), per the evaluation-site region's own axis facts.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "compile-time interval fact from `Items`'s declared `mincount` modifier (ProofSatisfaction.Numeric: `count >= mincount`, `src/Precept/Language/Modifiers.cs:195-208`) — a declared `mincount` of 1 or more entails `Items.count > 0`, the catalog's own fault precondition (`src/Precept/Language/Types.cs:297`)",
+          "validityArguments": [
+            "Inductive hypothesis plus sign monotonicity"
+          ],
+          "decisionProcedure": "Look up `Items`'s declared `mincount` value, if any, via the ProofSatisfactions table; the fault discharges iff the declared `mincount` is >= 1 (for an integer count, `count >= 1` entails `count > 0`). No `mincount` modifier, or one declaring 0, fails the class.",
+          "citations": [
+            {
+              "kind": "code",
+              "ref": "src/Precept/Language/Modifiers.cs:195",
+              "note": "Mincount ProofSatisfaction — count >= DeclarationValue"
+            },
+            {
+              "kind": "code",
+              "ref": "src/Precept/Language/Types.cs:297",
+              "note": "list.first's catalog-declared Numeric requirement — List must be non-empty"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+              "note": "fault-family case shape: premise classes (b)/(c)/(a) per catalog ProofSatisfactions"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "d"
+          ],
+          "derivation": "a `rule Items.count > 0` (or an equivalent lower-bound form) holding in the pre-state, consumed directly as the fault's WP with no arithmetic — the same fact, not a derived one",
+          "strategy": "CompositionalConstraint",
+          "validityArguments": [
+            "Inductive hypothesis plus sign monotonicity"
+          ],
+          "decisionProcedure": "Search the pre-state constraint set for a `rule` whose condition is normal-form-equal to (or N13-covers) `Items.count > 0`; found, consumed via CompositionalConstraint. Absent, or naming a different field, fails the class.",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+              "note": "premise class (d): all constraints holding in the pre-state"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "Inductive hypothesis plus sign monotonicity"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "apply a `mincount` modifier (at least 1) to the collection field's declaration",
+          "citations": [
+            {
+              "kind": "code",
+              "ref": "src/Precept/Language/Modifiers.cs:125",
+              "note": "the Notempty HoverDescription names mincount 1, not notempty, as the collection route"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "d"
+          ],
+          "schema": "add a `rule <WP>` (e.g. `rule Items.count > 0`) holding in the pre-state",
+          "notes": [
+            "This suggestion is licensed under the model. At HEAD it is also the exact shape of the Defect B false-proof hazard (authored-expressiveness-gaps.md, Part 3): a rule consumed as a premise while nothing yet establishes or preserves it. Recorded as the model's suggestion; a diagnostic emitting it today would be recommending a currently-unsound spelling. Not resolved here."
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept ListFirstTransitionrowguard\nfield Items as list of integer\nstate Active initial\nstate Closed terminal\nevent Add(Value as integer)\nevent Check\nevent Close\nfrom Active on Add\n    -> append Items Add.Value\n    -> no transition\nfrom Active on Check when Items.first > 10\n    -> no transition\nfrom Active on Close\n    -> transition Closed\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a",
+              "d"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        },
+        "discharges": [
+          {
+            "id": "mincount-1",
+            "kind": "other",
+            "addition": "mincount 1  # added to the `Items` field declaration",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "declared mincount 1 -> count >= 1 -> count > 0 (Inductive hypothesis plus sign monotonicity, trivial/identity case)",
+            "strategy": "IntervalContainment",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "the transition-row-guard position mints no fault obligation at all at HEAD (measured, commit e1a14d91) — there is nothing for this addition to discharge; the clean compile below is the site failing to mint, not the addition being recognized as a discharge",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Live run (2026-07-21, Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll), HEAD e1a14d91): `list-transition-row-guard__discharge-a.precept` compiles with rc=0 and no diagnostics (stdout carries only the WP calculator's own '[skipped obligation] ...mincount: accessor-projected bound...' note, which is about the calculator's inability to compute an establishment/preservation WP for the mincount-desugared rule — unrelated to the fault obligation this cell defines).",
+              "`application` is omitted: this addition changes a field declaration's modifier list, which is neither a row guard (`row-guard` locus) nor an event-arg declaration (`event-arg-declarations` locus) — the schema's `application` DU has no locus for a field-modifier addition. The cell->test conversion machinery cannot mechanically apply this discharge today; flagged as a schema/tooling gap, not worked around."
+            ]
+          },
+          {
+            "id": "rule-count-gt-0",
+            "kind": "other",
+            "addition": "rule Items.count > 0 because \"the collection is provisioned non-empty at handoff\"  # added as a top-level declaration",
+            "premiseClasses": [
+              "d"
+            ],
+            "derivation": "pre-state rule Items.count > 0 consumed directly as the WP -> CompositionalConstraint",
+            "strategy": "CompositionalConstraint",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "the transition-row-guard position mints no fault obligation at all at HEAD (measured, commit e1a14d91) — there is nothing for this addition to discharge. Separately and more seriously: even at a position that DOES mint, Defect B shows a `rule` consumed as a premise via CompositionalConstraint while nothing establishes or preserves it is a live false-proof at HEAD (authored-expressiveness-gaps.md, Part 3) — so this discharge must never be read as confirmed by a clean compile, here or elsewhere.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Live run (2026-07-21, Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll), HEAD e1a14d91): `list-transition-row-guard__discharge-d.precept` compiles with rc=0 and no diagnostics related to the target fault (stdout shows the WP calculator's own printout for the added `rule` obligation itself — establishment WP and a 'NOT SUPPORTED' preservation note for the append action, both about the calculator's own rule-write machinery, not the fault obligation this cell defines).",
+              "`application` is omitted: this addition is a new top-level `rule` declaration, not a row guard or an event-arg declaration — the same schema/tooling gap as the mincount discharge above."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "mincount-1",
+            "addition": "mincount 0  # added to the `Items` field declaration",
+            "whyStillRejects": "mincount 0 does not exclude an empty collection — the compile-time lower bound is 0, not >= 1, so it still admits the empty case; must still reject under the model, same obligation.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          },
+          {
+            "pairsWith": "rule-count-gt-0",
+            "addition": "rule Items.count >= 0 because \"...\"  # weakened top-level declaration",
+            "whyStillRejects": "`>= 0` is trivially true of any count and does not establish non-emptiness; must still reject under the model, same obligation.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "cell-override",
+        "overrideVerdict": "yes",
+        "bandMember": "from Active on Check when Items.count > 0 and Items.first > 10\n    -> no transition",
+        "respelling": "declare `Items` with `mincount 1` (class a), or state a top-level `rule Items.count > 0` that the induction consumes once the rule-write establishment/preservation machinery is built (class d) — both close the fault without relying on same-guard conjunct ordering, which the matrix does not license (see notes).",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the respellable verdict definition"
+          }
+        ],
+        "notes": [
+          "The band member is the natural author spelling for this group: a single guard combining the cardinality check and the accessor read in one `and`-joined condition. Whether the first conjunct (`count > 0`) is itself a licensed premise for the second (`.first`/`.peek` above threshold) is an open question the matrix does not answer (see the cell's own notes) — this respelling is offered as the always-available fallback, not as evidence the band member is permanently unlicensable."
+        ]
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+          "note": "fault family case shape — catalog-declared safety precondition at the evaluation site"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+          "note": "the four premise classes"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md § Transition row"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Types.cs:297",
+          "note": "list.first's catalog-declared Numeric requirement"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Diagnostics.cs:568",
+          "note": "UnguardedCollectionAccess — PreventsFault CollectionEmptyOnAccess, the write-site analogue of this obligation"
+        }
+      ],
+      "notes": [
+        "Built-status: measured at HEAD (commit e1a14d91, 2026-07-21) via `Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)` — a transition row's `when` clause mints no fault obligation at all. Base, both discharge additions, and both near-misses all compile clean (rc=0, no diagnostic touching this fault) regardless of which addition is present. This is the site failing to mint, not the additions being recognized or the near-misses failing to be caught — see each witness's own notes for the literal compile output.",
+        "Open question, not licensed here: the natural author spelling `when Items.count > 0 and Items.first > 10` puts both facts in the SAME guard. Class (c) — the handler's own guard — is unavailable at every guard position (a guard cannot supply a premise to an obligation arising inside itself), but whether an EARLIER conjunct of that same guard licenses a LATER one is not answered by the matrix or by `precept-language-spec.md`. This cell does not license that spelling; the band-member respelling above is offered as the licensed alternative, not as tacit permission for the self-referential form.",
+        "Class (d) is listed as available at this evaluation-site category (constraints holding in the pre-state), so a discharge witness citing a `rule` is authored here. Per the group's hazard instruction, every such witness is recorded `builtStatus: unresolved-today` with the false-proof reason named — never as confirmed by a clean compile.",
+        "No validity argument in the matrix's § Validity arguments literally covers premise class (a) — a collection field's own declared `mincount` modifier, as opposed to an event arg's modifier — discharging a fault-family obligation. 'Arg-bound interval arithmetic' is scoped in its own text to values 'entering as an event arg' (want:268/ingress governance); it does not by its own words extend to a persistent field's structurally-enforced bound. The closer fit is 'Inductive hypothesis plus sign monotonicity' — since every ProofSatisfaction-bearing modifier desugars to an implicit rule (`DesugarsToRule: true`, `Modifiers.cs`) under the SAME establishment+preservation obligation machinery as an author-written rule — but that argument's own worked text is about combining the hypothesis with a sign-monotonicity step (Family 1 Base B), not the direct-identity case used here. Cited as the closest available named argument; the generalization to synthesized field-modifier rules, and to the trivial (no-arithmetic) case, is not itself written out. Recorded as a missing rule, not silently absorbed by the citation.",
+        "The fault-family case-shape table (matrix, the per-family case-shapes table) lists premise classes (b)/(c)/(a) for the fault family and does not list (d), yet this cell (per the group's own authoring instruction and the region's axis facts) authors a class-(d) discharge, and Defect B independently shows class (d) being consumed for a fault discharge at HEAD via CompositionalConstraint. Whether (d) is a licensed fault-discharge premise class at all is not stated cleanly in the matrix text — flagged as a missing rule, distinct from (and prior to) the false-proof soundness hazard Defect B documents."
+      ]
+    },
+    {
+      "id": "g14/list-first-state-hook-guard",
+      "label": "List.first read inside a state entry hook's pre-verb `when` clause",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "accessor/List/first/numeric-0",
+        "evaluationSiteCategory": "state-hook-guard",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+            "note": "fault family case shape"
+          },
+          {
+            "kind": "spec",
+            "ref": "docs/language/precept-language-spec.md § State action"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Items.count > 0",
+        "metavariables": [
+          {
+            "name": "Items",
+            "standsFor": "the list field the accessor reads"
+          },
+          {
+            "name": "0",
+            "standsFor": "the fixed non-emptiness threshold — the catalog's declared condition, never authored"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          },
+          {
+            "kind": "normal-form-draft",
+            "ref": "docs/Working/normal-form-draft-2026-07-19.md"
+          }
+        ],
+        "wp": {
+          "statement": "Items.count > 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a",
+        "d"
+      ],
+      "premiseAvailability": "No write occurs at a state entry hook's pre-verb `when` clause (it decides applicability/writability; it does not mutate). Class (c) is unavailable — the guard cannot supply a premise to an obligation arising inside itself, the headline asymmetry of this evaluation-site region. Class (b) is unavailable — no event argument represents the collection's cardinality, so no arg constraint can instantiate this obligation. Class (a) (the field's own declared `mincount`) is always in scope. Class (d) is available at this category (pre-state constraints), per the evaluation-site region's own axis facts.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "compile-time interval fact from `Items`'s declared `mincount` modifier (ProofSatisfaction.Numeric: `count >= mincount`, `src/Precept/Language/Modifiers.cs:195-208`) — a declared `mincount` of 1 or more entails `Items.count > 0`, the catalog's own fault precondition (`src/Precept/Language/Types.cs:297`)",
+          "validityArguments": [
+            "Inductive hypothesis plus sign monotonicity"
+          ],
+          "decisionProcedure": "Look up `Items`'s declared `mincount` value, if any, via the ProofSatisfactions table; the fault discharges iff the declared `mincount` is >= 1 (for an integer count, `count >= 1` entails `count > 0`). No `mincount` modifier, or one declaring 0, fails the class.",
+          "citations": [
+            {
+              "kind": "code",
+              "ref": "src/Precept/Language/Modifiers.cs:195",
+              "note": "Mincount ProofSatisfaction — count >= DeclarationValue"
+            },
+            {
+              "kind": "code",
+              "ref": "src/Precept/Language/Types.cs:297",
+              "note": "list.first's catalog-declared Numeric requirement — List must be non-empty"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+              "note": "fault-family case shape: premise classes (b)/(c)/(a) per catalog ProofSatisfactions"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "d"
+          ],
+          "derivation": "a `rule Items.count > 0` (or an equivalent lower-bound form) holding in the pre-state, consumed directly as the fault's WP with no arithmetic — the same fact, not a derived one",
+          "strategy": "CompositionalConstraint",
+          "validityArguments": [
+            "Inductive hypothesis plus sign monotonicity"
+          ],
+          "decisionProcedure": "Search the pre-state constraint set for a `rule` whose condition is normal-form-equal to (or N13-covers) `Items.count > 0`; found, consumed via CompositionalConstraint. Absent, or naming a different field, fails the class.",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+              "note": "premise class (d): all constraints holding in the pre-state"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "Inductive hypothesis plus sign monotonicity"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "apply a `mincount` modifier (at least 1) to the collection field's declaration",
+          "citations": [
+            {
+              "kind": "code",
+              "ref": "src/Precept/Language/Modifiers.cs:125",
+              "note": "the Notempty HoverDescription names mincount 1, not notempty, as the collection route"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "d"
+          ],
+          "schema": "add a `rule <WP>` (e.g. `rule Items.count > 0`) holding in the pre-state",
+          "notes": [
+            "This suggestion is licensed under the model. At HEAD it is also the exact shape of the Defect B false-proof hazard (authored-expressiveness-gaps.md, Part 3): a rule consumed as a premise while nothing yet establishes or preserves it. Recorded as the model's suggestion; a diagnostic emitting it today would be recommending a currently-unsound spelling. Not resolved here."
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept ListFirstStatehookguard\nfield Items as list of integer\nfield Note as integer default 0\nstate Draft initial\nstate Done terminal\nevent Add(Value as integer)\nevent Finish\nfrom Draft on Add\n    -> append Items Add.Value\n    -> no transition\nto Done when Items.first > 10 -> set Note = 1\nfrom Draft on Finish\n    -> transition Done\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a",
+              "d"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        },
+        "discharges": [
+          {
+            "id": "mincount-1",
+            "kind": "other",
+            "addition": "mincount 1  # added to the `Items` field declaration",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "declared mincount 1 -> count >= 1 -> count > 0 (Inductive hypothesis plus sign monotonicity, trivial/identity case)",
+            "strategy": "IntervalContainment",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "the state-hook-guard position mints no fault obligation at all at HEAD (measured, commit e1a14d91) — there is nothing for this addition to discharge; the clean compile below is the site failing to mint, not the addition being recognized as a discharge",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Live run (2026-07-21, Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll), HEAD e1a14d91): `list-state-hook-guard__discharge-a.precept` compiles with rc=0 and no diagnostics (stdout carries only the WP calculator's own '[skipped obligation] ...mincount: accessor-projected bound...' note, which is about the calculator's inability to compute an establishment/preservation WP for the mincount-desugared rule — unrelated to the fault obligation this cell defines).",
+              "`application` is omitted: this addition changes a field declaration's modifier list, which is neither a row guard (`row-guard` locus) nor an event-arg declaration (`event-arg-declarations` locus) — the schema's `application` DU has no locus for a field-modifier addition. The cell->test conversion machinery cannot mechanically apply this discharge today; flagged as a schema/tooling gap, not worked around."
+            ]
+          },
+          {
+            "id": "rule-count-gt-0",
+            "kind": "other",
+            "addition": "rule Items.count > 0 because \"the collection is provisioned non-empty at handoff\"  # added as a top-level declaration",
+            "premiseClasses": [
+              "d"
+            ],
+            "derivation": "pre-state rule Items.count > 0 consumed directly as the WP -> CompositionalConstraint",
+            "strategy": "CompositionalConstraint",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "the state-hook-guard position mints no fault obligation at all at HEAD (measured, commit e1a14d91) — there is nothing for this addition to discharge. Separately and more seriously: even at a position that DOES mint, Defect B shows a `rule` consumed as a premise via CompositionalConstraint while nothing establishes or preserves it is a live false-proof at HEAD (authored-expressiveness-gaps.md, Part 3) — so this discharge must never be read as confirmed by a clean compile, here or elsewhere.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Live run (2026-07-21, Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll), HEAD e1a14d91): `list-state-hook-guard__discharge-d.precept` compiles with rc=0 and no diagnostics related to the target fault (stdout shows the WP calculator's own printout for the added `rule` obligation itself — establishment WP and a 'NOT SUPPORTED' preservation note for the append action, both about the calculator's own rule-write machinery, not the fault obligation this cell defines).",
+              "`application` is omitted: this addition is a new top-level `rule` declaration, not a row guard or an event-arg declaration — the same schema/tooling gap as the mincount discharge above."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "mincount-1",
+            "addition": "mincount 0  # added to the `Items` field declaration",
+            "whyStillRejects": "mincount 0 does not exclude an empty collection — the compile-time lower bound is 0, not >= 1, so it still admits the empty case; must still reject under the model, same obligation.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          },
+          {
+            "pairsWith": "rule-count-gt-0",
+            "addition": "rule Items.count >= 0 because \"...\"  # weakened top-level declaration",
+            "whyStillRejects": "`>= 0` is trivially true of any count and does not establish non-emptiness; must still reject under the model, same obligation.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "cell-override",
+        "overrideVerdict": "yes",
+        "bandMember": "to Done when Items.count > 0 and Items.first > 10 -> set Note = 1",
+        "respelling": "declare `Items` with `mincount 1` (class a), or state a top-level `rule Items.count > 0` that the induction consumes once the rule-write establishment/preservation machinery is built (class d) — both close the fault without relying on same-guard conjunct ordering, which the matrix does not license (see notes).",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the respellable verdict definition"
+          }
+        ],
+        "notes": [
+          "The band member is the natural author spelling for this group: a single guard combining the cardinality check and the accessor read in one `and`-joined condition. Whether the first conjunct (`count > 0`) is itself a licensed premise for the second (`.first`/`.peek` above threshold) is an open question the matrix does not answer (see the cell's own notes) — this respelling is offered as the always-available fallback, not as evidence the band member is permanently unlicensable."
+        ]
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+          "note": "fault family case shape — catalog-declared safety precondition at the evaluation site"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+          "note": "the four premise classes"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md § State action"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Types.cs:297",
+          "note": "list.first's catalog-declared Numeric requirement"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Diagnostics.cs:568",
+          "note": "UnguardedCollectionAccess — PreventsFault CollectionEmptyOnAccess, the write-site analogue of this obligation"
+        }
+      ],
+      "notes": [
+        "Built-status: measured at HEAD (commit e1a14d91, 2026-07-21) via `Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)` — a state entry hook's pre-verb `when` clause mints no fault obligation at all. Base, both discharge additions, and both near-misses all compile clean (rc=0, no diagnostic touching this fault) regardless of which addition is present. This is the site failing to mint, not the additions being recognized or the near-misses failing to be caught — see each witness's own notes for the literal compile output.",
+        "Open question, not licensed here: the natural author spelling `when Items.count > 0 and Items.first > 10` puts both facts in the SAME guard. Class (c) — the handler's own guard — is unavailable at every guard position (a guard cannot supply a premise to an obligation arising inside itself), but whether an EARLIER conjunct of that same guard licenses a LATER one is not answered by the matrix or by `precept-language-spec.md`. This cell does not license that spelling; the band-member respelling above is offered as the licensed alternative, not as tacit permission for the self-referential form.",
+        "Class (d) is listed as available at this evaluation-site category (constraints holding in the pre-state), so a discharge witness citing a `rule` is authored here. Per the group's hazard instruction, every such witness is recorded `builtStatus: unresolved-today` with the false-proof reason named — never as confirmed by a clean compile.",
+        "No validity argument in the matrix's § Validity arguments literally covers premise class (a) — a collection field's own declared `mincount` modifier, as opposed to an event arg's modifier — discharging a fault-family obligation. 'Arg-bound interval arithmetic' is scoped in its own text to values 'entering as an event arg' (want:268/ingress governance); it does not by its own words extend to a persistent field's structurally-enforced bound. The closer fit is 'Inductive hypothesis plus sign monotonicity' — since every ProofSatisfaction-bearing modifier desugars to an implicit rule (`DesugarsToRule: true`, `Modifiers.cs`) under the SAME establishment+preservation obligation machinery as an author-written rule — but that argument's own worked text is about combining the hypothesis with a sign-monotonicity step (Family 1 Base B), not the direct-identity case used here. Cited as the closest available named argument; the generalization to synthesized field-modifier rules, and to the trivial (no-arithmetic) case, is not itself written out. Recorded as a missing rule, not silently absorbed by the citation.",
+        "The fault-family case-shape table (matrix, the per-family case-shapes table) lists premise classes (b)/(c)/(a) for the fault family and does not list (d), yet this cell (per the group's own authoring instruction and the region's axis facts) authors a class-(d) discharge, and Defect B independently shows class (d) being consumed for a fault discharge at HEAD via CompositionalConstraint. Whether (d) is a licensed fault-discharge premise class at all is not stated cleanly in the matrix text — flagged as a missing rule, distinct from (and prior to) the false-proof soundness hazard Defect B documents."
+      ]
+    },
+    {
+      "id": "g14/list-first-access-mode-guard",
+      "label": "List.first read inside a state-scoped access-mode declaration's pre-verb `when` clause",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "accessor/List/first/numeric-0",
+        "evaluationSiteCategory": "access-mode-guard",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+            "note": "fault family case shape"
+          },
+          {
+            "kind": "spec",
+            "ref": "docs/language/precept-language-spec.md § Access mode and omit declaration"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Items.count > 0",
+        "metavariables": [
+          {
+            "name": "Items",
+            "standsFor": "the list field the accessor reads"
+          },
+          {
+            "name": "0",
+            "standsFor": "the fixed non-emptiness threshold — the catalog's declared condition, never authored"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          },
+          {
+            "kind": "normal-form-draft",
+            "ref": "docs/Working/normal-form-draft-2026-07-19.md"
+          }
+        ],
+        "wp": {
+          "statement": "Items.count > 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a",
+        "d"
+      ],
+      "premiseAvailability": "No write occurs at a state-scoped access-mode declaration's pre-verb `when` clause (it decides applicability/writability; it does not mutate). Class (c) is unavailable — the guard cannot supply a premise to an obligation arising inside itself, the headline asymmetry of this evaluation-site region. Class (b) is unavailable — no event argument represents the collection's cardinality, so no arg constraint can instantiate this obligation. Class (a) (the field's own declared `mincount`) is always in scope. Class (d) is available at this category (pre-state constraints), per the evaluation-site region's own axis facts.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "compile-time interval fact from `Items`'s declared `mincount` modifier (ProofSatisfaction.Numeric: `count >= mincount`, `src/Precept/Language/Modifiers.cs:195-208`) — a declared `mincount` of 1 or more entails `Items.count > 0`, the catalog's own fault precondition (`src/Precept/Language/Types.cs:297`)",
+          "validityArguments": [
+            "Inductive hypothesis plus sign monotonicity"
+          ],
+          "decisionProcedure": "Look up `Items`'s declared `mincount` value, if any, via the ProofSatisfactions table; the fault discharges iff the declared `mincount` is >= 1 (for an integer count, `count >= 1` entails `count > 0`). No `mincount` modifier, or one declaring 0, fails the class.",
+          "citations": [
+            {
+              "kind": "code",
+              "ref": "src/Precept/Language/Modifiers.cs:195",
+              "note": "Mincount ProofSatisfaction — count >= DeclarationValue"
+            },
+            {
+              "kind": "code",
+              "ref": "src/Precept/Language/Types.cs:297",
+              "note": "list.first's catalog-declared Numeric requirement — List must be non-empty"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+              "note": "fault-family case shape: premise classes (b)/(c)/(a) per catalog ProofSatisfactions"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "d"
+          ],
+          "derivation": "a `rule Items.count > 0` (or an equivalent lower-bound form) holding in the pre-state, consumed directly as the fault's WP with no arithmetic — the same fact, not a derived one",
+          "strategy": "CompositionalConstraint",
+          "validityArguments": [
+            "Inductive hypothesis plus sign monotonicity"
+          ],
+          "decisionProcedure": "Search the pre-state constraint set for a `rule` whose condition is normal-form-equal to (or N13-covers) `Items.count > 0`; found, consumed via CompositionalConstraint. Absent, or naming a different field, fails the class.",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+              "note": "premise class (d): all constraints holding in the pre-state"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "Inductive hypothesis plus sign monotonicity"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "apply a `mincount` modifier (at least 1) to the collection field's declaration",
+          "citations": [
+            {
+              "kind": "code",
+              "ref": "src/Precept/Language/Modifiers.cs:125",
+              "note": "the Notempty HoverDescription names mincount 1, not notempty, as the collection route"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "d"
+          ],
+          "schema": "add a `rule <WP>` (e.g. `rule Items.count > 0`) holding in the pre-state",
+          "notes": [
+            "This suggestion is licensed under the model. At HEAD it is also the exact shape of the Defect B false-proof hazard (authored-expressiveness-gaps.md, Part 3): a rule consumed as a premise while nothing yet establishes or preserves it. Recorded as the model's suggestion; a diagnostic emitting it today would be recommending a currently-unsound spelling. Not resolved here."
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept ListFirstAccessmodeguard\nfield Items as list of integer\nfield Note as string optional editable\nstate Draft initial\nstate Done terminal\nevent Add(Value as integer)\nevent Finish\nfrom Draft on Add\n    -> append Items Add.Value\n    -> no transition\nin Draft when Items.first > 10 modify Note readonly\nfrom Draft on Finish\n    -> transition Done\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a",
+              "d"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        },
+        "discharges": [
+          {
+            "id": "mincount-1",
+            "kind": "other",
+            "addition": "mincount 1  # added to the `Items` field declaration",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "declared mincount 1 -> count >= 1 -> count > 0 (Inductive hypothesis plus sign monotonicity, trivial/identity case)",
+            "strategy": "IntervalContainment",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "the access-mode-guard position mints no fault obligation at all at HEAD (measured, commit e1a14d91) — there is nothing for this addition to discharge; the clean compile below is the site failing to mint, not the addition being recognized as a discharge",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Live run (2026-07-21, Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll), HEAD e1a14d91): `list-access-mode-guard__discharge-a.precept` compiles with rc=0 and no diagnostics (stdout carries only the WP calculator's own '[skipped obligation] ...mincount: accessor-projected bound...' note, which is about the calculator's inability to compute an establishment/preservation WP for the mincount-desugared rule — unrelated to the fault obligation this cell defines).",
+              "`application` is omitted: this addition changes a field declaration's modifier list, which is neither a row guard (`row-guard` locus) nor an event-arg declaration (`event-arg-declarations` locus) — the schema's `application` DU has no locus for a field-modifier addition. The cell->test conversion machinery cannot mechanically apply this discharge today; flagged as a schema/tooling gap, not worked around."
+            ]
+          },
+          {
+            "id": "rule-count-gt-0",
+            "kind": "other",
+            "addition": "rule Items.count > 0 because \"the collection is provisioned non-empty at handoff\"  # added as a top-level declaration",
+            "premiseClasses": [
+              "d"
+            ],
+            "derivation": "pre-state rule Items.count > 0 consumed directly as the WP -> CompositionalConstraint",
+            "strategy": "CompositionalConstraint",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "the access-mode-guard position mints no fault obligation at all at HEAD (measured, commit e1a14d91) — there is nothing for this addition to discharge. Separately and more seriously: even at a position that DOES mint, Defect B shows a `rule` consumed as a premise via CompositionalConstraint while nothing establishes or preserves it is a live false-proof at HEAD (authored-expressiveness-gaps.md, Part 3) — so this discharge must never be read as confirmed by a clean compile, here or elsewhere.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Live run (2026-07-21, Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll), HEAD e1a14d91): `list-access-mode-guard__discharge-d.precept` compiles with rc=0 and no diagnostics related to the target fault (stdout shows the WP calculator's own printout for the added `rule` obligation itself — establishment WP and a 'NOT SUPPORTED' preservation note for the append action, both about the calculator's own rule-write machinery, not the fault obligation this cell defines).",
+              "`application` is omitted: this addition is a new top-level `rule` declaration, not a row guard or an event-arg declaration — the same schema/tooling gap as the mincount discharge above."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "mincount-1",
+            "addition": "mincount 0  # added to the `Items` field declaration",
+            "whyStillRejects": "mincount 0 does not exclude an empty collection — the compile-time lower bound is 0, not >= 1, so it still admits the empty case; must still reject under the model, same obligation.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          },
+          {
+            "pairsWith": "rule-count-gt-0",
+            "addition": "rule Items.count >= 0 because \"...\"  # weakened top-level declaration",
+            "whyStillRejects": "`>= 0` is trivially true of any count and does not establish non-emptiness; must still reject under the model, same obligation.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "cell-override",
+        "overrideVerdict": "yes",
+        "bandMember": "in Draft when Items.count > 0 and Items.first > 10 modify Note readonly",
+        "respelling": "declare `Items` with `mincount 1` (class a), or state a top-level `rule Items.count > 0` that the induction consumes once the rule-write establishment/preservation machinery is built (class d) — both close the fault without relying on same-guard conjunct ordering, which the matrix does not license (see notes).",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the respellable verdict definition"
+          }
+        ],
+        "notes": [
+          "The band member is the natural author spelling for this group: a single guard combining the cardinality check and the accessor read in one `and`-joined condition. Whether the first conjunct (`count > 0`) is itself a licensed premise for the second (`.first`/`.peek` above threshold) is an open question the matrix does not answer (see the cell's own notes) — this respelling is offered as the always-available fallback, not as evidence the band member is permanently unlicensable."
+        ]
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+          "note": "fault family case shape — catalog-declared safety precondition at the evaluation site"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+          "note": "the four premise classes"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md § Access mode and omit declaration"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Types.cs:297",
+          "note": "list.first's catalog-declared Numeric requirement"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Diagnostics.cs:568",
+          "note": "UnguardedCollectionAccess — PreventsFault CollectionEmptyOnAccess, the write-site analogue of this obligation"
+        }
+      ],
+      "notes": [
+        "Built-status: measured at HEAD (commit e1a14d91, 2026-07-21) via `Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)` — a state-scoped access-mode declaration's pre-verb `when` clause mints no fault obligation at all. Base, both discharge additions, and both near-misses all compile clean (rc=0, no diagnostic touching this fault) regardless of which addition is present. This is the site failing to mint, not the additions being recognized or the near-misses failing to be caught — see each witness's own notes for the literal compile output.",
+        "Open question, not licensed here: the natural author spelling `when Items.count > 0 and Items.first > 10` puts both facts in the SAME guard. Class (c) — the handler's own guard — is unavailable at every guard position (a guard cannot supply a premise to an obligation arising inside itself), but whether an EARLIER conjunct of that same guard licenses a LATER one is not answered by the matrix or by `precept-language-spec.md`. This cell does not license that spelling; the band-member respelling above is offered as the licensed alternative, not as tacit permission for the self-referential form.",
+        "Class (d) is listed as available at this evaluation-site category (constraints holding in the pre-state), so a discharge witness citing a `rule` is authored here. Per the group's hazard instruction, every such witness is recorded `builtStatus: unresolved-today` with the false-proof reason named — never as confirmed by a clean compile.",
+        "No validity argument in the matrix's § Validity arguments literally covers premise class (a) — a collection field's own declared `mincount` modifier, as opposed to an event arg's modifier — discharging a fault-family obligation. 'Arg-bound interval arithmetic' is scoped in its own text to values 'entering as an event arg' (want:268/ingress governance); it does not by its own words extend to a persistent field's structurally-enforced bound. The closer fit is 'Inductive hypothesis plus sign monotonicity' — since every ProofSatisfaction-bearing modifier desugars to an implicit rule (`DesugarsToRule: true`, `Modifiers.cs`) under the SAME establishment+preservation obligation machinery as an author-written rule — but that argument's own worked text is about combining the hypothesis with a sign-monotonicity step (Family 1 Base B), not the direct-identity case used here. Cited as the closest available named argument; the generalization to synthesized field-modifier rules, and to the trivial (no-arithmetic) case, is not itself written out. Recorded as a missing rule, not silently absorbed by the citation.",
+        "The fault-family case-shape table (matrix, the per-family case-shapes table) lists premise classes (b)/(c)/(a) for the fault family and does not list (d), yet this cell (per the group's own authoring instruction and the region's axis facts) authors a class-(d) discharge, and Defect B independently shows class (d) being consumed for a fault discharge at HEAD via CompositionalConstraint. Whether (d) is a licensed fault-discharge premise class at all is not stated cleanly in the matrix text — flagged as a missing rule, distinct from (and prior to) the false-proof soundness hazard Defect B documents."
+      ]
+    },
+    {
+      "id": "g14/list-first-ensure-activation-guard",
+      "label": "List.first read inside an ensure's pre-verb `when` clause",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "accessor/List/first/numeric-0",
+        "evaluationSiteCategory": "ensure-activation-guard",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+            "note": "fault family case shape"
+          },
+          {
+            "kind": "spec",
+            "ref": "docs/language/precept-language-spec.md § State/event ensure"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Items.count > 0",
+        "metavariables": [
+          {
+            "name": "Items",
+            "standsFor": "the list field the accessor reads"
+          },
+          {
+            "name": "0",
+            "standsFor": "the fixed non-emptiness threshold — the catalog's declared condition, never authored"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          },
+          {
+            "kind": "normal-form-draft",
+            "ref": "docs/Working/normal-form-draft-2026-07-19.md"
+          }
+        ],
+        "wp": {
+          "statement": "Items.count > 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a",
+        "d"
+      ],
+      "premiseAvailability": "No write occurs at an ensure's pre-verb `when` clause (it decides applicability/writability; it does not mutate). Class (c) is unavailable — the guard cannot supply a premise to an obligation arising inside itself, the headline asymmetry of this evaluation-site region. Class (b) is unavailable — no event argument represents the collection's cardinality, so no arg constraint can instantiate this obligation. Class (a) (the field's own declared `mincount`) is always in scope. Class (d) is available at this category (pre-state constraints), per the evaluation-site region's own axis facts.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "compile-time interval fact from `Items`'s declared `mincount` modifier (ProofSatisfaction.Numeric: `count >= mincount`, `src/Precept/Language/Modifiers.cs:195-208`) — a declared `mincount` of 1 or more entails `Items.count > 0`, the catalog's own fault precondition (`src/Precept/Language/Types.cs:297`)",
+          "validityArguments": [
+            "Inductive hypothesis plus sign monotonicity"
+          ],
+          "decisionProcedure": "Look up `Items`'s declared `mincount` value, if any, via the ProofSatisfactions table; the fault discharges iff the declared `mincount` is >= 1 (for an integer count, `count >= 1` entails `count > 0`). No `mincount` modifier, or one declaring 0, fails the class.",
+          "citations": [
+            {
+              "kind": "code",
+              "ref": "src/Precept/Language/Modifiers.cs:195",
+              "note": "Mincount ProofSatisfaction — count >= DeclarationValue"
+            },
+            {
+              "kind": "code",
+              "ref": "src/Precept/Language/Types.cs:297",
+              "note": "list.first's catalog-declared Numeric requirement — List must be non-empty"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+              "note": "fault-family case shape: premise classes (b)/(c)/(a) per catalog ProofSatisfactions"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "d"
+          ],
+          "derivation": "a `rule Items.count > 0` (or an equivalent lower-bound form) holding in the pre-state, consumed directly as the fault's WP with no arithmetic — the same fact, not a derived one",
+          "strategy": "CompositionalConstraint",
+          "validityArguments": [
+            "Inductive hypothesis plus sign monotonicity"
+          ],
+          "decisionProcedure": "Search the pre-state constraint set for a `rule` whose condition is normal-form-equal to (or N13-covers) `Items.count > 0`; found, consumed via CompositionalConstraint. Absent, or naming a different field, fails the class.",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+              "note": "premise class (d): all constraints holding in the pre-state"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "Inductive hypothesis plus sign monotonicity"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "apply a `mincount` modifier (at least 1) to the collection field's declaration",
+          "citations": [
+            {
+              "kind": "code",
+              "ref": "src/Precept/Language/Modifiers.cs:125",
+              "note": "the Notempty HoverDescription names mincount 1, not notempty, as the collection route"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "d"
+          ],
+          "schema": "add a `rule <WP>` (e.g. `rule Items.count > 0`) holding in the pre-state",
+          "notes": [
+            "This suggestion is licensed under the model. At HEAD it is also the exact shape of the Defect B false-proof hazard (authored-expressiveness-gaps.md, Part 3): a rule consumed as a premise while nothing yet establishes or preserves it. Recorded as the model's suggestion; a diagnostic emitting it today would be recommending a currently-unsound spelling. Not resolved here."
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept ListFirstEnsureactivationguard\nfield Items as list of integer\nfield Total as decimal default 0.0 editable\nstate Draft initial\nstate Done terminal\nevent Add(Value as integer)\nevent Finish\nfrom Draft on Add\n    -> append Items Add.Value\n    -> no transition\nin Done when Items.first > 10 ensure Total > 0.0 because \"bounded\"\nfrom Draft on Finish\n    -> transition Done\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a",
+              "d"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        },
+        "discharges": [
+          {
+            "id": "mincount-1",
+            "kind": "other",
+            "addition": "mincount 1  # added to the `Items` field declaration",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "declared mincount 1 -> count >= 1 -> count > 0 (Inductive hypothesis plus sign monotonicity, trivial/identity case)",
+            "strategy": "IntervalContainment",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "the ensure-activation-guard position mints no fault obligation at all at HEAD (measured, commit e1a14d91) — there is nothing for this addition to discharge; the clean compile below is the site failing to mint, not the addition being recognized as a discharge",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Live run (2026-07-21, Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll), HEAD e1a14d91): `list-ensure-activation-guard__discharge-a.precept` compiles with rc=0 and no diagnostics (stdout carries only the WP calculator's own '[skipped obligation] ...mincount: accessor-projected bound...' note, which is about the calculator's inability to compute an establishment/preservation WP for the mincount-desugared rule — unrelated to the fault obligation this cell defines).",
+              "`application` is omitted: this addition changes a field declaration's modifier list, which is neither a row guard (`row-guard` locus) nor an event-arg declaration (`event-arg-declarations` locus) — the schema's `application` DU has no locus for a field-modifier addition. The cell->test conversion machinery cannot mechanically apply this discharge today; flagged as a schema/tooling gap, not worked around."
+            ]
+          },
+          {
+            "id": "rule-count-gt-0",
+            "kind": "other",
+            "addition": "rule Items.count > 0 because \"the collection is provisioned non-empty at handoff\"  # added as a top-level declaration",
+            "premiseClasses": [
+              "d"
+            ],
+            "derivation": "pre-state rule Items.count > 0 consumed directly as the WP -> CompositionalConstraint",
+            "strategy": "CompositionalConstraint",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "the ensure-activation-guard position mints no fault obligation at all at HEAD (measured, commit e1a14d91) — there is nothing for this addition to discharge. Separately and more seriously: even at a position that DOES mint, Defect B shows a `rule` consumed as a premise via CompositionalConstraint while nothing establishes or preserves it is a live false-proof at HEAD (authored-expressiveness-gaps.md, Part 3) — so this discharge must never be read as confirmed by a clean compile, here or elsewhere.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Live run (2026-07-21, Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll), HEAD e1a14d91): `list-ensure-activation-guard__discharge-d.precept` compiles with rc=0 and no diagnostics related to the target fault (stdout shows the WP calculator's own printout for the added `rule` obligation itself — establishment WP and a 'NOT SUPPORTED' preservation note for the append action, both about the calculator's own rule-write machinery, not the fault obligation this cell defines).",
+              "`application` is omitted: this addition is a new top-level `rule` declaration, not a row guard or an event-arg declaration — the same schema/tooling gap as the mincount discharge above."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "mincount-1",
+            "addition": "mincount 0  # added to the `Items` field declaration",
+            "whyStillRejects": "mincount 0 does not exclude an empty collection — the compile-time lower bound is 0, not >= 1, so it still admits the empty case; must still reject under the model, same obligation.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          },
+          {
+            "pairsWith": "rule-count-gt-0",
+            "addition": "rule Items.count >= 0 because \"...\"  # weakened top-level declaration",
+            "whyStillRejects": "`>= 0` is trivially true of any count and does not establish non-emptiness; must still reject under the model, same obligation.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "cell-override",
+        "overrideVerdict": "yes",
+        "bandMember": "in Done when Items.count > 0 and Items.first > 10 ensure Total > 0.0 because \"bounded\"",
+        "respelling": "declare `Items` with `mincount 1` (class a), or state a top-level `rule Items.count > 0` that the induction consumes once the rule-write establishment/preservation machinery is built (class d) — both close the fault without relying on same-guard conjunct ordering, which the matrix does not license (see notes).",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the respellable verdict definition"
+          }
+        ],
+        "notes": [
+          "The band member is the natural author spelling for this group: a single guard combining the cardinality check and the accessor read in one `and`-joined condition. Whether the first conjunct (`count > 0`) is itself a licensed premise for the second (`.first`/`.peek` above threshold) is an open question the matrix does not answer (see the cell's own notes) — this respelling is offered as the always-available fallback, not as evidence the band member is permanently unlicensable."
+        ]
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+          "note": "fault family case shape — catalog-declared safety precondition at the evaluation site"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+          "note": "the four premise classes"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md § State/event ensure"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Types.cs:297",
+          "note": "list.first's catalog-declared Numeric requirement"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Diagnostics.cs:568",
+          "note": "UnguardedCollectionAccess — PreventsFault CollectionEmptyOnAccess, the write-site analogue of this obligation"
+        }
+      ],
+      "notes": [
+        "Built-status: measured at HEAD (commit e1a14d91, 2026-07-21) via `Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)` — an ensure's pre-verb `when` clause mints no fault obligation at all. Base, both discharge additions, and both near-misses all compile clean (rc=0, no diagnostic touching this fault) regardless of which addition is present. This is the site failing to mint, not the additions being recognized or the near-misses failing to be caught — see each witness's own notes for the literal compile output.",
+        "Open question, not licensed here: the natural author spelling `when Items.count > 0 and Items.first > 10` puts both facts in the SAME guard. Class (c) — the handler's own guard — is unavailable at every guard position (a guard cannot supply a premise to an obligation arising inside itself), but whether an EARLIER conjunct of that same guard licenses a LATER one is not answered by the matrix or by `precept-language-spec.md`. This cell does not license that spelling; the band-member respelling above is offered as the licensed alternative, not as tacit permission for the self-referential form.",
+        "Class (d) is listed as available at this evaluation-site category (constraints holding in the pre-state), so a discharge witness citing a `rule` is authored here. Per the group's hazard instruction, every such witness is recorded `builtStatus: unresolved-today` with the false-proof reason named — never as confirmed by a clean compile.",
+        "No validity argument in the matrix's § Validity arguments literally covers premise class (a) — a collection field's own declared `mincount` modifier, as opposed to an event arg's modifier — discharging a fault-family obligation. 'Arg-bound interval arithmetic' is scoped in its own text to values 'entering as an event arg' (want:268/ingress governance); it does not by its own words extend to a persistent field's structurally-enforced bound. The closer fit is 'Inductive hypothesis plus sign monotonicity' — since every ProofSatisfaction-bearing modifier desugars to an implicit rule (`DesugarsToRule: true`, `Modifiers.cs`) under the SAME establishment+preservation obligation machinery as an author-written rule — but that argument's own worked text is about combining the hypothesis with a sign-monotonicity step (Family 1 Base B), not the direct-identity case used here. Cited as the closest available named argument; the generalization to synthesized field-modifier rules, and to the trivial (no-arithmetic) case, is not itself written out. Recorded as a missing rule, not silently absorbed by the citation.",
+        "The fault-family case-shape table (matrix, the per-family case-shapes table) lists premise classes (b)/(c)/(a) for the fault family and does not list (d), yet this cell (per the group's own authoring instruction and the region's axis facts) authors a class-(d) discharge, and Defect B independently shows class (d) being consumed for a fault discharge at HEAD via CompositionalConstraint. Whether (d) is a licensed fault-discharge premise class at all is not stated cleanly in the matrix text — flagged as a missing rule, distinct from (and prior to) the false-proof soundness hazard Defect B documents."
+      ]
+    },
+    {
+      "id": "g14/list-first-rule-activation-guard",
+      "label": "List.first read inside a conditional rule's `when` clause",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "accessor/List/first/numeric-0",
+        "evaluationSiteCategory": "rule-activation-guard",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+            "note": "fault family case shape"
+          },
+          {
+            "kind": "spec",
+            "ref": "docs/language/precept-language-spec.md § rule` declaration"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Items.count > 0",
+        "metavariables": [
+          {
+            "name": "Items",
+            "standsFor": "the list field the accessor reads"
+          },
+          {
+            "name": "0",
+            "standsFor": "the fixed non-emptiness threshold — the catalog's declared condition, never authored"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          },
+          {
+            "kind": "normal-form-draft",
+            "ref": "docs/Working/normal-form-draft-2026-07-19.md"
+          }
+        ],
+        "wp": {
+          "statement": "Items.count > 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a"
+      ],
+      "premiseAvailability": "No write occurs at a conditional rule's `when` clause (it decides applicability/writability; it does not mutate). Class (c) is unavailable — the guard cannot supply a premise to an obligation arising inside itself, the headline asymmetry of this evaluation-site region. Class (b) is unavailable — no event argument represents the collection's cardinality, so no arg constraint can instantiate this obligation. Class (a) (the field's own declared `mincount`) is always in scope. Class (d) is NOT listed as available at this category, unlike the other four guard positions in this group — a rule's own activation guard has no handler guard, no event args, and (per the region's axis definition) no pre-state-constraint class either.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "compile-time interval fact from `Items`'s declared `mincount` modifier (ProofSatisfaction.Numeric: `count >= mincount`, `src/Precept/Language/Modifiers.cs:195-208`) — a declared `mincount` of 1 or more entails `Items.count > 0`, the catalog's own fault precondition (`src/Precept/Language/Types.cs:297`)",
+          "validityArguments": [
+            "Inductive hypothesis plus sign monotonicity"
+          ],
+          "decisionProcedure": "Look up `Items`'s declared `mincount` value, if any, via the ProofSatisfactions table; the fault discharges iff the declared `mincount` is >= 1 (for an integer count, `count >= 1` entails `count > 0`). No `mincount` modifier, or one declaring 0, fails the class.",
+          "citations": [
+            {
+              "kind": "code",
+              "ref": "src/Precept/Language/Modifiers.cs:195",
+              "note": "Mincount ProofSatisfaction — count >= DeclarationValue"
+            },
+            {
+              "kind": "code",
+              "ref": "src/Precept/Language/Types.cs:297",
+              "note": "list.first's catalog-declared Numeric requirement — List must be non-empty"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+              "note": "fault-family case shape: premise classes (b)/(c)/(a) per catalog ProofSatisfactions"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "apply a `mincount` modifier (at least 1) to the collection field's declaration",
+          "citations": [
+            {
+              "kind": "code",
+              "ref": "src/Precept/Language/Modifiers.cs:125",
+              "note": "the Notempty HoverDescription names mincount 1, not notempty, as the collection route"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept ListFirstRuleactivationguard\nfield Items as list of integer editable\nfield Total as decimal default 0.0 editable\nrule Total > 0.0 when Items.first > 10 because \"bounded\"\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        },
+        "discharges": [
+          {
+            "id": "mincount-1",
+            "kind": "other",
+            "addition": "mincount 1  # added to the `Items` field declaration",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "declared mincount 1 -> count >= 1 -> count > 0 (Inductive hypothesis plus sign monotonicity, trivial/identity case)",
+            "strategy": "IntervalContainment",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "the rule-activation-guard position mints no fault obligation at all at HEAD (measured, commit e1a14d91) — there is nothing for this addition to discharge; the clean compile below is the site failing to mint, not the addition being recognized as a discharge",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Live run (2026-07-21, Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll), HEAD e1a14d91): `list-rule-activation-guard__discharge-a.precept` compiles with rc=0 and no diagnostics (stdout carries only the WP calculator's own '[skipped obligation] ...mincount: accessor-projected bound...' note, which is about the calculator's inability to compute an establishment/preservation WP for the mincount-desugared rule — unrelated to the fault obligation this cell defines).",
+              "`application` is omitted: this addition changes a field declaration's modifier list, which is neither a row guard (`row-guard` locus) nor an event-arg declaration (`event-arg-declarations` locus) — the schema's `application` DU has no locus for a field-modifier addition. The cell->test conversion machinery cannot mechanically apply this discharge today; flagged as a schema/tooling gap, not worked around."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "mincount-1",
+            "addition": "mincount 0  # added to the `Items` field declaration",
+            "whyStillRejects": "mincount 0 does not exclude an empty collection — the compile-time lower bound is 0, not >= 1, so it still admits the empty case; must still reject under the model, same obligation.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "cell-override",
+        "overrideVerdict": "yes",
+        "bandMember": "rule Total > 0.0 when Items.count > 0 and Items.first > 10 because \"bounded\"",
+        "respelling": "declare `Items` with `mincount 1` (class a), or state a top-level `rule Items.count > 0` that the induction consumes once the rule-write establishment/preservation machinery is built (class d) — both close the fault without relying on same-guard conjunct ordering, which the matrix does not license (see notes).",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the respellable verdict definition"
+          }
+        ],
+        "notes": [
+          "The band member is the natural author spelling for this group: a single guard combining the cardinality check and the accessor read in one `and`-joined condition. Whether the first conjunct (`count > 0`) is itself a licensed premise for the second (`.first`/`.peek` above threshold) is an open question the matrix does not answer (see the cell's own notes) — this respelling is offered as the always-available fallback, not as evidence the band member is permanently unlicensable."
+        ]
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+          "note": "fault family case shape — catalog-declared safety precondition at the evaluation site"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+          "note": "the four premise classes"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md § rule` declaration"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Types.cs:297",
+          "note": "list.first's catalog-declared Numeric requirement"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Diagnostics.cs:568",
+          "note": "UnguardedCollectionAccess — PreventsFault CollectionEmptyOnAccess, the write-site analogue of this obligation"
+        }
+      ],
+      "notes": [
+        "Built-status: measured at HEAD (commit e1a14d91, 2026-07-21) via `Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)` — a conditional rule's `when` clause mints no fault obligation at all. Base, both discharge additions, and both near-misses all compile clean (rc=0, no diagnostic touching this fault) regardless of which addition is present. This is the site failing to mint, not the additions being recognized or the near-misses failing to be caught — see each witness's own notes for the literal compile output.",
+        "Open question, not licensed here: the natural author spelling `when Items.count > 0 and Items.first > 10` puts both facts in the SAME guard. Class (c) — the handler's own guard — is unavailable at every guard position (a guard cannot supply a premise to an obligation arising inside itself), but whether an EARLIER conjunct of that same guard licenses a LATER one is not answered by the matrix or by `precept-language-spec.md`. This cell does not license that spelling; the band-member respelling above is offered as the licensed alternative, not as tacit permission for the self-referential form.",
+        "Only premise class (a) is available at a conditional rule's own `when` clause: there is no handler guard and no event args in scope here, and — per the region's own axis definition — this category does not carry class (d) either, unlike the other four guard positions in this group. Whether a rule's own activation guard can discharge a fault obligation arising inside its own condition at all is a separate open question the matrix does not answer (recorded, not resolved, at this cell).",
+        "No validity argument in the matrix's § Validity arguments literally covers premise class (a) — a collection field's own declared `mincount` modifier, as opposed to an event arg's modifier — discharging a fault-family obligation. 'Arg-bound interval arithmetic' is scoped in its own text to values 'entering as an event arg' (want:268/ingress governance); it does not by its own words extend to a persistent field's structurally-enforced bound. The closer fit is 'Inductive hypothesis plus sign monotonicity' — since every ProofSatisfaction-bearing modifier desugars to an implicit rule (`DesugarsToRule: true`, `Modifiers.cs`) under the SAME establishment+preservation obligation machinery as an author-written rule — but that argument's own worked text is about combining the hypothesis with a sign-monotonicity step (Family 1 Base B), not the direct-identity case used here. Cited as the closest available named argument; the generalization to synthesized field-modifier rules, and to the trivial (no-arithmetic) case, is not itself written out. Recorded as a missing rule, not silently absorbed by the citation.",
+        "The fault-family case-shape table (matrix, the per-family case-shapes table) lists premise classes (b)/(c)/(a) for the fault family and does not list (d). This cell authors no class-(d) discharge — class (d) is recorded unavailable at a conditional rule's own activation guard — but the group's other eight cells do, and Defect B independently shows class (d) being consumed for a fault discharge at HEAD via CompositionalConstraint. Whether (d) is a licensed fault-discharge premise class at all is not stated cleanly in the matrix text — flagged as a missing rule, distinct from (and prior to) the false-proof soundness hazard Defect B documents."
+      ]
+    },
+    {
+      "id": "g14/queue-peek-transition-row-guard",
+      "label": "Queue.peek read inside a transition row's `when` clause",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "accessor/Queue/peek/numeric-0",
+        "evaluationSiteCategory": "transition-row-guard",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+            "note": "fault family case shape"
+          },
+          {
+            "kind": "spec",
+            "ref": "docs/language/precept-language-spec.md § Transition row"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Orders.count > 0",
+        "metavariables": [
+          {
+            "name": "Orders",
+            "standsFor": "the queue field the accessor reads"
+          },
+          {
+            "name": "0",
+            "standsFor": "the fixed non-emptiness threshold — the catalog's declared condition, never authored"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          },
+          {
+            "kind": "normal-form-draft",
+            "ref": "docs/Working/normal-form-draft-2026-07-19.md"
+          }
+        ],
+        "wp": {
+          "statement": "Orders.count > 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a",
+        "d"
+      ],
+      "premiseAvailability": "No write occurs at a transition row's `when` clause (it decides applicability/writability; it does not mutate). Class (c) is unavailable — the guard cannot supply a premise to an obligation arising inside itself, the headline asymmetry of this evaluation-site region. Class (b) is unavailable — no event argument represents the collection's cardinality, so no arg constraint can instantiate this obligation. Class (a) (the field's own declared `mincount`) is always in scope. Class (d) is available at this category (pre-state constraints), per the evaluation-site region's own axis facts.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "compile-time interval fact from `Orders`'s declared `mincount` modifier (ProofSatisfaction.Numeric: `count >= mincount`, `src/Precept/Language/Modifiers.cs:195-208`) — a declared `mincount` of 1 or more entails `Orders.count > 0`, the catalog's own fault precondition (`src/Precept/Language/Types.cs:205`)",
+          "validityArguments": [
+            "Inductive hypothesis plus sign monotonicity"
+          ],
+          "decisionProcedure": "Look up `Orders`'s declared `mincount` value, if any, via the ProofSatisfactions table; the fault discharges iff the declared `mincount` is >= 1 (for an integer count, `count >= 1` entails `count > 0`). No `mincount` modifier, or one declaring 0, fails the class.",
+          "citations": [
+            {
+              "kind": "code",
+              "ref": "src/Precept/Language/Modifiers.cs:195",
+              "note": "Mincount ProofSatisfaction — count >= DeclarationValue"
+            },
+            {
+              "kind": "code",
+              "ref": "src/Precept/Language/Types.cs:205",
+              "note": "queue.peek's catalog-declared Numeric requirement — Queue must be non-empty"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+              "note": "fault-family case shape: premise classes (b)/(c)/(a) per catalog ProofSatisfactions"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "d"
+          ],
+          "derivation": "a `rule Orders.count > 0` (or an equivalent lower-bound form) holding in the pre-state, consumed directly as the fault's WP with no arithmetic — the same fact, not a derived one",
+          "strategy": "CompositionalConstraint",
+          "validityArguments": [
+            "Inductive hypothesis plus sign monotonicity"
+          ],
+          "decisionProcedure": "Search the pre-state constraint set for a `rule` whose condition is normal-form-equal to (or N13-covers) `Orders.count > 0`; found, consumed via CompositionalConstraint. Absent, or naming a different field, fails the class.",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+              "note": "premise class (d): all constraints holding in the pre-state"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "Inductive hypothesis plus sign monotonicity"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "apply a `mincount` modifier (at least 1) to the collection field's declaration",
+          "citations": [
+            {
+              "kind": "code",
+              "ref": "src/Precept/Language/Modifiers.cs:125",
+              "note": "the Notempty HoverDescription names mincount 1, not notempty, as the collection route"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "d"
+          ],
+          "schema": "add a `rule <WP>` (e.g. `rule Orders.count > 0`) holding in the pre-state",
+          "notes": [
+            "This suggestion is licensed under the model. At HEAD it is also the exact shape of the Defect B false-proof hazard (authored-expressiveness-gaps.md, Part 3): a rule consumed as a premise while nothing yet establishes or preserves it. Recorded as the model's suggestion; a diagnostic emitting it today would be recommending a currently-unsound spelling. Not resolved here."
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept QueuePeekTransitionrowguard\nfield Orders as queue of integer\nstate Active initial\nstate Closed terminal\nevent Add(Value as integer)\nevent Check\nevent Close\nfrom Active on Add\n    -> enqueue Orders Add.Value\n    -> no transition\nfrom Active on Check when Orders.peek > 10\n    -> no transition\nfrom Active on Close\n    -> transition Closed\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a",
+              "d"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        },
+        "discharges": [
+          {
+            "id": "mincount-1",
+            "kind": "other",
+            "addition": "mincount 1  # added to the `Orders` field declaration",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "declared mincount 1 -> count >= 1 -> count > 0 (Inductive hypothesis plus sign monotonicity, trivial/identity case)",
+            "strategy": "IntervalContainment",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "the transition-row-guard position mints no fault obligation at all at HEAD (measured, commit e1a14d91) — there is nothing for this addition to discharge; the clean compile below is the site failing to mint, not the addition being recognized as a discharge",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Live run (2026-07-21, Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll), HEAD e1a14d91): `queue-transition-row-guard__discharge-a.precept` compiles with rc=0 and no diagnostics (stdout carries only the WP calculator's own '[skipped obligation] ...mincount: accessor-projected bound...' note, which is about the calculator's inability to compute an establishment/preservation WP for the mincount-desugared rule — unrelated to the fault obligation this cell defines).",
+              "`application` is omitted: this addition changes a field declaration's modifier list, which is neither a row guard (`row-guard` locus) nor an event-arg declaration (`event-arg-declarations` locus) — the schema's `application` DU has no locus for a field-modifier addition. The cell->test conversion machinery cannot mechanically apply this discharge today; flagged as a schema/tooling gap, not worked around."
+            ]
+          },
+          {
+            "id": "rule-count-gt-0",
+            "kind": "other",
+            "addition": "rule Orders.count > 0 because \"the collection is provisioned non-empty at handoff\"  # added as a top-level declaration",
+            "premiseClasses": [
+              "d"
+            ],
+            "derivation": "pre-state rule Orders.count > 0 consumed directly as the WP -> CompositionalConstraint",
+            "strategy": "CompositionalConstraint",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "the transition-row-guard position mints no fault obligation at all at HEAD (measured, commit e1a14d91) — there is nothing for this addition to discharge. Separately and more seriously: even at a position that DOES mint, Defect B shows a `rule` consumed as a premise via CompositionalConstraint while nothing establishes or preserves it is a live false-proof at HEAD (authored-expressiveness-gaps.md, Part 3) — so this discharge must never be read as confirmed by a clean compile, here or elsewhere.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Live run (2026-07-21, Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll), HEAD e1a14d91): `queue-transition-row-guard__discharge-d.precept` compiles with rc=0 and no diagnostics related to the target fault (stdout shows the WP calculator's own printout for the added `rule` obligation itself — establishment WP and a 'NOT SUPPORTED' preservation note for the enqueue action, both about the calculator's own rule-write machinery, not the fault obligation this cell defines).",
+              "`application` is omitted: this addition is a new top-level `rule` declaration, not a row guard or an event-arg declaration — the same schema/tooling gap as the mincount discharge above."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "mincount-1",
+            "addition": "mincount 0  # added to the `Orders` field declaration",
+            "whyStillRejects": "mincount 0 does not exclude an empty collection — the compile-time lower bound is 0, not >= 1, so it still admits the empty case; must still reject under the model, same obligation.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          },
+          {
+            "pairsWith": "rule-count-gt-0",
+            "addition": "rule Orders.count >= 0 because \"...\"  # weakened top-level declaration",
+            "whyStillRejects": "`>= 0` is trivially true of any count and does not establish non-emptiness; must still reject under the model, same obligation.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "cell-override",
+        "overrideVerdict": "yes",
+        "bandMember": "from Active on Check when Orders.count > 0 and Orders.peek > 10\n    -> no transition",
+        "respelling": "declare `Orders` with `mincount 1` (class a), or state a top-level `rule Orders.count > 0` that the induction consumes once the rule-write establishment/preservation machinery is built (class d) — both close the fault without relying on same-guard conjunct ordering, which the matrix does not license (see notes).",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the respellable verdict definition"
+          }
+        ],
+        "notes": [
+          "The band member is the natural author spelling for this group: a single guard combining the cardinality check and the accessor read in one `and`-joined condition. Whether the first conjunct (`count > 0`) is itself a licensed premise for the second (`.first`/`.peek` above threshold) is an open question the matrix does not answer (see the cell's own notes) — this respelling is offered as the always-available fallback, not as evidence the band member is permanently unlicensable."
+        ]
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+          "note": "fault family case shape — catalog-declared safety precondition at the evaluation site"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+          "note": "the four premise classes"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md § Transition row"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Types.cs:205",
+          "note": "queue.peek's catalog-declared Numeric requirement"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Diagnostics.cs:568",
+          "note": "UnguardedCollectionAccess — PreventsFault CollectionEmptyOnAccess, the write-site analogue of this obligation"
+        }
+      ],
+      "notes": [
+        "Built-status: measured at HEAD (commit e1a14d91, 2026-07-21) via `Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)` — a transition row's `when` clause mints no fault obligation at all. Base, both discharge additions, and both near-misses all compile clean (rc=0, no diagnostic touching this fault) regardless of which addition is present. This is the site failing to mint, not the additions being recognized or the near-misses failing to be caught — see each witness's own notes for the literal compile output.",
+        "Open question, not licensed here: the natural author spelling `when Orders.count > 0 and Orders.peek > 10` puts both facts in the SAME guard. Class (c) — the handler's own guard — is unavailable at every guard position (a guard cannot supply a premise to an obligation arising inside itself), but whether an EARLIER conjunct of that same guard licenses a LATER one is not answered by the matrix or by `precept-language-spec.md`. This cell does not license that spelling; the band-member respelling above is offered as the licensed alternative, not as tacit permission for the self-referential form.",
+        "Class (d) is listed as available at this evaluation-site category (constraints holding in the pre-state), so a discharge witness citing a `rule` is authored here. Per the group's hazard instruction, every such witness is recorded `builtStatus: unresolved-today` with the false-proof reason named — never as confirmed by a clean compile.",
+        "No validity argument in the matrix's § Validity arguments literally covers premise class (a) — a collection field's own declared `mincount` modifier, as opposed to an event arg's modifier — discharging a fault-family obligation. 'Arg-bound interval arithmetic' is scoped in its own text to values 'entering as an event arg' (want:268/ingress governance); it does not by its own words extend to a persistent field's structurally-enforced bound. The closer fit is 'Inductive hypothesis plus sign monotonicity' — since every ProofSatisfaction-bearing modifier desugars to an implicit rule (`DesugarsToRule: true`, `Modifiers.cs`) under the SAME establishment+preservation obligation machinery as an author-written rule — but that argument's own worked text is about combining the hypothesis with a sign-monotonicity step (Family 1 Base B), not the direct-identity case used here. Cited as the closest available named argument; the generalization to synthesized field-modifier rules, and to the trivial (no-arithmetic) case, is not itself written out. Recorded as a missing rule, not silently absorbed by the citation.",
+        "The fault-family case-shape table (matrix, the per-family case-shapes table) lists premise classes (b)/(c)/(a) for the fault family and does not list (d), yet this cell (per the group's own authoring instruction and the region's axis facts) authors a class-(d) discharge, and Defect B independently shows class (d) being consumed for a fault discharge at HEAD via CompositionalConstraint. Whether (d) is a licensed fault-discharge premise class at all is not stated cleanly in the matrix text — flagged as a missing rule, distinct from (and prior to) the false-proof soundness hazard Defect B documents."
+      ]
+    },
+    {
+      "id": "g14/queue-peek-state-hook-guard",
+      "label": "Queue.peek read inside a state entry hook's pre-verb `when` clause",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "accessor/Queue/peek/numeric-0",
+        "evaluationSiteCategory": "state-hook-guard",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+            "note": "fault family case shape"
+          },
+          {
+            "kind": "spec",
+            "ref": "docs/language/precept-language-spec.md § State action"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Orders.count > 0",
+        "metavariables": [
+          {
+            "name": "Orders",
+            "standsFor": "the queue field the accessor reads"
+          },
+          {
+            "name": "0",
+            "standsFor": "the fixed non-emptiness threshold — the catalog's declared condition, never authored"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          },
+          {
+            "kind": "normal-form-draft",
+            "ref": "docs/Working/normal-form-draft-2026-07-19.md"
+          }
+        ],
+        "wp": {
+          "statement": "Orders.count > 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a",
+        "d"
+      ],
+      "premiseAvailability": "No write occurs at a state entry hook's pre-verb `when` clause (it decides applicability/writability; it does not mutate). Class (c) is unavailable — the guard cannot supply a premise to an obligation arising inside itself, the headline asymmetry of this evaluation-site region. Class (b) is unavailable — no event argument represents the collection's cardinality, so no arg constraint can instantiate this obligation. Class (a) (the field's own declared `mincount`) is always in scope. Class (d) is available at this category (pre-state constraints), per the evaluation-site region's own axis facts.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "compile-time interval fact from `Orders`'s declared `mincount` modifier (ProofSatisfaction.Numeric: `count >= mincount`, `src/Precept/Language/Modifiers.cs:195-208`) — a declared `mincount` of 1 or more entails `Orders.count > 0`, the catalog's own fault precondition (`src/Precept/Language/Types.cs:205`)",
+          "validityArguments": [
+            "Inductive hypothesis plus sign monotonicity"
+          ],
+          "decisionProcedure": "Look up `Orders`'s declared `mincount` value, if any, via the ProofSatisfactions table; the fault discharges iff the declared `mincount` is >= 1 (for an integer count, `count >= 1` entails `count > 0`). No `mincount` modifier, or one declaring 0, fails the class.",
+          "citations": [
+            {
+              "kind": "code",
+              "ref": "src/Precept/Language/Modifiers.cs:195",
+              "note": "Mincount ProofSatisfaction — count >= DeclarationValue"
+            },
+            {
+              "kind": "code",
+              "ref": "src/Precept/Language/Types.cs:205",
+              "note": "queue.peek's catalog-declared Numeric requirement — Queue must be non-empty"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+              "note": "fault-family case shape: premise classes (b)/(c)/(a) per catalog ProofSatisfactions"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "d"
+          ],
+          "derivation": "a `rule Orders.count > 0` (or an equivalent lower-bound form) holding in the pre-state, consumed directly as the fault's WP with no arithmetic — the same fact, not a derived one",
+          "strategy": "CompositionalConstraint",
+          "validityArguments": [
+            "Inductive hypothesis plus sign monotonicity"
+          ],
+          "decisionProcedure": "Search the pre-state constraint set for a `rule` whose condition is normal-form-equal to (or N13-covers) `Orders.count > 0`; found, consumed via CompositionalConstraint. Absent, or naming a different field, fails the class.",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+              "note": "premise class (d): all constraints holding in the pre-state"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "Inductive hypothesis plus sign monotonicity"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "apply a `mincount` modifier (at least 1) to the collection field's declaration",
+          "citations": [
+            {
+              "kind": "code",
+              "ref": "src/Precept/Language/Modifiers.cs:125",
+              "note": "the Notempty HoverDescription names mincount 1, not notempty, as the collection route"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "d"
+          ],
+          "schema": "add a `rule <WP>` (e.g. `rule Orders.count > 0`) holding in the pre-state",
+          "notes": [
+            "This suggestion is licensed under the model. At HEAD it is also the exact shape of the Defect B false-proof hazard (authored-expressiveness-gaps.md, Part 3): a rule consumed as a premise while nothing yet establishes or preserves it. Recorded as the model's suggestion; a diagnostic emitting it today would be recommending a currently-unsound spelling. Not resolved here."
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept QueuePeekStatehookguard\nfield Orders as queue of integer\nfield Note as integer default 0\nstate Draft initial\nstate Done terminal\nevent Add(Value as integer)\nevent Finish\nfrom Draft on Add\n    -> enqueue Orders Add.Value\n    -> no transition\nto Done when Orders.peek > 10 -> set Note = 1\nfrom Draft on Finish\n    -> transition Done\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a",
+              "d"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        },
+        "discharges": [
+          {
+            "id": "mincount-1",
+            "kind": "other",
+            "addition": "mincount 1  # added to the `Orders` field declaration",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "declared mincount 1 -> count >= 1 -> count > 0 (Inductive hypothesis plus sign monotonicity, trivial/identity case)",
+            "strategy": "IntervalContainment",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "the state-hook-guard position mints no fault obligation at all at HEAD (measured, commit e1a14d91) — there is nothing for this addition to discharge; the clean compile below is the site failing to mint, not the addition being recognized as a discharge",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Live run (2026-07-21, Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll), HEAD e1a14d91): `queue-state-hook-guard__discharge-a.precept` compiles with rc=0 and no diagnostics (stdout carries only the WP calculator's own '[skipped obligation] ...mincount: accessor-projected bound...' note, which is about the calculator's inability to compute an establishment/preservation WP for the mincount-desugared rule — unrelated to the fault obligation this cell defines).",
+              "`application` is omitted: this addition changes a field declaration's modifier list, which is neither a row guard (`row-guard` locus) nor an event-arg declaration (`event-arg-declarations` locus) — the schema's `application` DU has no locus for a field-modifier addition. The cell->test conversion machinery cannot mechanically apply this discharge today; flagged as a schema/tooling gap, not worked around."
+            ]
+          },
+          {
+            "id": "rule-count-gt-0",
+            "kind": "other",
+            "addition": "rule Orders.count > 0 because \"the collection is provisioned non-empty at handoff\"  # added as a top-level declaration",
+            "premiseClasses": [
+              "d"
+            ],
+            "derivation": "pre-state rule Orders.count > 0 consumed directly as the WP -> CompositionalConstraint",
+            "strategy": "CompositionalConstraint",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "the state-hook-guard position mints no fault obligation at all at HEAD (measured, commit e1a14d91) — there is nothing for this addition to discharge. Separately and more seriously: even at a position that DOES mint, Defect B shows a `rule` consumed as a premise via CompositionalConstraint while nothing establishes or preserves it is a live false-proof at HEAD (authored-expressiveness-gaps.md, Part 3) — so this discharge must never be read as confirmed by a clean compile, here or elsewhere.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Live run (2026-07-21, Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll), HEAD e1a14d91): `queue-state-hook-guard__discharge-d.precept` compiles with rc=0 and no diagnostics related to the target fault (stdout shows the WP calculator's own printout for the added `rule` obligation itself — establishment WP and a 'NOT SUPPORTED' preservation note for the enqueue action, both about the calculator's own rule-write machinery, not the fault obligation this cell defines).",
+              "`application` is omitted: this addition is a new top-level `rule` declaration, not a row guard or an event-arg declaration — the same schema/tooling gap as the mincount discharge above."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "mincount-1",
+            "addition": "mincount 0  # added to the `Orders` field declaration",
+            "whyStillRejects": "mincount 0 does not exclude an empty collection — the compile-time lower bound is 0, not >= 1, so it still admits the empty case; must still reject under the model, same obligation.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          },
+          {
+            "pairsWith": "rule-count-gt-0",
+            "addition": "rule Orders.count >= 0 because \"...\"  # weakened top-level declaration",
+            "whyStillRejects": "`>= 0` is trivially true of any count and does not establish non-emptiness; must still reject under the model, same obligation.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "cell-override",
+        "overrideVerdict": "yes",
+        "bandMember": "to Done when Orders.count > 0 and Orders.peek > 10 -> set Note = 1",
+        "respelling": "declare `Orders` with `mincount 1` (class a), or state a top-level `rule Orders.count > 0` that the induction consumes once the rule-write establishment/preservation machinery is built (class d) — both close the fault without relying on same-guard conjunct ordering, which the matrix does not license (see notes).",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the respellable verdict definition"
+          }
+        ],
+        "notes": [
+          "The band member is the natural author spelling for this group: a single guard combining the cardinality check and the accessor read in one `and`-joined condition. Whether the first conjunct (`count > 0`) is itself a licensed premise for the second (`.first`/`.peek` above threshold) is an open question the matrix does not answer (see the cell's own notes) — this respelling is offered as the always-available fallback, not as evidence the band member is permanently unlicensable."
+        ]
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+          "note": "fault family case shape — catalog-declared safety precondition at the evaluation site"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+          "note": "the four premise classes"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md § State action"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Types.cs:205",
+          "note": "queue.peek's catalog-declared Numeric requirement"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Diagnostics.cs:568",
+          "note": "UnguardedCollectionAccess — PreventsFault CollectionEmptyOnAccess, the write-site analogue of this obligation"
+        }
+      ],
+      "notes": [
+        "Built-status: measured at HEAD (commit e1a14d91, 2026-07-21) via `Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)` — a state entry hook's pre-verb `when` clause mints no fault obligation at all. Base, both discharge additions, and both near-misses all compile clean (rc=0, no diagnostic touching this fault) regardless of which addition is present. This is the site failing to mint, not the additions being recognized or the near-misses failing to be caught — see each witness's own notes for the literal compile output.",
+        "Open question, not licensed here: the natural author spelling `when Orders.count > 0 and Orders.peek > 10` puts both facts in the SAME guard. Class (c) — the handler's own guard — is unavailable at every guard position (a guard cannot supply a premise to an obligation arising inside itself), but whether an EARLIER conjunct of that same guard licenses a LATER one is not answered by the matrix or by `precept-language-spec.md`. This cell does not license that spelling; the band-member respelling above is offered as the licensed alternative, not as tacit permission for the self-referential form.",
+        "Class (d) is listed as available at this evaluation-site category (constraints holding in the pre-state), so a discharge witness citing a `rule` is authored here. Per the group's hazard instruction, every such witness is recorded `builtStatus: unresolved-today` with the false-proof reason named — never as confirmed by a clean compile.",
+        "No validity argument in the matrix's § Validity arguments literally covers premise class (a) — a collection field's own declared `mincount` modifier, as opposed to an event arg's modifier — discharging a fault-family obligation. 'Arg-bound interval arithmetic' is scoped in its own text to values 'entering as an event arg' (want:268/ingress governance); it does not by its own words extend to a persistent field's structurally-enforced bound. The closer fit is 'Inductive hypothesis plus sign monotonicity' — since every ProofSatisfaction-bearing modifier desugars to an implicit rule (`DesugarsToRule: true`, `Modifiers.cs`) under the SAME establishment+preservation obligation machinery as an author-written rule — but that argument's own worked text is about combining the hypothesis with a sign-monotonicity step (Family 1 Base B), not the direct-identity case used here. Cited as the closest available named argument; the generalization to synthesized field-modifier rules, and to the trivial (no-arithmetic) case, is not itself written out. Recorded as a missing rule, not silently absorbed by the citation.",
+        "The fault-family case-shape table (matrix, the per-family case-shapes table) lists premise classes (b)/(c)/(a) for the fault family and does not list (d), yet this cell (per the group's own authoring instruction and the region's axis facts) authors a class-(d) discharge, and Defect B independently shows class (d) being consumed for a fault discharge at HEAD via CompositionalConstraint. Whether (d) is a licensed fault-discharge premise class at all is not stated cleanly in the matrix text — flagged as a missing rule, distinct from (and prior to) the false-proof soundness hazard Defect B documents."
+      ]
+    },
+    {
+      "id": "g14/queue-peek-access-mode-guard",
+      "label": "Queue.peek read inside a state-scoped access-mode declaration's pre-verb `when` clause",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "accessor/Queue/peek/numeric-0",
+        "evaluationSiteCategory": "access-mode-guard",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+            "note": "fault family case shape"
+          },
+          {
+            "kind": "spec",
+            "ref": "docs/language/precept-language-spec.md § Access mode and omit declaration"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Orders.count > 0",
+        "metavariables": [
+          {
+            "name": "Orders",
+            "standsFor": "the queue field the accessor reads"
+          },
+          {
+            "name": "0",
+            "standsFor": "the fixed non-emptiness threshold — the catalog's declared condition, never authored"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          },
+          {
+            "kind": "normal-form-draft",
+            "ref": "docs/Working/normal-form-draft-2026-07-19.md"
+          }
+        ],
+        "wp": {
+          "statement": "Orders.count > 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a",
+        "d"
+      ],
+      "premiseAvailability": "No write occurs at a state-scoped access-mode declaration's pre-verb `when` clause (it decides applicability/writability; it does not mutate). Class (c) is unavailable — the guard cannot supply a premise to an obligation arising inside itself, the headline asymmetry of this evaluation-site region. Class (b) is unavailable — no event argument represents the collection's cardinality, so no arg constraint can instantiate this obligation. Class (a) (the field's own declared `mincount`) is always in scope. Class (d) is available at this category (pre-state constraints), per the evaluation-site region's own axis facts.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "compile-time interval fact from `Orders`'s declared `mincount` modifier (ProofSatisfaction.Numeric: `count >= mincount`, `src/Precept/Language/Modifiers.cs:195-208`) — a declared `mincount` of 1 or more entails `Orders.count > 0`, the catalog's own fault precondition (`src/Precept/Language/Types.cs:205`)",
+          "validityArguments": [
+            "Inductive hypothesis plus sign monotonicity"
+          ],
+          "decisionProcedure": "Look up `Orders`'s declared `mincount` value, if any, via the ProofSatisfactions table; the fault discharges iff the declared `mincount` is >= 1 (for an integer count, `count >= 1` entails `count > 0`). No `mincount` modifier, or one declaring 0, fails the class.",
+          "citations": [
+            {
+              "kind": "code",
+              "ref": "src/Precept/Language/Modifiers.cs:195",
+              "note": "Mincount ProofSatisfaction — count >= DeclarationValue"
+            },
+            {
+              "kind": "code",
+              "ref": "src/Precept/Language/Types.cs:205",
+              "note": "queue.peek's catalog-declared Numeric requirement — Queue must be non-empty"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+              "note": "fault-family case shape: premise classes (b)/(c)/(a) per catalog ProofSatisfactions"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "d"
+          ],
+          "derivation": "a `rule Orders.count > 0` (or an equivalent lower-bound form) holding in the pre-state, consumed directly as the fault's WP with no arithmetic — the same fact, not a derived one",
+          "strategy": "CompositionalConstraint",
+          "validityArguments": [
+            "Inductive hypothesis plus sign monotonicity"
+          ],
+          "decisionProcedure": "Search the pre-state constraint set for a `rule` whose condition is normal-form-equal to (or N13-covers) `Orders.count > 0`; found, consumed via CompositionalConstraint. Absent, or naming a different field, fails the class.",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+              "note": "premise class (d): all constraints holding in the pre-state"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "Inductive hypothesis plus sign monotonicity"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "apply a `mincount` modifier (at least 1) to the collection field's declaration",
+          "citations": [
+            {
+              "kind": "code",
+              "ref": "src/Precept/Language/Modifiers.cs:125",
+              "note": "the Notempty HoverDescription names mincount 1, not notempty, as the collection route"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "d"
+          ],
+          "schema": "add a `rule <WP>` (e.g. `rule Orders.count > 0`) holding in the pre-state",
+          "notes": [
+            "This suggestion is licensed under the model. At HEAD it is also the exact shape of the Defect B false-proof hazard (authored-expressiveness-gaps.md, Part 3): a rule consumed as a premise while nothing yet establishes or preserves it. Recorded as the model's suggestion; a diagnostic emitting it today would be recommending a currently-unsound spelling. Not resolved here."
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept QueuePeekAccessmodeguard\nfield Orders as queue of integer\nfield Note as string optional editable\nstate Draft initial\nstate Done terminal\nevent Add(Value as integer)\nevent Finish\nfrom Draft on Add\n    -> enqueue Orders Add.Value\n    -> no transition\nin Draft when Orders.peek > 10 modify Note readonly\nfrom Draft on Finish\n    -> transition Done\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a",
+              "d"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        },
+        "discharges": [
+          {
+            "id": "mincount-1",
+            "kind": "other",
+            "addition": "mincount 1  # added to the `Orders` field declaration",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "declared mincount 1 -> count >= 1 -> count > 0 (Inductive hypothesis plus sign monotonicity, trivial/identity case)",
+            "strategy": "IntervalContainment",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "the access-mode-guard position mints no fault obligation at all at HEAD (measured, commit e1a14d91) — there is nothing for this addition to discharge; the clean compile below is the site failing to mint, not the addition being recognized as a discharge",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Live run (2026-07-21, Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll), HEAD e1a14d91): `queue-access-mode-guard__discharge-a.precept` compiles with rc=0 and no diagnostics (stdout carries only the WP calculator's own '[skipped obligation] ...mincount: accessor-projected bound...' note, which is about the calculator's inability to compute an establishment/preservation WP for the mincount-desugared rule — unrelated to the fault obligation this cell defines).",
+              "`application` is omitted: this addition changes a field declaration's modifier list, which is neither a row guard (`row-guard` locus) nor an event-arg declaration (`event-arg-declarations` locus) — the schema's `application` DU has no locus for a field-modifier addition. The cell->test conversion machinery cannot mechanically apply this discharge today; flagged as a schema/tooling gap, not worked around."
+            ]
+          },
+          {
+            "id": "rule-count-gt-0",
+            "kind": "other",
+            "addition": "rule Orders.count > 0 because \"the collection is provisioned non-empty at handoff\"  # added as a top-level declaration",
+            "premiseClasses": [
+              "d"
+            ],
+            "derivation": "pre-state rule Orders.count > 0 consumed directly as the WP -> CompositionalConstraint",
+            "strategy": "CompositionalConstraint",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "the access-mode-guard position mints no fault obligation at all at HEAD (measured, commit e1a14d91) — there is nothing for this addition to discharge. Separately and more seriously: even at a position that DOES mint, Defect B shows a `rule` consumed as a premise via CompositionalConstraint while nothing establishes or preserves it is a live false-proof at HEAD (authored-expressiveness-gaps.md, Part 3) — so this discharge must never be read as confirmed by a clean compile, here or elsewhere.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Live run (2026-07-21, Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll), HEAD e1a14d91): `queue-access-mode-guard__discharge-d.precept` compiles with rc=0 and no diagnostics related to the target fault (stdout shows the WP calculator's own printout for the added `rule` obligation itself — establishment WP and a 'NOT SUPPORTED' preservation note for the enqueue action, both about the calculator's own rule-write machinery, not the fault obligation this cell defines).",
+              "`application` is omitted: this addition is a new top-level `rule` declaration, not a row guard or an event-arg declaration — the same schema/tooling gap as the mincount discharge above."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "mincount-1",
+            "addition": "mincount 0  # added to the `Orders` field declaration",
+            "whyStillRejects": "mincount 0 does not exclude an empty collection — the compile-time lower bound is 0, not >= 1, so it still admits the empty case; must still reject under the model, same obligation.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          },
+          {
+            "pairsWith": "rule-count-gt-0",
+            "addition": "rule Orders.count >= 0 because \"...\"  # weakened top-level declaration",
+            "whyStillRejects": "`>= 0` is trivially true of any count and does not establish non-emptiness; must still reject under the model, same obligation.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "cell-override",
+        "overrideVerdict": "yes",
+        "bandMember": "in Draft when Orders.count > 0 and Orders.peek > 10 modify Note readonly",
+        "respelling": "declare `Orders` with `mincount 1` (class a), or state a top-level `rule Orders.count > 0` that the induction consumes once the rule-write establishment/preservation machinery is built (class d) — both close the fault without relying on same-guard conjunct ordering, which the matrix does not license (see notes).",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the respellable verdict definition"
+          }
+        ],
+        "notes": [
+          "The band member is the natural author spelling for this group: a single guard combining the cardinality check and the accessor read in one `and`-joined condition. Whether the first conjunct (`count > 0`) is itself a licensed premise for the second (`.first`/`.peek` above threshold) is an open question the matrix does not answer (see the cell's own notes) — this respelling is offered as the always-available fallback, not as evidence the band member is permanently unlicensable."
+        ]
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+          "note": "fault family case shape — catalog-declared safety precondition at the evaluation site"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+          "note": "the four premise classes"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md § Access mode and omit declaration"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Types.cs:205",
+          "note": "queue.peek's catalog-declared Numeric requirement"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Diagnostics.cs:568",
+          "note": "UnguardedCollectionAccess — PreventsFault CollectionEmptyOnAccess, the write-site analogue of this obligation"
+        }
+      ],
+      "notes": [
+        "Built-status: measured at HEAD (commit e1a14d91, 2026-07-21) via `Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)` — a state-scoped access-mode declaration's pre-verb `when` clause mints no fault obligation at all. Base, both discharge additions, and both near-misses all compile clean (rc=0, no diagnostic touching this fault) regardless of which addition is present. This is the site failing to mint, not the additions being recognized or the near-misses failing to be caught — see each witness's own notes for the literal compile output.",
+        "Open question, not licensed here: the natural author spelling `when Orders.count > 0 and Orders.peek > 10` puts both facts in the SAME guard. Class (c) — the handler's own guard — is unavailable at every guard position (a guard cannot supply a premise to an obligation arising inside itself), but whether an EARLIER conjunct of that same guard licenses a LATER one is not answered by the matrix or by `precept-language-spec.md`. This cell does not license that spelling; the band-member respelling above is offered as the licensed alternative, not as tacit permission for the self-referential form.",
+        "Class (d) is listed as available at this evaluation-site category (constraints holding in the pre-state), so a discharge witness citing a `rule` is authored here. Per the group's hazard instruction, every such witness is recorded `builtStatus: unresolved-today` with the false-proof reason named — never as confirmed by a clean compile.",
+        "No validity argument in the matrix's § Validity arguments literally covers premise class (a) — a collection field's own declared `mincount` modifier, as opposed to an event arg's modifier — discharging a fault-family obligation. 'Arg-bound interval arithmetic' is scoped in its own text to values 'entering as an event arg' (want:268/ingress governance); it does not by its own words extend to a persistent field's structurally-enforced bound. The closer fit is 'Inductive hypothesis plus sign monotonicity' — since every ProofSatisfaction-bearing modifier desugars to an implicit rule (`DesugarsToRule: true`, `Modifiers.cs`) under the SAME establishment+preservation obligation machinery as an author-written rule — but that argument's own worked text is about combining the hypothesis with a sign-monotonicity step (Family 1 Base B), not the direct-identity case used here. Cited as the closest available named argument; the generalization to synthesized field-modifier rules, and to the trivial (no-arithmetic) case, is not itself written out. Recorded as a missing rule, not silently absorbed by the citation.",
+        "The fault-family case-shape table (matrix, the per-family case-shapes table) lists premise classes (b)/(c)/(a) for the fault family and does not list (d), yet this cell (per the group's own authoring instruction and the region's axis facts) authors a class-(d) discharge, and Defect B independently shows class (d) being consumed for a fault discharge at HEAD via CompositionalConstraint. Whether (d) is a licensed fault-discharge premise class at all is not stated cleanly in the matrix text — flagged as a missing rule, distinct from (and prior to) the false-proof soundness hazard Defect B documents."
+      ]
+    },
+    {
+      "id": "g14/queue-peek-ensure-activation-guard",
+      "label": "Queue.peek read inside an ensure's pre-verb `when` clause",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "accessor/Queue/peek/numeric-0",
+        "evaluationSiteCategory": "ensure-activation-guard",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+            "note": "fault family case shape"
+          },
+          {
+            "kind": "spec",
+            "ref": "docs/language/precept-language-spec.md § State/event ensure"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Orders.count > 0",
+        "metavariables": [
+          {
+            "name": "Orders",
+            "standsFor": "the queue field the accessor reads"
+          },
+          {
+            "name": "0",
+            "standsFor": "the fixed non-emptiness threshold — the catalog's declared condition, never authored"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          },
+          {
+            "kind": "normal-form-draft",
+            "ref": "docs/Working/normal-form-draft-2026-07-19.md"
+          }
+        ],
+        "wp": {
+          "statement": "Orders.count > 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a",
+        "d"
+      ],
+      "premiseAvailability": "No write occurs at an ensure's pre-verb `when` clause (it decides applicability/writability; it does not mutate). Class (c) is unavailable — the guard cannot supply a premise to an obligation arising inside itself, the headline asymmetry of this evaluation-site region. Class (b) is unavailable — no event argument represents the collection's cardinality, so no arg constraint can instantiate this obligation. Class (a) (the field's own declared `mincount`) is always in scope. Class (d) is available at this category (pre-state constraints), per the evaluation-site region's own axis facts.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "compile-time interval fact from `Orders`'s declared `mincount` modifier (ProofSatisfaction.Numeric: `count >= mincount`, `src/Precept/Language/Modifiers.cs:195-208`) — a declared `mincount` of 1 or more entails `Orders.count > 0`, the catalog's own fault precondition (`src/Precept/Language/Types.cs:205`)",
+          "validityArguments": [
+            "Inductive hypothesis plus sign monotonicity"
+          ],
+          "decisionProcedure": "Look up `Orders`'s declared `mincount` value, if any, via the ProofSatisfactions table; the fault discharges iff the declared `mincount` is >= 1 (for an integer count, `count >= 1` entails `count > 0`). No `mincount` modifier, or one declaring 0, fails the class.",
+          "citations": [
+            {
+              "kind": "code",
+              "ref": "src/Precept/Language/Modifiers.cs:195",
+              "note": "Mincount ProofSatisfaction — count >= DeclarationValue"
+            },
+            {
+              "kind": "code",
+              "ref": "src/Precept/Language/Types.cs:205",
+              "note": "queue.peek's catalog-declared Numeric requirement — Queue must be non-empty"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+              "note": "fault-family case shape: premise classes (b)/(c)/(a) per catalog ProofSatisfactions"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "d"
+          ],
+          "derivation": "a `rule Orders.count > 0` (or an equivalent lower-bound form) holding in the pre-state, consumed directly as the fault's WP with no arithmetic — the same fact, not a derived one",
+          "strategy": "CompositionalConstraint",
+          "validityArguments": [
+            "Inductive hypothesis plus sign monotonicity"
+          ],
+          "decisionProcedure": "Search the pre-state constraint set for a `rule` whose condition is normal-form-equal to (or N13-covers) `Orders.count > 0`; found, consumed via CompositionalConstraint. Absent, or naming a different field, fails the class.",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+              "note": "premise class (d): all constraints holding in the pre-state"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "Inductive hypothesis plus sign monotonicity"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "apply a `mincount` modifier (at least 1) to the collection field's declaration",
+          "citations": [
+            {
+              "kind": "code",
+              "ref": "src/Precept/Language/Modifiers.cs:125",
+              "note": "the Notempty HoverDescription names mincount 1, not notempty, as the collection route"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "d"
+          ],
+          "schema": "add a `rule <WP>` (e.g. `rule Orders.count > 0`) holding in the pre-state",
+          "notes": [
+            "This suggestion is licensed under the model. At HEAD it is also the exact shape of the Defect B false-proof hazard (authored-expressiveness-gaps.md, Part 3): a rule consumed as a premise while nothing yet establishes or preserves it. Recorded as the model's suggestion; a diagnostic emitting it today would be recommending a currently-unsound spelling. Not resolved here."
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept QueuePeekEnsureactivationguard\nfield Orders as queue of integer\nfield Total as decimal default 0.0 editable\nstate Draft initial\nstate Done terminal\nevent Add(Value as integer)\nevent Finish\nfrom Draft on Add\n    -> enqueue Orders Add.Value\n    -> no transition\nin Done when Orders.peek > 10 ensure Total > 0.0 because \"bounded\"\nfrom Draft on Finish\n    -> transition Done\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a",
+              "d"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        },
+        "discharges": [
+          {
+            "id": "mincount-1",
+            "kind": "other",
+            "addition": "mincount 1  # added to the `Orders` field declaration",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "declared mincount 1 -> count >= 1 -> count > 0 (Inductive hypothesis plus sign monotonicity, trivial/identity case)",
+            "strategy": "IntervalContainment",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "the ensure-activation-guard position mints no fault obligation at all at HEAD (measured, commit e1a14d91) — there is nothing for this addition to discharge; the clean compile below is the site failing to mint, not the addition being recognized as a discharge",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Live run (2026-07-21, Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll), HEAD e1a14d91): `queue-ensure-activation-guard__discharge-a.precept` compiles with rc=0 and no diagnostics (stdout carries only the WP calculator's own '[skipped obligation] ...mincount: accessor-projected bound...' note, which is about the calculator's inability to compute an establishment/preservation WP for the mincount-desugared rule — unrelated to the fault obligation this cell defines).",
+              "`application` is omitted: this addition changes a field declaration's modifier list, which is neither a row guard (`row-guard` locus) nor an event-arg declaration (`event-arg-declarations` locus) — the schema's `application` DU has no locus for a field-modifier addition. The cell->test conversion machinery cannot mechanically apply this discharge today; flagged as a schema/tooling gap, not worked around."
+            ]
+          },
+          {
+            "id": "rule-count-gt-0",
+            "kind": "other",
+            "addition": "rule Orders.count > 0 because \"the collection is provisioned non-empty at handoff\"  # added as a top-level declaration",
+            "premiseClasses": [
+              "d"
+            ],
+            "derivation": "pre-state rule Orders.count > 0 consumed directly as the WP -> CompositionalConstraint",
+            "strategy": "CompositionalConstraint",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "the ensure-activation-guard position mints no fault obligation at all at HEAD (measured, commit e1a14d91) — there is nothing for this addition to discharge. Separately and more seriously: even at a position that DOES mint, Defect B shows a `rule` consumed as a premise via CompositionalConstraint while nothing establishes or preserves it is a live false-proof at HEAD (authored-expressiveness-gaps.md, Part 3) — so this discharge must never be read as confirmed by a clean compile, here or elsewhere.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Live run (2026-07-21, Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll), HEAD e1a14d91): `queue-ensure-activation-guard__discharge-d.precept` compiles with rc=0 and no diagnostics related to the target fault (stdout shows the WP calculator's own printout for the added `rule` obligation itself — establishment WP and a 'NOT SUPPORTED' preservation note for the enqueue action, both about the calculator's own rule-write machinery, not the fault obligation this cell defines).",
+              "`application` is omitted: this addition is a new top-level `rule` declaration, not a row guard or an event-arg declaration — the same schema/tooling gap as the mincount discharge above."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "mincount-1",
+            "addition": "mincount 0  # added to the `Orders` field declaration",
+            "whyStillRejects": "mincount 0 does not exclude an empty collection — the compile-time lower bound is 0, not >= 1, so it still admits the empty case; must still reject under the model, same obligation.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          },
+          {
+            "pairsWith": "rule-count-gt-0",
+            "addition": "rule Orders.count >= 0 because \"...\"  # weakened top-level declaration",
+            "whyStillRejects": "`>= 0` is trivially true of any count and does not establish non-emptiness; must still reject under the model, same obligation.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "cell-override",
+        "overrideVerdict": "yes",
+        "bandMember": "in Done when Orders.count > 0 and Orders.peek > 10 ensure Total > 0.0 because \"bounded\"",
+        "respelling": "declare `Orders` with `mincount 1` (class a), or state a top-level `rule Orders.count > 0` that the induction consumes once the rule-write establishment/preservation machinery is built (class d) — both close the fault without relying on same-guard conjunct ordering, which the matrix does not license (see notes).",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the respellable verdict definition"
+          }
+        ],
+        "notes": [
+          "The band member is the natural author spelling for this group: a single guard combining the cardinality check and the accessor read in one `and`-joined condition. Whether the first conjunct (`count > 0`) is itself a licensed premise for the second (`.first`/`.peek` above threshold) is an open question the matrix does not answer (see the cell's own notes) — this respelling is offered as the always-available fallback, not as evidence the band member is permanently unlicensable."
+        ]
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+          "note": "fault family case shape — catalog-declared safety precondition at the evaluation site"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+          "note": "the four premise classes"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md § State/event ensure"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Types.cs:205",
+          "note": "queue.peek's catalog-declared Numeric requirement"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Diagnostics.cs:568",
+          "note": "UnguardedCollectionAccess — PreventsFault CollectionEmptyOnAccess, the write-site analogue of this obligation"
+        }
+      ],
+      "notes": [
+        "Built-status: measured at HEAD (commit e1a14d91, 2026-07-21) via `Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)` — an ensure's pre-verb `when` clause mints no fault obligation at all. Base, both discharge additions, and both near-misses all compile clean (rc=0, no diagnostic touching this fault) regardless of which addition is present. This is the site failing to mint, not the additions being recognized or the near-misses failing to be caught — see each witness's own notes for the literal compile output.",
+        "Open question, not licensed here: the natural author spelling `when Orders.count > 0 and Orders.peek > 10` puts both facts in the SAME guard. Class (c) — the handler's own guard — is unavailable at every guard position (a guard cannot supply a premise to an obligation arising inside itself), but whether an EARLIER conjunct of that same guard licenses a LATER one is not answered by the matrix or by `precept-language-spec.md`. This cell does not license that spelling; the band-member respelling above is offered as the licensed alternative, not as tacit permission for the self-referential form.",
+        "Class (d) is listed as available at this evaluation-site category (constraints holding in the pre-state), so a discharge witness citing a `rule` is authored here. Per the group's hazard instruction, every such witness is recorded `builtStatus: unresolved-today` with the false-proof reason named — never as confirmed by a clean compile.",
+        "No validity argument in the matrix's § Validity arguments literally covers premise class (a) — a collection field's own declared `mincount` modifier, as opposed to an event arg's modifier — discharging a fault-family obligation. 'Arg-bound interval arithmetic' is scoped in its own text to values 'entering as an event arg' (want:268/ingress governance); it does not by its own words extend to a persistent field's structurally-enforced bound. The closer fit is 'Inductive hypothesis plus sign monotonicity' — since every ProofSatisfaction-bearing modifier desugars to an implicit rule (`DesugarsToRule: true`, `Modifiers.cs`) under the SAME establishment+preservation obligation machinery as an author-written rule — but that argument's own worked text is about combining the hypothesis with a sign-monotonicity step (Family 1 Base B), not the direct-identity case used here. Cited as the closest available named argument; the generalization to synthesized field-modifier rules, and to the trivial (no-arithmetic) case, is not itself written out. Recorded as a missing rule, not silently absorbed by the citation.",
+        "The fault-family case-shape table (matrix, the per-family case-shapes table) lists premise classes (b)/(c)/(a) for the fault family and does not list (d), yet this cell (per the group's own authoring instruction and the region's axis facts) authors a class-(d) discharge, and Defect B independently shows class (d) being consumed for a fault discharge at HEAD via CompositionalConstraint. Whether (d) is a licensed fault-discharge premise class at all is not stated cleanly in the matrix text — flagged as a missing rule, distinct from (and prior to) the false-proof soundness hazard Defect B documents."
+      ]
+    },
+    {
+      "id": "g14/queue-peek-rule-activation-guard",
+      "label": "Queue.peek read inside a conditional rule's `when` clause",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "accessor/Queue/peek/numeric-0",
+        "evaluationSiteCategory": "rule-activation-guard",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+            "note": "fault family case shape"
+          },
+          {
+            "kind": "spec",
+            "ref": "docs/language/precept-language-spec.md § rule` declaration"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Orders.count > 0",
+        "metavariables": [
+          {
+            "name": "Orders",
+            "standsFor": "the queue field the accessor reads"
+          },
+          {
+            "name": "0",
+            "standsFor": "the fixed non-emptiness threshold — the catalog's declared condition, never authored"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          },
+          {
+            "kind": "normal-form-draft",
+            "ref": "docs/Working/normal-form-draft-2026-07-19.md"
+          }
+        ],
+        "wp": {
+          "statement": "Orders.count > 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a"
+      ],
+      "premiseAvailability": "No write occurs at a conditional rule's `when` clause (it decides applicability/writability; it does not mutate). Class (c) is unavailable — the guard cannot supply a premise to an obligation arising inside itself, the headline asymmetry of this evaluation-site region. Class (b) is unavailable — no event argument represents the collection's cardinality, so no arg constraint can instantiate this obligation. Class (a) (the field's own declared `mincount`) is always in scope. Class (d) is NOT listed as available at this category, unlike the other four guard positions in this group — a rule's own activation guard has no handler guard, no event args, and (per the region's axis definition) no pre-state-constraint class either.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "compile-time interval fact from `Orders`'s declared `mincount` modifier (ProofSatisfaction.Numeric: `count >= mincount`, `src/Precept/Language/Modifiers.cs:195-208`) — a declared `mincount` of 1 or more entails `Orders.count > 0`, the catalog's own fault precondition (`src/Precept/Language/Types.cs:205`)",
+          "validityArguments": [
+            "Inductive hypothesis plus sign monotonicity"
+          ],
+          "decisionProcedure": "Look up `Orders`'s declared `mincount` value, if any, via the ProofSatisfactions table; the fault discharges iff the declared `mincount` is >= 1 (for an integer count, `count >= 1` entails `count > 0`). No `mincount` modifier, or one declaring 0, fails the class.",
+          "citations": [
+            {
+              "kind": "code",
+              "ref": "src/Precept/Language/Modifiers.cs:195",
+              "note": "Mincount ProofSatisfaction — count >= DeclarationValue"
+            },
+            {
+              "kind": "code",
+              "ref": "src/Precept/Language/Types.cs:205",
+              "note": "queue.peek's catalog-declared Numeric requirement — Queue must be non-empty"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+              "note": "fault-family case shape: premise classes (b)/(c)/(a) per catalog ProofSatisfactions"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "apply a `mincount` modifier (at least 1) to the collection field's declaration",
+          "citations": [
+            {
+              "kind": "code",
+              "ref": "src/Precept/Language/Modifiers.cs:125",
+              "note": "the Notempty HoverDescription names mincount 1, not notempty, as the collection route"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept QueuePeekRuleactivationguard\nfield Orders as queue of integer editable\nfield Total as decimal default 0.0 editable\nrule Total > 0.0 when Orders.peek > 10 because \"bounded\"\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        },
+        "discharges": [
+          {
+            "id": "mincount-1",
+            "kind": "other",
+            "addition": "mincount 1  # added to the `Orders` field declaration",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "declared mincount 1 -> count >= 1 -> count > 0 (Inductive hypothesis plus sign monotonicity, trivial/identity case)",
+            "strategy": "IntervalContainment",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "the rule-activation-guard position mints no fault obligation at all at HEAD (measured, commit e1a14d91) — there is nothing for this addition to discharge; the clean compile below is the site failing to mint, not the addition being recognized as a discharge",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Live run (2026-07-21, Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll), HEAD e1a14d91): `queue-rule-activation-guard__discharge-a.precept` compiles with rc=0 and no diagnostics (stdout carries only the WP calculator's own '[skipped obligation] ...mincount: accessor-projected bound...' note, which is about the calculator's inability to compute an establishment/preservation WP for the mincount-desugared rule — unrelated to the fault obligation this cell defines).",
+              "`application` is omitted: this addition changes a field declaration's modifier list, which is neither a row guard (`row-guard` locus) nor an event-arg declaration (`event-arg-declarations` locus) — the schema's `application` DU has no locus for a field-modifier addition. The cell->test conversion machinery cannot mechanically apply this discharge today; flagged as a schema/tooling gap, not worked around."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "mincount-1",
+            "addition": "mincount 0  # added to the `Orders` field declaration",
+            "whyStillRejects": "mincount 0 does not exclude an empty collection — the compile-time lower bound is 0, not >= 1, so it still admits the empty case; must still reject under the model, same obligation.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "cell-override",
+        "overrideVerdict": "yes",
+        "bandMember": "rule Total > 0.0 when Orders.count > 0 and Orders.peek > 10 because \"bounded\"",
+        "respelling": "declare `Orders` with `mincount 1` (class a), or state a top-level `rule Orders.count > 0` that the induction consumes once the rule-write establishment/preservation machinery is built (class d) — both close the fault without relying on same-guard conjunct ordering, which the matrix does not license (see notes).",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the respellable verdict definition"
+          }
+        ],
+        "notes": [
+          "The band member is the natural author spelling for this group: a single guard combining the cardinality check and the accessor read in one `and`-joined condition. Whether the first conjunct (`count > 0`) is itself a licensed premise for the second (`.first`/`.peek` above threshold) is an open question the matrix does not answer (see the cell's own notes) — this respelling is offered as the always-available fallback, not as evidence the band member is permanently unlicensable."
+        ]
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+          "note": "fault family case shape — catalog-declared safety precondition at the evaluation site"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+          "note": "the four premise classes"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md § rule` declaration"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Types.cs:205",
+          "note": "queue.peek's catalog-declared Numeric requirement"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Diagnostics.cs:568",
+          "note": "UnguardedCollectionAccess — PreventsFault CollectionEmptyOnAccess, the write-site analogue of this obligation"
+        }
+      ],
+      "notes": [
+        "Built-status: measured at HEAD (commit e1a14d91, 2026-07-21) via `Precept.MatrixTools (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)` — a conditional rule's `when` clause mints no fault obligation at all. Base, both discharge additions, and both near-misses all compile clean (rc=0, no diagnostic touching this fault) regardless of which addition is present. This is the site failing to mint, not the additions being recognized or the near-misses failing to be caught — see each witness's own notes for the literal compile output.",
+        "Open question, not licensed here: the natural author spelling `when Orders.count > 0 and Orders.peek > 10` puts both facts in the SAME guard. Class (c) — the handler's own guard — is unavailable at every guard position (a guard cannot supply a premise to an obligation arising inside itself), but whether an EARLIER conjunct of that same guard licenses a LATER one is not answered by the matrix or by `precept-language-spec.md`. This cell does not license that spelling; the band-member respelling above is offered as the licensed alternative, not as tacit permission for the self-referential form.",
+        "Only premise class (a) is available at a conditional rule's own `when` clause: there is no handler guard and no event args in scope here, and — per the region's own axis definition — this category does not carry class (d) either, unlike the other four guard positions in this group. Whether a rule's own activation guard can discharge a fault obligation arising inside its own condition at all is a separate open question the matrix does not answer (recorded, not resolved, at this cell).",
+        "No validity argument in the matrix's § Validity arguments literally covers premise class (a) — a collection field's own declared `mincount` modifier, as opposed to an event arg's modifier — discharging a fault-family obligation. 'Arg-bound interval arithmetic' is scoped in its own text to values 'entering as an event arg' (want:268/ingress governance); it does not by its own words extend to a persistent field's structurally-enforced bound. The closer fit is 'Inductive hypothesis plus sign monotonicity' — since every ProofSatisfaction-bearing modifier desugars to an implicit rule (`DesugarsToRule: true`, `Modifiers.cs`) under the SAME establishment+preservation obligation machinery as an author-written rule — but that argument's own worked text is about combining the hypothesis with a sign-monotonicity step (Family 1 Base B), not the direct-identity case used here. Cited as the closest available named argument; the generalization to synthesized field-modifier rules, and to the trivial (no-arithmetic) case, is not itself written out. Recorded as a missing rule, not silently absorbed by the citation.",
+        "The fault-family case-shape table (matrix, the per-family case-shapes table) lists premise classes (b)/(c)/(a) for the fault family and does not list (d). This cell authors no class-(d) discharge — class (d) is recorded unavailable at a conditional rule's own activation guard — but the group's other eight cells do, and Defect B independently shows class (d) being consumed for a fault discharge at HEAD via CompositionalConstraint. Whether (d) is a licensed fault-discharge premise class at all is not stated cleanly in the matrix text — flagged as a missing rule, distinct from (and prior to) the false-proof soundness hazard Defect B documents."
+      ]
+    }
+  ]
+}

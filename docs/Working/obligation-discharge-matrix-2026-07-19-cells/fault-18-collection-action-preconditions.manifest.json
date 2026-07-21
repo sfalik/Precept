@@ -1,0 +1,68 @@
+{
+  "familyId": "fault-18-collection-action-preconditions",
+  "definitionVersion": "obligation-discharge-matrix-2026-07-19 rev 7 (2026-07-20, draft)",
+  "sourceFile": "fault-18-collection-action-preconditions.cells.json",
+  "rows": [],
+  "skips": [
+    {
+      "cellId": "g18/dequeue-nonempty",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g18/pop-nonempty",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g18/dequeueby-nonempty",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g18/insert-indexbounds-transition",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g18/insert-indexbounds-construction",
+      "item": "cell",
+      "reason": "disposition is \u0027open\u0027 \u2014 only defined cells state the reject/discharge/near-miss triple the conversion needs"
+    },
+    {
+      "cellId": "g18/insert-indexbounds-statehook",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g18/removeat-nonempty-transition",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g18/removeat-nonempty-construction",
+      "item": "cell",
+      "reason": "disposition is \u0027open\u0027 \u2014 only defined cells state the reject/discharge/near-miss triple the conversion needs"
+    },
+    {
+      "cellId": "g18/removeat-nonempty-statehook",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g18/removeat-indexbounds-transition",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g18/removeat-indexbounds-construction",
+      "item": "cell",
+      "reason": "disposition is \u0027open\u0027 \u2014 only defined cells state the reject/discharge/near-miss triple the conversion needs"
+    },
+    {
+      "cellId": "g18/removeat-indexbounds-statehook",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    }
+  ]
+}

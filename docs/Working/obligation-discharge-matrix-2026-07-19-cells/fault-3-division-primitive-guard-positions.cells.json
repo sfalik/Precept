@@ -1,0 +1,2451 @@
+{
+  "$schema": "./cell.schema.json",
+  "familyId": "fault-3-division-primitive-guard-positions",
+  "title": "Fault Family 3 -- division by zero inside a guard, where the guard cannot discharge itself",
+  "caseShape": "fault",
+  "definitionVersion": "obligation-discharge-matrix-2026-07-19 rev 7 (2026-07-20, draft)",
+  "citations": [
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+      "note": "the four premise classes"
+    },
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+      "note": "the Fault family case-shape row"
+    },
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:186",
+      "note": "Fault minting: catalog-stamped at evaluation sites"
+    },
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:204",
+      "note": "Guard normal-form match -- why class (c) cannot discharge an obligation arising within its own evaluation"
+    },
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:94",
+      "note": "the Open design hole -- nothing detects an obligation that was never minted; every cell in this file is a live instance of exactly this gap"
+    },
+    {
+      "kind": "review",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md § Defect B",
+      "note": "the false-proof hazard this file's (d) discharges must be recorded against"
+    }
+  ],
+  "respellability": {
+    "verdict": "yes",
+    "evidence": "model-derived",
+    "corpusMeasurement": "pending",
+    "citations": [
+      {
+        "kind": "matrix",
+        "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:45",
+        "note": "the respellable verdict definition"
+      },
+      {
+        "kind": "matrix",
+        "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+        "note": "(a) field modifiers"
+      }
+    ],
+    "notes": [
+      "Every safe program in this family's band has an unambiguous escape hatch that does not depend on any open dependency: declare the divisor's exclusion of zero directly as a field modifier (class a) -- positive, nonzero, or a min bound above zero -- rather than spelling it inside the guard. This routes through the same modifier-declaration mechanism class (a) already licenses (matrix line 38), independent of whether an earlier guard conjunct or a rule can ALSO discharge the same fact. The verdict is stated yes on the strength of that escape hatch alone.",
+      "A genuine band member is the guard-spelled form itself when no modifier is declared -- e.g. `when Parts != 0 and Total / Parts > 1` -- because whether an earlier conjunct of the same guard licenses a later one is an open dependency this family does not resolve (see each cell's notes). Its respelling is the modifier-declaration form above.",
+      "Not corpus-measured: this pass did not find a division inside a guard, where the guard is the only available conjunct and no modifier or rule exists on the divisor, exercised verbatim in `samples/` today."
+    ]
+  },
+  "cells": [
+    {
+      "id": "g03/transition-row-guard-int",
+      "label": "Transition-row guard -- integer lane",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "IntegerDivideInteger",
+        "evaluationSiteCategory": "transition-row-guard",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:186",
+            "note": "Fault minting: catalog-stamped at evaluation sites"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+            "note": "the Fault family case-shape row"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Parts != 0",
+        "metavariables": [
+          {
+            "name": "Total",
+            "standsFor": "the field read as the guard's dividend -- immaterial to the safety precondition itself"
+          },
+          {
+            "name": "Parts",
+            "standsFor": "the field read as the guard's divisor"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:42",
+            "note": "the Normalization bullet"
+          },
+          {
+            "kind": "normal-form-draft",
+            "ref": "docs/Working/normal-form-draft-2026-07-19.md"
+          }
+        ],
+        "wp": {
+          "statement": "Parts != 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a",
+        "d"
+      ],
+      "premiseAvailability": "Derived per evaluation-site category, not asserted: this is a transition row's `when` (`from S on E when G -> action`). Classes (a) and (d) instantiate; (b) does not (see notes); (c) never does (structural, see notes).",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "field modifier on the divisor field, excluding zero -> interval containment over the modifier's declared bound",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "Compute the divisor field's interval from its own declared modifiers (a finite set -- the modifier-to-ProofSatisfaction table, docs/compiler/proof-engine.md § Strategy 2); a computed interval excluding zero closes the obligation. Modelled on the matrix's own Family 4 sketch decision procedure (matrix line 299: \"compute the divisor's interval from its declared modifiers and in-scope guard facts\"), generalized here from premise class (b) (an event-arg modifier) to premise class (a) (a field modifier) on the same divisor. No excluding bound rejects, naming class (a).",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+              "note": "the four premise classes, including (a) field modifiers"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:206",
+              "note": "Arg-bound interval arithmetic -- the modifier-to-ProofSatisfaction interval derivation this entry extends from arg modifiers to field modifiers"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:299",
+              "note": "Family 4 sketch -- \"compute the divisor's interval from its declared modifiers and in-scope guard facts\""
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "d"
+          ],
+          "derivation": "a rule established and preserved over the divisor field, consumed as the inductive hypothesis -> the divisor's pre-state fact closes the obligation directly (CompositionalConstraint)",
+          "validityArguments": [
+            "Inductive hypothesis plus sign monotonicity"
+          ],
+          "decisionProcedure": "Look up a nonzero fact for the divisor field among the constraints holding in the pre-state (the CompositionalConstraint strategy already exercised at HEAD for this exact shape -- docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md Part 3, \"rule PlannedQuantity > 0 ... discharges a division-by-zero obligation via the CompositionalConstraint strategy\"). No such fact rejects, naming class (d).",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+              "note": "(d) all constraints holding in the pre-state"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:208",
+              "note": "Inductive hypothesis plus sign monotonicity -- extended here from its written sign-monotonicity/subtraction shape to a bare nonzero fact read directly"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:94",
+              "note": "the Open design hole section -- the matrix's own worked example of a rule consumed as premise (d) for a divisor-nonzero fault obligation"
+            },
+            {
+              "kind": "review",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md § Defect B",
+              "note": "Defect B: a rule consumed as premise (d) while nothing establishes it (fail-open)"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "declare a field modifier on <WP>'s divisor that excludes zero (e.g. positive, nonzero, or a min bound above zero)",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:46",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "d"
+          ],
+          "schema": "add a rule establishing and preserving <WP> over the divisor field, available as premise (d)",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:46",
+              "note": "the suggestion-schema bullet"
+            }
+          ],
+          "notes": [
+            "A discharge accepted through this suggestion inherits the false-proof hazard: record its builtStatus as unresolved-today and its provenance as model-derived, never as confirmed by a clean compile, until the rule's own establishment/preservation obligations are built (docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md Part 3, Defect A and Defect B)."
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept TrgBaseInt\nfield Total as integer default 10\nfield Parts as integer default 0\nstate Active initial\nstate Closed terminal\nevent Open initial\nevent Check\nevent Close\non Open\n    -> set Total = 10\n    -> set Parts = 0\nfrom Active on Check when Total / Parts > 1\n    -> no transition\nfrom Active on Close\n    -> transition Closed",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a",
+              "d"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "model-derived"
+          }
+        },
+        "discharges": [
+          {
+            "id": "transition-row-guard-int-a",
+            "kind": "other",
+            "addition": "field Parts as integer default 1 nonzero",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "field modifier excluding zero on the divisor -> interval containment (class a)",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "Live-verified (Precept.MatrixTools, 2026-07-21, commit e1a14d91): this addition compiles with zero diagnostics and no obligation is reported for the division -- the same no-mint behaviour as the base. builtStatus is unresolved-today because the site does not mint at HEAD at all; a clean compile here records the site's failure to mint, not confirmation that this discharge is accepted. This discharge is a field modifier (class a), which is NOT subject to the false-proof hazard (task authoring notes: \"guard-based and modifier-based discharges ... are unaffected\").",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Replaces the base's `field Parts as integer default 0` declaration (and the matching construction assignment) with `field Parts as integer default 1 nonzero`. The compiled program is the base program with that one field declaration replaced; it is not stored verbatim anywhere, and no `application` record reconstructs it mechanically (see the schema-vocabulary note below).",
+              "kind is recorded as \"other\": the closed dischargeWitness.kind vocabulary has \"arg-modifier\" for an event-arg modifier but no corresponding value for a FIELD modifier, even though class (a) field modifiers is named in the Vocabulary (matrix line 38) as a first-class premise source. Flagged as a vocabulary gap.",
+              "The schema's `application` discriminated union (row-guard / event-arg-declarations) has no locus for a field-declaration modifier addition or a whole new `rule` declaration -- neither of this discharge's addition shapes is either of the two loci the schema expresses. `application` is omitted rather than forced into an ill-fitting locus; the day-one validator's cell-to-test conversion cannot yet mechanically apply this addition. Flagged as a schema-vocabulary gap, not resolved here."
+            ]
+          },
+          {
+            "id": "transition-row-guard-int-d",
+            "kind": "other",
+            "addition": "rule Parts != 0 because \"Parts must stay nonzero\"",
+            "premiseClasses": [
+              "d"
+            ],
+            "derivation": "rule establishing the divisor's nonzero-ness, consumed as premise (d) via CompositionalConstraint",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "Doubly unverifiable, so no live run is cited as confirmation here even though compiling this exact program shows the same no-mint behaviour as every other witness in this file: (i) this evaluation-site category mints no fault obligation at HEAD at all (measured on the base and on this addition); (ii) independent of (i), a `rule` consumed as premise (d) is exactly the false-proof-prone discharge path verified at HEAD (docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md Part 3, Defect B -- a rule can be accepted as a divisor-nonzero premise via the CompositionalConstraint strategy while nothing establishes or preserves it). A clean compile could never be read as confirmation of this discharge even if the site did mint. modelStatus is stated as provable-under-model on the strength of premise (d)'s general validity argument (matrix line 208), extended from its written sign-monotonicity/subtraction shape to a bare nonzero fact read directly -- an extension the matrix does not explicitly write out (see missing rules).",
+            "provenance": {
+              "mark": "model-derived"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Adds `rule Parts != 0 because \"Parts must stay nonzero\"` as a new top-level declaration and marks Total and Parts `editable` (parity with the standalone-rule shape the false-proof hazard's own repro uses; editability is incidental to the derivation, not load-bearing for it).",
+              "kind is recorded as \"other\": the closed dischargeWitness.kind vocabulary has no value for \"a new rule declaration added to the file\" -- the closest options (guard, arg-modifier, default-constant-fold, structural-edit) all name a different shape. Flagged as a vocabulary gap.",
+              "The schema's `application` discriminated union (row-guard / event-arg-declarations) has no locus for a field-declaration modifier addition or a whole new `rule` declaration -- neither of this discharge's addition shapes is either of the two loci the schema expresses. `application` is omitted rather than forced into an ill-fitting locus; the day-one validator's cell-to-test conversion cannot yet mechanically apply this addition. Flagged as a schema-vocabulary gap, not resolved here.",
+              "Listed in this task's unverifiableWitnesses output: false-proof hazard (rule used as premise (d)), per docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md Part 3, Defect B, compounded by this site's no-mint status at HEAD."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "transition-row-guard-int-a",
+            "addition": "field Parts as integer default 0 nonnegative",
+            "whyStillRejects": "`nonnegative` (unlike `nonzero`/`positive`) does not exclude 0: the divisor's declared interval still contains zero, so the interval-containment derivation does not close -- must still reject, same obligation.",
+            "provenance": {
+              "mark": "model-derived"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          },
+          {
+            "pairsWith": "transition-row-guard-int-d",
+            "addition": "rule Parts >= 0 because \"Parts must stay nonnegative\"",
+            "whyStillRejects": "`rule Parts >= 0` (unlike `!=`) does not exclude zero: the pre-state fact still admits a zero divisor, so the inductive-hypothesis derivation does not close -- must still reject, same obligation.",
+            "provenance": {
+              "mark": "model-derived"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+          "note": "the four premise classes"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+          "note": "the Fault family case-shape row"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:186",
+          "note": "Fault minting: catalog-stamped at evaluation sites"
+        }
+      ],
+      "notes": [
+        "Class (c) -- the handler's guard -- is structurally unavailable and is excluded from every contract entry in this file. The obligation arises from evaluating the guard expression's own division, before the guard has produced the truth value anything downstream (a row's actions, an ensure, a rule, an access-mode decision) could rely on. Class (c) is defined as a fact the guard's truth supplies to obligations arising after it (matrix line 38: \"(c) the handler's guard\"; the Guard normal-form match argument, matrix line 204, grounds (c) precisely in a row's actions executing only after the guard evaluated true -- a precondition the guard's own internal evaluation cannot satisfy about itself). A guard cannot supply its own truth as a premise for an obligation it must discharge in order to compute that very truth value. This is the headline asymmetry the whole cell group demonstrates; it holds identically across all five evaluation-site categories and both lanes.",
+        "Argument constraints (b) would be available in principle -- the triggering event's args are in scope at a transition row's guard -- but this cell's guard reads only field-typed operands (Total, Parts are both fields, not event args), so there is no event-arg premise to instantiate here. The applicable-class set is a per-cell fact derived from what the guard actually reads (matrix line 74), not a ceiling on what this evaluation-site category could support with a different divisor.",
+        "Pre-state constraints (d) are available: the guard is evaluated against the configuration in place immediately before the row's own actions would run -- a definite pre-state, exactly as for the row's actions themselves (the rule-anchored write-site case shape, matrix line 149; the Inductive hypothesis plus sign monotonicity argument, matrix line 208, grounds a rule holding in the pre-state as usable wherever a definite single pre-state exists, and a transition row's guard shares the row's one pre-state).",
+        "Not answered here, carried as an open dependency: whether an EARLIER conjunct of this same guard would be a premise for a fault arising in a LATER conjunct (e.g. `when Parts != 0 and Total / Parts > 1`) is not settled by anything the matrix currently states. This is a different question from class (c)'s exclusion above (which concerns the guard supplying a premise to an obligation arising within itself, full stop) -- it asks whether the guard's own internal conjunct ordering creates a second, narrower notion of \"before\" that class (c)'s exclusion does not reach. This cell does not attempt that spelling and states no answer for it.",
+        "Measured live (Precept.MatrixTools, 2026-07-21, commit e1a14d91) on the base program below and on every discharge and near-miss addition in this cell: all compile with zero diagnostics, and the tool reports no obligation for this division (transition-row-guard mints nothing at HEAD in either lane). This is a direct, self-contained instance of the matrix's own \"open design hole -- nothing detects an obligation that was never minted\" (matrix lines 88-101): the compiler visits this site, computes no fault obligation for it, and nothing anywhere flags the absence.",
+        "operationKind is recorded as the catalog's declaring-entry name (\"IntegerDivideInteger\", src/Precept/Language/Operations.cs; ProofRequirementKind.Numeric, src/Precept/Language/ProofRequirementKind.cs) rather than the coarser RequirementKind (\"Numeric\", shared by both lanes) -- the coarser value could not distinguish the integer and decimal lane cells as separate coordinates. Recorded so the choice is checkable, not asserted silently."
+      ]
+    },
+    {
+      "id": "g03/transition-row-guard-dec",
+      "label": "Transition-row guard -- decimal lane",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "DecimalDivideDecimal",
+        "evaluationSiteCategory": "transition-row-guard",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:186",
+            "note": "Fault minting: catalog-stamped at evaluation sites"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+            "note": "the Fault family case-shape row"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Parts != 0",
+        "metavariables": [
+          {
+            "name": "Total",
+            "standsFor": "the field read as the guard's dividend -- immaterial to the safety precondition itself"
+          },
+          {
+            "name": "Parts",
+            "standsFor": "the field read as the guard's divisor"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:42",
+            "note": "the Normalization bullet"
+          },
+          {
+            "kind": "normal-form-draft",
+            "ref": "docs/Working/normal-form-draft-2026-07-19.md"
+          }
+        ],
+        "wp": {
+          "statement": "Parts != 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a",
+        "d"
+      ],
+      "premiseAvailability": "Derived per evaluation-site category, not asserted: this is a transition row's `when` (`from S on E when G -> action`). Classes (a) and (d) instantiate; (b) does not (see notes); (c) never does (structural, see notes).",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "field modifier on the divisor field, excluding zero -> interval containment over the modifier's declared bound",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "Compute the divisor field's interval from its own declared modifiers (a finite set -- the modifier-to-ProofSatisfaction table, docs/compiler/proof-engine.md § Strategy 2); a computed interval excluding zero closes the obligation. Modelled on the matrix's own Family 4 sketch decision procedure (matrix line 299: \"compute the divisor's interval from its declared modifiers and in-scope guard facts\"), generalized here from premise class (b) (an event-arg modifier) to premise class (a) (a field modifier) on the same divisor. No excluding bound rejects, naming class (a).",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+              "note": "the four premise classes, including (a) field modifiers"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:206",
+              "note": "Arg-bound interval arithmetic -- the modifier-to-ProofSatisfaction interval derivation this entry extends from arg modifiers to field modifiers"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:299",
+              "note": "Family 4 sketch -- \"compute the divisor's interval from its declared modifiers and in-scope guard facts\""
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "d"
+          ],
+          "derivation": "a rule established and preserved over the divisor field, consumed as the inductive hypothesis -> the divisor's pre-state fact closes the obligation directly (CompositionalConstraint)",
+          "validityArguments": [
+            "Inductive hypothesis plus sign monotonicity"
+          ],
+          "decisionProcedure": "Look up a nonzero fact for the divisor field among the constraints holding in the pre-state (the CompositionalConstraint strategy already exercised at HEAD for this exact shape -- docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md Part 3, \"rule PlannedQuantity > 0 ... discharges a division-by-zero obligation via the CompositionalConstraint strategy\"). No such fact rejects, naming class (d).",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+              "note": "(d) all constraints holding in the pre-state"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:208",
+              "note": "Inductive hypothesis plus sign monotonicity -- extended here from its written sign-monotonicity/subtraction shape to a bare nonzero fact read directly"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:94",
+              "note": "the Open design hole section -- the matrix's own worked example of a rule consumed as premise (d) for a divisor-nonzero fault obligation"
+            },
+            {
+              "kind": "review",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md § Defect B",
+              "note": "Defect B: a rule consumed as premise (d) while nothing establishes it (fail-open)"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "declare a field modifier on <WP>'s divisor that excludes zero (e.g. positive, nonzero, or a min bound above zero)",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:46",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "d"
+          ],
+          "schema": "add a rule establishing and preserving <WP> over the divisor field, available as premise (d)",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:46",
+              "note": "the suggestion-schema bullet"
+            }
+          ],
+          "notes": [
+            "A discharge accepted through this suggestion inherits the false-proof hazard: record its builtStatus as unresolved-today and its provenance as model-derived, never as confirmed by a clean compile, until the rule's own establishment/preservation obligations are built (docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md Part 3, Defect A and Defect B)."
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept TrgBaseDec\nfield Total as decimal default 10.0\nfield Parts as decimal default 0.0\nstate Active initial\nstate Closed terminal\nevent Open initial\nevent Check\nevent Close\non Open\n    -> set Total = 10.0\n    -> set Parts = 0.0\nfrom Active on Check when Total / Parts > 1.0\n    -> no transition\nfrom Active on Close\n    -> transition Closed",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a",
+              "d"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "model-derived"
+          }
+        },
+        "discharges": [
+          {
+            "id": "transition-row-guard-dec-a",
+            "kind": "other",
+            "addition": "field Parts as decimal default 1.0 nonzero",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "field modifier excluding zero on the divisor -> interval containment (class a)",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "Live-verified (Precept.MatrixTools, 2026-07-21, commit e1a14d91): this addition compiles with zero diagnostics and no obligation is reported for the division -- the same no-mint behaviour as the base. builtStatus is unresolved-today because the site does not mint at HEAD at all; a clean compile here records the site's failure to mint, not confirmation that this discharge is accepted. This discharge is a field modifier (class a), which is NOT subject to the false-proof hazard (task authoring notes: \"guard-based and modifier-based discharges ... are unaffected\").",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Replaces the base's `field Parts as decimal default 0.0` declaration (and the matching construction assignment) with `field Parts as decimal default 1.0 nonzero`. The compiled program is the base program with that one field declaration replaced; it is not stored verbatim anywhere, and no `application` record reconstructs it mechanically (see the schema-vocabulary note below).",
+              "kind is recorded as \"other\": the closed dischargeWitness.kind vocabulary has \"arg-modifier\" for an event-arg modifier but no corresponding value for a FIELD modifier, even though class (a) field modifiers is named in the Vocabulary (matrix line 38) as a first-class premise source. Flagged as a vocabulary gap.",
+              "The schema's `application` discriminated union (row-guard / event-arg-declarations) has no locus for a field-declaration modifier addition or a whole new `rule` declaration -- neither of this discharge's addition shapes is either of the two loci the schema expresses. `application` is omitted rather than forced into an ill-fitting locus; the day-one validator's cell-to-test conversion cannot yet mechanically apply this addition. Flagged as a schema-vocabulary gap, not resolved here."
+            ]
+          },
+          {
+            "id": "transition-row-guard-dec-d",
+            "kind": "other",
+            "addition": "rule Parts != 0.0 because \"Parts must stay nonzero\"",
+            "premiseClasses": [
+              "d"
+            ],
+            "derivation": "rule establishing the divisor's nonzero-ness, consumed as premise (d) via CompositionalConstraint",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "Doubly unverifiable, so no live run is cited as confirmation here even though compiling this exact program shows the same no-mint behaviour as every other witness in this file: (i) this evaluation-site category mints no fault obligation at HEAD at all (measured on the base and on this addition); (ii) independent of (i), a `rule` consumed as premise (d) is exactly the false-proof-prone discharge path verified at HEAD (docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md Part 3, Defect B -- a rule can be accepted as a divisor-nonzero premise via the CompositionalConstraint strategy while nothing establishes or preserves it). A clean compile could never be read as confirmation of this discharge even if the site did mint. modelStatus is stated as provable-under-model on the strength of premise (d)'s general validity argument (matrix line 208), extended from its written sign-monotonicity/subtraction shape to a bare nonzero fact read directly -- an extension the matrix does not explicitly write out (see missing rules).",
+            "provenance": {
+              "mark": "model-derived"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Adds `rule Parts != 0.0 because \"Parts must stay nonzero\"` as a new top-level declaration and marks Total and Parts `editable` (parity with the standalone-rule shape the false-proof hazard's own repro uses; editability is incidental to the derivation, not load-bearing for it).",
+              "kind is recorded as \"other\": the closed dischargeWitness.kind vocabulary has no value for \"a new rule declaration added to the file\" -- the closest options (guard, arg-modifier, default-constant-fold, structural-edit) all name a different shape. Flagged as a vocabulary gap.",
+              "The schema's `application` discriminated union (row-guard / event-arg-declarations) has no locus for a field-declaration modifier addition or a whole new `rule` declaration -- neither of this discharge's addition shapes is either of the two loci the schema expresses. `application` is omitted rather than forced into an ill-fitting locus; the day-one validator's cell-to-test conversion cannot yet mechanically apply this addition. Flagged as a schema-vocabulary gap, not resolved here.",
+              "Listed in this task's unverifiableWitnesses output: false-proof hazard (rule used as premise (d)), per docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md Part 3, Defect B, compounded by this site's no-mint status at HEAD."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "transition-row-guard-dec-a",
+            "addition": "field Parts as decimal default 0.0 nonnegative",
+            "whyStillRejects": "`nonnegative` (unlike `nonzero`/`positive`) does not exclude 0.0: the divisor's declared interval still contains zero, so the interval-containment derivation does not close -- must still reject, same obligation.",
+            "provenance": {
+              "mark": "model-derived"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          },
+          {
+            "pairsWith": "transition-row-guard-dec-d",
+            "addition": "rule Parts >= 0.0 because \"Parts must stay nonnegative\"",
+            "whyStillRejects": "`rule Parts >= 0.0` (unlike `!=`) does not exclude zero: the pre-state fact still admits a zero divisor, so the inductive-hypothesis derivation does not close -- must still reject, same obligation.",
+            "provenance": {
+              "mark": "model-derived"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+          "note": "the four premise classes"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+          "note": "the Fault family case-shape row"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:186",
+          "note": "Fault minting: catalog-stamped at evaluation sites"
+        }
+      ],
+      "notes": [
+        "Class (c) -- the handler's guard -- is structurally unavailable and is excluded from every contract entry in this file. The obligation arises from evaluating the guard expression's own division, before the guard has produced the truth value anything downstream (a row's actions, an ensure, a rule, an access-mode decision) could rely on. Class (c) is defined as a fact the guard's truth supplies to obligations arising after it (matrix line 38: \"(c) the handler's guard\"; the Guard normal-form match argument, matrix line 204, grounds (c) precisely in a row's actions executing only after the guard evaluated true -- a precondition the guard's own internal evaluation cannot satisfy about itself). A guard cannot supply its own truth as a premise for an obligation it must discharge in order to compute that very truth value. This is the headline asymmetry the whole cell group demonstrates; it holds identically across all five evaluation-site categories and both lanes.",
+        "Argument constraints (b) would be available in principle -- the triggering event's args are in scope at a transition row's guard -- but this cell's guard reads only field-typed operands (Total, Parts are both fields, not event args), so there is no event-arg premise to instantiate here. The applicable-class set is a per-cell fact derived from what the guard actually reads (matrix line 74), not a ceiling on what this evaluation-site category could support with a different divisor.",
+        "Pre-state constraints (d) are available: the guard is evaluated against the configuration in place immediately before the row's own actions would run -- a definite pre-state, exactly as for the row's actions themselves (the rule-anchored write-site case shape, matrix line 149; the Inductive hypothesis plus sign monotonicity argument, matrix line 208, grounds a rule holding in the pre-state as usable wherever a definite single pre-state exists, and a transition row's guard shares the row's one pre-state).",
+        "Not answered here, carried as an open dependency: whether an EARLIER conjunct of this same guard would be a premise for a fault arising in a LATER conjunct (e.g. `when Parts != 0 and Total / Parts > 1`) is not settled by anything the matrix currently states. This is a different question from class (c)'s exclusion above (which concerns the guard supplying a premise to an obligation arising within itself, full stop) -- it asks whether the guard's own internal conjunct ordering creates a second, narrower notion of \"before\" that class (c)'s exclusion does not reach. This cell does not attempt that spelling and states no answer for it.",
+        "Measured live (Precept.MatrixTools, 2026-07-21, commit e1a14d91) on the base program below and on every discharge and near-miss addition in this cell: all compile with zero diagnostics, and the tool reports no obligation for this division (transition-row-guard mints nothing at HEAD in either lane). This is a direct, self-contained instance of the matrix's own \"open design hole -- nothing detects an obligation that was never minted\" (matrix lines 88-101): the compiler visits this site, computes no fault obligation for it, and nothing anywhere flags the absence.",
+        "operationKind is recorded as the catalog's declaring-entry name (\"DecimalDivideDecimal\", src/Precept/Language/Operations.cs; ProofRequirementKind.Numeric, src/Precept/Language/ProofRequirementKind.cs) rather than the coarser RequirementKind (\"Numeric\", shared by both lanes) -- the coarser value could not distinguish the integer and decimal lane cells as separate coordinates. Recorded so the choice is checkable, not asserted silently."
+      ]
+    },
+    {
+      "id": "g03/state-hook-guard-int",
+      "label": "State entry/exit hook guard -- integer lane",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "IntegerDivideInteger",
+        "evaluationSiteCategory": "state-hook-guard",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:186",
+            "note": "Fault minting: catalog-stamped at evaluation sites"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+            "note": "the Fault family case-shape row"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Parts != 0",
+        "metavariables": [
+          {
+            "name": "Total",
+            "standsFor": "the field read as the guard's dividend -- immaterial to the safety precondition itself"
+          },
+          {
+            "name": "Parts",
+            "standsFor": "the field read as the guard's divisor"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:42",
+            "note": "the Normalization bullet"
+          },
+          {
+            "kind": "normal-form-draft",
+            "ref": "docs/Working/normal-form-draft-2026-07-19.md"
+          }
+        ],
+        "wp": {
+          "statement": "Parts != 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a",
+        "d"
+      ],
+      "premiseAvailability": "Derived per evaluation-site category, not asserted: this is a state entry/exit hook's own pre-verb `when` (`to S when G -> action` / `from S when G -> action`). Classes (a) and (d) instantiate; (b) does not (see notes); (c) never does (structural, see notes).",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "field modifier on the divisor field, excluding zero -> interval containment over the modifier's declared bound",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "Compute the divisor field's interval from its own declared modifiers (a finite set -- the modifier-to-ProofSatisfaction table, docs/compiler/proof-engine.md § Strategy 2); a computed interval excluding zero closes the obligation. Modelled on the matrix's own Family 4 sketch decision procedure (matrix line 299: \"compute the divisor's interval from its declared modifiers and in-scope guard facts\"), generalized here from premise class (b) (an event-arg modifier) to premise class (a) (a field modifier) on the same divisor. No excluding bound rejects, naming class (a).",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+              "note": "the four premise classes, including (a) field modifiers"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:206",
+              "note": "Arg-bound interval arithmetic -- the modifier-to-ProofSatisfaction interval derivation this entry extends from arg modifiers to field modifiers"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:299",
+              "note": "Family 4 sketch -- \"compute the divisor's interval from its declared modifiers and in-scope guard facts\""
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "d"
+          ],
+          "derivation": "a rule established and preserved over the divisor field, consumed as the inductive hypothesis -> the divisor's pre-state fact closes the obligation directly (CompositionalConstraint)",
+          "validityArguments": [
+            "Inductive hypothesis plus sign monotonicity"
+          ],
+          "decisionProcedure": "Look up a nonzero fact for the divisor field among the constraints holding in the pre-state (the CompositionalConstraint strategy already exercised at HEAD for this exact shape -- docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md Part 3, \"rule PlannedQuantity > 0 ... discharges a division-by-zero obligation via the CompositionalConstraint strategy\"). No such fact rejects, naming class (d).",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+              "note": "(d) all constraints holding in the pre-state"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:208",
+              "note": "Inductive hypothesis plus sign monotonicity -- extended here from its written sign-monotonicity/subtraction shape to a bare nonzero fact read directly"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:94",
+              "note": "the Open design hole section -- the matrix's own worked example of a rule consumed as premise (d) for a divisor-nonzero fault obligation"
+            },
+            {
+              "kind": "review",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md § Defect B",
+              "note": "Defect B: a rule consumed as premise (d) while nothing establishes it (fail-open)"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "declare a field modifier on <WP>'s divisor that excludes zero (e.g. positive, nonzero, or a min bound above zero)",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:46",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "d"
+          ],
+          "schema": "add a rule establishing and preserving <WP> over the divisor field, available as premise (d)",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:46",
+              "note": "the suggestion-schema bullet"
+            }
+          ],
+          "notes": [
+            "A discharge accepted through this suggestion inherits the false-proof hazard: record its builtStatus as unresolved-today and its provenance as model-derived, never as confirmed by a clean compile, until the rule's own establishment/preservation obligations are built (docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md Part 3, Defect A and Defect B)."
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept ShgBaseInt\nfield Total as integer default 10\nfield Parts as integer default 0\nfield Note as integer default 0\nstate Draft initial\nstate Done terminal\nevent Open initial\nevent Finish\non Open\n    -> set Total = 10\n    -> set Parts = 0\nto Done when Total / Parts > 1 -> set Note = 1\nfrom Draft on Finish\n    -> transition Done",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a",
+              "d"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "model-derived"
+          }
+        },
+        "discharges": [
+          {
+            "id": "state-hook-guard-int-a",
+            "kind": "other",
+            "addition": "field Parts as integer default 1 nonzero",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "field modifier excluding zero on the divisor -> interval containment (class a)",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "Live-verified (Precept.MatrixTools, 2026-07-21, commit e1a14d91): this addition compiles with zero diagnostics and no obligation is reported for the division -- the same no-mint behaviour as the base. builtStatus is unresolved-today because the site does not mint at HEAD at all; a clean compile here records the site's failure to mint, not confirmation that this discharge is accepted. This discharge is a field modifier (class a), which is NOT subject to the false-proof hazard (task authoring notes: \"guard-based and modifier-based discharges ... are unaffected\").",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Replaces the base's `field Parts as integer default 0` declaration (and the matching construction assignment) with `field Parts as integer default 1 nonzero`. The compiled program is the base program with that one field declaration replaced; it is not stored verbatim anywhere, and no `application` record reconstructs it mechanically (see the schema-vocabulary note below).",
+              "kind is recorded as \"other\": the closed dischargeWitness.kind vocabulary has \"arg-modifier\" for an event-arg modifier but no corresponding value for a FIELD modifier, even though class (a) field modifiers is named in the Vocabulary (matrix line 38) as a first-class premise source. Flagged as a vocabulary gap.",
+              "The schema's `application` discriminated union (row-guard / event-arg-declarations) has no locus for a field-declaration modifier addition or a whole new `rule` declaration -- neither of this discharge's addition shapes is either of the two loci the schema expresses. `application` is omitted rather than forced into an ill-fitting locus; the day-one validator's cell-to-test conversion cannot yet mechanically apply this addition. Flagged as a schema-vocabulary gap, not resolved here."
+            ]
+          },
+          {
+            "id": "state-hook-guard-int-d",
+            "kind": "other",
+            "addition": "rule Parts != 0 because \"Parts must stay nonzero\"",
+            "premiseClasses": [
+              "d"
+            ],
+            "derivation": "rule establishing the divisor's nonzero-ness, consumed as premise (d) via CompositionalConstraint",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "Doubly unverifiable, so no live run is cited as confirmation here even though compiling this exact program shows the same no-mint behaviour as every other witness in this file: (i) this evaluation-site category mints no fault obligation at HEAD at all (measured on the base and on this addition); (ii) independent of (i), a `rule` consumed as premise (d) is exactly the false-proof-prone discharge path verified at HEAD (docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md Part 3, Defect B -- a rule can be accepted as a divisor-nonzero premise via the CompositionalConstraint strategy while nothing establishes or preserves it). A clean compile could never be read as confirmation of this discharge even if the site did mint. modelStatus is stated as provable-under-model on the strength of premise (d)'s general validity argument (matrix line 208), extended from its written sign-monotonicity/subtraction shape to a bare nonzero fact read directly -- an extension the matrix does not explicitly write out (see missing rules).",
+            "provenance": {
+              "mark": "model-derived"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Adds `rule Parts != 0 because \"Parts must stay nonzero\"` as a new top-level declaration and marks Total and Parts `editable` (parity with the standalone-rule shape the false-proof hazard's own repro uses; editability is incidental to the derivation, not load-bearing for it).",
+              "kind is recorded as \"other\": the closed dischargeWitness.kind vocabulary has no value for \"a new rule declaration added to the file\" -- the closest options (guard, arg-modifier, default-constant-fold, structural-edit) all name a different shape. Flagged as a vocabulary gap.",
+              "The schema's `application` discriminated union (row-guard / event-arg-declarations) has no locus for a field-declaration modifier addition or a whole new `rule` declaration -- neither of this discharge's addition shapes is either of the two loci the schema expresses. `application` is omitted rather than forced into an ill-fitting locus; the day-one validator's cell-to-test conversion cannot yet mechanically apply this addition. Flagged as a schema-vocabulary gap, not resolved here.",
+              "Listed in this task's unverifiableWitnesses output: false-proof hazard (rule used as premise (d)), per docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md Part 3, Defect B, compounded by this site's no-mint status at HEAD."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "state-hook-guard-int-a",
+            "addition": "field Parts as integer default 0 nonnegative",
+            "whyStillRejects": "`nonnegative` (unlike `nonzero`/`positive`) does not exclude 0: the divisor's declared interval still contains zero, so the interval-containment derivation does not close -- must still reject, same obligation.",
+            "provenance": {
+              "mark": "model-derived"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          },
+          {
+            "pairsWith": "state-hook-guard-int-d",
+            "addition": "rule Parts >= 0 because \"Parts must stay nonnegative\"",
+            "whyStillRejects": "`rule Parts >= 0` (unlike `!=`) does not exclude zero: the pre-state fact still admits a zero divisor, so the inductive-hypothesis derivation does not close -- must still reject, same obligation.",
+            "provenance": {
+              "mark": "model-derived"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+          "note": "the four premise classes"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+          "note": "the Fault family case-shape row"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:186",
+          "note": "Fault minting: catalog-stamped at evaluation sites"
+        }
+      ],
+      "notes": [
+        "Class (c) -- the handler's guard -- is structurally unavailable and is excluded from every contract entry in this file. The obligation arises from evaluating the guard expression's own division, before the guard has produced the truth value anything downstream (a row's actions, an ensure, a rule, an access-mode decision) could rely on. Class (c) is defined as a fact the guard's truth supplies to obligations arising after it (matrix line 38: \"(c) the handler's guard\"; the Guard normal-form match argument, matrix line 204, grounds (c) precisely in a row's actions executing only after the guard evaluated true -- a precondition the guard's own internal evaluation cannot satisfy about itself). A guard cannot supply its own truth as a premise for an obligation it must discharge in order to compute that very truth value. This is the headline asymmetry the whole cell group demonstrates; it holds identically across all five evaluation-site categories and both lanes.",
+        "Argument constraints (b) are structurally unavailable at this evaluation-site category regardless of what the guard reads: no triggering event is in scope here (a state hook fires on every inbound/outbound edge and an access-mode declaration carries no event at all), so there is no event-arg premise vocabulary to draw on.",
+        "Pre-state constraints (d) are available: a state entry/exit hook's own guard scopes a discrete transition-moment obligation with a definite pre-state -- the configuration immediately before the transition. The StateEntry/StateExit case-shape rows (matrix lines 151-152) describe the analogous ensure-anchored transition-moment obligation as drawing on \"the entering row's guard, args, and pre-state\"; the hook's own `when` is the same transition-moment evaluation occasion.",
+        "Not answered here, carried as an open dependency: whether an EARLIER conjunct of this same guard would be a premise for a fault arising in a LATER conjunct (e.g. `when Parts != 0 and Total / Parts > 1`) is not settled by anything the matrix currently states. This is a different question from class (c)'s exclusion above (which concerns the guard supplying a premise to an obligation arising within itself, full stop) -- it asks whether the guard's own internal conjunct ordering creates a second, narrower notion of \"before\" that class (c)'s exclusion does not reach. This cell does not attempt that spelling and states no answer for it.",
+        "Measured live (Precept.MatrixTools, 2026-07-21, commit e1a14d91) on the base program below and on every discharge and near-miss addition in this cell: all compile with zero diagnostics, and the tool reports no obligation for this division (state-hook-guard mints nothing at HEAD in either lane). This is a direct, self-contained instance of the matrix's own \"open design hole -- nothing detects an obligation that was never minted\" (matrix lines 88-101): the compiler visits this site, computes no fault obligation for it, and nothing anywhere flags the absence.",
+        "operationKind is recorded as the catalog's declaring-entry name (\"IntegerDivideInteger\", src/Precept/Language/Operations.cs; ProofRequirementKind.Numeric, src/Precept/Language/ProofRequirementKind.cs) rather than the coarser RequirementKind (\"Numeric\", shared by both lanes) -- the coarser value could not distinguish the integer and decimal lane cells as separate coordinates. Recorded so the choice is checkable, not asserted silently."
+      ]
+    },
+    {
+      "id": "g03/state-hook-guard-dec",
+      "label": "State entry/exit hook guard -- decimal lane",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "DecimalDivideDecimal",
+        "evaluationSiteCategory": "state-hook-guard",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:186",
+            "note": "Fault minting: catalog-stamped at evaluation sites"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+            "note": "the Fault family case-shape row"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Parts != 0",
+        "metavariables": [
+          {
+            "name": "Total",
+            "standsFor": "the field read as the guard's dividend -- immaterial to the safety precondition itself"
+          },
+          {
+            "name": "Parts",
+            "standsFor": "the field read as the guard's divisor"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:42",
+            "note": "the Normalization bullet"
+          },
+          {
+            "kind": "normal-form-draft",
+            "ref": "docs/Working/normal-form-draft-2026-07-19.md"
+          }
+        ],
+        "wp": {
+          "statement": "Parts != 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a",
+        "d"
+      ],
+      "premiseAvailability": "Derived per evaluation-site category, not asserted: this is a state entry/exit hook's own pre-verb `when` (`to S when G -> action` / `from S when G -> action`). Classes (a) and (d) instantiate; (b) does not (see notes); (c) never does (structural, see notes).",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "field modifier on the divisor field, excluding zero -> interval containment over the modifier's declared bound",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "Compute the divisor field's interval from its own declared modifiers (a finite set -- the modifier-to-ProofSatisfaction table, docs/compiler/proof-engine.md § Strategy 2); a computed interval excluding zero closes the obligation. Modelled on the matrix's own Family 4 sketch decision procedure (matrix line 299: \"compute the divisor's interval from its declared modifiers and in-scope guard facts\"), generalized here from premise class (b) (an event-arg modifier) to premise class (a) (a field modifier) on the same divisor. No excluding bound rejects, naming class (a).",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+              "note": "the four premise classes, including (a) field modifiers"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:206",
+              "note": "Arg-bound interval arithmetic -- the modifier-to-ProofSatisfaction interval derivation this entry extends from arg modifiers to field modifiers"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:299",
+              "note": "Family 4 sketch -- \"compute the divisor's interval from its declared modifiers and in-scope guard facts\""
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "d"
+          ],
+          "derivation": "a rule established and preserved over the divisor field, consumed as the inductive hypothesis -> the divisor's pre-state fact closes the obligation directly (CompositionalConstraint)",
+          "validityArguments": [
+            "Inductive hypothesis plus sign monotonicity"
+          ],
+          "decisionProcedure": "Look up a nonzero fact for the divisor field among the constraints holding in the pre-state (the CompositionalConstraint strategy already exercised at HEAD for this exact shape -- docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md Part 3, \"rule PlannedQuantity > 0 ... discharges a division-by-zero obligation via the CompositionalConstraint strategy\"). No such fact rejects, naming class (d).",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+              "note": "(d) all constraints holding in the pre-state"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:208",
+              "note": "Inductive hypothesis plus sign monotonicity -- extended here from its written sign-monotonicity/subtraction shape to a bare nonzero fact read directly"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:94",
+              "note": "the Open design hole section -- the matrix's own worked example of a rule consumed as premise (d) for a divisor-nonzero fault obligation"
+            },
+            {
+              "kind": "review",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md § Defect B",
+              "note": "Defect B: a rule consumed as premise (d) while nothing establishes it (fail-open)"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "declare a field modifier on <WP>'s divisor that excludes zero (e.g. positive, nonzero, or a min bound above zero)",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:46",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "d"
+          ],
+          "schema": "add a rule establishing and preserving <WP> over the divisor field, available as premise (d)",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:46",
+              "note": "the suggestion-schema bullet"
+            }
+          ],
+          "notes": [
+            "A discharge accepted through this suggestion inherits the false-proof hazard: record its builtStatus as unresolved-today and its provenance as model-derived, never as confirmed by a clean compile, until the rule's own establishment/preservation obligations are built (docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md Part 3, Defect A and Defect B)."
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept ShgBaseDec\nfield Total as decimal default 10.0\nfield Parts as decimal default 0.0\nfield Note as decimal default 0.0\nstate Draft initial\nstate Done terminal\nevent Open initial\nevent Finish\non Open\n    -> set Total = 10.0\n    -> set Parts = 0.0\nto Done when Total / Parts > 1.0 -> set Note = 1.0\nfrom Draft on Finish\n    -> transition Done",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a",
+              "d"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "model-derived"
+          }
+        },
+        "discharges": [
+          {
+            "id": "state-hook-guard-dec-a",
+            "kind": "other",
+            "addition": "field Parts as decimal default 1.0 nonzero",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "field modifier excluding zero on the divisor -> interval containment (class a)",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "Live-verified (Precept.MatrixTools, 2026-07-21, commit e1a14d91): this addition compiles with zero diagnostics and no obligation is reported for the division -- the same no-mint behaviour as the base. builtStatus is unresolved-today because the site does not mint at HEAD at all; a clean compile here records the site's failure to mint, not confirmation that this discharge is accepted. This discharge is a field modifier (class a), which is NOT subject to the false-proof hazard (task authoring notes: \"guard-based and modifier-based discharges ... are unaffected\").",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Replaces the base's `field Parts as decimal default 0.0` declaration (and the matching construction assignment) with `field Parts as decimal default 1.0 nonzero`. The compiled program is the base program with that one field declaration replaced; it is not stored verbatim anywhere, and no `application` record reconstructs it mechanically (see the schema-vocabulary note below).",
+              "kind is recorded as \"other\": the closed dischargeWitness.kind vocabulary has \"arg-modifier\" for an event-arg modifier but no corresponding value for a FIELD modifier, even though class (a) field modifiers is named in the Vocabulary (matrix line 38) as a first-class premise source. Flagged as a vocabulary gap.",
+              "The schema's `application` discriminated union (row-guard / event-arg-declarations) has no locus for a field-declaration modifier addition or a whole new `rule` declaration -- neither of this discharge's addition shapes is either of the two loci the schema expresses. `application` is omitted rather than forced into an ill-fitting locus; the day-one validator's cell-to-test conversion cannot yet mechanically apply this addition. Flagged as a schema-vocabulary gap, not resolved here."
+            ]
+          },
+          {
+            "id": "state-hook-guard-dec-d",
+            "kind": "other",
+            "addition": "rule Parts != 0.0 because \"Parts must stay nonzero\"",
+            "premiseClasses": [
+              "d"
+            ],
+            "derivation": "rule establishing the divisor's nonzero-ness, consumed as premise (d) via CompositionalConstraint",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "Doubly unverifiable, so no live run is cited as confirmation here even though compiling this exact program shows the same no-mint behaviour as every other witness in this file: (i) this evaluation-site category mints no fault obligation at HEAD at all (measured on the base and on this addition); (ii) independent of (i), a `rule` consumed as premise (d) is exactly the false-proof-prone discharge path verified at HEAD (docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md Part 3, Defect B -- a rule can be accepted as a divisor-nonzero premise via the CompositionalConstraint strategy while nothing establishes or preserves it). A clean compile could never be read as confirmation of this discharge even if the site did mint. modelStatus is stated as provable-under-model on the strength of premise (d)'s general validity argument (matrix line 208), extended from its written sign-monotonicity/subtraction shape to a bare nonzero fact read directly -- an extension the matrix does not explicitly write out (see missing rules).",
+            "provenance": {
+              "mark": "model-derived"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Adds `rule Parts != 0.0 because \"Parts must stay nonzero\"` as a new top-level declaration and marks Total and Parts `editable` (parity with the standalone-rule shape the false-proof hazard's own repro uses; editability is incidental to the derivation, not load-bearing for it).",
+              "kind is recorded as \"other\": the closed dischargeWitness.kind vocabulary has no value for \"a new rule declaration added to the file\" -- the closest options (guard, arg-modifier, default-constant-fold, structural-edit) all name a different shape. Flagged as a vocabulary gap.",
+              "The schema's `application` discriminated union (row-guard / event-arg-declarations) has no locus for a field-declaration modifier addition or a whole new `rule` declaration -- neither of this discharge's addition shapes is either of the two loci the schema expresses. `application` is omitted rather than forced into an ill-fitting locus; the day-one validator's cell-to-test conversion cannot yet mechanically apply this addition. Flagged as a schema-vocabulary gap, not resolved here.",
+              "Listed in this task's unverifiableWitnesses output: false-proof hazard (rule used as premise (d)), per docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md Part 3, Defect B, compounded by this site's no-mint status at HEAD."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "state-hook-guard-dec-a",
+            "addition": "field Parts as decimal default 0.0 nonnegative",
+            "whyStillRejects": "`nonnegative` (unlike `nonzero`/`positive`) does not exclude 0.0: the divisor's declared interval still contains zero, so the interval-containment derivation does not close -- must still reject, same obligation.",
+            "provenance": {
+              "mark": "model-derived"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          },
+          {
+            "pairsWith": "state-hook-guard-dec-d",
+            "addition": "rule Parts >= 0.0 because \"Parts must stay nonnegative\"",
+            "whyStillRejects": "`rule Parts >= 0.0` (unlike `!=`) does not exclude zero: the pre-state fact still admits a zero divisor, so the inductive-hypothesis derivation does not close -- must still reject, same obligation.",
+            "provenance": {
+              "mark": "model-derived"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+          "note": "the four premise classes"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+          "note": "the Fault family case-shape row"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:186",
+          "note": "Fault minting: catalog-stamped at evaluation sites"
+        }
+      ],
+      "notes": [
+        "Class (c) -- the handler's guard -- is structurally unavailable and is excluded from every contract entry in this file. The obligation arises from evaluating the guard expression's own division, before the guard has produced the truth value anything downstream (a row's actions, an ensure, a rule, an access-mode decision) could rely on. Class (c) is defined as a fact the guard's truth supplies to obligations arising after it (matrix line 38: \"(c) the handler's guard\"; the Guard normal-form match argument, matrix line 204, grounds (c) precisely in a row's actions executing only after the guard evaluated true -- a precondition the guard's own internal evaluation cannot satisfy about itself). A guard cannot supply its own truth as a premise for an obligation it must discharge in order to compute that very truth value. This is the headline asymmetry the whole cell group demonstrates; it holds identically across all five evaluation-site categories and both lanes.",
+        "Argument constraints (b) are structurally unavailable at this evaluation-site category regardless of what the guard reads: no triggering event is in scope here (a state hook fires on every inbound/outbound edge and an access-mode declaration carries no event at all), so there is no event-arg premise vocabulary to draw on.",
+        "Pre-state constraints (d) are available: a state entry/exit hook's own guard scopes a discrete transition-moment obligation with a definite pre-state -- the configuration immediately before the transition. The StateEntry/StateExit case-shape rows (matrix lines 151-152) describe the analogous ensure-anchored transition-moment obligation as drawing on \"the entering row's guard, args, and pre-state\"; the hook's own `when` is the same transition-moment evaluation occasion.",
+        "Not answered here, carried as an open dependency: whether an EARLIER conjunct of this same guard would be a premise for a fault arising in a LATER conjunct (e.g. `when Parts != 0 and Total / Parts > 1`) is not settled by anything the matrix currently states. This is a different question from class (c)'s exclusion above (which concerns the guard supplying a premise to an obligation arising within itself, full stop) -- it asks whether the guard's own internal conjunct ordering creates a second, narrower notion of \"before\" that class (c)'s exclusion does not reach. This cell does not attempt that spelling and states no answer for it.",
+        "Measured live (Precept.MatrixTools, 2026-07-21, commit e1a14d91) on the base program below and on every discharge and near-miss addition in this cell: all compile with zero diagnostics, and the tool reports no obligation for this division (state-hook-guard mints nothing at HEAD in either lane). This is a direct, self-contained instance of the matrix's own \"open design hole -- nothing detects an obligation that was never minted\" (matrix lines 88-101): the compiler visits this site, computes no fault obligation for it, and nothing anywhere flags the absence.",
+        "operationKind is recorded as the catalog's declaring-entry name (\"DecimalDivideDecimal\", src/Precept/Language/Operations.cs; ProofRequirementKind.Numeric, src/Precept/Language/ProofRequirementKind.cs) rather than the coarser RequirementKind (\"Numeric\", shared by both lanes) -- the coarser value could not distinguish the integer and decimal lane cells as separate coordinates. Recorded so the choice is checkable, not asserted silently."
+      ]
+    },
+    {
+      "id": "g03/access-mode-guard-int",
+      "label": "Access-mode declaration guard -- integer lane",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "IntegerDivideInteger",
+        "evaluationSiteCategory": "access-mode-guard",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:186",
+            "note": "Fault minting: catalog-stamped at evaluation sites"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+            "note": "the Fault family case-shape row"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Parts != 0",
+        "metavariables": [
+          {
+            "name": "Total",
+            "standsFor": "the field read as the guard's dividend -- immaterial to the safety precondition itself"
+          },
+          {
+            "name": "Parts",
+            "standsFor": "the field read as the guard's divisor"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:42",
+            "note": "the Normalization bullet"
+          },
+          {
+            "kind": "normal-form-draft",
+            "ref": "docs/Working/normal-form-draft-2026-07-19.md"
+          }
+        ],
+        "wp": {
+          "statement": "Parts != 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a",
+        "d"
+      ],
+      "premiseAvailability": "Derived per evaluation-site category, not asserted: this is a state-scoped access-mode declaration's `when` (`in S when G modify F readonly|editable`). Classes (a) and (d) instantiate; (b) does not (see notes); (c) never does (structural, see notes).",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "field modifier on the divisor field, excluding zero -> interval containment over the modifier's declared bound",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "Compute the divisor field's interval from its own declared modifiers (a finite set -- the modifier-to-ProofSatisfaction table, docs/compiler/proof-engine.md § Strategy 2); a computed interval excluding zero closes the obligation. Modelled on the matrix's own Family 4 sketch decision procedure (matrix line 299: \"compute the divisor's interval from its declared modifiers and in-scope guard facts\"), generalized here from premise class (b) (an event-arg modifier) to premise class (a) (a field modifier) on the same divisor. No excluding bound rejects, naming class (a).",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+              "note": "the four premise classes, including (a) field modifiers"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:206",
+              "note": "Arg-bound interval arithmetic -- the modifier-to-ProofSatisfaction interval derivation this entry extends from arg modifiers to field modifiers"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:299",
+              "note": "Family 4 sketch -- \"compute the divisor's interval from its declared modifiers and in-scope guard facts\""
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "d"
+          ],
+          "derivation": "a rule established and preserved over the divisor field, consumed as the inductive hypothesis -> the divisor's pre-state fact closes the obligation directly (CompositionalConstraint)",
+          "validityArguments": [
+            "Inductive hypothesis plus sign monotonicity"
+          ],
+          "decisionProcedure": "Look up a nonzero fact for the divisor field among the constraints holding in the pre-state (the CompositionalConstraint strategy already exercised at HEAD for this exact shape -- docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md Part 3, \"rule PlannedQuantity > 0 ... discharges a division-by-zero obligation via the CompositionalConstraint strategy\"). No such fact rejects, naming class (d).",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+              "note": "(d) all constraints holding in the pre-state"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:208",
+              "note": "Inductive hypothesis plus sign monotonicity -- extended here from its written sign-monotonicity/subtraction shape to a bare nonzero fact read directly"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:94",
+              "note": "the Open design hole section -- the matrix's own worked example of a rule consumed as premise (d) for a divisor-nonzero fault obligation"
+            },
+            {
+              "kind": "review",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md § Defect B",
+              "note": "Defect B: a rule consumed as premise (d) while nothing establishes it (fail-open)"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "declare a field modifier on <WP>'s divisor that excludes zero (e.g. positive, nonzero, or a min bound above zero)",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:46",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "d"
+          ],
+          "schema": "add a rule establishing and preserving <WP> over the divisor field, available as premise (d)",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:46",
+              "note": "the suggestion-schema bullet"
+            }
+          ],
+          "notes": [
+            "A discharge accepted through this suggestion inherits the false-proof hazard: record its builtStatus as unresolved-today and its provenance as model-derived, never as confirmed by a clean compile, until the rule's own establishment/preservation obligations are built (docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md Part 3, Defect A and Defect B)."
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept AmgBaseInt\nfield Total as integer default 10\nfield Parts as integer default 0\nfield Note as string optional editable\nstate Draft initial\nstate Done terminal\nevent Open initial\nevent Finish\non Open\n    -> set Total = 10\n    -> set Parts = 0\nin Draft when Total / Parts > 1 modify Note readonly\nfrom Draft on Finish\n    -> transition Done",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a",
+              "d"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "model-derived"
+          }
+        },
+        "discharges": [
+          {
+            "id": "access-mode-guard-int-a",
+            "kind": "other",
+            "addition": "field Parts as integer default 1 nonzero",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "field modifier excluding zero on the divisor -> interval containment (class a)",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "Live-verified (Precept.MatrixTools, 2026-07-21, commit e1a14d91): this addition compiles with zero diagnostics and no obligation is reported for the division -- the same no-mint behaviour as the base. builtStatus is unresolved-today because the site does not mint at HEAD at all; a clean compile here records the site's failure to mint, not confirmation that this discharge is accepted. This discharge is a field modifier (class a), which is NOT subject to the false-proof hazard (task authoring notes: \"guard-based and modifier-based discharges ... are unaffected\").",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Replaces the base's `field Parts as integer default 0` declaration (and the matching construction assignment) with `field Parts as integer default 1 nonzero`. The compiled program is the base program with that one field declaration replaced; it is not stored verbatim anywhere, and no `application` record reconstructs it mechanically (see the schema-vocabulary note below).",
+              "kind is recorded as \"other\": the closed dischargeWitness.kind vocabulary has \"arg-modifier\" for an event-arg modifier but no corresponding value for a FIELD modifier, even though class (a) field modifiers is named in the Vocabulary (matrix line 38) as a first-class premise source. Flagged as a vocabulary gap.",
+              "The schema's `application` discriminated union (row-guard / event-arg-declarations) has no locus for a field-declaration modifier addition or a whole new `rule` declaration -- neither of this discharge's addition shapes is either of the two loci the schema expresses. `application` is omitted rather than forced into an ill-fitting locus; the day-one validator's cell-to-test conversion cannot yet mechanically apply this addition. Flagged as a schema-vocabulary gap, not resolved here."
+            ]
+          },
+          {
+            "id": "access-mode-guard-int-d",
+            "kind": "other",
+            "addition": "rule Parts != 0 because \"Parts must stay nonzero\"",
+            "premiseClasses": [
+              "d"
+            ],
+            "derivation": "rule establishing the divisor's nonzero-ness, consumed as premise (d) via CompositionalConstraint",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "Doubly unverifiable, so no live run is cited as confirmation here even though compiling this exact program shows the same no-mint behaviour as every other witness in this file: (i) this evaluation-site category mints no fault obligation at HEAD at all (measured on the base and on this addition); (ii) independent of (i), a `rule` consumed as premise (d) is exactly the false-proof-prone discharge path verified at HEAD (docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md Part 3, Defect B -- a rule can be accepted as a divisor-nonzero premise via the CompositionalConstraint strategy while nothing establishes or preserves it). A clean compile could never be read as confirmation of this discharge even if the site did mint. modelStatus is stated as provable-under-model on the strength of premise (d)'s general validity argument (matrix line 208), extended from its written sign-monotonicity/subtraction shape to a bare nonzero fact read directly -- an extension the matrix does not explicitly write out (see missing rules).",
+            "provenance": {
+              "mark": "model-derived"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Adds `rule Parts != 0 because \"Parts must stay nonzero\"` as a new top-level declaration and marks Total and Parts `editable` (parity with the standalone-rule shape the false-proof hazard's own repro uses; editability is incidental to the derivation, not load-bearing for it).",
+              "kind is recorded as \"other\": the closed dischargeWitness.kind vocabulary has no value for \"a new rule declaration added to the file\" -- the closest options (guard, arg-modifier, default-constant-fold, structural-edit) all name a different shape. Flagged as a vocabulary gap.",
+              "The schema's `application` discriminated union (row-guard / event-arg-declarations) has no locus for a field-declaration modifier addition or a whole new `rule` declaration -- neither of this discharge's addition shapes is either of the two loci the schema expresses. `application` is omitted rather than forced into an ill-fitting locus; the day-one validator's cell-to-test conversion cannot yet mechanically apply this addition. Flagged as a schema-vocabulary gap, not resolved here.",
+              "Listed in this task's unverifiableWitnesses output: false-proof hazard (rule used as premise (d)), per docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md Part 3, Defect B, compounded by this site's no-mint status at HEAD."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "access-mode-guard-int-a",
+            "addition": "field Parts as integer default 0 nonnegative",
+            "whyStillRejects": "`nonnegative` (unlike `nonzero`/`positive`) does not exclude 0: the divisor's declared interval still contains zero, so the interval-containment derivation does not close -- must still reject, same obligation.",
+            "provenance": {
+              "mark": "model-derived"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          },
+          {
+            "pairsWith": "access-mode-guard-int-d",
+            "addition": "rule Parts >= 0 because \"Parts must stay nonnegative\"",
+            "whyStillRejects": "`rule Parts >= 0` (unlike `!=`) does not exclude zero: the pre-state fact still admits a zero divisor, so the inductive-hypothesis derivation does not close -- must still reject, same obligation.",
+            "provenance": {
+              "mark": "model-derived"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+          "note": "the four premise classes"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+          "note": "the Fault family case-shape row"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:186",
+          "note": "Fault minting: catalog-stamped at evaluation sites"
+        }
+      ],
+      "notes": [
+        "Class (c) -- the handler's guard -- is structurally unavailable and is excluded from every contract entry in this file. The obligation arises from evaluating the guard expression's own division, before the guard has produced the truth value anything downstream (a row's actions, an ensure, a rule, an access-mode decision) could rely on. Class (c) is defined as a fact the guard's truth supplies to obligations arising after it (matrix line 38: \"(c) the handler's guard\"; the Guard normal-form match argument, matrix line 204, grounds (c) precisely in a row's actions executing only after the guard evaluated true -- a precondition the guard's own internal evaluation cannot satisfy about itself). A guard cannot supply its own truth as a premise for an obligation it must discharge in order to compute that very truth value. This is the headline asymmetry the whole cell group demonstrates; it holds identically across all five evaluation-site categories and both lanes.",
+        "Argument constraints (b) are structurally unavailable at this evaluation-site category regardless of what the guard reads: no triggering event is in scope here (a state hook fires on every inbound/outbound edge and an access-mode declaration carries no event at all), so there is no event-arg premise vocabulary to draw on.",
+        "Pre-state constraints (d) are available on the following reading, offered here as this cell's own derivation rather than a matrix-stated rule: whatever configuration the entity currently occupies when the access-mode check runs is a reachable configuration the induction ranges over, so a rule established-and-preserved up to that point is a valid fact regardless of which check is reading it -- nothing in the Inductive hypothesis argument (matrix line 208) is specific to the write-site occasion. This is NOT the same question as the matrix's own explicitly open one -- \"whether the residency fact itself is a premise\" (matrix line 150) -- which concerns whether being-in-S is a fact, not whether an ordinary rule holding in the current configuration is. NOTE: the identical argument would appear to extend to ensure-activation-guard below (also a state-scoped `when` guard), yet this file's authoring guidance treats (d) as unavailable/open there. That asymmetry is recorded as a missing rule -- see ensure-activation-guard's notes and this file's missing-rule list -- not resolved by this cell.",
+        "Not answered here, carried as an open dependency: whether an EARLIER conjunct of this same guard would be a premise for a fault arising in a LATER conjunct (e.g. `when Parts != 0 and Total / Parts > 1`) is not settled by anything the matrix currently states. This is a different question from class (c)'s exclusion above (which concerns the guard supplying a premise to an obligation arising within itself, full stop) -- it asks whether the guard's own internal conjunct ordering creates a second, narrower notion of \"before\" that class (c)'s exclusion does not reach. This cell does not attempt that spelling and states no answer for it.",
+        "Measured live (Precept.MatrixTools, 2026-07-21, commit e1a14d91) on the base program below and on every discharge and near-miss addition in this cell: all compile with zero diagnostics, and the tool reports no obligation for this division (access-mode-guard mints nothing at HEAD in either lane). This is a direct, self-contained instance of the matrix's own \"open design hole -- nothing detects an obligation that was never minted\" (matrix lines 88-101): the compiler visits this site, computes no fault obligation for it, and nothing anywhere flags the absence.",
+        "operationKind is recorded as the catalog's declaring-entry name (\"IntegerDivideInteger\", src/Precept/Language/Operations.cs; ProofRequirementKind.Numeric, src/Precept/Language/ProofRequirementKind.cs) rather than the coarser RequirementKind (\"Numeric\", shared by both lanes) -- the coarser value could not distinguish the integer and decimal lane cells as separate coordinates. Recorded so the choice is checkable, not asserted silently."
+      ]
+    },
+    {
+      "id": "g03/access-mode-guard-dec",
+      "label": "Access-mode declaration guard -- decimal lane",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "DecimalDivideDecimal",
+        "evaluationSiteCategory": "access-mode-guard",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:186",
+            "note": "Fault minting: catalog-stamped at evaluation sites"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+            "note": "the Fault family case-shape row"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Parts != 0",
+        "metavariables": [
+          {
+            "name": "Total",
+            "standsFor": "the field read as the guard's dividend -- immaterial to the safety precondition itself"
+          },
+          {
+            "name": "Parts",
+            "standsFor": "the field read as the guard's divisor"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:42",
+            "note": "the Normalization bullet"
+          },
+          {
+            "kind": "normal-form-draft",
+            "ref": "docs/Working/normal-form-draft-2026-07-19.md"
+          }
+        ],
+        "wp": {
+          "statement": "Parts != 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a",
+        "d"
+      ],
+      "premiseAvailability": "Derived per evaluation-site category, not asserted: this is a state-scoped access-mode declaration's `when` (`in S when G modify F readonly|editable`). Classes (a) and (d) instantiate; (b) does not (see notes); (c) never does (structural, see notes).",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "field modifier on the divisor field, excluding zero -> interval containment over the modifier's declared bound",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "Compute the divisor field's interval from its own declared modifiers (a finite set -- the modifier-to-ProofSatisfaction table, docs/compiler/proof-engine.md § Strategy 2); a computed interval excluding zero closes the obligation. Modelled on the matrix's own Family 4 sketch decision procedure (matrix line 299: \"compute the divisor's interval from its declared modifiers and in-scope guard facts\"), generalized here from premise class (b) (an event-arg modifier) to premise class (a) (a field modifier) on the same divisor. No excluding bound rejects, naming class (a).",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+              "note": "the four premise classes, including (a) field modifiers"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:206",
+              "note": "Arg-bound interval arithmetic -- the modifier-to-ProofSatisfaction interval derivation this entry extends from arg modifiers to field modifiers"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:299",
+              "note": "Family 4 sketch -- \"compute the divisor's interval from its declared modifiers and in-scope guard facts\""
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "d"
+          ],
+          "derivation": "a rule established and preserved over the divisor field, consumed as the inductive hypothesis -> the divisor's pre-state fact closes the obligation directly (CompositionalConstraint)",
+          "validityArguments": [
+            "Inductive hypothesis plus sign monotonicity"
+          ],
+          "decisionProcedure": "Look up a nonzero fact for the divisor field among the constraints holding in the pre-state (the CompositionalConstraint strategy already exercised at HEAD for this exact shape -- docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md Part 3, \"rule PlannedQuantity > 0 ... discharges a division-by-zero obligation via the CompositionalConstraint strategy\"). No such fact rejects, naming class (d).",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+              "note": "(d) all constraints holding in the pre-state"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:208",
+              "note": "Inductive hypothesis plus sign monotonicity -- extended here from its written sign-monotonicity/subtraction shape to a bare nonzero fact read directly"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:94",
+              "note": "the Open design hole section -- the matrix's own worked example of a rule consumed as premise (d) for a divisor-nonzero fault obligation"
+            },
+            {
+              "kind": "review",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md § Defect B",
+              "note": "Defect B: a rule consumed as premise (d) while nothing establishes it (fail-open)"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "declare a field modifier on <WP>'s divisor that excludes zero (e.g. positive, nonzero, or a min bound above zero)",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:46",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "d"
+          ],
+          "schema": "add a rule establishing and preserving <WP> over the divisor field, available as premise (d)",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:46",
+              "note": "the suggestion-schema bullet"
+            }
+          ],
+          "notes": [
+            "A discharge accepted through this suggestion inherits the false-proof hazard: record its builtStatus as unresolved-today and its provenance as model-derived, never as confirmed by a clean compile, until the rule's own establishment/preservation obligations are built (docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md Part 3, Defect A and Defect B)."
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept AmgBaseDec\nfield Total as decimal default 10.0\nfield Parts as decimal default 0.0\nfield Note as string optional editable\nstate Draft initial\nstate Done terminal\nevent Open initial\nevent Finish\non Open\n    -> set Total = 10.0\n    -> set Parts = 0.0\nin Draft when Total / Parts > 1.0 modify Note readonly\nfrom Draft on Finish\n    -> transition Done",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a",
+              "d"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "model-derived"
+          }
+        },
+        "discharges": [
+          {
+            "id": "access-mode-guard-dec-a",
+            "kind": "other",
+            "addition": "field Parts as decimal default 1.0 nonzero",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "field modifier excluding zero on the divisor -> interval containment (class a)",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "Live-verified (Precept.MatrixTools, 2026-07-21, commit e1a14d91): this addition compiles with zero diagnostics and no obligation is reported for the division -- the same no-mint behaviour as the base. builtStatus is unresolved-today because the site does not mint at HEAD at all; a clean compile here records the site's failure to mint, not confirmation that this discharge is accepted. This discharge is a field modifier (class a), which is NOT subject to the false-proof hazard (task authoring notes: \"guard-based and modifier-based discharges ... are unaffected\").",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Replaces the base's `field Parts as decimal default 0.0` declaration (and the matching construction assignment) with `field Parts as decimal default 1.0 nonzero`. The compiled program is the base program with that one field declaration replaced; it is not stored verbatim anywhere, and no `application` record reconstructs it mechanically (see the schema-vocabulary note below).",
+              "kind is recorded as \"other\": the closed dischargeWitness.kind vocabulary has \"arg-modifier\" for an event-arg modifier but no corresponding value for a FIELD modifier, even though class (a) field modifiers is named in the Vocabulary (matrix line 38) as a first-class premise source. Flagged as a vocabulary gap.",
+              "The schema's `application` discriminated union (row-guard / event-arg-declarations) has no locus for a field-declaration modifier addition or a whole new `rule` declaration -- neither of this discharge's addition shapes is either of the two loci the schema expresses. `application` is omitted rather than forced into an ill-fitting locus; the day-one validator's cell-to-test conversion cannot yet mechanically apply this addition. Flagged as a schema-vocabulary gap, not resolved here."
+            ]
+          },
+          {
+            "id": "access-mode-guard-dec-d",
+            "kind": "other",
+            "addition": "rule Parts != 0.0 because \"Parts must stay nonzero\"",
+            "premiseClasses": [
+              "d"
+            ],
+            "derivation": "rule establishing the divisor's nonzero-ness, consumed as premise (d) via CompositionalConstraint",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "Doubly unverifiable, so no live run is cited as confirmation here even though compiling this exact program shows the same no-mint behaviour as every other witness in this file: (i) this evaluation-site category mints no fault obligation at HEAD at all (measured on the base and on this addition); (ii) independent of (i), a `rule` consumed as premise (d) is exactly the false-proof-prone discharge path verified at HEAD (docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md Part 3, Defect B -- a rule can be accepted as a divisor-nonzero premise via the CompositionalConstraint strategy while nothing establishes or preserves it). A clean compile could never be read as confirmation of this discharge even if the site did mint. modelStatus is stated as provable-under-model on the strength of premise (d)'s general validity argument (matrix line 208), extended from its written sign-monotonicity/subtraction shape to a bare nonzero fact read directly -- an extension the matrix does not explicitly write out (see missing rules).",
+            "provenance": {
+              "mark": "model-derived"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Adds `rule Parts != 0.0 because \"Parts must stay nonzero\"` as a new top-level declaration and marks Total and Parts `editable` (parity with the standalone-rule shape the false-proof hazard's own repro uses; editability is incidental to the derivation, not load-bearing for it).",
+              "kind is recorded as \"other\": the closed dischargeWitness.kind vocabulary has no value for \"a new rule declaration added to the file\" -- the closest options (guard, arg-modifier, default-constant-fold, structural-edit) all name a different shape. Flagged as a vocabulary gap.",
+              "The schema's `application` discriminated union (row-guard / event-arg-declarations) has no locus for a field-declaration modifier addition or a whole new `rule` declaration -- neither of this discharge's addition shapes is either of the two loci the schema expresses. `application` is omitted rather than forced into an ill-fitting locus; the day-one validator's cell-to-test conversion cannot yet mechanically apply this addition. Flagged as a schema-vocabulary gap, not resolved here.",
+              "Listed in this task's unverifiableWitnesses output: false-proof hazard (rule used as premise (d)), per docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md Part 3, Defect B, compounded by this site's no-mint status at HEAD."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "access-mode-guard-dec-a",
+            "addition": "field Parts as decimal default 0.0 nonnegative",
+            "whyStillRejects": "`nonnegative` (unlike `nonzero`/`positive`) does not exclude 0.0: the divisor's declared interval still contains zero, so the interval-containment derivation does not close -- must still reject, same obligation.",
+            "provenance": {
+              "mark": "model-derived"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          },
+          {
+            "pairsWith": "access-mode-guard-dec-d",
+            "addition": "rule Parts >= 0.0 because \"Parts must stay nonnegative\"",
+            "whyStillRejects": "`rule Parts >= 0.0` (unlike `!=`) does not exclude zero: the pre-state fact still admits a zero divisor, so the inductive-hypothesis derivation does not close -- must still reject, same obligation.",
+            "provenance": {
+              "mark": "model-derived"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+          "note": "the four premise classes"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+          "note": "the Fault family case-shape row"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:186",
+          "note": "Fault minting: catalog-stamped at evaluation sites"
+        }
+      ],
+      "notes": [
+        "Class (c) -- the handler's guard -- is structurally unavailable and is excluded from every contract entry in this file. The obligation arises from evaluating the guard expression's own division, before the guard has produced the truth value anything downstream (a row's actions, an ensure, a rule, an access-mode decision) could rely on. Class (c) is defined as a fact the guard's truth supplies to obligations arising after it (matrix line 38: \"(c) the handler's guard\"; the Guard normal-form match argument, matrix line 204, grounds (c) precisely in a row's actions executing only after the guard evaluated true -- a precondition the guard's own internal evaluation cannot satisfy about itself). A guard cannot supply its own truth as a premise for an obligation it must discharge in order to compute that very truth value. This is the headline asymmetry the whole cell group demonstrates; it holds identically across all five evaluation-site categories and both lanes.",
+        "Argument constraints (b) are structurally unavailable at this evaluation-site category regardless of what the guard reads: no triggering event is in scope here (a state hook fires on every inbound/outbound edge and an access-mode declaration carries no event at all), so there is no event-arg premise vocabulary to draw on.",
+        "Pre-state constraints (d) are available on the following reading, offered here as this cell's own derivation rather than a matrix-stated rule: whatever configuration the entity currently occupies when the access-mode check runs is a reachable configuration the induction ranges over, so a rule established-and-preserved up to that point is a valid fact regardless of which check is reading it -- nothing in the Inductive hypothesis argument (matrix line 208) is specific to the write-site occasion. This is NOT the same question as the matrix's own explicitly open one -- \"whether the residency fact itself is a premise\" (matrix line 150) -- which concerns whether being-in-S is a fact, not whether an ordinary rule holding in the current configuration is. NOTE: the identical argument would appear to extend to ensure-activation-guard below (also a state-scoped `when` guard), yet this file's authoring guidance treats (d) as unavailable/open there. That asymmetry is recorded as a missing rule -- see ensure-activation-guard's notes and this file's missing-rule list -- not resolved by this cell.",
+        "Not answered here, carried as an open dependency: whether an EARLIER conjunct of this same guard would be a premise for a fault arising in a LATER conjunct (e.g. `when Parts != 0 and Total / Parts > 1`) is not settled by anything the matrix currently states. This is a different question from class (c)'s exclusion above (which concerns the guard supplying a premise to an obligation arising within itself, full stop) -- it asks whether the guard's own internal conjunct ordering creates a second, narrower notion of \"before\" that class (c)'s exclusion does not reach. This cell does not attempt that spelling and states no answer for it.",
+        "Measured live (Precept.MatrixTools, 2026-07-21, commit e1a14d91) on the base program below and on every discharge and near-miss addition in this cell: all compile with zero diagnostics, and the tool reports no obligation for this division (access-mode-guard mints nothing at HEAD in either lane). This is a direct, self-contained instance of the matrix's own \"open design hole -- nothing detects an obligation that was never minted\" (matrix lines 88-101): the compiler visits this site, computes no fault obligation for it, and nothing anywhere flags the absence.",
+        "operationKind is recorded as the catalog's declaring-entry name (\"DecimalDivideDecimal\", src/Precept/Language/Operations.cs; ProofRequirementKind.Numeric, src/Precept/Language/ProofRequirementKind.cs) rather than the coarser RequirementKind (\"Numeric\", shared by both lanes) -- the coarser value could not distinguish the integer and decimal lane cells as separate coordinates. Recorded so the choice is checkable, not asserted silently."
+      ]
+    },
+    {
+      "id": "g03/ensure-activation-guard-int",
+      "label": "Ensure activation guard -- integer lane",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "IntegerDivideInteger",
+        "evaluationSiteCategory": "ensure-activation-guard",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:186",
+            "note": "Fault minting: catalog-stamped at evaluation sites"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+            "note": "the Fault family case-shape row"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Parts != 0",
+        "metavariables": [
+          {
+            "name": "Total",
+            "standsFor": "the field read as the guard's dividend -- immaterial to the safety precondition itself"
+          },
+          {
+            "name": "Parts",
+            "standsFor": "the field read as the guard's divisor"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:42",
+            "note": "the Normalization bullet"
+          },
+          {
+            "kind": "normal-form-draft",
+            "ref": "docs/Working/normal-form-draft-2026-07-19.md"
+          }
+        ],
+        "wp": {
+          "statement": "Parts != 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a"
+      ],
+      "premiseAvailability": "Derived per evaluation-site category, not asserted: this is the optional pre-verb `when` of a state-anchored ensure (`in S when G ensure ...`). Only class (a) instantiates without further ruling; (b), (c), and (d) do not (see notes).",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "field modifier on the divisor field, excluding zero -> interval containment over the modifier's declared bound",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "Compute the divisor field's interval from its own declared modifiers (a finite set -- the modifier-to-ProofSatisfaction table, docs/compiler/proof-engine.md § Strategy 2); a computed interval excluding zero closes the obligation. Modelled on the matrix's own Family 4 sketch decision procedure (matrix line 299: \"compute the divisor's interval from its declared modifiers and in-scope guard facts\"), generalized here from premise class (b) (an event-arg modifier) to premise class (a) (a field modifier) on the same divisor. No excluding bound rejects, naming class (a).",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+              "note": "the four premise classes, including (a) field modifiers"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:206",
+              "note": "Arg-bound interval arithmetic -- the modifier-to-ProofSatisfaction interval derivation this entry extends from arg modifiers to field modifiers"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:299",
+              "note": "Family 4 sketch -- \"compute the divisor's interval from its declared modifiers and in-scope guard facts\""
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "declare a field modifier on <WP>'s divisor that excludes zero (e.g. positive, nonzero, or a min bound above zero)",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:46",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept EwgBaseInt\nfield Total as integer default 10\nfield Parts as integer default 0\nstate Draft initial\nstate Done terminal\nevent Open initial\nevent Finish\non Open\n    -> set Total = 10\n    -> set Parts = 0\nin Done when Total / Parts > 1 ensure Total > 0 because \"bounded\"\nfrom Draft on Finish\n    -> transition Done",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "model-derived"
+          }
+        },
+        "discharges": [
+          {
+            "id": "ensure-activation-guard-int-a",
+            "kind": "other",
+            "addition": "field Parts as integer default 1 nonzero",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "field modifier excluding zero on the divisor -> interval containment (class a)",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "Live-verified (Precept.MatrixTools, 2026-07-21, commit e1a14d91): this addition compiles with zero diagnostics and no obligation is reported for the division -- the same no-mint behaviour as the base. builtStatus is unresolved-today because the site does not mint at HEAD at all; a clean compile here records the site's failure to mint, not confirmation that this discharge is accepted. This discharge is a field modifier (class a), which is NOT subject to the false-proof hazard (task authoring notes: \"guard-based and modifier-based discharges ... are unaffected\").",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Replaces the base's `field Parts as integer default 0` declaration (and the matching construction assignment) with `field Parts as integer default 1 nonzero`. The compiled program is the base program with that one field declaration replaced; it is not stored verbatim anywhere, and no `application` record reconstructs it mechanically (see the schema-vocabulary note below).",
+              "kind is recorded as \"other\": the closed dischargeWitness.kind vocabulary has \"arg-modifier\" for an event-arg modifier but no corresponding value for a FIELD modifier, even though class (a) field modifiers is named in the Vocabulary (matrix line 38) as a first-class premise source. Flagged as a vocabulary gap.",
+              "The schema's `application` discriminated union (row-guard / event-arg-declarations) has no locus for a field-declaration modifier addition or a whole new `rule` declaration -- neither of this discharge's addition shapes is either of the two loci the schema expresses. `application` is omitted rather than forced into an ill-fitting locus; the day-one validator's cell-to-test conversion cannot yet mechanically apply this addition. Flagged as a schema-vocabulary gap, not resolved here."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "ensure-activation-guard-int-a",
+            "addition": "field Parts as integer default 0 nonnegative",
+            "whyStillRejects": "`nonnegative` (unlike `nonzero`/`positive`) does not exclude 0: the divisor's declared interval still contains zero, so the interval-containment derivation does not close -- must still reject, same obligation.",
+            "provenance": {
+              "mark": "model-derived"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+          "note": "the four premise classes"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+          "note": "the Fault family case-shape row"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:186",
+          "note": "Fault minting: catalog-stamped at evaluation sites"
+        }
+      ],
+      "notes": [
+        "Class (c) -- the handler's guard -- is structurally unavailable and is excluded from every contract entry in this file. The obligation arises from evaluating the guard expression's own division, before the guard has produced the truth value anything downstream (a row's actions, an ensure, a rule, an access-mode decision) could rely on. Class (c) is defined as a fact the guard's truth supplies to obligations arising after it (matrix line 38: \"(c) the handler's guard\"; the Guard normal-form match argument, matrix line 204, grounds (c) precisely in a row's actions executing only after the guard evaluated true -- a precondition the guard's own internal evaluation cannot satisfy about itself). A guard cannot supply its own truth as a premise for an obligation it must discharge in order to compute that very truth value. This is the headline asymmetry the whole cell group demonstrates; it holds identically across all five evaluation-site categories and both lanes.",
+        "Class (d) is NOT included in this cell's applicablePremiseClasses. This slice's authoring guidance names only the transition-row, state-hook, and access-mode guards as positions where (d) is available; ensure-activation-guard is excluded from that list. The matrix itself does not state this exclusion, and the access-mode-guard cell's own derivation (a rule holding in whatever configuration the check runs against is a valid premise regardless of occasion) would appear to extend symmetrically to a state-anchored ensure's own activation guard, since both are ordinary state-scoped `when` guards evaluated against the current configuration. Recorded as an open item/missing rule rather than resolved either way: this cell states no (d) contract entry, but the exclusion is a curatorial choice for this pass, not an independently matrix-derived asymmetry.",
+        "Not answered here, carried as an open dependency: whether an EARLIER conjunct of this same guard would be a premise for a fault arising in a LATER conjunct (e.g. `when Parts != 0 and Total / Parts > 1`) is not settled by anything the matrix currently states. This is a different question from class (c)'s exclusion above (which concerns the guard supplying a premise to an obligation arising within itself, full stop) -- it asks whether the guard's own internal conjunct ordering creates a second, narrower notion of \"before\" that class (c)'s exclusion does not reach. This cell does not attempt that spelling and states no answer for it.",
+        "Measured live (Precept.MatrixTools, 2026-07-21, commit e1a14d91) on the base program below and on every discharge and near-miss addition in this cell: all compile with zero diagnostics, and the tool reports no obligation for this division (ensure-activation-guard mints nothing at HEAD in either lane). This is a direct, self-contained instance of the matrix's own \"open design hole -- nothing detects an obligation that was never minted\" (matrix lines 88-101): the compiler visits this site, computes no fault obligation for it, and nothing anywhere flags the absence.",
+        "operationKind is recorded as the catalog's declaring-entry name (\"IntegerDivideInteger\", src/Precept/Language/Operations.cs; ProofRequirementKind.Numeric, src/Precept/Language/ProofRequirementKind.cs) rather than the coarser RequirementKind (\"Numeric\", shared by both lanes) -- the coarser value could not distinguish the integer and decimal lane cells as separate coordinates. Recorded so the choice is checkable, not asserted silently."
+      ]
+    },
+    {
+      "id": "g03/ensure-activation-guard-dec",
+      "label": "Ensure activation guard -- decimal lane",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "DecimalDivideDecimal",
+        "evaluationSiteCategory": "ensure-activation-guard",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:186",
+            "note": "Fault minting: catalog-stamped at evaluation sites"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+            "note": "the Fault family case-shape row"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Parts != 0",
+        "metavariables": [
+          {
+            "name": "Total",
+            "standsFor": "the field read as the guard's dividend -- immaterial to the safety precondition itself"
+          },
+          {
+            "name": "Parts",
+            "standsFor": "the field read as the guard's divisor"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:42",
+            "note": "the Normalization bullet"
+          },
+          {
+            "kind": "normal-form-draft",
+            "ref": "docs/Working/normal-form-draft-2026-07-19.md"
+          }
+        ],
+        "wp": {
+          "statement": "Parts != 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a"
+      ],
+      "premiseAvailability": "Derived per evaluation-site category, not asserted: this is the optional pre-verb `when` of a state-anchored ensure (`in S when G ensure ...`). Only class (a) instantiates without further ruling; (b), (c), and (d) do not (see notes).",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "field modifier on the divisor field, excluding zero -> interval containment over the modifier's declared bound",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "Compute the divisor field's interval from its own declared modifiers (a finite set -- the modifier-to-ProofSatisfaction table, docs/compiler/proof-engine.md § Strategy 2); a computed interval excluding zero closes the obligation. Modelled on the matrix's own Family 4 sketch decision procedure (matrix line 299: \"compute the divisor's interval from its declared modifiers and in-scope guard facts\"), generalized here from premise class (b) (an event-arg modifier) to premise class (a) (a field modifier) on the same divisor. No excluding bound rejects, naming class (a).",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+              "note": "the four premise classes, including (a) field modifiers"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:206",
+              "note": "Arg-bound interval arithmetic -- the modifier-to-ProofSatisfaction interval derivation this entry extends from arg modifiers to field modifiers"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:299",
+              "note": "Family 4 sketch -- \"compute the divisor's interval from its declared modifiers and in-scope guard facts\""
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "declare a field modifier on <WP>'s divisor that excludes zero (e.g. positive, nonzero, or a min bound above zero)",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:46",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept EwgBaseDec\nfield Total as decimal default 10.0\nfield Parts as decimal default 0.0\nstate Draft initial\nstate Done terminal\nevent Open initial\nevent Finish\non Open\n    -> set Total = 10.0\n    -> set Parts = 0.0\nin Done when Total / Parts > 1.0 ensure Total > 0.0 because \"bounded\"\nfrom Draft on Finish\n    -> transition Done",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "model-derived"
+          }
+        },
+        "discharges": [
+          {
+            "id": "ensure-activation-guard-dec-a",
+            "kind": "other",
+            "addition": "field Parts as decimal default 1.0 nonzero",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "field modifier excluding zero on the divisor -> interval containment (class a)",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "Live-verified (Precept.MatrixTools, 2026-07-21, commit e1a14d91): this addition compiles with zero diagnostics and no obligation is reported for the division -- the same no-mint behaviour as the base. builtStatus is unresolved-today because the site does not mint at HEAD at all; a clean compile here records the site's failure to mint, not confirmation that this discharge is accepted. This discharge is a field modifier (class a), which is NOT subject to the false-proof hazard (task authoring notes: \"guard-based and modifier-based discharges ... are unaffected\").",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Replaces the base's `field Parts as decimal default 0.0` declaration (and the matching construction assignment) with `field Parts as decimal default 1.0 nonzero`. The compiled program is the base program with that one field declaration replaced; it is not stored verbatim anywhere, and no `application` record reconstructs it mechanically (see the schema-vocabulary note below).",
+              "kind is recorded as \"other\": the closed dischargeWitness.kind vocabulary has \"arg-modifier\" for an event-arg modifier but no corresponding value for a FIELD modifier, even though class (a) field modifiers is named in the Vocabulary (matrix line 38) as a first-class premise source. Flagged as a vocabulary gap.",
+              "The schema's `application` discriminated union (row-guard / event-arg-declarations) has no locus for a field-declaration modifier addition or a whole new `rule` declaration -- neither of this discharge's addition shapes is either of the two loci the schema expresses. `application` is omitted rather than forced into an ill-fitting locus; the day-one validator's cell-to-test conversion cannot yet mechanically apply this addition. Flagged as a schema-vocabulary gap, not resolved here."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "ensure-activation-guard-dec-a",
+            "addition": "field Parts as decimal default 0.0 nonnegative",
+            "whyStillRejects": "`nonnegative` (unlike `nonzero`/`positive`) does not exclude 0.0: the divisor's declared interval still contains zero, so the interval-containment derivation does not close -- must still reject, same obligation.",
+            "provenance": {
+              "mark": "model-derived"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+          "note": "the four premise classes"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+          "note": "the Fault family case-shape row"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:186",
+          "note": "Fault minting: catalog-stamped at evaluation sites"
+        }
+      ],
+      "notes": [
+        "Class (c) -- the handler's guard -- is structurally unavailable and is excluded from every contract entry in this file. The obligation arises from evaluating the guard expression's own division, before the guard has produced the truth value anything downstream (a row's actions, an ensure, a rule, an access-mode decision) could rely on. Class (c) is defined as a fact the guard's truth supplies to obligations arising after it (matrix line 38: \"(c) the handler's guard\"; the Guard normal-form match argument, matrix line 204, grounds (c) precisely in a row's actions executing only after the guard evaluated true -- a precondition the guard's own internal evaluation cannot satisfy about itself). A guard cannot supply its own truth as a premise for an obligation it must discharge in order to compute that very truth value. This is the headline asymmetry the whole cell group demonstrates; it holds identically across all five evaluation-site categories and both lanes.",
+        "Class (d) is NOT included in this cell's applicablePremiseClasses. This slice's authoring guidance names only the transition-row, state-hook, and access-mode guards as positions where (d) is available; ensure-activation-guard is excluded from that list. The matrix itself does not state this exclusion, and the access-mode-guard cell's own derivation (a rule holding in whatever configuration the check runs against is a valid premise regardless of occasion) would appear to extend symmetrically to a state-anchored ensure's own activation guard, since both are ordinary state-scoped `when` guards evaluated against the current configuration. Recorded as an open item/missing rule rather than resolved either way: this cell states no (d) contract entry, but the exclusion is a curatorial choice for this pass, not an independently matrix-derived asymmetry.",
+        "Not answered here, carried as an open dependency: whether an EARLIER conjunct of this same guard would be a premise for a fault arising in a LATER conjunct (e.g. `when Parts != 0 and Total / Parts > 1`) is not settled by anything the matrix currently states. This is a different question from class (c)'s exclusion above (which concerns the guard supplying a premise to an obligation arising within itself, full stop) -- it asks whether the guard's own internal conjunct ordering creates a second, narrower notion of \"before\" that class (c)'s exclusion does not reach. This cell does not attempt that spelling and states no answer for it.",
+        "Measured live (Precept.MatrixTools, 2026-07-21, commit e1a14d91) on the base program below and on every discharge and near-miss addition in this cell: all compile with zero diagnostics, and the tool reports no obligation for this division (ensure-activation-guard mints nothing at HEAD in either lane). This is a direct, self-contained instance of the matrix's own \"open design hole -- nothing detects an obligation that was never minted\" (matrix lines 88-101): the compiler visits this site, computes no fault obligation for it, and nothing anywhere flags the absence.",
+        "operationKind is recorded as the catalog's declaring-entry name (\"DecimalDivideDecimal\", src/Precept/Language/Operations.cs; ProofRequirementKind.Numeric, src/Precept/Language/ProofRequirementKind.cs) rather than the coarser RequirementKind (\"Numeric\", shared by both lanes) -- the coarser value could not distinguish the integer and decimal lane cells as separate coordinates. Recorded so the choice is checkable, not asserted silently."
+      ]
+    },
+    {
+      "id": "g03/rule-activation-guard-int",
+      "label": "Conditional rule activation guard -- integer lane",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "IntegerDivideInteger",
+        "evaluationSiteCategory": "rule-activation-guard",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:186",
+            "note": "Fault minting: catalog-stamped at evaluation sites"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+            "note": "the Fault family case-shape row"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Parts != 0",
+        "metavariables": [
+          {
+            "name": "Total",
+            "standsFor": "the field read as the guard's dividend -- immaterial to the safety precondition itself"
+          },
+          {
+            "name": "Parts",
+            "standsFor": "the field read as the guard's divisor"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:42",
+            "note": "the Normalization bullet"
+          },
+          {
+            "kind": "normal-form-draft",
+            "ref": "docs/Working/normal-form-draft-2026-07-19.md"
+          }
+        ],
+        "wp": {
+          "statement": "Parts != 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a"
+      ],
+      "premiseAvailability": "Derived per evaluation-site category, not asserted: this is the `when` of a conditional rule (`rule ... when G because ...`). Only class (a) instantiates without further ruling; (b), (c), and (d) do not (see notes).",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "field modifier on the divisor field, excluding zero -> interval containment over the modifier's declared bound",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "Compute the divisor field's interval from its own declared modifiers (a finite set -- the modifier-to-ProofSatisfaction table, docs/compiler/proof-engine.md § Strategy 2); a computed interval excluding zero closes the obligation. Modelled on the matrix's own Family 4 sketch decision procedure (matrix line 299: \"compute the divisor's interval from its declared modifiers and in-scope guard facts\"), generalized here from premise class (b) (an event-arg modifier) to premise class (a) (a field modifier) on the same divisor. No excluding bound rejects, naming class (a).",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+              "note": "the four premise classes, including (a) field modifiers"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:206",
+              "note": "Arg-bound interval arithmetic -- the modifier-to-ProofSatisfaction interval derivation this entry extends from arg modifiers to field modifiers"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:299",
+              "note": "Family 4 sketch -- \"compute the divisor's interval from its declared modifiers and in-scope guard facts\""
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "declare a field modifier on <WP>'s divisor that excludes zero (e.g. positive, nonzero, or a min bound above zero)",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:46",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept RagBaseInt\nfield Total as integer default 10 editable\nfield Parts as integer default 0 editable\nrule Total > 0 when Total / Parts > 1 because \"bounded\"",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "model-derived"
+          }
+        },
+        "discharges": [
+          {
+            "id": "rule-activation-guard-int-a",
+            "kind": "other",
+            "addition": "field Parts as integer default 1 editable nonzero",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "field modifier excluding zero on the divisor -> interval containment (class a)",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "Live-verified (Precept.MatrixTools, 2026-07-21, commit e1a14d91): this addition compiles with zero diagnostics and no obligation is reported for the division -- the same no-mint behaviour as the base. builtStatus is unresolved-today because the site does not mint at HEAD at all; a clean compile here records the site's failure to mint, not confirmation that this discharge is accepted. This discharge is a field modifier (class a), which is NOT subject to the false-proof hazard (task authoring notes: \"guard-based and modifier-based discharges ... are unaffected\").",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Replaces the base's `field Parts as integer default 0` declaration (and the matching construction assignment) with `field Parts as integer default 1 editable nonzero`. The compiled program is the base program with that one field declaration replaced; it is not stored verbatim anywhere, and no `application` record reconstructs it mechanically (see the schema-vocabulary note below).",
+              "kind is recorded as \"other\": the closed dischargeWitness.kind vocabulary has \"arg-modifier\" for an event-arg modifier but no corresponding value for a FIELD modifier, even though class (a) field modifiers is named in the Vocabulary (matrix line 38) as a first-class premise source. Flagged as a vocabulary gap.",
+              "The schema's `application` discriminated union (row-guard / event-arg-declarations) has no locus for a field-declaration modifier addition or a whole new `rule` declaration -- neither of this discharge's addition shapes is either of the two loci the schema expresses. `application` is omitted rather than forced into an ill-fitting locus; the day-one validator's cell-to-test conversion cannot yet mechanically apply this addition. Flagged as a schema-vocabulary gap, not resolved here."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "rule-activation-guard-int-a",
+            "addition": "field Parts as integer default 0 editable nonnegative",
+            "whyStillRejects": "`nonnegative` (unlike `nonzero`/`positive`) does not exclude 0: the divisor's declared interval still contains zero, so the interval-containment derivation does not close -- must still reject, same obligation.",
+            "provenance": {
+              "mark": "model-derived"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+          "note": "the four premise classes"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+          "note": "the Fault family case-shape row"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:186",
+          "note": "Fault minting: catalog-stamped at evaluation sites"
+        }
+      ],
+      "notes": [
+        "Class (c) -- the handler's guard -- is structurally unavailable and is excluded from every contract entry in this file. The obligation arises from evaluating the guard expression's own division, before the guard has produced the truth value anything downstream (a row's actions, an ensure, a rule, an access-mode decision) could rely on. Class (c) is defined as a fact the guard's truth supplies to obligations arising after it (matrix line 38: \"(c) the handler's guard\"; the Guard normal-form match argument, matrix line 204, grounds (c) precisely in a row's actions executing only after the guard evaluated true -- a precondition the guard's own internal evaluation cannot satisfy about itself). A guard cannot supply its own truth as a premise for an obligation it must discharge in order to compute that very truth value. This is the headline asymmetry the whole cell group demonstrates; it holds identically across all five evaluation-site categories and both lanes.",
+        "Class (d) is NOT included in this cell's applicablePremiseClasses, on a derivation this cell can state directly from the matrix's own text (not merely a curatorial choice): class (d) is defined as \"all constraints holding in THE pre-state\" (matrix line 38, definite article -- one specific configuration, the one a single write plan starts from). A `rule`'s own activation guard is not anchored to any one write plan: the Constraint kinds table states a `rule` (Invariant) must hold \"always, after every mutation\" (matrix line 59) -- its activation condition is checked at every checkpoint, not keyed to one specific pre-state. \"The pre-state\" is therefore ill-defined for an obligation quantified over every reachable configuration rather than anchored to a single write plan's start, which is why this cell records (d) as open rather than available, in agreement with this slice's authoring guidance.",
+        "Not answered here, carried as an open dependency: whether an EARLIER conjunct of this same guard would be a premise for a fault arising in a LATER conjunct (e.g. `when Parts != 0 and Total / Parts > 1`) is not settled by anything the matrix currently states. This is a different question from class (c)'s exclusion above (which concerns the guard supplying a premise to an obligation arising within itself, full stop) -- it asks whether the guard's own internal conjunct ordering creates a second, narrower notion of \"before\" that class (c)'s exclusion does not reach. This cell does not attempt that spelling and states no answer for it.",
+        "Measured live (Precept.MatrixTools, 2026-07-21, commit e1a14d91) on the base program below and on every discharge and near-miss addition in this cell: all compile with zero diagnostics, and the tool reports no obligation for this division (rule-activation-guard mints nothing at HEAD in either lane). This is a direct, self-contained instance of the matrix's own \"open design hole -- nothing detects an obligation that was never minted\" (matrix lines 88-101): the compiler visits this site, computes no fault obligation for it, and nothing anywhere flags the absence.",
+        "operationKind is recorded as the catalog's declaring-entry name (\"IntegerDivideInteger\", src/Precept/Language/Operations.cs; ProofRequirementKind.Numeric, src/Precept/Language/ProofRequirementKind.cs) rather than the coarser RequirementKind (\"Numeric\", shared by both lanes) -- the coarser value could not distinguish the integer and decimal lane cells as separate coordinates. Recorded so the choice is checkable, not asserted silently."
+      ]
+    },
+    {
+      "id": "g03/rule-activation-guard-dec",
+      "label": "Conditional rule activation guard -- decimal lane",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "DecimalDivideDecimal",
+        "evaluationSiteCategory": "rule-activation-guard",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:186",
+            "note": "Fault minting: catalog-stamped at evaluation sites"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+            "note": "the Fault family case-shape row"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Parts != 0",
+        "metavariables": [
+          {
+            "name": "Total",
+            "standsFor": "the field read as the guard's dividend -- immaterial to the safety precondition itself"
+          },
+          {
+            "name": "Parts",
+            "standsFor": "the field read as the guard's divisor"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:42",
+            "note": "the Normalization bullet"
+          },
+          {
+            "kind": "normal-form-draft",
+            "ref": "docs/Working/normal-form-draft-2026-07-19.md"
+          }
+        ],
+        "wp": {
+          "statement": "Parts != 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a"
+      ],
+      "premiseAvailability": "Derived per evaluation-site category, not asserted: this is the `when` of a conditional rule (`rule ... when G because ...`). Only class (a) instantiates without further ruling; (b), (c), and (d) do not (see notes).",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "field modifier on the divisor field, excluding zero -> interval containment over the modifier's declared bound",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "Compute the divisor field's interval from its own declared modifiers (a finite set -- the modifier-to-ProofSatisfaction table, docs/compiler/proof-engine.md § Strategy 2); a computed interval excluding zero closes the obligation. Modelled on the matrix's own Family 4 sketch decision procedure (matrix line 299: \"compute the divisor's interval from its declared modifiers and in-scope guard facts\"), generalized here from premise class (b) (an event-arg modifier) to premise class (a) (a field modifier) on the same divisor. No excluding bound rejects, naming class (a).",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+              "note": "the four premise classes, including (a) field modifiers"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:206",
+              "note": "Arg-bound interval arithmetic -- the modifier-to-ProofSatisfaction interval derivation this entry extends from arg modifiers to field modifiers"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:299",
+              "note": "Family 4 sketch -- \"compute the divisor's interval from its declared modifiers and in-scope guard facts\""
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "declare a field modifier on <WP>'s divisor that excludes zero (e.g. positive, nonzero, or a min bound above zero)",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:46",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept RagBaseDec\nfield Total as decimal default 10.0 editable\nfield Parts as decimal default 0.0 editable\nrule Total > 0.0 when Total / Parts > 1.0 because \"bounded\"",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "model-derived"
+          }
+        },
+        "discharges": [
+          {
+            "id": "rule-activation-guard-dec-a",
+            "kind": "other",
+            "addition": "field Parts as decimal default 1.0 editable nonzero",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "field modifier excluding zero on the divisor -> interval containment (class a)",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "Live-verified (Precept.MatrixTools, 2026-07-21, commit e1a14d91): this addition compiles with zero diagnostics and no obligation is reported for the division -- the same no-mint behaviour as the base. builtStatus is unresolved-today because the site does not mint at HEAD at all; a clean compile here records the site's failure to mint, not confirmation that this discharge is accepted. This discharge is a field modifier (class a), which is NOT subject to the false-proof hazard (task authoring notes: \"guard-based and modifier-based discharges ... are unaffected\").",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Replaces the base's `field Parts as decimal default 0.0` declaration (and the matching construction assignment) with `field Parts as decimal default 1.0 editable nonzero`. The compiled program is the base program with that one field declaration replaced; it is not stored verbatim anywhere, and no `application` record reconstructs it mechanically (see the schema-vocabulary note below).",
+              "kind is recorded as \"other\": the closed dischargeWitness.kind vocabulary has \"arg-modifier\" for an event-arg modifier but no corresponding value for a FIELD modifier, even though class (a) field modifiers is named in the Vocabulary (matrix line 38) as a first-class premise source. Flagged as a vocabulary gap.",
+              "The schema's `application` discriminated union (row-guard / event-arg-declarations) has no locus for a field-declaration modifier addition or a whole new `rule` declaration -- neither of this discharge's addition shapes is either of the two loci the schema expresses. `application` is omitted rather than forced into an ill-fitting locus; the day-one validator's cell-to-test conversion cannot yet mechanically apply this addition. Flagged as a schema-vocabulary gap, not resolved here."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "rule-activation-guard-dec-a",
+            "addition": "field Parts as decimal default 0.0 editable nonnegative",
+            "whyStillRejects": "`nonnegative` (unlike `nonzero`/`positive`) does not exclude 0.0: the divisor's declared interval still contains zero, so the interval-containment derivation does not close -- must still reject, same obligation.",
+            "provenance": {
+              "mark": "model-derived"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:38",
+          "note": "the four premise classes"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:154",
+          "note": "the Fault family case-shape row"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:186",
+          "note": "Fault minting: catalog-stamped at evaluation sites"
+        }
+      ],
+      "notes": [
+        "Class (c) -- the handler's guard -- is structurally unavailable and is excluded from every contract entry in this file. The obligation arises from evaluating the guard expression's own division, before the guard has produced the truth value anything downstream (a row's actions, an ensure, a rule, an access-mode decision) could rely on. Class (c) is defined as a fact the guard's truth supplies to obligations arising after it (matrix line 38: \"(c) the handler's guard\"; the Guard normal-form match argument, matrix line 204, grounds (c) precisely in a row's actions executing only after the guard evaluated true -- a precondition the guard's own internal evaluation cannot satisfy about itself). A guard cannot supply its own truth as a premise for an obligation it must discharge in order to compute that very truth value. This is the headline asymmetry the whole cell group demonstrates; it holds identically across all five evaluation-site categories and both lanes.",
+        "Class (d) is NOT included in this cell's applicablePremiseClasses, on a derivation this cell can state directly from the matrix's own text (not merely a curatorial choice): class (d) is defined as \"all constraints holding in THE pre-state\" (matrix line 38, definite article -- one specific configuration, the one a single write plan starts from). A `rule`'s own activation guard is not anchored to any one write plan: the Constraint kinds table states a `rule` (Invariant) must hold \"always, after every mutation\" (matrix line 59) -- its activation condition is checked at every checkpoint, not keyed to one specific pre-state. \"The pre-state\" is therefore ill-defined for an obligation quantified over every reachable configuration rather than anchored to a single write plan's start, which is why this cell records (d) as open rather than available, in agreement with this slice's authoring guidance.",
+        "Not answered here, carried as an open dependency: whether an EARLIER conjunct of this same guard would be a premise for a fault arising in a LATER conjunct (e.g. `when Parts != 0 and Total / Parts > 1`) is not settled by anything the matrix currently states. This is a different question from class (c)'s exclusion above (which concerns the guard supplying a premise to an obligation arising within itself, full stop) -- it asks whether the guard's own internal conjunct ordering creates a second, narrower notion of \"before\" that class (c)'s exclusion does not reach. This cell does not attempt that spelling and states no answer for it.",
+        "Measured live (Precept.MatrixTools, 2026-07-21, commit e1a14d91) on the base program below and on every discharge and near-miss addition in this cell: all compile with zero diagnostics, and the tool reports no obligation for this division (rule-activation-guard mints nothing at HEAD in either lane). This is a direct, self-contained instance of the matrix's own \"open design hole -- nothing detects an obligation that was never minted\" (matrix lines 88-101): the compiler visits this site, computes no fault obligation for it, and nothing anywhere flags the absence.",
+        "operationKind is recorded as the catalog's declaring-entry name (\"DecimalDivideDecimal\", src/Precept/Language/Operations.cs; ProofRequirementKind.Numeric, src/Precept/Language/ProofRequirementKind.cs) rather than the coarser RequirementKind (\"Numeric\", shared by both lanes) -- the coarser value could not distinguish the integer and decimal lane cells as separate coordinates. Recorded so the choice is checkable, not asserted silently."
+      ]
+    }
+  ]
+}

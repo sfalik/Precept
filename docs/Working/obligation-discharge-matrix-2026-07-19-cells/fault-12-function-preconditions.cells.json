@@ -1,0 +1,1256 @@
+{
+  "$schema": "./cell.schema.json",
+  "familyId": "fault-12-function-preconditions",
+  "title": "Fault family, group 12 — function preconditions: sqrt's non-negative argument, pow's non-negative integer exponent",
+  "caseShape": "fault",
+  "definitionVersion": "obligation-discharge-matrix-2026-07-19 rev 7 (2026-07-20, draft)",
+  "citations": [
+    { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes (a discriminated union of axis sets)", "note": "the Fault family row: catalog-declared safety precondition at the evaluation site; premise classes (b)/(c)/(a) per catalog ProofSatisfactions" },
+    { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md:186", "note": "fault minting is catalog-stamped at evaluation sites; settled and shipped for the fault family" },
+    { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104", "note": "the fault family gets the identical premise-and-certificate treatment as business rules" },
+    { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:72", "note": "a fault expression can sit in a reject-row interpolation with no write at all" },
+    { "kind": "code", "ref": "src/Precept/Language/Functions.cs:183", "note": "FunctionKind.Pow and FunctionKind.Sqrt catalog entries and their NumericProofRequirement declarations" }
+  ],
+  "respellability": {
+    "verdict": "yes",
+    "evidence": "model-derived",
+    "corpusMeasurement": "pending",
+    "citations": [
+      { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the sound-but-unprovable band is spelling no bounded derivation covers — algebraic rearrangement — not alternate spellings of covered premise shapes" },
+      { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witness Family 1", "note": "the respellability paragraph this group's verdict is authored by extension of" }
+    ],
+    "notes": [
+      "No fault-family-specific respellability paragraph is written in the matrix yet; the verdict here is authored by extension of the same general argument the matrix states for the rule-write family (Witness Family 1), not restated matrix text. Flagged so the extension is findable, not silently absorbed as if the matrix already said it for this family.",
+      "Representative band member (both cells' sqrt/pow forms): a guard spelled with a cancelling additive term, e.g. `when Delta + 1 >= 1` for sqrt or `when Exponent + 2 >= 2` for pow — algebraically equivalent to the licensed `>= 0` form but not reachable by the matrix's two stated normalization rules (comparison-direction flip; commutative-operand reorder). Respelling: the direct bound, `when Delta >= 0` / `when Exponent >= 0`."
+    ]
+  },
+  "cells": [
+    {
+      "id": "g12/sqrt-write",
+      "label": "sqrt argument non-negativity at a transition-row write",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "Sqrt",
+        "evaluationSiteCategory": "transition-row-action-operand",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" }
+        ]
+      },
+      "obligation": {
+        "statement": "sqrt(Value) where Value >= 0",
+        "metavariables": [
+          { "name": "Value", "standsFor": "the number-lane expression passed as sqrt's sole argument at this write site" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" }
+        ],
+        "wp": { "statement": "Value >= 0" }
+      },
+      "applicablePremiseClasses": ["a", "b", "c"],
+      "premiseAvailability": "The evaluation site is an action operand in a transition row: the row's guard has already evaluated true and the triggering event's args are in scope, so classes (a) field modifiers, (b) argument constraints, and (c) the handler's guard can all supply the non-negativity fact directly on Value or on the field/arg it reads. Class (d) is a separate, unresolved question for this site — see notes.",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["c"],
+          "derivation": "guard fact normal-form-equal to the WP (Value >= 0) discharges via GuardInPath's per-term bound match",
+          "strategy": "GuardInPath",
+          "validityArguments": ["Guard normal-form match"],
+          "decisionProcedure": "Live-verified decision procedure (src/Precept/Pipeline/ProofEngine.Strategies.cs:713-787, GuardSubsumes at :971): the guard's conjuncts are extracted as (field, comparison, literal) constraints; a conjunct whose field matches Value's field/arg name and whose (comparison, literal) pair subsumes (>=, 0) discharges. No matching conjunct in any AND-branch of the guard rejects."
+        },
+        {
+          "premiseClasses": ["b"],
+          "derivation": "the event arg Value reads is declared nonnegative, enforced at ingress before the handler runs",
+          "validityArguments": ["Arg-bound interval arithmetic"],
+          "decisionProcedure": "Same GuardSubsumes machinery reads the arg's declared modifier as a standing constraint rather than a guard conjunct; a declared bound that does not subsume (>=, 0) fails the class.",
+          "citations": [
+            { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.Strategies.cs:971", "note": "GuardSubsumes / NumericConstraintSubsumes — the shared (field, comparison, literal) matcher underlying both (b) and (c)" }
+          ]
+        },
+        {
+          "premiseClasses": ["a"],
+          "derivation": "the field Value reads (when Value is a bare field reference, not a compound expression) carries a nonnegative/min-0 modifier",
+          "validityArguments": ["Arg-bound interval arithmetic"],
+          "decisionProcedure": "Same (field, comparison, literal) matcher, sourced from the field's own declared modifiers rather than the event arg's; a field with no qualifying bound fails the class."
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": ["c"],
+          "schema": "add a guard normal-form-equal to <WP>",
+          "citations": [{ "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the suggestion-schema bullet" }]
+        },
+        {
+          "premiseClasses": ["b"],
+          "schema": "bound the args such that the interval combination satisfies <WP>",
+          "citations": [{ "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the suggestion-schema bullet" }]
+        },
+        {
+          "premiseClasses": ["a"],
+          "schema": "declare the field with a modifier bound satisfying <WP>",
+          "notes": ["The matrix's Vocabulary section states the (b)/(c) schemas verbatim but no explicit (a) schema text; this schema is authored here by the same pattern, not quoted from the matrix."]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept SqrtWriteBase\n\nfield MeasurementRoot as number default 0\n\nevent Adjust(Delta as number)\n\non Adjust\n    -> set MeasurementRoot = sqrt(Adjust.Delta)\n",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["a", "b", "c"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)", "date": "2026-07-21", "head": "e1a14d91" }
+        },
+        "discharges": [
+          {
+            "id": "guard-nf",
+            "kind": "guard",
+            "addition": "when Adjust.Delta >= 0",
+            "application": { "locus": "row-guard", "eventName": "Adjust" },
+            "premiseClasses": ["c"],
+            "derivation": "guard fact normal-form-equal to the WP -> GuardInPath",
+            "strategy": "GuardInPath",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          },
+          {
+            "id": "arg-mod",
+            "kind": "arg-modifier",
+            "addition": "Delta as number nonnegative",
+            "application": { "locus": "event-arg-declarations", "replacements": [{ "eventName": "Adjust", "argName": "Delta", "declaration": "Delta as number nonnegative" }] },
+            "premiseClasses": ["b"],
+            "derivation": "arg ingress bound Delta >= 0 -> GuardInPath (reads declared modifier)",
+            "strategy": "GuardInPath",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "guard-nf",
+            "addition": "when Adjust.Delta > -100",
+            "application": { "locus": "row-guard", "eventName": "Adjust" },
+            "whyStillRejects": "the guard bounds Delta only below -100, not at 0 — must still reject, same obligation",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          },
+          {
+            "pairsWith": "arg-mod",
+            "addition": "Delta as number min -100",
+            "application": { "locus": "event-arg-declarations", "replacements": [{ "eventName": "Adjust", "argName": "Delta", "declaration": "Delta as number min -100" }] },
+            "whyStillRejects": "the declared floor is -100, not 0 — must still reject, same obligation",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [
+        { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" },
+        { "kind": "code", "ref": "src/Precept/Language/Functions.cs:200" }
+      ],
+      "notes": [
+        "HAZARD: a rule stated over the field sqrt reads is a distinct, unlicensed-by-the-matrix discharge path that the shipped compiler nonetheless accepts. Live-verified demonstration at this exact evaluation-site category (commit e1a14d91, 2026-07-21, Precept.MatrixTools CLI): `field Delta as number default 0`, `field MeasurementRoot as number default 0`, `rule Delta >= 0 because \"Delta must never be negative\"`, `event Drift(Amount as number)`, `event Adjust(NewDelta as number nonnegative)`, `on Adjust -> set Delta = Adjust.NewDelta -> set MeasurementRoot = sqrt(Delta)`, `on Drift -> set Delta = Drift.Amount` compiles with **zero diagnostics** even though `Drift` drives `Delta` negative completely unguarded and `Adjust` then takes `sqrt(Delta)` — the CompositionalConstraint strategy accepts the rule as a premise for the fault obligation. This is the same shape as the verified false-proof in authored-expressiveness-gaps.md Part 3, Defect B, reproduced here for sqrt specifically. No discharge witness citing this path is recorded above — see missingRules.",
+        "Missing rule, recorded rather than resolved: the matrix's own fault-family case-shape row states premise classes '(b)/(c)/(a) per catalog ProofSatisfactions' with no (d). Whether a pre-state rule is ever a licensed premise for a fault obligation — and if so, under what derivation and validity argument — is not stated. Until that is ruled, the live behaviour demonstrated above is recorded as a verified defect (an acceptance the current contract text does not license), not as a fourth discharge-contract entry.",
+        "wp.canonicalKey is omitted throughout this file: tools/Precept.MatrixTools's WP calculator (WpCalculator.ComputeEstablishmentWp/ComputePreservationWp) prints canonical keys only for authored `rule` invariants, not for fault-family ProofRequirement obligations — confirmed by running these witnesses through the tool, whose 'Establishment/Preservation' printout addresses the file's own `rule` declarations only, never the sqrt/pow precondition itself. No canonical key exists to record without inventing one."
+      ]
+    },
+    {
+      "id": "g12/sqrt-construction",
+      "label": "sqrt argument non-negativity at a construction row",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "Sqrt",
+        "evaluationSiteCategory": "construction-row-action-operand",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" }
+        ]
+      },
+      "obligation": {
+        "statement": "sqrt(Value) where Value >= 0",
+        "metavariables": [
+          { "name": "Value", "standsFor": "the number-lane expression passed as sqrt's sole argument in the construction row (the handler for an event marked initial)" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" }
+        ],
+        "wp": { "statement": "Value >= 0" }
+      },
+      "applicablePremiseClasses": ["a", "b", "c"],
+      "premiseAvailability": "The entity does not yet exist before a construction row fires, so there is no pre-state: class (d) is structurally unavailable here, free of the hazard the write/state-hook/some-guard cells carry (there is no prior configuration a rule could have been established over). Field modifiers (a), the constructing event's arg constraints (b), and the construction row's own guard (c) remain available and, live-verified below, functional.",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["c"],
+          "derivation": "the construction row's own guard, normal-form-equal to the WP, discharges via GuardInPath",
+          "strategy": "GuardInPath",
+          "validityArguments": ["Guard normal-form match"],
+          "decisionProcedure": "Same GuardSubsumes matcher as the write-tier cell (src/Precept/Pipeline/ProofEngine.Strategies.cs:713-787): the construction row's guard branches are extracted and checked for a conjunct subsuming (>=, 0) on Value's field/arg."
+        },
+        {
+          "premiseClasses": ["b"],
+          "derivation": "the constructing event's arg Value reads is declared nonnegative at ingress",
+          "validityArguments": ["Arg-bound interval arithmetic"],
+          "decisionProcedure": "Same matcher, sourced from the arg's declared modifier."
+        },
+        {
+          "premiseClasses": ["a"],
+          "derivation": "a field already materialised earlier in the same construction row (declaration order) carries a qualifying modifier, and Value reads that field",
+          "validityArguments": ["Arg-bound interval arithmetic"],
+          "decisionProcedure": "Same matcher, sourced from the field's declared modifiers."
+        }
+      ],
+      "suggestions": [
+        { "premiseClasses": ["c"], "schema": "add a guard normal-form-equal to <WP>", "citations": [{ "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary" }] },
+        { "premiseClasses": ["b"], "schema": "bound the args such that the interval combination satisfies <WP>", "citations": [{ "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary" }] },
+        { "premiseClasses": ["a"], "schema": "declare the field with a modifier bound satisfying <WP>", "notes": ["Authored here by the same pattern as the (b)/(c) schemas the matrix states; not matrix-quoted text."] }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept SqrtConstructionBase\n\nfield MeasurementRoot as number default 0\n\nevent Open(Reading as number) initial\n\non Open\n    -> set MeasurementRoot = sqrt(Open.Reading)\n",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["a", "b", "c"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)", "date": "2026-07-21", "head": "e1a14d91" }
+        },
+        "discharges": [
+          {
+            "id": "guard-nf",
+            "kind": "guard",
+            "addition": "when Open.Reading >= 0",
+            "application": { "locus": "row-guard", "eventName": "Open" },
+            "premiseClasses": ["c"],
+            "derivation": "guard fact normal-form-equal to the WP -> GuardInPath",
+            "strategy": "GuardInPath",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          },
+          {
+            "id": "arg-mod",
+            "kind": "arg-modifier",
+            "addition": "Reading as number nonnegative",
+            "application": { "locus": "event-arg-declarations", "replacements": [{ "eventName": "Open", "argName": "Reading", "declaration": "Reading as number nonnegative" }] },
+            "premiseClasses": ["b"],
+            "derivation": "arg ingress bound Reading >= 0 -> GuardInPath",
+            "strategy": "GuardInPath",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "guard-nf",
+            "addition": "when Open.Reading > -50",
+            "application": { "locus": "row-guard", "eventName": "Open" },
+            "whyStillRejects": "the guard bounds Reading only below -50, not at 0 — must still reject, same obligation",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          },
+          {
+            "pairsWith": "arg-mod",
+            "addition": "Reading as number min -50",
+            "application": { "locus": "event-arg-declarations", "replacements": [{ "eventName": "Open", "argName": "Reading", "declaration": "Reading as number min -50" }] },
+            "whyStillRejects": "the declared floor is -50, not 0 — must still reject, same obligation",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [
+        { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" },
+        { "kind": "code", "ref": "src/Precept/Language/Functions.cs:200" }
+      ],
+      "notes": [
+        "Free of the premise-(d) hazard by construction: no prior configuration exists for a rule to have been established over before this row fires.",
+        "wp.canonicalKey omitted — see the write-tier cell's note; the WP calculator does not compute fault-family canonical keys."
+      ]
+    },
+    {
+      "id": "g12/sqrt-state-hook",
+      "label": "sqrt argument non-negativity at a state entry hook",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "Sqrt",
+        "evaluationSiteCategory": "state-hook-action-operand",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" }
+        ]
+      },
+      "obligation": {
+        "statement": "sqrt(Value) where Value >= 0",
+        "metavariables": [
+          { "name": "Value", "standsFor": "the number-lane expression passed as sqrt's sole argument in a state entry/exit hook action" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" }
+        ],
+        "wp": { "statement": "Value >= 0" }
+      },
+      "applicablePremiseClasses": ["a", "c"],
+      "premiseAvailability": "A hook fires on every inbound/outbound edge regardless of which row triggered it, so the triggering row's own guard and args are not in scope for it — class (b) is structurally unavailable and, live-verified below, a guard on the ENTERING TRANSITION ROW does not discharge the hook's obligation. What IS available: (a) a modifier declared directly on the field the hook reads (enforced at every write site via IntervalContainment, independent of which row wrote it), and (c) the hook's own optional pre-verb `when`, which live-verifies as a working discharge distinct from the entering row's guard.",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["c"],
+          "derivation": "the hook's own pre-verb guard, normal-form-equal to the WP, discharges via GuardInPath (StateHookContext.Hook.Guard)",
+          "strategy": "GuardInPath",
+          "validityArguments": ["Guard normal-form match"],
+          "decisionProcedure": "Same GuardSubsumes matcher (src/Precept/Pipeline/ProofEngine.Strategies.cs:723-787), reading the guard off StateHookContext rather than TransitionRowContext.",
+          "citations": [{ "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.Strategies.cs:723" }]
+        },
+        {
+          "premiseClasses": ["a"],
+          "derivation": "the field Value reads carries a qualifying modifier (e.g. nonnegative), which IntervalContainment enforces at every write site of the field regardless of which handler wrote it",
+          "validityArguments": ["Arg-bound interval arithmetic"],
+          "decisionProcedure": "Same (field, comparison, literal) matcher, sourced from the field's declared modifier."
+        }
+      ],
+      "suggestions": [
+        { "premiseClasses": ["c"], "schema": "add a guard normal-form-equal to <WP> on the hook itself (to/from S when <WP>)", "citations": [{ "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary" }], "notes": ["The entering transition row's own guard does not discharge this obligation; the suggestion must point at the hook's guard, not the row's."] },
+        { "premiseClasses": ["a"], "schema": "declare the field with a modifier bound satisfying <WP>", "notes": ["Authored here by the same pattern as the (b)/(c) schemas the matrix states; not matrix-quoted text."] }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept SqrtStateHookBase\n\nfield Reading as number default 0\nfield MeasurementRoot as number default 0\n\nstate Idle initial\nstate Active terminal\n\nevent Advance(NewReading as number)\n\nfrom Idle on Advance\n    -> set Reading = Advance.NewReading\n    -> transition Active\n\nto Active -> set MeasurementRoot = sqrt(Reading)\n",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["a", "c"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)", "date": "2026-07-21", "head": "e1a14d91" }
+        },
+        "discharges": [
+          {
+            "id": "hook-guard-nf",
+            "kind": "guard",
+            "addition": "to Active when Reading >= 0 -> set MeasurementRoot = sqrt(Reading)",
+            "application": { "locus": "row-guard", "eventName": "__state_hook_to_Active" },
+            "premiseClasses": ["c"],
+            "derivation": "the hook's own guard, normal-form-equal to the WP -> GuardInPath",
+            "strategy": "GuardInPath",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true },
+            "notes": ["The `application` locus vocabulary (row-guard/event-arg-declarations) has no member for 'entry hook's own guard clause' — this addition is recorded as the full replacement hook line rather than through the schema's application DU, an open vocabulary gap flagged rather than forced into the wrong locus."]
+          },
+          {
+            "id": "field-mod",
+            "kind": "arg-modifier",
+            "addition": "field Reading as number default 0 nonnegative",
+            "premiseClasses": ["a"],
+            "derivation": "field modifier Reading >= 0, enforced at every write site by IntervalContainment -> GuardInPath reads it as a standing fact",
+            "strategy": "GuardInPath",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true },
+            "notes": ["`kind: arg-modifier` is a schema-vocabulary compromise: the addition is a FIELD modifier, not an event-arg modifier, and the application DU's `event-arg-declarations` locus does not fit a field declaration either. Recorded as free text; flagged as an open vocabulary gap rather than mis-fit into an existing locus."]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "hook-guard-nf",
+            "addition": "to Active when Reading > -50 -> set MeasurementRoot = sqrt(Reading)",
+            "whyStillRejects": "the hook's guard bounds Reading only below -50, not at 0 — must still reject, same obligation",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          },
+          {
+            "pairsWith": "field-mod",
+            "addition": "field Reading as number default 0 min -50",
+            "whyStillRejects": "the declared floor is -50, not 0 — must still reject, same obligation",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [
+        { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" },
+        { "kind": "code", "ref": "src/Precept/Language/Functions.cs:200" }
+      ],
+      "notes": [
+        "Live-verified negative finding: a guard on the ENTERING TRANSITION ROW (`from Idle on Advance when Advance.NewReading >= 0`) does NOT discharge this obligation, nor does a `nonnegative` modifier on the triggering event's arg — both compiled and still rejected with SqrtOfNegative (2026-07-21, commit e1a14d91). This matches the premise-availability argument: the hook fires on every inbound edge, and the row that happened to trigger it is not distinguished from any other inbound row, so its guard cannot be assumed by the hook.",
+        "HAZARD: a bare `rule` stating the field's non-negativity IS accepted as a discharge at this site, and it is unsound in the same way as the write-tier cell's hazard note. Live-verified demonstration (commit e1a14d91, 2026-07-21): `field Reading as number default 0`, `rule Reading >= 0 because \"Reading must never be negative\"`, a second unguarded event `Drift(Amount as number) -> set Reading = Drift.Amount -> transition Active` alongside the guarded `Advance`, compiles with **zero diagnostics** even though `Drift` can drive `Reading` negative with nothing checking it, and the hook then takes `sqrt(Reading)`. Distinguishing this from the field-modifier discharge above: a `nonnegative` MODIFIER is enforced at every write site via IntervalContainment (Defect A in authored-expressiveness-gaps.md does not apply to modifiers), whereas a bare `rule` mints no write-site obligation at all at HEAD — so the modifier discharge is sound today and the rule-premise discharge is not. No discharge witness citing the rule path is recorded above; see the write-tier cell's missing-rule note, which applies identically here.",
+        "wp.canonicalKey omitted — see the write-tier cell's note."
+      ]
+    },
+    {
+      "id": "g12/sqrt-guard",
+      "label": "sqrt argument non-negativity inside a guard expression",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "Sqrt",
+        "evaluationSiteCategory": "transition-row-guard",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" }
+        ]
+      },
+      "obligation": {
+        "statement": "sqrt(Value) where Value >= 0",
+        "metavariables": [
+          { "name": "Value", "standsFor": "the number-lane expression passed as sqrt's sole argument inside a guard's boolean expression" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" }
+        ],
+        "wp": { "statement": "Value >= 0" }
+      },
+      "applicablePremiseClasses": ["a", "b"],
+      "premiseAvailability": "This cell stands for the five guard-shaped evaluation-site categories the group's coordinate space carries (transition-row-guard, state-hook-guard, access-mode-guard, ensure-activation-guard, rule-activation-guard) plus reject-message-interpolation, folded in here because a reject row's message is the sibling arm of the same guarded row. A guard cannot discharge an obligation arising inside its own expression — that is this axis's headline asymmetry — so class (c) is unavailable at every one of these positions even though the identical expression IS class (c) for the row's action operands. Field modifiers (a) and, on categories with event args in scope (transition-row-guard, ensure-activation-guard on the event-anchored form, reject-message-interpolation), argument constraints (b) remain the only classes the model licenses. Class (d) reasoning is a separate, unresolved question flagged in notes, distinct per sub-category (see notes).",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["a"],
+          "derivation": "the field Value reads carries a qualifying modifier",
+          "validityArguments": ["Arg-bound interval arithmetic"],
+          "decisionProcedure": "The same (field, comparison, literal) matcher named in the write-tier cell, applied under the model to a guard-position obligation once the site mints one."
+        },
+        {
+          "premiseClasses": ["b"],
+          "derivation": "the event arg Value reads is declared with a qualifying bound at ingress",
+          "validityArguments": ["Arg-bound interval arithmetic"],
+          "decisionProcedure": "Same matcher, sourced from the declared arg modifier, under the model."
+        }
+      ],
+      "suggestions": [
+        { "premiseClasses": ["a"], "schema": "declare the field with a modifier bound satisfying <WP>", "notes": ["Authored by extension; not matrix-quoted text."] },
+        { "premiseClasses": ["b"], "schema": "bound the args such that the interval combination satisfies <WP>", "citations": [{ "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary" }] }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept SqrtGuardBase\n\nfield MeasurementRoot as number default 0\n\nevent Adjust(Delta as number)\n\non Adjust when sqrt(Adjust.Delta) >= 0\n    -> set MeasurementRoot = 1\n",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["a", "b"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "model-derived" }
+        },
+        "discharges": [
+          {
+            "id": "arg-mod",
+            "kind": "arg-modifier",
+            "addition": "Delta as number nonnegative",
+            "application": { "locus": "event-arg-declarations", "replacements": [{ "eventName": "Adjust", "argName": "Delta", "declaration": "Delta as number nonnegative" }] },
+            "premiseClasses": ["b"],
+            "derivation": "arg ingress bound Delta >= 0, under the model",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "the guard position mints no fault obligation at all at HEAD — base and this addition both compile clean with zero diagnostics, so nothing here confirms a discharge; it confirms only that the site is silent",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "arg-mod",
+            "addition": "Delta as number min -100",
+            "application": { "locus": "event-arg-declarations", "replacements": [{ "eventName": "Adjust", "argName": "Delta", "declaration": "Delta as number min -100" }] },
+            "whyStillRejects": "under the model, the declared floor is -100, not 0, so this must still reject with the same obligation — untestable at HEAD since the base itself does not reject here",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [
+        { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" },
+        { "kind": "code", "ref": "src/Precept/Language/Functions.cs:200" }
+      ],
+      "notes": [
+        "Live-verified, 2026-07-21, commit e1a14d91: `on Adjust when sqrt(Adjust.Delta) >= 0 -> set MeasurementRoot = 1` with `Delta` completely unbounded compiles with ZERO diagnostics. This matches the disposition pass's finding that all five guard-shaped categories mint no fault obligation at HEAD today. Per the matrix's fault-minting rule (docs/Working/obligation-discharge-matrix-2026-07-19.md:186) and the want doc's fault-family paragraph (want :104), the model commits to an obligation existing here; the silence is a built-status gap, not a model exclusion. Because baseWitness carries no explicit builtStatus field in the schema, this gap is recorded here in prose rather than left implicit in a provenance mark that could be misread as confirming a rejection.",
+        "reject-message-interpolation is folded into this cell rather than given its own: live-verified separately (2026-07-21, commit e1a14d91), `on Adjust -> reject \"root would be {sqrt(Adjust.Delta)}\"` with Delta unbounded compiles clean (only an unrelated FieldNeverSet warning, no fault diagnostic) — the same non-minting result as the guard positions. HAZARD applies to it per the authoring instructions carried into this group.",
+        "HAZARD (per the authoring instructions carried into this group): transition-row-guard, state-hook-guard, and access-mode-guard are named explicitly as hazard-relevant; reject-message-interpolation is named alongside them. This cell could not independently verify a false-proof reproduction at these positions, since none of them mint any obligation at HEAD to be falsely proved in the first place — the hazard is a model-level premise-availability concern (should the site start minting, would a bare rule be wrongly accepted the way it is at write/state-hook sites), not a currently-observable HEAD behaviour here. Recorded as stated in the authoring instructions, not independently reproduced.",
+        "ensure-activation-guard and rule-activation-guard are also folded into this cell's evaluation-site coordinate but were NOT named in either the hazard or the free list the authoring instructions gave. Recorded as an open item rather than assigned a guess: rule-activation-guard has no event args and, per the spec, cannot see a handler guard or the pre-state constraints of an anchored handler either — whether a pre-state rule is even meaningfully 'available' to a rule's own activation guard is a different, unopened question the matrix does not address (it addresses premise (d) for handler-anchored sites only). ensure-activation-guard shares the same self-discharge exclusion as the other four guard positions. Neither is asserted hazard or free here; both are left as stated coordinates with this ambiguity flagged rather than resolved by guess. See missingRules.",
+        "wp.canonicalKey omitted — see the write-tier cell's note."
+      ]
+    },
+    {
+      "id": "g12/sqrt-constraint",
+      "label": "sqrt argument non-negativity inside a constraint's own condition",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "Sqrt",
+        "evaluationSiteCategory": "rule-condition",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" }
+        ]
+      },
+      "obligation": {
+        "statement": "sqrt(Value) where Value >= 0",
+        "metavariables": [
+          { "name": "Value", "standsFor": "the number-lane expression passed as sqrt's sole argument inside a rule's condition, a computed field's expression, or a quantifier's predicate" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" }
+        ],
+        "wp": { "statement": "Value >= 0" }
+      },
+      "applicablePremiseClasses": ["a"],
+      "premiseAvailability": "This cell stands for rule-condition, computed-field-expression, and quantifier-predicate — live-verified below to share one discharge story — plus constraint-rationale-interpolation (folded in; confirmed non-minting). None of these three is anchored to a specific handler: a rule condition is checked against every reachable configuration, a computed field's expression is re-evaluated on every read, and a quantifier's predicate inherits its host's premise set plus the collection's element bound. None has a handler guard or event args in scope, and there is no single pre-state to appeal to, so only class (a) field/element modifiers are available without further ruling. Live-verified: an event-arg modifier on the handler that writes the underlying field does NOT discharge here (only the field's own modifier does) — the event that writes the field is not privileged over any other write, which is exactly why no per-handler class (b)/(c) applies to a condition evaluated over every configuration.",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["a"],
+          "derivation": "the field/element Value reads carries a qualifying modifier",
+          "validityArguments": ["Arg-bound interval arithmetic"],
+          "decisionProcedure": "Live-verified decision procedure: the same (field, comparison, literal) matcher as the write-tier cell, sourced from the field's own declared modifier (or, for quantifier-predicate, the collection's inner-type value modifier on the binding variable)."
+        }
+      ],
+      "suggestions": [
+        { "premiseClasses": ["a"], "schema": "declare the field (or the collection's inner-type value) with a modifier bound satisfying <WP>", "notes": ["Authored by extension; not matrix-quoted text."] }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept SqrtRuleConditionBase\n\nfield Delta as number default 0\nfield MeasurementRoot as number default 0\n\nrule sqrt(Delta) >= 0 because \"root must be real\"\n\nevent Adjust(NewDelta as number)\n\non Adjust\n    -> set Delta = Adjust.NewDelta\n    -> set MeasurementRoot = Delta\n",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["a"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)", "date": "2026-07-21", "head": "e1a14d91" }
+        },
+        "discharges": [
+          {
+            "id": "field-mod",
+            "kind": "arg-modifier",
+            "addition": "field Delta as number default 0 nonnegative",
+            "premiseClasses": ["a"],
+            "derivation": "field modifier Delta >= 0",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true },
+            "notes": ["`kind: arg-modifier` and the absence of an `application` locus are schema-vocabulary compromises: this addition is a field-declaration modifier with no event-arg/row locus in the application DU. Recorded as free text (mirrors the state-hook cell's same gap)."]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "field-mod",
+            "addition": "field Delta as number default 0 min -5",
+            "whyStillRejects": "the declared floor is -5, not 0 — must still reject, same obligation",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "reject", "sameObligation": true },
+            "notes": ["This exact near-miss also raised an unrelated NumericOverflow error (the field's now-widened declared range), a scope exclusion per this slice's overflow deferral — not evidence against the sqrt obligation, which still fired."]
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [
+        { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" },
+        { "kind": "code", "ref": "src/Precept/Language/Functions.cs:200" }
+      ],
+      "notes": [
+        "Live-verified negative finding, 2026-07-21, commit e1a14d91: declaring the WRITING EVENT's arg `NewDelta as number nonnegative` (leaving the field Delta itself unbounded) does NOT discharge — SqrtOfNegative still fires. Only a modifier on the field ITSELF discharges. This is the concrete evidence behind the premise-availability argument above.",
+        "computed-field-expression, live-verified separately (2026-07-21, commit e1a14d91): `field MeasurementRoot as number <- sqrt(Delta)` mints the identical obligation, and a `nonnegative` modifier on `Delta` discharges it the same way. Folded into this cell rather than given its own — same obligation shape, same discharge story, confirmed independently rather than assumed.",
+        "quantifier-predicate, live-verified separately (2026-07-21, commit e1a14d91): `rule each x in Readings (sqrt(x) >= 0)` (with `Readings as set of number`) mints the identical obligation — despite collection-types.md:10 marking quantifier predicates as a whole 'not yet built' for the RULE-family establishment/preservation machinery, the FAULT-family evaluation-site scan does run inside the predicate. Discharge status differs from rule-condition/computed-field, however: declaring `Readings as set of number nonnegative` (the collection's inner-type value modifier, which collection-types.md:628 states carries the bound onto the quantifier's binding variable) did NOT discharge at HEAD — SqrtOfNegative still fired with the modifier present. Recorded as modelStatus provable-under-model (collection-types.md:628 licenses it), builtStatus unresolved-today, live-verified as a negative result (not folded into this cell's discharge list above, which covers the rule-condition/computed-field field-modifier story that DOES work; the quantifier's own inner-type-modifier discharge is a distinct, currently-unresolved contract entry this cell does not claim).",
+        "constraint-rationale-interpolation, live-verified (2026-07-21, commit e1a14d91): `rule Delta >= -5 because \"root would be {sqrt(Delta)}\"` compiles clean with zero diagnostics regardless of Delta's bound — the rationale interpolation does not mint, matching the authoring instructions' FREE-of-hazard classification for it (mint-vs-hazard: free here because there is nothing to falsely prove, not because a hazard was checked and found absent).",
+        "state-ensure-condition and event-ensure-condition sit in this cell's coordinate group under the task's six-setting structure ('a constraint condition' is one setting), but their premise story is NOT identical to rule-condition/computed-field/quantifier's: the authoring instructions carried into this group name them HAZARD, meaning (unlike this cell's three live-verified siblings) a pre-state rule fact is available and, by the same pattern verified at the write and state-hook tiers, would be expected to falsely discharge via CompositionalConstraint if a `rule` is used as premise there. Neither was independently live-verified in this pass — the analogy to the write/state-hook hazard demonstrations is asserted, not measured, and is recorded as such rather than guessed at face value. A discharge witness for these two categories citing a `rule` would need builtStatus unverified with this reason named, per the group's authoring instructions; none is added here since it was not run. See missingRules.",
+        "wp.canonicalKey omitted — see the write-tier cell's note."
+      ]
+    },
+    {
+      "id": "g12/sqrt-declaration",
+      "label": "sqrt argument non-negativity inside a declaration-position value expression",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "Sqrt",
+        "evaluationSiteCategory": "field-default-value-expression",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" }
+        ]
+      },
+      "obligation": {
+        "statement": "sqrt(Value) where Value >= 0",
+        "metavariables": [
+          { "name": "Value", "standsFor": "the number-lane expression passed as sqrt's sole argument inside a field default, a field/event-arg constraint-modifier value, a collection inner-type value modifier, or a type-qualifier expression" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" }
+        ],
+        "wp": { "statement": "Value >= 0" }
+      },
+      "applicablePremiseClasses": ["a"],
+      "premiseAvailability": "This cell stands for all five declaration-position categories (field-default-value-expression, field-modifier-value-expression, event-arg-modifier-value-expression, collection-inner-type-modifier-value-expression, type-qualifier-expression). None has a guard, event args in a handler sense, or a pre-state; a default/modifier/qualifier expression may only read fields declared earlier (a forward reference is impossible), so the only class available is (a) — a modifier on one of those earlier fields, or, for a literal Value, the constant-fold derivation the matrix already states for establishment over defaults.",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["a"],
+          "derivation": "Value is a literal, or reads a field declared earlier that carries a qualifying modifier",
+          "validityArguments": ["Literal constant-fold for defaults", "Arg-bound interval arithmetic"],
+          "decisionProcedure": "Under the model: constant-fold Value if it is a literal (terminates over finite, loop-free expression trees); otherwise the (field, comparison, literal) matcher named in the write-tier cell, sourced from the earlier field's declared modifier."
+        }
+      ],
+      "suggestions": [
+        { "premiseClasses": ["a"], "schema": "supply a literal value satisfying <WP>, or declare the earlier field with a modifier bound satisfying <WP>", "notes": ["Authored by extension; not matrix-quoted text."] }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept SqrtDeclarationDefaultLit\n\nfield MeasurementRoot as number default sqrt(-4)\n",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["a"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "model-derived" }
+        },
+        "discharges": [
+          {
+            "id": "literal-fold",
+            "kind": "other",
+            "addition": "field MeasurementRoot as number default sqrt(4)",
+            "premiseClasses": [],
+            "derivation": "under the model: constant-fold sqrt(4) >= 0 over the literal default (replaces the base's literal, from -4 to 4)",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "field-default-value-expression mints no fault obligation at all at HEAD, so there is nothing here for a fold to discharge — see notes",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true },
+            "notes": ["No `application` locus fits 'replace a field declaration's default-value expression' — the application DU covers row-guard and event-arg-declarations only. Recorded as free text; the same open vocabulary gap flagged on the state-hook and constraint cells' field-modifier additions. `kind: other` used rather than `default-constant-fold` because this addition DOES change authored text (the literal), unlike a true standing discharge."]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "literal-fold",
+            "addition": "field MeasurementRoot as number default sqrt(-1)",
+            "whyStillRejects": "under the model, -1 is still negative — must still reject, same obligation — untestable at HEAD since the base itself does not reject here",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [
+        { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" },
+        { "kind": "code", "ref": "src/Precept/Language/Functions.cs:200" }
+      ],
+      "notes": [
+        "Live-verified, 2026-07-21, commit e1a14d91: `field MeasurementRoot as number default sqrt(-4)` compiles with zero diagnostics — no SqrtOfNegative, no error of any kind. A second run with `default sqrt(Seed)` reading an earlier unbounded field default confirmed the same silence. field-default-value-expression mints no fault obligation at HEAD.",
+        "field-modifier-value-expression and event-arg-modifier-value-expression, live-verified separately (2026-07-21, commit e1a14d91): `field MeasurementRoot as number max sqrt(Delta)` and `event Adjust(Cap as number max sqrt(Delta))`, both with `Delta` defaulting to -4, compile with no SqrtOfNegative diagnostic either. All three of the five declaration categories that were measured mint nothing at HEAD.",
+        "collection-inner-type-modifier-value-expression and type-qualifier-expression were NOT tested for sqrt in this pass. Not asserted either minting or non-minting; recorded as unmeasured rather than inferred from the three that were measured.",
+        "This cell's discharge is recorded entirely under the model (modelStatus provable-under-model, builtStatus unresolved-today) precisely because the site mints nothing to discharge at HEAD — the standing default-constant-fold discharge (kind: default-constant-fold, addition: null) is the schema's own vocabulary for 'no authored addition exists', which fits this case for a different reason than family 1's (there, the fold is proven-today; here, the site never mints in the first place).",
+        "wp.canonicalKey omitted — see the write-tier cell's note."
+      ]
+    },
+    {
+      "id": "g12/pow-write",
+      "label": "pow integer-overload exponent non-negativity at a transition-row write",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "Pow",
+        "evaluationSiteCategory": "transition-row-action-operand",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" }
+        ]
+      },
+      "obligation": {
+        "statement": "pow(Base, Exponent) where Exponent >= 0, and only when both Base and Exponent resolve to the integer overload (integer, integer) -> integer",
+        "metavariables": [
+          { "name": "Base", "standsFor": "pow's first argument; the precondition below is independent of its value" },
+          { "name": "Exponent", "standsFor": "pow's second argument, at this write site — the requirement attaches ONLY to overload 0 ([Integer,Integer] -> Integer); the decimal and number overloads carry no such requirement" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" }
+        ],
+        "wp": { "statement": "Exponent >= 0" }
+      },
+      "applicablePremiseClasses": ["a", "b", "c"],
+      "premiseAvailability": "Identical structure to g12/sqrt-write, substituting the integer-overload exponent for sqrt's argument: the row's guard has already evaluated true and the triggering event's args are in scope, so (a), (b), and (c) can all supply the non-negativity fact. Class (d) reasoning is the same open/hazard question flagged there.",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["c"],
+          "derivation": "guard fact normal-form-equal to the WP (Exponent >= 0) discharges via GuardInPath",
+          "strategy": "GuardInPath",
+          "validityArguments": ["Guard normal-form match"],
+          "decisionProcedure": "Same decision procedure as g12/sqrt-write (src/Precept/Pipeline/ProofEngine.Strategies.cs:713-787)."
+        },
+        {
+          "premiseClasses": ["b"],
+          "derivation": "the event arg Exponent reads is declared nonnegative at ingress",
+          "validityArguments": ["Arg-bound interval arithmetic"],
+          "decisionProcedure": "Same matcher, sourced from the declared arg modifier."
+        },
+        {
+          "premiseClasses": ["a"],
+          "derivation": "the field Exponent reads (when it is a bare field reference) carries a qualifying modifier",
+          "validityArguments": ["Arg-bound interval arithmetic"],
+          "decisionProcedure": "Same matcher, sourced from the field's declared modifiers."
+        }
+      ],
+      "suggestions": [
+        { "premiseClasses": ["c"], "schema": "add a guard normal-form-equal to <WP>", "citations": [{ "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary" }] },
+        { "premiseClasses": ["b"], "schema": "bound the args such that the interval combination satisfies <WP>", "citations": [{ "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary" }] },
+        { "premiseClasses": ["a"], "schema": "declare the field with a modifier bound satisfying <WP>", "notes": ["Authored by extension; not matrix-quoted text."] }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept PowWriteBase\n\nfield ScaleFactor as integer default 1\n\nevent Rescale(Exponent as integer)\n\non Rescale\n    -> set ScaleFactor = pow(2, Rescale.Exponent)\n",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["a", "b", "c"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)", "date": "2026-07-21", "head": "e1a14d91" }
+        },
+        "discharges": [
+          {
+            "id": "guard-nf",
+            "kind": "guard",
+            "addition": "when Rescale.Exponent >= 0",
+            "application": { "locus": "row-guard", "eventName": "Rescale" },
+            "premiseClasses": ["c"],
+            "derivation": "guard fact normal-form-equal to the WP -> GuardInPath",
+            "strategy": "GuardInPath",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          },
+          {
+            "id": "arg-mod",
+            "kind": "arg-modifier",
+            "addition": "Exponent as integer nonnegative",
+            "application": { "locus": "event-arg-declarations", "replacements": [{ "eventName": "Rescale", "argName": "Exponent", "declaration": "Exponent as integer nonnegative" }] },
+            "premiseClasses": ["b"],
+            "derivation": "arg ingress bound Exponent >= 0 -> GuardInPath",
+            "strategy": "GuardInPath",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "guard-nf",
+            "addition": "when Rescale.Exponent > -10",
+            "application": { "locus": "row-guard", "eventName": "Rescale" },
+            "whyStillRejects": "the guard bounds Exponent only below -10, not at 0 — must still reject, same obligation",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          },
+          {
+            "pairsWith": "arg-mod",
+            "addition": "Exponent as integer min -10",
+            "application": { "locus": "event-arg-declarations", "replacements": [{ "eventName": "Rescale", "argName": "Exponent", "declaration": "Exponent as integer min -10" }] },
+            "whyStillRejects": "the declared floor is -10, not 0 — must still reject, same obligation",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [
+        { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" },
+        { "kind": "code", "ref": "src/Precept/Language/Functions.cs:183" }
+      ],
+      "notes": [
+        "Verified HEAD diagnostic-code defect: the base above rejects with `[Error] SqrtOfNegative: 'Exponent' can be negative in event handler 'Rescale', so sqrt(...) is unsafe` — the diagnostic names sqrt even though the program contains no sqrt call. Root cause: GetNumericRequirementDiagnosticCode (src/Precept/Pipeline/ProofEngine.Diagnostics.cs:390-392) maps every Numeric requirement with comparison >= and threshold 0 to DiagnosticCode.SqrtOfNegative, with no separate code for pow's exponent precondition. The obligation itself is correctly identified and checked (kind=Numeric, the right condition, the right site); only the diagnostic's code and message are wrong. Every pow witness in this file inherits this same mislabeling; recorded once here rather than repeated per cell.",
+        "HAZARD: identical to g12/sqrt-write's hazard note, reproduced for pow. Live-verified demonstration (commit e1a14d91, 2026-07-21): `field Exponent as integer default 0`, `rule Exponent >= 0 because \"Exponent must never be negative\"`, `event Drift(Amount as integer)`, `event Rescale(NewExponent as integer nonnegative)`, `on Rescale -> set Exponent = Rescale.NewExponent -> set ScaleFactor = pow(2, Exponent)`, `on Drift -> set Exponent = Drift.Amount` compiles with zero diagnostics even though Drift drives Exponent negative unguarded. Same missing-rule status as sqrt's write cell — see there rather than repeating.",
+        "wp.canonicalKey omitted — see g12/sqrt-write's note; the same applies here."
+      ]
+    },
+    {
+      "id": "g12/pow-construction",
+      "label": "pow integer-overload exponent non-negativity at a construction row",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "Pow",
+        "evaluationSiteCategory": "construction-row-action-operand",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" }
+        ]
+      },
+      "obligation": {
+        "statement": "pow(Base, Exponent) where Exponent >= 0, integer overload only",
+        "metavariables": [
+          { "name": "Base", "standsFor": "pow's first argument" },
+          { "name": "Exponent", "standsFor": "pow's second argument, at this construction row (the handler for an event marked initial), integer overload only" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" }
+        ],
+        "wp": { "statement": "Exponent >= 0" }
+      },
+      "applicablePremiseClasses": ["a", "b", "c"],
+      "premiseAvailability": "Identical structure to g12/sqrt-construction: no pre-state exists before the row fires, so class (d) is structurally unavailable and free of the hazard the write/state-hook cells carry. (a), (b), and (c) remain available and, live-verified below, functional.",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["c"],
+          "derivation": "the construction row's own guard, normal-form-equal to the WP, discharges via GuardInPath",
+          "strategy": "GuardInPath",
+          "validityArguments": ["Guard normal-form match"],
+          "decisionProcedure": "Same GuardSubsumes matcher as g12/sqrt-construction."
+        },
+        {
+          "premiseClasses": ["b"],
+          "derivation": "the constructing event's arg Exponent reads is declared nonnegative at ingress",
+          "validityArguments": ["Arg-bound interval arithmetic"],
+          "decisionProcedure": "Same matcher, sourced from the arg's declared modifier."
+        },
+        {
+          "premiseClasses": ["a"],
+          "derivation": "a field already materialised earlier in the same construction row carries a qualifying modifier, and Exponent reads that field",
+          "validityArguments": ["Arg-bound interval arithmetic"],
+          "decisionProcedure": "Same matcher, sourced from the field's declared modifiers."
+        }
+      ],
+      "suggestions": [
+        { "premiseClasses": ["c"], "schema": "add a guard normal-form-equal to <WP>", "citations": [{ "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary" }] },
+        { "premiseClasses": ["b"], "schema": "bound the args such that the interval combination satisfies <WP>", "citations": [{ "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary" }] },
+        { "premiseClasses": ["a"], "schema": "declare the field with a modifier bound satisfying <WP>", "notes": ["Authored by extension; not matrix-quoted text."] }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept PowConstructionBase\n\nfield ScaleFactor as integer default 1\n\nevent Open(Exponent as integer) initial\n\non Open\n    -> set ScaleFactor = pow(2, Open.Exponent)\n",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["a", "b", "c"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)", "date": "2026-07-21", "head": "e1a14d91" }
+        },
+        "discharges": [
+          {
+            "id": "guard-nf",
+            "kind": "guard",
+            "addition": "when Open.Exponent >= 0",
+            "application": { "locus": "row-guard", "eventName": "Open" },
+            "premiseClasses": ["c"],
+            "derivation": "guard fact normal-form-equal to the WP -> GuardInPath",
+            "strategy": "GuardInPath",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          },
+          {
+            "id": "arg-mod",
+            "kind": "arg-modifier",
+            "addition": "Exponent as integer nonnegative",
+            "application": { "locus": "event-arg-declarations", "replacements": [{ "eventName": "Open", "argName": "Exponent", "declaration": "Exponent as integer nonnegative" }] },
+            "premiseClasses": ["b"],
+            "derivation": "arg ingress bound Exponent >= 0 -> GuardInPath",
+            "strategy": "GuardInPath",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "guard-nf",
+            "addition": "when Open.Exponent > -5",
+            "application": { "locus": "row-guard", "eventName": "Open" },
+            "whyStillRejects": "the guard bounds Exponent only below -5, not at 0 — must still reject, same obligation",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          },
+          {
+            "pairsWith": "arg-mod",
+            "addition": "Exponent as integer min -5",
+            "application": { "locus": "event-arg-declarations", "replacements": [{ "eventName": "Open", "argName": "Exponent", "declaration": "Exponent as integer min -5" }] },
+            "whyStillRejects": "the declared floor is -5, not 0 — must still reject, same obligation",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [
+        { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" },
+        { "kind": "code", "ref": "src/Precept/Language/Functions.cs:183" }
+      ],
+      "notes": [
+        "Same diagnostic-code mislabeling as g12/pow-write (SqrtOfNegative reported in place of a pow-specific code) — see that cell's note rather than repeating.",
+        "Free of the premise-(d) hazard by construction, same argument as g12/sqrt-construction.",
+        "wp.canonicalKey omitted — see g12/sqrt-write's note."
+      ]
+    },
+    {
+      "id": "g12/pow-state-hook",
+      "label": "pow integer-overload exponent non-negativity at a state entry hook",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "Pow",
+        "evaluationSiteCategory": "state-hook-action-operand",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" }
+        ]
+      },
+      "obligation": {
+        "statement": "pow(Base, Exponent) where Exponent >= 0, integer overload only",
+        "metavariables": [
+          { "name": "Base", "standsFor": "pow's first argument" },
+          { "name": "Exponent", "standsFor": "pow's second argument, at this state hook, integer overload only" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" }
+        ],
+        "wp": { "statement": "Exponent >= 0" }
+      },
+      "applicablePremiseClasses": ["a", "c"],
+      "premiseAvailability": "Identical structure to g12/sqrt-state-hook: class (b) is structurally unavailable (the hook has no event args), a guard on the entering row does not discharge, and only (a) a modifier declared directly on the field and (c) the hook's own pre-verb guard are available and functional.",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["c"],
+          "derivation": "the hook's own pre-verb guard, normal-form-equal to the WP, discharges via GuardInPath",
+          "strategy": "GuardInPath",
+          "validityArguments": ["Guard normal-form match"],
+          "decisionProcedure": "Same GuardSubsumes matcher as g12/sqrt-state-hook, reading StateHookContext.Hook.Guard."
+        },
+        {
+          "premiseClasses": ["a"],
+          "derivation": "the field Exponent reads carries a qualifying modifier, enforced at every write site by IntervalContainment",
+          "validityArguments": ["Arg-bound interval arithmetic"],
+          "decisionProcedure": "Same matcher, sourced from the field's declared modifier."
+        }
+      ],
+      "suggestions": [
+        { "premiseClasses": ["c"], "schema": "add a guard normal-form-equal to <WP> on the hook itself (to/from S when <WP>)", "citations": [{ "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary" }] },
+        { "premiseClasses": ["a"], "schema": "declare the field with a modifier bound satisfying <WP>", "notes": ["Authored by extension; not matrix-quoted text."] }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept PowStateHookBase\n\nfield Exponent as integer default 0\nfield ScaleFactor as integer default 1\n\nstate Idle initial\nstate Active terminal\n\nevent Advance(NewExponent as integer)\n\nfrom Idle on Advance\n    -> set Exponent = Advance.NewExponent\n    -> transition Active\n\nto Active -> set ScaleFactor = pow(2, Exponent)\n",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["a", "c"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)", "date": "2026-07-21", "head": "e1a14d91" }
+        },
+        "discharges": [
+          {
+            "id": "hook-guard-nf",
+            "kind": "guard",
+            "addition": "to Active when Exponent >= 0 -> set ScaleFactor = pow(2, Exponent)",
+            "application": { "locus": "row-guard", "eventName": "__state_hook_to_Active" },
+            "premiseClasses": ["c"],
+            "derivation": "the hook's own guard, normal-form-equal to the WP -> GuardInPath",
+            "strategy": "GuardInPath",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true },
+            "notes": ["Same application-locus vocabulary gap as g12/sqrt-state-hook."]
+          },
+          {
+            "id": "field-mod",
+            "kind": "arg-modifier",
+            "addition": "field Exponent as integer default 0 nonnegative",
+            "premiseClasses": ["a"],
+            "derivation": "field modifier Exponent >= 0, enforced at every write site by IntervalContainment -> GuardInPath",
+            "strategy": "GuardInPath",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true },
+            "notes": ["Same schema-vocabulary compromise as g12/sqrt-state-hook."]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "hook-guard-nf",
+            "addition": "to Active when Exponent > -5 -> set ScaleFactor = pow(2, Exponent)",
+            "whyStillRejects": "the hook's guard bounds Exponent only below -5, not at 0 — must still reject, same obligation",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          },
+          {
+            "pairsWith": "field-mod",
+            "addition": "field Exponent as integer default 0 min -5",
+            "whyStillRejects": "the declared floor is -5, not 0 — must still reject, same obligation",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [
+        { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" },
+        { "kind": "code", "ref": "src/Precept/Language/Functions.cs:183" }
+      ],
+      "notes": [
+        "Same diagnostic-code mislabeling as g12/pow-write — see that cell's note.",
+        "Live-verified negative finding, same as g12/sqrt-state-hook: a guard on the entering transition row does not discharge; only the hook's own guard or a direct field modifier do.",
+        "HAZARD: identical shape to g12/sqrt-state-hook's hazard note, reproduced for pow. Live-verified (commit e1a14d91, 2026-07-21): `rule Exponent >= 0`, an unguarded `Drift` handler that sets `Exponent` to any value, and the guarded `Advance` handler together compile with zero diagnostics even though the hook then computes `pow(2, Exponent)` after an unguarded write could have made it negative. Same missing-rule status as g12/sqrt-write — see there.",
+        "wp.canonicalKey omitted — see g12/sqrt-write's note."
+      ]
+    },
+    {
+      "id": "g12/pow-guard",
+      "label": "pow integer-overload exponent non-negativity inside a guard expression",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "Pow",
+        "evaluationSiteCategory": "transition-row-guard",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" }
+        ]
+      },
+      "obligation": {
+        "statement": "pow(Base, Exponent) where Exponent >= 0, integer overload only",
+        "metavariables": [
+          { "name": "Base", "standsFor": "pow's first argument" },
+          { "name": "Exponent", "standsFor": "pow's second argument, inside a guard's boolean expression, integer overload only" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" }
+        ],
+        "wp": { "statement": "Exponent >= 0" }
+      },
+      "applicablePremiseClasses": ["a", "b"],
+      "premiseAvailability": "Identical structure to g12/sqrt-guard: stands for the same five guard-shaped categories plus reject-message-interpolation. Class (c) is unavailable (a guard cannot discharge an obligation arising inside itself); (a) and (b) are the model-licensed classes on the categories with the relevant scope. Class (d) reasoning is the same open/hazard question flagged there.",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["a"],
+          "derivation": "the field Exponent reads carries a qualifying modifier",
+          "validityArguments": ["Arg-bound interval arithmetic"],
+          "decisionProcedure": "Same matcher as g12/sqrt-guard, applied under the model."
+        },
+        {
+          "premiseClasses": ["b"],
+          "derivation": "the event arg Exponent reads is declared with a qualifying bound at ingress",
+          "validityArguments": ["Arg-bound interval arithmetic"],
+          "decisionProcedure": "Same matcher, under the model."
+        }
+      ],
+      "suggestions": [
+        { "premiseClasses": ["a"], "schema": "declare the field with a modifier bound satisfying <WP>", "notes": ["Authored by extension; not matrix-quoted text."] },
+        { "premiseClasses": ["b"], "schema": "bound the args such that the interval combination satisfies <WP>", "citations": [{ "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary" }] }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept PowGuardBase\n\nfield ScaleFactor as integer default 1\n\nevent Rescale(Exponent as integer)\n\non Rescale when pow(2, Rescale.Exponent) >= 0\n    -> set ScaleFactor = 1\n",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["a", "b"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "model-derived" }
+        },
+        "discharges": [
+          {
+            "id": "arg-mod",
+            "kind": "arg-modifier",
+            "addition": "Exponent as integer nonnegative",
+            "application": { "locus": "event-arg-declarations", "replacements": [{ "eventName": "Rescale", "argName": "Exponent", "declaration": "Exponent as integer nonnegative" }] },
+            "premiseClasses": ["b"],
+            "derivation": "arg ingress bound Exponent >= 0, under the model",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "the guard position mints no fault obligation at all at HEAD, for either function — base and this addition both compile clean",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "arg-mod",
+            "addition": "Exponent as integer min -10",
+            "application": { "locus": "event-arg-declarations", "replacements": [{ "eventName": "Rescale", "argName": "Exponent", "declaration": "Exponent as integer min -10" }] },
+            "whyStillRejects": "under the model, the declared floor is -10, not 0 — untestable at HEAD since the base itself does not reject here",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [
+        { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" },
+        { "kind": "code", "ref": "src/Precept/Language/Functions.cs:183" }
+      ],
+      "notes": [
+        "Live-verified, 2026-07-21, commit e1a14d91: `on Rescale when pow(2, Rescale.Exponent) >= 0 -> set ScaleFactor = 1` compiles with zero diagnostics regardless of Exponent's bound. Guard positions mint nothing at HEAD for pow either, matching g12/sqrt-guard's finding.",
+        "reject-message-interpolation, live-verified separately (2026-07-21, commit e1a14d91): `on Rescale -> reject \"scale would be {pow(2, Rescale.Exponent)}\"` compiles clean (only an unrelated FieldNeverSet warning). Same non-minting result as sqrt's, folded into this cell on the same basis as g12/sqrt-guard.",
+        "The same ensure-activation-guard / rule-activation-guard open item flagged on g12/sqrt-guard applies here identically — not repeated in full.",
+        "wp.canonicalKey omitted — see g12/sqrt-write's note."
+      ]
+    },
+    {
+      "id": "g12/pow-constraint",
+      "label": "pow integer-overload exponent non-negativity inside a constraint's own condition",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "Pow",
+        "evaluationSiteCategory": "rule-condition",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" }
+        ]
+      },
+      "obligation": {
+        "statement": "pow(Base, Exponent) where Exponent >= 0, integer overload only",
+        "metavariables": [
+          { "name": "Base", "standsFor": "pow's first argument" },
+          { "name": "Exponent", "standsFor": "pow's second argument, inside a rule condition, computed field expression, or quantifier predicate, integer overload only" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" }
+        ],
+        "wp": { "statement": "Exponent >= 0" }
+      },
+      "applicablePremiseClasses": ["a"],
+      "premiseAvailability": "Identical structure to g12/sqrt-constraint: no handler guard, no event args, no single pre-state, so only class (a) field/element modifiers are available. Live-verified for rule-condition; computed-field-expression and quantifier-predicate are expected by the same evaluation-site-level argument that carried across for sqrt but were NOT independently run for pow in this pass — see notes rather than assumed silently.",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["a"],
+          "derivation": "the field Exponent reads carries a qualifying modifier",
+          "validityArguments": ["Arg-bound interval arithmetic"],
+          "decisionProcedure": "Live-verified decision procedure: the same (field, comparison, literal) matcher as g12/sqrt-constraint, sourced from the field's own declared modifier."
+        }
+      ],
+      "suggestions": [
+        { "premiseClasses": ["a"], "schema": "declare the field (or the collection's inner-type value) with a modifier bound satisfying <WP>", "notes": ["Authored by extension; not matrix-quoted text."] }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept PowRuleConditionBase\n\nfield Exponent as integer default 0\nfield ScaleFactor as integer default 1\n\nrule pow(2, Exponent) >= 0 because \"scale factor exponent must be well-formed\"\n\nevent Rescale(NewExponent as integer)\n\non Rescale\n    -> set Exponent = Rescale.NewExponent\n    -> set ScaleFactor = Exponent\n",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["a"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)", "date": "2026-07-21", "head": "e1a14d91" }
+        },
+        "discharges": [
+          {
+            "id": "field-mod",
+            "kind": "arg-modifier",
+            "addition": "field Exponent as integer default 0 nonnegative",
+            "premiseClasses": ["a"],
+            "derivation": "field modifier Exponent >= 0",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true },
+            "notes": ["Same schema-vocabulary compromise as g12/sqrt-constraint."]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "field-mod",
+            "addition": "field Exponent as integer default 0 min -3",
+            "whyStillRejects": "the declared floor is -3, not 0 — must still reject, same obligation",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "reject", "sameObligation": true },
+            "notes": ["This exact near-miss also raised an unrelated NumericOverflow error, a scope exclusion per this slice's overflow deferral — not evidence against the pow obligation, which still fired (mislabeled as SqrtOfNegative, see g12/pow-write's note)."]
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [
+        { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" },
+        { "kind": "code", "ref": "src/Precept/Language/Functions.cs:183" }
+      ],
+      "notes": [
+        "Same diagnostic-code mislabeling as g12/pow-write — see that cell's note.",
+        "computed-field-expression and quantifier-predicate were NOT independently live-verified for pow in this pass (sqrt's equivalents were). Not asserted either way beyond the structural argument that evaluation-site minting is a site-level property, not a per-function one — flagged as unverified-for-pow rather than silently inherited from the sqrt result.",
+        "state-ensure-condition and event-ensure-condition carry the same HAZARD flag and same not-independently-tested status as noted on g12/sqrt-constraint, reproduced for pow rather than repeated in full. See missingRules.",
+        "constraint-rationale-interpolation is folded into this cell on the same basis as g12/sqrt-constraint's rationale finding, NOT independently re-verified for pow's exponent condition in this pass.",
+        "wp.canonicalKey omitted — see g12/sqrt-write's note."
+      ]
+    },
+    {
+      "id": "g12/pow-declaration",
+      "label": "pow integer-overload exponent non-negativity inside a declaration-position value expression",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "Pow",
+        "evaluationSiteCategory": "field-default-value-expression",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" }
+        ]
+      },
+      "obligation": {
+        "statement": "pow(Base, Exponent) where Exponent >= 0, integer overload only",
+        "metavariables": [
+          { "name": "Base", "standsFor": "pow's first argument" },
+          { "name": "Exponent", "standsFor": "pow's second argument, inside a field default, a field/event-arg constraint-modifier value, a collection inner-type value modifier, or a type-qualifier expression, integer overload only" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" }
+        ],
+        "wp": { "statement": "Exponent >= 0" }
+      },
+      "applicablePremiseClasses": ["a"],
+      "premiseAvailability": "Identical structure to g12/sqrt-declaration: stands for all five declaration-position categories; only class (a) — a literal fold or an earlier field's modifier — is available under the model.",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["a"],
+          "derivation": "Exponent is a literal, or reads a field declared earlier that carries a qualifying modifier",
+          "validityArguments": ["Literal constant-fold for defaults", "Arg-bound interval arithmetic"],
+          "decisionProcedure": "Under the model: constant-fold if Exponent is a literal; otherwise the (field, comparison, literal) matcher named in g12/pow-write, sourced from the earlier field's declared modifier."
+        }
+      ],
+      "suggestions": [
+        { "premiseClasses": ["a"], "schema": "supply a literal value satisfying <WP>, or declare the earlier field with a modifier bound satisfying <WP>", "notes": ["Authored by extension; not matrix-quoted text."] }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept PowDeclarationDefaultLit\n\nfield ScaleFactor as integer default pow(2, -3)\n",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["a"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "model-derived" }
+        },
+        "discharges": [
+          {
+            "id": "literal-fold",
+            "kind": "other",
+            "addition": "field ScaleFactor as integer default pow(2, 3)",
+            "premiseClasses": [],
+            "derivation": "under the model: constant-fold pow(2, 3) >= 0-exponent check over the literal default (replaces the base's literal exponent, from -3 to 3)",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "field-default-value-expression mints no fault obligation at all at HEAD, so there is nothing here for a fold to discharge",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true },
+            "notes": ["Same application-locus vocabulary gap as g12/sqrt-declaration."]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "literal-fold",
+            "addition": "field ScaleFactor as integer default pow(2, -1)",
+            "whyStillRejects": "under the model, -1 is still negative — must still reject, same obligation — untestable at HEAD since the base itself does not reject here",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [
+        { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:104" },
+        { "kind": "code", "ref": "src/Precept/Language/Functions.cs:183" }
+      ],
+      "notes": [
+        "Live-verified, 2026-07-21, commit e1a14d91: `field ScaleFactor as integer default pow(2, -3)` compiles with zero diagnostics — no fault diagnostic of any kind. field-default-value-expression mints nothing at HEAD for pow either, matching g12/sqrt-declaration's finding.",
+        "field-modifier-value-expression and event-arg-modifier-value-expression were NOT independently re-run for pow in this pass; sqrt's equivalents were live-verified non-minting. Not asserted for pow beyond the structural site-level argument — flagged as unverified-for-pow rather than silently inherited.",
+        "collection-inner-type-modifier-value-expression and type-qualifier-expression are unmeasured for both functions, same as g12/sqrt-declaration.",
+        "wp.canonicalKey omitted — see g12/sqrt-write's note."
+      ]
+    }
+  ]
+}

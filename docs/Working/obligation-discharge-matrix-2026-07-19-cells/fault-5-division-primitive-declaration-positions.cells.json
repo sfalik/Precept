@@ -1,0 +1,1667 @@
+{
+  "$schema": "./cell.schema.json",
+  "familyId": "fault-5-division-primitive-declaration-positions",
+  "title": "Fault group 5 — division by zero in a declaration-position value expression, primitive lanes",
+  "caseShape": "fault",
+  "definitionVersion": "obligation-discharge-matrix-2026-07-19 rev 7 (2026-07-20, draft)",
+  "citations": [
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The cell",
+      "note": "fault-family obligation, contract, witness shape"
+    },
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes (a discriminated union of axis sets)",
+      "note": "fault family row — premise classes (b)/(c)/(a) per catalog ProofSatisfactions"
+    },
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+      "note": "Family 4 — fault family, arg-constraint discharge (the precedent this group's contract generalizes from class (b) to class (a))"
+    },
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The minting rule — an explicit input",
+      "note": "fault minting is catalog-stamped at evaluation sites"
+    },
+    {
+      "kind": "spec",
+      "ref": "docs/language/precept-language-spec.md § Expression scope",
+      "note": "the declaration-order and full-scope rules this group's derivations turn on"
+    },
+    {
+      "kind": "spec",
+      "ref": "docs/language/precept-language-spec.md § Type References",
+      "note": "type qualifier semantics, load-bearing for the type-qualifier empty cells"
+    },
+    {
+      "kind": "spec",
+      "ref": "docs/language/precept-language-spec.md § Field Modifiers",
+      "note": "constraint-modifier desugaring to rule shorthand"
+    },
+    {
+      "kind": "code",
+      "ref": "src/Precept/Pipeline/ProofEngine.cs",
+      "note": "ResolveParamInBinaryOp — the right-operand convention for the shared-ParameterMeta divisor sites"
+    },
+    {
+      "kind": "packet",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md",
+      "note": "Part 3 — the false-proof hazard this group's categories are confirmed free of (no premise class (d) anywhere in this group's region)"
+    }
+  ],
+  "respellability": {
+    "verdict": "yes",
+    "evidence": "model-derived",
+    "corpusMeasurement": "pending",
+    "licensedNonBandExamples": [
+      {
+        "spelling": "field Reserved as integer max -1",
+        "whyLicensed": "Looks unusual (an upper-only, negative bound) but is licensed by ordinary interval combination: `max -1` alone gives the interval (-inf, -1], which excludes zero exactly as `positive`/`nonzero` would, so the same decision procedure discharges it without needing either named sign modifier.",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+            "note": "Family 1 Base A's own note that per-term bound conjuncts feed the same interval arithmetic regardless of spelling"
+          }
+        ]
+      }
+    ],
+    "notes": [
+      "Applies to the eight defined cells only; the two empty (type-qualifier) cells have no obligation and therefore no band.",
+      "A genuine band member for this group: `max Budget / (Reserved + 1)` with `Reserved as integer nonnegative` is sound (Reserved+1 is always >= 1) but not covered by the stated decision procedure, which resolves only a bare single-field divisor reference, not a compound arithmetic expression. Respelling: introduce an intermediate field (e.g. `field ReservedPlusOne as integer <- Reserved + 1` with its own established `positive`) and divide by that field directly, which the bare-single-field derivation then covers."
+    ]
+  },
+  "cells": [
+    {
+      "id": "g05/field-default-integer",
+      "label": "Field default expression divides — integer lane (IntegerDivideInteger)",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "IntegerDivideInteger",
+        "evaluationSiteCategory": "field-default-value-expression",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The cell",
+            "note": "item 1 — fault-family obligation schema is the catalog-declared safety precondition at the evaluation site"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The minting rule — an explicit input",
+            "note": "fault minting is catalog-stamped at evaluation sites"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "PartsCount != 0",
+        "metavariables": [
+          {
+            "name": "PartsCount",
+            "standsFor": "the divisor (right) operand of the IntegerDivideInteger expression at this evaluation site, per ProofEngine.ResolveParamInBinaryOp convention"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "PartsCount != 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a"
+      ],
+      "premiseAvailability": "At `field-default-value-expression` the scope is narrower than the other four categories in this group: the expression may reference only fields declared *before* this field — a forward reference is impossible in the grammar (construction materializes defaults in declaration order), not merely disallowed. So the only premise source available is an earlier-declared field's own modifier; there is no guard, no event arg, and no later-declared field in scope at this site.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "PartsCount is a field declared before UnitShare, whose default expression divides by it. If PartsCount carries a declared modifier combination whose exact interval excludes zero (e.g. `positive`, `nonzero`, or a `min`/`max` pair bounded away from zero), that field-modifier fact (premise class (a)) discharges the obligation.",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "Resolve the divisor sub-expression to a single referenced field (reject the derivation if it is a compound expression with no single resolvable field — see the sound-but-unprovable band note below). Extract that field's exact interval by combining its declared numeric modifiers (`positive`/`nonnegative`/`nonzero`/`min`/`max`) under the same exact-decimal/exact-integer interval combination Family 1's class-(b) argument uses. Zero inside the combined interval, or no modifier excluding it, fails the derivation.",
+          "citations": [
+            {
+              "kind": "spec",
+              "ref": "docs/language/precept-language-spec.md:1350",
+              "note": "Expression scope table — default value expression scope is fields declared before this field, no forward reference"
+            },
+            {
+              "kind": "spec",
+              "ref": "docs/language/precept-language-spec.md:1354",
+              "note": "a forward reference from a default value expression is impossible, not merely disallowed, because construction materializes defaults in declaration order"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+              "note": "Family 4 — fault family, arg-constraint discharge: the precedent this contract generalizes from class (b) to class (a)"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "declare the divisor field <WP> positive or nonzero",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept FdIntBase\nfield PartsCount as integer default 0\nfield UnitShare as integer default 100 / PartsCount",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        },
+        "discharges": [
+          {
+            "id": "field-modifier-exclusion",
+            "kind": "other",
+            "addition": "replace `field PartsCount as integer default 0` with `field PartsCount as integer default 1 positive`",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "PartsCount carries a nonzero-excluding modifier -> field-modifier interval exclusion (class (a), generalized Arg-bound interval arithmetic)",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "measured at HEAD (commit e1a14d91, 2026-07-21, scratch snippet `d.precept` and this cell's own live run): the site mints no fault obligation at all — the file compiles with zero diagnostics regardless of whether the divisor field carries a nonzero-excluding modifier. This is the site failing to mint, not the program being judged safe.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "No `application` block is given: the schema's `application` discriminated union offers only two loci (`row-guard`, appending a guard to a transition row; `event-arg-declarations`, replacing named event-arg declarations) and neither fits — this discharge edits the divisor field's own declaration, a locus the DU does not yet name. Recorded as a schema gap rather than forced into either existing locus.",
+              "`dischargeWitness.kind` is recorded as `other`, not `arg-modifier`: the enum's `arg-modifier` value is precedented (Witness Family 1) for an *event-arg* modifier addition; this discharge adds a modifier to a *field* declaration instead, and no enum member names that shape. Recorded as a second schema gap alongside the `application` locus gap."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "field-modifier-exclusion",
+            "addition": "replace `field PartsCount as integer default 0` with `field PartsCount as integer default 0 nonnegative`",
+            "whyStillRejects": "`nonnegative` admits zero — the combined interval still contains 0, so the derivation still fails and the obligation still rejects, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md:1350",
+          "note": "Expression scope table — default value expression scope is fields declared before this field, no forward reference"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md:1354",
+          "note": "a forward reference from a default value expression is impossible, not merely disallowed, because construction materializes defaults in declaration order"
+        },
+        {
+          "kind": "want-doc",
+          "ref": "docs/Working/what-i-want-2026-07-16.md:104",
+          "note": "fault-prevention obligation family"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+          "note": "premise class (a) — field modifiers"
+        }
+      ],
+      "notes": [
+        "No false-proof hazard: this evaluation-site category carries only premise class (a) (field modifiers) — never class (d) — so no discharge here can run through a business `rule` used as a premise (docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md Part 3, Defect B does not apply). Clean-compile confirmation of the field-modifier discharge would be admissible in principle; it is moot here because the site mints nothing at HEAD regardless (see builtStatusNote).",
+        "This derivation cites \"Arg-bound interval arithmetic\", the closest written validity argument, but the matrix's own text for that argument (obligation-discharge-matrix-2026-07-19.md, the argument's paragraph) is scoped explicitly to premise class (b) (Witness Family 1, Base A) — declared *argument* bounds summed against a rule's bound. Applying the same interval-extraction technique to a premise class (a) *field* modifier discharging a divisor-exclusion check (rather than a sum-bound check) is an unstated generalization: the mechanism (exact-bound extraction, interval combination) is identical, but the matrix has never written this specific application out. Flagged as a missing rule, not silently assumed identical.",
+        "wp.canonicalKey / canonicalKeySource omitted: the WP calculator (tools/Precept.MatrixTools) computes establishment/preservation WPs through a handler write plan; this obligation sits at a declaration-position evaluation site with no write plan, and the calculator has no computation path for it. Not measured, not inferred.",
+        "Live-verified at HEAD (commit e1a14d91, Precept.MatrixTools, 2026-07-21): base, discharge, and near-miss all compile with zero fault-related diagnostics — the site mints nothing regardless of premises, so the run cannot distinguish base from discharge from near-miss on the fault obligation. The `expected: reject` / `expected: accept` blocks above state the model's committed power, not what the run showed; provenance is marked live-verified because the run itself is exactly what is reported, including its failure to confirm the model's expectation.",
+        "This cell's schema also covers the other integer-lane catalog sites sharing the same 'Divisor must be non-zero' condition and the same discharge contract: IntegerModuloInteger, IntegerDivideDecimal, IntegerDivideNumber, IntegerModuloDecimal, IntegerModuloNumber."
+      ]
+    },
+    {
+      "id": "g05/field-default-decimal",
+      "label": "Field default expression divides — decimal lane (DecimalDivideDecimal)",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "DecimalDivideDecimal",
+        "evaluationSiteCategory": "field-default-value-expression",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The cell",
+            "note": "item 1 — fault-family obligation schema is the catalog-declared safety precondition at the evaluation site"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The minting rule — an explicit input",
+            "note": "fault minting is catalog-stamped at evaluation sites"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Weight != 0",
+        "metavariables": [
+          {
+            "name": "Weight",
+            "standsFor": "the divisor (right) operand of the DecimalDivideDecimal expression at this evaluation site, per ProofEngine.ResolveParamInBinaryOp convention"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "Weight != 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a"
+      ],
+      "premiseAvailability": "At `field-default-value-expression` the scope is narrower than the other four categories in this group: the expression may reference only fields declared *before* this field — a forward reference is impossible in the grammar (construction materializes defaults in declaration order), not merely disallowed. So the only premise source available is an earlier-declared field's own modifier; there is no guard, no event arg, and no later-declared field in scope at this site.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "Weight is a field declared before Portion, whose default expression divides by it. If Weight carries a declared modifier combination whose exact interval excludes zero (e.g. `positive`, `nonzero`, or a `min`/`max` pair bounded away from zero), that field-modifier fact (premise class (a)) discharges the obligation.",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "Resolve the divisor sub-expression to a single referenced field (reject the derivation if it is a compound expression with no single resolvable field — see the sound-but-unprovable band note below). Extract that field's exact interval by combining its declared numeric modifiers (`positive`/`nonnegative`/`nonzero`/`min`/`max`) under the same exact-decimal/exact-integer interval combination Family 1's class-(b) argument uses. Zero inside the combined interval, or no modifier excluding it, fails the derivation.",
+          "citations": [
+            {
+              "kind": "spec",
+              "ref": "docs/language/precept-language-spec.md:1350",
+              "note": "Expression scope table — default value expression scope is fields declared before this field, no forward reference"
+            },
+            {
+              "kind": "spec",
+              "ref": "docs/language/precept-language-spec.md:1354",
+              "note": "a forward reference from a default value expression is impossible, not merely disallowed, because construction materializes defaults in declaration order"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+              "note": "Family 4 — fault family, arg-constraint discharge: the precedent this contract generalizes from class (b) to class (a)"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "declare the divisor field <WP> positive or nonzero",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept FdDecBase\nfield Weight as decimal default 0.0\nfield Portion as decimal default 100.0 / Weight",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        },
+        "discharges": [
+          {
+            "id": "field-modifier-exclusion",
+            "kind": "other",
+            "addition": "replace `field Weight as decimal default 0.0` with `field Weight as decimal default 1.0 positive`",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "Weight carries a nonzero-excluding modifier -> field-modifier interval exclusion (class (a), generalized Arg-bound interval arithmetic)",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "measured at HEAD (commit e1a14d91, 2026-07-21, scratch snippet `d.precept` and this cell's own live run): the site mints no fault obligation at all — the file compiles with zero diagnostics regardless of whether the divisor field carries a nonzero-excluding modifier. This is the site failing to mint, not the program being judged safe.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "No `application` block is given: the schema's `application` discriminated union offers only two loci (`row-guard`, appending a guard to a transition row; `event-arg-declarations`, replacing named event-arg declarations) and neither fits — this discharge edits the divisor field's own declaration, a locus the DU does not yet name. Recorded as a schema gap rather than forced into either existing locus.",
+              "`dischargeWitness.kind` is recorded as `other`, not `arg-modifier`: the enum's `arg-modifier` value is precedented (Witness Family 1) for an *event-arg* modifier addition; this discharge adds a modifier to a *field* declaration instead, and no enum member names that shape. Recorded as a second schema gap alongside the `application` locus gap."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "field-modifier-exclusion",
+            "addition": "replace `field Weight as decimal default 0.0` with `field Weight as decimal default 0.0 nonnegative`",
+            "whyStillRejects": "`nonnegative` admits zero — the combined interval still contains 0, so the derivation still fails and the obligation still rejects, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md:1350",
+          "note": "Expression scope table — default value expression scope is fields declared before this field, no forward reference"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md:1354",
+          "note": "a forward reference from a default value expression is impossible, not merely disallowed, because construction materializes defaults in declaration order"
+        },
+        {
+          "kind": "want-doc",
+          "ref": "docs/Working/what-i-want-2026-07-16.md:104",
+          "note": "fault-prevention obligation family"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+          "note": "premise class (a) — field modifiers"
+        }
+      ],
+      "notes": [
+        "No false-proof hazard: this evaluation-site category carries only premise class (a) (field modifiers) — never class (d) — so no discharge here can run through a business `rule` used as a premise (docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md Part 3, Defect B does not apply). Clean-compile confirmation of the field-modifier discharge would be admissible in principle; it is moot here because the site mints nothing at HEAD regardless (see builtStatusNote).",
+        "This derivation cites \"Arg-bound interval arithmetic\", the closest written validity argument, but the matrix's own text for that argument (obligation-discharge-matrix-2026-07-19.md, the argument's paragraph) is scoped explicitly to premise class (b) (Witness Family 1, Base A) — declared *argument* bounds summed against a rule's bound. Applying the same interval-extraction technique to a premise class (a) *field* modifier discharging a divisor-exclusion check (rather than a sum-bound check) is an unstated generalization: the mechanism (exact-bound extraction, interval combination) is identical, but the matrix has never written this specific application out. Flagged as a missing rule, not silently assumed identical.",
+        "wp.canonicalKey / canonicalKeySource omitted: the WP calculator (tools/Precept.MatrixTools) computes establishment/preservation WPs through a handler write plan; this obligation sits at a declaration-position evaluation site with no write plan, and the calculator has no computation path for it. Not measured, not inferred.",
+        "Live-verified at HEAD (commit e1a14d91, Precept.MatrixTools, 2026-07-21): base, discharge, and near-miss all compile with zero fault-related diagnostics — the site mints nothing regardless of premises, so the run cannot distinguish base from discharge from near-miss on the fault obligation. The `expected: reject` / `expected: accept` blocks above state the model's committed power, not what the run showed; provenance is marked live-verified because the run itself is exactly what is reported, including its failure to confirm the model's expectation.",
+        "This cell's schema also covers the other decimal/number-lane catalog sites sharing the same 'Divisor must be non-zero' condition and the same discharge contract: DecimalModuloDecimal, NumberDivideNumber, NumberModuloNumber."
+      ]
+    },
+    {
+      "id": "g05/field-modifier-integer",
+      "label": "Field constraint-modifier bound divides — integer lane (IntegerDivideInteger)",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "IntegerDivideInteger",
+        "evaluationSiteCategory": "field-modifier-value-expression",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The cell",
+            "note": "item 1 — fault-family obligation schema is the catalog-declared safety precondition at the evaluation site"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The minting rule — an explicit input",
+            "note": "fault minting is catalog-stamped at evaluation sites"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Reserved != 0",
+        "metavariables": [
+          {
+            "name": "Reserved",
+            "standsFor": "the divisor (right) operand of the IntegerDivideInteger expression at this evaluation site, per ProofEngine.ResolveParamInBinaryOp convention"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "Reserved != 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a"
+      ],
+      "premiseAvailability": "Unlike field-default-value-expression, this category's scope is NOT narrowed by declaration order: a constraint modifier's value expression is rule shorthand, checked against the complete working copy after all mutations, so any field may be referenced regardless of where it is declared. The only available premise source is still class (a) — field modifiers — because there is no guard, no event arg, and no pre-state induction available at a declaration-position bound (no write plan exists here to found an inductive hypothesis on).",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "Budget and Reserved are fields; PerUnit's `max` bound divides Budget by Reserved. If Reserved carries a declared modifier combination whose exact interval excludes zero (e.g. `positive`, `nonzero`, or a `min`/`max` pair bounded away from zero), that field-modifier fact (premise class (a)) discharges the obligation.",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "Resolve the divisor sub-expression to a single referenced field (reject the derivation if it is a compound expression with no single resolvable field — see the sound-but-unprovable band note below). Extract that field's exact interval by combining its declared numeric modifiers (`positive`/`nonnegative`/`nonzero`/`min`/`max`) under the same exact-decimal/exact-integer interval combination Family 1's class-(b) argument uses. Zero inside the combined interval, or no modifier excluding it, fails the derivation.",
+          "citations": [
+            {
+              "kind": "spec",
+              "ref": "docs/language/precept-language-spec.md:1352",
+              "note": "Expression scope table — modifier value expressions have full scope: any field, regardless of declaration order, since a constraint modifier is rule shorthand"
+            },
+            {
+              "kind": "spec",
+              "ref": "docs/language/precept-language-spec.md:1354",
+              "note": "a rule condition (and a constraint modifier, which is rule shorthand) is checked against the complete working copy after all mutations, so declaration order is irrelevant"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+              "note": "Family 4 — fault family, arg-constraint discharge: the precedent this contract generalizes from class (b) to class (a)"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "declare the divisor field <WP> positive or nonzero",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept FmIntBase\nfield Budget as integer default 1000\nfield Reserved as integer default 0\nfield PerUnit as integer default 0 max Budget / Reserved",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        },
+        "discharges": [
+          {
+            "id": "field-modifier-exclusion",
+            "kind": "other",
+            "addition": "replace `field Reserved as integer default 0` with `field Reserved as integer default 1 positive`",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "Reserved carries a nonzero-excluding modifier -> field-modifier interval exclusion (class (a), generalized Arg-bound interval arithmetic)",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "measured at HEAD (commit e1a14d91, 2026-07-21, scratch snippet `m.precept` and this cell's own live run): the site mints no fault obligation, and additionally the WP calculator reports `[skipped obligation] <field>:max: bound is not a literal declared value (cross-field or unsupported bound source); not representable as a constant-bound rule` — a second, entangled gap distinct from the mint gap: the calculator's own bound-representation currently requires a literal, so it cannot even attempt this obligation's premise regardless of what discharges it.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "No `application` block is given: the schema's `application` discriminated union offers only two loci (`row-guard`, appending a guard to a transition row; `event-arg-declarations`, replacing named event-arg declarations) and neither fits — this discharge edits the divisor field's own declaration, a locus the DU does not yet name. Recorded as a schema gap rather than forced into either existing locus.",
+              "`dischargeWitness.kind` is recorded as `other`, not `arg-modifier`: the enum's `arg-modifier` value is precedented (Witness Family 1) for an *event-arg* modifier addition; this discharge adds a modifier to a *field* declaration instead, and no enum member names that shape. Recorded as a second schema gap alongside the `application` locus gap."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "field-modifier-exclusion",
+            "addition": "replace `field Reserved as integer default 0` with `field Reserved as integer default 0 nonnegative`",
+            "whyStillRejects": "`nonnegative` admits zero — the combined interval still contains 0, so the derivation still fails and the obligation still rejects, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md:1352",
+          "note": "Expression scope table — modifier value expressions have full scope: any field, regardless of declaration order, since a constraint modifier is rule shorthand"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md:1354",
+          "note": "a rule condition (and a constraint modifier, which is rule shorthand) is checked against the complete working copy after all mutations, so declaration order is irrelevant"
+        },
+        {
+          "kind": "want-doc",
+          "ref": "docs/Working/what-i-want-2026-07-16.md:104",
+          "note": "fault-prevention obligation family"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+          "note": "premise class (a) — field modifiers"
+        }
+      ],
+      "notes": [
+        "No false-proof hazard: this evaluation-site category carries only premise class (a) (field modifiers) — never class (d) — so no discharge here can run through a business `rule` used as a premise (docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md Part 3, Defect B does not apply). Clean-compile confirmation of the field-modifier discharge would be admissible in principle; it is moot here because the site mints nothing at HEAD regardless (see builtStatusNote).",
+        "This derivation cites \"Arg-bound interval arithmetic\", the closest written validity argument, but the matrix's own text for that argument (obligation-discharge-matrix-2026-07-19.md, the argument's paragraph) is scoped explicitly to premise class (b) (Witness Family 1, Base A) — declared *argument* bounds summed against a rule's bound. Applying the same interval-extraction technique to a premise class (a) *field* modifier discharging a divisor-exclusion check (rather than a sum-bound check) is an unstated generalization: the mechanism (exact-bound extraction, interval combination) is identical, but the matrix has never written this specific application out. Flagged as a missing rule, not silently assumed identical.",
+        "`[skipped obligation]` message observed for this category specifically (see field-modifier scope note above); the event-arg-modifier and collection-inner-type-modifier categories in this same group do NOT print this message for the structurally identical non-literal bound — recorded as a distinct, diagnostic-completeness gap (not a modeling gap): the same underlying representational limitation surfaces inconsistently across evaluation-site categories.",
+        "wp.canonicalKey / canonicalKeySource omitted: the WP calculator (tools/Precept.MatrixTools) computes establishment/preservation WPs through a handler write plan; this obligation sits at a declaration-position evaluation site with no write plan, and the calculator has no computation path for it. Not measured, not inferred.",
+        "Live-verified at HEAD (commit e1a14d91, Precept.MatrixTools, 2026-07-21): base, discharge, and near-miss all compile with zero fault-related diagnostics — the site mints nothing regardless of premises, so the run cannot distinguish base from discharge from near-miss on the fault obligation. The `expected: reject` / `expected: accept` blocks above state the model's committed power, not what the run showed; provenance is marked live-verified because the run itself is exactly what is reported, including its failure to confirm the model's expectation.",
+        "This cell's schema also covers the other integer-lane catalog sites sharing the same 'Divisor must be non-zero' condition and the same discharge contract: IntegerModuloInteger, IntegerDivideDecimal, IntegerDivideNumber, IntegerModuloDecimal, IntegerModuloNumber."
+      ]
+    },
+    {
+      "id": "g05/field-modifier-decimal",
+      "label": "Field constraint-modifier bound divides — decimal lane (DecimalDivideDecimal)",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "DecimalDivideDecimal",
+        "evaluationSiteCategory": "field-modifier-value-expression",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The cell",
+            "note": "item 1 — fault-family obligation schema is the catalog-declared safety precondition at the evaluation site"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The minting rule — an explicit input",
+            "note": "fault minting is catalog-stamped at evaluation sites"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Reserved != 0",
+        "metavariables": [
+          {
+            "name": "Reserved",
+            "standsFor": "the divisor (right) operand of the DecimalDivideDecimal expression at this evaluation site, per ProofEngine.ResolveParamInBinaryOp convention"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "Reserved != 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a"
+      ],
+      "premiseAvailability": "Unlike field-default-value-expression, this category's scope is NOT narrowed by declaration order: a constraint modifier's value expression is rule shorthand, checked against the complete working copy after all mutations, so any field may be referenced regardless of where it is declared. The only available premise source is still class (a) — field modifiers — because there is no guard, no event arg, and no pre-state induction available at a declaration-position bound (no write plan exists here to found an inductive hypothesis on).",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "Budget and Reserved are fields; PerUnit's `max` bound divides Budget by Reserved. If Reserved carries a declared modifier combination whose exact interval excludes zero (e.g. `positive`, `nonzero`, or a `min`/`max` pair bounded away from zero), that field-modifier fact (premise class (a)) discharges the obligation.",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "Resolve the divisor sub-expression to a single referenced field (reject the derivation if it is a compound expression with no single resolvable field — see the sound-but-unprovable band note below). Extract that field's exact interval by combining its declared numeric modifiers (`positive`/`nonnegative`/`nonzero`/`min`/`max`) under the same exact-decimal/exact-integer interval combination Family 1's class-(b) argument uses. Zero inside the combined interval, or no modifier excluding it, fails the derivation.",
+          "citations": [
+            {
+              "kind": "spec",
+              "ref": "docs/language/precept-language-spec.md:1352",
+              "note": "Expression scope table — modifier value expressions have full scope: any field, regardless of declaration order, since a constraint modifier is rule shorthand"
+            },
+            {
+              "kind": "spec",
+              "ref": "docs/language/precept-language-spec.md:1354",
+              "note": "a rule condition (and a constraint modifier, which is rule shorthand) is checked against the complete working copy after all mutations, so declaration order is irrelevant"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+              "note": "Family 4 — fault family, arg-constraint discharge: the precedent this contract generalizes from class (b) to class (a)"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "declare the divisor field <WP> positive or nonzero",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept FmDecBase\nfield Budget as decimal default 1000.0\nfield Reserved as decimal default 0.0\nfield PerUnit as decimal default 0.0 max Budget / Reserved",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        },
+        "discharges": [
+          {
+            "id": "field-modifier-exclusion",
+            "kind": "other",
+            "addition": "replace `field Reserved as decimal default 0.0` with `field Reserved as decimal default 1.0 positive`",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "Reserved carries a nonzero-excluding modifier -> field-modifier interval exclusion (class (a), generalized Arg-bound interval arithmetic)",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "measured at HEAD (commit e1a14d91, 2026-07-21, scratch snippet `m.precept` and this cell's own live run): the site mints no fault obligation, and additionally the WP calculator reports `[skipped obligation] <field>:max: bound is not a literal declared value (cross-field or unsupported bound source); not representable as a constant-bound rule` — a second, entangled gap distinct from the mint gap: the calculator's own bound-representation currently requires a literal, so it cannot even attempt this obligation's premise regardless of what discharges it.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "No `application` block is given: the schema's `application` discriminated union offers only two loci (`row-guard`, appending a guard to a transition row; `event-arg-declarations`, replacing named event-arg declarations) and neither fits — this discharge edits the divisor field's own declaration, a locus the DU does not yet name. Recorded as a schema gap rather than forced into either existing locus.",
+              "`dischargeWitness.kind` is recorded as `other`, not `arg-modifier`: the enum's `arg-modifier` value is precedented (Witness Family 1) for an *event-arg* modifier addition; this discharge adds a modifier to a *field* declaration instead, and no enum member names that shape. Recorded as a second schema gap alongside the `application` locus gap."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "field-modifier-exclusion",
+            "addition": "replace `field Reserved as decimal default 0.0` with `field Reserved as decimal default 0.0 nonnegative`",
+            "whyStillRejects": "`nonnegative` admits zero — the combined interval still contains 0, so the derivation still fails and the obligation still rejects, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md:1352",
+          "note": "Expression scope table — modifier value expressions have full scope: any field, regardless of declaration order, since a constraint modifier is rule shorthand"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md:1354",
+          "note": "a rule condition (and a constraint modifier, which is rule shorthand) is checked against the complete working copy after all mutations, so declaration order is irrelevant"
+        },
+        {
+          "kind": "want-doc",
+          "ref": "docs/Working/what-i-want-2026-07-16.md:104",
+          "note": "fault-prevention obligation family"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+          "note": "premise class (a) — field modifiers"
+        }
+      ],
+      "notes": [
+        "No false-proof hazard: this evaluation-site category carries only premise class (a) (field modifiers) — never class (d) — so no discharge here can run through a business `rule` used as a premise (docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md Part 3, Defect B does not apply). Clean-compile confirmation of the field-modifier discharge would be admissible in principle; it is moot here because the site mints nothing at HEAD regardless (see builtStatusNote).",
+        "This derivation cites \"Arg-bound interval arithmetic\", the closest written validity argument, but the matrix's own text for that argument (obligation-discharge-matrix-2026-07-19.md, the argument's paragraph) is scoped explicitly to premise class (b) (Witness Family 1, Base A) — declared *argument* bounds summed against a rule's bound. Applying the same interval-extraction technique to a premise class (a) *field* modifier discharging a divisor-exclusion check (rather than a sum-bound check) is an unstated generalization: the mechanism (exact-bound extraction, interval combination) is identical, but the matrix has never written this specific application out. Flagged as a missing rule, not silently assumed identical.",
+        "wp.canonicalKey / canonicalKeySource omitted: the WP calculator (tools/Precept.MatrixTools) computes establishment/preservation WPs through a handler write plan; this obligation sits at a declaration-position evaluation site with no write plan, and the calculator has no computation path for it. Not measured, not inferred.",
+        "Live-verified at HEAD (commit e1a14d91, Precept.MatrixTools, 2026-07-21): base, discharge, and near-miss all compile with zero fault-related diagnostics — the site mints nothing regardless of premises, so the run cannot distinguish base from discharge from near-miss on the fault obligation. The `expected: reject` / `expected: accept` blocks above state the model's committed power, not what the run showed; provenance is marked live-verified because the run itself is exactly what is reported, including its failure to confirm the model's expectation.",
+        "This cell's schema also covers the other decimal/number-lane catalog sites sharing the same 'Divisor must be non-zero' condition and the same discharge contract: DecimalModuloDecimal, NumberDivideNumber, NumberModuloNumber."
+      ]
+    },
+    {
+      "id": "g05/event-arg-modifier-integer",
+      "label": "Event-arg constraint-modifier bound divides — integer lane (IntegerDivideInteger)",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "IntegerDivideInteger",
+        "evaluationSiteCategory": "event-arg-modifier-value-expression",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The cell",
+            "note": "item 1 — fault-family obligation schema is the catalog-declared safety precondition at the evaluation site"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The minting rule — an explicit input",
+            "note": "fault minting is catalog-stamped at evaluation sites"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Reserved != 0",
+        "metavariables": [
+          {
+            "name": "Reserved",
+            "standsFor": "the divisor (right) operand of the IntegerDivideInteger expression at this evaluation site, per ProofEngine.ResolveParamInBinaryOp convention"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "Reserved != 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a"
+      ],
+      "premiseAvailability": "The bound belongs to an event arg's declaration, but the *divisor* it evaluates is still a reference to a FIELD (Reserved), so the fact source is still premise class (a) — field modifiers on Reserved — not an arg constraint on the arg being bounded. No guard is in scope at an event-arg declaration, and the arg itself is the subject of the bound, not a premise for it.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "Budget and Reserved are fields; event Approve's arg Cap carries a `max` bound dividing Budget by Reserved. If Reserved carries a declared modifier combination whose exact interval excludes zero (e.g. `positive`, `nonzero`, or a `min`/`max` pair bounded away from zero), that field-modifier fact (premise class (a)) discharges the obligation.",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "Resolve the divisor sub-expression to a single referenced field (reject the derivation if it is a compound expression with no single resolvable field — see the sound-but-unprovable band note below). Extract that field's exact interval by combining its declared numeric modifiers (`positive`/`nonnegative`/`nonzero`/`min`/`max`) under the same exact-decimal/exact-integer interval combination Family 1's class-(b) argument uses. Zero inside the combined interval, or no modifier excluding it, fails the derivation.",
+          "citations": [
+            {
+              "kind": "spec",
+              "ref": "docs/language/precept-language-spec.md:927",
+              "note": "ArgDecl := Identifier as TypeRef FieldModifier* — an event arg's modifier value expression uses the same FieldModifier production as a field's"
+            },
+            {
+              "kind": "spec",
+              "ref": "docs/language/precept-language-spec.md § Field Modifiers",
+              "note": "field modifiers appear after the type reference and before any computed expression, on both field and arg declarations"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+              "note": "Family 4 — fault family, arg-constraint discharge: the precedent this contract generalizes from class (b) to class (a)"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "declare the divisor field <WP> positive or nonzero",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept EaIntBase\nfield Budget as integer default 1000\nfield Reserved as integer default 0\nevent Approve(Cap as integer max Budget / Reserved)",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        },
+        "discharges": [
+          {
+            "id": "field-modifier-exclusion",
+            "kind": "other",
+            "addition": "replace `field Reserved as integer default 0` with `field Reserved as integer default 1 positive`",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "Reserved carries a nonzero-excluding modifier -> field-modifier interval exclusion (class (a), generalized Arg-bound interval arithmetic)",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "measured at HEAD (commit e1a14d91, 2026-07-21, scratch snippet `ag.precept` and this cell's own live run): the site mints no fault obligation. Unlike field-modifier-value-expression, no `[skipped obligation]` message is printed here either — the position is silently passed over, not even reported as skipped.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "No `application` block is given: the schema's `application` discriminated union offers only two loci (`row-guard`, appending a guard to a transition row; `event-arg-declarations`, replacing named event-arg declarations) and neither fits — this discharge edits the divisor field's own declaration, a locus the DU does not yet name. Recorded as a schema gap rather than forced into either existing locus.",
+              "`dischargeWitness.kind` is recorded as `other`, not `arg-modifier`: the enum's `arg-modifier` value is precedented (Witness Family 1) for an *event-arg* modifier addition; this discharge adds a modifier to a *field* declaration instead, and no enum member names that shape. Recorded as a second schema gap alongside the `application` locus gap."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "field-modifier-exclusion",
+            "addition": "replace `field Reserved as integer default 0` with `field Reserved as integer default 0 nonnegative`",
+            "whyStillRejects": "`nonnegative` admits zero — the combined interval still contains 0, so the derivation still fails and the obligation still rejects, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md:927",
+          "note": "ArgDecl := Identifier as TypeRef FieldModifier* — an event arg's modifier value expression uses the same FieldModifier production as a field's"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md § Field Modifiers",
+          "note": "field modifiers appear after the type reference and before any computed expression, on both field and arg declarations"
+        },
+        {
+          "kind": "want-doc",
+          "ref": "docs/Working/what-i-want-2026-07-16.md:104",
+          "note": "fault-prevention obligation family"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+          "note": "premise class (a) — field modifiers"
+        }
+      ],
+      "notes": [
+        "No false-proof hazard: this evaluation-site category carries only premise class (a) (field modifiers) — never class (d) — so no discharge here can run through a business `rule` used as a premise (docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md Part 3, Defect B does not apply). Clean-compile confirmation of the field-modifier discharge would be admissible in principle; it is moot here because the site mints nothing at HEAD regardless (see builtStatusNote).",
+        "This derivation cites \"Arg-bound interval arithmetic\", the closest written validity argument, but the matrix's own text for that argument (obligation-discharge-matrix-2026-07-19.md, the argument's paragraph) is scoped explicitly to premise class (b) (Witness Family 1, Base A) — declared *argument* bounds summed against a rule's bound. Applying the same interval-extraction technique to a premise class (a) *field* modifier discharging a divisor-exclusion check (rather than a sum-bound check) is an unstated generalization: the mechanism (exact-bound extraction, interval combination) is identical, but the matrix has never written this specific application out. Flagged as a missing rule, not silently assumed identical.",
+        "wp.canonicalKey / canonicalKeySource omitted: the WP calculator (tools/Precept.MatrixTools) computes establishment/preservation WPs through a handler write plan; this obligation sits at a declaration-position evaluation site with no write plan, and the calculator has no computation path for it. Not measured, not inferred.",
+        "Live-verified at HEAD (commit e1a14d91, Precept.MatrixTools, 2026-07-21): base, discharge, and near-miss all compile with zero fault-related diagnostics — the site mints nothing regardless of premises, so the run cannot distinguish base from discharge from near-miss on the fault obligation. The `expected: reject` / `expected: accept` blocks above state the model's committed power, not what the run showed; provenance is marked live-verified because the run itself is exactly what is reported, including its failure to confirm the model's expectation.",
+        "This cell's schema also covers the other integer-lane catalog sites sharing the same 'Divisor must be non-zero' condition and the same discharge contract: IntegerModuloInteger, IntegerDivideDecimal, IntegerDivideNumber, IntegerModuloDecimal, IntegerModuloNumber."
+      ]
+    },
+    {
+      "id": "g05/event-arg-modifier-decimal",
+      "label": "Event-arg constraint-modifier bound divides — decimal lane (DecimalDivideDecimal)",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "DecimalDivideDecimal",
+        "evaluationSiteCategory": "event-arg-modifier-value-expression",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The cell",
+            "note": "item 1 — fault-family obligation schema is the catalog-declared safety precondition at the evaluation site"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The minting rule — an explicit input",
+            "note": "fault minting is catalog-stamped at evaluation sites"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Reserved != 0",
+        "metavariables": [
+          {
+            "name": "Reserved",
+            "standsFor": "the divisor (right) operand of the DecimalDivideDecimal expression at this evaluation site, per ProofEngine.ResolveParamInBinaryOp convention"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "Reserved != 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a"
+      ],
+      "premiseAvailability": "The bound belongs to an event arg's declaration, but the *divisor* it evaluates is still a reference to a FIELD (Reserved), so the fact source is still premise class (a) — field modifiers on Reserved — not an arg constraint on the arg being bounded. No guard is in scope at an event-arg declaration, and the arg itself is the subject of the bound, not a premise for it.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "Budget and Reserved are fields; event Approve's arg Cap carries a `max` bound dividing Budget by Reserved. If Reserved carries a declared modifier combination whose exact interval excludes zero (e.g. `positive`, `nonzero`, or a `min`/`max` pair bounded away from zero), that field-modifier fact (premise class (a)) discharges the obligation.",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "Resolve the divisor sub-expression to a single referenced field (reject the derivation if it is a compound expression with no single resolvable field — see the sound-but-unprovable band note below). Extract that field's exact interval by combining its declared numeric modifiers (`positive`/`nonnegative`/`nonzero`/`min`/`max`) under the same exact-decimal/exact-integer interval combination Family 1's class-(b) argument uses. Zero inside the combined interval, or no modifier excluding it, fails the derivation.",
+          "citations": [
+            {
+              "kind": "spec",
+              "ref": "docs/language/precept-language-spec.md:927",
+              "note": "ArgDecl := Identifier as TypeRef FieldModifier* — an event arg's modifier value expression uses the same FieldModifier production as a field's"
+            },
+            {
+              "kind": "spec",
+              "ref": "docs/language/precept-language-spec.md § Field Modifiers",
+              "note": "field modifiers appear after the type reference and before any computed expression, on both field and arg declarations"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+              "note": "Family 4 — fault family, arg-constraint discharge: the precedent this contract generalizes from class (b) to class (a)"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "declare the divisor field <WP> positive or nonzero",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept EaDecBase\nfield Budget as decimal default 1000.0\nfield Reserved as decimal default 0.0\nevent Approve(Cap as decimal max Budget / Reserved)",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        },
+        "discharges": [
+          {
+            "id": "field-modifier-exclusion",
+            "kind": "other",
+            "addition": "replace `field Reserved as decimal default 0.0` with `field Reserved as decimal default 1.0 positive`",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "Reserved carries a nonzero-excluding modifier -> field-modifier interval exclusion (class (a), generalized Arg-bound interval arithmetic)",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "measured at HEAD (commit e1a14d91, 2026-07-21, scratch snippet `ag.precept` and this cell's own live run): the site mints no fault obligation. Unlike field-modifier-value-expression, no `[skipped obligation]` message is printed here either — the position is silently passed over, not even reported as skipped.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "No `application` block is given: the schema's `application` discriminated union offers only two loci (`row-guard`, appending a guard to a transition row; `event-arg-declarations`, replacing named event-arg declarations) and neither fits — this discharge edits the divisor field's own declaration, a locus the DU does not yet name. Recorded as a schema gap rather than forced into either existing locus.",
+              "`dischargeWitness.kind` is recorded as `other`, not `arg-modifier`: the enum's `arg-modifier` value is precedented (Witness Family 1) for an *event-arg* modifier addition; this discharge adds a modifier to a *field* declaration instead, and no enum member names that shape. Recorded as a second schema gap alongside the `application` locus gap."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "field-modifier-exclusion",
+            "addition": "replace `field Reserved as decimal default 0.0` with `field Reserved as decimal default 0.0 nonnegative`",
+            "whyStillRejects": "`nonnegative` admits zero — the combined interval still contains 0, so the derivation still fails and the obligation still rejects, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md:927",
+          "note": "ArgDecl := Identifier as TypeRef FieldModifier* — an event arg's modifier value expression uses the same FieldModifier production as a field's"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md § Field Modifiers",
+          "note": "field modifiers appear after the type reference and before any computed expression, on both field and arg declarations"
+        },
+        {
+          "kind": "want-doc",
+          "ref": "docs/Working/what-i-want-2026-07-16.md:104",
+          "note": "fault-prevention obligation family"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+          "note": "premise class (a) — field modifiers"
+        }
+      ],
+      "notes": [
+        "No false-proof hazard: this evaluation-site category carries only premise class (a) (field modifiers) — never class (d) — so no discharge here can run through a business `rule` used as a premise (docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md Part 3, Defect B does not apply). Clean-compile confirmation of the field-modifier discharge would be admissible in principle; it is moot here because the site mints nothing at HEAD regardless (see builtStatusNote).",
+        "This derivation cites \"Arg-bound interval arithmetic\", the closest written validity argument, but the matrix's own text for that argument (obligation-discharge-matrix-2026-07-19.md, the argument's paragraph) is scoped explicitly to premise class (b) (Witness Family 1, Base A) — declared *argument* bounds summed against a rule's bound. Applying the same interval-extraction technique to a premise class (a) *field* modifier discharging a divisor-exclusion check (rather than a sum-bound check) is an unstated generalization: the mechanism (exact-bound extraction, interval combination) is identical, but the matrix has never written this specific application out. Flagged as a missing rule, not silently assumed identical.",
+        "wp.canonicalKey / canonicalKeySource omitted: the WP calculator (tools/Precept.MatrixTools) computes establishment/preservation WPs through a handler write plan; this obligation sits at a declaration-position evaluation site with no write plan, and the calculator has no computation path for it. Not measured, not inferred.",
+        "Live-verified at HEAD (commit e1a14d91, Precept.MatrixTools, 2026-07-21): base, discharge, and near-miss all compile with zero fault-related diagnostics — the site mints nothing regardless of premises, so the run cannot distinguish base from discharge from near-miss on the fault obligation. The `expected: reject` / `expected: accept` blocks above state the model's committed power, not what the run showed; provenance is marked live-verified because the run itself is exactly what is reported, including its failure to confirm the model's expectation.",
+        "This cell's schema also covers the other decimal/number-lane catalog sites sharing the same 'Divisor must be non-zero' condition and the same discharge contract: DecimalModuloDecimal, NumberDivideNumber, NumberModuloNumber."
+      ]
+    },
+    {
+      "id": "g05/collection-inner-type-modifier-integer",
+      "label": "Collection inner-type modifier bound divides — integer lane (IntegerDivideInteger)",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "IntegerDivideInteger",
+        "evaluationSiteCategory": "collection-inner-type-modifier-value-expression",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The cell",
+            "note": "item 1 — fault-family obligation schema is the catalog-declared safety precondition at the evaluation site"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The minting rule — an explicit input",
+            "note": "fault minting is catalog-stamped at evaluation sites"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Reserved != 0",
+        "metavariables": [
+          {
+            "name": "Reserved",
+            "standsFor": "the divisor (right) operand of the IntegerDivideInteger expression at this evaluation site, per ProofEngine.ResolveParamInBinaryOp convention"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "Reserved != 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a"
+      ],
+      "premiseAvailability": "The bound is a `max` value modifier in a collection's inner-type position (the per-element analogue of a scalar field bound, desugaring to a per-element rule — spec:1123). The divisor it evaluates is still a field reference (Reserved), so premise class (a) — field modifiers on Reserved — is the sole available fact source, exactly as for field-modifier-value-expression; no guard, no arg, no pre-state is in scope.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "Budget and Reserved are fields; Queue's inner-type `max` bound divides Budget by Reserved. If Reserved carries a declared modifier combination whose exact interval excludes zero (e.g. `positive`, `nonzero`, or a `min`/`max` pair bounded away from zero), that field-modifier fact (premise class (a)) discharges the obligation.",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "Resolve the divisor sub-expression to a single referenced field (reject the derivation if it is a compound expression with no single resolvable field — see the sound-but-unprovable band note below). Extract that field's exact interval by combining its declared numeric modifiers (`positive`/`nonnegative`/`nonzero`/`min`/`max`) under the same exact-decimal/exact-integer interval combination Family 1's class-(b) argument uses. Zero inside the combined interval, or no modifier excluding it, fails the derivation.",
+          "citations": [
+            {
+              "kind": "spec",
+              "ref": "docs/language/precept-language-spec.md:1123",
+              "note": "value modifiers in inner-type position desugar to a per-element rule and participate in proof identically to the same modifier on a scalar field"
+            },
+            {
+              "kind": "spec",
+              "ref": "docs/language/precept-language-spec.md:1108",
+              "note": "CollectionInnerType := ScalarType TypeQualifier? ValueModifier* — the inner-type ValueModifier production admits min/max identically to the scalar field production"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+              "note": "Family 4 — fault family, arg-constraint discharge: the precedent this contract generalizes from class (b) to class (a)"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "declare the divisor field <WP> positive or nonzero",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept CiIntBase\nfield Budget as integer default 1000\nfield Reserved as integer default 0\nfield Queue as queue of integer max Budget / Reserved",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        },
+        "discharges": [
+          {
+            "id": "field-modifier-exclusion",
+            "kind": "other",
+            "addition": "replace `field Reserved as integer default 0` with `field Reserved as integer default 1 positive`",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "Reserved carries a nonzero-excluding modifier -> field-modifier interval exclusion (class (a), generalized Arg-bound interval arithmetic)",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "measured at HEAD (commit e1a14d91, 2026-07-21, this cell's own live run — not previously measured by the prior probing pass): the site mints no fault obligation. As with event-arg-modifier-value-expression, and unlike field-modifier-value-expression, no `[skipped obligation]` message is printed — the position is silently passed over.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "No `application` block is given: the schema's `application` discriminated union offers only two loci (`row-guard`, appending a guard to a transition row; `event-arg-declarations`, replacing named event-arg declarations) and neither fits — this discharge edits the divisor field's own declaration, a locus the DU does not yet name. Recorded as a schema gap rather than forced into either existing locus.",
+              "`dischargeWitness.kind` is recorded as `other`, not `arg-modifier`: the enum's `arg-modifier` value is precedented (Witness Family 1) for an *event-arg* modifier addition; this discharge adds a modifier to a *field* declaration instead, and no enum member names that shape. Recorded as a second schema gap alongside the `application` locus gap."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "field-modifier-exclusion",
+            "addition": "replace `field Reserved as integer default 0` with `field Reserved as integer default 0 nonnegative`",
+            "whyStillRejects": "`nonnegative` admits zero — the combined interval still contains 0, so the derivation still fails and the obligation still rejects, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md:1123",
+          "note": "value modifiers in inner-type position desugar to a per-element rule and participate in proof identically to the same modifier on a scalar field"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md:1108",
+          "note": "CollectionInnerType := ScalarType TypeQualifier? ValueModifier* — the inner-type ValueModifier production admits min/max identically to the scalar field production"
+        },
+        {
+          "kind": "want-doc",
+          "ref": "docs/Working/what-i-want-2026-07-16.md:104",
+          "note": "fault-prevention obligation family"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+          "note": "premise class (a) — field modifiers"
+        }
+      ],
+      "notes": [
+        "No false-proof hazard: this evaluation-site category carries only premise class (a) (field modifiers) — never class (d) — so no discharge here can run through a business `rule` used as a premise (docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md Part 3, Defect B does not apply). Clean-compile confirmation of the field-modifier discharge would be admissible in principle; it is moot here because the site mints nothing at HEAD regardless (see builtStatusNote).",
+        "This derivation cites \"Arg-bound interval arithmetic\", the closest written validity argument, but the matrix's own text for that argument (obligation-discharge-matrix-2026-07-19.md, the argument's paragraph) is scoped explicitly to premise class (b) (Witness Family 1, Base A) — declared *argument* bounds summed against a rule's bound. Applying the same interval-extraction technique to a premise class (a) *field* modifier discharging a divisor-exclusion check (rather than a sum-bound check) is an unstated generalization: the mechanism (exact-bound extraction, interval combination) is identical, but the matrix has never written this specific application out. Flagged as a missing rule, not silently assumed identical.",
+        "wp.canonicalKey / canonicalKeySource omitted: the WP calculator (tools/Precept.MatrixTools) computes establishment/preservation WPs through a handler write plan; this obligation sits at a declaration-position evaluation site with no write plan, and the calculator has no computation path for it. Not measured, not inferred.",
+        "Live-verified at HEAD (commit e1a14d91, Precept.MatrixTools, 2026-07-21): base, discharge, and near-miss all compile with zero fault-related diagnostics — the site mints nothing regardless of premises, so the run cannot distinguish base from discharge from near-miss on the fault obligation. The `expected: reject` / `expected: accept` blocks above state the model's committed power, not what the run showed; provenance is marked live-verified because the run itself is exactly what is reported, including its failure to confirm the model's expectation.",
+        "This cell's schema also covers the other integer-lane catalog sites sharing the same 'Divisor must be non-zero' condition and the same discharge contract: IntegerModuloInteger, IntegerDivideDecimal, IntegerDivideNumber, IntegerModuloDecimal, IntegerModuloNumber."
+      ]
+    },
+    {
+      "id": "g05/collection-inner-type-modifier-decimal",
+      "label": "Collection inner-type modifier bound divides — decimal lane (DecimalDivideDecimal)",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "DecimalDivideDecimal",
+        "evaluationSiteCategory": "collection-inner-type-modifier-value-expression",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The cell",
+            "note": "item 1 — fault-family obligation schema is the catalog-declared safety precondition at the evaluation site"
+          },
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The minting rule — an explicit input",
+            "note": "fault minting is catalog-stamped at evaluation sites"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Reserved != 0",
+        "metavariables": [
+          {
+            "name": "Reserved",
+            "standsFor": "the divisor (right) operand of the DecimalDivideDecimal expression at this evaluation site, per ProofEngine.ResolveParamInBinaryOp convention"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "Reserved != 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "a"
+      ],
+      "premiseAvailability": "The bound is a `max` value modifier in a collection's inner-type position (the per-element analogue of a scalar field bound, desugaring to a per-element rule — spec:1123). The divisor it evaluates is still a field reference (Reserved), so premise class (a) — field modifiers on Reserved — is the sole available fact source, exactly as for field-modifier-value-expression; no guard, no arg, no pre-state is in scope.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "derivation": "Budget and Reserved are fields; Queue's inner-type `max` bound divides Budget by Reserved. If Reserved carries a declared modifier combination whose exact interval excludes zero (e.g. `positive`, `nonzero`, or a `min`/`max` pair bounded away from zero), that field-modifier fact (premise class (a)) discharges the obligation.",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "Resolve the divisor sub-expression to a single referenced field (reject the derivation if it is a compound expression with no single resolvable field — see the sound-but-unprovable band note below). Extract that field's exact interval by combining its declared numeric modifiers (`positive`/`nonnegative`/`nonzero`/`min`/`max`) under the same exact-decimal/exact-integer interval combination Family 1's class-(b) argument uses. Zero inside the combined interval, or no modifier excluding it, fails the derivation.",
+          "citations": [
+            {
+              "kind": "spec",
+              "ref": "docs/language/precept-language-spec.md:1123",
+              "note": "value modifiers in inner-type position desugar to a per-element rule and participate in proof identically to the same modifier on a scalar field"
+            },
+            {
+              "kind": "spec",
+              "ref": "docs/language/precept-language-spec.md:1108",
+              "note": "CollectionInnerType := ScalarType TypeQualifier? ValueModifier* — the inner-type ValueModifier production admits min/max identically to the scalar field production"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+              "note": "Family 4 — fault family, arg-constraint discharge: the precedent this contract generalizes from class (b) to class (a)"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "declare the divisor field <WP> positive or nonzero",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept CiDecBase\nfield Budget as decimal default 1000.0\nfield Reserved as decimal default 0.0\nfield Queue as queue of decimal max Budget / Reserved",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "a"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        },
+        "discharges": [
+          {
+            "id": "field-modifier-exclusion",
+            "kind": "other",
+            "addition": "replace `field Reserved as decimal default 0.0` with `field Reserved as decimal default 1.0 positive`",
+            "premiseClasses": [
+              "a"
+            ],
+            "derivation": "Reserved carries a nonzero-excluding modifier -> field-modifier interval exclusion (class (a), generalized Arg-bound interval arithmetic)",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "measured at HEAD (commit e1a14d91, 2026-07-21, this cell's own live run — not previously measured by the prior probing pass): the site mints no fault obligation. As with event-arg-modifier-value-expression, and unlike field-modifier-value-expression, no `[skipped obligation]` message is printed — the position is silently passed over.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "No `application` block is given: the schema's `application` discriminated union offers only two loci (`row-guard`, appending a guard to a transition row; `event-arg-declarations`, replacing named event-arg declarations) and neither fits — this discharge edits the divisor field's own declaration, a locus the DU does not yet name. Recorded as a schema gap rather than forced into either existing locus.",
+              "`dischargeWitness.kind` is recorded as `other`, not `arg-modifier`: the enum's `arg-modifier` value is precedented (Witness Family 1) for an *event-arg* modifier addition; this discharge adds a modifier to a *field* declaration instead, and no enum member names that shape. Recorded as a second schema gap alongside the `application` locus gap."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "field-modifier-exclusion",
+            "addition": "replace `field Reserved as decimal default 0.0` with `field Reserved as decimal default 0.0 nonnegative`",
+            "whyStillRejects": "`nonnegative` admits zero — the combined interval still contains 0, so the derivation still fails and the obligation still rejects, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md:1123",
+          "note": "value modifiers in inner-type position desugar to a per-element rule and participate in proof identically to the same modifier on a scalar field"
+        },
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md:1108",
+          "note": "CollectionInnerType := ScalarType TypeQualifier? ValueModifier* — the inner-type ValueModifier production admits min/max identically to the scalar field production"
+        },
+        {
+          "kind": "want-doc",
+          "ref": "docs/Working/what-i-want-2026-07-16.md:104",
+          "note": "fault-prevention obligation family"
+        },
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+          "note": "premise class (a) — field modifiers"
+        }
+      ],
+      "notes": [
+        "No false-proof hazard: this evaluation-site category carries only premise class (a) (field modifiers) — never class (d) — so no discharge here can run through a business `rule` used as a premise (docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md Part 3, Defect B does not apply). Clean-compile confirmation of the field-modifier discharge would be admissible in principle; it is moot here because the site mints nothing at HEAD regardless (see builtStatusNote).",
+        "This derivation cites \"Arg-bound interval arithmetic\", the closest written validity argument, but the matrix's own text for that argument (obligation-discharge-matrix-2026-07-19.md, the argument's paragraph) is scoped explicitly to premise class (b) (Witness Family 1, Base A) — declared *argument* bounds summed against a rule's bound. Applying the same interval-extraction technique to a premise class (a) *field* modifier discharging a divisor-exclusion check (rather than a sum-bound check) is an unstated generalization: the mechanism (exact-bound extraction, interval combination) is identical, but the matrix has never written this specific application out. Flagged as a missing rule, not silently assumed identical.",
+        "wp.canonicalKey / canonicalKeySource omitted: the WP calculator (tools/Precept.MatrixTools) computes establishment/preservation WPs through a handler write plan; this obligation sits at a declaration-position evaluation site with no write plan, and the calculator has no computation path for it. Not measured, not inferred.",
+        "Live-verified at HEAD (commit e1a14d91, Precept.MatrixTools, 2026-07-21): base, discharge, and near-miss all compile with zero fault-related diagnostics — the site mints nothing regardless of premises, so the run cannot distinguish base from discharge from near-miss on the fault obligation. The `expected: reject` / `expected: accept` blocks above state the model's committed power, not what the run showed; provenance is marked live-verified because the run itself is exactly what is reported, including its failure to confirm the model's expectation.",
+        "This cell's schema also covers the other decimal/number-lane catalog sites sharing the same 'Divisor must be non-zero' condition and the same discharge contract: DecimalModuloDecimal, NumberDivideNumber, NumberModuloNumber."
+      ]
+    },
+    {
+      "id": "g05/type-qualifier-integer",
+      "label": "Type qualifier expression divides — integer lane (IntegerDivideInteger) — unreachable",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "IntegerDivideInteger",
+        "evaluationSiteCategory": "type-qualifier-expression",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "empty",
+        "pruningDerivation": "empty: a type-qualifier `Expr` (`in`/`of`/`to`) is a typed constant whose single interpolation hole resolves against the `WholeValue` slot, which admits only a hole of the field's own target type (money/quantity) — never a numeric hole. Re-verified by direct measurement (commit e1a14d91, 2026-07-21, Precept.MatrixTools): `field Amount as money in '{Base / Rate}'` with integer Base/Rate rejects with `[Error] InterpolatedTypedConstantHoleTypeMismatch: '{wholevalue}' expects a the target type value, but the expression is integer — use a compatible field or literal`, and `field Amt as quantity of '{Base / Rate}'` with decimal Base/Rate rejects with the identical message reading `decimal`. The two escape routes are closed as well: an unquoted qualifier expression (`money in Base / Rate`) rejects at the parser with `[Error] ExpectedToken: Expected typed constant here, but found 'Base'`, and a multi-hole qualifier form (`money in '{Base / Rate} USD'`) rejects with `[Error] InvalidInterpolatedTypedConstantForm: 'currency' doesn't match a recognized pattern for this type` — the qualifier position recognizes a single-slot `currency` form, so no Magnitude slot is reachable there. So a primitive numeric division/modulo expression can never occupy this evaluation-site category — the type-family-mismatch pruning derivation the matrix's other empty cells use, confirmed here by direct measurement rather than by catalog cross-reference. This corrects the disposition map's 'defined' label for this coordinate, which had recorded the position as unmeasured rather than unreachable.",
+        "citations": [
+          {
+            "kind": "spec",
+            "ref": "docs/language/precept-language-spec.md § Type References",
+            "note": "type qualifiers narrow the value domain to a unit/currency (`in`) or dimension family (`of`); the qualifier's Expr resolves to that identity, not to the field's own scalar type"
+          },
+          {
+            "kind": "code",
+            "ref": "src/Precept/Pipeline/TypeChecker.Expressions.TypedConstants.cs",
+            "note": "IsSlotCompatible (line 295) and its caller at line 542: the `WholeValue` arm accepts a hole only when `holeType == targetType`, and `Magnitude` — the sole arm admitting integer/decimal/number — is not the slot a qualifier hole resolves to. The `InterpolationSlotKind` enum itself is declared in src/Precept/Pipeline/SemanticIndex.cs:199-209."
+          }
+        ]
+      },
+      "citations": [
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md § Type References",
+          "note": "type qualifiers narrow the value domain to a unit/currency (`in`) or dimension family (`of`); the qualifier's Expr resolves to that identity, not to the field's own scalar type"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Pipeline/TypeChecker.Expressions.TypedConstants.cs",
+          "note": "IsSlotCompatible (line 295) and its caller at line 542: the `WholeValue` arm accepts a hole only when `holeType == targetType`, and `Magnitude` — the sole arm admitting integer/decimal/number — is not the slot a qualifier hole resolves to. The `InterpolationSlotKind` enum itself is declared in src/Precept/Pipeline/SemanticIndex.cs:199-209."
+        }
+      ],
+      "notes": [
+        "The disposition map (slice-3 planning artifact) classified this coordinate as `defined`, reflecting the prior probe's own uncertainty (eval-sites.json: 'no unsafe operation was placed inside a qualifier, so whether the position mints fault obligations at HEAD is unmeasured'). This cell's own live testing resolves that uncertainty: the coordinate is unreachable, not merely unmeasured. Recorded as a correction, per the ground rule against inventing a 'defined' answer the matrix's rules cannot actually derive."
+      ]
+    },
+    {
+      "id": "g05/type-qualifier-decimal",
+      "label": "Type qualifier expression divides — decimal lane (DecimalDivideDecimal) — unreachable",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "DecimalDivideDecimal",
+        "evaluationSiteCategory": "type-qualifier-expression",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "empty",
+        "pruningDerivation": "empty: a type-qualifier `Expr` (`in`/`of`/`to`) is a typed constant whose single interpolation hole resolves against the `WholeValue` slot, which admits only a hole of the field's own target type (money/quantity) — never a numeric hole. Re-verified by direct measurement (commit e1a14d91, 2026-07-21, Precept.MatrixTools): `field Amount as money in '{Base / Rate}'` with integer Base/Rate rejects with `[Error] InterpolatedTypedConstantHoleTypeMismatch: '{wholevalue}' expects a the target type value, but the expression is integer — use a compatible field or literal`, and `field Amt as quantity of '{Base / Rate}'` with decimal Base/Rate rejects with the identical message reading `decimal`. The two escape routes are closed as well: an unquoted qualifier expression (`money in Base / Rate`) rejects at the parser with `[Error] ExpectedToken: Expected typed constant here, but found 'Base'`, and a multi-hole qualifier form (`money in '{Base / Rate} USD'`) rejects with `[Error] InvalidInterpolatedTypedConstantForm: 'currency' doesn't match a recognized pattern for this type` — the qualifier position recognizes a single-slot `currency` form, so no Magnitude slot is reachable there. So a primitive numeric division/modulo expression can never occupy this evaluation-site category — the type-family-mismatch pruning derivation the matrix's other empty cells use, confirmed here by direct measurement rather than by catalog cross-reference. This corrects the disposition map's 'defined' label for this coordinate, which had recorded the position as unmeasured rather than unreachable.",
+        "citations": [
+          {
+            "kind": "spec",
+            "ref": "docs/language/precept-language-spec.md § Type References",
+            "note": "type qualifiers narrow the value domain to a unit/currency (`in`) or dimension family (`of`); the qualifier's Expr resolves to that identity, not to the field's own scalar type"
+          },
+          {
+            "kind": "code",
+            "ref": "src/Precept/Pipeline/TypeChecker.Expressions.TypedConstants.cs",
+            "note": "IsSlotCompatible (line 295) and its caller at line 542: the `WholeValue` arm accepts a hole only when `holeType == targetType`, and `Magnitude` — the sole arm admitting integer/decimal/number — is not the slot a qualifier hole resolves to. The `InterpolationSlotKind` enum itself is declared in src/Precept/Pipeline/SemanticIndex.cs:199-209."
+          }
+        ]
+      },
+      "citations": [
+        {
+          "kind": "spec",
+          "ref": "docs/language/precept-language-spec.md § Type References",
+          "note": "type qualifiers narrow the value domain to a unit/currency (`in`) or dimension family (`of`); the qualifier's Expr resolves to that identity, not to the field's own scalar type"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Pipeline/TypeChecker.Expressions.TypedConstants.cs",
+          "note": "IsSlotCompatible (line 295) and its caller at line 542: the `WholeValue` arm accepts a hole only when `holeType == targetType`, and `Magnitude` — the sole arm admitting integer/decimal/number — is not the slot a qualifier hole resolves to. The `InterpolationSlotKind` enum itself is declared in src/Precept/Pipeline/SemanticIndex.cs:199-209."
+        }
+      ],
+      "notes": [
+        "The disposition map (slice-3 planning artifact) classified this coordinate as `defined`, reflecting the prior probe's own uncertainty (eval-sites.json: 'no unsafe operation was placed inside a qualifier, so whether the position mints fault obligations at HEAD is unmeasured'). This cell's own live testing resolves that uncertainty: the coordinate is unreachable, not merely unmeasured. Recorded as a correction, per the ground rule against inventing a 'defined' answer the matrix's rules cannot actually derive."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,1346 @@
+{
+  "$schema": "./cell.schema.json",
+  "familyId": "fault-18-collection-action-preconditions",
+  "title": "Fault family — collection actions with a safety precondition (group 18)",
+  "caseShape": "fault",
+  "definitionVersion": "obligation-discharge-matrix-2026-07-19 rev 7 (2026-07-20, draft)",
+  "citations": [
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § The cell",
+      "note": "the fault-family cell definition and base-minimality clause"
+    },
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+      "note": "premise classes, discharge mechanisms, suggestion schema, write-plan mechanics"
+    },
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+      "note": "the Fault family row: catalog-declared safety precondition, premise classes (b)/(c)/(a)"
+    },
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Sketch witnesses",
+      "note": "the Family 4 paragraph — fault family, arg-constraint discharge; the shared decision-procedure precedent this group's contracts follow"
+    },
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Constraint kinds",
+      "note": "a rule's attribution is fields and definition scope only — no rule mentions an event argument, which is why class (d) cannot supply a fact about an authored index operand"
+    },
+    {
+      "kind": "spec",
+      "ref": "docs/language/collection-types.md § Emptiness Safety"
+    },
+    {
+      "kind": "spec",
+      "ref": "docs/language/collection-types.md § Mutation proof obligations"
+    },
+    {
+      "kind": "spec",
+      "ref": "docs/language/collection-types.md § Guard pattern"
+    },
+    {
+      "kind": "spec",
+      "ref": "docs/language/collection-types.md § Constraint Catalog"
+    },
+    {
+      "kind": "spec",
+      "ref": "docs/language/collection-types.md § `list of T`"
+    },
+    {
+      "kind": "spec",
+      "ref": "docs/language/collection-types.md § `queue of T by P`"
+    },
+    {
+      "kind": "code",
+      "ref": "src/Precept/Language/Actions.cs:108",
+      "note": "the six catalog ActionMeta entries this group's sites derive from span lines 108-266 (Dequeue, Pop, Insert, RemoveAt, DequeueBy)"
+    },
+    {
+      "kind": "code",
+      "ref": "src/Precept/Language/ProofRequirement.cs:249",
+      "note": "IndexBoundsMode (StrictlyBefore for remove/at-access, AtOrBefore for insert) and IndexBoundsProofRequirement, spanning lines 249-270"
+    },
+    {
+      "kind": "code",
+      "ref": "src/Precept/Pipeline/ProofEngine.Strategies.cs:390",
+      "note": "TryIndexBoundsProof — the guard-in-path strategy this group's index-bounds discharge contracts are measured against, spanning lines 390-474; the guard-required-unconditionally rule for the upper bound is at lines 441-445"
+    },
+    {
+      "kind": "code",
+      "ref": "src/Precept/Pipeline/ProofEngine.Diagnostics.cs:303",
+      "note": "TryCreateCollectionSafetyDiagnostic — site-shape dispatch to UnguardedCollectionMutation for the action case, spanning lines 303-342"
+    },
+    {
+      "kind": "code",
+      "ref": "src/Precept/Language/Modifiers.cs:195",
+      "note": "ModifierKind.Mincount ProofSatisfaction.Numeric; full declaration spans lines 195-208"
+    },
+    {
+      "kind": "code",
+      "ref": "src/Precept/Language/Modifiers.cs:69",
+      "note": "ModifierKind.Nonnegative ProofSatisfaction.Numeric(SelfValue, GreaterThanOrEqual, Constant(0)); full declaration spans lines 69-80"
+    },
+    {
+      "kind": "code",
+      "ref": "src/Precept/Pipeline/ProofLedger.cs:100",
+      "note": "ProofStrategy enum, including CollectionGrowth = 11 (\"a count > 0 obligation discharged by a prior grow action in the same chain\"), spanning lines 100-115"
+    },
+    {
+      "kind": "owner-ruling",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md § Defect B",
+      "note": "the false-proof hazard for rule-premise discharges — tested directly for every class-(d) route in this group; every attempt rejected (unresolved-today), so the hazard did not materialize in any witness recorded here",
+      "date": "2026-07-20"
+    }
+  ],
+  "respellability": {
+    "verdict": "yes",
+    "evidence": "model-derived",
+    "corpusMeasurement": "pending",
+    "licensedNonBandExamples": [
+      {
+        "spelling": "from Cart on ReorderItem when ReorderItem.FromIndex < LineItems.count and ReorderItem.ToIndex < LineItems.count and LineItems.count > 0 -> insert LineItems ... at ReorderItem.ToIndex -> remove LineItems at ReorderItem.FromIndex",
+        "whyLicensed": "a real corpus row discharging two index-bounds obligations (insert and remove-at, on the same list) by ANDing three separate guard conjuncts in one when clause — exactly the multi-conjunct guard-match reading this group's guard-alone contract entries rest on, not an invented extension",
+        "citations": [
+          { "kind": "code", "ref": "samples/shopping-cart.precept:187", "note": "the four-row ReorderItem sequence spans lines 187-196" }
+        ]
+      }
+    ],
+    "citations": [
+      {
+        "kind": "matrix",
+        "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Ratification protocol",
+        "note": "layer 4: corpus measurement is the hard gate"
+      }
+    ],
+    "notes": [
+      "Every sound band member's business intent respells into a licensed guard restating F.count > 0 (operand-free cells) or a guard/arg-modifier combination stating both halves of the index-bounds WP (operand cells), mirroring Witness Family 1 and group 13's respellability findings.",
+      "One concrete band member found this session, generalizing group 13's finding to the action (mutating) case: `F.count >= 1` is not recognized by the guard-match decision procedure for the operand-free obligation (live-verified); its licensed respelling is `F.count > 0` itself."
+    ]
+  },
+  "cells": [
+    {
+      "id": "g18/dequeue-nonempty",
+      "label": "Dequeue — queue must be non-empty (operand-free action precondition)",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "action/Dequeue/numeric-0",
+        "evaluationSiteCategory": "operand-free-action-precondition",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes" }
+        ]
+      },
+      "obligation": {
+        "statement": "F.count > 0",
+        "metavariables": [
+          { "name": "F", "standsFor": "the queue field the dequeue action mutates" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" }
+        ],
+        "wp": { "statement": "F.count > 0" }
+      },
+      "applicablePremiseClasses": ["c", "d"],
+      "premiseAvailability": "Dequeue carries no authored operand — its ActionMeta requirement names the collection field itself as the subject, so no event argument is in play at all and class (b) never applies (there is nothing to constrain). Class (a) (a mincount modifier) does NOT independently apply: declaring mincount on a field a shrinking action mutates introduces its own carrier obligation (CountBoundViolation, PRE0136) that itself requires a guard, and the guard that closes that carrier obligation already closes this one on its own — mincount contributes no discharge power beyond what the guard alone provides (live-verified, this cell; see notes). Class (c) applies at every occurrence of this obligation, since a guard position is always in scope wherever the action fires. Class (d) applies wherever a pre-state exists for this obligation.",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["c"],
+          "derivation": "guard conjunct normal-form-equal to the WP (F.count > 0) -> guard-match",
+          "capabilityTier": "1a",
+          "strategy": "GuardInPath",
+          "validityArguments": ["Guard normal-form match"],
+          "decisionProcedure": "Normal-form match of the WP (F.count > 0) against the row's guard conjuncts (a finite set). A conjunct normal-form-equal to F.count > 0 discharges; a semantically-equivalent but non-normal-form spelling (e.g. F.count >= 1) does not match under the stated normalization and is rejected (live-verified, this group) — a sound-but-unprovable band member, not a near-miss.",
+          "citations": [
+            { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments", "note": "Guard normal-form match" },
+            { "kind": "spec", "ref": "docs/language/collection-types.md § Guard pattern", "note": "\"the proof engine recognizes F.count > 0 in the when clause as sufficient proof for ... dequeue, and pop operations\"" }
+          ]
+        },
+        {
+          "premiseClasses": ["d"],
+          "derivation": "a rule stating F.count > 0 (or a bound entailing it) holds in the pre-state, and no earlier action in the plan writes F before this dequeue, so the fact is frame-preserved to the precondition check",
+          "validityArguments": ["Inductive hypothesis plus sign monotonicity"],
+          "decisionProcedure": "Look up a rule establishing F.count > 0 (or an entailing bound) as holding in the pre-state, and confirm no earlier write-plan action writes F before this one. Absent such a rule, fails the class.",
+          "citations": [
+            { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments", "note": "Inductive hypothesis plus sign monotonicity" },
+            { "kind": "owner-ruling", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md § Defect B", "note": "false-proof hazard for rule-premise discharges — tested directly here rather than assumed; the rule premise did not discharge at HEAD (still rejects), so no false accept occurred", "date": "2026-07-20" }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": ["c"],
+          "schema": "add a guard normal-form-equal to <WP>",
+          "citations": [
+            { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the suggestion-schema bullet" }
+          ]
+        },
+        {
+          "premiseClasses": ["d"],
+          "schema": "restate <WP> as a rule holding in the pre-state, established at construction and preserved by every other write site of the collection",
+          "citations": [
+            { "kind": "owner-ruling", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md § Defect B", "date": "2026-07-20" }
+          ],
+          "notes": [
+            "HEAD does not consume a rule as a premise for this obligation today (live-verified) — where it is built, the false-proof hazard applies (Defect B)."
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept CollectionActionG18Dequeue\n\nfield WorkQueue as queue of string maxlength 200\nfield LastItem as string optional maxlength 200\n\nstate Active initial\n\nevent Begin initial\nevent Process\n\non Begin\n    -> enqueue WorkQueue \"seed\"\n    -> set LastItem = \"none\"\n\nfrom Active on Process\n    -> dequeue WorkQueue into LastItem\n    -> no transition\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": ["c"],
+            "noOtherDiagnostics": true
+          },
+          "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools", "date": "2026-07-21", "head": "e1a14d91" }
+        },
+        "discharges": [
+          {
+            "id": "guard-nf",
+            "kind": "guard",
+            "addition": "when WorkQueue.count > 0",
+            "application": { "locus": "row-guard", "eventName": "Process" },
+            "premiseClasses": ["c"],
+            "derivation": "guard fact normal-form-equal to the WP -> guard-match",
+            "strategy": "GuardInPath",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true },
+            "notes": ["Live-verified in witness-g18/dequeue-discharge-c-guard.precept."]
+          },
+          {
+            "id": "rule-premise",
+            "kind": "other",
+            "addition": "rule WorkQueue.count > 0 because \"seeded queue never runs dry\"",
+            "premiseClasses": ["d"],
+            "derivation": "premise (d): rule holds in pre-state; no earlier plan action writes F -> frame-preserved",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "Live-verified: with the rule declared and no other premise, the dequeue still raises UnguardedCollectionMutation — this fault check does not consume rule facts as a premise at HEAD.",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true },
+            "notes": ["Live-verified in witness-g18/dequeue-discharge-d-rule.precept."]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "guard-nf",
+            "addition": "when WorkQueue.count >= 0",
+            "whyStillRejects": "vacuously true for a non-negative count — carries no information, must still reject, same obligation",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "reject", "sameObligation": true },
+            "notes": ["Live-verified in witness-g18/dequeue-nearmiss-c-guard.precept."]
+          },
+          {
+            "pairsWith": "rule-premise",
+            "addition": "rule WorkQueue.count >= 0 because \"...\"",
+            "whyStillRejects": "vacuous rule (count is never negative) — establishes nothing beyond the type's own range, must still reject, same obligation",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "reject", "sameObligation": true },
+            "notes": ["Not independently run — the rule-premise route already does not discharge at HEAD (builtStatus unresolved-today above), so a weakened rule cannot newly break through; recorded model-derived to keep the polarity honest rather than claiming an unrun compile."]
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [
+        { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes", "note": "Fault family row: the catalog-declared safety precondition at the evaluation site" },
+        { "kind": "code", "ref": "src/Precept/Language/Actions.cs:108", "note": "ActionKind.Dequeue — NumericProofRequirement(SelfSubject(count), GreaterThan, 0, \"Queue must be non-empty\"); full declaration spans lines 108-121" },
+        { "kind": "spec", "ref": "docs/language/collection-types.md § `queue`", "note": "the dequeue action table naming the .count > 0 proof requirement" },
+        { "kind": "spec", "ref": "docs/language/collection-types.md § Guard pattern" }
+      ],
+      "notes": [
+        "Mincount finding: declaring `mincount 1` on WorkQueue with NO guard does not discharge this obligation cleanly — it converts the fault into a different one (CountBoundViolation, PRE0136, `docs/language/collection-types.md:792`), because mincount on a field a shrinking action mutates carries its own in-band obligation. The guard that closes CountBoundViolation (`when F.count > mincount`) also closes this cell's obligation on its own; mincount contributes no independent or additive discharge power for a MUTATING site, unlike group 13's pure-read accessors where mincount alone is sufficient. Live-verified (this session): `mincount 1` alone -> CountBoundViolation; `mincount 1` + `when F.count > 1` -> clean; `mincount 1` + `when F.count > 0` (weakened) -> CountBoundViolation, not this cell's obligation, so it cannot serve as this cell's near-miss either. Class (a) is therefore omitted from the applicable set rather than force-fit into a contract entry whose near-miss would misrepresent a different obligation as this one.",
+        "The (c) and (d) discharges/near-misses were live-verified for this specific action (Dequeue). Pop and DequeueBy carry the identical NumericProofRequirement catalog shape (Actions.cs) and were spot-verified for the (c) route only (base + discharge + near-miss); see g18/pop-nonempty and g18/dequeueby-nonempty."
+      ]
+    },
+    {
+      "id": "g18/pop-nonempty",
+      "label": "Pop — stack must be non-empty (operand-free action precondition)",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "action/Pop/numeric-0",
+        "evaluationSiteCategory": "operand-free-action-precondition",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes" }
+        ]
+      },
+      "obligation": {
+        "statement": "F.count > 0",
+        "metavariables": [
+          { "name": "F", "standsFor": "the stack field the pop action mutates" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" }
+        ],
+        "wp": { "statement": "F.count > 0" }
+      },
+      "applicablePremiseClasses": ["c", "d"],
+      "premiseAvailability": "Identical shape and reasoning to g18/dequeue-nonempty: Pop carries no authored operand, class (b) never applies, class (a) is not independently sufficient on a shrinking action (see that cell's notes), class (c) always applies, class (d) applies wherever a pre-state exists.",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["c"],
+          "derivation": "guard conjunct normal-form-equal to the WP (F.count > 0) -> guard-match",
+          "capabilityTier": "1a",
+          "strategy": "GuardInPath",
+          "validityArguments": ["Guard normal-form match"],
+          "decisionProcedure": "Normal-form match of the WP against the row's guard conjuncts (a finite set); see g18/dequeue-nonempty for the full decision procedure, identical here.",
+          "citations": [
+            { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments", "note": "Guard normal-form match" },
+            { "kind": "spec", "ref": "docs/language/collection-types.md § Guard pattern" }
+          ]
+        },
+        {
+          "premiseClasses": ["d"],
+          "derivation": "a rule stating F.count > 0 holds in the pre-state, and no earlier action in the plan writes F before this pop, so the fact is frame-preserved to the precondition check",
+          "validityArguments": ["Inductive hypothesis plus sign monotonicity"],
+          "decisionProcedure": "As g18/dequeue-nonempty.",
+          "citations": [
+            { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments", "note": "Inductive hypothesis plus sign monotonicity" },
+            { "kind": "owner-ruling", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md § Defect B", "date": "2026-07-20" }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": ["c"],
+          "schema": "add a guard normal-form-equal to <WP>",
+          "citations": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary" } ]
+        },
+        {
+          "premiseClasses": ["d"],
+          "schema": "restate <WP> as a rule holding in the pre-state, established at construction and preserved by every other write site of the collection",
+          "citations": [ { "kind": "owner-ruling", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md § Defect B", "date": "2026-07-20" } ],
+          "notes": ["HEAD does not consume a rule as a premise for this obligation today (not independently re-run for Pop; see g18/dequeue-nonempty's live result on the identical catalog shape)."]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept CollectionActionG18Pop\n\nfield HistoryStack as stack of string maxlength 200\nfield LastPopped as string optional maxlength 200\n\nstate Active initial\n\nevent Begin initial\nevent Process\n\non Begin\n    -> push HistoryStack \"seed\"\n    -> set LastPopped = \"none\"\n\nfrom Active on Process\n    -> pop HistoryStack into LastPopped\n    -> no transition\n",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["c"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools", "date": "2026-07-21", "head": "e1a14d91" }
+        },
+        "discharges": [
+          {
+            "id": "guard-nf",
+            "kind": "guard",
+            "addition": "when HistoryStack.count > 0",
+            "application": { "locus": "row-guard", "eventName": "Process" },
+            "premiseClasses": ["c"],
+            "derivation": "guard fact normal-form-equal to the WP -> guard-match",
+            "strategy": "GuardInPath",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true },
+            "notes": ["Live-verified in witness-g18/pop-discharge-c-guard.precept."]
+          },
+          {
+            "id": "rule-premise",
+            "kind": "other",
+            "addition": "rule HistoryStack.count > 0 because \"seeded stack never runs dry\"",
+            "premiseClasses": ["d"],
+            "derivation": "premise (d): rule holds in pre-state; no earlier plan action writes F -> frame-preserved",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "Not independently re-run for Pop; the identical NumericProofRequirement catalog shape (Actions.cs) is expected to behave as g18/dequeue-nonempty's live result (rejects, unresolved-today) — recorded as model-derived-from-representative, not independently confirmed.",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true },
+            "notes": ["Model-derived from g18/dequeue-nonempty's live-verified representative; not independently run for Pop."]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "guard-nf",
+            "addition": "when HistoryStack.count >= 0",
+            "whyStillRejects": "vacuously true for a non-negative count — must still reject, same obligation",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "reject", "sameObligation": true },
+            "notes": ["Live-verified in witness-g18/pop-nearmiss-c-guard.precept."]
+          },
+          {
+            "pairsWith": "rule-premise",
+            "addition": "rule HistoryStack.count >= 0 because \"...\"",
+            "whyStillRejects": "vacuous rule — must still reject, same obligation",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [
+        { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes" },
+        { "kind": "code", "ref": "src/Precept/Language/Actions.cs:132", "note": "ActionKind.Pop — NumericProofRequirement(SelfSubject(count), GreaterThan, 0, \"Stack must be non-empty\"); full declaration spans lines 132-145" },
+        { "kind": "spec", "ref": "docs/language/collection-types.md § `stack`" },
+        { "kind": "spec", "ref": "docs/language/collection-types.md § Guard pattern" }
+      ],
+      "notes": [
+        "Spot-verified representative of g18/dequeue-nonempty's shared story; the mincount finding recorded there applies unchanged here (identical catalog shape)."
+      ]
+    },
+    {
+      "id": "g18/dequeueby-nonempty",
+      "label": "DequeueBy — keyed queue must be non-empty (operand-free action precondition)",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "action/DequeueBy/numeric-0",
+        "evaluationSiteCategory": "operand-free-action-precondition",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes" }
+        ]
+      },
+      "obligation": {
+        "statement": "F.count > 0",
+        "metavariables": [
+          { "name": "F", "standsFor": "the keyed queue (queue of T by P) field the dequeue action mutates" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary" }
+        ],
+        "wp": { "statement": "F.count > 0" }
+      },
+      "applicablePremiseClasses": ["c", "d"],
+      "premiseAvailability": "Identical shape and reasoning to g18/dequeue-nonempty — DequeueBy is the queue-of-T-by-P analogue of Dequeue and shares the same NumericProofRequirement catalog shape (Actions.cs).",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["c"],
+          "derivation": "guard conjunct normal-form-equal to the WP (F.count > 0) -> guard-match",
+          "capabilityTier": "1a",
+          "strategy": "GuardInPath",
+          "validityArguments": ["Guard normal-form match"],
+          "decisionProcedure": "As g18/dequeue-nonempty.",
+          "citations": [
+            { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments", "note": "Guard normal-form match" },
+            { "kind": "spec", "ref": "docs/language/collection-types.md § `queue of T by P`", "note": "\"Proof engine implications: Emptiness obligations identical to queue\"" }
+          ]
+        },
+        {
+          "premiseClasses": ["d"],
+          "derivation": "a rule stating F.count > 0 holds in the pre-state, and no earlier action in the plan writes F before this dequeue, so the fact is frame-preserved",
+          "validityArguments": ["Inductive hypothesis plus sign monotonicity"],
+          "decisionProcedure": "As g18/dequeue-nonempty.",
+          "citations": [
+            { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments", "note": "Inductive hypothesis plus sign monotonicity" },
+            { "kind": "owner-ruling", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md § Defect B", "date": "2026-07-20" }
+          ]
+        }
+      ],
+      "suggestions": [
+        { "premiseClasses": ["c"], "schema": "add a guard normal-form-equal to <WP>", "citations": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary" } ] },
+        {
+          "premiseClasses": ["d"],
+          "schema": "restate <WP> as a rule holding in the pre-state, established at construction and preserved by every other write site of the collection",
+          "citations": [ { "kind": "owner-ruling", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md § Defect B", "date": "2026-07-20" } ],
+          "notes": ["Not independently re-run; see g18/dequeue-nonempty's live-verified representative."]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept CollectionActionG18DequeueBy\n\nfield TriageQueue as queue of string by integer\nfield LastTriaged as string optional maxlength 200\n\nstate Active initial\n\nevent Begin initial\nevent Process\n\non Begin\n    -> enqueue TriageQueue \"seed\" by 1\n    -> set LastTriaged = \"none\"\n\nfrom Active on Process\n    -> dequeue TriageQueue into LastTriaged\n    -> no transition\n",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["c"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools", "date": "2026-07-21", "head": "e1a14d91" }
+        },
+        "discharges": [
+          {
+            "id": "guard-nf",
+            "kind": "guard",
+            "addition": "when TriageQueue.count > 0",
+            "application": { "locus": "row-guard", "eventName": "Process" },
+            "premiseClasses": ["c"],
+            "derivation": "guard fact normal-form-equal to the WP -> guard-match",
+            "strategy": "GuardInPath",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true },
+            "notes": ["Live-verified in witness-g18/dequeueby-discharge-c-guard.precept."]
+          },
+          {
+            "id": "rule-premise",
+            "kind": "other",
+            "addition": "rule TriageQueue.count > 0 because \"seeded queue never runs dry\"",
+            "premiseClasses": ["d"],
+            "derivation": "premise (d): rule holds in pre-state; no earlier plan action writes F -> frame-preserved",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "Model-derived from g18/dequeue-nonempty's live-verified representative (identical NumericProofRequirement shape); not independently run for DequeueBy.",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "guard-nf",
+            "addition": "when TriageQueue.count >= 0",
+            "whyStillRejects": "vacuously true for a non-negative count — must still reject, same obligation",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "reject", "sameObligation": true },
+            "notes": ["Live-verified in witness-g18/dequeueby-nearmiss-c-guard.precept."]
+          },
+          {
+            "pairsWith": "rule-premise",
+            "addition": "rule TriageQueue.count >= 0 because \"...\"",
+            "whyStillRejects": "vacuous rule — must still reject, same obligation",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [
+        { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes" },
+        { "kind": "code", "ref": "src/Precept/Language/Actions.cs:253", "note": "ActionKind.DequeueBy — NumericProofRequirement(SelfSubject(count), GreaterThan, 0, \"Queue must be non-empty\"); full declaration spans lines 253-266" },
+        { "kind": "spec", "ref": "docs/language/collection-types.md § `queue of T by P`" }
+      ],
+      "notes": [
+        "Spot-verified representative of g18/dequeue-nonempty's shared story for the keyed-queue lane."
+      ]
+    },
+    {
+      "id": "g18/insert-indexbounds-transition",
+      "label": "Insert at — index bounds [0, count], transition row",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "action/Insert/indexbounds-0",
+        "evaluationSiteCategory": "transition-row-action-operand",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes" }
+        ]
+      },
+      "obligation": {
+        "statement": "0 <= Index and Index <= F.count",
+        "metavariables": [
+          { "name": "Index", "standsFor": "the authored index expression the insert action's `at` clause supplies" },
+          { "name": "F", "standsFor": "the list field the insert action mutates" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" }
+        ],
+        "wp": { "statement": "0 <= Index and Index <= F.count" }
+      },
+      "applicablePremiseClasses": ["b", "c"],
+      "premiseAvailability": "The WP is a conjunction of two relational facts about two different quantities: a lower bound on Index (an event argument) and an upper bound comparing Index against F's own count. Class (b) can supply the lower-bound conjunct alone, via a `nonnegative` arg modifier — a direct instance of the already-written Arg-bound interval arithmetic argument. Class (b) cannot supply the upper-bound conjunct: F.count is a runtime-computed collection property, not a declarable literal bound, so no arg modifier can state a relationship to it. Class (c) can supply either or both conjuncts as guard facts. Class (d) does NOT apply: a rule mentions only fields (`docs/Working/obligation-discharge-matrix-2026-07-19.md § Constraint kinds` — attribution is fields and definition scope), and Index is an event argument, never a rule subject; live-tested this session (a rule stating a bound on F.count, with no guard at all, leaves the obligation rejected) confirms this is not merely unbuilt but structurally outside what a rule can state about this WP's Index term.",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["c"],
+          "derivation": "both WP conjuncts matched, each normal-form-equal, against distinct conjuncts of the row's guard -> guard-match",
+          "capabilityTier": "1a",
+          "strategy": "GuardInPath",
+          "validityArguments": ["Guard normal-form match"],
+          "decisionProcedure": "Family 1's own decision-procedure text speaks of matching the WP against \"the row's guard conjuncts (a finite set)\" (plural); applied here to a two-conjunct WP, each conjunct is independently matched against the guard's own conjunct set, or the guard states a single relational expression normal-form-equal to the whole conjunction. A stricter guard (e.g. `Index < F.count` in place of `Index <= F.count`) also discharges, since it entails the WP's conjunct (live-verified). Any guard failing to establish both conjuncts — lower bound only, or an off-by-one upper bound — rejects (live-verified, same obligation).",
+          "citations": [
+            { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Sketch witnesses", "note": "Family 1's own decision procedure for class (c): \"normal-form match of the WP against the row's guard conjuncts (a finite set)\"" },
+            { "kind": "code", "ref": "samples/shopping-cart.precept:187", "note": "a real corpus row discharging insert-at and remove-at index-bounds obligations via three ANDed guard conjuncts in the same when clause, spanning lines 187-196" }
+          ]
+        },
+        {
+          "premiseClasses": ["b", "c"],
+          "derivation": "the index arg declared `nonnegative` discharges the lower-bound conjunct (type-derived, no guard conjunct needed for it); a guard conjunct normal-form-equal to the upper-bound conjunct (Index <= F.count) discharges the rest",
+          "strategy": "GuardInPath",
+          "validityArguments": ["Arg-bound interval arithmetic", "Guard normal-form match"],
+          "decisionProcedure": "The built strategy (TryIndexBoundsProof) always requires a guard for the upper bound — there is no type-derived counterpart to `nonnegative` for a dynamic collection size — but the lower bound may come from either the guard or the arg's declared `nonnegative` modifier; a guard stating the upper-bound conjunct alone, with the arg declared nonnegative and no lower-bound guard conjunct at all, still discharges (live-verified). Weakening the upper-bound conjunct (off-by-one) still rejects, same obligation (live-verified).",
+          "citations": [
+            { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments", "note": "Arg-bound interval arithmetic — an arg's declared bound instantiated directly as a WP conjunct, the same shape as Family 1 Base A" },
+            { "kind": "code", "ref": "src/Precept/Language/Modifiers.cs:69", "note": "ModifierKind.Nonnegative ProofSatisfaction.Numeric(SelfValue, GreaterThanOrEqual, Constant(0))" },
+            { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.Strategies.cs:436", "note": "type-derived lower-bound check (IsTypeDerivedNonnegative) and the comment explaining why the upper bound always needs an explicit guard, lines 436-445" }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": ["b"],
+          "schema": "declare the index argument `nonnegative` to discharge the lower-bound half of <WP>; the upper-bound half still needs a guard (class c)",
+          "citations": [ { "kind": "code", "ref": "src/Precept/Language/Modifiers.cs:69" } ],
+          "notes": ["Class (b) alone never fully discharges this obligation — it is a partial, always-combine-with-(c) contributor, unlike a single-conjunct WP where an arg bound can close the whole obligation on its own."]
+        },
+        {
+          "premiseClasses": ["c"],
+          "schema": "add a guard normal-form-equal to <WP>",
+          "citations": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary" } ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept CollectionActionG18InsertTransition\n\nfield ItemList as list of string maxlength 200\n\nstate Active initial\n\nevent Begin initial\nevent InsertItem(NewItem as string maxlength 200, Position as integer)\n\non Begin\n    -> append ItemList \"seed\"\n\nfrom Active on InsertItem\n    -> insert ItemList InsertItem.NewItem at InsertItem.Position\n    -> no transition\n",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["b", "c"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools", "date": "2026-07-21", "head": "e1a14d91" }
+        },
+        "discharges": [
+          {
+            "id": "guard-both",
+            "kind": "guard",
+            "addition": "when InsertItem.Position >= 0 and InsertItem.Position <= ItemList.count",
+            "application": { "locus": "row-guard", "eventName": "InsertItem" },
+            "premiseClasses": ["c"],
+            "derivation": "both WP conjuncts matched against distinct guard conjuncts -> guard-match",
+            "strategy": "GuardInPath",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true },
+            "notes": [
+              "Live-verified in witness-g18/insert-transition-discharge-c-guard.precept.",
+              "A strictly stronger guard (`Position < ItemList.count`, StrictlyBefore shape instead of AtOrBefore) also discharges cleanly — live-verified in witness-g18/insert-transition-strict-lt.precept — since it entails the AtOrBefore WP; recorded to show the discharge is not brittle to the exact comparison operator, only to the direction of entailment."
+            ]
+          },
+          {
+            "id": "nonneg-arg-plus-upper-guard",
+            "kind": "arg-modifier",
+            "addition": "Position as integer nonnegative",
+            "application": {
+              "locus": "event-arg-declarations",
+              "replacements": [ { "eventName": "InsertItem", "argName": "Position", "declaration": "Position as integer nonnegative" } ]
+            },
+            "premiseClasses": ["b", "c"],
+            "derivation": "nonnegative arg -> type-derived lower bound; guard `Position <= ItemList.count` (upper-bound conjunct only) -> guard-match for the rest",
+            "strategy": "GuardInPath",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true },
+            "notes": [
+              "Live-verified in witness-g18/insert-transition-bc-nonneg-plus-upper.precept. The guard here carries only the upper-bound conjunct (no `Position >= 0` at all) — confirms the lower bound is genuinely type-derived from the modifier, not silently required in the guard too.",
+              "The nonnegative arg alone, with NO guard at all, still rejects (live-verified, witness-g18/insert-transition-b-nonneg-only.precept) — confirms class (b) never independently discharges the whole obligation, matching the code comment that the upper bound always needs an explicit guard (ProofEngine.Strategies.cs:441-445)."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "guard-both",
+            "addition": "when InsertItem.Position >= 0",
+            "whyStillRejects": "establishes the lower bound only; the upper-bound conjunct is absent, so the collection could still be shorter than Position — must still reject, same obligation",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "reject", "sameObligation": true },
+            "notes": ["Live-verified in witness-g18/insert-transition-nearmiss-lower-only.precept."]
+          },
+          {
+            "pairsWith": "nonneg-arg-plus-upper-guard",
+            "addition": "when InsertItem.Position <= ItemList.count + 1",
+            "whyStillRejects": "off-by-one upper bound — admits Position == count + 1, one past the legal insertion range — must still reject, same obligation",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "reject", "sameObligation": true },
+            "notes": ["Live-verified in witness-g18/insert-transition-bc-nearmiss.precept (nonnegative arg retained, only the guard's upper bound weakened)."]
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "cell-override",
+        "overrideVerdict": "yes",
+        "bandMember": "when InsertItem.Position >= 0 and InsertItem.Position <= ItemList.count - 0",
+        "respelling": "when InsertItem.Position >= 0 and InsertItem.Position <= ItemList.count",
+        "citations": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Sketch witnesses" }
+        ],
+        "notes": ["Not independently corpus-measured for this specific two-conjunct shape; recorded as a per-cell override because the family verdict was stated over the single-conjunct operand-free obligations and this cell's band is a compound-conjunct case the family text does not explicitly speak to."]
+      },
+      "citations": [
+        { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes" },
+        { "kind": "code", "ref": "src/Precept/Language/Actions.cs:183", "note": "ActionKind.Insert — IndexBoundsProofRequirement(ParamSubject(index), AtOrBefore, CollectionCountAccessor, \"Insert index must be within bounds [0, count]\"); full declaration spans lines 183-202" },
+        { "kind": "spec", "ref": "docs/language/collection-types.md § `list of T`", "note": "\"insert at N ... Precondition: N >= 0 and N <= F.count. Author writes guard; proof engine raises UnguardedCollectionAccess if absent\" (line 1030) — the diagnostic actually raised at HEAD is IndexBoundsGuard, not UnguardedCollectionAccess; see notes" }
+      ],
+      "notes": [
+        "Diagnostic-code discrepancy between doc and code: `docs/language/collection-types.md:1030-1032` states the unguarded diagnostic is `UnguardedCollectionAccess` for insert-at/remove-at; HEAD actually raises `IndexBoundsGuard` (PRE0100) uniformly for every IndexBoundsProofRequirement, confirmed live this session and matching this group's authoring notes (\"measured: IndexBoundsGuard for insert-at\"). `src/Precept/Language/ProofRequirement.cs:367-370` pins IndexBoundsGuard as the catalog-declared code. This is a doc/code drift the matrix's doc-sync obligations should pick up when this family is promoted; not fixed here (outside this task's scope — the cells file only records the measured behaviour honestly)."
+      ]
+    },
+    {
+      "id": "g18/insert-indexbounds-construction",
+      "label": "Insert at — index bounds [0, count], construction row",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "action/Insert/indexbounds-0",
+        "evaluationSiteCategory": "construction-row-action-operand",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "open",
+        "citations": [
+          { "kind": "code", "ref": "src/Precept/Language/DiagnosticCode.cs:207", "note": "ConstructionGuardReadsUninitializedField — a construction-row guard cannot read a field at all, live-verified this session; not yet stated in the canonical language spec" },
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments", "note": "\"Establishment over defaults\" and \"Literal constant-fold for defaults\" are both scoped to fields the firing construction row does NOT write — neither covers a field the plan itself grows and then indexes into" }
+        ]
+      },
+      "obligation": {
+        "statement": "0 <= Index and Index <= F.count",
+        "metavariables": [
+          { "name": "Index", "standsFor": "the authored index expression the insert action's `at` clause supplies" },
+          { "name": "F", "standsFor": "the list field the insert action mutates" }
+        ],
+        "normalization": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary" } ],
+        "wp": { "statement": "0 <= Index and Index <= F.count" }
+      },
+      "witnesses": {
+        "base": {
+          "program": "precept CollectionActionG18InsertConstructionSeq\n\nfield ItemList as list of string maxlength 200\n\nstate Active initial\n\nevent Begin(NewItem as string maxlength 200) initial\n\non Begin\n    -> append ItemList \"seed\"\n    -> insert ItemList Begin.NewItem at 0\n",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["b", "c"], "noOtherDiagnostics": false },
+          "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools", "date": "2026-07-21", "head": "e1a14d91" }
+        }
+      },
+      "citations": [
+        { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes", "note": "the obligation is genuinely minted; only its discharge is undecided" },
+        { "kind": "code", "ref": "src/Precept/Language/Actions.cs:183" }
+      ],
+      "notes": [
+        "This cell is open, not defined — the disposition-pass input (`disposition-map.json`) marked this coordinate `defined`, but authoring it against the matrix's actual written text surfaced that no discharge route is derivable, so it is corrected to `open` here per this task's ground rule 1 (never invent an answer) rather than force a contract that does not exist in the generative sections.",
+        "Why class (c) is unavailable here and nowhere else in this group: a construction-row guard cannot read ANY field — `ConstructionGuardReadsUninitializedField` fires the instant a construction guard mentions `ItemList` at all, live-verified this session (`witness-g18/insert-construction-guard-test2.precept`). This is a hard, structural exclusion specific to the construction-row-action-operand category; transition rows and state hooks read a real pre-existing entity and do not carry it (both live-verified elsewhere in this group).",
+        "Why class (b)/(a) do not cover the gap either: the upper-bound conjunct (`Index <= F.count`) needs a fact about F's count, which no arg modifier can state (count is not a declarable literal bound). Tested whether a literal, statically-known count could substitute — a field with a literal `default [...]` of exactly matching length, combined with an arg `max` bound equal to that length, and no guard at all — and HEAD still rejects (`witness-g18/insert-construction-default-literal.precept`, live-verified). Also tested whether the write plan's own prior actions (an `append` before the `insert`, using a literal index provably in range) discharge via sequential tracking with no guard at all — HEAD still rejects (`witness-g18/insert-construction-seq-track.precept` and `.../insert-construction-seq-empty.precept`, both live-verified). No route tried succeeds.",
+        "Whether the model (as opposed to the built engine) licenses a discharge here at all is the actual open question, not merely an unbuilt feature. The matrix's write-plan vocabulary states generally that \"an expression later in a plan does see the results of earlier writes ... and its own fault obligations are minted per evaluation site,\" which is suggestive that a literal-fold-through-the-plan route SHOULD be derivable in principle — but the two named defaults arguments (\"Establishment over defaults,\" \"Literal constant-fold for defaults\") are both explicitly scoped to a field the row does NOT write, which is the opposite of this case (the field is grown then indexed within the same plan). No generative rule in the matrix currently covers a field that IS written earlier in the plan and then read for a fault precondition later in the same plan. This is the missing rule to report, not to invent an answer for.",
+        "This is the sharpest form of the two-sided index-bounds gap this group's authoring notes flagged (\"behaves like group 17... if the two-sided derivation turns out not to be derivable, that is a missing rule to report\"): at construction specifically, even the SINGLE-conjunct pieces (which discharge fine individually at transition-row/state-hook) have no route, because the one mechanism that supplies the upper bound anywhere else in this group (a guard) is structurally excluded here."
+      ]
+    },
+    {
+      "id": "g18/insert-indexbounds-statehook",
+      "label": "Insert at — index bounds [0, count], state hook",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "action/Insert/indexbounds-0",
+        "evaluationSiteCategory": "state-hook-action-operand",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes" } ]
+      },
+      "obligation": {
+        "statement": "0 <= Index and Index <= F.count",
+        "metavariables": [
+          { "name": "Index", "standsFor": "the field read by the state-hook insert action's `at` clause (the hook has no event args of its own — the value must arrive via a field the entering transition row set)" },
+          { "name": "F", "standsFor": "the list field the insert action mutates" }
+        ],
+        "normalization": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary" } ],
+        "wp": { "statement": "0 <= Index and Index <= F.count" }
+      },
+      "applicablePremiseClasses": ["b", "c"],
+      "premiseAvailability": "Identical reasoning to g18/insert-indexbounds-transition. A state entry hook operates on the already-constructed entity (the pre-transition configuration is real), so unlike construction, a hook guard CAN read F.count — live-verified this session (`to StateName when Field ... -> insert ...` compiles and discharges). Class (d) does not apply, same reasoning as the transition-row cell (a rule cannot mention an event/field-sourced index the way this WP's Index metavariable requires; here Index is itself a field, so in principle a rule COULD mention it, but doing so does not supply a fact relating it to F.count — no test in this group found a rule-only route discharging any index-bounds obligation, and none is written in the matrix).",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["c"],
+          "derivation": "both WP conjuncts matched, each normal-form-equal, against distinct conjuncts of the hook's guard -> guard-match",
+          "capabilityTier": "1a",
+          "strategy": "GuardInPath",
+          "validityArguments": ["Guard normal-form match"],
+          "decisionProcedure": "As g18/insert-indexbounds-transition, applied to the state hook's guard position instead of the transition row's.",
+          "citations": [
+            { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Sketch witnesses" },
+            { "kind": "spec", "ref": "docs/language/precept-language-spec.md:950", "note": "`to` — state action (entry hook); a guard-bearing entry hook (`to S when ...`) is real corpus syntax, `samples/library-hold-request.precept:51`" }
+          ]
+        },
+        {
+          "premiseClasses": ["b", "c"],
+          "derivation": "the index field's `nonnegative` modifier discharges the lower-bound conjunct (type-derived); a hook guard conjunct normal-form-equal to the upper-bound conjunct discharges the rest",
+          "strategy": "GuardInPath",
+          "validityArguments": ["Arg-bound interval arithmetic", "Guard normal-form match"],
+          "decisionProcedure": "As g18/insert-indexbounds-transition — not independently re-run at the state-hook site; the guard-alone route above was live-verified here, and the mixed route is expected to generalize on the identical IndexBoundsProofRequirement/TryIndexBoundsProof shape (both site-agnostic per ProofEngine.Strategies.cs).",
+          "citations": [
+            { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.Strategies.cs:428", "note": "the guard resolution switches on ObligationContext (TransitionRowContext / StateHookContext / EventHandlerContext) uniformly, lines 428-434 — the strategy does not distinguish transition rows from state hooks" }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": ["b"],
+          "schema": "declare the index field `nonnegative` to discharge the lower-bound half of <WP>; the upper-bound half still needs a guard (class c)",
+          "citations": [ { "kind": "code", "ref": "src/Precept/Language/Modifiers.cs:69" } ]
+        },
+        { "premiseClasses": ["c"], "schema": "add a guard normal-form-equal to <WP>", "citations": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary" } ] }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept CollectionActionG18InsertStateHook\n\nfield ItemList as list of string maxlength 200\nfield Position as integer default 0\nfield NewItem as string default \"x\" maxlength 200\n\nstate Active initial\nstate Archived terminal\n\nevent Begin initial\nevent Archive(NewItem as string maxlength 200, Position as integer)\n\non Begin\n    -> append ItemList \"seed\"\n\nfrom Active on Archive\n    -> set NewItem = Archive.NewItem\n    -> set Position = Archive.Position\n    -> transition Archived\n\nto Archived\n    -> insert ItemList NewItem at Position\n",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["b", "c"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools", "date": "2026-07-21", "head": "e1a14d91" }
+        },
+        "discharges": [
+          {
+            "id": "guard-both",
+            "kind": "guard",
+            "addition": "when Position >= 0 and Position <= ItemList.count",
+            "premiseClasses": ["c"],
+            "derivation": "both WP conjuncts matched against distinct hook-guard conjuncts -> guard-match",
+            "strategy": "GuardInPath",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true },
+            "notes": [
+              "Live-verified in witness-g18/insert-statehook-discharge-c-guard.precept.",
+              "No `application` recorded: the addition attaches to a state entry hook's `when` clause, which fits neither the schema's `row-guard` locus (named for a transition row's event) nor `event-arg-declarations` — a schema-vocabulary gap for hook-guard-locus additions, not invented around here."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "guard-both",
+            "addition": "when Position >= 0",
+            "whyStillRejects": "lower bound only — must still reject, same obligation",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "reject", "sameObligation": true },
+            "notes": ["Live-verified in witness-g18/insert-statehook-nearmiss.precept."]
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [
+        { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes" },
+        { "kind": "code", "ref": "src/Precept/Language/Actions.cs:183" },
+        { "kind": "spec", "ref": "docs/language/precept-language-spec.md:950" }
+      ],
+      "notes": [
+        "Only the guard-alone route was independently live-verified at this site; the mixed (b)+(c) route is recorded model-derived-from-representative (identical catalog/strategy shape, confirmed site-agnostic in code), consistent with this group's economy of witnessing one full battery per sub-story and spot-checking the rest."
+      ]
+    },
+    {
+      "id": "g18/removeat-nonempty-transition",
+      "label": "Remove at — list must be non-empty, transition row",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "action/RemoveAt/numeric-0",
+        "evaluationSiteCategory": "transition-row-action-operand",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes" } ]
+      },
+      "obligation": {
+        "statement": "F.count > 0",
+        "metavariables": [ { "name": "F", "standsFor": "the list field the remove-at action mutates" } ],
+        "normalization": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary" } ],
+        "wp": { "statement": "F.count > 0" }
+      },
+      "applicablePremiseClasses": ["c", "d"],
+      "premiseAvailability": "Identical shape/reasoning to g18/dequeue-nonempty. Distinctive to `remove at`: this action mints TWO ProofRequirements at once (this cell's non-empty check and the index-bounds check of g18/removeat-indexbounds-transition), so base minimality requires the base program used FOR THIS CELL to already carry a discharge for the sibling obligation (an index-bounds guard), and vice versa — recorded once here, applies symmetrically to that cell too (mirrors group 13's `.at()` note about a base rejecting only for the target obligation).",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["c"],
+          "derivation": "guard conjunct normal-form-equal to the WP (F.count > 0) -> guard-match",
+          "capabilityTier": "1a",
+          "strategy": "GuardInPath",
+          "validityArguments": ["Guard normal-form match"],
+          "decisionProcedure": "As g18/dequeue-nonempty.",
+          "citations": [
+            { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments", "note": "Guard normal-form match" },
+            { "kind": "spec", "ref": "docs/language/collection-types.md § Guard pattern" }
+          ]
+        },
+        {
+          "premiseClasses": ["d"],
+          "derivation": "a rule stating F.count > 0 holds in the pre-state, and no earlier action in the plan writes F before this remove, so the fact is frame-preserved",
+          "validityArguments": ["Inductive hypothesis plus sign monotonicity"],
+          "decisionProcedure": "As g18/dequeue-nonempty.",
+          "citations": [
+            { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments", "note": "Inductive hypothesis plus sign monotonicity" },
+            { "kind": "owner-ruling", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md § Defect B", "date": "2026-07-20" }
+          ]
+        }
+      ],
+      "suggestions": [
+        { "premiseClasses": ["c"], "schema": "add a guard normal-form-equal to <WP>", "citations": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary" } ] },
+        {
+          "premiseClasses": ["d"],
+          "schema": "restate <WP> as a rule holding in the pre-state, established at construction and preserved by every other write site of the collection",
+          "citations": [ { "kind": "owner-ruling", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md § Defect B", "date": "2026-07-20" } ],
+          "notes": ["Live-verified this session: with the rule declared and the sibling index-bounds obligation already guarded, the remove still raises UnguardedCollectionMutation — HEAD does not consume the rule."]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept CollectionActionG18RemoveAtTransition\n\nfield ItemList as list of string maxlength 200\n\nstate Active initial\n\nevent Begin initial\nevent RemoveItem(Position as integer)\n\non Begin\n    -> append ItemList \"seed\"\n\nfrom Active on RemoveItem when RemoveItem.Position >= 0 and RemoveItem.Position < ItemList.count\n    -> remove ItemList at RemoveItem.Position\n    -> no transition\n",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["c"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools", "date": "2026-07-21", "head": "e1a14d91" },
+          "notes": ["The base already carries the sibling index-bounds discharge (`Position >= 0 and Position < ItemList.count`) so that only this cell's target obligation (UnguardedCollectionMutation) is raised — base minimality per the sibling-obligation note above."]
+        },
+        "discharges": [
+          {
+            "id": "guard-nf",
+            "kind": "guard",
+            "addition": "and ItemList.count > 0",
+            "application": { "locus": "row-guard", "eventName": "RemoveItem" },
+            "premiseClasses": ["c"],
+            "derivation": "guard fact normal-form-equal to the WP -> guard-match",
+            "strategy": "GuardInPath",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true },
+            "notes": [
+              "Live-verified in witness-g18/removeat-transition-discharge-both.precept (full guard: `ItemList.count > 0 and Position >= 0 and Position < ItemList.count`).",
+              "No `application` recorded as a clean single-clause insertion: the addition is ANDed into an existing guard (the base already carries the sibling index-bounds conjuncts) rather than the whole `when` clause of a bare row — a variant of the `row-guard` locus this schema does not distinguish from a fresh guard; recorded as a conjunct addition, not invented around."
+            ]
+          },
+          {
+            "id": "rule-premise",
+            "kind": "other",
+            "addition": "rule ItemList.count > 0 because \"hazard probe\"",
+            "premiseClasses": ["d"],
+            "derivation": "premise (d): rule holds in pre-state; no earlier plan action writes F before this remove -> frame-preserved",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "Live-verified: with the rule declared and the sibling index-bounds obligation guarded, the remove still raises UnguardedCollectionMutation.",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true },
+            "notes": ["Live-verified in witness-g18/removeat-transition-d-rule.precept."]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "guard-nf",
+            "addition": "and ItemList.count >= 0",
+            "whyStillRejects": "vacuously true — must still reject, same obligation",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "reject", "sameObligation": true },
+            "notes": ["Live-verified in witness-g18/removeat-transition-nearmiss-numeric.precept."]
+          },
+          {
+            "pairsWith": "rule-premise",
+            "addition": "rule ItemList.count >= 0 because \"...\"",
+            "whyStillRejects": "vacuous rule — must still reject, same obligation",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [
+        { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes" },
+        { "kind": "code", "ref": "src/Precept/Language/Actions.cs:204", "note": "ActionKind.RemoveAt — NumericProofRequirement(SelfSubject(count), GreaterThan, 0, \"List must be non-empty\"); full declaration spans lines 204-229" },
+        { "kind": "spec", "ref": "docs/language/collection-types.md § `list of T`", "note": "`remove at N` — \"Precondition: N >= 0 and N < F.count\" (line 1032); the non-empty half is the same shape as the operand-free cells" }
+      ],
+      "notes": []
+    },
+    {
+      "id": "g18/removeat-nonempty-construction",
+      "label": "Remove at — list must be non-empty, construction row",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "action/RemoveAt/numeric-0",
+        "evaluationSiteCategory": "construction-row-action-operand",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "open",
+        "citations": [
+          { "kind": "code", "ref": "src/Precept/Pipeline/ProofLedger.cs:100", "note": "ProofStrategy.CollectionGrowth = 11 is the only route that live-discharges this obligation at construction, and no matrix validity argument names it" },
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Rule validity", "note": "\"no cell ratifies whose derivation cites an argument-less rule\" — the ratification gate this open disposition avoids violating" }
+        ]
+      },
+      "obligation": {
+        "statement": "F.count > 0",
+        "metavariables": [ { "name": "F", "standsFor": "the list field the remove-at action mutates" } ],
+        "normalization": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary" } ],
+        "wp": { "statement": "F.count > 0" }
+      },
+      "witnesses": {
+        "base": {
+          "program": "precept CollectionActionG18RemoveAtConstructionLiteralDefault\n\nfield ItemList as list of string maxlength 200 default [\"seed\"]\n\nstate Active initial\n\nevent Begin initial\n\non Begin\n    -> remove ItemList at 0\n",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["c"], "noOtherDiagnostics": false },
+          "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools", "date": "2026-07-21", "head": "e1a14d91" },
+          "notes": ["This base also raises IndexBoundsGuard simultaneously (the sibling obligation, g18/removeat-indexbounds-construction, is also open and equally undischargeable at construction) — `noOtherDiagnostics` is honestly recorded false rather than force-isolating a clean single-obligation base that does not actually exist at this site under any tested configuration."]
+        }
+      },
+      "citations": [
+        { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes" },
+        { "kind": "code", "ref": "src/Precept/Language/Actions.cs:204" }
+      ],
+      "notes": [
+        "This cell is open, not defined — the disposition-pass input marked this coordinate `defined`, but authoring it surfaced a real gap between what HEAD does and what the matrix has written, so it is corrected here per ground rule 1.",
+        "Live-verified this session (`witness-g18/removeat-construction-base.precept`): a construction row that `append`s then `remove`s the SAME field in one plan, with NO guard at all and a literal index, compiles with the non-empty obligation silently discharged (only IndexBoundsGuard remains) — this is `ProofStrategy.CollectionGrowth` (`src/Precept/Pipeline/ProofLedger.cs:114`: \"a count > 0 obligation discharged by a prior grow action in the same chain\"), a real, named, built strategy.",
+        "But this strategy requires an explicit prior GROW ACTION in the same write plan — it is not a general literal-default fold. Tested and confirmed live: a field with a non-empty literal `default [\"seed\"]` and NO prior append, removed at literal index 0 with no guard, still rejects both obligations (`witness-g18/removeat-construction-literal-default.precept`). So the discharge is narrower than \"the field is provably non-empty at this point\" in general — it specifically tracks grow actions, not declared defaults.",
+        "Why this is open rather than defined: none of the matrix's seven named validity arguments covers CollectionGrowth. The two candidates that discuss construction-row defaults (\"Establishment over defaults,\" \"Literal constant-fold for defaults\") are both explicitly scoped to a field the firing construction row does NOT write — the opposite of this case, where the row DOES write the field (via append) before reading it (via remove). The general Vocabulary sentence that \"an expression later in a plan does see the results of earlier writes ... and its own fault obligations are minted per evaluation site\" states WHAT is minted and WHERE, not that forward-propagation from a grow action is a licensed discharge, and gives no decision procedure for it. Citing this discharge as `defined` would require inventing that connection, which ground rule 1 forbids. The missing rule to report: a validity argument (and, ideally, a stated decision procedure) for the CollectionGrowth strategy — is forward-propagation from a same-plan grow action licensed as a discharge mechanism at all, and if so under which premise class (it consumes no authored premise — it is closer in shape to a standing/constant-fold discharge than to any of classes (a)-(d))?",
+        "Distinct from g18/insert-indexbounds-construction and g18/removeat-indexbounds-construction: those two are open because NO route discharges them at all under any test. This cell IS discharged live by a real strategy — the gap here is purely that the matrix has not written a validity argument for that strategy, which the ratification gate requires before any cell may cite it."
+      ]
+    },
+    {
+      "id": "g18/removeat-nonempty-statehook",
+      "label": "Remove at — list must be non-empty, state hook",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "action/RemoveAt/numeric-0",
+        "evaluationSiteCategory": "state-hook-action-operand",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes" } ]
+      },
+      "obligation": {
+        "statement": "F.count > 0",
+        "metavariables": [ { "name": "F", "standsFor": "the list field the remove-at action mutates" } ],
+        "normalization": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary" } ],
+        "wp": { "statement": "F.count > 0" }
+      },
+      "applicablePremiseClasses": ["c", "d"],
+      "premiseAvailability": "Identical to g18/removeat-nonempty-transition — a state hook operates on a real pre-existing entity, so guard availability and the (d) reasoning transfer unchanged.",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["c"],
+          "derivation": "guard conjunct normal-form-equal to the WP (F.count > 0) -> guard-match",
+          "capabilityTier": "1a",
+          "strategy": "GuardInPath",
+          "validityArguments": ["Guard normal-form match"],
+          "decisionProcedure": "As g18/dequeue-nonempty, applied to the hook's guard position.",
+          "citations": [
+            { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments", "note": "Guard normal-form match" }
+          ]
+        },
+        {
+          "premiseClasses": ["d"],
+          "derivation": "a rule stating F.count > 0 holds in the pre-state, frame-preserved as no earlier plan action writes F before this remove",
+          "validityArguments": ["Inductive hypothesis plus sign monotonicity"],
+          "decisionProcedure": "As g18/dequeue-nonempty.",
+          "citations": [
+            { "kind": "owner-ruling", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md § Defect B", "date": "2026-07-20" }
+          ]
+        }
+      ],
+      "suggestions": [
+        { "premiseClasses": ["c"], "schema": "add a guard normal-form-equal to <WP>", "citations": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary" } ] },
+        {
+          "premiseClasses": ["d"],
+          "schema": "restate <WP> as a rule holding in the pre-state, established at construction and preserved by every other write site of the collection",
+          "citations": [ { "kind": "owner-ruling", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md § Defect B", "date": "2026-07-20" } ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept CollectionActionG18RemoveAtStateHook\n\nfield ItemList as list of string maxlength 200\nfield Position as integer default 0\n\nstate Active initial\nstate Archived terminal\n\nevent Begin initial\nevent Archive(Position as integer)\n\non Begin\n    -> append ItemList \"seed\"\n\nfrom Active on Archive\n    -> set Position = Archive.Position\n    -> transition Archived\n\nto Archived when Position >= 0 and Position < ItemList.count\n    -> remove ItemList at Position\n",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["c"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools", "date": "2026-07-21", "head": "e1a14d91" },
+          "notes": ["Base already carries the sibling index-bounds discharge for isolation, mirroring the transition-row cell."]
+        },
+        "discharges": [
+          {
+            "id": "guard-nf",
+            "kind": "guard",
+            "addition": "and ItemList.count > 0",
+            "premiseClasses": ["c"],
+            "derivation": "guard fact normal-form-equal to the WP -> guard-match",
+            "strategy": "GuardInPath",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true },
+            "notes": ["Live-verified in witness-g18/removeat-statehook-discharge-both.precept."]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "guard-nf",
+            "addition": "and ItemList.count >= 0",
+            "whyStillRejects": "vacuously true — must still reject, same obligation",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "reject", "sameObligation": true },
+            "notes": ["Live-verified 2026-07-21 (adversarial re-run, same binary, commit e1a14d91) on the near-miss text exactly as written — hook guard `Position >= 0 and Position < ItemList.count and ItemList.count >= 0`; rejects with UnguardedCollectionMutation, this cell's obligation. The original note cited witness-g18/removeat-statehook-isolate-numeric.precept, which is this cell's BASE (non-empty guard absent), not the weakened near-miss; the near-miss program itself had not been run. Corrected."]
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [
+        { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes" },
+        { "kind": "code", "ref": "src/Precept/Language/Actions.cs:204" }
+      ],
+      "notes": ["The (d) rule-premise route was not independently re-run at the state-hook site; it is model-derived from the transition-row and operand-free representatives (identical NumericProofRequirement shape, uniformly unresolved-today per every live test in this group)."]
+    },
+    {
+      "id": "g18/removeat-indexbounds-transition",
+      "label": "Remove at — index bounds [0, count), transition row",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "action/RemoveAt/indexbounds-1",
+        "evaluationSiteCategory": "transition-row-action-operand",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes" } ]
+      },
+      "obligation": {
+        "statement": "0 <= Index and Index < F.count",
+        "metavariables": [
+          { "name": "Index", "standsFor": "the authored index expression the remove-at action's `at` clause supplies" },
+          { "name": "F", "standsFor": "the list field the remove-at action mutates" }
+        ],
+        "normalization": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary" } ],
+        "wp": { "statement": "0 <= Index and Index < F.count" }
+      },
+      "applicablePremiseClasses": ["b", "c"],
+      "premiseAvailability": "Same reasoning as g18/insert-indexbounds-transition, with StrictlyBefore in place of AtOrBefore (`< F.count` rather than `<= F.count`) — the only difference in the requirement's declared IndexBoundsMode.",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["c"],
+          "derivation": "both WP conjuncts matched, each normal-form-equal, against distinct conjuncts of the row's guard -> guard-match",
+          "capabilityTier": "1a",
+          "strategy": "GuardInPath",
+          "validityArguments": ["Guard normal-form match"],
+          "decisionProcedure": "As g18/insert-indexbounds-transition, with the strict comparison.",
+          "citations": [
+            { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Sketch witnesses" },
+            { "kind": "code", "ref": "samples/shopping-cart.precept:195", "note": "`remove LineItems at ReorderItem.FromIndex` discharged by the same multi-conjunct guard as the sibling insert" }
+          ]
+        },
+        {
+          "premiseClasses": ["b", "c"],
+          "derivation": "the index arg declared `nonnegative` discharges the lower-bound conjunct; a guard conjunct normal-form-equal to the upper-bound conjunct (Index < F.count) discharges the rest",
+          "strategy": "GuardInPath",
+          "validityArguments": ["Arg-bound interval arithmetic", "Guard normal-form match"],
+          "decisionProcedure": "As g18/insert-indexbounds-transition.",
+          "citations": [
+            { "kind": "code", "ref": "src/Precept/Language/Modifiers.cs:69" },
+            { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.Strategies.cs:436" }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": ["b"],
+          "schema": "declare the index argument `nonnegative` to discharge the lower-bound half of <WP>; the upper-bound half still needs a guard (class c)",
+          "citations": [ { "kind": "code", "ref": "src/Precept/Language/Modifiers.cs:69" } ]
+        },
+        { "premiseClasses": ["c"], "schema": "add a guard normal-form-equal to <WP>", "citations": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary" } ] }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept CollectionActionG18RemoveAtTransition\n\nfield ItemList as list of string maxlength 200\n\nstate Active initial\n\nevent Begin initial\nevent RemoveItem(Position as integer)\n\non Begin\n    -> append ItemList \"seed\"\n\nfrom Active on RemoveItem when ItemList.count > 0\n    -> remove ItemList at RemoveItem.Position\n    -> no transition\n",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["b", "c"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools", "date": "2026-07-21", "head": "e1a14d91" },
+          "notes": ["The base already carries the sibling non-empty discharge (`ItemList.count > 0`) so only this cell's target obligation (IndexBoundsGuard) is raised."]
+        },
+        "discharges": [
+          {
+            "id": "guard-both",
+            "kind": "guard",
+            "addition": "and RemoveItem.Position >= 0 and RemoveItem.Position < ItemList.count",
+            "application": { "locus": "row-guard", "eventName": "RemoveItem" },
+            "premiseClasses": ["c"],
+            "derivation": "both WP conjuncts matched against distinct guard conjuncts -> guard-match",
+            "strategy": "GuardInPath",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true },
+            "notes": ["Live-verified in witness-g18/removeat-transition-discharge-both.precept (same file as the sibling cell's discharge — the full guard closes both obligations at once)."]
+          },
+          {
+            "id": "nonneg-arg-plus-upper-guard",
+            "kind": "arg-modifier",
+            "addition": "Position as integer nonnegative",
+            "application": {
+              "locus": "event-arg-declarations",
+              "replacements": [ { "eventName": "RemoveItem", "argName": "Position", "declaration": "Position as integer nonnegative" } ]
+            },
+            "premiseClasses": ["b", "c"],
+            "derivation": "nonnegative arg -> type-derived lower bound; guard `Position < ItemList.count` (upper-bound conjunct only, plus the sibling's `ItemList.count > 0`) -> guard-match for the rest",
+            "strategy": "GuardInPath",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true },
+            "notes": [
+              "Live-verified in witness-g18/removeat-transition-bc-nonneg-upper.precept.",
+              "The nonnegative arg alone, with no upper-bound guard conjunct at all, still rejects — live-verified in witness-g18/removeat-transition-b-nonneg-alone.precept — confirms class (b) never independently discharges the whole obligation."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "guard-both",
+            "addition": "and RemoveItem.Position >= 0",
+            "whyStillRejects": "lower bound only — must still reject, same obligation",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "reject", "sameObligation": true },
+            "notes": ["Live-verified in witness-g18/removeat-transition-nearmiss-lower-only.precept."]
+          },
+          {
+            "pairsWith": "nonneg-arg-plus-upper-guard",
+            "addition": "and RemoveItem.Position <= ItemList.count",
+            "whyStillRejects": "off-by-one upper bound (non-strict where the requirement is strict) — admits Position == count, one past the last valid element — must still reject, same obligation",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "reject", "sameObligation": true },
+            "notes": ["Live-verified 2026-07-21 (adversarial re-run, same binary, commit e1a14d91) on the near-miss text exactly as written — `Position as integer nonnegative` retained, guard `ItemList.count > 0 and RemoveItem.Position <= ItemList.count`; rejects with IndexBoundsGuard, this cell's obligation. The original note cited witness-g18/removeat-transition-nearmiss-indexbounds.precept, whose event arg is a plain `Position as integer` with an explicit `Position >= 0` guard conjunct — i.e. a weakening of the guard-alone discharge, not of this paired (b)+(c) discharge. Corrected."]
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "cell-override",
+        "overrideVerdict": "yes",
+        "bandMember": "when RemoveItem.Position <= ItemList.count - 1",
+        "respelling": "when RemoveItem.Position >= 0 and RemoveItem.Position < ItemList.count",
+        "citations": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Sketch witnesses" } ],
+        "notes": ["Not independently corpus-measured for this two-conjunct shape; per-cell override for the same reason as g18/insert-indexbounds-transition."]
+      },
+      "citations": [
+        { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes" },
+        { "kind": "code", "ref": "src/Precept/Language/Actions.cs:204", "note": "ActionKind.RemoveAt — IndexBoundsProofRequirement(ParamSubject(index), StrictlyBefore, CollectionCountAccessor, \"Remove index must be within bounds [0, count)\")" },
+        { "kind": "spec", "ref": "docs/language/collection-types.md § `list of T`", "note": "`remove at N` — \"Precondition: N >= 0 and N < F.count\" (line 1032)" }
+      ],
+      "notes": ["Same diagnostic-code discrepancy noted at g18/insert-indexbounds-transition applies here (doc says UnguardedCollectionAccess; HEAD raises IndexBoundsGuard)."]
+    },
+    {
+      "id": "g18/removeat-indexbounds-construction",
+      "label": "Remove at — index bounds [0, count), construction row",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "action/RemoveAt/indexbounds-1",
+        "evaluationSiteCategory": "construction-row-action-operand",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "open",
+        "citations": [
+          { "kind": "code", "ref": "src/Precept/Language/DiagnosticCode.cs:207", "note": "ConstructionGuardReadsUninitializedField — same structural exclusion as g18/insert-indexbounds-construction" },
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments", "note": "the two defaults-scoped arguments do not cover a field the plan itself writes before indexing into it" }
+        ]
+      },
+      "obligation": {
+        "statement": "0 <= Index and Index < F.count",
+        "metavariables": [
+          { "name": "Index", "standsFor": "the authored index expression the remove-at action's `at` clause supplies" },
+          { "name": "F", "standsFor": "the list field the remove-at action mutates" }
+        ],
+        "normalization": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary" } ],
+        "wp": { "statement": "0 <= Index and Index < F.count" }
+      },
+      "witnesses": {
+        "base": {
+          "program": "precept CollectionActionG18RemoveAtConstruction\n\nfield ItemList as list of string maxlength 200\n\nstate Active initial\n\nevent Begin(NewItem as string maxlength 200) initial\n\non Begin\n    -> append ItemList Begin.NewItem\n    -> remove ItemList at 0\n",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["b", "c"], "noOtherDiagnostics": false },
+          "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools", "date": "2026-07-21", "head": "e1a14d91" },
+          "notes": [
+            "Isolated from the sibling non-empty obligation: the same-plan append already discharges non-emptiness via CollectionGrowth (see g18/removeat-nonempty-construction), so IndexBoundsGuard is the only ERROR raised here even with a literal index and no guard at all.",
+            "`noOtherDiagnostics` is false, not true (corrected by adversarial re-run, 2026-07-21, same binary and commit): the base also raises `[Warning] StructuralSinkState: State 'Active' has no outgoing transitions and is not marked 'terminal'`, because a construction-only witness at this evaluation-site category has no transition row. The sibling g18/insert-indexbounds-construction base carries the identical warning and already records false; the two now agree."
+          ]
+        }
+      },
+      "citations": [
+        { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes" },
+        { "kind": "code", "ref": "src/Precept/Language/Actions.cs:204" }
+      ],
+      "notes": [
+        "This cell is open, not defined — same correction as g18/insert-indexbounds-construction, for the same reason: the disposition-pass input marked it `defined`, but no discharge route is derivable from the matrix's written text once tested.",
+        "The asymmetry with the sibling non-empty obligation is itself the finding: CollectionGrowth (ProofStrategy, `src/Precept/Pipeline/ProofLedger.cs:114`) discharges a `count > 0` check from a same-plan prior grow action, but `TryIndexBoundsProof` (`src/Precept/Pipeline/ProofEngine.Strategies.cs:390-474`) has NO such fallback — it unconditionally requires a guard for the upper bound (lines 441-445), and no guard can be written at a construction row (`ConstructionGuardReadsUninitializedField`). So even though the same write plan that silently proves non-emptiness sits right next to the index-bounds check, the index-bounds obligation has no route at all, live-verified even with a literal index (0) that is trivially in range given the preceding append.",
+        "Same missing rule as g18/insert-indexbounds-construction (both share the identical structural cause — the guard mechanism is the only one with an upper-bound story anywhere in this group, and it is unavailable at this evaluation-site category): whether any discharge mechanism is licensed for an index-bounds obligation at a site where the guard route is structurally excluded is undecided in the matrix as written."
+      ]
+    },
+    {
+      "id": "g18/removeat-indexbounds-statehook",
+      "label": "Remove at — index bounds [0, count), state hook",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "action/RemoveAt/indexbounds-1",
+        "evaluationSiteCategory": "state-hook-action-operand",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes" } ]
+      },
+      "obligation": {
+        "statement": "0 <= Index and Index < F.count",
+        "metavariables": [
+          { "name": "Index", "standsFor": "the field read by the state-hook remove-at action's `at` clause" },
+          { "name": "F", "standsFor": "the list field the remove-at action mutates" }
+        ],
+        "normalization": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary" } ],
+        "wp": { "statement": "0 <= Index and Index < F.count" }
+      },
+      "applicablePremiseClasses": ["b", "c"],
+      "premiseAvailability": "Identical reasoning to g18/insert-indexbounds-statehook, with StrictlyBefore in place of AtOrBefore.",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["c"],
+          "derivation": "both WP conjuncts matched, each normal-form-equal, against distinct conjuncts of the hook's guard -> guard-match",
+          "capabilityTier": "1a",
+          "strategy": "GuardInPath",
+          "validityArguments": ["Guard normal-form match"],
+          "decisionProcedure": "As g18/insert-indexbounds-statehook.",
+          "citations": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Sketch witnesses" } ]
+        },
+        {
+          "premiseClasses": ["b", "c"],
+          "derivation": "the index field's `nonnegative` modifier discharges the lower-bound conjunct; a hook guard conjunct normal-form-equal to the upper-bound conjunct discharges the rest",
+          "strategy": "GuardInPath",
+          "validityArguments": ["Arg-bound interval arithmetic", "Guard normal-form match"],
+          "decisionProcedure": "As g18/insert-indexbounds-statehook — not independently re-run here; expected to generalize on the site-agnostic strategy code.",
+          "citations": [ { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.Strategies.cs:428" } ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": ["b"],
+          "schema": "declare the index field `nonnegative` to discharge the lower-bound half of <WP>; the upper-bound half still needs a guard (class c)",
+          "citations": [ { "kind": "code", "ref": "src/Precept/Language/Modifiers.cs:69" } ]
+        },
+        { "premiseClasses": ["c"], "schema": "add a guard normal-form-equal to <WP>", "citations": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary" } ] }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept CollectionActionG18RemoveAtStateHook\n\nfield ItemList as list of string maxlength 200\nfield Position as integer default 0\n\nstate Active initial\nstate Archived terminal\n\nevent Begin initial\nevent Archive(Position as integer)\n\non Begin\n    -> append ItemList \"seed\"\n\nfrom Active on Archive\n    -> set Position = Archive.Position\n    -> transition Archived\n\nto Archived when ItemList.count > 0\n    -> remove ItemList at Position\n",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["b", "c"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools", "date": "2026-07-21", "head": "e1a14d91" },
+          "notes": ["Base already carries the sibling non-empty discharge for isolation."]
+        },
+        "discharges": [
+          {
+            "id": "guard-both",
+            "kind": "guard",
+            "addition": "and Position >= 0 and Position < ItemList.count",
+            "premiseClasses": ["c"],
+            "derivation": "both WP conjuncts matched against distinct hook-guard conjuncts -> guard-match",
+            "strategy": "GuardInPath",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true },
+            "notes": ["Live-verified in witness-g18/removeat-statehook-discharge-both.precept."]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "guard-both",
+            "addition": "and Position >= 0",
+            "whyStillRejects": "lower bound only — must still reject, same obligation",
+            "provenance": { "mark": "live-verified", "tool": "Precept.MatrixTools", "date": "2026-07-21", "head": "e1a14d91" },
+            "expected": { "outcome": "reject", "sameObligation": true },
+            "notes": ["Live-verified 2026-07-21 (adversarial re-run, same binary, commit e1a14d91) on the near-miss text exactly as written — hook guard `ItemList.count > 0 and Position >= 0`; rejects with IndexBoundsGuard, this cell's obligation. The original note cited witness-g18/removeat-statehook-isolate-numeric.precept and described it as 'non-empty guarded, index lower-bound-only'; that file is in fact the OPPOSITE configuration (index-bounds guarded, non-empty absent) and rejects with UnguardedCollectionMutation — a DIFFERENT obligation, so it could not have witnessed this near-miss. Corrected."]
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [
+        { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes" },
+        { "kind": "code", "ref": "src/Precept/Language/Actions.cs:204" }
+      ],
+      "notes": ["Only the guard-alone route was independently live-verified at this site; the mixed (b)+(c) route is model-derived-from-representative, consistent with this group's spot-check economy."]
+    }
+  ]
+}

@@ -1,0 +1,68 @@
+{
+  "familyId": "fault-17-collection-index-bounds",
+  "definitionVersion": "obligation-discharge-matrix-2026-07-19 rev 7 (2026-07-20, draft)",
+  "sourceFile": "fault-17-collection-index-bounds.cells.json",
+  "rows": [],
+  "skips": [
+    {
+      "cellId": "g17/list-write",
+      "item": "cell",
+      "reason": "disposition is \u0027open\u0027 \u2014 only defined cells state the reject/discharge/near-miss triple the conversion needs"
+    },
+    {
+      "cellId": "g17/list-guard",
+      "item": "cell",
+      "reason": "disposition is \u0027open\u0027 \u2014 only defined cells state the reject/discharge/near-miss triple the conversion needs"
+    },
+    {
+      "cellId": "g17/list-constraint",
+      "item": "cell",
+      "reason": "disposition is \u0027open\u0027 \u2014 only defined cells state the reject/discharge/near-miss triple the conversion needs"
+    },
+    {
+      "cellId": "g17/list-declaration",
+      "item": "cell",
+      "reason": "disposition is \u0027open\u0027 \u2014 only defined cells state the reject/discharge/near-miss triple the conversion needs"
+    },
+    {
+      "cellId": "g17/log-write",
+      "item": "cell",
+      "reason": "disposition is \u0027open\u0027 \u2014 only defined cells state the reject/discharge/near-miss triple the conversion needs"
+    },
+    {
+      "cellId": "g17/log-guard",
+      "item": "cell",
+      "reason": "disposition is \u0027open\u0027 \u2014 only defined cells state the reject/discharge/near-miss triple the conversion needs"
+    },
+    {
+      "cellId": "g17/log-constraint",
+      "item": "cell",
+      "reason": "disposition is \u0027open\u0027 \u2014 only defined cells state the reject/discharge/near-miss triple the conversion needs"
+    },
+    {
+      "cellId": "g17/log-declaration",
+      "item": "cell",
+      "reason": "disposition is \u0027open\u0027 \u2014 only defined cells state the reject/discharge/near-miss triple the conversion needs"
+    },
+    {
+      "cellId": "g17/logby-write",
+      "item": "cell",
+      "reason": "disposition is \u0027open\u0027 \u2014 only defined cells state the reject/discharge/near-miss triple the conversion needs"
+    },
+    {
+      "cellId": "g17/logby-guard",
+      "item": "cell",
+      "reason": "disposition is \u0027open\u0027 \u2014 only defined cells state the reject/discharge/near-miss triple the conversion needs"
+    },
+    {
+      "cellId": "g17/logby-constraint",
+      "item": "cell",
+      "reason": "disposition is \u0027open\u0027 \u2014 only defined cells state the reject/discharge/near-miss triple the conversion needs"
+    },
+    {
+      "cellId": "g17/logby-declaration",
+      "item": "cell",
+      "reason": "disposition is \u0027open\u0027 \u2014 only defined cells state the reject/discharge/near-miss triple the conversion needs"
+    }
+  ]
+}

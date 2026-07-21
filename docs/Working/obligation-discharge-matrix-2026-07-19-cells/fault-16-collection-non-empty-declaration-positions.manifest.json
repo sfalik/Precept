@@ -1,0 +1,58 @@
+{
+  "familyId": "fault-16-collection-non-empty-declaration-positions",
+  "definitionVersion": "obligation-discharge-matrix-2026-07-19 rev 7 (2026-07-20)",
+  "sourceFile": "fault-16-collection-non-empty-declaration-positions.cells.json",
+  "rows": [],
+  "skips": [
+    {
+      "cellId": "g16/list-first/field-default",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g16/list-first/field-modifier",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g16/list-first/event-arg-modifier",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g16/list-first/inner-type-modifier",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g16/list-first/type-qualifier",
+      "item": "obligation",
+      "reason": "no mechanized canonical WP key is recorded (obligation.wp.canonicalKey absent) \u2014 the cell\u0027s obligation cannot be identified among the base program\u0027s enumerated obligations"
+    },
+    {
+      "cellId": "g16/log-last/field-default",
+      "item": "cell",
+      "reason": "disposition is \u0027open\u0027 \u2014 only defined cells state the reject/discharge/near-miss triple the conversion needs"
+    },
+    {
+      "cellId": "g16/log-last/field-modifier",
+      "item": "cell",
+      "reason": "disposition is \u0027open\u0027 \u2014 only defined cells state the reject/discharge/near-miss triple the conversion needs"
+    },
+    {
+      "cellId": "g16/log-last/event-arg-modifier",
+      "item": "cell",
+      "reason": "disposition is \u0027open\u0027 \u2014 only defined cells state the reject/discharge/near-miss triple the conversion needs"
+    },
+    {
+      "cellId": "g16/log-last/inner-type-modifier",
+      "item": "cell",
+      "reason": "disposition is \u0027open\u0027 \u2014 only defined cells state the reject/discharge/near-miss triple the conversion needs"
+    },
+    {
+      "cellId": "g16/log-last/type-qualifier",
+      "item": "cell",
+      "reason": "disposition is \u0027open\u0027 \u2014 only defined cells state the reject/discharge/near-miss triple the conversion needs"
+    }
+  ]
+}

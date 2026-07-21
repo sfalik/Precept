@@ -1,0 +1,2956 @@
+{
+  "$schema": "./cell.schema.json",
+  "familyId": "fault-7-division-business-transition-write",
+  "title": "Division by zero with money, quantity, price and exchange-rate operands, at a transition-row write",
+  "caseShape": "fault",
+  "definitionVersion": "obligation-discharge-matrix-2026-07-19 rev 7 (2026-07-20, draft)",
+  "citations": [
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+      "note": "Family 4 — fault family, arg-constraint discharge; the shared interval-exclude-zero story this whole group instantiates"
+    },
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+      "note": "the fault-family case shape: catalog-declared safety precondition at the evaluation site, premise classes (b)/(c)/(a) per catalog ProofSatisfactions"
+    },
+    {
+      "kind": "want-doc",
+      "ref": "docs/Working/what-i-want-2026-07-16.md:104",
+      "note": "fault prevention obligation family"
+    },
+    {
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19-cells/authored-expressiveness-gaps.md § Defect B",
+      "note": "the false-proof hazard on premise (d) via a business rule; considered and found not to arise in this file — the group's shared setting always carries the divisor on the event, never as a pre-state field, so no witness here consumes premise (d)"
+    }
+  ],
+  "respellability": {
+    "verdict": "yes",
+    "evidence": "model-derived",
+    "corpusMeasurement": "pending",
+    "citations": [
+      {
+        "kind": "matrix",
+        "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+        "note": "the Respellable definition"
+      },
+      {
+        "kind": "matrix",
+        "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Ratification protocol",
+        "note": "layer 4: a family verdict ratifies only when corpus-measured"
+      }
+    ],
+    "notes": [
+      "Same story as Witness Family 1: the sound-but-unprovable band here is a divisor-non-zero fact spelled in a form no written derivation covers — for example a guard or a rule deriving the divisor's sign from an arithmetic relationship among other fields/args (`when A > B` where the divisor is `A - B`), rather than a direct bound or a normal-form-equal guard on the divisor itself. Its respelling is the direct bound (`positive`/`nonnegative` on the divisor arg) or a guard restating the divisor's own non-zero condition directly — the same respelling shape Witness Family 1 names.",
+      "This verdict is about the MODEL's power, independent of the built-status gaps recorded per cell (the guard mechanism's non-discharge for business-domain-typed divisors, and the two DisambiguateCandidates reachability findings). Those are built-status facts, not respellability facts: the model licenses the same derivations regardless of divisor type family."
+    ]
+  },
+  "cells": [
+    {
+      "id": "g07/money-divide-decimal",
+      "label": "Money ÷ decimal, transition-row write — the divisor is a decimal arg",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "MoneyDivideDecimal",
+        "evaluationSiteCategory": "transition-row-action-operand",
+        "typeFamily": "business-domain"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+            "note": "Family 4 — fault family, arg-constraint discharge; the interval-exclude-zero derivation this group instantiates (“compute the divisor's interval from its declared modifiers and in-scope guard facts… zero inside the interval, or no bound excluding it, rejects”)"
+          },
+          {
+            "kind": "want-doc",
+            "ref": "docs/Working/what-i-want-2026-07-16.md:104",
+            "note": "fault prevention"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Split.Divisor != 0",
+        "metavariables": [
+          {
+            "name": "Divisor",
+            "standsFor": "the event arg supplying the divisor operand (decimal-typed)"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "Split.Divisor != 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "b",
+        "c"
+      ],
+      "premiseAvailability": "The divisor is the triggering event's own arg (per the group's shared setting: “a divisor carried on the event”) and is not read elsewhere in the plan, so it is neither a written nor a pre-state-mentioned field — premise (d) has nothing to instantiate. Only (b) (the arg's own declared modifiers) and (c) (the row's guard) can supply the interval that excludes zero.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "derivation": "guard fact normal-form-equal to the divisor's non-zero condition → guard-match",
+          "capabilityTier": "1a",
+          "validityArguments": [
+            "Guard normal-form match"
+          ],
+          "decisionProcedure": "Compute the divisor's interval from its declared modifiers and in-scope guard facts (a finite set per site); zero inside the interval, or no bound excluding it, rejects. (Family 4's own decision-procedure text, restated for this operand pairing — the interval story is unchanged by the numerator/divisor type family.)",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+              "note": "Family 4 — fault family, arg-constraint discharge; the interval-exclude-zero derivation this group instantiates (“compute the divisor's interval from its declared modifiers and in-scope guard facts… zero inside the interval, or no bound excluding it, rejects”)"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "“Guard normal-form match” is stated in § Validity arguments against Witness Family 1's Bases A and C (a rule-preservation WP). Reusing it here is a direct corollary, not a separately-written argument: the same reasoning — a row fires only if its guard evaluated true, and the guard reads the same pre-state/args the action reads — applies unchanged when the proposition being matched is the fault family's “Divisor ≠ 0” instead of a rule's bound. No dedicated validity argument is written for the fault family in § Validity arguments; Family 4's own § Witnesses entry states the decision procedure but is not one of the six named arguments the schema enumerates. Flagged here rather than silently assumed."
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "b"
+          ],
+          "derivation": "declared arg-modifier bound on the divisor (e.g. `positive`) excludes 0 from its interval → IntervalContainment",
+          "capabilityTier": "1a",
+          "strategy": "IntervalContainment",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "Compute the divisor's interval from its declared modifiers and in-scope guard facts (a finite set per site); zero inside the interval, or no bound excluding it, rejects. (Family 4's own decision-procedure text, restated for this operand pairing — the interval story is unchanged by the numerator/divisor type family.)",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+              "note": "Family 4 — fault family, arg-constraint discharge; the interval-exclude-zero derivation this group instantiates (“compute the divisor's interval from its declared modifiers and in-scope guard facts… zero inside the interval, or no bound excluding it, rejects”)"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "“Arg-bound interval arithmetic” is stated in § Validity arguments against Witness Family 1 Base A (summing two bounded args against a rule's bound). Reusing it here is a direct, simpler corollary: governance enforces the declared modifier on the event arg at ingress (precept-language-spec.md:268), so a `positive`-declared divisor's runtime value is provably > 0, hence ≠ 0 — no sum, no second term. As with the guard argument above, no validity argument is separately written for the fault family; this is the same reuse, flagged rather than assumed."
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "schema": "add a guard normal-form-equal to <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "b"
+          ],
+          "schema": "bound the args such that the interval combination satisfies <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept BillingMoneyDecimal\n\nfield Subtotal as money in 'USD' default '0 USD'\nfield UnitShare as money in 'USD' default '0 USD'\n\nstate Draft initial\nstate Active\n\nevent Open(Amount as money in 'USD')\nfrom Draft on Open\n    -> set Subtotal = Open.Amount\n    -> transition Active\n\nevent Split(Divisor as decimal)\nfrom Active on Split\n    -> set UnitShare = Subtotal / Split.Divisor\n    -> no transition\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "b",
+              "c"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        },
+        "discharges": [
+          {
+            "id": "positive-arg",
+            "kind": "arg-modifier",
+            "addition": "Divisor as decimal positive",
+            "application": {
+              "locus": "event-arg-declarations",
+              "replacements": [
+                {
+                  "eventName": "Split",
+                  "argName": "Divisor",
+                  "declaration": "Divisor as decimal positive"
+                }
+              ]
+            },
+            "premiseClasses": [
+              "b"
+            ],
+            "derivation": "declared `positive` modifier → Divisor > 0 → Divisor ≠ 0 (IntervalContainment)",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          },
+          {
+            "id": "guard-nonzero",
+            "kind": "guard",
+            "addition": "when Split.Divisor != 0",
+            "application": {
+              "locus": "row-guard",
+              "eventName": "Split"
+            },
+            "premiseClasses": [
+              "c"
+            ],
+            "derivation": "guard fact normal-form-equal to `Divisor ≠ 0` → guard-match",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "positive-arg",
+            "addition": "Divisor as decimal nonnegative",
+            "application": {
+              "locus": "event-arg-declarations",
+              "replacements": [
+                {
+                  "eventName": "Split",
+                  "argName": "Divisor",
+                  "declaration": "Divisor as decimal nonnegative"
+                }
+              ]
+            },
+            "whyStillRejects": "`nonnegative` admits 0 — the interval still contains zero; must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          },
+          {
+            "pairsWith": "guard-nonzero",
+            "addition": "when Split.Divisor >= 0",
+            "application": {
+              "locus": "row-guard",
+              "eventName": "Split"
+            },
+            "whyStillRejects": "`>= 0` admits 0 — does not imply the WP; must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+          "note": "Family 4 — fault family, arg-constraint discharge; the interval-exclude-zero derivation this group instantiates (“compute the divisor's interval from its declared modifiers and in-scope guard facts… zero inside the interval, or no bound excluding it, rejects”)"
+        },
+        {
+          "kind": "catalog",
+          "ref": "src/Precept/Language/Operations.cs:442",
+          "note": "MoneyDivideDecimal catalog entry — divisor subject is the decimal operand, single NumericProofRequirement at index 0"
+        }
+      ],
+      "notes": [
+        "Dual type-family site: MoneyDivideDecimal's declared operand types are Money (business-domain) and decimal (primitive), so the site is live at both type-family product coordinates. This one cell covers both: the coordinate recorded above (business-domain) reflects the numerator's family; the requirement's actual subject — the divisor — is the primitive decimal operand in every witness below. Stated explicitly per the group's authoring note so the family coordinate is not read as ambiguous.",
+        "The divisor is a fresh event arg untouched earlier in the (single-write) plan, so the weakest precondition equals the catalog condition verbatim — no backward substitution is needed.",
+        "The mechanized WP calculator (tools/Precept.MatrixTools, WpCalculator.*) targets rule-family write-plan WPs (Witness Family 1); it does not compute a canonicalKey for fault-family catalog preconditions in this build, so wp.canonicalKey is omitted rather than invented."
+      ]
+    },
+    {
+      "id": "g07/money-divide-money-same-currency",
+      "label": "Money ÷ money (same currency), transition-row write — the divisor is a same-currency money arg",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "MoneyDivideMoneySameCurrency",
+        "evaluationSiteCategory": "transition-row-action-operand",
+        "typeFamily": "business-domain"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+            "note": "Family 4 — fault family, arg-constraint discharge; the interval-exclude-zero derivation this group instantiates (“compute the divisor's interval from its declared modifiers and in-scope guard facts… zero inside the interval, or no bound excluding it, rejects”)"
+          },
+          {
+            "kind": "want-doc",
+            "ref": "docs/Working/what-i-want-2026-07-16.md:104",
+            "note": "fault prevention"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Split.Divisor != '0 USD'",
+        "metavariables": [
+          {
+            "name": "Divisor",
+            "standsFor": "the event arg supplying the divisor operand (money-typed, same currency as the numerator)"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "Split.Divisor != '0 USD'"
+        }
+      },
+      "applicablePremiseClasses": [
+        "b",
+        "c"
+      ],
+      "premiseAvailability": "The divisor is the triggering event's own money-typed arg and is not read elsewhere in the plan — premise (d) has nothing to instantiate. Only (b) and (c) can supply the interval that excludes zero.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "derivation": "guard fact normal-form-equal to the divisor's non-zero condition → guard-match",
+          "capabilityTier": "1a",
+          "validityArguments": [
+            "Guard normal-form match"
+          ],
+          "decisionProcedure": "Compute the divisor's interval from its declared modifiers and in-scope guard facts (a finite set per site); zero inside the interval, or no bound excluding it, rejects. (Family 4's own decision-procedure text, restated for this operand pairing — the interval story is unchanged by the numerator/divisor type family.)",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+              "note": "Family 4 — fault family, arg-constraint discharge; the interval-exclude-zero derivation this group instantiates (“compute the divisor's interval from its declared modifiers and in-scope guard facts… zero inside the interval, or no bound excluding it, rejects”)"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "“Guard normal-form match” is stated in § Validity arguments against Witness Family 1's Bases A and C (a rule-preservation WP). Reusing it here is a direct corollary, not a separately-written argument: the same reasoning — a row fires only if its guard evaluated true, and the guard reads the same pre-state/args the action reads — applies unchanged when the proposition being matched is the fault family's “Divisor ≠ 0” instead of a rule's bound. No dedicated validity argument is written for the fault family in § Validity arguments; Family 4's own § Witnesses entry states the decision procedure but is not one of the six named arguments the schema enumerates. Flagged here rather than silently assumed."
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "b"
+          ],
+          "derivation": "declared arg-modifier bound on the divisor (e.g. `positive`) excludes 0 from its interval → IntervalContainment",
+          "capabilityTier": "1a",
+          "strategy": "IntervalContainment",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "Compute the divisor's interval from its declared modifiers and in-scope guard facts (a finite set per site); zero inside the interval, or no bound excluding it, rejects. (Family 4's own decision-procedure text, restated for this operand pairing — the interval story is unchanged by the numerator/divisor type family.)",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+              "note": "Family 4 — fault family, arg-constraint discharge; the interval-exclude-zero derivation this group instantiates (“compute the divisor's interval from its declared modifiers and in-scope guard facts… zero inside the interval, or no bound excluding it, rejects”)"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "“Arg-bound interval arithmetic” is stated in § Validity arguments against Witness Family 1 Base A (summing two bounded args against a rule's bound). Reusing it here is a direct, simpler corollary: governance enforces the declared modifier on the event arg at ingress (precept-language-spec.md:268), so a `positive`-declared divisor's runtime value is provably > 0, hence ≠ 0 — no sum, no second term. As with the guard argument above, no validity argument is separately written for the fault family; this is the same reuse, flagged rather than assumed."
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "schema": "add a guard normal-form-equal to <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "b"
+          ],
+          "schema": "bound the args such that the interval combination satisfies <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept BillingMoneyMoneySame\n\nfield Subtotal as money in 'USD' default '0 USD'\nfield UnitFraction as decimal default 0.0\n\nstate Draft initial\nstate Active\n\nevent Open(Amount as money in 'USD')\nfrom Draft on Open\n    -> set Subtotal = Open.Amount\n    -> transition Active\n\nevent Split(Divisor as money in 'USD')\nfrom Active on Split\n    -> set UnitFraction = Subtotal / Split.Divisor\n    -> no transition\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "b",
+              "c"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        },
+        "discharges": [
+          {
+            "id": "positive-arg",
+            "kind": "arg-modifier",
+            "addition": "Divisor as money in 'USD' positive",
+            "application": {
+              "locus": "event-arg-declarations",
+              "replacements": [
+                {
+                  "eventName": "Split",
+                  "argName": "Divisor",
+                  "declaration": "Divisor as money in 'USD' positive"
+                }
+              ]
+            },
+            "premiseClasses": [
+              "b"
+            ],
+            "derivation": "declared `positive` modifier → Divisor > '0 USD' → Divisor ≠ '0 USD' (IntervalContainment)",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          },
+          {
+            "id": "guard-nonzero",
+            "kind": "guard",
+            "addition": "when Split.Divisor != '0 USD'",
+            "application": {
+              "locus": "row-guard",
+              "eventName": "Split"
+            },
+            "premiseClasses": [
+              "c"
+            ],
+            "derivation": "guard fact normal-form-equal to `Divisor ≠ '0 USD'` → guard-match",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "Live-verified at HEAD (e1a14d91): a guard restating the divisor's non-zero condition (`when Split.Divisor != '0 USD'`) does not discharge the obligation for a business-domain-typed divisor — the file still rejects with the identical DivisionByZero diagnostic. Tried both the literal-comparison spelling and, for money, the `.amount` projection; both fail identically. This is a genuine built-status gap, not a near-miss: the SAME guard spelling that discharges cleanly when the divisor is `decimal`-typed (MoneyDivideDecimal, QuantityDivideDecimal, PriceDivideDecimal, ExchangeRateDivideDecimal, all verified working in this file) does not discharge when the divisor is a business-domain type. Recorded as builtStatus: unresolved-today per the false-proof-hazard instructions' sibling rule — a live run demonstrating non-discharge, not a business rule used as a premise.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Also tried `when Split.Divisor.amount != 0` (the `.amount` projection) — same rejection, same diagnostic."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "positive-arg",
+            "addition": "Divisor as money in 'USD' nonnegative",
+            "application": {
+              "locus": "event-arg-declarations",
+              "replacements": [
+                {
+                  "eventName": "Split",
+                  "argName": "Divisor",
+                  "declaration": "Divisor as money in 'USD' nonnegative"
+                }
+              ]
+            },
+            "whyStillRejects": "`nonnegative` admits '0 USD' — must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          },
+          {
+            "pairsWith": "guard-nonzero",
+            "addition": "when Split.Divisor >= '0 USD'",
+            "application": {
+              "locus": "row-guard",
+              "eventName": "Split"
+            },
+            "whyStillRejects": "`>= '0 USD'` admits '0 USD' — does not imply the WP; must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+          "note": "Family 4 — fault family, arg-constraint discharge; the interval-exclude-zero derivation this group instantiates (“compute the divisor's interval from its declared modifiers and in-scope guard facts… zero inside the interval, or no bound excluding it, rejects”)"
+        },
+        {
+          "kind": "catalog",
+          "ref": "src/Precept/Language/Operations.cs:452",
+          "note": "MoneyDivideMoneySameCurrency catalog entry — Match: Same, divisor subject is the money operand"
+        }
+      ],
+      "notes": [
+        "The divisor is a fresh event arg untouched earlier in the plan, so the WP equals the catalog condition verbatim.",
+        "wp.canonicalKey omitted: the mechanized WP calculator targets rule-family write-plan WPs, not fault-family catalog preconditions, in this build."
+      ]
+    },
+    {
+      "id": "g07/money-divide-money-cross-currency",
+      "label": "Money ÷ money (cross currency), transition-row write — the divisor is a different-currency money arg",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "MoneyDivideMoneyCrossCurrency",
+        "evaluationSiteCategory": "transition-row-action-operand",
+        "typeFamily": "business-domain"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+            "note": "Family 4 — fault family, arg-constraint discharge; the interval-exclude-zero derivation this group instantiates (“compute the divisor's interval from its declared modifiers and in-scope guard facts… zero inside the interval, or no bound excluding it, rejects”)"
+          },
+          {
+            "kind": "want-doc",
+            "ref": "docs/Working/what-i-want-2026-07-16.md:104",
+            "note": "fault prevention"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Split.Divisor != '0 EUR'",
+        "metavariables": [
+          {
+            "name": "Divisor",
+            "standsFor": "the event arg supplying the divisor operand (money-typed, currency different from the numerator)"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "Split.Divisor != '0 EUR'"
+        }
+      },
+      "applicablePremiseClasses": [
+        "b",
+        "c"
+      ],
+      "premiseAvailability": "The divisor is the triggering event's own money-typed arg and is not read elsewhere in the plan — premise (d) has nothing to instantiate. Only (b) and (c) can supply the interval that excludes zero, under the model. See the reachability note: at HEAD this obligation is always minted under MoneyDivideMoneySameCurrency's identity (identical requirement content), never this catalog entry's own.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "derivation": "guard fact normal-form-equal to the divisor's non-zero condition → guard-match",
+          "capabilityTier": "1a",
+          "validityArguments": [
+            "Guard normal-form match"
+          ],
+          "decisionProcedure": "Compute the divisor's interval from its declared modifiers and in-scope guard facts (a finite set per site); zero inside the interval, or no bound excluding it, rejects. (Family 4's own decision-procedure text, restated for this operand pairing — the interval story is unchanged by the numerator/divisor type family.)",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+              "note": "Family 4 — fault family, arg-constraint discharge; the interval-exclude-zero derivation this group instantiates (“compute the divisor's interval from its declared modifiers and in-scope guard facts… zero inside the interval, or no bound excluding it, rejects”)"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "“Guard normal-form match” is stated in § Validity arguments against Witness Family 1's Bases A and C (a rule-preservation WP). Reusing it here is a direct corollary, not a separately-written argument: the same reasoning — a row fires only if its guard evaluated true, and the guard reads the same pre-state/args the action reads — applies unchanged when the proposition being matched is the fault family's “Divisor ≠ 0” instead of a rule's bound. No dedicated validity argument is written for the fault family in § Validity arguments; Family 4's own § Witnesses entry states the decision procedure but is not one of the six named arguments the schema enumerates. Flagged here rather than silently assumed."
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "b"
+          ],
+          "derivation": "declared arg-modifier bound on the divisor (e.g. `positive`) excludes 0 from its interval → IntervalContainment",
+          "capabilityTier": "1a",
+          "strategy": "IntervalContainment",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "Compute the divisor's interval from its declared modifiers and in-scope guard facts (a finite set per site); zero inside the interval, or no bound excluding it, rejects. (Family 4's own decision-procedure text, restated for this operand pairing — the interval story is unchanged by the numerator/divisor type family.)",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+              "note": "Family 4 — fault family, arg-constraint discharge; the interval-exclude-zero derivation this group instantiates (“compute the divisor's interval from its declared modifiers and in-scope guard facts… zero inside the interval, or no bound excluding it, rejects”)"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "“Arg-bound interval arithmetic” is stated in § Validity arguments against Witness Family 1 Base A (summing two bounded args against a rule's bound). Reusing it here is a direct, simpler corollary: governance enforces the declared modifier on the event arg at ingress (precept-language-spec.md:268), so a `positive`-declared divisor's runtime value is provably > 0, hence ≠ 0 — no sum, no second term. As with the guard argument above, no validity argument is separately written for the fault family; this is the same reuse, flagged rather than assumed."
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "schema": "add a guard normal-form-equal to <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "b"
+          ],
+          "schema": "bound the args such that the interval combination satisfies <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept BillingMoneyMoneyCrossProbe\n\nfield BaseCurrency as currency default 'USD'\nfield QuoteCurrency as currency default 'EUR'\nfield Subtotal as money in '{BaseCurrency}' default '0 {BaseCurrency}'\nfield Ratio as decimal default 0.0\n\nstate Draft initial\nstate Active\n\nevent Open(Amount as money in '{BaseCurrency}')\nfrom Draft on Open\n    -> set BaseCurrency = 'USD'\n    -> set QuoteCurrency = 'EUR'\n    -> set Subtotal = Open.Amount\n    -> transition Active\n\nevent Split(Divisor as money in '{QuoteCurrency}')\nfrom Active on Split\n    -> set Ratio = Subtotal / Split.Divisor\n    -> no transition\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "b",
+              "c"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        },
+        "discharges": [
+          {
+            "id": "positive-arg",
+            "kind": "arg-modifier",
+            "addition": "Divisor as money in '{QuoteCurrency}' positive",
+            "application": {
+              "locus": "event-arg-declarations",
+              "replacements": [
+                {
+                  "eventName": "Split",
+                  "argName": "Divisor",
+                  "declaration": "Divisor as money in '{QuoteCurrency}' positive"
+                }
+              ]
+            },
+            "premiseClasses": [
+              "b"
+            ],
+            "derivation": "declared `positive` modifier → Divisor > 0 → Divisor ≠ 0 (IntervalContainment)",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Live-verified as compiling clean when the result is assigned to a `decimal` field. Per the reachability note, this exercises MoneyDivideMoneySameCurrency's identity at HEAD (identical requirement content), not MoneyDivideMoneyCrossCurrency's own — recorded honestly rather than claimed as a Cross-specific run."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "positive-arg",
+            "addition": "Divisor as money in '{QuoteCurrency}' nonnegative",
+            "application": {
+              "locus": "event-arg-declarations",
+              "replacements": [
+                {
+                  "eventName": "Split",
+                  "argName": "Divisor",
+                  "declaration": "Divisor as money in '{QuoteCurrency}' nonnegative"
+                }
+              ]
+            },
+            "whyStillRejects": "`nonnegative` admits zero — must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited",
+        "notes": [
+          "The model's respellability story is unchanged from Cell 2 (Same currency) — the reachability finding is a built-status matter, not a model-power matter."
+        ]
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+          "note": "Family 4 — fault family, arg-constraint discharge; the interval-exclude-zero derivation this group instantiates (“compute the divisor's interval from its declared modifiers and in-scope guard facts… zero inside the interval, or no bound excluding it, rejects”)"
+        },
+        {
+          "kind": "catalog",
+          "ref": "src/Precept/Language/Operations.cs:462",
+          "note": "MoneyDivideMoneyCrossCurrency catalog entry — Match: Different, divisor subject is the money operand"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Operations.cs:1315",
+          "note": "DisambiguateCandidates — selects the Same-qualifier entry by default when multiple candidates exist"
+        }
+      ],
+      "notes": [
+        "Verified reachability limitation (HEAD e1a14d91): the catalog declares MoneyDivideMoneySameCurrency and MoneyDivideMoneyCrossCurrency as two candidates for the (Divide, Money, Money) type pair, but Operations.DisambiguateCandidates (src/Precept/Language/Operations.cs:1305-1326) “selects the Same entry by default” whenever more than one candidate exists — unconditionally, not based on any runtime or static qualifier fact. Consequences, both live-verified: (1) with STATICALLY same-vs-different literal currencies known ('USD' vs 'EUR'), the pairwise qualifier check (TypeChecker.Expressions.cs:1298-1314, PRE0070) fires first and rejects the file outright with CrossCurrencyArithmetic, before any divide-specific reasoning runs — unlike the equivalent Quantity/Quantity check, which explicitly excludes Divide (TypeChecker.Expressions.cs:1324-1325) with a comment naming the reason; the Money/Money check carries no such exclusion. (2) With DYNAMIC (field-interpolated) currency qualifiers — bypassing PRE0070 — the type-checker still always resolves the expression via MoneyDivideMoneySameCurrency's Decimal result type, never Cross's ExchangeRate result type; assigning to an exchangerate-typed field yields TypeMismatch (probed directly and confirmed) and assigning to a decimal-typed field silently compiles as the Same-currency meta regardless of the operands' actual runtime currencies. Net effect: no surface spelling reaches MoneyDivideMoneyCrossCurrency as its own catalog identity — every money/money division is type-checked, and therefore obligation-minted, under MoneyDivideMoneySameCurrency's identity. Because both catalog entries carry byte-for-byte identical NumericProofRequirement content (“Divisor must be non-zero”, subject = the money operand), the FAULT OBLIGATION itself is unaffected in substance — but this cell's catalog site, as its own distinct identity, is unreachable. This is a built-status / reachability finding about HEAD, not a gap in the model: the model's obligation and discharge story for this cell are exactly Family 4's interval-exclude-zero story, unchanged. Recorded here rather than papered over with an invented distinguishing witness.",
+        "No guard-discharge witness is recorded for this cell: given the guard mechanism already fails for the reachable Same-currency identity (Cell 2, live-verified), and this cell's own identity is itself unreachable, adding a guard witness here would not demonstrate anything the reachability note does not already state."
+      ]
+    },
+    {
+      "id": "g07/money-divide-quantity",
+      "label": "Money ÷ quantity, transition-row write — the divisor is a quantity arg",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "MoneyDivideQuantity",
+        "evaluationSiteCategory": "transition-row-action-operand",
+        "typeFamily": "business-domain"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+            "note": "Family 4 — fault family, arg-constraint discharge; the interval-exclude-zero derivation this group instantiates (“compute the divisor's interval from its declared modifiers and in-scope guard facts… zero inside the interval, or no bound excluding it, rejects”)"
+          },
+          {
+            "kind": "want-doc",
+            "ref": "docs/Working/what-i-want-2026-07-16.md:104",
+            "note": "fault prevention"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Split.Divisor != '0 kg'",
+        "metavariables": [
+          {
+            "name": "Divisor",
+            "standsFor": "the event arg supplying the divisor operand (quantity-typed)"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "Split.Divisor != '0 kg'"
+        }
+      },
+      "applicablePremiseClasses": [
+        "b",
+        "c"
+      ],
+      "premiseAvailability": "The divisor is the triggering event's own quantity-typed arg and is not read elsewhere in the plan — premise (d) has nothing to instantiate. Only (b) and (c) can supply the interval that excludes zero.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "derivation": "guard fact normal-form-equal to the divisor's non-zero condition → guard-match",
+          "capabilityTier": "1a",
+          "validityArguments": [
+            "Guard normal-form match"
+          ],
+          "decisionProcedure": "Compute the divisor's interval from its declared modifiers and in-scope guard facts (a finite set per site); zero inside the interval, or no bound excluding it, rejects. (Family 4's own decision-procedure text, restated for this operand pairing — the interval story is unchanged by the numerator/divisor type family.)",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+              "note": "Family 4 — fault family, arg-constraint discharge; the interval-exclude-zero derivation this group instantiates (“compute the divisor's interval from its declared modifiers and in-scope guard facts… zero inside the interval, or no bound excluding it, rejects”)"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "“Guard normal-form match” is stated in § Validity arguments against Witness Family 1's Bases A and C (a rule-preservation WP). Reusing it here is a direct corollary, not a separately-written argument: the same reasoning — a row fires only if its guard evaluated true, and the guard reads the same pre-state/args the action reads — applies unchanged when the proposition being matched is the fault family's “Divisor ≠ 0” instead of a rule's bound. No dedicated validity argument is written for the fault family in § Validity arguments; Family 4's own § Witnesses entry states the decision procedure but is not one of the six named arguments the schema enumerates. Flagged here rather than silently assumed."
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "b"
+          ],
+          "derivation": "declared arg-modifier bound on the divisor (e.g. `positive`) excludes 0 from its interval → IntervalContainment",
+          "capabilityTier": "1a",
+          "strategy": "IntervalContainment",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "Compute the divisor's interval from its declared modifiers and in-scope guard facts (a finite set per site); zero inside the interval, or no bound excluding it, rejects. (Family 4's own decision-procedure text, restated for this operand pairing — the interval story is unchanged by the numerator/divisor type family.)",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+              "note": "Family 4 — fault family, arg-constraint discharge; the interval-exclude-zero derivation this group instantiates (“compute the divisor's interval from its declared modifiers and in-scope guard facts… zero inside the interval, or no bound excluding it, rejects”)"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "“Arg-bound interval arithmetic” is stated in § Validity arguments against Witness Family 1 Base A (summing two bounded args against a rule's bound). Reusing it here is a direct, simpler corollary: governance enforces the declared modifier on the event arg at ingress (precept-language-spec.md:268), so a `positive`-declared divisor's runtime value is provably > 0, hence ≠ 0 — no sum, no second term. As with the guard argument above, no validity argument is separately written for the fault family; this is the same reuse, flagged rather than assumed."
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "schema": "add a guard normal-form-equal to <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "b"
+          ],
+          "schema": "bound the args such that the interval combination satisfies <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept BillingMoneyQuantity\n\nfield Subtotal as money in 'USD' default '0 USD'\nfield UnitPrice as price in 'USD/kg' default '0 USD/kg'\n\nstate Draft initial\nstate Active\n\nevent Open(Amount as money in 'USD')\nfrom Draft on Open\n    -> set Subtotal = Open.Amount\n    -> transition Active\n\nevent Split(Divisor as quantity in 'kg')\nfrom Active on Split\n    -> set UnitPrice = Subtotal / Split.Divisor\n    -> no transition\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "b",
+              "c"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        },
+        "discharges": [
+          {
+            "id": "positive-arg",
+            "kind": "arg-modifier",
+            "addition": "Divisor as quantity in 'kg' positive",
+            "application": {
+              "locus": "event-arg-declarations",
+              "replacements": [
+                {
+                  "eventName": "Split",
+                  "argName": "Divisor",
+                  "declaration": "Divisor as quantity in 'kg' positive"
+                }
+              ]
+            },
+            "premiseClasses": [
+              "b"
+            ],
+            "derivation": "declared `positive` modifier → Divisor > '0 kg' → Divisor ≠ '0 kg' (IntervalContainment)",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          },
+          {
+            "id": "guard-nonzero",
+            "kind": "guard",
+            "addition": "when Split.Divisor != '0 kg'",
+            "application": {
+              "locus": "row-guard",
+              "eventName": "Split"
+            },
+            "premiseClasses": [
+              "c"
+            ],
+            "derivation": "guard fact normal-form-equal to `Divisor ≠ '0 kg'` → guard-match",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "Live-verified at HEAD (e1a14d91): a guard restating the divisor's non-zero condition (`when Split.Divisor != '0 kg'`) does not discharge the obligation for a business-domain-typed divisor — the file still rejects with the identical DivisionByZero diagnostic. Tried both the literal-comparison spelling and, for money, the `.amount` projection; both fail identically. This is a genuine built-status gap, not a near-miss: the SAME guard spelling that discharges cleanly when the divisor is `decimal`-typed (MoneyDivideDecimal, QuantityDivideDecimal, PriceDivideDecimal, ExchangeRateDivideDecimal, all verified working in this file) does not discharge when the divisor is a business-domain type. Recorded as builtStatus: unresolved-today per the false-proof-hazard instructions' sibling rule — a live run demonstrating non-discharge, not a business rule used as a premise.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "positive-arg",
+            "addition": "Divisor as quantity in 'kg' nonnegative",
+            "application": {
+              "locus": "event-arg-declarations",
+              "replacements": [
+                {
+                  "eventName": "Split",
+                  "argName": "Divisor",
+                  "declaration": "Divisor as quantity in 'kg' nonnegative"
+                }
+              ]
+            },
+            "whyStillRejects": "`nonnegative` admits '0 kg' — must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          },
+          {
+            "pairsWith": "guard-nonzero",
+            "addition": "when Split.Divisor >= '0 kg'",
+            "application": {
+              "locus": "row-guard",
+              "eventName": "Split"
+            },
+            "whyStillRejects": "`>= '0 kg'` admits '0 kg' — does not imply the WP; must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+          "note": "Family 4 — fault family, arg-constraint discharge; the interval-exclude-zero derivation this group instantiates (“compute the divisor's interval from its declared modifiers and in-scope guard facts… zero inside the interval, or no bound excluding it, rejects”)"
+        },
+        {
+          "kind": "catalog",
+          "ref": "src/Precept/Language/Operations.cs:472",
+          "note": "MoneyDivideQuantity catalog entry — divisor subject is the quantity operand"
+        }
+      ],
+      "notes": [
+        "The divisor is a fresh event arg untouched earlier in the plan, so the WP equals the catalog condition verbatim.",
+        "wp.canonicalKey omitted for the same reason as Cell 1."
+      ]
+    },
+    {
+      "id": "g07/money-divide-price",
+      "label": "Money ÷ price, transition-row write — the divisor is a price arg (numeric-1: the non-zero requirement, not the currency-match requirement at index 0)",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "MoneyDividePrice",
+        "evaluationSiteCategory": "transition-row-action-operand",
+        "typeFamily": "business-domain"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+            "note": "Family 4 — fault family, arg-constraint discharge; the interval-exclude-zero derivation this group instantiates (“compute the divisor's interval from its declared modifiers and in-scope guard facts… zero inside the interval, or no bound excluding it, rejects”)"
+          },
+          {
+            "kind": "want-doc",
+            "ref": "docs/Working/what-i-want-2026-07-16.md:104",
+            "note": "fault prevention"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Split.Divisor != '0 USD/kg'",
+        "metavariables": [
+          {
+            "name": "Divisor",
+            "standsFor": "the event arg supplying the divisor operand (price-typed ('USD/kg'))"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "Split.Divisor != '0 USD/kg'"
+        }
+      },
+      "applicablePremiseClasses": [
+        "b",
+        "c"
+      ],
+      "premiseAvailability": "The divisor is the triggering event's own price-typed arg and is not read elsewhere in the plan — premise (d) has nothing to instantiate. Only (b) and (c) can supply the interval that excludes zero. This cell covers only the numeric-1 (non-zero divisor) requirement; the qualifier-chain currency-match requirement at numeric index 0 is a different requirement kind (QualifierChain, not Numeric) and is out of this group's scope per the authoring note — it is dispositioned open elsewhere (disposition-summary: “no premise class supplies type-qualifier facts”). The base program satisfies that other requirement by construction (both operands are 'USD') so it rejects for this cell's obligation alone.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "derivation": "guard fact normal-form-equal to the divisor's non-zero condition → guard-match",
+          "capabilityTier": "1a",
+          "validityArguments": [
+            "Guard normal-form match"
+          ],
+          "decisionProcedure": "Compute the divisor's interval from its declared modifiers and in-scope guard facts (a finite set per site); zero inside the interval, or no bound excluding it, rejects. (Family 4's own decision-procedure text, restated for this operand pairing — the interval story is unchanged by the numerator/divisor type family.)",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+              "note": "Family 4 — fault family, arg-constraint discharge; the interval-exclude-zero derivation this group instantiates (“compute the divisor's interval from its declared modifiers and in-scope guard facts… zero inside the interval, or no bound excluding it, rejects”)"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "“Guard normal-form match” is stated in § Validity arguments against Witness Family 1's Bases A and C (a rule-preservation WP). Reusing it here is a direct corollary, not a separately-written argument: the same reasoning — a row fires only if its guard evaluated true, and the guard reads the same pre-state/args the action reads — applies unchanged when the proposition being matched is the fault family's “Divisor ≠ 0” instead of a rule's bound. No dedicated validity argument is written for the fault family in § Validity arguments; Family 4's own § Witnesses entry states the decision procedure but is not one of the six named arguments the schema enumerates. Flagged here rather than silently assumed."
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "b"
+          ],
+          "derivation": "declared arg-modifier bound on the divisor (e.g. `positive`) excludes 0 from its interval → IntervalContainment",
+          "capabilityTier": "1a",
+          "strategy": "IntervalContainment",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "Compute the divisor's interval from its declared modifiers and in-scope guard facts (a finite set per site); zero inside the interval, or no bound excluding it, rejects. (Family 4's own decision-procedure text, restated for this operand pairing — the interval story is unchanged by the numerator/divisor type family.)",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+              "note": "Family 4 — fault family, arg-constraint discharge; the interval-exclude-zero derivation this group instantiates (“compute the divisor's interval from its declared modifiers and in-scope guard facts… zero inside the interval, or no bound excluding it, rejects”)"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "“Arg-bound interval arithmetic” is stated in § Validity arguments against Witness Family 1 Base A (summing two bounded args against a rule's bound). Reusing it here is a direct, simpler corollary: governance enforces the declared modifier on the event arg at ingress (precept-language-spec.md:268), so a `positive`-declared divisor's runtime value is provably > 0, hence ≠ 0 — no sum, no second term. As with the guard argument above, no validity argument is separately written for the fault family; this is the same reuse, flagged rather than assumed."
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "schema": "add a guard normal-form-equal to <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "b"
+          ],
+          "schema": "bound the args such that the interval combination satisfies <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept BillingMoneyPrice\n\nfield Subtotal as money in 'USD' default '0 USD'\nfield Qty as quantity in 'kg' default '0 kg'\n\nstate Draft initial\nstate Active\n\nevent Open(Amount as money in 'USD')\nfrom Draft on Open\n    -> set Subtotal = Open.Amount\n    -> transition Active\n\nevent Split(Divisor as price in 'USD/kg')\nfrom Active on Split\n    -> set Qty = Subtotal / Split.Divisor\n    -> no transition\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "b",
+              "c"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        },
+        "discharges": [
+          {
+            "id": "positive-arg",
+            "kind": "arg-modifier",
+            "addition": "Divisor as price in 'USD/kg' positive",
+            "application": {
+              "locus": "event-arg-declarations",
+              "replacements": [
+                {
+                  "eventName": "Split",
+                  "argName": "Divisor",
+                  "declaration": "Divisor as price in 'USD/kg' positive"
+                }
+              ]
+            },
+            "premiseClasses": [
+              "b"
+            ],
+            "derivation": "declared `positive` modifier → Divisor > '0 USD/kg' → Divisor ≠ '0 USD/kg' (IntervalContainment)",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          },
+          {
+            "id": "guard-nonzero",
+            "kind": "guard",
+            "addition": "when Split.Divisor != '0 USD/kg'",
+            "application": {
+              "locus": "row-guard",
+              "eventName": "Split"
+            },
+            "premiseClasses": [
+              "c"
+            ],
+            "derivation": "guard fact normal-form-equal to `Divisor ≠ '0 USD/kg'` → guard-match",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "Live-verified at HEAD (e1a14d91): a guard restating the divisor's non-zero condition (`when Split.Divisor != '0 USD/kg'`) does not discharge the obligation for a business-domain-typed divisor — the file still rejects with the identical DivisionByZero diagnostic. Tried both the literal-comparison spelling and, for money, the `.amount` projection; both fail identically. This is a genuine built-status gap, not a near-miss: the SAME guard spelling that discharges cleanly when the divisor is `decimal`-typed (MoneyDivideDecimal, QuantityDivideDecimal, PriceDivideDecimal, ExchangeRateDivideDecimal, all verified working in this file) does not discharge when the divisor is a business-domain type. Recorded as builtStatus: unresolved-today per the false-proof-hazard instructions' sibling rule — a live run demonstrating non-discharge, not a business rule used as a premise.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "positive-arg",
+            "addition": "Divisor as price in 'USD/kg' nonnegative",
+            "application": {
+              "locus": "event-arg-declarations",
+              "replacements": [
+                {
+                  "eventName": "Split",
+                  "argName": "Divisor",
+                  "declaration": "Divisor as price in 'USD/kg' nonnegative"
+                }
+              ]
+            },
+            "whyStillRejects": "`nonnegative` admits '0 USD/kg' — must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          },
+          {
+            "pairsWith": "guard-nonzero",
+            "addition": "when Split.Divisor >= '0 USD/kg'",
+            "application": {
+              "locus": "row-guard",
+              "eventName": "Split"
+            },
+            "whyStillRejects": "`>= '0 USD/kg'` admits '0 USD/kg' — does not imply the WP; must still reject, same obligation",
+            "provenance": {
+              "mark": "model-derived"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+          "note": "Family 4 — fault family, arg-constraint discharge; the interval-exclude-zero derivation this group instantiates (“compute the divisor's interval from its declared modifiers and in-scope guard facts… zero inside the interval, or no bound excluding it, rejects”)"
+        },
+        {
+          "kind": "catalog",
+          "ref": "src/Precept/Language/Operations.cs:486",
+          "note": "MoneyDividePrice catalog entry — two ProofRequirements: index 0 QualifierChain (currency match, out of scope), index 1 Numeric (divisor ≠ 0, this cell)"
+        }
+      ],
+      "notes": [
+        "The divisor is a fresh event arg untouched earlier in the plan, so the WP equals the catalog condition verbatim.",
+        "wp.canonicalKey omitted for the same reason as Cell 1.",
+        "The guard near-miss is model-derived, not live-verified: only the guard *discharge* (which already fails to compile, per builtStatus above) was run live; a separately weakened guard was not additionally tested for this site."
+      ]
+    },
+    {
+      "id": "g07/quantity-divide-decimal",
+      "label": "Quantity ÷ decimal, transition-row write — the divisor is a decimal arg",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "QuantityDivideDecimal",
+        "evaluationSiteCategory": "transition-row-action-operand",
+        "typeFamily": "business-domain"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+            "note": "Family 4 — fault family, arg-constraint discharge; the interval-exclude-zero derivation this group instantiates (“compute the divisor's interval from its declared modifiers and in-scope guard facts… zero inside the interval, or no bound excluding it, rejects”)"
+          },
+          {
+            "kind": "want-doc",
+            "ref": "docs/Working/what-i-want-2026-07-16.md:104",
+            "note": "fault prevention"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Split.Divisor != 0",
+        "metavariables": [
+          {
+            "name": "Divisor",
+            "standsFor": "the event arg supplying the divisor operand (decimal-typed)"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "Split.Divisor != 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "b",
+        "c"
+      ],
+      "premiseAvailability": "The divisor is the triggering event's own decimal-typed arg and is not read elsewhere in the plan — premise (d) has nothing to instantiate. Only (b) and (c) can supply the interval that excludes zero.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "derivation": "guard fact normal-form-equal to the divisor's non-zero condition → guard-match",
+          "capabilityTier": "1a",
+          "validityArguments": [
+            "Guard normal-form match"
+          ],
+          "decisionProcedure": "Compute the divisor's interval from its declared modifiers and in-scope guard facts (a finite set per site); zero inside the interval, or no bound excluding it, rejects. (Family 4's own decision-procedure text, restated for this operand pairing — the interval story is unchanged by the numerator/divisor type family.)",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+              "note": "Family 4 — fault family, arg-constraint discharge; the interval-exclude-zero derivation this group instantiates (“compute the divisor's interval from its declared modifiers and in-scope guard facts… zero inside the interval, or no bound excluding it, rejects”)"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "“Guard normal-form match” is stated in § Validity arguments against Witness Family 1's Bases A and C (a rule-preservation WP). Reusing it here is a direct corollary, not a separately-written argument: the same reasoning — a row fires only if its guard evaluated true, and the guard reads the same pre-state/args the action reads — applies unchanged when the proposition being matched is the fault family's “Divisor ≠ 0” instead of a rule's bound. No dedicated validity argument is written for the fault family in § Validity arguments; Family 4's own § Witnesses entry states the decision procedure but is not one of the six named arguments the schema enumerates. Flagged here rather than silently assumed."
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "b"
+          ],
+          "derivation": "declared arg-modifier bound on the divisor (e.g. `positive`) excludes 0 from its interval → IntervalContainment",
+          "capabilityTier": "1a",
+          "strategy": "IntervalContainment",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "Compute the divisor's interval from its declared modifiers and in-scope guard facts (a finite set per site); zero inside the interval, or no bound excluding it, rejects. (Family 4's own decision-procedure text, restated for this operand pairing — the interval story is unchanged by the numerator/divisor type family.)",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+              "note": "Family 4 — fault family, arg-constraint discharge; the interval-exclude-zero derivation this group instantiates (“compute the divisor's interval from its declared modifiers and in-scope guard facts… zero inside the interval, or no bound excluding it, rejects”)"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "“Arg-bound interval arithmetic” is stated in § Validity arguments against Witness Family 1 Base A (summing two bounded args against a rule's bound). Reusing it here is a direct, simpler corollary: governance enforces the declared modifier on the event arg at ingress (precept-language-spec.md:268), so a `positive`-declared divisor's runtime value is provably > 0, hence ≠ 0 — no sum, no second term. As with the guard argument above, no validity argument is separately written for the fault family; this is the same reuse, flagged rather than assumed."
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "schema": "add a guard normal-form-equal to <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "b"
+          ],
+          "schema": "bound the args such that the interval combination satisfies <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept BillingQuantityDecimal\n\nfield Qty as quantity in 'kg' default '0 kg'\nfield UnitShare as quantity in 'kg' default '0 kg'\n\nstate Draft initial\nstate Active\n\nevent Open(Amount as quantity in 'kg')\nfrom Draft on Open\n    -> set Qty = Open.Amount\n    -> transition Active\n\nevent Split(Divisor as decimal)\nfrom Active on Split\n    -> set UnitShare = Qty / Split.Divisor\n    -> no transition\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "b",
+              "c"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        },
+        "discharges": [
+          {
+            "id": "positive-arg",
+            "kind": "arg-modifier",
+            "addition": "Divisor as decimal positive",
+            "application": {
+              "locus": "event-arg-declarations",
+              "replacements": [
+                {
+                  "eventName": "Split",
+                  "argName": "Divisor",
+                  "declaration": "Divisor as decimal positive"
+                }
+              ]
+            },
+            "premiseClasses": [
+              "b"
+            ],
+            "derivation": "declared `positive` modifier → Divisor > 0 → Divisor ≠ 0 (IntervalContainment)",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          },
+          {
+            "id": "guard-nonzero",
+            "kind": "guard",
+            "addition": "when Split.Divisor != 0",
+            "application": {
+              "locus": "row-guard",
+              "eventName": "Split"
+            },
+            "premiseClasses": [
+              "c"
+            ],
+            "derivation": "guard fact normal-form-equal to `Divisor ≠ 0` → guard-match",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "positive-arg",
+            "addition": "Divisor as decimal nonnegative",
+            "application": {
+              "locus": "event-arg-declarations",
+              "replacements": [
+                {
+                  "eventName": "Split",
+                  "argName": "Divisor",
+                  "declaration": "Divisor as decimal nonnegative"
+                }
+              ]
+            },
+            "whyStillRejects": "`nonnegative` admits 0 — must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          },
+          {
+            "pairsWith": "guard-nonzero",
+            "addition": "when Split.Divisor >= 0",
+            "application": {
+              "locus": "row-guard",
+              "eventName": "Split"
+            },
+            "whyStillRejects": "`>= 0` admits 0 — does not imply the WP; must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+          "note": "Family 4 — fault family, arg-constraint discharge; the interval-exclude-zero derivation this group instantiates (“compute the divisor's interval from its declared modifiers and in-scope guard facts… zero inside the interval, or no bound excluding it, rejects”)"
+        },
+        {
+          "kind": "catalog",
+          "ref": "src/Precept/Language/Operations.cs:543",
+          "note": "QuantityDivideDecimal catalog entry — divisor subject is the decimal operand"
+        }
+      ],
+      "notes": [
+        "Dual type-family site, same reasoning as Cell 1: QuantityDivideDecimal's declared operand types are Quantity (business-domain) and decimal (primitive); the coordinate recorded here (business-domain) reflects the numerator's family, while the requirement's subject — the divisor — is the primitive decimal operand.",
+        "The divisor is a fresh event arg untouched earlier in the plan, so the WP equals the catalog condition verbatim.",
+        "wp.canonicalKey omitted for the same reason as Cell 1."
+      ]
+    },
+    {
+      "id": "g07/quantity-divide-quantity-same-dimension",
+      "label": "Quantity ÷ quantity (same dimension), transition-row write — the divisor is a same-unit quantity arg",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "QuantityDivideQuantitySameDimension",
+        "evaluationSiteCategory": "transition-row-action-operand",
+        "typeFamily": "business-domain"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+            "note": "Family 4 — fault family, arg-constraint discharge; the interval-exclude-zero derivation this group instantiates (“compute the divisor's interval from its declared modifiers and in-scope guard facts… zero inside the interval, or no bound excluding it, rejects”)"
+          },
+          {
+            "kind": "want-doc",
+            "ref": "docs/Working/what-i-want-2026-07-16.md:104",
+            "note": "fault prevention"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Split.Divisor != '0 kg'",
+        "metavariables": [
+          {
+            "name": "Divisor",
+            "standsFor": "the event arg supplying the divisor operand (quantity-typed, same dimension as the numerator)"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "Split.Divisor != '0 kg'"
+        }
+      },
+      "applicablePremiseClasses": [
+        "b",
+        "c"
+      ],
+      "premiseAvailability": "The divisor is the triggering event's own quantity-typed arg and is not read elsewhere in the plan — premise (d) has nothing to instantiate. Only (b) and (c) can supply the interval that excludes zero. Unlike Money/Money and Quantity/Quantity-cross-dimension (Cells 3 and 8), this site has no reachability problem: Operations.DisambiguateCandidates always resolves a multi-candidate (Divide, Quantity, Quantity) pair to the `Match: Same` entry, which is exactly this catalog member — it is the one every plain `quantity / quantity` division actually type-checks as.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "derivation": "guard fact normal-form-equal to the divisor's non-zero condition → guard-match",
+          "capabilityTier": "1a",
+          "validityArguments": [
+            "Guard normal-form match"
+          ],
+          "decisionProcedure": "Compute the divisor's interval from its declared modifiers and in-scope guard facts (a finite set per site); zero inside the interval, or no bound excluding it, rejects. (Family 4's own decision-procedure text, restated for this operand pairing — the interval story is unchanged by the numerator/divisor type family.)",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+              "note": "Family 4 — fault family, arg-constraint discharge; the interval-exclude-zero derivation this group instantiates (“compute the divisor's interval from its declared modifiers and in-scope guard facts… zero inside the interval, or no bound excluding it, rejects”)"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "“Guard normal-form match” is stated in § Validity arguments against Witness Family 1's Bases A and C (a rule-preservation WP). Reusing it here is a direct corollary, not a separately-written argument: the same reasoning — a row fires only if its guard evaluated true, and the guard reads the same pre-state/args the action reads — applies unchanged when the proposition being matched is the fault family's “Divisor ≠ 0” instead of a rule's bound. No dedicated validity argument is written for the fault family in § Validity arguments; Family 4's own § Witnesses entry states the decision procedure but is not one of the six named arguments the schema enumerates. Flagged here rather than silently assumed."
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "b"
+          ],
+          "derivation": "declared arg-modifier bound on the divisor (e.g. `positive`) excludes 0 from its interval → IntervalContainment",
+          "capabilityTier": "1a",
+          "strategy": "IntervalContainment",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "Compute the divisor's interval from its declared modifiers and in-scope guard facts (a finite set per site); zero inside the interval, or no bound excluding it, rejects. (Family 4's own decision-procedure text, restated for this operand pairing — the interval story is unchanged by the numerator/divisor type family.)",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+              "note": "Family 4 — fault family, arg-constraint discharge; the interval-exclude-zero derivation this group instantiates (“compute the divisor's interval from its declared modifiers and in-scope guard facts… zero inside the interval, or no bound excluding it, rejects”)"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "“Arg-bound interval arithmetic” is stated in § Validity arguments against Witness Family 1 Base A (summing two bounded args against a rule's bound). Reusing it here is a direct, simpler corollary: governance enforces the declared modifier on the event arg at ingress (precept-language-spec.md:268), so a `positive`-declared divisor's runtime value is provably > 0, hence ≠ 0 — no sum, no second term. As with the guard argument above, no validity argument is separately written for the fault family; this is the same reuse, flagged rather than assumed."
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "schema": "add a guard normal-form-equal to <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "b"
+          ],
+          "schema": "bound the args such that the interval combination satisfies <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept BillingQuantityQuantitySame\n\nfield Qty as quantity in 'kg' default '0 kg'\nfield UnitFraction as decimal default 0.0\n\nstate Draft initial\nstate Active\n\nevent Open(Amount as quantity in 'kg')\nfrom Draft on Open\n    -> set Qty = Open.Amount\n    -> transition Active\n\nevent Split(Divisor as quantity in 'kg')\nfrom Active on Split\n    -> set UnitFraction = Qty / Split.Divisor\n    -> no transition\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "b",
+              "c"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        },
+        "discharges": [
+          {
+            "id": "positive-arg",
+            "kind": "arg-modifier",
+            "addition": "Divisor as quantity in 'kg' positive",
+            "application": {
+              "locus": "event-arg-declarations",
+              "replacements": [
+                {
+                  "eventName": "Split",
+                  "argName": "Divisor",
+                  "declaration": "Divisor as quantity in 'kg' positive"
+                }
+              ]
+            },
+            "premiseClasses": [
+              "b"
+            ],
+            "derivation": "declared `positive` modifier → Divisor > '0 kg' → Divisor ≠ '0 kg' (IntervalContainment)",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          },
+          {
+            "id": "guard-nonzero",
+            "kind": "guard",
+            "addition": "when Split.Divisor != '0 kg'",
+            "application": {
+              "locus": "row-guard",
+              "eventName": "Split"
+            },
+            "premiseClasses": [
+              "c"
+            ],
+            "derivation": "guard fact normal-form-equal to `Divisor ≠ '0 kg'` → guard-match",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "Live-verified at HEAD (e1a14d91): a guard restating the divisor's non-zero condition (`when Split.Divisor != '0 kg' (probed as != '0 m' on an equivalent same-dimension setting)`) does not discharge the obligation for a business-domain-typed divisor — the file still rejects with the identical DivisionByZero diagnostic. Tried both the literal-comparison spelling and, for money, the `.amount` projection; both fail identically. This is a genuine built-status gap, not a near-miss: the SAME guard spelling that discharges cleanly when the divisor is `decimal`-typed (MoneyDivideDecimal, QuantityDivideDecimal, PriceDivideDecimal, ExchangeRateDivideDecimal, all verified working in this file) does not discharge when the divisor is a business-domain type. Recorded as builtStatus: unresolved-today per the false-proof-hazard instructions' sibling rule — a live run demonstrating non-discharge, not a business rule used as a premise.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "positive-arg",
+            "addition": "Divisor as quantity in 'kg' nonnegative",
+            "application": {
+              "locus": "event-arg-declarations",
+              "replacements": [
+                {
+                  "eventName": "Split",
+                  "argName": "Divisor",
+                  "declaration": "Divisor as quantity in 'kg' nonnegative"
+                }
+              ]
+            },
+            "whyStillRejects": "`nonnegative` admits '0 kg' — must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          },
+          {
+            "pairsWith": "guard-nonzero",
+            "addition": "when Split.Divisor >= '0 kg'",
+            "application": {
+              "locus": "row-guard",
+              "eventName": "Split"
+            },
+            "whyStillRejects": "`>= '0 kg'` admits '0 kg' — does not imply the WP; must still reject, same obligation",
+            "provenance": {
+              "mark": "model-derived"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+          "note": "Family 4 — fault family, arg-constraint discharge; the interval-exclude-zero derivation this group instantiates (“compute the divisor's interval from its declared modifiers and in-scope guard facts… zero inside the interval, or no bound excluding it, rejects”)"
+        },
+        {
+          "kind": "catalog",
+          "ref": "src/Precept/Language/Operations.cs:553",
+          "note": "QuantityDivideQuantitySameDimension catalog entry — Match: Same, divisor subject is the quantity operand"
+        }
+      ],
+      "notes": [
+        "The divisor is a fresh event arg untouched earlier in the plan, so the WP equals the catalog condition verbatim.",
+        "wp.canonicalKey omitted for the same reason as Cell 1.",
+        "Guard discharge live-verified as failing on an equivalent setting (`m` distance / `m` divisor rather than `kg`/`kg`) — the unit choice is not load-bearing for the finding; the same-dimension pairing is."
+      ]
+    },
+    {
+      "id": "g07/quantity-divide-quantity-cross-dimension",
+      "label": "Quantity ÷ quantity (cross dimension), transition-row write — the divisor is a different-dimension quantity arg",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "QuantityDivideQuantityCrossDimension",
+        "evaluationSiteCategory": "transition-row-action-operand",
+        "typeFamily": "business-domain"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+            "note": "Family 4 — fault family, arg-constraint discharge; the interval-exclude-zero derivation this group instantiates (“compute the divisor's interval from its declared modifiers and in-scope guard facts… zero inside the interval, or no bound excluding it, rejects”)"
+          },
+          {
+            "kind": "want-doc",
+            "ref": "docs/Working/what-i-want-2026-07-16.md:104",
+            "note": "fault prevention"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Split.Divisor != '0 s'",
+        "metavariables": [
+          {
+            "name": "Divisor",
+            "standsFor": "the event arg supplying the divisor operand (quantity-typed, dimension different from the numerator)"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "Split.Divisor != '0 s'"
+        }
+      },
+      "applicablePremiseClasses": [
+        "b",
+        "c"
+      ],
+      "premiseAvailability": "The divisor is the triggering event's own quantity-typed arg and is not read elsewhere in the plan — premise (d) has nothing to instantiate. Only (b) and (c) can supply the interval that excludes zero, under the model. See the reachability note: at HEAD this obligation is always minted under QuantityDivideQuantitySameDimension's identity (identical requirement content), never this catalog entry's own.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "derivation": "guard fact normal-form-equal to the divisor's non-zero condition → guard-match",
+          "capabilityTier": "1a",
+          "validityArguments": [
+            "Guard normal-form match"
+          ],
+          "decisionProcedure": "Compute the divisor's interval from its declared modifiers and in-scope guard facts (a finite set per site); zero inside the interval, or no bound excluding it, rejects. (Family 4's own decision-procedure text, restated for this operand pairing — the interval story is unchanged by the numerator/divisor type family.)",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+              "note": "Family 4 — fault family, arg-constraint discharge; the interval-exclude-zero derivation this group instantiates (“compute the divisor's interval from its declared modifiers and in-scope guard facts… zero inside the interval, or no bound excluding it, rejects”)"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "“Guard normal-form match” is stated in § Validity arguments against Witness Family 1's Bases A and C (a rule-preservation WP). Reusing it here is a direct corollary, not a separately-written argument: the same reasoning — a row fires only if its guard evaluated true, and the guard reads the same pre-state/args the action reads — applies unchanged when the proposition being matched is the fault family's “Divisor ≠ 0” instead of a rule's bound. No dedicated validity argument is written for the fault family in § Validity arguments; Family 4's own § Witnesses entry states the decision procedure but is not one of the six named arguments the schema enumerates. Flagged here rather than silently assumed."
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "b"
+          ],
+          "derivation": "declared arg-modifier bound on the divisor (e.g. `positive`) excludes 0 from its interval → IntervalContainment",
+          "capabilityTier": "1a",
+          "strategy": "IntervalContainment",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "Compute the divisor's interval from its declared modifiers and in-scope guard facts (a finite set per site); zero inside the interval, or no bound excluding it, rejects. (Family 4's own decision-procedure text, restated for this operand pairing — the interval story is unchanged by the numerator/divisor type family.)",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+              "note": "Family 4 — fault family, arg-constraint discharge; the interval-exclude-zero derivation this group instantiates (“compute the divisor's interval from its declared modifiers and in-scope guard facts… zero inside the interval, or no bound excluding it, rejects”)"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "“Arg-bound interval arithmetic” is stated in § Validity arguments against Witness Family 1 Base A (summing two bounded args against a rule's bound). Reusing it here is a direct, simpler corollary: governance enforces the declared modifier on the event arg at ingress (precept-language-spec.md:268), so a `positive`-declared divisor's runtime value is provably > 0, hence ≠ 0 — no sum, no second term. As with the guard argument above, no validity argument is separately written for the fault family; this is the same reuse, flagged rather than assumed."
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "schema": "add a guard normal-form-equal to <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "b"
+          ],
+          "schema": "bound the args such that the interval combination satisfies <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept QtyQtyCross\n\nfield DistUnit as unitofmeasure default 'm'\nfield TimeUnit as unitofmeasure default 's'\nfield Distance as quantity in '{DistUnit}' default '0 {DistUnit}'\nfield Ratio as decimal default 0.0\n\nstate Draft initial\nstate Active\n\nevent Open(D as quantity in '{DistUnit}')\nfrom Draft on Open\n    -> set DistUnit = 'm'\n    -> set TimeUnit = 's'\n    -> set Distance = Open.D\n    -> transition Active\n\nevent Split(Divisor as quantity in '{TimeUnit}')\nfrom Active on Split\n    -> set Ratio = Distance / Split.Divisor\n    -> no transition\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "b",
+              "c"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        },
+        "discharges": [
+          {
+            "id": "positive-arg",
+            "kind": "arg-modifier",
+            "addition": "Divisor as quantity in '{TimeUnit}' positive",
+            "application": {
+              "locus": "event-arg-declarations",
+              "replacements": [
+                {
+                  "eventName": "Split",
+                  "argName": "Divisor",
+                  "declaration": "Divisor as quantity in '{TimeUnit}' positive"
+                }
+              ]
+            },
+            "premiseClasses": [
+              "b"
+            ],
+            "derivation": "declared `positive` modifier → Divisor > 0 → Divisor ≠ 0 (IntervalContainment)",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "Live-verified as compiling clean when the result is assigned to a `decimal` field. Per the reachability note, this exercises QuantityDivideQuantitySameDimension's identity at HEAD, not this cell's own — recorded honestly rather than claimed as a Cross-specific run."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "positive-arg",
+            "addition": "Divisor as quantity in '{TimeUnit}' nonnegative",
+            "application": {
+              "locus": "event-arg-declarations",
+              "replacements": [
+                {
+                  "eventName": "Split",
+                  "argName": "Divisor",
+                  "declaration": "Divisor as quantity in '{TimeUnit}' nonnegative"
+                }
+              ]
+            },
+            "whyStillRejects": "`nonnegative` admits zero — must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited",
+        "notes": [
+          "The model's respellability story is unchanged from Cell 7 (Same dimension) — the reachability finding is a built-status matter, not a model-power matter."
+        ]
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+          "note": "Family 4 — fault family, arg-constraint discharge; the interval-exclude-zero derivation this group instantiates (“compute the divisor's interval from its declared modifiers and in-scope guard facts… zero inside the interval, or no bound excluding it, rejects”)"
+        },
+        {
+          "kind": "catalog",
+          "ref": "src/Precept/Language/Operations.cs:563",
+          "note": "QuantityDivideQuantityCrossDimension catalog entry — Match: Different, divisor subject is the quantity operand"
+        },
+        {
+          "kind": "code",
+          "ref": "src/Precept/Language/Operations.cs:1315",
+          "note": "DisambiguateCandidates — selects the Same-qualifier entry by default when multiple candidates exist"
+        }
+      ],
+      "notes": [
+        "Verified reachability limitation (HEAD e1a14d91), the same mechanism as Cell 3: the catalog declares QuantityDivideQuantitySameDimension and QuantityDivideQuantityCrossDimension as two candidates for the (Divide, Quantity, Quantity) type pair, and Operations.DisambiguateCandidates (src/Precept/Language/Operations.cs:1305-1326) always selects the `Match: Same` entry when multiple candidates exist. Probed directly with dynamic (field-interpolated) unit qualifiers of genuinely different dimensions (distance ÷ time): assigning the division to a compound-quantity-typed field yields TypeMismatch (\"Expected a quantity value here, but got 'decimal'\"); assigning to a decimal-typed field compiles, but as QuantityDivideQuantitySameDimension's identity, not this one's. Unlike Money/Money, this pair's cross-dimension case is NOT blocked by the cross-dimension pairwise check (PRE0071) — that check explicitly excludes Divide (TypeChecker.Expressions.cs:1324-1325, “division has its own catalog routes”) — but the exclusion only stops PRE0071 from firing; it does not make DisambiguateCandidates pick the Cross entry. Net effect: no surface spelling reaches QuantityDivideQuantityCrossDimension as its own catalog identity. Both catalog entries carry identical NumericProofRequirement content (“Divisor must be non-zero”, subject = the quantity operand), so the fault obligation's substance is unaffected — this is a built-status / reachability finding about HEAD, not a model gap.",
+        "No guard-discharge witness is recorded for this cell, for the same reason as Cell 3: the guard mechanism already fails for the reachable Same-dimension identity (Cell 7, live-verified), and this cell's own identity is itself unreachable at HEAD. The guard's failure on this exact setting was also directly probed (`when Split.Divisor != '0 s'`) and confirmed to still reject."
+      ]
+    },
+    {
+      "id": "g07/price-divide-decimal",
+      "label": "Price ÷ decimal, transition-row write — the divisor is a decimal arg",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "PriceDivideDecimal",
+        "evaluationSiteCategory": "transition-row-action-operand",
+        "typeFamily": "business-domain"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+            "note": "Family 4 — fault family, arg-constraint discharge; the interval-exclude-zero derivation this group instantiates (“compute the divisor's interval from its declared modifiers and in-scope guard facts… zero inside the interval, or no bound excluding it, rejects”)"
+          },
+          {
+            "kind": "want-doc",
+            "ref": "docs/Working/what-i-want-2026-07-16.md:104",
+            "note": "fault prevention"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Split.Divisor != 0",
+        "metavariables": [
+          {
+            "name": "Divisor",
+            "standsFor": "the event arg supplying the divisor operand (decimal-typed)"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "Split.Divisor != 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "b",
+        "c"
+      ],
+      "premiseAvailability": "The divisor is the triggering event's own decimal-typed arg and is not read elsewhere in the plan — premise (d) has nothing to instantiate. Only (b) and (c) can supply the interval that excludes zero.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "derivation": "guard fact normal-form-equal to the divisor's non-zero condition → guard-match",
+          "capabilityTier": "1a",
+          "validityArguments": [
+            "Guard normal-form match"
+          ],
+          "decisionProcedure": "Compute the divisor's interval from its declared modifiers and in-scope guard facts (a finite set per site); zero inside the interval, or no bound excluding it, rejects. (Family 4's own decision-procedure text, restated for this operand pairing — the interval story is unchanged by the numerator/divisor type family.)",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+              "note": "Family 4 — fault family, arg-constraint discharge; the interval-exclude-zero derivation this group instantiates (“compute the divisor's interval from its declared modifiers and in-scope guard facts… zero inside the interval, or no bound excluding it, rejects”)"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "“Guard normal-form match” is stated in § Validity arguments against Witness Family 1's Bases A and C (a rule-preservation WP). Reusing it here is a direct corollary, not a separately-written argument: the same reasoning — a row fires only if its guard evaluated true, and the guard reads the same pre-state/args the action reads — applies unchanged when the proposition being matched is the fault family's “Divisor ≠ 0” instead of a rule's bound. No dedicated validity argument is written for the fault family in § Validity arguments; Family 4's own § Witnesses entry states the decision procedure but is not one of the six named arguments the schema enumerates. Flagged here rather than silently assumed."
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "b"
+          ],
+          "derivation": "declared arg-modifier bound on the divisor (e.g. `positive`) excludes 0 from its interval → IntervalContainment",
+          "capabilityTier": "1a",
+          "strategy": "IntervalContainment",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "Compute the divisor's interval from its declared modifiers and in-scope guard facts (a finite set per site); zero inside the interval, or no bound excluding it, rejects. (Family 4's own decision-procedure text, restated for this operand pairing — the interval story is unchanged by the numerator/divisor type family.)",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+              "note": "Family 4 — fault family, arg-constraint discharge; the interval-exclude-zero derivation this group instantiates (“compute the divisor's interval from its declared modifiers and in-scope guard facts… zero inside the interval, or no bound excluding it, rejects”)"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "“Arg-bound interval arithmetic” is stated in § Validity arguments against Witness Family 1 Base A (summing two bounded args against a rule's bound). Reusing it here is a direct, simpler corollary: governance enforces the declared modifier on the event arg at ingress (precept-language-spec.md:268), so a `positive`-declared divisor's runtime value is provably > 0, hence ≠ 0 — no sum, no second term. As with the guard argument above, no validity argument is separately written for the fault family; this is the same reuse, flagged rather than assumed."
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "schema": "add a guard normal-form-equal to <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "b"
+          ],
+          "schema": "bound the args such that the interval combination satisfies <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept BillingPriceDecimal\n\nfield UnitPrice as price in 'USD/kg' default '0 USD/kg'\nfield ScaledPrice as price in 'USD/kg' default '0 USD/kg'\n\nstate Draft initial\nstate Active\n\nevent Open(Amount as price in 'USD/kg')\nfrom Draft on Open\n    -> set UnitPrice = Open.Amount\n    -> transition Active\n\nevent Split(Divisor as decimal)\nfrom Active on Split\n    -> set ScaledPrice = UnitPrice / Split.Divisor\n    -> no transition\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "b",
+              "c"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        },
+        "discharges": [
+          {
+            "id": "positive-arg",
+            "kind": "arg-modifier",
+            "addition": "Divisor as decimal positive",
+            "application": {
+              "locus": "event-arg-declarations",
+              "replacements": [
+                {
+                  "eventName": "Split",
+                  "argName": "Divisor",
+                  "declaration": "Divisor as decimal positive"
+                }
+              ]
+            },
+            "premiseClasses": [
+              "b"
+            ],
+            "derivation": "declared `positive` modifier → Divisor > 0 → Divisor ≠ 0 (IntervalContainment)",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          },
+          {
+            "id": "guard-nonzero",
+            "kind": "guard",
+            "addition": "when Split.Divisor != 0",
+            "application": {
+              "locus": "row-guard",
+              "eventName": "Split"
+            },
+            "premiseClasses": [
+              "c"
+            ],
+            "derivation": "guard fact normal-form-equal to `Divisor ≠ 0` → guard-match",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "positive-arg",
+            "addition": "Divisor as decimal nonnegative",
+            "application": {
+              "locus": "event-arg-declarations",
+              "replacements": [
+                {
+                  "eventName": "Split",
+                  "argName": "Divisor",
+                  "declaration": "Divisor as decimal nonnegative"
+                }
+              ]
+            },
+            "whyStillRejects": "`nonnegative` admits 0 — must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          },
+          {
+            "pairsWith": "guard-nonzero",
+            "addition": "when Split.Divisor >= 0",
+            "application": {
+              "locus": "row-guard",
+              "eventName": "Split"
+            },
+            "whyStillRejects": "`>= 0` admits 0 — does not imply the WP; must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+          "note": "Family 4 — fault family, arg-constraint discharge; the interval-exclude-zero derivation this group instantiates (“compute the divisor's interval from its declared modifiers and in-scope guard facts… zero inside the interval, or no bound excluding it, rejects”)"
+        },
+        {
+          "kind": "catalog",
+          "ref": "src/Precept/Language/Operations.cs:681",
+          "note": "PriceDivideDecimal catalog entry — divisor subject is the decimal operand"
+        }
+      ],
+      "notes": [
+        "Dual type-family site, same reasoning as Cell 1: PriceDivideDecimal's declared operand types are Price (business-domain) and decimal (primitive); the coordinate recorded here (business-domain) reflects the numerator's family, while the requirement's subject — the divisor — is the primitive decimal operand.",
+        "The divisor is a fresh event arg untouched earlier in the plan, so the WP equals the catalog condition verbatim.",
+        "wp.canonicalKey omitted for the same reason as Cell 1."
+      ]
+    },
+    {
+      "id": "g07/price-divide-quantity",
+      "label": "Price ÷ quantity (compound, dimension elevation), transition-row write — the divisor is a compound-quantity arg",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "PriceDivideQuantity",
+        "evaluationSiteCategory": "transition-row-action-operand",
+        "typeFamily": "business-domain"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+            "note": "Family 4 — fault family, arg-constraint discharge; the interval-exclude-zero derivation this group instantiates (“compute the divisor's interval from its declared modifiers and in-scope guard facts… zero inside the interval, or no bound excluding it, rejects”)"
+          },
+          {
+            "kind": "want-doc",
+            "ref": "docs/Working/what-i-want-2026-07-16.md:104",
+            "note": "fault prevention"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Split.Divisor != '0 each/kg'",
+        "metavariables": [
+          {
+            "name": "Divisor",
+            "standsFor": "the event arg supplying the divisor operand (compound-quantity-typed (numerator unit 'each', denominator unit 'kg'))"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "Split.Divisor != '0 each/kg'"
+        }
+      },
+      "applicablePremiseClasses": [
+        "b",
+        "c"
+      ],
+      "premiseAvailability": "The divisor is the triggering event's own compound-quantity-typed arg and is not read elsewhere in the plan — premise (d) has nothing to instantiate. Only (b) and (c) can supply the interval that excludes zero. `ResultQualifierPolicy.CompoundDimensionElevation` (Operation.cs:44-49) takes the result's unit from the divisor's own numerator ('each' here) and the result's currency from the price numerator ('USD') — verified empirically: `price in 'USD/kg' / quantity in 'each/kg' → price in 'USD/each'` compiled with only the target obligation's diagnostic once the divisor is bounded.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "derivation": "guard fact normal-form-equal to the divisor's non-zero condition → guard-match",
+          "capabilityTier": "1a",
+          "validityArguments": [
+            "Guard normal-form match"
+          ],
+          "decisionProcedure": "Compute the divisor's interval from its declared modifiers and in-scope guard facts (a finite set per site); zero inside the interval, or no bound excluding it, rejects. (Family 4's own decision-procedure text, restated for this operand pairing — the interval story is unchanged by the numerator/divisor type family.)",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+              "note": "Family 4 — fault family, arg-constraint discharge; the interval-exclude-zero derivation this group instantiates (“compute the divisor's interval from its declared modifiers and in-scope guard facts… zero inside the interval, or no bound excluding it, rejects”)"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "“Guard normal-form match” is stated in § Validity arguments against Witness Family 1's Bases A and C (a rule-preservation WP). Reusing it here is a direct corollary, not a separately-written argument: the same reasoning — a row fires only if its guard evaluated true, and the guard reads the same pre-state/args the action reads — applies unchanged when the proposition being matched is the fault family's “Divisor ≠ 0” instead of a rule's bound. No dedicated validity argument is written for the fault family in § Validity arguments; Family 4's own § Witnesses entry states the decision procedure but is not one of the six named arguments the schema enumerates. Flagged here rather than silently assumed."
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "b"
+          ],
+          "derivation": "declared arg-modifier bound on the divisor (e.g. `positive`) excludes 0 from its interval → IntervalContainment",
+          "capabilityTier": "1a",
+          "strategy": "IntervalContainment",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "Compute the divisor's interval from its declared modifiers and in-scope guard facts (a finite set per site); zero inside the interval, or no bound excluding it, rejects. (Family 4's own decision-procedure text, restated for this operand pairing — the interval story is unchanged by the numerator/divisor type family.)",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+              "note": "Family 4 — fault family, arg-constraint discharge; the interval-exclude-zero derivation this group instantiates (“compute the divisor's interval from its declared modifiers and in-scope guard facts… zero inside the interval, or no bound excluding it, rejects”)"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "“Arg-bound interval arithmetic” is stated in § Validity arguments against Witness Family 1 Base A (summing two bounded args against a rule's bound). Reusing it here is a direct, simpler corollary: governance enforces the declared modifier on the event arg at ingress (precept-language-spec.md:268), so a `positive`-declared divisor's runtime value is provably > 0, hence ≠ 0 — no sum, no second term. As with the guard argument above, no validity argument is separately written for the fault family; this is the same reuse, flagged rather than assumed."
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "schema": "add a guard normal-form-equal to <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "b"
+          ],
+          "schema": "bound the args such that the interval combination satisfies <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept BillingPriceQuantity\n\nfield UnitPricePerKg as price in 'USD/kg' default '0 USD/kg'\nfield UnitPricePerEach as price in 'USD/each' default '0 USD/each'\n\nstate Draft initial\nstate Active\n\nevent Open(Amount as price in 'USD/kg')\nfrom Draft on Open\n    -> set UnitPricePerKg = Open.Amount\n    -> transition Active\n\nevent Split(Divisor as quantity in 'each/kg')\nfrom Active on Split\n    -> set UnitPricePerEach = UnitPricePerKg / Split.Divisor\n    -> no transition\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "b",
+              "c"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        },
+        "discharges": [
+          {
+            "id": "positive-arg",
+            "kind": "arg-modifier",
+            "addition": "Divisor as quantity in 'each/kg' positive",
+            "application": {
+              "locus": "event-arg-declarations",
+              "replacements": [
+                {
+                  "eventName": "Split",
+                  "argName": "Divisor",
+                  "declaration": "Divisor as quantity in 'each/kg' positive"
+                }
+              ]
+            },
+            "premiseClasses": [
+              "b"
+            ],
+            "derivation": "declared `positive` modifier → Divisor > '0 each/kg' → Divisor ≠ '0 each/kg' (IntervalContainment)",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          },
+          {
+            "id": "guard-nonzero",
+            "kind": "guard",
+            "addition": "when Split.Divisor != '0 each/kg'",
+            "application": {
+              "locus": "row-guard",
+              "eventName": "Split"
+            },
+            "premiseClasses": [
+              "c"
+            ],
+            "derivation": "guard fact normal-form-equal to `Divisor ≠ '0 each/kg'` → guard-match",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "Live-verified at HEAD (e1a14d91): a guard restating the divisor's non-zero condition (`when Split.Divisor != '0 each/kg'`) does not discharge the obligation for a business-domain-typed divisor — the file still rejects with the identical DivisionByZero diagnostic. Tried both the literal-comparison spelling and, for money, the `.amount` projection; both fail identically. This is a genuine built-status gap, not a near-miss: the SAME guard spelling that discharges cleanly when the divisor is `decimal`-typed (MoneyDivideDecimal, QuantityDivideDecimal, PriceDivideDecimal, ExchangeRateDivideDecimal, all verified working in this file) does not discharge when the divisor is a business-domain type. Recorded as builtStatus: unresolved-today per the false-proof-hazard instructions' sibling rule — a live run demonstrating non-discharge, not a business rule used as a premise.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "positive-arg",
+            "addition": "Divisor as quantity in 'each/kg' nonnegative",
+            "application": {
+              "locus": "event-arg-declarations",
+              "replacements": [
+                {
+                  "eventName": "Split",
+                  "argName": "Divisor",
+                  "declaration": "Divisor as quantity in 'each/kg' nonnegative"
+                }
+              ]
+            },
+            "whyStillRejects": "`nonnegative` admits '0 each/kg' — must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          },
+          {
+            "pairsWith": "guard-nonzero",
+            "addition": "when Split.Divisor >= '0 each/kg'",
+            "application": {
+              "locus": "row-guard",
+              "eventName": "Split"
+            },
+            "whyStillRejects": "`>= '0 each/kg'` admits '0 each/kg' — does not imply the WP; must still reject, same obligation",
+            "provenance": {
+              "mark": "model-derived"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+          "note": "Family 4 — fault family, arg-constraint discharge; the interval-exclude-zero derivation this group instantiates (“compute the divisor's interval from its declared modifiers and in-scope guard facts… zero inside the interval, or no bound excluding it, rejects”)"
+        },
+        {
+          "kind": "catalog",
+          "ref": "src/Precept/Language/Operations.cs:691",
+          "note": "PriceDivideQuantity catalog entry — ResultQualifierPolicy.CompoundDimensionElevation, divisor subject is the quantity operand"
+        },
+        {
+          "kind": "catalog",
+          "ref": "src/Precept/Language/Operation.cs:44",
+          "note": "CompoundDimensionElevation doc comment — result unit elevated from the compound-quantity numerator (the divisor)"
+        }
+      ],
+      "notes": [
+        "The divisor is a fresh event arg untouched earlier in the plan, so the WP equals the catalog condition verbatim.",
+        "wp.canonicalKey omitted for the same reason as Cell 1.",
+        "This is the one site in the group needing a genuinely compound (two-unit) divisor to type-check at all; a bare single unit (e.g. `quantity in 'hour'`) was tried first and rejected (`InvalidUnitString`), so `'each/kg'` was used instead — this doesn't change the fault obligation, only what the base needs to type-check."
+      ]
+    },
+    {
+      "id": "g07/exchangerate-divide-decimal",
+      "label": "ExchangeRate ÷ decimal, transition-row write — the divisor is a decimal arg",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "ExchangeRateDivideDecimal",
+        "evaluationSiteCategory": "transition-row-action-operand",
+        "typeFamily": "business-domain"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+            "note": "Family 4 — fault family, arg-constraint discharge; the interval-exclude-zero derivation this group instantiates (“compute the divisor's interval from its declared modifiers and in-scope guard facts… zero inside the interval, or no bound excluding it, rejects”)"
+          },
+          {
+            "kind": "want-doc",
+            "ref": "docs/Working/what-i-want-2026-07-16.md:104",
+            "note": "fault prevention"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "Split.Divisor != 0",
+        "metavariables": [
+          {
+            "name": "Divisor",
+            "standsFor": "the event arg supplying the divisor operand (decimal-typed)"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "Split.Divisor != 0"
+        }
+      },
+      "applicablePremiseClasses": [
+        "b",
+        "c"
+      ],
+      "premiseAvailability": "The divisor is the triggering event's own decimal-typed arg and is not read elsewhere in the plan — premise (d) has nothing to instantiate. Only (b) and (c) can supply the interval that excludes zero.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "derivation": "guard fact normal-form-equal to the divisor's non-zero condition → guard-match",
+          "capabilityTier": "1a",
+          "validityArguments": [
+            "Guard normal-form match"
+          ],
+          "decisionProcedure": "Compute the divisor's interval from its declared modifiers and in-scope guard facts (a finite set per site); zero inside the interval, or no bound excluding it, rejects. (Family 4's own decision-procedure text, restated for this operand pairing — the interval story is unchanged by the numerator/divisor type family.)",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+              "note": "Family 4 — fault family, arg-constraint discharge; the interval-exclude-zero derivation this group instantiates (“compute the divisor's interval from its declared modifiers and in-scope guard facts… zero inside the interval, or no bound excluding it, rejects”)"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "“Guard normal-form match” is stated in § Validity arguments against Witness Family 1's Bases A and C (a rule-preservation WP). Reusing it here is a direct corollary, not a separately-written argument: the same reasoning — a row fires only if its guard evaluated true, and the guard reads the same pre-state/args the action reads — applies unchanged when the proposition being matched is the fault family's “Divisor ≠ 0” instead of a rule's bound. No dedicated validity argument is written for the fault family in § Validity arguments; Family 4's own § Witnesses entry states the decision procedure but is not one of the six named arguments the schema enumerates. Flagged here rather than silently assumed."
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "b"
+          ],
+          "derivation": "declared arg-modifier bound on the divisor (e.g. `positive`) excludes 0 from its interval → IntervalContainment",
+          "capabilityTier": "1a",
+          "strategy": "IntervalContainment",
+          "validityArguments": [
+            "Arg-bound interval arithmetic"
+          ],
+          "decisionProcedure": "Compute the divisor's interval from its declared modifiers and in-scope guard facts (a finite set per site); zero inside the interval, or no bound excluding it, rejects. (Family 4's own decision-procedure text, restated for this operand pairing — the interval story is unchanged by the numerator/divisor type family.)",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+              "note": "Family 4 — fault family, arg-constraint discharge; the interval-exclude-zero derivation this group instantiates (“compute the divisor's interval from its declared modifiers and in-scope guard facts… zero inside the interval, or no bound excluding it, rejects”)"
+            },
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments",
+              "note": "“Arg-bound interval arithmetic” is stated in § Validity arguments against Witness Family 1 Base A (summing two bounded args against a rule's bound). Reusing it here is a direct, simpler corollary: governance enforces the declared modifier on the event arg at ingress (precept-language-spec.md:268), so a `positive`-declared divisor's runtime value is provably > 0, hence ≠ 0 — no sum, no second term. As with the guard argument above, no validity argument is separately written for the fault family; this is the same reuse, flagged rather than assumed."
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "schema": "add a guard normal-form-equal to <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        },
+        {
+          "premiseClasses": [
+            "b"
+          ],
+          "schema": "bound the args such that the interval combination satisfies <WP>",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet"
+            }
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept BillingRateDecimal\n\nfield Rate as exchangerate in 'USD' to 'EUR' default '1 USD/EUR'\nfield ScaledRate as exchangerate in 'USD' to 'EUR' default '1 USD/EUR'\n\nstate Draft initial\nstate Active\n\nevent Open(Amount as exchangerate in 'USD' to 'EUR')\nfrom Draft on Open\n    -> set Rate = Open.Amount\n    -> transition Active\n\nevent Split(Divisor as decimal)\nfrom Active on Split\n    -> set ScaledRate = Rate / Split.Divisor\n    -> no transition\n",
+          "expected": {
+            "outcome": "reject",
+            "missingPremiseClasses": [
+              "b",
+              "c"
+            ],
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+            "date": "2026-07-21",
+            "head": "e1a14d91"
+          }
+        },
+        "discharges": [
+          {
+            "id": "positive-arg",
+            "kind": "arg-modifier",
+            "addition": "Divisor as decimal positive",
+            "application": {
+              "locus": "event-arg-declarations",
+              "replacements": [
+                {
+                  "eventName": "Split",
+                  "argName": "Divisor",
+                  "declaration": "Divisor as decimal positive"
+                }
+              ]
+            },
+            "premiseClasses": [
+              "b"
+            ],
+            "derivation": "declared `positive` modifier → Divisor > 0 → Divisor ≠ 0 (IntervalContainment)",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          },
+          {
+            "id": "guard-nonzero",
+            "kind": "guard",
+            "addition": "when Split.Divisor != 0",
+            "application": {
+              "locus": "row-guard",
+              "eventName": "Split"
+            },
+            "premiseClasses": [
+              "c"
+            ],
+            "derivation": "guard fact normal-form-equal to `Divisor ≠ 0` → guard-match",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "proven-today",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "positive-arg",
+            "addition": "Divisor as decimal nonnegative",
+            "application": {
+              "locus": "event-arg-declarations",
+              "replacements": [
+                {
+                  "eventName": "Split",
+                  "argName": "Divisor",
+                  "declaration": "Divisor as decimal nonnegative"
+                }
+              ]
+            },
+            "whyStillRejects": "`nonnegative` admits 0 — must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          },
+          {
+            "pairsWith": "guard-nonzero",
+            "addition": "when Split.Divisor >= 0",
+            "application": {
+              "locus": "row-guard",
+              "eventName": "Split"
+            },
+            "whyStillRejects": "`>= 0` admits 0 — does not imply the WP; must still reject, same obligation",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "Precept.MatrixTools CLI (dotnet temp/slice3/bin/Precept.MatrixTools/release/Precept.MatrixTools.dll)",
+              "date": "2026-07-21",
+              "head": "e1a14d91"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witnesses",
+          "note": "Family 4 — fault family, arg-constraint discharge; the interval-exclude-zero derivation this group instantiates (“compute the divisor's interval from its declared modifiers and in-scope guard facts… zero inside the interval, or no bound excluding it, rejects”)"
+        },
+        {
+          "kind": "catalog",
+          "ref": "src/Precept/Language/Operations.cs:717",
+          "note": "ExchangeRateDivideDecimal catalog entry — divisor subject is the decimal operand"
+        }
+      ],
+      "notes": [
+        "Dual type-family site, same reasoning as Cell 1: ExchangeRateDivideDecimal's declared operand types are ExchangeRate (business-domain) and decimal (primitive); the coordinate recorded here (business-domain) reflects the numerator's family, while the requirement's subject — the divisor — is the primitive decimal operand.",
+        "The divisor is a fresh event arg untouched earlier in the plan, so the WP equals the catalog condition verbatim.",
+        "wp.canonicalKey omitted for the same reason as Cell 1."
+      ]
+    }
+  ]
+}
