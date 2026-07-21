@@ -683,7 +683,9 @@ A function keeps its `decimal` overload if and only if the mathematical operatio
 
 ## Open Questions / Implementation Notes
 
-**Integer overflow model (deferred, post-MVP).** `integer` is fixed-width 64-bit. Whether arithmetic overflow is handled by compile-time proof-or-reject (prove no operation can exceed the representable range, else reject the definition) or by adopting an arbitrary-precision representation (removing overflow as a failure mode) is a post-MVP decision, not yet ruled. Until it is, `integer` arithmetic that could exceed the 64-bit range carries no live compile-time guarantee.
+**Arithmetic overflow model (deferred, post-MVP).** `integer` is fixed-width 64-bit. Whether arithmetic overflow is handled by compile-time proof-or-reject (prove no operation can exceed the representable range, else reject the definition) or by adopting an arbitrary-precision representation (removing overflow as a failure mode) is a post-MVP decision, not yet ruled. Until it is, `integer` arithmetic that could exceed the 64-bit range carries no live compile-time guarantee.
+
+**Temporal arithmetic rides with this deferral.** `instant ± duration` can push a result outside the representable temporal range, which is the same class of failure at a different type ([temporal-type-system.md](temporal-type-system.md) § instant arithmetic). It is deferred under this same open decision, not settled separately, and it is not an accepted edge case: whichever way the overflow model is ruled, the temporal arm follows it. One difference worth recording for whoever rules it — `integer` can carry `min`/`max` constraints that bound an operand, while temporal point types reject those constraints today, so a proof-or-reject answer needs a premise source for temporal operands (bound vocabulary on temporal types, guard-only closure, or a declared representable-range axiom).
 
 ---
 
