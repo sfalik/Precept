@@ -441,6 +441,8 @@ public static class Evaluator
 
 ### Execution Flow Diagram
 
+The sub-steps below are the evaluator's implementation labels (Step 1/2/2a…); each maps onto — and is ordered by — a phase of the § 3A.4 *Operation execution order* (`precept-language-spec.md`, § 3A.4). Phase names from § 3A.4 are cited in parentheses.
+
 ```text
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │                              Fire(event, args)                                │
@@ -448,7 +450,14 @@ public static class Evaluator
                                        │
                                        ▼
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│  Step 1: Dispatch Lookup                                                      │
+│  Step 0: Ingress Governance (§3A.4 — Ingress governance)                      │
+│  Event args are checked against their declared constraints as they enter,    │
+│  before dispatch. On failure → return InvalidArgs(reason).                   │
+└──────────────────────────────────────────────────────────────────────────────┘
+                                       │
+                                       ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  Step 1: Dispatch Lookup (§3A.4 — Dispatch)                                   │
 │  TransitionDispatchIndex[(currentState, event)] → ExecutionRow[]              │
 │  If empty → return UndefinedEvent()                                           │
 └──────────────────────────────────────────────────────────────────────────────┘
@@ -457,24 +466,41 @@ public static class Evaluator
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │  Step 2: Row Evaluation Loop (for each ExecutionRow)                          │
 │  ┌────────────────────────────────────────────────────────────────────────┐  │
-│  │  2a. Guard Evaluation                                                   │  │
+│  │  2a. Guard Evaluation (§3A.4 — Dispatch)                                │  │
 │  │  If row.Guard != null: evaluate against slots + args                    │  │
-│  │  If false → skip this row                                               │  │
+│  │  If false → skip this row. Guard evaluation writes nothing.              │  │
 │  └────────────────────────────────────────────────────────────────────────┘  │
 │  ┌────────────────────────────────────────────────────────────────────────┐  │
 │  │  2b. Snapshot Working Copy                                              │  │
 │  │  Clone slots array for mutation isolation                               │  │
 │  └────────────────────────────────────────────────────────────────────────┘  │
 │  ┌────────────────────────────────────────────────────────────────────────┐  │
-│  │  2c. Action Execution                                                   │  │
-│  │  For each ActionPlan in row.Actions: execute against working copy       │  │
+│  │  2c. Exit Actions (§3A.4 — Exit actions)                                │  │
+│  │  State actions declared on the state being left (`from <State> -> …`)   │  │
+│  │  applied to the working copy, resolving against the state being left.   │  │
 │  └────────────────────────────────────────────────────────────────────────┘  │
 │  ┌────────────────────────────────────────────────────────────────────────┐  │
-│  │  2d. Computed Field Recomputation                                       │  │
+│  │  2d. State Change + omit Reset (§3A.4 — The state change)               │  │
+│  │  Working copy's state becomes row.TargetState. The `omit` reset         │  │
+│  │  (composition rule 5) applies here, as part of entering the target      │  │
+│  │  state — before the row's own action chain runs.                        │  │
+│  └────────────────────────────────────────────────────────────────────────┘  │
+│  ┌────────────────────────────────────────────────────────────────────────┐  │
+│  │  2e. Row Action Execution (§3A.4 — Mutation)                            │  │
+│  │  For each ActionPlan in row.Actions: execute against working copy,       │  │
+│  │  in written order, each write seeing all preceding writes.               │  │
+│  └────────────────────────────────────────────────────────────────────────┘  │
+│  ┌────────────────────────────────────────────────────────────────────────┐  │
+│  │  2f. Entry Actions (§3A.4 — Entry actions)                              │  │
+│  │  State actions declared on the state being entered (`to <State> -> …`)  │  │
+│  │  applied, resolving against the state being entered.                    │  │
+│  └────────────────────────────────────────────────────────────────────────┘  │
+│  ┌────────────────────────────────────────────────────────────────────────┐  │
+│  │  2g. Computed Field Recomputation (§3A.4 — Computed-field recomputation)│  │
 │  │  For each slot in SlotLayout.ComputedSlots: re-evaluate expression      │  │
 │  └────────────────────────────────────────────────────────────────────────┘  │
 │  ┌────────────────────────────────────────────────────────────────────────┐  │
-│  │  2e. Constraint Evaluation                                              │  │
+│  │  2h. Constraint Evaluation (§3A.4 — Constraint evaluation)              │  │
 │  │  always + from<current> + on<event> + to<target>                        │  │
 │  │  Collect all violations; if any → row fails                             │  │
 │  └────────────────────────────────────────────────────────────────────────┘  │
@@ -483,28 +509,33 @@ public static class Evaluator
                                        │
                                        ▼
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│  Step 3: Candidate Resolution                                                 │
+│  Step 3: Candidate Resolution (§3A.4 — Commit or discard)                     │
 │  Zero candidates → return Unmatched() or EventOutcome.ConstraintsFailed(violations)   │
 │  One candidate → commit working copy, return Transitioned/Applied             │
 │  Multiple candidates → first-match-wins per spec §1808 (no ambiguity fault)   │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
+**Still open (§3A.4 / Open Questions):** when a state carries more than one state action, whether all of them fire and in what order, is unsettled — 2c and 2f above depict a single action chain per state-action position, not a resolution of that multiplicity question. Whether entry actions fire at construction and on a self-transition is likewise unsettled.
+
 ### Working Copy Management
 
-The evaluator never mutates the input `Version`. The Fire lifecycle for one event:
+The evaluator never mutates the input `Version`. The Fire lifecycle for one event, in § 3A.4 order (`precept-language-spec.md`, § 3A.4, *Operation execution order*):
 
 1. **Rent:** Rent a `PreceptValue[]` working copy from `ArrayPool<PreceptValue>.Shared`
 2. **Populate:** Copy `Version.Slots` into the rented array (field slots)
-3. **Load args:** The `FiredArgs` value carries the `PreceptValue[]` arg slot array materialized by `IArgBuilder` at the Fire boundary. Event args are already `PreceptValue` — no per-opcode conversion needed. `LOAD_ARG` reads from this array by pre-resolved slot index.
-4. **Mutate:** Execute action plans against the working copy
-5. **Recompute:** Walk `SlotLayout.ComputedSlots`; re-evaluate each computed field
-6. **Evaluate:** Run constraint plans against the working copy
-7. **Commit or discard:** If constraints pass, donate the working copy directly as `new Version(..., workingCopy).Slots` (zero-copy promotion — no clone); if constraints fail, return the array to `ArrayPool<PreceptValue>.Shared`
+3. **Load args:** The `FiredArgs` value carries the `PreceptValue[]` arg slot array materialized by `IArgBuilder` at the Fire boundary (ingress governance already validated these — §3A.4 phase 1). Event args are already `PreceptValue` — no per-opcode conversion needed. `LOAD_ARG` reads from this array by pre-resolved slot index.
+4. **Exit actions (§3A.4 — Exit actions):** State actions declared on the state being left (`from <State> -> …`) applied to the working copy.
+5. **State change + omit reset (§3A.4 — The state change):** The working copy's state becomes the row's target state; the `omit` reset (composition rule 5) applies here.
+6. **Mutate (§3A.4 — Mutation):** Execute the row's action chain against the working copy, in written order.
+7. **Entry actions (§3A.4 — Entry actions):** State actions declared on the state being entered (`to <State> -> …`) applied.
+8. **Recompute (§3A.4 — Computed-field recomputation):** Walk `SlotLayout.ComputedSlots`; re-evaluate each computed field.
+9. **Evaluate (§3A.4 — Constraint evaluation):** Run constraint plans against the working copy.
+10. **Commit or discard (§3A.4 — Commit or discard):** If constraints pass, donate the working copy directly as `new Version(..., workingCopy).Slots` (zero-copy promotion — no clone); if constraints fail, return the array to `ArrayPool<PreceptValue>.Shared`
 
 This ensures that constraint evaluation sees the post-mutation state, and that failed rows leave no side effects. On success, the working array becomes the committed `Version.Slots` — no extra allocation.
 
-> **Incomplete: state actions and the `omit` reset are missing.** This lifecycle, the flow diagram above, and the `Fire` pseudocode below all enumerate only the transition row's own writes. State exit actions, state entry actions (`from`/`to <State> -> ...`) and the `omit`-clears-on-entry reset also write during a Fire. The normative order is `precept-language-spec.md` § 3A.4, *Operation execution order*: exit actions, then the state change and `omit` reset, then the row's action chain (step 4 here), then entry actions, then computed-field recomputation (step 5). Do not read this enumeration as the complete write sequence until it is brought into line with § 3A.4.
+> **Follows § 3A.4's *Operation execution order*.** This lifecycle, the flow diagram above, and the `Fire` pseudocode below now enumerate exit actions, the state change and `omit` reset, and entry actions alongside the row's own writes, in the order fixed by `precept-language-spec.md` § 3A.4. Two things § 3A.4 itself leaves unsettled are not resolved by this enumeration and should not be read as answered here: when a state carries more than one state action, whether all of them fire and in what order; and whether entry actions fire at construction and on a self-transition. See § 3A.4 / Open Questions.
 
 ---
 
@@ -639,22 +670,38 @@ EventOutcome Fire(Precept precept, Version version, EventDescriptor @event, Fire
     // 2. Evaluate each row
     foreach (var row in rows)
     {
-        // 2a. Guard evaluation
+        // 2a. Guard evaluation (§3A.4 — Dispatch). Guard evaluation writes nothing.
         if (row.Guard != null && !EvaluateGuard(row.Guard, version.Slots, args))
             continue;  // Guard failed — skip row
         
         // 2b. Snapshot working copy
         var workingCopy = version.Slots.ToArray();
-        
-        // 2c. Execute actions
+
+        // 2c. Exit actions (§3A.4 — Exit actions): state actions on the state being
+        // left, resolved against the state being left, applied before the state change.
+        if (version.CurrentState != null)
+            ExecuteStateActions(version.CurrentState.ExitActions, workingCopy, args);
+
+        // 2d. State change + omit reset (§3A.4 — The state change): the working
+        // copy's state becomes the row's target state; the omit reset (composition
+        // rule 5) applies here, before the row's own action chain runs.
+        var targetState = row.TargetState ?? version.CurrentState;
+        ApplyOmitReset(targetState, workingCopy);
+
+        // 2e. Row action execution (§3A.4 — Mutation)
         foreach (var action in row.Actions)
             ExecuteAction(action, workingCopy, args);
-        
-        // 2d. Recompute computed fields
+
+        // 2f. Entry actions (§3A.4 — Entry actions): state actions on the state
+        // being entered, resolved against the state being entered.
+        if (targetState != null)
+            ExecuteStateActions(targetState.EntryActions, workingCopy, args);
+
+        // 2g. Recompute computed fields (§3A.4 — Computed-field recomputation)
         foreach (var slot in precept.SlotLayout.ComputedSlots)
             workingCopy[slot] = EvaluatePlan(precept.Fields[slot].ComputedPlan, workingCopy, args);
         
-        // 2e. Evaluate constraints
+        // 2h. Evaluate constraints (§3A.4 — Constraint evaluation)
         var violations = EvaluateFireConstraints(
             precept.ConstraintPlanIndex,
             version.CurrentState,

@@ -40,9 +40,14 @@ Design documents for the Precept runtime — the boundary between compiled prece
 
 ## Known drift, recorded 2026-07-21
 
-Found while establishing the operation execution order. Recorded here so they are not rediscovered; none is fixed.
+Found while establishing the operation execution order. Two of the four items below have since been reconciled; two remain open (both are code-vs-metadata gaps, not doc drift).
 
-- **Two pipeline vocabularies, neither reconciled.** `result-types.md` describes the runtime pipeline as "Stage 1 … Stage 10". That stage numbering is defined nowhere in the repository and does not line up with `evaluator.md`'s own Step 1–3 / 2a–2e numbering, or with the phase order now normative in `precept-language-spec.md` § 3A.4. Whichever survives, the other two need correcting to match it.
+**Reconciled 2026-07-21:**
+
+- **Pipeline vocabularies reconciled to § 3A.4.** `result-types.md` and `evaluator.md` previously used an orphaned "Stage 1 … Stage 10" numbering and a separate "Step 1–3 / 2a–2e" numbering, neither tied to canon. Both now name and cite the phases of `precept-language-spec.md` § 3A.4, *Operation execution order*, which is the single normative vocabulary.
+- **`Fire` lifecycle enumerations brought into line.** `evaluator.md` (flow diagram, Working-Copy lifecycle list, and `Fire` pseudocode) and `runtime-api.md` (the Fire-pipeline sentence) now enumerate exit actions, the state change and `omit` reset, and entry actions at their § 3A.4 positions. Each preserves the two genuinely-open § 3A.4 caveats — state-action multiplicity/order, and whether entry actions fire at construction/self-transition — rather than asserting an answer.
+
+**Still open (code-vs-metadata gaps, need implementation, not a doc edit):**
+
 - **Constraint activation timing is promised from catalog metadata that carries none.** `src/Precept/Runtime/Evaluator.cs` states that constraint activation timing comes from the constraint catalog's metadata, but `src/Precept/Language/Constraints.cs` defines the activation kinds as empty records with no timing data on them. Either the metadata is owed or the promise is wrong.
 - **Two write-semantics classifications have no members.** `ActionWriteSemantics` declares members that no action in the catalog uses, so any consumer switching over it carries live branches that nothing reaches. Either actions are missing a classification or the classification is over-specified.
-- **The `Fire` lifecycle enumerations are incomplete.** `evaluator.md` and `runtime-api.md` each describe the operation lifecycle without state actions or the `omit` reset; both previously called their enumeration "full". The word is removed and each now points at the normative order, but the enumerations themselves still need bringing into line.

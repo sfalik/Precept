@@ -107,13 +107,13 @@ public abstract record EventOutcome
 
 | Variant | Meaning | Pipeline stage | Stateless reachable? |
 |---------|---------|----------------|---------------------|
-| `Transitioned` | State change succeeded, new Version in target state; `Args` carries what was submitted; `Mutations` carries per-field before/after diff | Stage 10 commit | No (no states) |
-| `Applied` | No-transition row or stateless event succeeded, mutations committed; `Args` carries what was submitted; `Mutations` carries per-field before/after diff | Stage 10 commit | Yes |
-| `Rejected` | Authored `reject` row matched — business prohibition; `Args` carries what was submitted | Stage 4-5 (reject row) | Yes |
-| `InvalidArgs` | Arg validation failure — wrong type, unknown key | Stage 2 (arg validation) | Yes |
-| `ConstraintsFailed` | Post-mutation constraints violated (rules, state ensures, event ensures) | Stage 9-10 | Yes |
-| `Unmatched` | All guards failed (including `when` precondition) — no row matched; `EvaluatedRows` carries per-candidate guard trace | Stage 4-5 | Yes |
-| `UndefinedEvent` | No transition rows or hooks for this event in current state | Stage 1 | Yes |
+| `Transitioned` | State change succeeded, new Version in target state; `Args` carries what was submitted; `Mutations` carries per-field before/after diff | Commit/discard (§3A.4) | No (no states) |
+| `Applied` | No-transition row or stateless event succeeded, mutations committed; `Args` carries what was submitted; `Mutations` carries per-field before/after diff | Commit/discard (§3A.4) | Yes |
+| `Rejected` | Authored `reject` row matched — business prohibition; `Args` carries what was submitted | Dispatch — reject row matched (§3A.4) | Yes |
+| `InvalidArgs` | Arg validation failure — wrong type, unknown key | Ingress governance (§3A.4) | Yes |
+| `ConstraintsFailed` | Post-mutation constraints violated (rules, state ensures, event ensures) | Constraint evaluation → discard (§3A.4) | Yes |
+| `Unmatched` | All guards failed (including `when` precondition) — no row matched; `EvaluatedRows` carries per-candidate guard trace | Dispatch — no row matched (§3A.4) | Yes |
+| `UndefinedEvent` | No transition rows or hooks for this event in current state | Dispatch — no rows for (state, event) (§3A.4) | Yes |
 | `Faulted` | Evaluator impossible path — a `Fault` that the type checker should have prevented (programmer error, not a business outcome) | Backstop | Yes |
 
 **`Rejected` vs `InvalidArgs`:** `Rejected` is a business decision authored in the precept (`-> reject "reason"`). `InvalidArgs` is a caller error — the args don't match the event's declared contract. Parallel with `UpdateOutcome.InvalidFields`. DDD's "business rejection vs. invalid input" distinction.
