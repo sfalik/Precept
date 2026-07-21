@@ -85,6 +85,21 @@ The cell triple (theorem, premises, derivation) is deliberately the same shape a
 
 **Verification asymmetry** (owner-approved 2026-07-19): the two halves of the exact contract are verified by different machinery. The accept half is certificate-verified — every acceptance carries a walkable derivation, checked at both call sites. The reject half is **not certifiable**: a rejection carries no certificate of non-derivability, so nothing at load or in production ever confirms a rejection was correct, and a compiler that silently under-proves (rejects licensed programs) passes every certificate check. Reject-side conformance is verified **only** by the cell-generated test matrix — base, near-miss, and deletion rows run against the named decision procedures. The cell→test conversion is therefore part of the definition's verification machinery, not a convenience, and its coverage bar is set accordingly.
 
+**Open design hole — nothing detects an obligation that was never minted** (found 2026-07-20; owner-visible, unresolved; route to a design pass, do not patch here).
+
+The accept half is weaker than the paragraph above implies, in a way that certificates structurally cannot cover. A certificate records work that was done. It cannot report work that was never attempted. If the compiler simply never visits a write site, no obligation exists, no proof is attempted, and no artifact anywhere carries a trace of the absence — because nothing compares the set of sites that *should* have minted an obligation against the set that did.
+
+This matters because premise (d) makes every inductive proof depend on that completeness *elsewhere in the file*. Using a constraint as a fact is paid for by establishing it at construction and preserving it at every write site of every field it mentions (the validity argument for premise (d) states this dependency). If one site is missed, the fact is unearned, and every proof anywhere that consumed it is void — while each of those proofs remains individually valid and replayable. The failure is silent, non-local, and looks exactly like success.
+
+Verified instance at HEAD, 2026-07-20 (`precept_compile`): a definition declaring `rule PlannedQuantity > 0`, dividing by `PlannedQuantity` in one handler and setting it to `0` in another, compiles with zero diagnostics and reports `disposition: Proved, strategy: CompositionalConstraint` for "divisor must be non-zero". The constraint is consumed as a premise; nothing establishes it. A fully-built certificate checker would have passed this file. Today the cause is that no invariant-preservation obligation exists at all; but the checking gap is independent of that cause and would survive the machinery being built.
+
+Two constraints on any fix, recorded so the design pass starts from them:
+
+- **The expected set must be derived independently.** A completeness check that computes "sites that should have minted" from the same code that decides where to mint is circular — it agrees with itself and sees nothing, including the instance above. The expectation has to come from the catalog and the spec, where write-site categories and the mention set are declared.
+- **It is not covered by testing.** Tests check the cases someone thought of; the property here is enumerable per file — every (write site × mentioned field) pair is mechanically listable — so it can be checked on every compile rather than sampled. This document already computes that product for its own cell enumeration; nothing currently compares it against what a compiler emitted.
+
+Candidate shapes, none chosen: a file-level coverage obligation; a minting manifest carried in the certificate so completeness becomes a per-file property the checker can see; or requiring a premise-(d) citation to name the establishing and preserving obligations, which turns the global property into a local check. Prior art in this codebase points at build-time checking (catalog-declared positions plus a layered checker) rather than a pipeline stage, but where the check lives is the smaller question — independence of the expectation is the load-bearing one.
+
 ## Axes
 
 Each axis names its source. No axis is induced from an example.
