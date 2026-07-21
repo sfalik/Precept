@@ -237,6 +237,26 @@ surfaced for proper fixing.
 - **Fix complexity**: small, same shape as the slice's other breaches — generate the interval-containment obligation for the `min` direction on `set` regardless of whether a `max` is declared; unprovable ⇒ emit (`OutOfRange`/`PRE0079`).
 - **Priority**: soundness — a declared `min` silently unenforced on assignment; pre-release.
 - **Repro**: SubProbe1 (emits) vs SubProbe3 (clean) above.
+- **Reframing owed (2026-07-21, verified via `precept_compile`)**: the axis stated above — "`min` present, `max` absent" — does not match observed behaviour and should be re-derived before this is fixed. Two probes differing in one word:
+  - `field Reading as integer default 0 min 0` + `set Reading = 0 - 5` → **rejects**, `PRE0078`, `IntervalContainment` `Unresolved`, computed interval `[-5 .. -5]`, `declaredMin 0`. A `min` with no `max` *is* enforced here.
+  - `field Reading as integer default 0 nonnegative` + `set Reading = 0 - 5` → **compiles clean**, one obligation (the default-value check), **none for the write**.
+
+  So the discriminating axis appears to be the *spelling* — bound modifier (`min`/`max`) versus qualifier modifier (`nonzero`/`positive`/`nonnegative`) — not the presence of a companion bound. The original probes used a non-literal RHS (`A - B`) and a `nonnegative` field, which confounds the two axes. Whether these are one root cause or two is unresolved. This matters beyond containment: the proof engine consumes qualifier modifiers to discharge fault obligations (strategy `DeclarationAttribute`), so the spelling the engine trusts to prove a division safe is the one nothing enforces on write. See [[BUG-033]] for the same shape at a different write path.
+
+### BUG-034: `PRE0078` reports a declared-bound violation as a representable-range overflow — the message tells the author something untrue (diagnostic-quality)
+
+- **Discovered**: 2026-07-21, incidentally, in two unrelated probes.
+- **Symptom**: `field Reading as integer default 0 min 0` with `set Reading = 0 - 5` emits:
+
+  > `PRE0078: Numeric computation exceeded the representable range on field 'Reading'`
+
+  The value is −5 and the declared minimum is 0. Nothing approached the representable range of `integer`; a declared bound was violated. The obligation record alongside it is correct and specific — `IntervalContainment`, computed interval `[-5 .. -5]`, `declaredMin 0` — so the information needed for a true message is present and is being discarded at rendering.
+- **Scope**: the same code renders both genuine representable-range overflow and declared-bound violation. Only the message is wrong; the accept/reject verdict is right.
+- **Why it matters more than an ordinary wording nit**: the primary author is a domain expert (`philosophy.md § Who authors a precept`). "Exceeded the representable range" points them at the type, when the fix is their own declared bound or the expression feeding it. It is a message that sends the reader to the wrong place.
+- **Fix complexity**: small — the two conditions are already distinguishable at the point of emission; they need distinct messages, and probably distinct codes.
+- **Priority**: diagnostic quality, not soundness.
+- **Repro**: as above.
+- **Status**: Active.
 
 ### BUG-022: Consumer-side `switch (catalog *Kind)` dispatch is not enforced exhaustive — a missing arm is a silent gap (catalog-discipline hole)
 
