@@ -1,0 +1,5 @@
+# Fixture: a quantified rule over a collection — outside the numeric
+# single-field family.
+field Scores as set of integer
+
+rule no s in Scores (s > 100) because "score cap"

@@ -1,0 +1,9 @@
+# Fixture: activation-conditioned obligations — an explicit when-rule and a
+# modifier on an optional field (which desugars with a presence activation).
+field Cap as decimal default 100.0
+field Fee as decimal optional nonnegative
+
+rule Fee <= Cap when Fee is set because "fee cap"
+
+event SetFee(X as decimal)
+on SetFee -> set Fee = SetFee.X

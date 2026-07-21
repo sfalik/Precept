@@ -1,0 +1,166 @@
+[
+  {
+    "rowId": "wf1/preservation-reads-args#base",
+    "cellId": "wf1/preservation-reads-args",
+    "kind": "base",
+    "expected": "reject",
+    "head": "mustPass",
+    "outcome": "pass",
+    "compiledClean": false,
+    "errorCodes": [
+      "NumericOverflow"
+    ],
+    "obligationMinted": true,
+    "obligationUnresolved": true,
+    "detail": "expected reject naming obligation \u0027Total:max\u0027 (Total UpperInclusive 1000); hasErrors=True, obligation minted=True, unresolved=True, wellFormed=True, errorCodes=[NumericOverflow], otherUnresolvedObligations=False; unverified at HEAD: the rejection must name missing premise classes [b, c]; unverified at HEAD \u2014 diagnostics carry no premise-class structure to read"
+  },
+  {
+    "rowId": "wf1/preservation-reads-args#discharge:guard-nf",
+    "cellId": "wf1/preservation-reads-args",
+    "kind": "discharge",
+    "expected": "accept",
+    "head": "expectedFailure",
+    "outcome": "expectedFailure",
+    "compiledClean": false,
+    "errorCodes": [
+      "NumericOverflow"
+    ],
+    "obligationMinted": true,
+    "obligationUnresolved": true,
+    "detail": "expected clean compile proving obligation \u0027Total:max\u0027 (Total UpperInclusive 1000); hasErrors=True, obligation minted=True, unresolved=True, provedStrategy=(none), errorCodes=[NumericOverflow]; head note: multi-term fact shape unbuilt; unverified at HEAD: the accepting compile must record its premise list; unverified at HEAD \u2014 the proof-ledger obligation record carries no premise list"
+  },
+  {
+    "rowId": "wf1/preservation-reads-args#discharge:arg-bounds",
+    "cellId": "wf1/preservation-reads-args",
+    "kind": "discharge",
+    "expected": "accept",
+    "head": "mustPass",
+    "outcome": "pass",
+    "compiledClean": true,
+    "errorCodes": [],
+    "obligationMinted": true,
+    "obligationUnresolved": false,
+    "provedStrategy": "IntervalContainment",
+    "detail": "expected clean compile proving obligation \u0027Total:max\u0027 (Total UpperInclusive 1000) via IntervalContainment; hasErrors=False, obligation minted=True, unresolved=False, provedStrategy=IntervalContainment, errorCodes=[]; unverified at HEAD: the accepting compile must record its premise list; unverified at HEAD \u2014 the proof-ledger obligation record carries no premise list"
+  },
+  {
+    "rowId": "wf1/preservation-reads-args#near-miss:arg-bounds",
+    "cellId": "wf1/preservation-reads-args",
+    "kind": "nearMiss",
+    "expected": "reject",
+    "head": "mustPass",
+    "outcome": "pass",
+    "compiledClean": false,
+    "errorCodes": [
+      "NumericOverflow"
+    ],
+    "obligationMinted": true,
+    "obligationUnresolved": true,
+    "detail": "expected reject naming obligation \u0027Total:max\u0027 (Total UpperInclusive 1000); hasErrors=True, obligation minted=True, unresolved=True, wellFormed=True, errorCodes=[NumericOverflow]"
+  },
+  {
+    "rowId": "wf1/preservation-reads-args#near-miss:guard-nf",
+    "cellId": "wf1/preservation-reads-args",
+    "kind": "nearMiss",
+    "expected": "reject",
+    "head": "mustPass",
+    "outcome": "pass",
+    "compiledClean": false,
+    "errorCodes": [
+      "NumericOverflow"
+    ],
+    "obligationMinted": true,
+    "obligationUnresolved": true,
+    "detail": "expected reject naming obligation \u0027Total:max\u0027 (Total UpperInclusive 1000); hasErrors=True, obligation minted=True, unresolved=True, wellFormed=True, errorCodes=[NumericOverflow]"
+  },
+  {
+    "rowId": "wf1/preservation-reads-written-decrease#base",
+    "cellId": "wf1/preservation-reads-written-decrease",
+    "kind": "base",
+    "expected": "reject",
+    "head": "mustPass",
+    "outcome": "pass",
+    "compiledClean": false,
+    "errorCodes": [
+      "NumericOverflow"
+    ],
+    "obligationMinted": true,
+    "obligationUnresolved": true,
+    "detail": "expected reject naming obligation \u0027Total:max\u0027 (Total UpperInclusive 1000); hasErrors=True, obligation minted=True, unresolved=True, wellFormed=True, errorCodes=[NumericOverflow], otherUnresolvedObligations=False; unverified at HEAD: the rejection must name missing premise classes [b]; unverified at HEAD \u2014 diagnostics carry no premise-class structure to read"
+  },
+  {
+    "rowId": "wf1/preservation-reads-written-decrease#discharge:nonnegative-arg",
+    "cellId": "wf1/preservation-reads-written-decrease",
+    "kind": "discharge",
+    "expected": "accept",
+    "head": "expectedFailure",
+    "outcome": "expectedFailure",
+    "compiledClean": false,
+    "errorCodes": [
+      "NumericOverflow"
+    ],
+    "obligationMinted": true,
+    "obligationUnresolved": true,
+    "detail": "expected clean compile proving obligation \u0027Total:max\u0027 (Total UpperInclusive 1000); hasErrors=True, obligation minted=True, unresolved=True, provedStrategy=(none), errorCodes=[NumericOverflow]; head note: pre-state rule not carried as a premise \u2014 the engine widens Total to [-inf .. \u002Binf] at the read; unverified at HEAD: the accepting compile must record its premise list; unverified at HEAD \u2014 the proof-ledger obligation record carries no premise list"
+  },
+  {
+    "rowId": "wf1/preservation-reads-written-decrease#near-miss:nonnegative-arg",
+    "cellId": "wf1/preservation-reads-written-decrease",
+    "kind": "nearMiss",
+    "expected": "reject",
+    "head": "mustPass",
+    "outcome": "pass",
+    "compiledClean": false,
+    "errorCodes": [
+      "NumericOverflow"
+    ],
+    "obligationMinted": true,
+    "obligationUnresolved": true,
+    "detail": "expected reject naming obligation \u0027Total:max\u0027 (Total UpperInclusive 1000); hasErrors=True, obligation minted=True, unresolved=True, wellFormed=True, errorCodes=[NumericOverflow]"
+  },
+  {
+    "rowId": "wf1/preservation-reads-written-increase#base",
+    "cellId": "wf1/preservation-reads-written-increase",
+    "kind": "base",
+    "expected": "reject",
+    "head": "mustPass",
+    "outcome": "pass",
+    "compiledClean": false,
+    "errorCodes": [
+      "NumericOverflow"
+    ],
+    "obligationMinted": true,
+    "obligationUnresolved": true,
+    "detail": "expected reject naming obligation \u0027Total:max\u0027 (Total UpperInclusive 1000); hasErrors=True, obligation minted=True, unresolved=True, wellFormed=True, errorCodes=[NumericOverflow], otherUnresolvedObligations=False; unverified at HEAD: the rejection must name missing premise classes [c]; unverified at HEAD \u2014 diagnostics carry no premise-class structure to read"
+  },
+  {
+    "rowId": "wf1/preservation-reads-written-increase#discharge:guard-nf",
+    "cellId": "wf1/preservation-reads-written-increase",
+    "kind": "discharge",
+    "expected": "accept",
+    "head": "unstated",
+    "outcome": "unstatedObservation",
+    "compiledClean": false,
+    "errorCodes": [
+      "NumericOverflow"
+    ],
+    "obligationMinted": true,
+    "obligationUnresolved": true,
+    "detail": "expected clean compile proving obligation \u0027Total:max\u0027 (Total UpperInclusive 1000); hasErrors=True, obligation minted=True, unresolved=True, provedStrategy=(none), errorCodes=[NumericOverflow]; head note: built status unstated in the cell data; unverified at HEAD: the accepting compile must record its premise list; unverified at HEAD \u2014 the proof-ledger obligation record carries no premise list"
+  },
+  {
+    "rowId": "wf1/preservation-reads-written-increase#near-miss:guard-nf",
+    "cellId": "wf1/preservation-reads-written-increase",
+    "kind": "nearMiss",
+    "expected": "reject",
+    "head": "mustPass",
+    "outcome": "pass",
+    "compiledClean": false,
+    "errorCodes": [
+      "NumericOverflow"
+    ],
+    "obligationMinted": true,
+    "obligationUnresolved": true,
+    "detail": "expected reject naming obligation \u0027Total:max\u0027 (Total UpperInclusive 1000); hasErrors=True, obligation minted=True, unresolved=True, wellFormed=True, errorCodes=[NumericOverflow]"
+  }
+]

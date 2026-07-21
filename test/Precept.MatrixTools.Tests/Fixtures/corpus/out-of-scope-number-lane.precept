@@ -1,0 +1,8 @@
+# Fixture: the governed field is on the `number` (IEEE double) lane. The stated
+# interval and fold derivations argue truth-preservation from exact arithmetic,
+# so nothing on this lane is licensed by a written rule — the arg's declared
+# max would otherwise close the WP by interval summation.
+field Ratio as number max 1000 default 0.0
+
+event Assign(X as number max 500)
+on Assign -> set Ratio = Assign.X

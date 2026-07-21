@@ -1,0 +1,20 @@
+# Fixture: an editable-field edit site and an entry hook write — write-site
+# categories outside the handler-set coordinate.
+precept EditableFixture
+
+field Limit as decimal default 100.0
+
+rule Limit <= 1000 because "cap"
+
+state Active initial
+state Closed terminal
+
+in Active modify Limit editable
+
+to Closed -> set Limit = 0
+
+event Open initial
+on Open -> set Limit = 50
+
+event Close
+from Active on Close -> transition Closed

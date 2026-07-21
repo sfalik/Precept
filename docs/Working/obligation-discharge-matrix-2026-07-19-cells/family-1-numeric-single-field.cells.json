@@ -1,0 +1,497 @@
+{
+  "$schema": "./cell.schema.json",
+  "familyId": "witness-family-1",
+  "title": "Witness Family 1 — numeric single-field, handler set (live-verified slice)",
+  "caseShape": "rule-write",
+  "definitionVersion": "obligation-discharge-matrix-2026-07-19 rev 6 (2026-07-20, draft)",
+  "citations": [
+    { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witness Family 1" },
+    { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:19", "note": "the four premise classes" },
+    { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:20", "note": "symmetric attachment" },
+    { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:22", "note": "max desugars to rule Total <= 1000" }
+  ],
+  "respellability": {
+    "verdict": "yes",
+    "evidence": "model-derived",
+    "corpusMeasurement": "pending",
+    "licensedNonBandExamples": [
+      {
+        "spelling": "when Add.Amount1 <= 500 and Add.Amount2 <= 500",
+        "whyLicensed": "Per-term bound conjuncts discharge by the same interval derivation as arg bounds (500 + 500 <= 1000), spelled in the guard instead of on the args; premise class (c), derivation shared with (b). Licensed, therefore not in the sound-but-unprovable band.",
+        "citations": [
+          { "kind": "owner-ruling", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "date": "2026-07-19", "note": "the sound-but-unprovable band bullet: per-term bound conjuncts discharge by the same interval derivation as arg bounds" }
+        ]
+      }
+    ],
+    "citations": [
+      { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witness Family 1", "note": "the respellability paragraph" },
+      { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Ratification protocol", "note": "layer 4: corpus measurement is the hard gate; a family verdict ratifies only when it agrees with the classified sample corpus" }
+    ],
+    "notes": [
+      "All three preservation bases inherit this verdict; none states an override.",
+      "Every sound band member's business intent respells into a licensed guard or bound form (matrix, Family 1 respellability paragraph)."
+    ]
+  },
+  "cells": [
+    {
+      "id": "wf1/establishment-defaults",
+      "label": "Standing base-case obligation (establishment over defaults)",
+      "coordinates": {
+        "caseShape": "rule-write",
+        "obligationFamily": "establishment",
+        "ruleStructure": "single-field",
+        "writeSiteCategory": "construction-defaults",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:18", "note": "base case: the default configuration satisfies every rule" }
+        ]
+      },
+      "obligation": {
+        "statement": "default 0.0 satisfies Total <= 1000",
+        "metavariables": [
+          { "name": "Total", "standsFor": "the field the rule bounds" },
+          { "name": "0.0", "standsFor": "the field's declared default" },
+          { "name": "1000", "standsFor": "the bound" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" },
+          { "kind": "normal-form-draft", "ref": "docs/Working/normal-form-draft-2026-07-19.md", "note": "rules N1-N14; N9-division and N14 are owner-ruled but not implemented in the calculator" }
+        ],
+        "wp": {
+          "statement": "0.0 <= 1000",
+          "canonicalKey": "true",
+          "canonicalKeySource": "WpCalculator.ComputeEstablishmentWp; pinned in test/Precept.MatrixTools.Tests/WitnessFamily1Tests.cs (Establishment_DefaultSatisfiesMax_FoldsToTrue)"
+        }
+      },
+      "applicablePremiseClasses": [],
+      "premiseAvailability": "Discharged by constant folding over the default configuration — no authored premise class is consumed.",
+      "dischargeContract": [
+        {
+          "premiseClasses": [],
+          "derivation": "constant folding of the rule over the default environment",
+          "strategy": "Literal",
+          "validityArguments": ["Literal constant-fold for defaults", "Establishment over defaults"],
+          "decisionProcedure": "Constant-fold the rule over the default environment. The fold terminates because expressions are finite, loop-free trees (spec section 0.4). A fold that evaluates false, or cannot complete, leaves the obligation undischarged: reject.",
+          "citations": [
+            { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments", "note": "Establishment over defaults (the pre-configuration rule) — the companion argument for taking the WP over the default configuration" }
+          ]
+        }
+      ],
+      "suggestions": [],
+      "witnesses": {
+        "discharges": [
+          {
+            "id": "default-fold",
+            "kind": "default-constant-fold",
+            "addition": null,
+            "premiseClasses": [],
+            "derivation": "constant fold: default 0.0 satisfies Total <= 1000 (Literal)",
+            "strategy": "Literal",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-19", "head": "ed57d7fd" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          }
+        ],
+        "nearMisses": []
+      },
+      "respellability": {
+        "resolution": "family-inherited",
+        "notes": [
+          "The matrix's family verdict paragraph names the three preservation bases explicitly; this cell inherits under the family-level rule (verdict stated once per contract family, inherited by every cell the family's contracts govern)."
+        ]
+      },
+      "citations": [
+        { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:18" },
+        { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:22", "note": "max 1000 desugars to rule Total <= 1000" },
+        { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witness Family 1", "note": "the standing base-case obligation paragraph" }
+      ],
+      "notes": [
+        "The matrix records this cell as a standing discharged obligation only — no rejecting base program and no near-miss triple are stated for it; none is invented here. The discharge is standing (no authored addition exists to weaken), so no near-miss is owed under the one-per-addition rule.",
+        "The WP 0.0 <= 1000 constant-folds to true over the default environment; the canonical key records the folded form.",
+        "suggestions is empty because the applicable-class set is empty: no authorable premise class exists at this site, so there is no per-class suggestion to state.",
+        "No initial event exists in this slice; the establishment half over initial events is vacuous here (matrix, Witness Family 1).",
+        "The write-site coordinate construction-defaults is a file-local value: the matrix's write-site axis (axis 3) lists only authored write-site kinds and has no member for the establishment-over-defaults site — an open vocabulary item flagged, not silently absorbed."
+      ]
+    },
+    {
+      "id": "wf1/preservation-reads-args",
+      "label": "Base A — RHS reads args only",
+      "coordinates": {
+        "caseShape": "rule-write",
+        "obligationFamily": "preservation",
+        "ruleStructure": "single-field",
+        "writeSiteCategory": "handler-set",
+        "rhsReadSet": ["args"],
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:19", "note": "inductive step: preservation from the four premise classes" }
+        ]
+      },
+      "obligation": {
+        "statement": "Amount1 + Amount2 <= 1000",
+        "metavariables": [
+          { "name": "Amount1", "standsFor": "an event arg the RHS reads" },
+          { "name": "Amount2", "standsFor": "an event arg the RHS reads" },
+          { "name": "1000", "standsFor": "the bound" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" },
+          { "kind": "normal-form-draft", "ref": "docs/Working/normal-form-draft-2026-07-19.md" }
+        ],
+        "wp": {
+          "statement": "Amount1 + Amount2 <= 1000",
+          "canonicalKey": "(le (+ arg(Add.Amount1) arg(Add.Amount2)) #1000)",
+          "canonicalKeySource": "WpCalculator.ComputePreservationWp; pinned in test/Precept.MatrixTools.Tests/WitnessFamily1Tests.cs (BaseA_WpIsArgSumBound)"
+        }
+      },
+      "applicablePremiseClasses": ["b", "c"],
+      "premiseAvailability": "The read set does not intersect the mention set and the written field is not read, so premise (d) has nothing to instantiate — availability is derived per the read-set axis, not from 'overwrite'.",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["c"],
+          "derivation": "guard fact normal-form-equal to the WP -> guard-match",
+          "capabilityTier": "1a",
+          "validityArguments": ["Guard normal-form match"],
+          "decisionProcedure": "Normal-form match of the WP against the row's guard conjuncts (a finite set)."
+        },
+        {
+          "premiseClasses": ["c"],
+          "derivation": "per-term bound conjuncts (term op constant) over the WP's terms, combined by the same exact-decimal interval arithmetic as class (b)",
+          "validityArguments": ["Arg-bound interval arithmetic"],
+          "decisionProcedure": "Failing the whole-condition match: collect the guard's per-term bound conjuncts (term op constant) over the WP's terms and run the same exact-decimal interval combination as class (b) — a term with no bound conjunct, or a combined bound exceeding the rule bound, fails the derivation.",
+          "citations": [
+            { "kind": "owner-ruling", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "date": "2026-07-19", "note": "the sound-but-unprovable band bullet: per-term bound conjuncts feed the same interval arithmetic that discharges arg-modifier bounds, wherever they are spelled" }
+          ]
+        },
+        {
+          "premiseClasses": ["b"],
+          "derivation": "exact-decimal upper-bound sum over the args' declared max bounds -> IntervalContainment",
+          "capabilityTier": "1a",
+          "strategy": "IntervalContainment",
+          "validityArguments": ["Arg-bound interval arithmetic"],
+          "decisionProcedure": "Exact-decimal upper-bound sum over the args' declared max bounds; an arg with no upper bound, or a computed sum exceeding the rule bound, fails the class. If all derivations fail, reject, naming both classes."
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": ["c"],
+          "schema": "add a guard normal-form-equal to <WP>",
+          "citations": [{ "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the suggestion-schema bullet" }]
+        },
+        {
+          "premiseClasses": ["b"],
+          "schema": "bound the args such that the interval combination satisfies <WP>",
+          "citations": [{ "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the suggestion-schema bullet" }],
+          "notes": [
+            "The matrix's cell text states 'The suggestion schema names both'; the per-class schema texts here are the Vocabulary's own stated schemas, not cell-local wording."
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "field Total as decimal max 1000 default 0.0\nevent Add(Amount1 as decimal, Amount2 as decimal)\non Add -> set Total = Add.Amount1 + Add.Amount2",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["b", "c"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "model-derived" }
+        },
+        "discharges": [
+          {
+            "id": "guard-nf",
+            "kind": "guard",
+            "addition": "when Add.Amount1 + Add.Amount2 <= 1000",
+            "application": { "locus": "row-guard", "eventName": "Add" },
+            "premiseClasses": ["c"],
+            "derivation": "guard fact normal-form-equal to the WP -> guard-match (capability tier 1a)",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "multi-term fact shape unbuilt",
+            "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-19", "head": "ed57d7fd" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          },
+          {
+            "id": "arg-bounds",
+            "kind": "arg-modifier",
+            "addition": "Amount1 max 250, Amount2 max 750",
+            "application": {
+              "locus": "event-arg-declarations",
+              "replacements": [
+                { "eventName": "Add", "argName": "Amount1", "declaration": "Amount1 as decimal max 250" },
+                { "eventName": "Add", "argName": "Amount2", "declaration": "Amount2 as decimal max 750" }
+              ]
+            },
+            "premiseClasses": ["b"],
+            "derivation": "250 + 750 <= 1000 -> IntervalContainment",
+            "strategy": "IntervalContainment",
+            "builtStatus": "proven-today",
+            "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-19", "head": "ed57d7fd" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true },
+            "notes": [
+              "The 250/750 split is an instantiation witness of the class schema — the suggestion is the schema, never these constants."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "arg-bounds",
+            "addition": "Amount1 max 600, Amount2 max 600",
+            "application": {
+              "locus": "event-arg-declarations",
+              "replacements": [
+                { "eventName": "Add", "argName": "Amount1", "declaration": "Amount1 as decimal max 600" },
+                { "eventName": "Add", "argName": "Amount2", "declaration": "Amount2 as decimal max 600" }
+              ]
+            },
+            "whyStillRejects": "600 + 600 = 1200 > 1000 — must still reject, same obligation",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          },
+          {
+            "pairsWith": "guard-nf",
+            "addition": "when Add.Amount1 <= 1000",
+            "application": { "locus": "row-guard", "eventName": "Add" },
+            "whyStillRejects": "guard does not imply the WP — must still reject, same obligation",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited",
+        "bandMember": "when Add.Amount1 <= 1000 - Add.Amount2",
+        "respelling": "the normal-form guard (when Add.Amount1 + Add.Amount2 <= 1000) or per-term bounds",
+        "citations": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witness Family 1", "note": "the respellability paragraph — sound, but no defined derivation covers moving a term across the inequality" }
+        ]
+      },
+      "citations": [
+        { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:19" },
+        { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:20" },
+        { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:22" },
+        { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witness Family 1", "note": "the Base A block" }
+      ],
+      "notes": [
+        "The matrix's witness tables mark provenance on addition statuses only; base rows carry no explicit live-verification mark, so the base is recorded model-derived per the matrix's 'unmarked = model-derived' rule, even though the family is titled a live-verified slice."
+      ]
+    },
+    {
+      "id": "wf1/preservation-reads-written-decrease",
+      "label": "Base B — RHS reads the written field, decrease",
+      "coordinates": {
+        "caseShape": "rule-write",
+        "obligationFamily": "preservation",
+        "ruleStructure": "single-field",
+        "writeSiteCategory": "handler-set",
+        "rhsReadSet": ["written-field", "args"],
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:19" }
+        ]
+      },
+      "obligation": {
+        "statement": "Total_pre - Amount <= 1000",
+        "metavariables": [
+          { "name": "Total_pre", "standsFor": "the written field's pre-state value" },
+          { "name": "Amount", "standsFor": "the event arg the RHS subtracts" },
+          { "name": "1000", "standsFor": "the bound" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" },
+          { "kind": "normal-form-draft", "ref": "docs/Working/normal-form-draft-2026-07-19.md" }
+        ],
+        "wp": {
+          "statement": "Total_pre - Amount <= 1000",
+          "canonicalKey": "(le (+ (neg arg(Subtract.Amount)) pre(Total)) #1000)",
+          "canonicalKeySource": "WpCalculator.ComputePreservationWp; pinned in test/Precept.MatrixTools.Tests/WitnessFamily1Tests.cs (BaseB_WpReadsPreStateTotal)"
+        }
+      },
+      "applicablePremiseClasses": ["d", "b"],
+      "premiseAvailability": "The read set includes the written field, so premise (d) is available.",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["d", "b"],
+          "derivation": "(d) Total_pre <= 1000 plus (b) Amount >= 0: Total_pre - Amount <= Total_pre <= 1000 -> linear-with-hypothesis",
+          "capabilityTier": "1a",
+          "validityArguments": ["Inductive hypothesis plus sign monotonicity"],
+          "decisionProcedure": "Shape-match the RHS as written-field-minus-term (one syntactic pattern). Then look up a nonnegativity fact for the subtracted term in its declared modifiers (a finite set — the modifier-to-ProofSatisfaction table, docs/compiler/proof-engine.md § Strategy 2), and the rule's own bound in the pre-state hypothesis. Either lookup failing rejects.",
+          "openDependencies": ["S4", "Q5"],
+          "citations": [
+            { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Validity arguments", "note": "the inductive-hypothesis argument names its open dependency: the hypothesis is only as sound as the minting rule is complete, so the mention set (S4, which also carries computed-field transitivity) and activation sites (Q5) are load-bearing for every cell consuming premise (d); a missed write site voids the hypothesis" }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": ["b"],
+          "schema": "bound the args such that the interval combination satisfies <WP>",
+          "citations": [{ "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the suggestion-schema bullet" }],
+          "notes": [
+            "The contract's class-(d) half is the standing inductive hypothesis, not an authorable premise; the base's missing-class list names (b) alone, so the suggestion addresses (b). For this cell the interval fact the combination needs is the subtracted term's sign bound (nonnegativity)."
+          ]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "field Total as decimal max 1000 default 0.0\nevent Subtract(Amount as decimal)\non Subtract -> set Total = Total - Subtract.Amount",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["b"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "model-derived" }
+        },
+        "discharges": [
+          {
+            "id": "nonnegative-arg",
+            "kind": "arg-modifier",
+            "addition": "Amount as decimal nonnegative",
+            "application": {
+              "locus": "event-arg-declarations",
+              "replacements": [
+                { "eventName": "Subtract", "argName": "Amount", "declaration": "Amount as decimal nonnegative" }
+              ]
+            },
+            "premiseClasses": ["d", "b"],
+            "derivation": "Total_pre - Amount <= Total_pre <= 1000 -> linear-with-hypothesis (capability tier 1a)",
+            "modelStatus": "provable-under-model",
+            "builtStatus": "unresolved-today",
+            "builtStatusNote": "pre-state rule not carried as a premise — the engine widens Total to [-inf .. +inf] at the read",
+            "provenance": { "mark": "live-verified", "tool": "precept_compile", "date": "2026-07-19", "head": "ed57d7fd" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "nonnegative-arg",
+            "addition": "Amount as decimal max 100",
+            "application": {
+              "locus": "event-arg-declarations",
+              "replacements": [
+                { "eventName": "Subtract", "argName": "Amount", "declaration": "Amount as decimal max 100" }
+              ]
+            },
+            "whyStillRejects": "sign unconstrained: a negative Amount still breaches — must still reject, same obligation",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited",
+        "notes": [
+          "The matrix states Bases B and C are analogous to Base A — every sound band member's business intent respells into a licensed guard or bound form; no concrete band member is stated for this cell, and none is invented here."
+        ]
+      },
+      "citations": [
+        { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:19" },
+        { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:22" },
+        { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witness Family 1", "note": "the Base B block" }
+      ],
+      "notes": [
+        "The matrix does not enumerate this cell's full applicable-class set; it states only that premise (d) is available, and its decision procedure names the (d)+(b) shape alone. Whether class (c) (a guard restating the WP) is applicable here is unstated — the guard-match validity argument names Bases A and C only. Recorded as stated; flagged, not resolved.",
+        "The matrix does not state the base's named missing-class list for this cell; (b) is recorded as the class the stated addition supplies.",
+        "The matrix gives only the row for this base; the event declaration (event Subtract(Amount as decimal), unconstrained) is reconstructed as the base the stated addition modifies."
+      ]
+    },
+    {
+      "id": "wf1/preservation-reads-written-increase",
+      "label": "Base C — RHS reads the written field, increase",
+      "coordinates": {
+        "caseShape": "rule-write",
+        "obligationFamily": "preservation",
+        "ruleStructure": "single-field",
+        "writeSiteCategory": "handler-set",
+        "rhsReadSet": ["written-field", "args"],
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:19" }
+        ]
+      },
+      "obligation": {
+        "statement": "Total_pre + Amount <= 1000",
+        "metavariables": [
+          { "name": "Total_pre", "standsFor": "the written field's pre-state value" },
+          { "name": "Amount", "standsFor": "the event arg the RHS adds (declared positive in the base)" },
+          { "name": "1000", "standsFor": "the bound" }
+        ],
+        "normalization": [
+          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet" },
+          { "kind": "normal-form-draft", "ref": "docs/Working/normal-form-draft-2026-07-19.md" }
+        ],
+        "wp": {
+          "statement": "Total_pre + Amount <= 1000",
+          "canonicalKey": "(le (+ arg(Grow.Amount) pre(Total)) #1000)",
+          "canonicalKeySource": "WpCalculator.ComputePreservationWp; pinned in test/Precept.MatrixTools.Tests/WitnessFamily1Tests.cs (BaseC_LicensedGuardMatchesWp)"
+        }
+      },
+      "applicablePremiseClasses": ["c"],
+      "premiseAvailability": "Premise (d) is available but insufficient (1000 + positive > 1000); no arg bound closes it; (c) is the only applicable class — the applicable-class set is a per-cell fact.",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["c"],
+          "derivation": "guard fact normal-form-equal to the WP -> guard-match",
+          "capabilityTier": "1a",
+          "validityArguments": ["Guard normal-form match"],
+          "decisionProcedure": "The class-(c) normal-form match, against this row's guard conjuncts. No match rejects (no other class applies in this cell — the applicable-class set is the cell's own fact)."
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": ["c"],
+          "schema": "add a guard normal-form-equal to <WP>",
+          "citations": [{ "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the suggestion-schema bullet" }]
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "field Total as decimal max 1000 default 0.0\nevent Grow(Amount as decimal positive)\non Grow -> set Total = Total + Grow.Amount",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["c"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "model-derived" }
+        },
+        "discharges": [
+          {
+            "id": "guard-nf",
+            "kind": "guard",
+            "addition": "when Total + Grow.Amount <= 1000",
+            "application": { "locus": "row-guard", "eventName": "Grow" },
+            "premiseClasses": ["c"],
+            "derivation": "guard fact normal-form-equal to the WP -> guard-match (capability tier 1a)",
+            "modelStatus": "provable-under-model",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true },
+            "notes": [
+              "The matrix states 'provable under want' with no built-status entry and no live-verification mark for this addition; the built status is left unstated rather than inferred."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "guard-nf",
+            "addition": "when Grow.Amount <= 1000",
+            "application": { "locus": "row-guard", "eventName": "Grow" },
+            "whyStillRejects": "ignores Total_pre — must still reject, same obligation",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited",
+        "notes": [
+          "The matrix states Bases B and C are analogous to Base A — every sound band member's business intent respells into a licensed guard or bound form; no concrete band member is stated for this cell, and none is invented here."
+        ]
+      },
+      "citations": [
+        { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:19" },
+        { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:22" },
+        { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witness Family 1", "note": "the Base C block" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+# Fixture: written-field decrease with a nonnegative subtrahend — the
+# pre-state hypothesis plus the arg's declared sign closes the WP.
+field Total as decimal default 0.0
+
+rule Total <= 1000 because "cap"
+
+event Subtract(Amount as decimal nonnegative)
+on Subtract -> set Total = Total - Subtract.Amount

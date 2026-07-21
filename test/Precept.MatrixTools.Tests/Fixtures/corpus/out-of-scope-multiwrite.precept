@@ -1,0 +1,9 @@
+# Fixture: a two-write plan touching a rule-mentioned field — outside the
+# single-write calculator pending the write-plan decomposition ruling.
+field A as decimal default 0.0
+field B as decimal default 0.0
+
+rule A <= 100 because "cap"
+
+event Move(X as decimal)
+on Move -> set A = Move.X -> set B = Move.X

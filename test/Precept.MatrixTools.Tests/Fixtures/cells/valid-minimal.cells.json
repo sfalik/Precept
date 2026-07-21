@@ -1,0 +1,102 @@
+{
+  "familyId": "fixture-valid-minimal",
+  "title": "Fixture — one well-formed defined cell whose canonical key recomputes",
+  "caseShape": "rule-write",
+  "definitionVersion": "fixture definition version stamp",
+  "citations": [
+    { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:19" }
+  ],
+  "respellability": {
+    "verdict": "yes",
+    "evidence": "model-derived",
+    "corpusMeasurement": "pending",
+    "citations": [
+      { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary" }
+    ]
+  },
+  "cells": [
+    {
+      "id": "fx/args-only",
+      "label": "Fixture Base A clone — RHS reads args only",
+      "coordinates": {
+        "caseShape": "rule-write",
+        "obligationFamily": "preservation",
+        "ruleStructure": "single-field",
+        "writeSiteCategory": "handler-set",
+        "rhsReadSet": ["args"],
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:19" }
+        ]
+      },
+      "obligation": {
+        "statement": "Amount1 + Amount2 <= 1000",
+        "metavariables": [
+          { "name": "Amount1", "standsFor": "an event arg the RHS reads" }
+        ],
+        "normalization": [
+          { "kind": "normal-form-draft", "ref": "docs/Working/normal-form-draft-2026-07-19.md" }
+        ],
+        "wp": {
+          "statement": "Amount1 + Amount2 <= 1000",
+          "canonicalKey": "(le (+ arg(Add.Amount1) arg(Add.Amount2)) #1000)",
+          "canonicalKeySource": "fixture: pinned by CellValidatorTests"
+        }
+      },
+      "applicablePremiseClasses": ["c"],
+      "premiseAvailability": "fixture",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["c"],
+          "derivation": "guard fact normal-form-equal to the WP -> guard-match",
+          "validityArguments": ["Guard normal-form match"],
+          "decisionProcedure": "Normal-form match of the WP against the row's guard conjuncts (a finite set)."
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": ["c"],
+          "schema": "add a guard normal-form-equal to <WP>"
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "field Total as decimal max 1000 default 0.0\nevent Add(Amount1 as decimal, Amount2 as decimal)\non Add -> set Total = Add.Amount1 + Add.Amount2",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["c"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "model-derived" }
+        },
+        "discharges": [
+          {
+            "id": "guard-nf",
+            "kind": "guard",
+            "addition": "when Add.Amount1 + Add.Amount2 <= 1000",
+            "application": { "locus": "row-guard", "eventName": "Add" },
+            "premiseClasses": ["c"],
+            "derivation": "guard fact normal-form-equal to the WP -> guard-match",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "guard-nf",
+            "addition": "when Add.Amount1 <= 1000",
+            "application": { "locus": "row-guard", "eventName": "Add" },
+            "whyStillRejects": "guard does not imply the WP",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:19" }
+      ]
+    }
+  ]
+}

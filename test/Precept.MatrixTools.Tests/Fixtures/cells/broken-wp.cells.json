@@ -1,0 +1,235 @@
+{
+  "familyId": "fixture-broken-wp",
+  "title": "Fixture — WP recomputation defects and named skips",
+  "caseShape": "rule-write",
+  "definitionVersion": "fixture definition version stamp",
+  "citations": [
+    { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:19" }
+  ],
+  "respellability": {
+    "verdict": "yes",
+    "evidence": "model-derived",
+    "corpusMeasurement": "pending",
+    "citations": [
+      { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary" }
+    ]
+  },
+  "cells": [
+    {
+      "id": "wp/wrong-key",
+      "label": "Stored canonical key disagrees with the recomputed WP",
+      "coordinates": {
+        "caseShape": "rule-write",
+        "obligationFamily": "preservation",
+        "ruleStructure": "single-field",
+        "writeSiteCategory": "handler-set",
+        "rhsReadSet": ["args"],
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:19" }
+        ]
+      },
+      "obligation": {
+        "statement": "Amount1 + Amount2 <= 1000",
+        "metavariables": [
+          { "name": "Amount1", "standsFor": "an event arg the RHS reads" }
+        ],
+        "normalization": [
+          { "kind": "normal-form-draft", "ref": "docs/Working/normal-form-draft-2026-07-19.md" }
+        ],
+        "wp": {
+          "statement": "Amount1 + Amount2 <= 1000",
+          "canonicalKey": "(le arg(Add.Amount1) #1)",
+          "canonicalKeySource": "fixture: deliberately wrong"
+        }
+      },
+      "applicablePremiseClasses": ["c"],
+      "premiseAvailability": "fixture",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["c"],
+          "derivation": "guard-match",
+          "validityArguments": ["Guard normal-form match"],
+          "decisionProcedure": "Normal-form match of the WP against the row's guard conjuncts."
+        }
+      ],
+      "suggestions": [
+        { "premiseClasses": ["c"], "schema": "add a guard normal-form-equal to <WP>" }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "field Total as decimal max 1000 default 0.0\nevent Add(Amount1 as decimal, Amount2 as decimal)\non Add -> set Total = Add.Amount1 + Add.Amount2",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["c"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "model-derived" }
+        },
+        "discharges": [
+          {
+            "id": "guard-nf",
+            "kind": "guard",
+            "addition": "when Add.Amount1 + Add.Amount2 <= 1000",
+            "application": { "locus": "row-guard", "eventName": "Add" },
+            "premiseClasses": ["c"],
+            "derivation": "guard-match",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "guard-nf",
+            "addition": "when Add.Amount1 <= 1000",
+            "application": { "locus": "row-guard", "eventName": "Add" },
+            "whyStillRejects": "guard does not imply the WP",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [
+        { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:19" }
+      ]
+    },
+    {
+      "id": "wp/multi-write",
+      "label": "Two-write plan the single-write calculator declines",
+      "coordinates": {
+        "caseShape": "rule-write",
+        "obligationFamily": "preservation",
+        "ruleStructure": "single-field",
+        "writeSiteCategory": "handler-set",
+        "rhsReadSet": ["args"],
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:19" }
+        ]
+      },
+      "obligation": {
+        "statement": "X <= 1000",
+        "metavariables": [
+          { "name": "X", "standsFor": "the incoming arg value" }
+        ],
+        "normalization": [
+          { "kind": "normal-form-draft", "ref": "docs/Working/normal-form-draft-2026-07-19.md" }
+        ],
+        "wp": {
+          "statement": "X <= 1000",
+          "canonicalKey": "(le arg(Load.X) #1000)",
+          "canonicalKeySource": "fixture: not mechanized — the plan is outside the single-write scope"
+        }
+      },
+      "applicablePremiseClasses": ["c"],
+      "premiseAvailability": "fixture",
+      "dischargeContract": [
+        {
+          "premiseClasses": ["c"],
+          "derivation": "guard-match",
+          "validityArguments": ["Guard normal-form match"],
+          "decisionProcedure": "Normal-form match of the WP against the row's guard conjuncts."
+        }
+      ],
+      "suggestions": [
+        { "premiseClasses": ["c"], "schema": "add a guard normal-form-equal to <WP>" }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "field A as decimal max 1000 default 0.0\nfield B as decimal default 0.0\nevent Load(X as decimal)\non Load\n  -> set A = Load.X\n  -> set B = Load.X",
+          "expected": { "outcome": "reject", "missingPremiseClasses": ["c"], "noOtherDiagnostics": true },
+          "provenance": { "mark": "model-derived" }
+        },
+        "discharges": [
+          {
+            "id": "guard-nf",
+            "kind": "guard",
+            "addition": "when Load.X <= 1000",
+            "application": { "locus": "row-guard", "eventName": "Load" },
+            "premiseClasses": ["c"],
+            "derivation": "guard-match",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "guard-nf",
+            "addition": "when Load.X <= 2000",
+            "application": { "locus": "row-guard", "eventName": "Load" },
+            "whyStillRejects": "bound loosened past the arithmetic",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [
+        { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:19" }
+      ]
+    },
+    {
+      "id": "wp/no-base",
+      "label": "Defined cell with a mechanized key but no base witness program",
+      "coordinates": {
+        "caseShape": "rule-write",
+        "obligationFamily": "establishment",
+        "ruleStructure": "single-field",
+        "writeSiteCategory": "construction-defaults",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:18" }
+        ]
+      },
+      "obligation": {
+        "statement": "default 0.0 satisfies Total <= 1000",
+        "metavariables": [
+          { "name": "Total", "standsFor": "the field the rule bounds" }
+        ],
+        "normalization": [
+          { "kind": "normal-form-draft", "ref": "docs/Working/normal-form-draft-2026-07-19.md" }
+        ],
+        "wp": {
+          "statement": "0.0 <= 1000",
+          "canonicalKey": "true",
+          "canonicalKeySource": "fixture"
+        }
+      },
+      "applicablePremiseClasses": [],
+      "premiseAvailability": "fixture",
+      "dischargeContract": [
+        {
+          "premiseClasses": [],
+          "derivation": "constant fold",
+          "validityArguments": ["Literal constant-fold for defaults"],
+          "decisionProcedure": "Constant-fold the rule over the default environment."
+        }
+      ],
+      "suggestions": [],
+      "witnesses": {
+        "discharges": [
+          {
+            "id": "default-fold",
+            "kind": "default-constant-fold",
+            "addition": null,
+            "premiseClasses": [],
+            "derivation": "constant fold",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          }
+        ],
+        "nearMisses": []
+      },
+      "respellability": { "resolution": "family-inherited" },
+      "citations": [
+        { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:18" }
+      ]
+    }
+  ]
+}

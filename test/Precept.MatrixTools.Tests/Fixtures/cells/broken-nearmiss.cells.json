@@ -1,0 +1,100 @@
+{
+  "familyId": "fixture-broken-nearmiss",
+  "title": "Fixture — near-miss pairing defects",
+  "caseShape": "rule-write",
+  "definitionVersion": "fixture definition version stamp",
+  "citations": [
+    { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:19" }
+  ],
+  "respellability": {
+    "verdict": "yes",
+    "evidence": "model-derived",
+    "corpusMeasurement": "pending",
+    "citations": [
+      { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary" }
+    ]
+  },
+  "cells": [
+    {
+      "id": "nm/pairing-defects",
+      "label": "Discharges with missing, doubled, dangling, and standing-owed near-misses",
+      "coordinates": {
+        "caseShape": "rule-write",
+        "obligationFamily": "preservation",
+        "ruleStructure": "single-field",
+        "writeSiteCategory": "handler-set",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "open",
+        "citations": [
+          { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:19" }
+        ]
+      },
+      "witnesses": {
+        "discharges": [
+          {
+            "id": "no-nearmiss",
+            "kind": "guard",
+            "addition": "when A <= 1000",
+            "premiseClasses": ["c"],
+            "derivation": "guard-match",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          },
+          {
+            "id": "double-nearmiss",
+            "kind": "arg-modifier",
+            "addition": "X max 100",
+            "premiseClasses": ["b"],
+            "derivation": "interval",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          },
+          {
+            "id": "standing",
+            "kind": "default-constant-fold",
+            "addition": null,
+            "premiseClasses": [],
+            "derivation": "constant fold",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "accept", "premiseListRecorded": true }
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "double-nearmiss",
+            "addition": "X max 2000",
+            "whyStillRejects": "bound loosened past the arithmetic",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          },
+          {
+            "pairsWith": "double-nearmiss",
+            "addition": "X max 3000",
+            "whyStillRejects": "bound loosened past the arithmetic",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          },
+          {
+            "pairsWith": "ghost-discharge",
+            "addition": "when B <= 1",
+            "whyStillRejects": "pairs with nothing",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          },
+          {
+            "pairsWith": "standing",
+            "addition": "weakened nothing",
+            "whyStillRejects": "a standing discharge has no addition to weaken",
+            "provenance": { "mark": "model-derived" },
+            "expected": { "outcome": "reject", "sameObligation": true }
+          }
+        ]
+      },
+      "citations": [
+        { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:19" }
+      ]
+    }
+  ]
+}

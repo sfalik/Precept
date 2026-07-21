@@ -1,0 +1,507 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "obligation-discharge-matrix-cell-file.schema.json",
+  "title": "Obligation-discharge matrix — cell data file (one witness family / case shape per file)",
+  "description": "Machine-checkable cell records for the obligation-discharge matrix (docs/Working/obligation-discharge-matrix-2026-07-19.md). One file per family/case-shape, per the matrix's Storage ruling. Cells instantiate the matrix's generative rules; they never define them — a cell whose answer cannot be derived from the generative sections is a missing rule to author in the matrix, not here.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["familyId", "title", "caseShape", "definitionVersion", "citations", "respellability", "cells"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "familyId": {
+      "type": "string",
+      "description": "Stable identifier for the witness family this file carries (citation anchor).",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "title": { "type": "string" },
+    "caseShape": { "$ref": "#/$defs/caseShape" },
+    "definitionVersion": {
+      "type": "string",
+      "description": "The matrix revision these cells were authored against — the definition-version stamp the Storage ruling requires for certificate coupling."
+    },
+    "citations": {
+      "$ref": "#/$defs/citationList",
+      "description": "Family-level derivation record: the want-doc sentences, spec lines, and owner rulings the family derives from."
+    },
+    "respellability": {
+      "$ref": "#/$defs/familyRespellability",
+      "description": "The family-level respellability verdict every cell in this file inherits unless it states a more specific override."
+    },
+    "cells": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/cell" }
+    }
+  },
+  "$defs": {
+    "caseShape": {
+      "description": "Which arm of the matrix's family-indexed axis DU the cell belongs to. The axes differ per case shape; coordinates are validated against the arm this discriminator selects.",
+      "enum": ["rule-write", "fault", "editable-ingress", "structural"]
+    },
+    "premiseClass": {
+      "description": "Where a proof may get its facts (want :19, :143): (a) field modifiers, (b) arg constraints, (c) the handler's guard, (d) all rules holding in the pre-state (the inductive hypothesis), (e) evaluating the applicable rule set at an editable-field write — (e)'s status as a genuinely fifth class vs (a) generalized is an open owner item.",
+      "enum": ["a", "b", "c", "d", "e"]
+    },
+    "citation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "ref"],
+      "properties": {
+        "kind": {
+          "enum": ["want-doc", "spec", "matrix", "normal-form-draft", "owner-ruling", "catalog", "code", "packet", "review"],
+          "description": "What kind of source is being cited. owner-ruling requires a date."
+        },
+        "ref": {
+          "type": "string",
+          "description": "Where to look. Three machine-checkable forms only: a repo path; a repo path with a :line suffix; or 'path § anchor', where the anchor must be a substring of exactly one markdown heading in the cited file. Finer-grained sub-locations (a bullet, a paragraph, a table row) go in note, never in ref — the validator's citation-resolution check decides every ref by these three forms alone."
+        },
+        "date": { "type": "string", "format": "date", "description": "Required for owner rulings: the date the ruling was made." },
+        "note": { "type": "string" }
+      },
+      "if": { "properties": { "kind": { "const": "owner-ruling" } } },
+      "then": { "required": ["kind", "ref", "date"] }
+    },
+    "citationList": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/citation" }
+    },
+    "provenance": {
+      "type": "object",
+      "description": "How this record was verified. live-verified = confirmed by a live tool run (the matrix's checkmark-v mark), and must say which tool, when, and at which commit. model-derived = derived from the want doc / matrix text with no live run claimed. Provenance attests the record's status claims only — on a discharge witness it attests builtStatus (what the run demonstrated), never the expected block, which states the definition's committed power under the model.",
+      "additionalProperties": false,
+      "required": ["mark"],
+      "properties": {
+        "mark": { "enum": ["live-verified", "model-derived"] },
+        "tool": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "head": { "type": "string", "description": "The git commit the live verification ran at." }
+      },
+      "if": { "properties": { "mark": { "const": "live-verified" } } },
+      "then": { "required": ["mark", "tool", "date", "head"] }
+    },
+    "coordinates": {
+      "description": "The cell's axis coordinates. A discriminated union keyed by caseShape — the axes genuinely differ per case shape (the matrix's per-family case-shape table), so one flat record would misrepresent the structure.",
+      "oneOf": [
+        {
+          "type": "object",
+          "description": "Rule families at authored write sites (establishment, preservation).",
+          "additionalProperties": false,
+          "required": ["caseShape", "obligationFamily", "ruleStructure", "writeSiteCategory", "typeFamily"],
+          "properties": {
+            "caseShape": { "title": "case shape", "const": "rule-write" },
+            "obligationFamily": { "title": "obligation family", "enum": ["establishment", "preservation"] },
+            "ruleStructure": { "title": "rule structure", "enum": ["single-field", "relational", "conditional", "quantified", "non-linear", "temporal"] },
+            "writeSiteCategory": {
+              "title": "write site category",
+              "enum": ["handler-set", "editable-edit", "entry-hook", "collection-action", "computed-transitive", "construction-defaults"],
+              "description": "The mutation-surface kind (spec :1971 + the matrix's write-site sweep). construction-defaults is a file-local extension: the establishment-over-defaults site (want :18) when no initial event exists — the matrix's axis 3 does not list this site kind; flagged as an open vocabulary item, not silently absorbed."
+            },
+            "rhsReadSet": {
+              "title": "RHS read set",
+              "type": "array",
+              "description": "What the authored right-hand side reads — combinations permitted. Absent when the site has no authored expression (the RHS axis applies only where one exists).",
+              "items": { "enum": ["constant", "args", "written-field", "other-rule-mentioned-fields", "rule-unmentioned-fields"] },
+              "uniqueItems": true
+            },
+            "typeFamily": { "title": "type family", "enum": ["primitive", "temporal", "business-domain", "collection"] }
+          }
+        },
+        {
+          "type": "object",
+          "description": "Fault family: catalog-declared safety precondition at an evaluation site.",
+          "additionalProperties": false,
+          "required": ["caseShape", "obligationFamily", "operationKind", "evaluationSiteCategory", "typeFamily"],
+          "properties": {
+            "caseShape": { "title": "case shape", "const": "fault" },
+            "obligationFamily": { "title": "obligation family", "const": "fault-prevention" },
+            "operationKind": { "title": "operation kind", "type": "string", "description": "From the ProofRequirements catalog (replaces the rule-structure axis)." },
+            "evaluationSiteCategory": { "title": "evaluation site category", "type": "string", "description": "Where the expression is evaluated (replaces the write-site axis) — may be a guard or a reject-row interpolation with no write at all." },
+            "typeFamily": { "title": "type family", "enum": ["primitive", "temporal", "business-domain", "collection"] }
+          }
+        },
+        {
+          "type": "object",
+          "description": "Editable-ingress cells: the field's modifier-rules plus every rule mentioning the field, at the edit. No RHS axis — the incoming value is arbitrary.",
+          "additionalProperties": false,
+          "required": ["caseShape", "obligationFamily", "ruleStructure", "writeSiteCategory", "typeFamily"],
+          "properties": {
+            "caseShape": { "title": "case shape", "const": "editable-ingress" },
+            "obligationFamily": { "title": "obligation family", "enum": ["establishment", "preservation"] },
+            "ruleStructure": { "title": "rule structure", "enum": ["single-field", "relational", "conditional", "quantified", "non-linear", "temporal"] },
+            "writeSiteCategory": { "title": "write site category", "const": "editable-edit" },
+            "typeFamily": { "title": "type family", "enum": ["primitive", "temporal", "business-domain", "collection"] }
+          }
+        },
+        {
+          "type": "object",
+          "description": "Structural family: the weaker case shape — no WP, no premise class; flagged base, required rejection, fixing structural edit.",
+          "additionalProperties": false,
+          "required": ["caseShape", "structuralFactKind", "shape"],
+          "properties": {
+            "caseShape": { "title": "case shape", "const": "structural" },
+            "structuralFactKind": {
+              "title": "structural fact kind",
+              "enum": ["Reachability", "DominancePath", "EventCoverage", "TerminalCompleteness", "DeadEndState"],
+              "description": "Keyed to the ProofForwardingFact kinds (docs/compiler/proof-engine.md:214-240)."
+            },
+            "shape": { "title": "shape", "enum": ["state", "row"] }
+          }
+        }
+      ]
+    },
+    "disposition": {
+      "type": "object",
+      "description": "Every cell carries exactly one disposition. empty requires a written one-line pruning derivation; open/deferred/conflicted require the citation(s) of the item they rest on; conflicted cites both conflicting sources.",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": { "enum": ["defined", "deferred", "open", "empty", "conflicted"] },
+        "citations": { "$ref": "#/$defs/citationList" },
+        "pruningDerivation": { "type": "string", "description": "Required when status is empty: the one-line derivation of why the cell is pruned." }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "empty" } } },
+          "then": { "required": ["status", "pruningDerivation"] }
+        },
+        {
+          "if": { "properties": { "status": { "enum": ["deferred", "open", "conflicted"] } } },
+          "then": { "required": ["status", "citations"] }
+        },
+        {
+          "if": { "properties": { "status": { "const": "conflicted" } }, "required": ["status"] },
+          "then": { "properties": { "citations": { "minItems": 2 } } }
+        }
+      ]
+    },
+    "metavariable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "standsFor"],
+      "properties": {
+        "name": { "type": "string", "description": "The placeholder token as it appears in the representative statement." },
+        "standsFor": { "type": "string", "description": "What the placeholder ranges over: the field, the bound, the arg, the expression shape." }
+      }
+    },
+    "obligation": {
+      "type": "object",
+      "description": "The cell's obligation schema: a representative statement whose named tokens are metavariables, matched under the stated normalization. Two programs sit in the same cell iff their minted obligations unify with this schema.",
+      "additionalProperties": false,
+      "required": ["statement", "metavariables", "normalization", "wp"],
+      "properties": {
+        "statement": { "type": "string", "description": "The obligation in source syntax, using the representative's names." },
+        "metavariables": { "type": "array", "items": { "$ref": "#/$defs/metavariable" } },
+        "normalization": { "$ref": "#/$defs/citationList", "description": "The normal form the schema is matched under." },
+        "wp": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["statement"],
+          "properties": {
+            "statement": { "type": "string", "description": "The weakest precondition through the write plan, in source syntax." },
+            "canonicalKey": { "type": "string", "description": "The mechanized normal-form key (tools/Precept.MatrixTools CanonExpr.Key) when the WP calculator can compute it." },
+            "canonicalKeySource": { "type": "string", "description": "Where the key was computed/pinned (test or CLI run)." }
+          }
+        }
+      }
+    },
+    "contractEntry": {
+      "type": "object",
+      "description": "One arm of the cell's discharge contract: which premise class(es) discharge, by which named derivation, decided by which finite procedure. The contract is exact (iff): the derivation licenses acceptance, and the decision procedure decides rejection.",
+      "additionalProperties": false,
+      "required": ["premiseClasses", "derivation", "validityArguments", "decisionProcedure"],
+      "properties": {
+        "premiseClasses": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/premiseClass" },
+          "description": "More than one entry means the classes discharge jointly (e.g. the inductive hypothesis plus an arg sign bound). Empty when the discharge needs no authored premise at all (constant folding over defaults)."
+        },
+        "derivation": { "type": "string", "description": "The named derivation that closes the proof. Intended anchor once the rule-obligation catalog entries land: the CertificateStepKind / CertificatePremise vocabulary; free text until then." },
+        "capabilityTier": { "enum": ["1a", "1b"], "description": "Capability-tier annotation (retained from the phase design as an annotation, not a derivation vocabulary)." },
+        "strategy": { "type": "string", "description": "The ProofStrategy member realizing the discharge, where one exists today (src/Precept/Pipeline/ProofLedger.cs). The validator cross-checks values against that enum." },
+        "validityArguments": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "Guard normal-form match",
+              "Arg-bound interval arithmetic",
+              "Inductive hypothesis plus sign monotonicity",
+              "Literal constant-fold for defaults",
+              "Establishment over defaults",
+              "Guard-fact substitution for relational rules",
+              "Vacuity by activation"
+            ]
+          },
+          "description": "Every named validity argument (matrix § Validity arguments) the derivation rests on — the ratification gate requires one per cited rule, and a derivation may rest on more than one (e.g. constant folding plus the pre-configuration rule). Names are the bold lead-ins of the matrix's argument paragraphs, before any parenthetical; the enum mirrors that section and grows with it."
+        },
+        "decisionProcedure": { "type": "string", "description": "The concrete finite check that decides no licensed derivation exists — without it the reject side cannot be tested even in principle." },
+        "openDependencies": { "$ref": "#/$defs/openDependencyList" },
+        "citations": { "$ref": "#/$defs/citationList" }
+      }
+    },
+    "openDependencyList": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[QS][0-9]+[a-z]?$" },
+      "description": "The open ⧖ items (packet Q/S identifiers) this record's answer is load-bearing on — the minting-rule parts and open questions the matrix records as dependencies instead of absorbing an answer. Recorded structurally so every cell affected by a landed ruling is mechanically findable."
+    },
+    "suggestion": {
+      "type": "object",
+      "description": "What the diagnostic must suggest when the proof fails, per applicable premise class — a schema over the WP metavariable, never a constant.",
+      "additionalProperties": false,
+      "required": ["premiseClasses", "schema"],
+      "properties": {
+        "premiseClasses": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/premiseClass" } },
+        "schema": { "type": "string" },
+        "citations": { "$ref": "#/$defs/citationList" },
+        "notes": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "baseWitness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["program", "expected", "provenance"],
+      "properties": {
+        "program": { "type": "string", "description": "The complete representative .precept program the compiler must flag." },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["outcome", "missingPremiseClasses", "noOtherDiagnostics"],
+          "properties": {
+            "outcome": { "const": "reject" },
+            "missingPremiseClasses": { "type": "array", "items": { "$ref": "#/$defs/premiseClass" }, "description": "The rejection names the schema's obligation and these missing premise classes." },
+            "noOtherDiagnostics": { "const": true, "description": "Base minimality: the base rejects only for the target obligation." }
+          }
+        },
+        "provenance": { "$ref": "#/$defs/provenance" }
+      }
+    },
+    "dischargeWitness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "premiseClasses", "derivation", "provenance", "expected"],
+      "properties": {
+        "id": { "type": "string", "description": "Stable id within the cell; near-misses pair against it." },
+        "kind": {
+          "enum": ["guard", "arg-modifier", "default-constant-fold", "structural-edit", "other"],
+          "description": "What sort of source text realizes the discharge. default-constant-fold marks a standing discharge with no authored addition (addition is null)."
+        },
+        "addition": {
+          "type": ["string", "null"],
+          "description": "The source text added to the base — an instance of the discharge contract. Null only for a standing discharge (no addition exists to weaken, so no near-miss is owed)."
+        },
+        "application": { "$ref": "#/$defs/application" },
+        "premiseClasses": { "type": "array", "items": { "$ref": "#/$defs/premiseClass" }, "description": "Empty when the discharge needs no authored premise (constant folding over defaults)." },
+        "derivation": { "type": "string", "description": "The derivation that closes the proof for this instance, as the matrix states it." },
+        "strategy": { "type": "string" },
+        "modelStatus": { "enum": ["provable-under-model"], "description": "Committed power: the matrix's 'provable under want' claim, when stated." },
+        "builtStatus": { "enum": ["proven-today", "unresolved-today"], "description": "Built power, tracked separately from committed power — never conflated with modelStatus." },
+        "builtStatusNote": { "type": "string", "description": "Why the built engine falls short, when builtStatus is unresolved-today." },
+        "provenance": {
+          "$ref": "#/$defs/provenance",
+          "description": "Attests the builtStatus claim, not the expected outcome: a live-verified mark beside builtStatus unresolved-today records a run demonstrating the engine does NOT yet prove this addition. The expected block is the definition's committed power under the model; this provenance never claims it verified."
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["outcome", "premiseListRecorded"],
+          "properties": {
+            "outcome": { "const": "accept" },
+            "premiseListRecorded": { "const": true, "description": "Base + addition compiles clean via the expected strategy, premise list recorded." }
+          }
+        },
+        "notes": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "nearMissWitness": {
+      "type": "object",
+      "description": "A discharge addition deliberately weakened past sufficiency. One per discharge addition (validator-enforced pairing; a null-addition standing discharge owes none).",
+      "additionalProperties": false,
+      "required": ["pairsWith", "addition", "whyStillRejects", "provenance", "expected"],
+      "properties": {
+        "pairsWith": { "type": "string", "description": "The id of the discharge addition this weakens." },
+        "addition": { "type": "string", "description": "The weakened source text." },
+        "application": { "$ref": "#/$defs/application" },
+        "whyStillRejects": { "type": "string" },
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["outcome", "sameObligation"],
+          "properties": {
+            "outcome": { "const": "reject" },
+            "sameObligation": { "const": true, "description": "The compiler still rejects, naming the same obligation." }
+          }
+        }
+      }
+    },
+    "application": {
+      "description": "How the addition mechanically applies to the base program, keyed by where it lands — so the cell→test conversion the matrix requires can generate the modified source without hand-coded per-cell patching. A discriminated union: a guard addition appends a when clause to a named row; an arg-modifier addition replaces named event-arg declarations.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["locus", "eventName"],
+          "properties": {
+            "locus": { "const": "row-guard" },
+            "eventName": { "type": "string", "description": "The event whose row receives the addition: the addition text is inserted as the row's when clause (the row must not already carry one)." }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["locus", "replacements"],
+          "properties": {
+            "locus": { "const": "event-arg-declarations" },
+            "replacements": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["eventName", "argName", "declaration"],
+                "properties": {
+                  "eventName": { "type": "string" },
+                  "argName": { "type": "string", "description": "The event arg whose declaration is replaced." },
+                  "declaration": { "type": "string", "description": "The complete replacement declaration for that arg, in source syntax." }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "familyRespellability": {
+      "type": "object",
+      "description": "The respellability verdict, stated once per contract family (owner-approved 2026-07-19) and inherited by every cell the family's contracts govern.",
+      "additionalProperties": false,
+      "required": ["verdict", "evidence", "corpusMeasurement", "citations"],
+      "properties": {
+        "verdict": { "enum": ["yes", "no"], "description": "yes iff every sound program in the band has a provable respelling within the surface. no routes to the owner as a surface decision." },
+        "evidence": { "enum": ["model-derived", "corpus-measured"], "description": "A family verdict ratifies only when corpus-measured (ratification protocol, layer 4)." },
+        "corpusMeasurement": { "enum": ["pending", "done"] },
+        "licensedNonBandExamples": {
+          "type": "array",
+          "description": "Spellings that look band-like but are licensed by a written derivation — recorded so the band boundary is findable.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["spelling", "whyLicensed"],
+            "properties": {
+              "spelling": { "type": "string" },
+              "whyLicensed": { "type": "string" },
+              "citations": { "$ref": "#/$defs/citationList" }
+            }
+          }
+        },
+        "citations": { "$ref": "#/$defs/citationList" },
+        "notes": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "cellRespellability": {
+      "type": "object",
+      "description": "How this cell resolves its respellability verdict: inherited from the family, or a more specific per-cell override.",
+      "additionalProperties": false,
+      "required": ["resolution"],
+      "properties": {
+        "resolution": { "enum": ["family-inherited", "cell-override"] },
+        "overrideVerdict": { "enum": ["yes", "no"], "description": "Required when resolution is cell-override." },
+        "bandMember": { "type": "string", "description": "A representative sound-but-unprovable program fragment for this cell." },
+        "respelling": { "type": "string", "description": "The licensed respelling of the band member. The day-one validator requires it whenever the cell's resolved verdict is yes and a bandMember is stated — a cross-field rule this schema cannot express." },
+        "citations": { "$ref": "#/$defs/citationList" },
+        "notes": { "type": "array", "items": { "type": "string" } }
+      },
+      "if": { "properties": { "resolution": { "const": "cell-override" } } },
+      "then": { "required": ["resolution", "overrideVerdict"] }
+    },
+    "cell": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "coordinates", "disposition", "citations"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable cell id — a citation anchor that must never be renamed once cited (path-style, lowercase).",
+          "pattern": "^[a-z0-9][a-z0-9/-]*$"
+        },
+        "label": { "type": "string", "description": "The human name the matrix doc uses for this cell." },
+        "coordinates": { "$ref": "#/$defs/coordinates" },
+        "disposition": { "$ref": "#/$defs/disposition" },
+        "obligation": { "$ref": "#/$defs/obligation" },
+        "applicablePremiseClasses": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/premiseClass" },
+          "description": "The per-cell applicable-class set, derived from the axes (the read-set axis), not asserted."
+        },
+        "premiseAvailability": { "type": "string", "description": "The derivation of the applicable-class set from the read-set/mention-set intersection, in the matrix's words." },
+        "dischargeContract": { "type": "array", "items": { "$ref": "#/$defs/contractEntry" } },
+        "suggestions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/suggestion" },
+          "description": "The suggestion schemas the failure diagnostic must carry, per applicable premise class — a required component of every defined non-structural cell. Empty exactly when the applicable-class set is empty (no authorable premise exists, so there is nothing per-class to suggest); non-empty otherwise, naming all applicable classes."
+        },
+        "witnesses": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "base": { "$ref": "#/$defs/baseWitness" },
+            "discharges": { "type": "array", "items": { "$ref": "#/$defs/dischargeWitness" } },
+            "nearMisses": { "type": "array", "items": { "$ref": "#/$defs/nearMissWitness" } }
+          }
+        },
+        "respellability": { "$ref": "#/$defs/cellRespellability" },
+        "openDependencies": { "$ref": "#/$defs/openDependencyList" },
+        "citations": { "$ref": "#/$defs/citationList", "description": "The want-doc sentence(s) / owner rulings this cell's obligation and premise availability derive from — the citation duty." },
+        "notes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Honest recording of source-doc gaps and ambiguities affecting this cell — never a place to invent answers."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "disposition": { "properties": { "status": { "const": "defined" } }, "required": ["status"] },
+              "coordinates": { "properties": { "caseShape": { "enum": ["rule-write", "fault", "editable-ingress"] } }, "required": ["caseShape"] }
+            },
+            "required": ["disposition", "coordinates"]
+          },
+          "then": {
+            "required": ["id", "label", "coordinates", "disposition", "citations", "obligation", "applicablePremiseClasses", "dischargeContract", "suggestions", "witnesses", "respellability"],
+            "properties": {
+              "dischargeContract": { "minItems": 1 },
+              "witnesses": {
+                "required": ["discharges"],
+                "properties": { "discharges": { "minItems": 1 } }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "disposition": { "properties": { "status": { "const": "defined" } }, "required": ["status"] },
+              "applicablePremiseClasses": { "type": "array", "minItems": 1 }
+            },
+            "required": ["disposition", "applicablePremiseClasses"]
+          },
+          "then": { "properties": { "suggestions": { "minItems": 1 } } }
+        },
+        {
+          "if": {
+            "properties": {
+              "disposition": { "properties": { "status": { "const": "defined" } }, "required": ["status"] },
+              "coordinates": { "properties": { "caseShape": { "const": "structural" } }, "required": ["caseShape"] }
+            },
+            "required": ["disposition", "coordinates"]
+          },
+          "then": { "required": ["id", "label", "coordinates", "disposition", "citations", "witnesses"] }
+        }
+      ]
+    }
+  }
+}

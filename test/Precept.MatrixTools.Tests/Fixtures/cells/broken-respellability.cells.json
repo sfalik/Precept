@@ -1,0 +1,86 @@
+{
+  "familyId": "fixture-broken-respellability",
+  "title": "Fixture — respellability resolution defects",
+  "caseShape": "rule-write",
+  "definitionVersion": "fixture definition version stamp",
+  "citations": [
+    { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:19" }
+  ],
+  "respellability": {
+    "verdict": "yes",
+    "evidence": "model-derived",
+    "corpusMeasurement": "pending",
+    "citations": [
+      { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary" }
+    ]
+  },
+  "cells": [
+    {
+      "id": "rs/override-without-verdict",
+      "label": "Cell override that states no override verdict",
+      "coordinates": {
+        "caseShape": "rule-write",
+        "obligationFamily": "preservation",
+        "ruleStructure": "single-field",
+        "writeSiteCategory": "handler-set",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "open",
+        "citations": [
+          { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:19" }
+        ]
+      },
+      "respellability": {
+        "resolution": "cell-override"
+      },
+      "citations": [
+        { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:19" }
+      ]
+    },
+    {
+      "id": "rs/band-member-without-respelling",
+      "label": "Resolved yes verdict with a band member but no respelling",
+      "coordinates": {
+        "caseShape": "rule-write",
+        "obligationFamily": "preservation",
+        "ruleStructure": "single-field",
+        "writeSiteCategory": "handler-set",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "open",
+        "citations": [
+          { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:19" }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited",
+        "bandMember": "when A <= 1000 - B"
+      },
+      "citations": [
+        { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:19" }
+      ]
+    },
+    {
+      "id": "rs/defined-without-respellability",
+      "label": "Defined non-structural cell with no respellability block at all",
+      "coordinates": {
+        "caseShape": "rule-write",
+        "obligationFamily": "preservation",
+        "ruleStructure": "single-field",
+        "writeSiteCategory": "handler-set",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:19" }
+        ]
+      },
+      "citations": [
+        { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:19" }
+      ]
+    }
+  ]
+}

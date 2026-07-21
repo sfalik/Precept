@@ -1,0 +1,9 @@
+# Fixture: a rule mentioning two fields — relational shape, outside the
+# single-field family this harness classifies against.
+field Balance as decimal default 0.0
+field Limit as decimal default 100.0
+
+rule Balance >= -Limit because "overdraft"
+
+event SetLimit(X as decimal nonnegative)
+on SetLimit when Balance >= -SetLimit.X -> set Limit = SetLimit.X

@@ -1,0 +1,10 @@
+# Fixture: the WP closes only by summing a *lower* bound (the arg's declared
+# nonnegativity). The written class-(b) procedure is an upper-bound sum over
+# declared max bounds; no lower-bound rule is stated, so the harness must not
+# report this as licensed as written.
+field Limit as decimal default 10.0
+
+rule Limit >= 0 because "a limit is never negative"
+
+event Reduce(NewLimit as decimal nonnegative)
+on Reduce -> set Limit = Reduce.NewLimit

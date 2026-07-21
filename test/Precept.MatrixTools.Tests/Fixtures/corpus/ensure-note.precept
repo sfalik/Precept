@@ -1,0 +1,16 @@
+# Fixture: a state-scoped ensure — outside the obligation enumerator's
+# surface today; must surface as a named record, never silently.
+precept EnsureFixture
+
+field Total as decimal default 0.0
+
+state Active initial
+state Closed terminal
+
+in Active ensure Total >= 0 because "balance floor"
+
+event Open initial
+on Open -> set Total = 10
+
+event Close
+from Active on Close -> transition Closed

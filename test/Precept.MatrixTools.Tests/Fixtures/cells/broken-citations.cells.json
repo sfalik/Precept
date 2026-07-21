@@ -1,0 +1,43 @@
+{
+  "familyId": "fixture-broken-citations",
+  "title": "Fixture — citation resolution defects",
+  "caseShape": "rule-write",
+  "definitionVersion": "fixture definition version stamp",
+  "citations": [
+    { "kind": "want-doc", "ref": "docs/Working/no-such-file-ever-2026.md" },
+    { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § No Such Heading Anywhere" },
+    { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Witness" },
+    { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:99999" },
+    { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:19" }
+  ],
+  "respellability": {
+    "verdict": "yes",
+    "evidence": "model-derived",
+    "corpusMeasurement": "pending",
+    "citations": [
+      { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary" }
+    ]
+  },
+  "cells": [
+    {
+      "id": "cx/open-cell",
+      "label": "Open cell whose disposition citation points at a missing file",
+      "coordinates": {
+        "caseShape": "rule-write",
+        "obligationFamily": "preservation",
+        "ruleStructure": "single-field",
+        "writeSiteCategory": "handler-set",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "open",
+        "citations": [
+          { "kind": "packet", "ref": "docs/Working/also-not-a-real-file.md:12" }
+        ]
+      },
+      "citations": [
+        { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:19" }
+      ]
+    }
+  ]
+}

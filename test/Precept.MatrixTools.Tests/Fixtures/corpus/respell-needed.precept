@@ -1,0 +1,11 @@
+# Fixture: two writes no stated derivation licenses, each with a licensed
+# respelling — an unguarded increase, and an algebraically rearranged guard.
+field Total as decimal default 0.0
+
+rule Total <= 1000 because "cap"
+
+event Grow(Amount as decimal positive)
+on Grow -> set Total = Total + Grow.Amount
+
+event Add(Amount1 as decimal, Amount2 as decimal)
+on Add when Add.Amount1 <= 1000 - Add.Amount2 -> set Total = Add.Amount1 + Add.Amount2

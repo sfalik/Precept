@@ -1,0 +1,8 @@
+# Fixture: modifier desugars the obligation enumerator records as named
+# skips — cross-field bound, accessor-projected bound.
+field B as decimal default 0.0
+field A as decimal min B default 1.0
+field S as string maxlength 10 default "x"
+
+event Touch(Amount as decimal)
+on Touch -> set B = Touch.Amount

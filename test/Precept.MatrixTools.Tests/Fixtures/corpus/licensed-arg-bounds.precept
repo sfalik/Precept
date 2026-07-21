@@ -1,0 +1,7 @@
+# Fixture: declared arg bounds close the WP by exact interval summation.
+field Total as decimal default 0.0
+
+rule Total <= 1000 because "cap"
+
+event Add(Amount1 as decimal max 250, Amount2 as decimal max 750)
+on Add -> set Total = Add.Amount1 + Add.Amount2

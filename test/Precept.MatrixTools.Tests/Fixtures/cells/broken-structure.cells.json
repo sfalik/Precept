@@ -1,0 +1,120 @@
+{
+  "familyId": "fixture-broken-structure",
+  "title": "Fixture — disposition, axis, decision-procedure, and version defects",
+  "caseShape": "rule-write",
+  "definitionVersion": "",
+  "citations": [
+    { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:19" }
+  ],
+  "respellability": {
+    "verdict": "yes",
+    "evidence": "model-derived",
+    "corpusMeasurement": "pending",
+    "citations": [
+      { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary" }
+    ]
+  },
+  "cells": [
+    {
+      "id": "bx/bad-disposition",
+      "label": "Disposition value outside the closed set",
+      "coordinates": {
+        "caseShape": "rule-write",
+        "obligationFamily": "preservation",
+        "ruleStructure": "single-field",
+        "writeSiteCategory": "handler-set",
+        "typeFamily": "primitive"
+      },
+      "disposition": { "status": "sideways" },
+      "citations": [
+        { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:19" }
+      ]
+    },
+    {
+      "id": "bx/no-disposition",
+      "label": "Disposition missing entirely",
+      "coordinates": {
+        "caseShape": "rule-write",
+        "obligationFamily": "preservation",
+        "ruleStructure": "single-field",
+        "writeSiteCategory": "handler-set",
+        "typeFamily": "primitive"
+      },
+      "citations": [
+        { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:19" }
+      ]
+    },
+    {
+      "id": "bx/bad-axes",
+      "label": "Axis values outside the case shape's vocabularies",
+      "coordinates": {
+        "caseShape": "rule-write",
+        "obligationFamily": "preservation",
+        "ruleStructure": "single-field",
+        "writeSiteCategory": "telepathy",
+        "rhsReadSet": ["args", "vibes"],
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "open",
+        "citations": [
+          { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:19" }
+        ]
+      },
+      "citations": [
+        { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:19" }
+      ]
+    },
+    {
+      "id": "bx/shape-mismatch",
+      "label": "Cell case shape differs from the file's case shape",
+      "coordinates": {
+        "caseShape": "structural",
+        "structuralFactKind": "Reachability",
+        "shape": "state"
+      },
+      "disposition": {
+        "status": "open",
+        "citations": [
+          { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:19" }
+        ]
+      },
+      "citations": [
+        { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:19" }
+      ]
+    },
+    {
+      "id": "bx/no-decision-procedure",
+      "label": "Contract entry without a decision procedure",
+      "coordinates": {
+        "caseShape": "rule-write",
+        "obligationFamily": "preservation",
+        "ruleStructure": "single-field",
+        "writeSiteCategory": "handler-set",
+        "typeFamily": "primitive"
+      },
+      "disposition": {
+        "status": "open",
+        "citations": [
+          { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:19" }
+        ]
+      },
+      "dischargeContract": [
+        {
+          "premiseClasses": ["c"],
+          "derivation": "guard fact normal-form-equal to the WP -> guard-match",
+          "validityArguments": ["Guard normal-form match"]
+        },
+        {
+          "premiseClasses": ["b"],
+          "derivation": "exact-decimal upper-bound sum",
+          "validityArguments": ["Arg-bound interval arithmetic"],
+          "decisionProcedure": "   "
+        }
+      ],
+      "citations": [
+        { "kind": "want-doc", "ref": "docs/Working/what-i-want-2026-07-16.md:19" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+# Fixture: literal division in the WP — division folding is ruled but not
+# implemented in the calculator, so the harness must emit a named skip.
+field Total as decimal default 0.0
+
+rule Total <= 1000 because "cap"
+
+event Half
+on Half -> set Total = 1000 / 2

@@ -1,0 +1,8 @@
+# Fixture: per-term bound conjuncts in the guard close the WP by the same
+# interval summation that discharges declared arg bounds.
+field Total as decimal default 0.0
+
+rule Total <= 1000 because "cap"
+
+event Add(Amount1 as decimal, Amount2 as decimal)
+on Add when Add.Amount1 <= 500 and Add.Amount2 <= 500 -> set Total = Add.Amount1 + Add.Amount2

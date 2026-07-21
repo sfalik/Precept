@@ -1,0 +1,9 @@
+# Fixture: a negated ordering comparison in the guard — the ruled comparison
+# flip is not implemented in the calculator, so the harness must emit a named
+# skip rather than a wrong "respell needed" verdict.
+field Total as decimal default 0.0
+
+rule Total <= 1000 because "cap"
+
+event Assign(X as decimal)
+on Assign when not (Assign.X > 1000) -> set Total = Assign.X

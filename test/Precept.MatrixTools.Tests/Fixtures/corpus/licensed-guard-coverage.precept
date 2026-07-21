@@ -1,0 +1,8 @@
+# Fixture: the guard carries the WP as one conjunct plus an extra fact —
+# conjunct coverage, not a whole-condition match.
+field Total as decimal default 0.0
+
+rule Total <= 1000 because "cap"
+
+event Grow(Amount as decimal)
+on Grow when Total + Grow.Amount <= 1000 and Grow.Amount <= 50 -> set Total = Total + Grow.Amount

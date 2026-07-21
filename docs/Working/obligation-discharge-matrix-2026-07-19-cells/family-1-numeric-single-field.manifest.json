@@ -1,0 +1,252 @@
+{
+  "familyId": "witness-family-1",
+  "definitionVersion": "obligation-discharge-matrix-2026-07-19 rev 6 (2026-07-20, draft)",
+  "sourceFile": "family-1-numeric-single-field.cells.json",
+  "rows": [
+    {
+      "id": "wf1/preservation-reads-args#base",
+      "cellId": "wf1/preservation-reads-args",
+      "kind": "base",
+      "program": "field Total as decimal max 1000 default 0.0\nevent Add(Amount1 as decimal, Amount2 as decimal)\non Add -\u003E set Total = Add.Amount1 \u002B Add.Amount2",
+      "expected": "reject",
+      "obligation": {
+        "field": "Total",
+        "kind": "upperInclusive",
+        "bound": 1000,
+        "label": "Total:max",
+        "contextClass": "writeSite"
+      },
+      "head": "mustPass",
+      "requireOnlyObligationDiagnostics": true,
+      "expectedMissingPremiseClasses": [
+        "b",
+        "c"
+      ],
+      "expectedPremiseListRecorded": false,
+      "unverifiableAtHead": [
+        "the rejection must name missing premise classes [b, c]; unverified at HEAD \u2014 diagnostics carry no premise-class structure to read"
+      ]
+    },
+    {
+      "id": "wf1/preservation-reads-args#discharge:guard-nf",
+      "cellId": "wf1/preservation-reads-args",
+      "kind": "discharge",
+      "program": "field Total as decimal max 1000 default 0.0\nevent Add(Amount1 as decimal, Amount2 as decimal)\non Add when Add.Amount1 \u002B Add.Amount2 \u003C= 1000 -\u003E set Total = Add.Amount1 \u002B Add.Amount2",
+      "expected": "accept",
+      "obligation": {
+        "field": "Total",
+        "kind": "upperInclusive",
+        "bound": 1000,
+        "label": "Total:max",
+        "contextClass": "writeSite"
+      },
+      "head": "expectedFailure",
+      "headNote": "multi-term fact shape unbuilt",
+      "requireOnlyObligationDiagnostics": false,
+      "expectedMissingPremiseClasses": [],
+      "expectedPremiseListRecorded": true,
+      "unverifiableAtHead": [
+        "the accepting compile must record its premise list; unverified at HEAD \u2014 the proof-ledger obligation record carries no premise list"
+      ]
+    },
+    {
+      "id": "wf1/preservation-reads-args#discharge:arg-bounds",
+      "cellId": "wf1/preservation-reads-args",
+      "kind": "discharge",
+      "program": "field Total as decimal max 1000 default 0.0\nevent Add(Amount1 as decimal max 250, Amount2 as decimal max 750)\non Add -\u003E set Total = Add.Amount1 \u002B Add.Amount2",
+      "expected": "accept",
+      "obligation": {
+        "field": "Total",
+        "kind": "upperInclusive",
+        "bound": 1000,
+        "label": "Total:max",
+        "contextClass": "writeSite"
+      },
+      "head": "mustPass",
+      "expectedStrategy": "IntervalContainment",
+      "requireOnlyObligationDiagnostics": false,
+      "expectedMissingPremiseClasses": [],
+      "expectedPremiseListRecorded": true,
+      "unverifiableAtHead": [
+        "the accepting compile must record its premise list; unverified at HEAD \u2014 the proof-ledger obligation record carries no premise list"
+      ]
+    },
+    {
+      "id": "wf1/preservation-reads-args#near-miss:arg-bounds",
+      "cellId": "wf1/preservation-reads-args",
+      "kind": "nearMiss",
+      "program": "field Total as decimal max 1000 default 0.0\nevent Add(Amount1 as decimal max 600, Amount2 as decimal max 600)\non Add -\u003E set Total = Add.Amount1 \u002B Add.Amount2",
+      "expected": "reject",
+      "obligation": {
+        "field": "Total",
+        "kind": "upperInclusive",
+        "bound": 1000,
+        "label": "Total:max",
+        "contextClass": "writeSite"
+      },
+      "head": "mustPass",
+      "pairsWith": "arg-bounds",
+      "requireOnlyObligationDiagnostics": false,
+      "expectedMissingPremiseClasses": [],
+      "expectedPremiseListRecorded": false,
+      "unverifiableAtHead": []
+    },
+    {
+      "id": "wf1/preservation-reads-args#near-miss:guard-nf",
+      "cellId": "wf1/preservation-reads-args",
+      "kind": "nearMiss",
+      "program": "field Total as decimal max 1000 default 0.0\nevent Add(Amount1 as decimal, Amount2 as decimal)\non Add when Add.Amount1 \u003C= 1000 -\u003E set Total = Add.Amount1 \u002B Add.Amount2",
+      "expected": "reject",
+      "obligation": {
+        "field": "Total",
+        "kind": "upperInclusive",
+        "bound": 1000,
+        "label": "Total:max",
+        "contextClass": "writeSite"
+      },
+      "head": "mustPass",
+      "pairsWith": "guard-nf",
+      "requireOnlyObligationDiagnostics": false,
+      "expectedMissingPremiseClasses": [],
+      "expectedPremiseListRecorded": false,
+      "unverifiableAtHead": []
+    },
+    {
+      "id": "wf1/preservation-reads-written-decrease#base",
+      "cellId": "wf1/preservation-reads-written-decrease",
+      "kind": "base",
+      "program": "field Total as decimal max 1000 default 0.0\nevent Subtract(Amount as decimal)\non Subtract -\u003E set Total = Total - Subtract.Amount",
+      "expected": "reject",
+      "obligation": {
+        "field": "Total",
+        "kind": "upperInclusive",
+        "bound": 1000,
+        "label": "Total:max",
+        "contextClass": "writeSite"
+      },
+      "head": "mustPass",
+      "requireOnlyObligationDiagnostics": true,
+      "expectedMissingPremiseClasses": [
+        "b"
+      ],
+      "expectedPremiseListRecorded": false,
+      "unverifiableAtHead": [
+        "the rejection must name missing premise classes [b]; unverified at HEAD \u2014 diagnostics carry no premise-class structure to read"
+      ]
+    },
+    {
+      "id": "wf1/preservation-reads-written-decrease#discharge:nonnegative-arg",
+      "cellId": "wf1/preservation-reads-written-decrease",
+      "kind": "discharge",
+      "program": "field Total as decimal max 1000 default 0.0\nevent Subtract(Amount as decimal nonnegative)\non Subtract -\u003E set Total = Total - Subtract.Amount",
+      "expected": "accept",
+      "obligation": {
+        "field": "Total",
+        "kind": "upperInclusive",
+        "bound": 1000,
+        "label": "Total:max",
+        "contextClass": "writeSite"
+      },
+      "head": "expectedFailure",
+      "headNote": "pre-state rule not carried as a premise \u2014 the engine widens Total to [-inf .. \u002Binf] at the read",
+      "requireOnlyObligationDiagnostics": false,
+      "expectedMissingPremiseClasses": [],
+      "expectedPremiseListRecorded": true,
+      "unverifiableAtHead": [
+        "the accepting compile must record its premise list; unverified at HEAD \u2014 the proof-ledger obligation record carries no premise list"
+      ]
+    },
+    {
+      "id": "wf1/preservation-reads-written-decrease#near-miss:nonnegative-arg",
+      "cellId": "wf1/preservation-reads-written-decrease",
+      "kind": "nearMiss",
+      "program": "field Total as decimal max 1000 default 0.0\nevent Subtract(Amount as decimal max 100)\non Subtract -\u003E set Total = Total - Subtract.Amount",
+      "expected": "reject",
+      "obligation": {
+        "field": "Total",
+        "kind": "upperInclusive",
+        "bound": 1000,
+        "label": "Total:max",
+        "contextClass": "writeSite"
+      },
+      "head": "mustPass",
+      "pairsWith": "nonnegative-arg",
+      "requireOnlyObligationDiagnostics": false,
+      "expectedMissingPremiseClasses": [],
+      "expectedPremiseListRecorded": false,
+      "unverifiableAtHead": []
+    },
+    {
+      "id": "wf1/preservation-reads-written-increase#base",
+      "cellId": "wf1/preservation-reads-written-increase",
+      "kind": "base",
+      "program": "field Total as decimal max 1000 default 0.0\nevent Grow(Amount as decimal positive)\non Grow -\u003E set Total = Total \u002B Grow.Amount",
+      "expected": "reject",
+      "obligation": {
+        "field": "Total",
+        "kind": "upperInclusive",
+        "bound": 1000,
+        "label": "Total:max",
+        "contextClass": "writeSite"
+      },
+      "head": "mustPass",
+      "requireOnlyObligationDiagnostics": true,
+      "expectedMissingPremiseClasses": [
+        "c"
+      ],
+      "expectedPremiseListRecorded": false,
+      "unverifiableAtHead": [
+        "the rejection must name missing premise classes [c]; unverified at HEAD \u2014 diagnostics carry no premise-class structure to read"
+      ]
+    },
+    {
+      "id": "wf1/preservation-reads-written-increase#discharge:guard-nf",
+      "cellId": "wf1/preservation-reads-written-increase",
+      "kind": "discharge",
+      "program": "field Total as decimal max 1000 default 0.0\nevent Grow(Amount as decimal positive)\non Grow when Total \u002B Grow.Amount \u003C= 1000 -\u003E set Total = Total \u002B Grow.Amount",
+      "expected": "accept",
+      "obligation": {
+        "field": "Total",
+        "kind": "upperInclusive",
+        "bound": 1000,
+        "label": "Total:max",
+        "contextClass": "writeSite"
+      },
+      "head": "unstated",
+      "headNote": "built status unstated in the cell data",
+      "requireOnlyObligationDiagnostics": false,
+      "expectedMissingPremiseClasses": [],
+      "expectedPremiseListRecorded": true,
+      "unverifiableAtHead": [
+        "the accepting compile must record its premise list; unverified at HEAD \u2014 the proof-ledger obligation record carries no premise list"
+      ]
+    },
+    {
+      "id": "wf1/preservation-reads-written-increase#near-miss:guard-nf",
+      "cellId": "wf1/preservation-reads-written-increase",
+      "kind": "nearMiss",
+      "program": "field Total as decimal max 1000 default 0.0\nevent Grow(Amount as decimal positive)\non Grow when Grow.Amount \u003C= 1000 -\u003E set Total = Total \u002B Grow.Amount",
+      "expected": "reject",
+      "obligation": {
+        "field": "Total",
+        "kind": "upperInclusive",
+        "bound": 1000,
+        "label": "Total:max",
+        "contextClass": "writeSite"
+      },
+      "head": "mustPass",
+      "pairsWith": "guard-nf",
+      "requireOnlyObligationDiagnostics": false,
+      "expectedMissingPremiseClasses": [],
+      "expectedPremiseListRecorded": false,
+      "unverifiableAtHead": []
+    }
+  ],
+  "skips": [
+    {
+      "cellId": "wf1/establishment-defaults",
+      "item": "base",
+      "reason": "no base witness program is recorded (a standing discharge has no rejecting base) \u2014 no runnable program is stated in the cell data"
+    }
+  ]
+}

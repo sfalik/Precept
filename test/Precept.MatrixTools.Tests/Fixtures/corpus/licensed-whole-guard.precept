@@ -1,0 +1,7 @@
+# Fixture: a guard whose whole condition is normal-form-equal to the WP.
+field Total as decimal default 0.0
+
+rule Total <= 1000 because "cap"
+
+event Grow(Amount as decimal positive)
+on Grow when Total + Grow.Amount <= 1000 -> set Total = Total + Grow.Amount

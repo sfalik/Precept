@@ -1,21 +1,44 @@
 using System.Linq;
+using System.Text.Json;
 using Precept.Pipeline;
 
 namespace Precept.MatrixTools;
 
 /// <summary>
-/// CLI: compile a .precept file and print, for every obligation (explicit rules
-/// plus modifier-desugared rules), the establishment WP over the default
-/// configuration and the preservation WP through each row's write plan — with
-/// guard-match verdicts where the row carries a guard.
+/// CLI. Default (single .precept file): compile it and print, for every
+/// obligation (explicit rules plus modifier-desugared rules), the establishment
+/// WP over the default configuration and the preservation WP through each row's
+/// write plan — with guard-match verdicts where the row carries a guard.
+/// Subcommands: <c>convert-cells</c> turns a *.cells.json family file into a
+/// test manifest; <c>run-manifest</c> executes a manifest through the pipeline
+/// and verdicts each row from structured compile results; <c>measure-corpus</c>
+/// classifies every rule × write-site obligation in a corpus directory against
+/// the written discharge contracts; <c>render-cells</c> regenerates the
+/// human-readable cell tables from the cell data.
 /// </summary>
 public static class Cli
 {
     public static int Run(string[] args)
     {
+        if (args.Length >= 1 && args[0] == "convert-cells")
+            return ConvertCells(args.Skip(1).ToArray());
+        if (args.Length >= 1 && args[0] == "run-manifest")
+            return RunManifest(args.Skip(1).ToArray());
+        if (args.Length >= 1 && args[0] == "measure-corpus")
+            return MeasureCorpus(args.Skip(1).ToArray());
+        if (args.Length >= 1 && args[0] == "render-cells")
+            return RenderCells(args.Skip(1).ToArray());
+        if (args.Length >= 1 && args[0] == "validate-cells")
+            return ValidateCells(args.Skip(1).ToArray());
+
         if (args.Length != 1)
         {
             Console.Error.WriteLine("usage: precept-matrixtools <file.precept>");
+            Console.Error.WriteLine("       precept-matrixtools convert-cells <family.cells.json> [<out.manifest.json>]");
+            Console.Error.WriteLine("       precept-matrixtools run-manifest <manifest.json> [<out.results.json>]");
+            Console.Error.WriteLine("       precept-matrixtools measure-corpus <corpus-dir> [<out.json> [<out.md>]]");
+            Console.Error.WriteLine("       precept-matrixtools render-cells <cells-dir>");
+            Console.Error.WriteLine("       precept-matrixtools validate-cells <cells-dir> [<repo-root>]");
             return 2;
         }
 
@@ -66,6 +89,157 @@ public static class Cli
         }
 
         return compilation.HasErrors ? 1 : 0;
+    }
+
+    private static int ConvertCells(string[] args)
+    {
+        if (args.Length is < 1 or > 2)
+        {
+            Console.Error.WriteLine("usage: precept-matrixtools convert-cells <family.cells.json> [<out.manifest.json>]");
+            return 2;
+        }
+
+        var manifest = CellTestConverter.Convert(args[0]);
+
+        foreach (var skip in manifest.Skips)
+            Console.WriteLine($"[skipped] {skip.CellId} ({skip.Item}): {skip.Reason}");
+        Console.WriteLine($"{manifest.FamilyId}: {manifest.Rows.Length} rows ("
+            + $"{manifest.Rows.Count(r => r.Kind == ManifestRowKind.Base)} base, "
+            + $"{manifest.Rows.Count(r => r.Kind == ManifestRowKind.Discharge)} discharge, "
+            + $"{manifest.Rows.Count(r => r.Kind == ManifestRowKind.NearMiss)} near-miss), "
+            + $"{manifest.Skips.Length} skips");
+
+        var json = CellTestConverter.ToJson(manifest);
+        if (args.Length == 2)
+        {
+            File.WriteAllText(args[1], json);
+            Console.WriteLine($"manifest written to {args[1]}");
+        }
+        else
+        {
+            Console.WriteLine(json);
+        }
+
+        return 0;
+    }
+
+    private static int ValidateCells(string[] args)
+    {
+        if (args.Length is < 1 or > 2)
+        {
+            Console.Error.WriteLine("usage: precept-matrixtools validate-cells <cells-dir> [<repo-root>]");
+            return 2;
+        }
+
+        var repoRoot = args.Length == 2 ? args[1] : Directory.GetCurrentDirectory();
+        var report = CellValidator.ValidateDirectory(args[0], repoRoot);
+
+        foreach (var finding in report.Findings)
+            Console.WriteLine($"[{finding.Severity}] {finding.Check} — {finding.Location}: {finding.Message}");
+        foreach (var skip in report.Skips)
+            Console.WriteLine($"[skipped] {skip.Check} — {skip.Location}: {skip.Reason}");
+
+        Console.WriteLine($"{report.Findings.Count(f => f.Severity == CellFindingSeverity.Error)} errors, "
+            + $"{report.Findings.Count(f => f.Severity == CellFindingSeverity.Warning)} warnings, "
+            + $"{report.Skips.Length} named skips");
+
+        return report.HasErrors ? 1 : 0;
+    }
+
+    private static int RenderCells(string[] args)
+    {
+        if (args.Length != 1)
+        {
+            Console.Error.WriteLine("usage: precept-matrixtools render-cells <cells-dir>");
+            return 2;
+        }
+
+        // Exit 1 (never the usage code 2) on an unrenderable file, and name the file:
+        // a generation run that cannot read its own source must fail distinguishably.
+        try
+        {
+            var written = CellProseGenerator.RenderDirectory(args[0]);
+            foreach (var path in written)
+                Console.WriteLine($"rendered {path}");
+            Console.WriteLine($"{written.Length} generated cell tables written under "
+                + $"{Path.Combine(args[0], "generated")}");
+            return 0;
+        }
+        catch (Exception e) when (e is JsonException or IOException or InvalidOperationException)
+        {
+            Console.Error.WriteLine($"render-cells failed in {args[0]}: {e.Message}");
+            return 1;
+        }
+    }
+
+    private static int MeasureCorpus(string[] args)
+    {
+        if (args.Length is < 1 or > 3)
+        {
+            Console.Error.WriteLine("usage: precept-matrixtools measure-corpus <corpus-dir> [<out.json> [<out.md>]]");
+            return 2;
+        }
+
+        var report = CorpusMeasurement.MeasureDirectory(args[0]);
+
+        // "with a rule-shaped entry" is broader than the matrix's "rule-bearing files"
+        // (its ratification layer 4 counts the files with explicit rules) — the two
+        // numbers are reported under distinct words so neither reads as the other.
+        Console.WriteLine($"files: {report.FileCount} measured, {report.RuleBearingFileCount} with a rule-shaped entry, "
+            + $"{report.FilesWithExplicitRules} with explicit rules, "
+            + $"{report.FilesWithErrorDiagnostics} with error diagnostics");
+        Console.WriteLine($"frame-preserved pairs (no obligation minted): {report.FramePreservedPairs}");
+        foreach (var (classification, count) in report.ClassificationTotals)
+            Console.WriteLine($"  {classification}: {count}");
+        Console.WriteLine("out-of-scope reasons:");
+        foreach (var (reason, count) in report.OutOfScopeReasonTotals)
+            Console.WriteLine($"  {count,5}  {reason}");
+
+        if (args.Length >= 2)
+        {
+            File.WriteAllText(args[1], CorpusMeasurement.ToJson(report));
+            Console.WriteLine($"report written to {args[1]}");
+        }
+        if (args.Length == 3)
+        {
+            File.WriteAllText(args[2], CorpusMeasurement.ToMarkdown(report));
+            Console.WriteLine($"summary written to {args[2]}");
+        }
+
+        return 0;
+    }
+
+    private static int RunManifest(string[] args)
+    {
+        if (args.Length is < 1 or > 2)
+        {
+            Console.Error.WriteLine("usage: precept-matrixtools run-manifest <manifest.json> [<out.results.json>]");
+            return 2;
+        }
+
+        var manifest = CellTestConverter.FromJson(File.ReadAllText(args[0]));
+        var results = ManifestRunner.Execute(manifest);
+
+        foreach (var result in results)
+        {
+            Console.WriteLine($"[{result.Outcome}] {result.RowId}");
+            Console.WriteLine($"    {result.Detail}");
+        }
+
+        var tally = results
+            .GroupBy(r => r.Outcome)
+            .OrderBy(g => g.Key)
+            .Select(g => $"{g.Key}={g.Count()}");
+        Console.WriteLine($"{manifest.FamilyId}: {results.Length} rows — {string.Join(", ", tally)}");
+
+        if (args.Length == 2)
+        {
+            File.WriteAllText(args[1], ManifestRunner.ToJson(results));
+            Console.WriteLine($"results written to {args[1]}");
+        }
+
+        // Fail loudly on real misses and on stale built-status expectations.
+        return results.Any(r => r.Outcome is RowOutcome.Fail or RowOutcome.UnexpectedPass) ? 1 : 0;
     }
 
     private static void PrintPreservation(
