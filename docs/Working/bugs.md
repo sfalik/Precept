@@ -27,6 +27,31 @@ surfaced for proper fixing.
 
 ## Active
 
+### BUG-033: An action's `into` binding target is not treated as a write site — a guard fact survives a write to the field it constrains, giving a false `Proved` (SOUNDNESS hole)
+
+- **Discovered**: 2026-07-21, while establishing whether the set of in-operation writers is closed; **behaviorally confirmed via `precept_compile`**, not grep-only.
+- **Scope**: the binding actions that write a second field — `dequeue <coll> into <field>`, `pop <coll> into <field>`, `dequeueBy … into <field>`. The action's primary target is registered as a write; the `into` target is not, by either consumer.
+- **Affected**: `GraphAnalyzer.FieldWriteSites.cs:118` and `ProofEngine.cs:532-534` both key on `action.FieldName` only. The binding name is carried on the typed action (`SemanticIndex.cs:335-345`, `TypedBindingAction(… string? Binding …)`) and is never read by either.
+- **Symptom / confirmation**: a guard establishes a fact about a field, the `into` write replaces that field's value, and the stale fact still discharges a downstream obligation:
+
+  ```precept
+  from Idle on Step when D != 0 and Q.count > 0
+      -> dequeue Q into D
+      -> set R = 100.0 / D
+      -> no transition
+  ```
+
+  → `success: true`, divisor obligation `Proved` with strategy `GuardInPath`. The control — identical but written as `-> dequeue Q` followed by `-> set D = 0` — correctly rejects with `PRE0083`. The only difference is the `into`.
+- **Second symptom, same root cause**: the same program emits a spurious `PRE0158` "Field 'D' has no write site", because the write-site collector cannot see the `into` write either. The blind spot shows from both directions at once.
+- **Scope / class**: **SOUNDNESS** — the over-accept / false-clean direction. An accepted division by zero.
+- **Root cause**: the write-site enumeration is derived from the action's primary field only, so an action with two write targets registers one.
+- **Related**: the same investigation found no statement anywhere that the set of in-operation writers is closed, and no test that would fail if a sixteenth action were added — `ActionKind` carries no exhaustiveness enforcement in either consumer, and `test/Precept.Tests/Language/ActionCatalogTests.cs:81-116` hand-lists the write-semantics sets. This bug is what an unenforced enumeration produces.
+- **Workaround used**: none.
+- **Fix complexity**: small — read the binding target in both consumers. The broader enumeration-closure question is separate and larger.
+- **Priority**: live false-clean on the fault guarantee.
+- **Repro**: as above.
+- **Status**: Active — soundness hole.
+
 ### BUG-031: Faulting arithmetic in any `when` guard-condition collects NO proof obligation — a false `Proved` (SOUNDNESS hole)
 
 - **Discovered**: 2026-06-07, surfaced as Open Question O-8 by the soundness-and-coverage design Workflow; **behaviorally confirmed via `precept_compile`** (not grep-only).

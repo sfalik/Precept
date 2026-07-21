@@ -492,7 +492,7 @@ public static class Evaluator
 
 ### Working Copy Management
 
-The evaluator never mutates the input `Version`. The full Fire lifecycle for one event:
+The evaluator never mutates the input `Version`. The Fire lifecycle for one event:
 
 1. **Rent:** Rent a `PreceptValue[]` working copy from `ArrayPool<PreceptValue>.Shared`
 2. **Populate:** Copy `Version.Slots` into the rented array (field slots)
@@ -503,6 +503,8 @@ The evaluator never mutates the input `Version`. The full Fire lifecycle for one
 7. **Commit or discard:** If constraints pass, donate the working copy directly as `new Version(..., workingCopy).Slots` (zero-copy promotion — no clone); if constraints fail, return the array to `ArrayPool<PreceptValue>.Shared`
 
 This ensures that constraint evaluation sees the post-mutation state, and that failed rows leave no side effects. On success, the working array becomes the committed `Version.Slots` — no extra allocation.
+
+> **Incomplete: state actions and the `omit` reset are missing.** This lifecycle, the flow diagram above, and the `Fire` pseudocode below all enumerate only the transition row's own writes. State exit actions, state entry actions (`from`/`to <State> -> ...`) and the `omit`-clears-on-entry reset also write during a Fire. The normative order is `precept-language-spec.md` § 3A.4, *Operation execution order*: exit actions, then the state change and `omit` reset, then the row's action chain (step 4 here), then entry actions, then computed-field recomputation (step 5). Do not read this enumeration as the complete write sequence until it is brought into line with § 3A.4.
 
 ---
 
@@ -866,6 +868,10 @@ RowEffect BuildRowEffect(ExecutionRow row) => row.Outcome switch
     TransitionOutcome.Reject => new RowEffect.Rejection(row.RejectReason ?? ""),
 };
 ```
+
+**Undetermined values, not only undetermined guards.** Three-valued evaluation on the inspect path applies to values as well as guards, for the same reason and by the same rule: an expression whose inputs are not all supplied has no consequence the evaluator can reach, so it is not evaluated and its result is reported as undetermined. This is what makes inspection best-effort without exempting it from the fault guarantee (`precept-language-spec.md` § 3A.6).
+
+The case that forces it: a row simulates its actions when its guard is merely `Possible` (below), because the caller wants the projected field values. Those actions can contain a fault-prone expression whose compile-time proof consumed the guard and an argument constraint — exactly the premises that are absent when the guard came back `Unknown`. Evaluating it anyway would fault inside a preview. Reporting it undetermined is both honest and safe, and it costs the caller nothing they could have had: the value genuinely is not determined until the missing input arrives. Projected fields therefore divide into those computed and those undetermined, per row.
 
 **`EvaluateGuardProspect` — Kleene ternary guard evaluation for the inspect path:**
 
@@ -1679,7 +1685,7 @@ The only exception paths are truly exceptional: out-of-memory, corrupted `Precep
 | **Fault–diagnostic correspondence** | Every `Fault` produced by the evaluator carries a `FaultCode` with a `[StaticallyPreventable]` attribute. If the compiler emits no errors, the evaluator should never fault. |
 | **Inspection–commit agreement** | `InspectFire` and `Fire` execute the same plans. A row that `InspectFire` marks `Prospect.Certain` will be the winning row when `Fire` is called with the same inputs. |
 | **Constraint completeness** | All applicable constraints are evaluated. The evaluator does not short-circuit on first violation (it collects all violations for diagnostic completeness). |
-| **Access mode bypass for Restore** | `Restore` bypasses access-mode checks but enforces constraint checks. |
+| **Access mode bypass for Restore** | `Restore` bypasses both access-mode checks and constraint evaluation — trusted hydration (spec §0.7; Decision 5 below). |
 
 ### Slot Index Invariants
 
@@ -2143,7 +2149,7 @@ This matrix summarizes which constraint buckets and access-mode checks apply to 
 | `Restore` | no (bypassed) | no | `always`, `in <current>` — computed fields recomputed first |
 
 **Key rules:**
-- Restore bypasses access-mode checks but enforces constraint checks
+- Restore bypasses both access-mode checks and constraint evaluation — trusted hydration (spec §0.7; Decision 5)
 - Inspection and commit paths execute the same prebuilt plans — disposition alone differs
 - `to <State>` constraints are evaluated only during Fire, not Update or Restore
 

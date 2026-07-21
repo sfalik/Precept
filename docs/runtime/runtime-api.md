@@ -358,7 +358,9 @@ Version next = outcome switch
 };
 ```
 
-Fire runs the full event pipeline: arg validation → row matching (first-match with guard evaluation) → action chain execution on working copy (mutation rows) or rejection (reject rows) → computed field recomputation → constraint evaluation (collect-all) → commit or discard. Returns one `EventOutcome` variant. See `result-types.md` for the full hierarchy.
+Fire runs the event pipeline: arg validation → row matching (first-match with guard evaluation) → action chain execution on working copy (mutation rows) or rejection (reject rows) → computed field recomputation → constraint evaluation (collect-all) → commit or discard. Returns one `EventOutcome` variant. See `result-types.md` for the full hierarchy.
+
+> This sequence covers the transition row's own writes. State exit actions, the state change and the `omit`-clears-on-entry reset, and state entry actions also write during a Fire, and are omitted here. The normative order is `precept-language-spec.md` § 3A.4, *Operation execution order*: exit actions, then the state change and `omit` reset, then the row's action chain, then entry actions, then computed-field recomputation.
 
 **Row dispatch model:** Transition rows come in two shapes — mutation rows (`TransitionRowMutation`: carry action chain + success outcome) and reject rows (`TransitionRowReject`: carry reject clause only). Row matching evaluates guards in declaration order; the first matching row's shape determines the outcome. A mutation row executes its action chain and produces `Transitioned`, `Applied`, or `ConstraintsFailed`. A reject row produces `Rejected` with the authored reason string. The two shapes are grammar-level constructs — a single row cannot mix mutations with rejection.
 

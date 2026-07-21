@@ -148,7 +148,7 @@ The guarantee *statement* — what an author can rely on — is in the language 
 
 **Composition.** The compile-time proof for an externally-sourced operand relies on the operand's *declared* constraint; ingress governance makes that constraint hold on the actual value. The compiler never inspects the value — it proves the structural "carries a constraint" fact and rejects when it cannot. The runtime check is the discharge of that declared precondition, not a fallback for a proof the compiler skipped.
 
-**Out-of-contract data and traps.** The `[StaticallyPreventable]` evaluator fault codes are defense-in-depth, unreachable for data that entered through the contract. They cover only out-of-contract entry: state restored from a different definition version (which re-validates declared constraints) and host injection bypassing the engine. A trap firing for contract data indicates a proof-engine gap — a defect to fix, not an accommodated path.
+**Out-of-contract data and traps.** The `[StaticallyPreventable]` evaluator fault codes are defense-in-depth, unreachable for data that entered through the contract. They cover only out-of-contract entry: restored state (which is trusted, not re-validated — spec §0.7) and host injection bypassing the engine. A trap firing for contract data indicates a proof-engine gap — a defect to fix, not an accommodated path.
 
 ### 1.2 Prove-or-reject: how the chain and runtime cooperate
 
@@ -715,7 +715,7 @@ flowchart LR
 
 ### Definition versioning
 
-When a `.precept` file changes (field added, state renamed, constraint tightened), persisted `Version` instances compiled against the old definition may fail `Restore` under the new definition's constraints. **This is a known gap — definition migration is out of scope for v1.** The contract digest hash provides change detection; a structural diff API provides change enumeration; but automated migration is deferred. Host applications that need to handle definition evolution must manage the migration externally. The gap is acknowledged so downstream design does not assume migration exists.
+When a `.precept` file changes (field added, state renamed, constraint tightened), persisted `Version` instances compiled against the old definition carry values the new definition would not accept. `Restore` itself does not reject them — it is trusted hydration and does not re-validate (spec §0.7) — but the next operation's post-mutation sweep will, so a stale entity can become unusable rather than un-loadable. **This is a known gap — definition migration is out of scope for v1.** The contract digest hash provides change detection; a structural diff API provides change enumeration; but automated migration is deferred. Host applications that need to handle definition evolution must manage the migration externally. The gap is acknowledged so downstream design does not assume migration exists.
 
 > **Precept Innovations**
 > - **Contract digest hash.** A deterministic semantic hash enables definition-change detection without source diffing. Without it, host applications would need to compare source text (fragile — comments and whitespace cause false positives) or track file modification times (wrong — doesn't detect semantic equivalence). It grounds deployment safety and the future migration story.
@@ -764,7 +764,7 @@ The full `Precept` executable model — descriptor tables, dispatch indexes, exe
 
 ### `Version` serialization contract
 
-Host applications must persist and hand back to `Restore` the following: the current state name (or stateless marker), and field values keyed by field name. The serialization shape is `(string StateName, IDictionary<string, object?> FieldValues)` — or equivalently, `(StateDescriptor?, SlotArray)` at the descriptor level. Hosts own the serialization format (JSON, binary, database columns); Precept owns the contract for what data is required. `Restore` validates the supplied data against the current definition's constraints — it does not trust the persisted shape.
+Host applications must persist and hand back to `Restore` the following: the current state name (or stateless marker), and field values keyed by field name. The serialization shape is `(string StateName, IDictionary<string, object?> FieldValues)` — or equivalently, `(StateDescriptor?, SlotArray)` at the descriptor level. Hosts own the serialization format (JSON, binary, database columns); Precept owns the contract for what data is required. `Restore` does not re-validate the supplied data against the current definition's constraints — restored state is trusted as valid at the time it was persisted, and is re-governed by the next operation's post-mutation sweep (spec §0.7, owner decision 2026-06-02).
 
 > **Precept Innovations**
 > - **Flat evaluation plans with slot-addressed opcodes.** Expressions are not tree-walked — they are precomputed into flat, cache-friendly execution plans with field-slot references and operation codes. Without this, the evaluator would need to walk expression trees at runtime and re-resolve operation kinds and field names on every operation. Flat plans make evaluation predictable-time and the execution trace trivially inspectable.
@@ -842,7 +842,7 @@ Every operation evaluates constraints through the same prebuilt plan indexes. Ac
 | `Create` without initial event | no | no | `always`, `in <initial>` |
 | `Restore` | no | no | `always`, `in <current>` |
 
-Two rules: (1) `Restore` bypasses access-mode checks and row dispatch but does **not** bypass constraint evaluation. (2) `to` ensures are transitional — they do not participate in `in`-anchor evaluation.
+Two rules: (1) `Restore` bypasses access-mode checks, row dispatch, **and** constraint evaluation — trusted hydration (spec §0.7, owner decision 2026-06-02); it does recompute computed fields. (2) `to` ensures are transitional — they do not participate in `in`-anchor evaluation.
 
 Inspection and commit paths execute the same prebuilt plans. Disposition alone differs — report vs. enforce.
 

@@ -1970,6 +1970,45 @@ This post-mutation sweep is one of two enforcement points. Externally-sourced va
 
 This guarantee applies to all mutation surfaces: event-driven transitions, stateless event hooks, direct field updates, and state entry/exit actions. The working copy semantics are uniform — every path through the engine that can modify entity data uses the same all-or-nothing promotion/discard model.
 
+#### What can write during one operation
+
+The sentence above scopes the atomicity guarantee; it is not the enumeration of writers. Compile-time reasoning that carries a fact forward — a guard establishes something about a field, and a later expression relies on it — depends on knowing every way that field's value can change in between. A writer that is not on this list is a fact that survives a write it should not, which is an accepted fault rather than a missed one.
+
+These are the writers:
+
+| Writer | Where it is declared |
+|---|---|
+| A field-targeting action in a transition row or event handler action chain | the action catalog (`ActionKind`, `Actions`) — fifteen kinds, each carrying its write semantics |
+| The `into` binding target of `dequeue` / `pop` / `dequeueBy` | the same actions, writing a **second** field — see the note below |
+| A state exit or entry action's action chain | the same action catalog, at the state-action positions (§2.2) |
+| Default materialization at construction | the `default` modifier (§2.4), applied in declaration order (§3.5) |
+| Computed-field recomputation | the `<-` declaration (§3.5); recomputed in every operation, including `Restore` |
+| The `omit` reset on entering a state that omits the field | §2.2 composition rule 5 |
+| An update patch applied to an editable field | the `editable` access mode (§2.2) |
+| Restore writing persisted values into slots | §0.7 |
+
+**The `into` target writes a second field.** `dequeue Q into D` writes both the collection and `D`. Any analysis that derives write sites from an action's primary field target alone will miss it, and a fact about `D` will appear to survive.
+
+**This enumeration is not yet enforced.** Actions are catalogued and their write semantics are catalog metadata; the other five writers are not catalogued at all — the `omit` reset in particular has no catalog member. The intended end state is that every writer is catalog-declared and that the exhaustiveness analyzer used elsewhere for catalog coverage is applied to the write surface, so that adding a writer without teaching every consumer about it fails the build. Until that exists, this table is asserted rather than kept, and any soundness argument that depends on the enumeration being complete should say so.
+
+#### Operation execution order
+
+Every operation that can change entity data — `Create`, `Fire`, `Update`, `Restore`, and their inspection counterparts (§3A.6) — executes these phases in this order. A phase that does not apply to an operation is skipped; the relative order of the phases that do apply never varies by operation.
+
+1. **Ingress governance.** Externally-supplied values — event arguments, construction inputs, an update patch — are checked against their declared constraints as they enter, before the working copy derives any dependent value (§0.7, and the paragraph above). For `Update`, the patch's access modes (§2.2) are enforced before any value is applied.
+2. **Dispatch.** For row-dispatched operations, the transition rows for the current (state, event) pair are evaluated in declaration order; the first matching guard wins and the remaining rows are not evaluated (§3A.1, *Collect-all vs first-match*). Guard evaluation selects; it writes nothing (§0.4 property 6).
+3. **Exit actions.** The state actions declared on the state being left (`from <State> -> …`, §2.2) are applied to the working copy. Their expressions resolve against the state being left (§2.2 composition rule 6).
+4. **The state change.** The entity's state becomes the row's target state. This sits after exit actions and before entry actions, which is what makes composition rule 6 coherent: the same construct resolves an exit action against the source state and an entry action against the target. The `omit` reset (§2.2 composition rule 5) applies here, as part of entering the target state.
+5. **Mutation.** The selected row's action chain — or the update patch — is applied to the working copy in written order, each write seeing the state left by all preceding writes (§0.4 properties 2 and 3).
+6. **Entry actions.** The state actions declared on the state being entered (`to <State> -> …`) are applied. Their expressions resolve against the state being entered (§2.2 composition rule 6).
+7. **Computed-field recomputation.** After all mutations and before any constraint is evaluated, every computed field is re-derived from the working copy (§3.5, expression scope).
+8. **Constraint evaluation.** Every applicable rule and ensure is evaluated against the working copy after all mutations complete, collect-all (§3A.1, and the paragraph above).
+9. **Commit or discard.** The working copy is promoted only if every constraint passed; otherwise it is discarded whole (the paragraph above).
+
+Phases 3, 4 and 6 restore a statement that was made canonically and then lost. `docs/ArchitectureDesign.md` stated this order twice — once for the mutating operation (*"executes the event pipeline (exit actions → row mutations → entry actions → derived fields → constraint evaluation), and commits on success"*) and once for its inspection counterpart (*"guard evaluation, exit state actions, row mutations, entry state actions, derived field recomputation, constraint evaluation"*) — and `docs/EngineDesign.md` carried the same sequence in its rationale. Both documents were deleted whole in the v1 documentation reset; the sentence surviving in §3A.6 is the last remaining fragment of the statement they made in full. Nothing in canon has ever stated a different order, and §2.2 composition rule 6 independently requires the state change to sit between the two state-action phases.
+
+**Still unsettled, and narrower than the order itself**: when a state carries more than one state action, whether all of them fire and in what order; and whether entry actions fire at construction and on a self-transition. Neither was addressed by the restored statement. See [Open Questions](#open-questions--implementation-notes).
+
 ### 3A.5 Entity Construction
 
 Construction is modeled as an **initial event** — the precept's constructor. This solves the fundamental problem that entities with required fields (non-optional, no default) cannot be constructed parameterlessly: the author would be forced to either invent nonsense defaults or make things optional that should not be.
@@ -2114,11 +2153,15 @@ This is the natural extension of §3A.5 to precepts without a state machine. Nul
 
 ### 3A.6 Inspection as a First-Class Operation
 
-Inspection is not a reporting layer — it is a fundamental language operation. It has the same depth as event execution: guard evaluation, exit actions, mutations, entry actions, computed field recomputation, and constraint evaluation — all executed on a working copy without committing.
+Inspection is not a reporting layer — it is a fundamental language operation. It has the same depth as event execution: guard evaluation, exit actions, mutations, entry actions, computed field recomputation, and constraint evaluation — all executed on a working copy without committing. The normative phase order is §3A.4, *Operation execution order*, which this sentence agrees with.
 
 The answer to "what would happen?" is always available, from any state, for any event, and is honest. The inspection result matches what execution would produce for the same inputs. Inspectability is what makes the governance contract trustworthy — you can always ask, and the language guarantees the answer matches what execution would do.
 
 This is not merely a tooling convenience. It is a language-level guarantee that flows from the execution model's properties: expression purity (§0.4 property 6 — expressions cannot mutate state), deterministic semantics (§0.1 principle 3 — same inputs produce same outputs), and working copy isolation (§3A.4 — mutations execute on a copy). These properties together make inspection safe and honest by construction, not by convention.
+
+Inspection may be asked for an answer it cannot reach — an input it depends on has not been supplied. It is **best-effort**: it answers with everything it can legitimately determine and reports the rest as undetermined. It never guesses and never substitutes a value the caller did not give, so the honesty guarantee above holds with the inputs actually present.
+
+Being best-effort does not make inspection exempt from any guarantee. It is a fundamental operation, not a preview mode, so the fault guarantee (§0.1 principles 10 and 11) holds during inspection exactly as during execution — and it holds without weakening what the compiler may prove. A proof discharged from an argument constraint or a guard stays discharged: where those premises are absent, the consequence is undetermined and is reported as such rather than evaluated. (The mechanism — how undetermined values are represented and propagated — is runtime behaviour: `docs/runtime/evaluator.md`.)
 
 ---
 
@@ -2152,7 +2195,11 @@ An unprovable obligation is not treated as "probably fine."It remains unresolved
 
 ## Open Questions / Implementation Notes
 
-_TBD — open questions will be captured here as later pipeline stages are designed._
+**The write surface is only half catalogued.** §3A.4 *What can write during one operation* enumerates the eight writers. Actions carry their write semantics as catalog metadata; the other five — default materialization, computed-field recomputation, the `omit` reset, the update patch, and restore slot injection — have no catalog declaration, and the `omit` reset has neither a catalog member nor an implementation. The exhaustiveness analyzer that fails the build when a consumer misses a catalog member is applied to three enums today, none of them on the write surface, so nothing detects a new writer arriving. Until both are addressed, the enumeration is asserted by this document rather than kept by the build, and every analysis resting on its completeness inherits that. Deferred to implementation.
+
+**State-action multiplicity and firing.** §3A.4 *Operation execution order* places state exit actions, the state change, and state entry actions relative to a transition row's own action chain, restoring the statement the archived architecture documents made. Two narrower things it does not settle: when a state carries more than one state action, whether all of them fire and in what order (declaration order is the obvious candidate but is unstated); and whether entry actions fire at construction and on a self-transition — §2.2 composition rule 5 says the `omit` reset *does* apply to a self-transition, but state actions are unaddressed, and §3A.5 names entry *ensures* at construction without naming entry actions. Until these are ruled, no analysis may assume an ordering among several state actions on one state, nor that entry actions run at construction.
+
+**Whether the set of in-operation writers is closed.** §3A.4 lists four mutation surfaces, but that sentence scopes the working-copy guarantee rather than enumerating writers, and at least four further writers exist outside it: default materialization at construction (§3.5), computed-field recomputation (§3A.4 phase 4), the `omit` reset (§2.2 composition rule 5), and the `into` target of `dequeue`/`pop` (§2.2 transition row grammar). No document states that the resulting list is complete. A proof that relies on a fact surviving an operation depends on that closure, so the question is a soundness dependency, not a documentation nicety.
 
 ---
 
