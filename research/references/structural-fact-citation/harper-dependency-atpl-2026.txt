@@ -1,0 +1,926 @@
+Dependent Type Theory for Programming and Proving*
+Robert Harper
+Spring, 2026
+
+1 Introduction
+Simple, or non-dependent, type theories feature a complete separation between types and programs.
+Types, given a priori, are used to classify programs based on their execution behavior, which is also
+specified in advance. More precisely, types determine when two programs behave the same way, and
+hence are considered equal. In richer languages types themselves admit non-trivial notions of equality,
+always adhering to the general principle that equal types classify the same behaviors. Such languages
+are said to be phase separated in that type checking is regarded as a static, or compile-time, or verificationtime, notion, whereas execution is regarded as a dynamic, or run-time, notion. The vast majority of
+extant programming languages are phase-separated in this sense.
+By contrast dependent type theories exhibit no such separation of types from programs. In fact types
+are themselves programs that have the special status of being used as classifiers of other programs—and
+they themselves are also so-classified. Dependent type theories are phase integrated in that there is no
+clear separation between types and programs, rather types are simply a certain class of programs that
+admit interpretation as classifiers. Such type theories are distinctly expressive, so much so that they
+serve not only to classify data objects, but are also precise enough to serve as specifications of program
+behavior. Thus, a type such as “sequence of length 𝑛” classifies finite sequences of values whose length
+is 𝑛 ≥ 0, and arrow types such as those between sequences of length 𝑛 and sequences of length 2×𝑛 may
+be regarded as specifications of program behavior. Transposing the emphasis, programs are regarded
+as evidence that a type qua proposition is true in the Brouwerian sense of being realized by a program.
+One role of dependent types in programming languages is as a rich language for program modules,
+separable components that may be selectively combined to form larger components, ultimately complete programs. Such languages, though reliant on dependent types for their expressive power, exhibit
+a phase distinction between the static and dynamic aspects of a program module, the static aspects being types and the dynamics aspects being executable programs. The distinction lies in the treatment of
+equality of components: whereas two modules may differ when considered in full, they may coincide
+when their run-time aspects are disregarded, thereby isolating only their compile-time aspects. Such a
+distinction is crucial for supporting well-established program development methodologies, particularly
+those based directly on combining statically coherent components to form other components. Given
+such a phase distinction, violations of such coherence constraints are visible at compile time, ensuring
+that violations are caught when the program is composed, rather than once delivered to a user.
+* Copyright © Robert Harper. All Rights Reserved
+
+1
+
+The development of these ideas will proceed in stages, first considering only pure (effect-free) terms,
+then considering computational effects, and finally the phase distinction. The core concept of dependent type theory is that of a family of types indexed by the elements of another type or types. A nonindexed type is a degenerate family with no indexing; otherwise, a family is, informally, a mapping from
+a type into the “multiverse” of all types.1 For technical reasons families are usually defined in an iterated
+(“curried”) form, to avoid the reliance on product types in their definition, though once those are available, a family can always be presented in simultaneous (“un-curried”) form. Families are closed under
+generalizations of the function and product types considered in the non-dependent setting, and are enriched to include inductive and co-inductive types, albeit with dependent forms of their elimination
+and introductory forms, respectively. A crucial question is the status of equality as a family of types;
+there are several extant notions with different properties. Finally, a stratified hierarchy of universes,
+types whose elements are types, is considered, affording considerable expressive power and providing
+convenient technical devices for consolidating families of types with families of elements. Then type
+theory is equipped with effectful computations, which are distinguished to avoid compromising the
+very notion of a family, or the fundamental propositions-as-types principle. The static/dynamic phase
+distinction collapses computations, to isolate the compile-time significance of a program module from
+its run-time aspects. The associated notion of an extension type provides support for the notion of a
+sharing specification governing the coherent composition of programs from components.
+
+2 Pure Dependent Type Theory
+A formalism for dependent type theory defines the following judgment forms:
+1. Γ ⊢ 𝐴 type, stating that 𝐴 is a type in context Γ;
+2. Γ ⊢ 𝐴 ≡ 𝐴′ type, stating that 𝐴 and 𝐴′ are equal types in context Γ;
+3. Γ ⊢ 𝑀 ∶ 𝐴, stating that 𝑀 is a term of type 𝐴;
+4. Γ ⊢ 𝑀 ≡ 𝑀 ′ ∶ 𝐴, stating that 𝑀 and 𝑀 ′ are equal elements of type 𝐴.
+Whereas the latter two judgments are familiar from non-dependent type theory, the first two are manifestations of the inter-relatedness between types and their elements that is characteristic of dependent
+type theory.
+Any set of rules defining these judgments should be formulated to ensure that the following wellformation conditions are true:
+1. If Γ ⊢ 𝐴 ≡ 𝐴′ type, then Γ ⊢ 𝐴 type and Γ ⊢ 𝐴′ type.
+2. If Γ ⊢ 𝑀 ∶ 𝐴, then Γ ⊢ 𝐴 type.
+3. If Γ ⊢ 𝑀 ≡ 𝑀 ′ ∶ 𝐴, then Γ ⊢ 𝑀 ∶ 𝐴 and Γ ⊢ 𝑀 ′ ∶ 𝐴.
+Contrarily, the well-formation of the context is pre-supposed in these situations! That is, the successive
+types of the variables in a context are assumed to be well-formed types in the prefix of the context up
+to, but not including, that variable.
+The structural rules for a dependent type theory are given in Figure 1. These rules are to be included
+in any dependent type theory to ensure that the following general principles are upheld:
+1
+
+The motivation for the peculiar terminology will emerge as part of the development.
+
+2
+
+June 28, 2026
+
+type-sym
+
+type-refl
+
+Γ ⊢ 𝐴 type
+
+Γ ⊢ 𝐴 ≡ 𝐴′ type
+
+Γ ⊢ 𝐴 ≡ 𝐴 type
+
+Γ ⊢ 𝐴′ ≡ 𝐴 type
+
+elt-refl
+
+elt-sym
+
+Γ⊢𝑀∶𝐴
+
+Γ ⊢ 𝑀 ≡ 𝑀′ ∶ 𝐴
+
+Γ⊢𝑀≡𝑀∶𝐴
+
+Γ ⊢ 𝑀′ ≡ 𝑀 ∶ 𝐴
+
+elt-resp
+
+Γ⊢𝑀∶𝐴
+
+type-trans
+
+Γ ⊢ 𝐴 ≡ 𝐴′ type
+
+Γ ⊢ 𝐴′ ≡ 𝐴′′ type
+
+Γ ⊢ 𝐴 ≡ 𝐴′′ type
+
+elt-trans
+
+Γ ⊢ 𝑀 ≡ 𝑀′ ∶ 𝐴
+
+Γ ⊢ 𝑀 ′ ≡ 𝑀 ′′ ∶ 𝐴
+
+Γ ⊢ 𝑀 ≡ 𝑀 ′′ ∶ 𝐴
+
+eqv-resp
+
+Γ ⊢ 𝑀 ≡ 𝑀′ ∶ 𝐴
+
+Γ ⊢ 𝐴 ≡ 𝐴′ type
+
+Γ ⊢ 𝑀 ∶ 𝐴′
+
+Γ ⊢ 𝐴 ≡ 𝐴′ type
+
+Γ ⊢ 𝑀 ≡ 𝑀 ′ ∶ 𝐴′
+
+var-eqv
+
+var-of
+
+Γ⊢𝑥∶𝐴
+Γ 𝑥 ∶ 𝐴 Γ′ ⊢ 𝑥 ∶ 𝐴
+
+Γ⊢𝑥≡𝑥∶𝐴
+
+Figure 1: Structural Rules of Dependent Type Theory
+1. Judgmental equality of types and their elements is an equivalence relation.
+2. Formation and equality of elements respects equality of their classifiers: equal types determine
+equal elements and their equality.
+3. Variables inhabit the types according to their declaration in the context. Consequently, the induced entailment between types is reflexive.
+4. Substitution of elements of a type for variables of that type must be valid for all forms of judgment.
+Consequently, the induced entailment between types is transitive.
+5. The dependence of types and terms on variables must be functional in that substitution of equal
+elements must yield equal results.
+Reflexivity and substitution suffice to ensure that weakening (adding additional variables) and contraction (consolidating two variables of the same type) are admissible.2 The functionality condition for
+types is fundamental to the very idea of dependency: the occurrence of variables within types is that of
+a function from a type to the multiverse of types.
+There are many variations on the formulation of dependent type theory according to various criteria
+such as convenience for usage in an implementation, and according to the formulation of concepts such
+as inductive types. These variations are far too numerous to consider here; the present development is
+concerned only with the skeletal apparatus of dependent type theory. The formulation considered here
+2
+The proof of both properties follows from a generalization of substitution to simultaneous instantiation of the variables
+in a context by terms in another context. The rules must be formulated with this in mind; for example, the “extra” context
+beyond the declaration of the variable in the variable rule is there to “build in” weakening to ensure that it be admissible.
+
+3
+
+June 28, 2026
+
+relies on the admissibility of, say, substitution and weakening, which means that they hold for a given
+set of rules, and must be reconsidered whenever the theory is extended with new constructs.
+Although the types in a non-dependent setting can be carried over to the dependent setting without
+change, to get their full expressive power their dependent counterparts usually have much richer—
+and more flexible—typing rules. A good example is the type bool of Booleans, whose introductory
+forms are true and false, and whose elimination is the conditional branch, if(𝑒;𝑒1 ;𝑒2 ). In a nondependent setting both branches of the conditional must be of the same type, because it is not possible to
+predict the outcome of the branch statically. However, in a dependent setting we have the possibility—
+because expressions can appear in types—to give a much more powerful typing rule, and associated
+equations, as given in Figure 2. The important point is that the type of the conditional is dependent on
+the condition on which it is branching, which raises the possibility that the result type can also branch
+on the same condition to determine the type for each branch. This is achieved using a type-level version
+of the conditional, called a large elimination form, that yields a type instead of a term on each branch.3
+Thus, one may judge that if(𝑀;7; true) is of type If(𝑀; nat ; bool)! It is important to study the
+rules in Figure 2 very carefully to see how this is achieved. In particular note well that the generic rule
+of type equivalence plays an essential role. In general the elimination form of any inductive type—
+including the empty type, any sum type, and the type of natural numbers—is similarly general, and
+relies—for the moment—on the “large” elimination forms to define a family that takes full advantage
+of the dependency of the type of the elimination on the expression being eliminated.
+It is worth noting that, even for the type of Booleans, the equations given in Figure 2 are incomplete
+in that there are true equations that cannot be proved using these rules. An example of such an equation
+is if(𝑀;𝑁;𝑁) ≡ 𝑁 ∶ 𝐴, stating that if both branches of a conditional are the same, then the there is
+no need to branch at all. It is possible, though technically rather involved, to prove that this equation
+is not derivable from the given rules, and is therefore “missing” from the theory. In the special case of
+Booleans, or any other finite type, it is possible to rectify this shortcoming by introducing the following
+principle of Boolean induction for proving equations involving a Boolean variable:
+bool-ind
+
+Γ ⊢ 𝑀 ∶ bool
+Γ, 𝑥 ∶ bool ⊢ 𝑁 ∶ 𝐵
+Γ, 𝑥 ∶ bool ⊢ 𝑁 ′ ∶ 𝐵
+Γ ⊢ [true ∕𝑥]𝑁 ≡ [true ∕𝑥]𝑁 ′ ∶ [true ∕𝑥]𝐵
+Γ ⊢ [false ∕𝑥]𝑁 ≡ [false ∕𝑥]𝑁 ′ ∶ [false ∕𝑥]𝐵
+Γ ⊢ [𝑀∕𝑥]𝑁 ≡ [𝑀∕𝑥]𝑁 ′ ∶ [𝑀∕𝑥]𝐵
+
+That is, if two terms, 𝑁 and 𝑁 ′ , with a free variable of Boolean type coincide on true and an false, then
+they are equal for any Boolean. Using this rule equations such as the one mentioned are derivable. So
+why not add it to the theory? There are two reasons, one practical, the other conceptual. As a practical
+matter the principle of bool-induction involves a bifurcation of proof obligations, one for true, one
+for false. When nested inside one another, each such bifurcation introduces another factor of two,
+and quickly becomes unmanageable. For this reason, bool-induction is not normally included in the
+equations of a type theory. As a conceptual matter, the idea does not scale to other inductive types,
+the premier example being the natural numbers, for the simple reason that the inductive hypothesis in
+equality proof would require an equational assumption, and these are not available in type theory as
+presented here. This question will be reconsidered once “identity types” are considered; for now, let us
+simply say that it is not practical to admit induction as a means of proving equations involving variables
+of an inductive type.
+3
+
+In due course the “large” conditional will be reduced to an ordinary conditional whose branches are elements of a “universe” of types.
+
+4
+
+June 28, 2026
+
+true
+
+false
+
+Γ ⊢ true ∶ bool
+
+Γ ⊢ false ∶ bool
+
+if
+
+Γ, 𝑥 ∶ bool ⊢ 𝐵 type
+
+Γ ⊢ 𝑀 ∶ bool
+
+Γ ⊢ 𝑀1 ∶ [true ∕𝑥]𝐵
+
+Γ ⊢ 𝑀2 ∶ [false ∕𝑥]𝐵
+
+Γ ⊢ if(𝑀;𝑀1 ;𝑀2 ) ∶ [𝑀∕𝑥]𝐵
+if-true
+
+Γ, 𝑥 ∶ bool ⊢ 𝐵 type
+
+Γ ⊢ 𝑀1 ∶ [true ∕𝑥]𝐵
+
+Γ ⊢ 𝑀2 ∶ [true ∕𝑥]𝐵
+
+Γ ⊢ if(true ;𝑀1 ;𝑀2 ) ≡ 𝑀1 ∶ [true ∕𝑥]𝐵
+if-true
+
+Γ, 𝑥 ∶ bool ⊢ 𝐵 type
+
+Γ ⊢ 𝑀1 ∶ [true ∕𝑥]𝐵
+
+Γ ⊢ 𝑀2 ∶ [true ∕𝑥]𝐵
+
+Γ ⊢ if(true ;𝑀1 ;𝑀2 ) ≡ 𝑀2 ∶ [true ∕𝑥]𝐵
+If-true
+
+If
+
+Γ ⊢ 𝑀 ∶ bool
+
+Γ ⊢ 𝐴1 type
+
+Γ ⊢ 𝐴2 type
+
+Γ ⊢ If(𝑀;𝐴1 ;𝐴2 ) type
+
+Γ ⊢ 𝐴1 type
+
+Γ ⊢ 𝐴2 type
+
+Γ ⊢ If(true ;𝐴1 ;𝐴2 ) ≡ 𝐴1 type
+
+If-false
+
+Γ ⊢ 𝐴1 type
+
+Γ ⊢ 𝐴2 type
+
+Γ ⊢ If(false ;𝐴1 ;𝐴2 ) ≡ 𝐴2 type
+Figure 2: Booleans in Dependent Type Theory (Selected Rules)
+
+5
+
+June 28, 2026
+
+pi
+
+lam
+
+Γ ⊢ 𝐴1 type
+
+Γ, 𝑥 ∶ 𝐴1 ⊢ 𝐴2 type
+
+Γ ⊢ 𝐴1 type
+
+Γ ⊢ 𝑥 ∶ 𝐴1 → 𝐴2 type
+
+Γ, 𝑥 ∶ 𝐴1 ⊢ 𝑀2 ∶ 𝐴2
+
+Γ ⊢ 𝜆(𝑥.𝑀2 ) ∶ 𝑥 ∶ 𝐴1 → 𝐴2
+beta
+
+app
+
+Γ ⊢ 𝑀 ∶ 𝑥 ∶ 𝐴1 → 𝐴2
+
+Γ ⊢ 𝑀1 ∶ 𝐴1
+
+Γ ⊢ 𝑀1 ∶ 𝐴1
+
+Γ ⊢ ap(𝑀;𝑀1 ) ∶ [𝑀1 ∕𝑥]𝐴2
+
+Γ, 𝑥 ∶ 𝐴1 ⊢ 𝑀2 ∶ 𝐴2
+
+Γ ⊢ ap(𝜆(𝑥.𝑀2 );𝑀1 ) ≡ [𝑀1 ∕𝑥]𝑀2 ∶ [𝑀1 ∕𝑥]𝐴2
+
+Figure 3: Dependent Function Types (Selected Rules)
+Similarly, the function type is generalized to permit the range type of an application to depend on
+the argument. Thus, the type 𝐴 → 𝐵 becomes the dependent form 𝑥 ∶ 𝐴 → 𝐵, where 𝐵 may depend
+on 𝑥 of type 𝐴. Correspondingly, the type of an application substitutes the argument itself into the
+result type of the function. Similarly, the product type 𝐴 × 𝐵 becomes the dependent form 𝑥 ∶ 𝐴 × 𝐵,
+again with 𝐵 depending on 𝑥 of type 𝐴. Correspondingly, the type of the second projection substitutes
+the first projection itself into the type of the second component. Rules for these generalizations are
+given in Figures 3 and 4. The dependent function type degenerates into the ordinary function type
+in the case that the range type is independent of the argument, and similarly the dependent product
+type degenerates into the ordinary product type in the case that the type of the second component does
+not depend on the first component. It is possible to consider 𝜂-like principles for both the product
+and function types; these are left as an exercise. Transposed into logic the dependent function type
+corresponds to universal quantification, a view that is especially natural when the domain type is a
+“data” type as opposed to a proposition. Similarly, the dependent product type corresponds to existential
+quantification in the full-throated constructive sense in which the witness to the existential is provided
+along with the proof that it satisfies the property given as second component. Constructive negation is
+definable as ¬𝐴 ≜ 𝐴 → void, a transformation of a hypothetical proof of 𝐴 into a proof of falsehood.
+Famously, ¬¬𝐴 is weaker than 𝐴 itself, though in the presence of continuation effects the two can be
+reconciled.
+Exercise 1. Formulate 𝜂-like equations for dependent function and product types.
+So far there are no examples of dependent types that would make use of the infrastructure established so far. As with conventional textbook logic, the identity (or equality) type provides a fundamental
+example.4 The identity type, Id[𝐴](𝑀; 𝑁), is axiomatized as the least reflexive binary relation on elements of type 𝐴, which is presented in Figure 5. Whereas the introductory form is straightforward, the
+elimination form is infamously obscure. However, all it says is to prove a property 𝐵 of a given proof 𝑃
+of the identity of 𝑀 and 𝑁, it suffices to prove that 𝐵 is true for all possible instances of reflexivity, with
+the proof given 𝑥.𝑄. The stated equation specifies that if the proof 𝑃 is, in fact, an instance of reflexivity,
+then the induction form is definitionally equivalent to the corresponding instance of 𝑄.
+Though beguiling, the difficult with this formulation of equality is that it reduces equality to syntactic identity. In particular, when 𝐴 is a function type 𝐴1 → 𝐴2 , it deems two functions 𝐹 and 𝐺 of this
+type to be equal exactly when they are identical, up to judgmental equality. But according to this criterion the functions5 𝜆(𝑥.2 × 𝑥) and 𝜆(𝑥.𝑥 + 𝑥), being not identical, are in fact not equal to each other! In
+4
+5
+
+Which terminology is used depends on the formulation, of which two main examples are extant.
+Spare the informality for the sake of argument.
+
+6
+
+June 28, 2026
+
+sigma
+
+pair
+
+Γ ⊢ 𝐴1 type
+
+Γ, 𝑥 ∶ 𝐴1 ⊢ 𝐴2 type
+
+Γ ⊢ 𝑀1 ∶ 𝐴1
+
+Γ ⊢ 𝑥 ∶ 𝐴1 × 𝐴2 type
+
+Γ ⊢ 𝑀2 ∶ [𝑀1 ∕𝑥]𝐴2
+
+Γ ⊢ ⟨𝑀1 , 𝑀2 ⟩ ∶ 𝑥 ∶ 𝐴1 × 𝐴2
+snd
+
+fst
+
+Γ ⊢ 𝑀 ∶ 𝑥 ∶ 𝐴1 × 𝐴2
+
+Γ ⊢ 𝑀 ∶ 𝑥 ∶ 𝐴1 × 𝐴 2
+
+Γ ⊢ 𝑀 ⋅ 1 ∶ 𝐴1
+
+Γ ⊢ 𝑀 ⋅ 2 ∶ [𝑀 ⋅ 1∕𝑥]𝐴2
+snd-pair
+
+fst-pair
+
+Γ ⊢ 𝑀1 ∶ 𝐴1
+
+Γ ⊢ 𝑀1 ∶ 𝐴1
+
+Γ ⊢ 𝑀2 ∶ [𝑀1 ∕𝑥]𝐴2
+
+Γ ⊢ ⟨𝑀1 , 𝑀2 ⟩ ⋅ 1 ≡ 𝑀1 ∶ 𝐴1
+
+Γ ⊢ 𝑀2 ∶ [𝑀1 ∕𝑥]𝐴2
+
+Γ ⊢ ⟨𝑀1 , 𝑀2 ⟩ ⋅ 2 ≡ 𝑀2 ∶ [𝑀1 ∕𝑥]𝐴2
+
+Figure 4: Dependent Product Types (Selected Rules)
+
+id
+
+refl
+
+Γ ⊢ 𝐴 type
+
+Γ⊢𝑀∶𝐴
+
+Γ⊢𝑁∶𝐴
+
+Γ ⊢ Id[𝐴](𝑀; 𝑁) type
+
+Γ⊢𝑀∶𝐴
+Γ ⊢ refl[𝐴](𝑀) ∶ Id[𝐴](𝑀; 𝑀)
+
+ind
+
+Γ⊢𝑀∶𝐴
+Γ⊢𝑁∶𝐴
+Γ ⊢ 𝑃 ∶ Id[𝐴](𝑀; 𝑁)
+Γ, 𝑥 ∶ 𝐴, 𝑦 ∶ 𝐴, 𝑧 ∶ Id[𝐴](𝑥; 𝑦) ⊢ 𝐵 type
+Γ, 𝑥 ∶ 𝐴 ⊢ 𝑄 ∶ [𝑥, 𝑥, refl[𝐴](𝑥)∕𝑥, 𝑦, 𝑧]𝐵
+Γ ⊢ id-ind[𝐴;𝑥, 𝑦, 𝑧.𝐵](𝑃; 𝑥.𝑄) ∶ [𝑀, 𝑁, 𝑃∕𝑥, 𝑦, 𝑧]𝐵
+ind-beta
+
+Γ, 𝑥 ∶ 𝐴, 𝑦 ∶ 𝐴, 𝑧 ∶ Id[𝐴](𝑥; 𝑦) ⊢ 𝐵 type
+Γ⊢𝑀∶𝐴
+Γ, 𝑥 ∶ 𝐴 ⊢ 𝑄 ∶ [𝑥, 𝑥, refl[𝐴](𝑥)∕𝑥, 𝑦, 𝑧]𝐵
+Γ ⊢ id-ind[𝐴;𝑥, 𝑦, 𝑧.𝐵](refl[𝐴](𝑀); 𝑥.𝑄) ≡ [𝑀∕𝑥]𝑄 ∶ [𝑀, 𝑀, refl[𝐴](𝑀)∕𝑥, 𝑦, 𝑧]𝐵
+Figure 5: Identity Type
+
+7
+
+June 28, 2026
+
+other words it fails to equate two functions on the basis of their having the same input/output behavior,
+the standard notion of equality of functions in mathematics.6 This is the infamous problem of function
+extensionality in type theory: if the identity type given in Figure 5 is used to express equality, then it
+fails to equate two functions with the same input/output behavior unless they are in fact the very same
+programs.7
+What to do? In mathematical practice functions are invariably treated extensionally—indeed, in set
+theory, they are defined as sets of ordered pairs, an inherently extensional choice. But in a constructive
+setting they should also have computational meaning as programs. There are several extant proposals
+for how to manage this situation. One is simply to live with it, but that has proved to be a practical
+impossibility.8 Another is to add to type theory an axiom stating that if two functions give equal results
+(in the sense of the identity type) on all inputs then they are to be regarded as equal:
+funext ∶ 𝑓, 𝑔 ∶ (𝐴 → 𝐵) → (𝑥 ∶ 𝐴 → Id[𝐵](ap(𝑓;𝑥); ap(𝑔;𝑥))) → Id[𝐴 → 𝐵](𝑓; 𝑔)
+But what is the elimination rule for the identity type supposed to make of an instance of funext? Its
+only reduction is on reflexivity, but funext is something else. The resulting theory is a mess in which,
+say, closed elements of type bool are not just true and false!
+The fundamental problem is that equality is a type-specific notion, whereas the identity type axiomatizes it in a type-generic fashion. Functions are only the first symptom of the disorder. For example, if
+one were to have quotient types in this setting, then the fact that elements of a type are equivalent must
+be regarded as evidence that their equivalence classes are identical, and this goes beyond mere reflexivity. There are several extant reactions to this observation.9 The most (in)famous, because widely criticized, though also widely adopted, is to abandon the identity type in favor of the equality type (MartinLöf, 1982),10 which permits evidence for the equality of, say, two functions to suffice for them to be
+judgmentally equal, and hence interchangeable in all contexts. An alternative is to define equality on
+a type-by-type basis, with, say, equality at function types being defined to be the above-mentioned extensionality principle (Altenkirch et al., 2007). A third approach is to introduce higher-dimensional
+structure in the form of “thin cubes” that codify evidence for an equation, and to introduce a “coercion” operation that enacts that evidence (Sterling et al., 2022).
+All three approaches have their advantages, albeit at the expense of considerable machinery to formulate them precisely. Here we confine ourselves to the first of these, formulating what is called extensional type theory. To avoid possible confusion, the identity type described above is replaced by the
+equality type, Eq[𝐴](𝑀;𝑁), with at most one inhabitant, ⋆, that witnesses the truth of an equation that
+is derivable judgmentally. The unicity of this element is imposed explicitly. The critical rule is the elimination rule, called equality reflection, which states that if there is evidence (which at most exists) for an
+equation, then it is judged to hold. (See 6 for specifics.) Using equality reflection one may easily prove
+that the identity function and the double-negation function on the Booleans are judgmentally equal as
+elements of type bool → bool.
+6
+Indeed, in set theory functions are defined to be certain sets of ordered pairs; the two indicated functions determining the
+same set of ordered pairs, they are identical, hence equal. But in a setting where computation matters, the representational
+device used in set theory is not available, it is important to have access to the code in order to execute it.
+7
+The problem is not limited to functions, though these are often called out as the central issue; other mathematical objects
+fail to be equated properly when equality is formulated in this way. For example, the type of well-founded trees, perhaps the
+most abstract formulation of inductive types, is ill-behaved to the point of unusability in the intensional setting.
+8
+One inevitably wants to have proper functions in any mathematical theory; being forced to encode them in some manner
+is both unnatural and unbearably burdensome.
+9
+Indeed, one may think of function extensionality as generating a quotient of identity by all instances of that principle.
+10
+See below.
+
+8
+
+June 28, 2026
+
+eq-form
+
+Γ⊢𝑀∶𝐴
+
+eq-intro
+
+Γ⊢𝑁∶𝐴
+
+Γ⊢𝑀∶𝐴
+
+Γ ⊢ Eq[𝐴](𝑀;𝑁) type
+
+Γ ⊢ ⋆ ∶ Eq[𝐴](𝑀;𝑀)
+
+eq-unicity
+
+Γ⊢𝑀∶𝐴
+Γ ⊢ 𝑃 ∶ Eq[𝐴](𝑀;𝑁)
+
+Γ⊢𝑁∶𝐴
+Γ ⊢ 𝑄 ∶ Eq[𝐴](𝑀;𝑁)
+
+Γ ⊢ 𝑃 ≡ 𝑄 ∶ Eq[𝐴](𝑀;𝑁)
+eq-reflection
+
+Γ⊢𝑀∶𝐴
+
+Γ⊢𝑁∶𝐴
+
+Γ ⊢ 𝑃 ∶ Eq[𝐴](𝑀;𝑁)
+
+Γ⊢𝑀≡𝑁∶𝐴
+Figure 6: Equality Type
+The chief criticism against this formulation of equality is that by enriching the equality judgment
+to be mathematically sensible, it is by the same token rendered undecidable—the equality reflection
+rule says that to determine whether two elements of a type are equal, it suffices to search for a proof of
+that fact. Consequently, because typing is defined to respect equality of types, and because equality of
+indices of a family of types implies equality of their instances, type checking is no longer decidable. In
+some circles this is regarded as completely unacceptable and wrong-headed: type checking, it is said,
+simply must be decidable.11
+The other two approaches mentioned above work by encoding the influence of such evidence explicitly in the type theory, relying on one form or another of coercion to make use of it, retaining some
+implicit notion of equality by virtue of computation. In the case of “observational type theory” the idea
+is to define Eq[𝐴](𝑀;𝑁) by induction on the structure of 𝐴; for example, the isomorphism
+Eq[𝐴 → 𝐵](𝐹;𝐺) ≅ 𝑥, 𝑦 ∶ 𝐴 → Eq[𝐴](𝑥;𝑦) → Eq[𝐵](ap(𝐹;𝑥); ap(𝐺;𝑦))
+expresses the intended extensional equality of elements of the function type. When Eq[𝐴](𝑀;𝑁) is
+taken as a primitive notion as in Figure 6, the foregoing isomorphism expresses a true fact about equality
+at function type. Alternatively, one can define the equality type by induction on the structure of 𝐴, using
+clauses such as the one above to define the meaning of equality on a type-by-type basis. The indicated
+isomorphism then provides coercions back and forth that are used to mediate uses of equality in a proof.
+Although this summary is accurate, as far as it goes, working it out in detail is rather involved, and is
+not a clear “win” over the extensional approach in any practical sense.
+The last major ingredient in pure dependent type theory is that of a universe, a type whose elements are types. Absent universes, type theory lacks any form of “polymorphism” such as is found in
+many programming languages to express code whose behavior is generic across choices of types—the
+identity function on a type being a leading example, requiring no knowledge of a type to simply return
+a given element of it. In their presence the genericity in type can be expressed by an ordinary function abstraction over a universe of types. Absent universes, special-purpose “large elim’s,” such as the
+11
+
+Invariably ignoring the intractable complexity of the decision problem, which renders decidability questions moot as a
+practical matter.
+
+9
+
+June 28, 2026
+
+conditional type expression associated with Booleans discussed above, must be included in the type
+theory. In their presence, however, the large elimination forms are merely standard elimination forms
+whose result is an element of a universe. In a programming context modules are, informally, hybrid
+structures consisting of some types and some pieces of code, which may be construed as dependent
+products over a universe—and parameterized modules may be construed as dependent functions over
+such structures (MacQueen, 1986).
+If a universe is to be a type-of-types, why not have just one, the type of all types, including itself?
+Originally Martin-Löf made this very proposal, but it was later shown by Girard to be inconsistent.12 The
+standard move—since Russell—is to stratify universes into an infinite hierarchy, each contained within
+the next, with each universe closed under all type-forming operations, including formation of prior
+universes at a given level. Informally, the “union” of all of these universes determines the collection of
+all types, but that thought is merely conceptual, rather than codified into type theory itself.
+Supporting a hierarchy of universes requires that the judgments 𝐴 type and 𝐴 ≡ 𝐴′ type be generalized to specify a universe level whose structure is dictated by the requirements of predicativity (noncircularity) in the use of universes. Writing 𝐴 type𝑖 to mean that 𝐴 is a type of level 𝑖, and 𝐴 ≡ 𝐴′ type𝑖
+to mean that 𝐴 and 𝐴′ are equivalent types at level 𝑖, the rules governing universes are given in Figure 7, along with the ambient rules governing the stratified type hierarchy that they induce. It is left
+implicit that each level in the type hierarchy is closed under the constructs discussed above, and indeed
+the level-free judgments can be interpreted as being schematic in the choice of level. It is a matter of
+convention whether the level hierarchy begins with 0 or 1, but to be fully expressive it should extend
+indefinitely through any finite level.
+Using universes large elimination forms such as If(𝑀;𝐴;𝐵) can be replaced by the “small” form
+if(𝑀;𝐴;𝐵) whose range type is some universe 𝒰 , achieving a technical economy not available without
+universes.
+
+3 Impure Dependent Type Theory
+It is possible to incorporate effects into dependent type theory, provided that effectful computations
+are carefully segregated from pure expressions. Otherwise, the role of type theory as a logic via the
+propositions-as-types principle is lost, and the very idea of dependency becomes questionable when,
+say, indices of a family of types have effects. However, it is sensible to integrate effects using methods
+inspired by Levy (2003)’s formulation of effects in the non-dependent setting.
+The basic formulation of effects consists of defining these two judgment forms (in addition to those
+considered in the pure fragment):
+1. Γ ⊢ 𝐸 ∻ 𝐴, stating that 𝐸 is a computation that returns a value of type 𝐴;
+2. Γ ⊢ 𝐸 ≡ 𝐸 ′ ∻ 𝐴, stating that 𝐸 and 𝐸 ′ are equal computations returning type 𝐴.
+The basic form of computation is ret(𝑀), which simply returns 𝑀 as its value. The type Comp(𝐴)
+classifies suspended computations returning type 𝐴, which are the values of that type. The elimination
+form is a sequencing operation that activates a suspended computation and passes its return value to a
+given computation. Selected typing and equality rules for these constructs are given in Figure 8.
+12
+
+But doesn’t System F quantify over all possible types as inputs? Yes, but it does not permit computing such types as output,
+which makes all the difference.
+
+10
+
+June 28, 2026
+
+U-form
+
+Cum-eq
+
+Cum
+
+Γ ⊢ 𝒰𝑖 type𝑖+1
+
+Γ ⊢ 𝐴 type𝑖
+
+Γ ⊢ 𝐴 ≡ 𝐴′ type𝑖
+
+Γ ⊢ 𝐴 type𝑖+1
+
+Γ ⊢ 𝐴 ≡ 𝐴′ type𝑖+1
+
+Resp-eq
+
+Resp
+
+Γ⊢𝑀∶𝐴
+
+Γ ⊢ 𝐴 ≡ 𝐴′ type
+
+.
+Γ ⊢ 𝑀 = 𝑀′ ∶ 𝐴
+
+𝑖
+
+Γ ⊢ 𝐴 ≡ 𝐴′ type𝑖
+
+.
+Γ ⊢ 𝑀 = 𝑀 ′ ∶ 𝐴′
+
+Γ ⊢ 𝑀 ∶ 𝐴′
+
+U-intro-eq
+
+U-intro
+
+Γ ⊢ 𝐴 ∶ 𝒰𝑖
+
+Γ ⊢ 𝐴 ≡ 𝐴′ type𝑖
+.
+Γ ⊢ 𝐴 = 𝐴 ′ ∶ 𝒰𝑖
+
+U-elim
+
+U-elim-eq
+
+Γ ⊢ 𝐴 type𝑖
+
+Γ ⊢ 𝐴 ∶ 𝒰𝑖
+
+.
+Γ ⊢ 𝐴 = 𝐴 ′ ∶ 𝒰𝑖
+
+Γ ⊢ 𝐴 type𝑖
+
+Γ ⊢ 𝐴 ≡ 𝐴′ type𝑖
+Figure 7: Universes
+
+4 Computational Semantics (Summary)
+Following Martin-Löf (1982); Allen (1987); Angiuli (2019) a computational semantics for pure extensional dependent type theory may be defined as follows:13
+1. Fix a deterministic transition system 𝑈 ↦,→ 𝑈 ′ for closed terms 𝑈 and 𝑈 ′ , which are used to
+interpret the constructs of type theory. Final states are values, defined by the judgment 𝑈 val. For
+the pure fragment of type theory it is customary to consider a lazy dynamics in which values are
+determined by their outermost form, leaving sequencing to the impure fragment, but it is also
+possible to consider instead an eager formulation. Variables are considered to range over closed
+terms, but may be limited to values without major alteration of the development.
+.
+2. A type system defines, for each predicativity level 𝑖 ≥ 0, a binary relation 𝐴 =𝑖 𝐴′ , called type
+.
+.
+equality (at level 𝑖), and, for each 𝐴 such that 𝐴 =𝑖 𝐴, a binary relation 𝑀 =𝑖 𝑀 ′ ∈ 𝐴, called
+equality of elements 𝑀, 𝑀 ′ of type 𝐴 (at level 𝑖). All of these relations are required to be symmetric
+.
+and transitive, and closed under head expansion in all arguments. Moreover, if 𝐴 =𝑖 𝐴′ , then
+.
+.
+.
+.
+.
+𝑀 =𝑖 𝑀 ′ ∈ 𝐴 iff 𝑀 =𝑖 𝑀 ′ ∈ 𝐴′ , and, for each 𝑖 ≥ 0, if 𝐴 =𝑖 𝐴′ , then 𝐴 =𝑖+1 𝐴′ and, for 𝐴 =𝑖 𝐴′ ,
+.
+.
+𝑀 =𝑖 𝑀 ′ ∈ 𝐴 iff 𝑀 =𝑖+1 𝑀 ′ ∈ 𝐴.
+3. For a type system given by the above relations, equality of contexts and of substitutions classified
+by valid context is defined as follows.
+13
+
+Please see Angiuli (2019) for a full development.
+
+11
+
+June 28, 2026
+
+comp-resp
+
+Γ ⊢ 𝐴 ≡ 𝐴′ type𝑖
+
+Γ⊢𝐸∻𝐴
+
+Γ ⊢ 𝐸 ∻ 𝐴′
+
+Comp-intro
+
+Comp-form
+
+Comp-elim
+
+Γ ⊢ 𝐴 type𝑖
+
+Γ⊢𝐸∻𝐴
+
+Γ ⊢ 𝑀 ∶ Comp(𝐴)
+
+Γ ⊢ Comp(𝐴) type𝑖
+
+Γ ⊢ comp(𝐸) ∶ Comp(𝐴)
+
+Γ ⊢ force(𝑀) ∻ 𝐴
+
+Comp-eta
+
+Comp-beta
+
+Γ ⊢ 𝑀 ∶ Comp(𝐴)
+.
+Γ ⊢ 𝑀 = comp(force(𝑀)) ∶ Comp(𝐴)
+
+Γ⊢𝐸∻𝐴
+Γ ⊢ force(comp(𝐸)) ≡ 𝐸 ∻ 𝐴
+
+bnd
+
+ret
+
+Γ⊢𝑀∶𝐴
+
+Γ ⊢ 𝐸1 ∻ 𝐴1
+
+Γ ⊢ ret(𝑀) ∻ 𝐴
+
+Γ, 𝑥 ∶ 𝐴1 ⊢ 𝐸2 ∻ 𝐴2
+
+Γ ⊢ bnd(𝐸1 ;𝑥.𝐸2 ) ∻ 𝐴2
+
+bnd-ret
+
+ret-bnd
+
+Γ ⊢ 𝑀1 ∶ 𝐴1
+
+Γ, 𝑥 ∶ 𝐴1 ⊢ 𝐸2 ∻ 𝐴2
+
+Γ⊢𝐸∻𝐴
+
+Γ ⊢ bnd(ret(𝑀1 );𝑥.𝐸2 ) ≡ [𝑀1 ∕𝑥]𝐸2 ∻ 𝐴2
+
+Γ ⊢ 𝐸 ≡ bnd(𝐸;𝑥. ret(𝑥)) ∻ 𝐴
+
+bnd-assoc
+
+Γ ⊢ 𝐸1 ∻ 𝐴1
+
+Γ, 𝑥1 ∶ 𝐴1 ⊢ 𝐸2 ∻ 𝐴2
+
+Γ, 𝑥2 ∶ 𝐴2 ⊢ 𝐸3 ∻ 𝐴3
+
+Γ ⊢ bnd(bnd(𝐸1 ;𝑥1 .𝐸2 );𝑥2 .𝐸3 ) ≡ bnd(𝐸1 ;𝑥1 . bnd(𝐸2 ;𝑥2 .𝐸3 )) ∻ 𝐴3
+Figure 8: Computations and Computation Type (Selected)
+
+12
+
+June 28, 2026
+
+.
+.
+(a) 𝜀 =𝑖 𝜀, and ∅ =𝑖 ∅ ∈ 𝜀.
+.
+.
+.
+.
+(b) 𝑥 ∶ 𝐴, Γ =𝑖 𝑥 ∶ 𝐴′ , Γ′ iff 𝐴 =𝑖 𝐴′ and, if 𝑀 =𝑖 𝑀 ′ ∈ 𝐴, then [𝑀∕𝑥]Γ =𝑖 [𝑀 ′ ∕𝑥]Γ′ , and
+.
+.
+.
+𝑥 → 𝑀 , 𝛾 =𝑖 𝑥 → 𝑀 ′ , 𝛾′ ∈ 𝑥 ∶ 𝐴, Γ iff 𝑀 =𝑖 𝑀 ′ ∈ 𝐴 and 𝛾 =𝑖 𝛾′ ∈ [𝑀∕𝑥]Γ.
+.
+.
+4. The hypothetical judgments Γ ≫𝑖 𝐴 = 𝐴′ and Γ ≫𝑖 𝑀 = 𝑀 ′ ∈ 𝐴 are defined for semantically
+valid contexts and semantically valid substitutions as follows:
+.
+.
+.
+(a) Γ ≫𝑖 𝐴 = 𝐴′ iff 𝛾 =𝑖 𝛾′ ∈ Γ implies 𝛾ˆ(𝐴) =𝑖 𝛾ˆ′ (𝐴′ ).
+.
+.
+.
+.
+(b) Γ ≫𝑖 𝑀 = 𝑀 ′ ∈ 𝐴, for Γ ≫𝑖 𝐴 = 𝐴, iff 𝛾 =𝑖 𝛾′ ∈ Γ implies 𝛾ˆ(𝑀) =𝑖 𝛾ˆ′ (𝑀 ′ ) ∈ 𝛾ˆ(𝐴)
+Observe the dependency structure that ensures that an indexing type is defined prior to its use to define
+a family of types or of their elements, and that the predicativity levels are defined in order of level,
+requiring that these levels be cumulative in that one is contained in the next.
+It then remains to define a variety of types and their elements with which a given type system is
+constructed. The following clauses define the intended definitions of equality at a few representative
+types; see Angiuli (2019) for a full development of the definitions and their properties.
+• Universes internalize typing at each predicativity level:
+.
+1. If 𝐴, 𝐴′ ⇓ 𝒰 ⟨𝑖⟩, then 𝐴 =𝑖+1 𝐴′ .
+.
+.
+2. If 𝐵 ⇓ 𝒰 ⟨𝑖⟩, then 𝐴 =𝑖+1 𝐴′ ∈ 𝐵 iff 𝐴 =𝑖 𝐴′ .
+• Equality types internalize equality:
+.
+.
+.
+1. If 𝐴 ⇓ Eq[𝐵](𝑀;𝑀 ′ ) and 𝐴′ ⇓ Eq[𝐵′ ](𝑁;𝑁 ′ ), then 𝐴 =𝑖 𝐴′ iff 𝐵 =𝑖 𝐵′ , 𝑀 =𝑖 𝑁 ∈ 𝐵, and
+.
+𝑀 ′ =𝑖 𝑁 ′ ∈ 𝐵.
+.
+.
+.
+2. If 𝐴 ⇓ Eq[𝐵](𝑁;𝑁 ′ ), where 𝐴 =𝑖 𝐴, then 𝑀 =𝑖 𝑀 ′ ∈ 𝐴 iff 𝑀, 𝑀 ′ ⇓ ⋆ and 𝑁 =𝑖 𝑁 ′ ∈ 𝐵.
+• Booleans are bits:
+.
+1. If 𝐴, 𝐴′ ⇓ bool, then 𝐴 =𝑖 𝐴′ .
+.
+2. If 𝐴 ⇓ bool, then 𝑀 =𝑖 𝑀 ′ ∈ 𝐴 iff 𝑀, 𝑀 ′ ⇓ true or 𝑀, 𝑀 ′ ⇓ false.
+• Dependent product types internalize combinations of values:
+.
+.
+.
+1. If 𝐴 ⇓ 𝑥 ∶ 𝐴1 × 𝐴2 and 𝐴′ ⇓ 𝑥 ∶ 𝐴1′ × 𝐴2′ , then 𝐴 =𝑖 𝐴′ iff 𝐴1 =𝑖 𝐴1′ and, if 𝑀 =𝑖 𝑀 ′ ∈ 𝐴1 ,
+.
+then [𝑀∕𝑥]𝐴2 =𝑖 [𝑀 ′ ∕𝑥]𝐴2′ .
+.
+.
+2. If 𝐴 ⇓ 𝑥 ∶ 𝐴1 × 𝐴2 , and 𝐴 =𝑖 𝐴, then 𝑀 =𝑖 𝑀 ′ ∈ 𝐴 iff 𝑀 ⇓ ⟨𝑀1 , 𝑀2 ⟩, 𝑀 ′ ⇓ ⟨𝑀1′ , 𝑀2′ ⟩, and
+.
+.
+𝑀1 =𝑖 𝑀1′ ∈ 𝐴1 and 𝑀2 =𝑖 𝑀2′ ∈ [𝑀1 ∕𝑥]𝐴2 .
+• Dependent function types internalize entailment:
+.
+.
+.
+1. If 𝐴 ⇓ 𝑥 ∶ 𝐴1 → 𝐴2 and 𝐴′ ⇓ 𝑥 ∶ 𝐴1′ → 𝐴2′ , then 𝐴 =𝑖 𝐴′ iff 𝐴1 =𝑖 𝐴1′ and, if 𝑀 =𝑖 𝑀 ′ ∈ 𝐴1 ,
+.
+then [𝑀∕𝑥]𝐴2 =𝑖 [𝑀 ′ ∕𝑥]𝐴2′ .
+.
+.
+2. If 𝐴 ⇓ 𝑥 ∶ 𝐴1 → 𝐴2 , and 𝐴 =𝑖 𝐴, then 𝑀 =𝑖 𝑀 ′ ∈ 𝐴 iff 𝑀 ⇓ 𝜆(𝑥.𝑀2 ), 𝑀 ′ ⇓ 𝜆(𝑥.𝑀2′ ) and
+.
+.
+𝑀1 =𝑖 𝑀1′ ∈ 𝐴1 implies [𝑀1 ∕𝑥]𝑀2 =𝑖 [𝑀1′ ∕𝑥]𝑀2′ ∈ [𝑀1 ∕𝑥]𝐴2 .
+13
+
+June 28, 2026
+
+Why does this constitute a valid definition? There are two key criteria that ensure its validity. First,
+types are stratified into levels to accommodate an infinite hierarchy of universes without incurring
+Girard’s Paradox. Second, when considering dependent types, such as the product type, 𝑥 ∶ 𝐴1 × 𝐴2
+and function type 𝑥 ∶ 𝐴1 → 𝐴2 , both the domain type, 𝐴1 , and each instance of the co-domain type,
+[𝑀1 ∕𝑥]𝐴2 , by an element of 𝐴1 , are prior to the product or function types themselves. This means,
+for example, when 𝐴1 is nat, the type of natural numbers, the product and function types arise only
+after infinitely many types [𝑛∕𝑥]𝐴2 have been defined! That is, each such type has infinitely many
+predecessors in the dependency ordering, calling to mind Brouwer’s tree-like formulation of transfinite
+ordinals as finitely-deep, yet infinitely wide, branching trees. It is possible to justify these principles in
+many ways, but in the last analysis they must be taken, for essentially Gödelian reasons, as intuitively
+acceptable—all other explanations must rely on even stronger assumptions than the ones at stake!14
+With these formulations of equality in hand, it is a lengthy exercise to verify the validity of the
+derivable typing judgments according to the formulation given earlier.15
+Theorem 1 (FTLR).
+.
+.
+1. If Γ ⊢ 𝐴 type𝑖 , then Γ ≫𝑖 𝐴 = 𝐴, and if Γ ⊢ 𝐴 ≡ 𝐴′ type𝑖 , then Γ ≫𝑖 𝐴 = 𝐴′ .
+.
+.
+.
+2. If Γ ⊢ 𝑀 ∶ 𝐴, where Γ ≫𝑖 𝐴 = 𝐴, then Γ ≫𝑖 𝑀 = 𝑀 ∈ 𝐴, and if Γ ⊢ 𝑀 = 𝑀 ′ ∶ 𝐴, then
+.
+. ′
+Γ ≫𝑖 𝐴 = 𝐴 and Γ ≫𝑖 𝑀 = 𝑀 ∈ 𝐴.
+Exercise 2. Check that the semantic equality type may be used to interpret the identity type proposed by
+Martin-Löf. How is the elimination form justified in this setting?
+Exercise 3 (Extending to Computations). Given a transition dynamics for bnd and ret, and use this to
+.
+˜ 𝑖 𝐴. and
+define semantic equality of two closed computations returning the same type, written 𝐸 = 𝐸 ′ ∈
+prove that the (skeletal) rules given in Figure 8 are validated by this definition.
+
+References
+Stuart Frazier Allen. A non-type-theoretic semantics for type-theoretic language. Ph.d., Cornell University, USA, 1987. AAI8725748.
+Thorsten Altenkirch, Conor McBride, and Wouter Swierstra. Observational equality, now! In Proceedings of the 2007 workshop on Programming languages meets program verification, pages 57–68,
+Freiburg Germany, October 2007. ACM. ISBN 978-1-59593-677-6. doi: 10.1145/1292597.1292608.
+URL https://dl.acm.org/doi/10.1145/1292597.1292608.
+Carlo Angiuli. Computational Semantics of Cartesian Cubical Type Theory. PhD thesis, Carnegie Mellon
+University, Pittsburgh, PA, September 2019.
+Robert Harper. Practical Foundations for Programming Languages. Cambridge University Press, Cambridge, England, Second edition, 2016.
+14
+For example, to give a classical set-theoretic justification requires an infinite sequence of inaccessible cardinals corresponding to the universe hierarchy, a substantial extension of the usual axioms of set theory that can only be justified by even
+more dubious assumptions. There is simply no end to this conundrum; it can only be “colored” in various ways that shed light
+on the nature of the assumptions involved.
+15
+Warning! The most difficult properties to verify are the symmetry and transitivity of equality; the only known proof is
+given in Angiuli (2019), and it is quite involved.
+
+14
+
+June 28, 2026
+
+Paul Blain Levy. Call-By-Push-Value. Springer Netherlands, Dordrecht, 2003. ISBN 978-94-010-3752-5
+978-94-007-0954-6. doi: 10.1007/978-94-007-0954-6. URL http://link.springer.com/10.1007/
+978-94-007-0954-6.
+David B. MacQueen. Using dependent types to express modular structure. In Proceedings of the 13th
+ACM SIGACT-SIGPLAN symposium on Principles of programming languages - POPL ’86, pages 277–
+286, St. Petersburg Beach, Florida, 1986. ACM Press. doi: 10.1145/512644.512670. URL http://
+portal.acm.org/citation.cfm?doid=512644.512670.
+Per Martin-Löf. Constructive Mathematics and Computer Programming. In Logic, Methodology and
+Philosophy of Science VI, volume 104 of Studies in Logic and Foundations of Mathematics, pages 153–
+175. Elsevier, 1982. URL https://doi.org/10.1016/S0049-237X(09)70189-2.
+Per Martin-Löf and Giovanni Sambin. Intuitionistic type theory. Number 1 in Studies in proof theory
+Lecture notes. Bibliopolis, Napoli, 1984. ISBN 978-88-7088-105-9.
+Bengt Nordström, Kent Petersson, and Jan Smith. Programming in Martin-Lof’s Type Theory, 1990.
+URL https://www.cse.chalmers.se/research/group/logic/book/.
+Jonathan Sterling, Carlo Angiuli, and Daniel Gratzer. A Cubical Language for Bishop Sets. Logical
+Methods in Computer Science, Volume 18, Issue 1:9069, March 2022. ISSN 1860-5974. doi: 10.46298/
+lmcs-18(1:43)2022. URL https://lmcs.episciences.org/9069.
+
+15
+
+June 28, 2026
+
+
