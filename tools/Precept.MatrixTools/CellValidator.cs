@@ -663,9 +663,25 @@ public static class CellValidator
         int index = 0;
         foreach (var entry in contract.EnumerateArray())
         {
+            // A pruned entry records that a premise class is structurally empty for
+            // this cell. It licenses no discharge, so it has no reject side to decide
+            // and no derivation whose truth-preservation could be argued — the thing it
+            // owes instead is the reasoning for why the class is empty.
+            if (entry.TryGetProperty("pruned", out var pruned)
+                && pruned.ValueKind == JsonValueKind.True)
+            {
+                if (string.IsNullOrWhiteSpace(GetString(entry, "pruningDerivation")))
+                    context.Error(CheckDecisionProcedure, location,
+                        $"discharge-contract entry {index} is marked pruned but carries no "
+                        + "pruningDerivation — a pruned premise class must say why no discharge can "
+                        + "appear there, or the emptiness is asserted rather than argued");
+                index++;
+                continue;
+            }
+
             if (string.IsNullOrWhiteSpace(GetString(entry, "decisionProcedure")))
                 context.Error(CheckDecisionProcedure, location,
-                    $"discharge-contract entry {index} names no decision procedure — without one the reject "
+                    $"discharge-contract entry {index} names no decision procedure — without one the reject"
                     + "side of the exact contract cannot be tested even in principle");
             index++;
         }

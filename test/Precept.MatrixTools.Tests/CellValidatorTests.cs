@@ -227,6 +227,28 @@ public class CellValidatorTests
             .Should().BeEmpty("ranges, lists, and parenthetical notes are citation forms in use, not broken paths");
     }
 
+    /// <summary>
+    /// A pruned contract entry records that a premise class is structurally
+    /// empty for this cell — it licenses nothing, so there is no reject side to
+    /// decide and no derivation whose truth-preservation could be argued.
+    /// Demanding a decision procedure from it is demanding one for a discharge
+    /// that does not exist.
+    /// </summary>
+    [Fact]
+    public void PrunedContractEntry_NeedsNoDecisionProcedure()
+    {
+        var report = ValidateFixture("pruned-contract.cells.json");
+        report.Findings.Where(f => f.Check == "decision-procedure")
+            .Should().BeEmpty("a pruned entry licenses no discharge, so it has no reject side to decide");
+    }
+
+    [Fact]
+    public void PrunedContractEntry_MustSayWhyItIsPruned()
+    {
+        var report = ValidateFixture("broken-pruned-contract.cells.json");
+        AssertHasError(report, "decision-procedure", "pruningDerivation");
+    }
+
     [Fact]
     public void CitationRangeEndingOutsideTheFile_IsWarning()
     {
