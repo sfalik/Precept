@@ -44,7 +44,62 @@
     "[carried from the pre-normalization shape] premiseClasses: {\"applicable\": [\"(a) field modifiers\", \"(b) arg constraints\", \"(c) handler/rule/ensure guard\"], \"inapplicable\": {\"(d) pre-state constraint / inductive hypothesis\": \"N/A for this kind. A qualifier axis value is not a preservable runtime quantity: a DECLARED qualifier (`in 'USD'`, `of 'kg'`) is immutable declaration metadata — no write site can change field F's declared currency/unit, because any `set F = e` to a qualified field re-mints its OWN qualifier-compat obligation to keep the axis value invariant (Operations.cs assignment path). An OPEN field's runtime currency is a value, but no qualifier obligation carries it as a pre-state constraint fact — the engine tracks it only through the guard-narrowing (class c) and declaration (class a/b) surfaces. So there is no class-(d) fact to consume, and the citation duty for class (d) never arises here.\"}, \"note\": \"The fault-case discharge column in the matrix (§ Per-family case shapes) reads classes (b)/(c)/(a); (d) is admitted family-wide under the 2026-07-21 citation duty but is vacuous for the qualifier axis per the row above. Class (a) is NOT exempt from the citation duty (2026-07-21 ruling) — a field's declared qualifier is a one-field constraint whose truth at the site must be named; here its establishing obligation is the declaration and its preserving-obligation set is EMPTY (see per-cell citationDuty).\"}",
     "[carried from the pre-normalization shape] dischargeMechanics: {\"decisionProcedureShared\": \"A QualifierCompatibilityProofRequirement(L, R, axis A) at binary-op site s discharges IFF resolve(L,A,s) and resolve(R,A,s) are both defined AND QualifiersAreCompatible(resolve(L,A,s), resolve(R,A,s), A) (ProofEngine.Qualifiers.cs:118-173), where resolve(operand,A,s) = [1] the operand field/arg's DECLARED qualifier on axis A if it declares one — premise class (a) for a field, (b) for an event arg (ResolveQualifierFromExpression / ResolveQualifierOnAxis); else [2] the guard-narrowed value v if the enclosing context's guard provably pins the operand's field to a single value v on A across EVERY disjunctive branch AND the field is not in obligation.ReassignedBefore — premise class (c) (TryQualifierGuardNarrowingProof / NarrowedValueFromGuard, ProofEngine.QualifierNarrowing.cs:96-170); else [3] undefined -> reject (PRE0114). Compatibility (QualifiersAreCompatible): equal value, or symbolically equal via shared SourceFieldName / source path (interpolated `in '{CurrencyCode}'` on both operands), or same dimension name across Unit/Dimension subtypes, or CompoundPrice component-wise (currency AND unit) match.\", \"searchBound\": \"Finite and search-free: one declaration lookup per operand; when an operand is open, a finite structural scan of the enclosing guard's conjunction/disjunction tree (ExtractQualifierNarrowingBranches) requiring all-branch agreement to a single value; then a finite string/structural compatibility test. No interval arithmetic, no fixpoint. Bounded by the guard's syntactic size.\", \"rejectSide\": \"resolve undefined on either operand (open with no narrowing guard, or a guard that narrows to a mismatched value / fails all-branch agreement) OR compatible-check false -> PRE0114, naming both operands and their resolved-or-unresolved axis values, suggesting `Align both declarations, or insert an explicit conversion`.\"}",
     "[carried from the pre-normalization shape] transportShared: {\"declaredQualifierFact\": \"For a class-(a) field-modifier or class-(b) arg qualifier: the fact `F.<axis> == v` is established by the qualifier DECLARATION and is carried at route position zero. Its read-closure deps is empty — a declared qualifier is immutable metadata, so mayWrite(r,p,q) never intersects it and the fact is NEVER killed on any route reaching the site (transport-rule-restatement § What kills — guards/conditions/modifier expressions write nothing; and the declared axis value is not a slot a `set` can change). Transport therefore holds trivially on every route in the site's route set.\", \"guardNarrowedFact\": \"For a class-(c) guard fact narrowing an OPEN operand field F: the fact `F.<axis> == v` is earned at the guard (phase 2, transport § 5 'Fired-guard fact') and is KILLED by any write to F before the site — deps(φ) = {F}, and the transport premise deps(φ) ∩ mayWrite(r,p,q) = ∅ is exactly what the shipped code enforces via `obligation.ReassignedBefore.Contains(field)` (ProofEngine.QualifierNarrowing.cs:142). Route relation per occasion below.\", \"knownHole\": \"If an operand field F were instead written by `dequeue C into F` / `pop C into F` between the guard and the site, BUG-033 (the `into` target not registered as a write site) would leave the guard fact wrongly alive and PRE0114 wrongly discharged. No witness below uses an `into` target on an operand field, so none is flagged; a variant that did would be FLAGGED, not counted as verified.\"}",
-    "[carried from the pre-normalization shape] $schemaNote: \"Fault-family cells for ProofRequirementKind.QualifierCompatibility. Each cell carries the discharge contract (iff + decision procedure), the transport-rule citation with the citation duty on any declared fact it consumes, and a witness triple (base -> reject / discharge-addition -> clean / near-miss -> reject-same-obligation). Every .precept snippet was syntax/compile-validated through the precept MCP (precept_compile) at HEAD on 2026-07-21; the recorded diagnostic codes and obligation dispositions are compile-oracle OBSERVATIONS of the shipped compiler, never cited as authority for what the DEFINITION says. Known compiler holes checked against every witness: BUG-033 (dequeue/pop `into` target not registered as a write site) and the un-build-enforced write-surface enumeration — no witness here rests on either (no snippet writes an operand field via an `into` target or across an exit-hook kill), so no cell is flagged for a hole. Grounded against: src/Precept/Language/Operations.cs (QualifierCompatibilityProofRequirement mint sites), src/Precept/Pipeline/ProofEngine.cs:305-307 (bin.ProofRequirements instantiation), src/Precept/Pipeline/ProofEngine.Qualifiers.cs (TryQualifierCompatibilityProof / QualifiersAreCompatible — declaration discharge), src/Precept/Pipeline/ProofEngine.QualifierNarrowing.cs (TryQualifierGuardNarrowingProof / NarrowedValueFromGuard — guard discharge), src/Precept/Language/ProofRequirement.cs:113-118 (the DU subtype), docs/Working/obligation-discharge-matrix-2026-07-19.md (rev 7 — fault case shape, citation-duty ruling, minting rule), docs/Working/transport-rule-restatement-2026-07-21.md (route index over the 23-value evaluation-site axis).\""
+    "[carried from the pre-normalization shape] $schemaNote: \"Fault-family cells for ProofRequirementKind.QualifierCompatibility. Each cell carries the discharge contract (iff + decision procedure), the transport-rule citation with the citation duty on any declared fact it consumes, and a witness triple (base -> reject / discharge-addition -> clean / near-miss -> reject-same-obligation). Every .precept snippet was syntax/compile-validated through the precept MCP (precept_compile) at HEAD on 2026-07-21; the recorded diagnostic codes and obligation dispositions are compile-oracle OBSERVATIONS of the shipped compiler, never cited as authority for what the DEFINITION says. Known compiler holes checked against every witness: BUG-033 (dequeue/pop `into` target not registered as a write site) and the un-build-enforced write-surface enumeration — no witness here rests on either (no snippet writes an operand field via an `into` target or across an exit-hook kill), so no cell is flagged for a hole. Grounded against: src/Precept/Language/Operations.cs (QualifierCompatibilityProofRequirement mint sites), src/Precept/Pipeline/ProofEngine.cs:305-307 (bin.ProofRequirements instantiation), src/Precept/Pipeline/ProofEngine.Qualifiers.cs (TryQualifierCompatibilityProof / QualifiersAreCompatible — declaration discharge), src/Precept/Pipeline/ProofEngine.QualifierNarrowing.cs (TryQualifierGuardNarrowingProof / NarrowedValueFromGuard — guard discharge), src/Precept/Language/ProofRequirement.cs:113-118 (the DU subtype), docs/Working/obligation-discharge-matrix-2026-07-19.md (rev 7 — fault case shape, citation-duty ruling, minting rule), docs/Working/transport-rule-restatement-2026-07-21.md (route index over the 23-value evaluation-site axis).\"",
+    "[pre-normalization content preserved] The 2026-07-23 normalization to the cell schema dropped the entries below; they are restored here verbatim with their original paths. The commit that performed the normalization claimed nothing was dropped — that claim was wrong, and this block is what makes the claim checkable rather than asserted.",
+    "[carried] $.definitionVersion = obligation-discharge-matrix-2026-07-19 rev 7 + transport-rule-restatement-2026-07-21",
+    "[carried] $.respellability.rationale = The band (sound-but-unprovable programs) for this kind is thin because compatibility is decided by finite declaration + guard lookup. A representative band member: an action chain `-> set Payment = Fee -> set Total = Payment + Fee` where Fee is `in 'USD'` and Payment is open — after the write, Payment's currency is provably USD by written-value provenance (E2, matrix § The cell), so the `+` is sound, yet the shipped narrowing reads only guards (not E2) and rejects with PRE0114. Its licensed respelling: add the row/hook guard `when Payment.currency == 'USD'` (class c) or declare `field Payment as money in 'USD'` (class a). Both are surface the author can write, so the gap costs authoring friction only — respellable: yes. Every cell inherits this family verdict; none overrides it.",
+    "[carried] $.cells[0].witness.base.precept = precept QC1\nstate Draft initial\nstate Posted terminal\nfield Fee as money in 'USD' default '0 USD' nonnegative\nfield Payment as money default '0 USD'\nfield Total as money default '0 USD'\nevent Post()\nfrom Draft on Post -> set Total = Payment + Fee -> transition Posted",
+    "[carried] $.cells[0].witness.base.expected = reject:PRE0114",
+    "[carried] $.cells[0].witness.base.observed = PRE0114 error 'Payment (Currency: unresolved) and Fee (Currency: USD)'; QualifierCompatibility obligation Unresolved. Incidental non-error PRE0158 write-site warnings on read-only Fee/Payment (benign; not the rejection reason). Single QualifierCompatibility obligation — assignment to an OPEN Total mints no enclosing obligation.",
+    "[carried] $.cells[0].witness.base.baseMinimality = the only error is the target PRE0114; PRE0158 are warnings, not errors.",
+    "[carried] $.cells[0].witness.dischargeAddition.precept = precept QC1g\nstate Draft initial\nstate Posted terminal\nfield Fee as money in 'USD' default '0 USD' nonnegative\nfield Payment as money default '0 USD'\nfield Total as money default '0 USD'\nevent Post()\nfrom Draft on Post when Payment.currency == 'USD' -> set Total = Payment + Fee -> transition Posted",
+    "[carried] $.cells[0].witness.nearMiss.precept = precept QC1n\nstate Draft initial\nstate Posted terminal\nfield Fee as money in 'USD' default '0 USD' nonnegative\nfield Payment as money default '0 USD'\nfield Total as money default '0 USD'\nevent Post()\nfrom Draft on Post when Payment.currency == 'EUR' -> set Total = Payment + Fee -> transition Posted",
+    "[carried] $.cells[0].witness.nearMiss.expected = reject:PRE0114",
+    "[carried] $.cells[0].witness.nearMiss.observed = PRE0114 error 'Payment (Currency: EUR (from guard)) and Fee (Currency: USD)'; same QualifierCompatibility obligation, Unresolved.",
+    "[carried] $.cells[1].premiseClassNote = Class (b) is not generally available: a `from S ->` / `to S ->` hook fires on any transition into/out of S regardless of which event drove it, so a specific event's args are not reliably in scope.",
+    "[carried] $.cells[1].witness.base.precept = precept QC2b\nstate Draft initial\nstate Posted terminal\nfield Fee as money in 'USD' default '0 USD' nonnegative\nfield Payment as money default '0 USD'\nfield Total as money default '0 USD'\nevent Post()\nfrom Draft -> set Total = Payment + Fee\nfrom Draft on Post -> transition Posted",
+    "[carried] $.cells[1].witness.base.expected = reject:PRE0114",
+    "[carried] $.cells[1].witness.base.observed = PRE0114 on the exit-hook action 'Payment (Currency: unresolved) and Fee (Currency: USD)'; obligation Unresolved. (Compile-oracle confirmed on the guarded/near-miss variants below; base is the same shape with the guard removed.)",
+    "[carried] $.cells[1].witness.base.baseMinimality = target PRE0114 only; PRE0158 warnings benign.",
+    "[carried] $.cells[1].witness.dischargeAddition.precept = precept QC2\nstate Draft initial\nstate Posted terminal\nfield Fee as money in 'USD' default '0 USD' nonnegative\nfield Payment as money default '0 USD'\nfield Total as money default '0 USD'\nevent Post()\nfrom Draft when Payment.currency == 'USD' -> set Total = Payment + Fee\nfrom Draft on Post -> transition Posted",
+    "[carried] $.cells[1].witness.nearMiss.precept = precept QC2n\nstate Draft initial\nstate Posted terminal\nfield Fee as money in 'USD' default '0 USD' nonnegative\nfield Payment as money default '0 USD'\nfield Total as money default '0 USD'\nevent Post()\nfrom Draft when Payment.currency == 'EUR' -> set Total = Payment + Fee\nfrom Draft on Post -> transition Posted",
+    "[carried] $.cells[1].witness.nearMiss.expected = reject:PRE0114",
+    "[carried] $.cells[1].witness.nearMiss.observed = PRE0114 'Payment (Currency: EUR (from guard)) and Fee (Currency: USD)' in state hook for Draft; same obligation, Unresolved.",
+    "[carried] $.cells[2].premiseClassNote = Class (c) is UNAVAILABLE for stateless handlers: spec:1007 states 'Handlers do not support `when` guards or a trailing `ensure`'. GuardOfContext has an EventHandlerContext arm, but the definition supplies no guard for a stateless handler to narrow with. (See openFlags — the shipped parser accepts a `when` guard on a stateless handler contrary to spec:1007.)",
+    "[carried] $.cells[2].witness.base.precept = precept QC3b\nfield Fee as money in 'USD' default '0 USD' nonnegative\nfield Total as money default '0 USD'\nevent Allocate(Amount as money)\non Allocate -> set Total = Allocate.Amount + Fee",
+    "[carried] $.cells[2].witness.base.expected = reject:PRE0114",
+    "[carried] $.cells[2].witness.base.observed = PRE0114 'Amount (Currency: unresolved) and Fee (Currency: USD)' in event handler Allocate; obligation Unresolved. Single obligation (assignment to open Total).",
+    "[carried] $.cells[2].witness.dischargeAddition.precept = precept QC3\nfield Fee as money in 'USD' default '0 USD' nonnegative\nfield Total as money default '0 USD'\nevent Allocate(Amount as money in 'USD')\non Allocate -> set Total = Allocate.Amount + Fee",
+    "[carried] $.cells[2].witness.nearMiss.precept = precept QC3n\nfield Fee as money in 'USD' default '0 USD' nonnegative\nfield Total as money default '0 USD'\nevent Allocate(Amount as money in 'EUR')\non Allocate -> set Total = Allocate.Amount + Fee",
+    "[carried] $.cells[2].witness.nearMiss.expected = reject:PRE0114",
+    "[carried] $.cells[2].witness.nearMiss.observed = PRE0114 'Amount (Currency: EUR) and Fee (Currency: USD)'; same obligation, Unresolved. (Confirms a declared-vs-declared operand mismatch on a binary op stays the proof-stage PRE0114 — it does NOT reroute to the type-check QualifierMismatch in this context.)",
+    "[carried] $.cells[3].premiseClassNote = Class (b) is N/A: a `rule` condition is evaluated over entity state, not against a specific event's args.",
+    "[carried] $.cells[3].enclosingObligationNote = A `rule` condition must be boolean, so a money±money combination sits inside a comparison (`<= '1000 USD'`), and that enclosing money comparison co-mints a SECOND QualifierCompatibility obligation (the sum's result vs the literal). Both are the same schema at sibling sites; a fully-clean discharge requires BOTH cleared, which the class-(a) witness does (all three currencies USD). A single-obligation rejecting witness is not constructible for this occasion — any rejecting money-combination inside a boolean comparison yields the inner + enclosing pair (both fail whenever the sum's currency is unresolved).",
+    "[carried] $.cells[3].witness.base.precept = precept QC4base\nfield Fee as money in 'USD' default '0 USD' nonnegative\nfield Payment as money default '0 USD'\nrule Payment + Fee <= '1000 USD' because \"combined charges stay within the ceiling\"",
+    "[carried] $.cells[3].witness.base.expected = reject:PRE0114",
+    "[carried] $.cells[3].witness.base.observed = TWO PRE0114 errors of the SAME schema, both Unresolved: inner `+` 'Payment (unresolved) and Fee (USD)'; enclosing `<=` '(Payment + Fee) (unresolved) and 1000 USD (USD)'. The target is the inner money+money combination; the enclosing comparison is the co-minted sibling (see enclosingObligationNote).",
+    "[carried] $.cells[3].witness.dischargeAddition.precept = precept QC4d\nfield Fee as money in 'USD' default '0 USD' nonnegative\nfield Payment as money in 'USD' default '0 USD'\nrule Payment + Fee <= '1000 USD' because \"combined charges stay within the ceiling\"",
+    "[carried] $.cells[3].witness.nearMiss.precept = precept QC4n\nfield Fee as money in 'USD' default '0 USD' nonnegative\nfield Payment as money in 'EUR' default '0 EUR' nonnegative\nrule Payment + Fee <= '1000 USD' because \"combined charges stay within the ceiling\"",
+    "[carried] $.cells[3].witness.nearMiss.expected = reject:PRE0114",
+    "[carried] $.cells[3].witness.nearMiss.observed = TWO PRE0114 (same schema): inner 'Payment (EUR) and Fee (USD)', enclosing '(Payment + Fee) (EUR) and 1000 USD (USD)'; both Unresolved. Still rejects naming the same obligation.",
+    "[carried] $.cells[4].premiseClassNote = Class (b) is N/A: a residency ensure is evaluated over entity state, not against a specific event's args. Whether the residency fact itself (the entity is in S) is a premise is a separate OPEN matrix question and does not bear on the qualifier axis.",
+    "[carried] $.cells[4].enclosingObligationNote = As with the rule cell: an `ensure` condition is boolean, so the money±money combination sits inside a comparison that co-mints a sibling QualifierCompatibility obligation. Both cleared together by matched declarations; a single-obligation rejecting witness is not constructible.",
+    "[carried] $.cells[4].witness.base.precept = precept QC5b\nstate Active initial terminal\nfield Fee as money in 'USD' default '0 USD' nonnegative\nfield Payment as money default '0 USD'\nin Active ensure Payment + Fee <= '1000 USD' because \"residency charges stay within the ceiling\"",
+    "[carried] $.cells[4].witness.base.expected = reject:PRE0114",
+    "[carried] $.cells[4].witness.base.observed = TWO PRE0114 (same schema), both Unresolved, 'while evaluating ensure for Active': inner 'Payment (unresolved) and Fee (USD)', enclosing '(Payment + Fee) (unresolved) and 1000 USD (USD)'.",
+    "[carried] $.cells[4].witness.dischargeAddition.precept = precept QC5d\nstate Active initial terminal\nfield Fee as money in 'USD' default '0 USD' nonnegative\nfield Payment as money in 'USD' default '0 USD' nonnegative\nin Active ensure Payment + Fee <= '1000 USD' because \"residency charges stay within the ceiling\"",
+    "[carried] $.cells[4].witness.nearMiss.precept = precept QC5n\nstate Active initial terminal\nfield Fee as money in 'USD' default '0 USD' nonnegative\nfield Payment as money in 'EUR' default '0 EUR' nonnegative\nin Active ensure Payment + Fee <= '1000 USD' because \"residency charges stay within the ceiling\"",
+    "[carried] $.cells[4].witness.nearMiss.expected = reject:PRE0114",
+    "[carried] $.cells[4].witness.nearMiss.observed = TWO PRE0114 (same schema): inner 'Payment (EUR) and Fee (USD)', enclosing '(Payment + Fee) (EUR) and 1000 USD (USD)'; both Unresolved. Still rejects naming the same obligation.",
+    "[carried] $.cells[5].premiseClassNote = Classes (b) and (c) are BOTH unavailable: a computed-field expression has no event args (no b) and no guard — GuardOfContext returns null for FieldExpressionContext (QualifierNarrowing.cs:197-209), so no narrowing (no c). Discharge is class (a) declaration only.",
+    "[carried] $.cells[5].witness.base.precept = precept QC6\nfield CurrencyCode as currency default 'USD'\nfield Fee as money in '{CurrencyCode}' default '0 {CurrencyCode}' nonnegative\nfield Payment as money default '0 USD'\nfield Total as money <- Payment + Fee",
+    "[carried] $.cells[5].witness.base.expected = reject:PRE0114",
+    "[carried] $.cells[5].witness.base.observed = single PRE0114 'Payment (Currency: unresolved) and Fee (Currency: {CurrencyCode})' in the computed expression for Total; QualifierCompatibility obligation Unresolved. Single obligation (computed field assigned to open Total; no enclosing comparison).",
+    "[carried] $.cells[5].witness.base.baseMinimality = target PRE0114 only; PRE0158 warnings benign.",
+    "[carried] $.cells[5].witness.dischargeAddition.precept = precept QC6d\nfield Fee as money in 'USD' default '0 USD' nonnegative\nfield Payment as money in 'USD' default '0 USD'\nfield Total as money <- Payment + Fee",
+    "[carried] $.cells[5].witness.nearMiss.precept = precept QC6n\nfield Fee as money in 'USD' default '0 USD' nonnegative\nfield Payment as money in 'EUR' default '0 EUR'\nfield Total as money <- Payment + Fee",
+    "[carried] $.cells[5].witness.nearMiss.expected = reject:PRE0114",
+    "[carried] $.cells[5].witness.nearMiss.observed = rejects with the target PRE0114 'Payment (Currency: EUR) and Fee (Currency: USD)' (obligation Unresolved), PLUS a second type-check-stage diagnostic PRE0070 'Cannot combine Payment (EUR) with Fee (USD) — different currencies'. The near-miss still rejects naming the SAME obligation (PRE0114); the extra PRE0070 fires because a computed-field context runs the type-checker's declared-declared currency-mismatch check in addition to the proof-stage obligation (near-misses do not require minimality, only rejection naming the same obligation)."
   ],
   "cells": [
     {
@@ -166,7 +221,8 @@
             },
             "notes": [
               "[carried from the pre-normalization shape] dischargeAddition: {\"premiseClass\": \"(c) transition row guard\", \"precept\": \"precept QC1g\\nstate Draft initial\\nstate Posted terminal\\nfield Fee as money in 'USD' default '0 USD' nonnegative\\nfield Payment as money default '0 USD'\\nfield Total as money default '0 USD'\\nevent Post()\\nfrom Draft on Post when Payment.currency == 'USD' -> set Total = Payment + Fee -> transition Posted\", \"expected\": \"accept\", \"observed\": \"success:true; QualifierCompatibility obligation Proved, strategy QualifierCompatibility (guard narrowing narrowed Payment -> USD).\"}"
-            ]
+            ],
+            "program": "precept QC1g\nstate Draft initial\nstate Posted terminal\nfield Fee as money in 'USD' default '0 USD' nonnegative\nfield Payment as money default '0 USD'\nfield Total as money default '0 USD'\nevent Post()\nfrom Draft on Post when Payment.currency == 'USD' -> set Total = Payment + Fee -> transition Posted"
           }
         ],
         "nearMisses": [
@@ -182,7 +238,8 @@
             "expected": {
               "outcome": "reject",
               "sameObligation": true
-            }
+            },
+            "program": "precept QC1n\nstate Draft initial\nstate Posted terminal\nfield Fee as money in 'USD' default '0 USD' nonnegative\nfield Payment as money default '0 USD'\nfield Total as money default '0 USD'\nevent Post()\nfrom Draft on Post when Payment.currency == 'EUR' -> set Total = Payment + Fee -> transition Posted"
           }
         ]
       },
@@ -321,7 +378,8 @@
             },
             "notes": [
               "[carried from the pre-normalization shape] dischargeAddition: {\"premiseClass\": \"(c) state hook guard\", \"precept\": \"precept QC2\\nstate Draft initial\\nstate Posted terminal\\nfield Fee as money in 'USD' default '0 USD' nonnegative\\nfield Payment as money default '0 USD'\\nfield Total as money default '0 USD'\\nevent Post()\\nfrom Draft when Payment.currency == 'USD' -> set Total = Payment + Fee\\nfrom Draft on Post -> transition Posted\", \"expected\": \"accept\", \"observed\": \"success:true; QualifierCompatibility obligation Proved, strategy QualifierCompatibility (guard narrowing on the exit hook).\"}"
-            ]
+            ],
+            "program": "precept QC2\nstate Draft initial\nstate Posted terminal\nfield Fee as money in 'USD' default '0 USD' nonnegative\nfield Payment as money default '0 USD'\nfield Total as money default '0 USD'\nevent Post()\nfrom Draft when Payment.currency == 'USD' -> set Total = Payment + Fee\nfrom Draft on Post -> transition Posted"
           }
         ],
         "nearMisses": [
@@ -337,7 +395,8 @@
             "expected": {
               "outcome": "reject",
               "sameObligation": true
-            }
+            },
+            "program": "precept QC2n\nstate Draft initial\nstate Posted terminal\nfield Fee as money in 'USD' default '0 USD' nonnegative\nfield Payment as money default '0 USD'\nfield Total as money default '0 USD'\nevent Post()\nfrom Draft when Payment.currency == 'EUR' -> set Total = Payment + Fee\nfrom Draft on Post -> transition Posted"
           }
         ]
       },
@@ -476,7 +535,8 @@
             },
             "notes": [
               "[carried from the pre-normalization shape] dischargeAddition: {\"premiseClass\": \"(b) event arg qualifier\", \"precept\": \"precept QC3\\nfield Fee as money in 'USD' default '0 USD' nonnegative\\nfield Total as money default '0 USD'\\nevent Allocate(Amount as money in 'USD')\\non Allocate -> set Total = Allocate.Amount + Fee\", \"expected\": \"accept\", \"observed\": \"success:true; QualifierCompatibility obligation Proved, strategy QualifierCompatibility (both operands resolve to USD by declaration).\"}"
-            ]
+            ],
+            "program": "precept QC3\nfield Fee as money in 'USD' default '0 USD' nonnegative\nfield Total as money default '0 USD'\nevent Allocate(Amount as money in 'USD')\non Allocate -> set Total = Allocate.Amount + Fee"
           }
         ],
         "nearMisses": [
@@ -492,7 +552,8 @@
             "expected": {
               "outcome": "reject",
               "sameObligation": true
-            }
+            },
+            "program": "precept QC3n\nfield Fee as money in 'USD' default '0 USD' nonnegative\nfield Total as money default '0 USD'\nevent Allocate(Amount as money in 'EUR')\non Allocate -> set Total = Allocate.Amount + Fee"
           }
         ]
       },
@@ -632,7 +693,8 @@
             },
             "notes": [
               "[carried from the pre-normalization shape] dischargeAddition: {\"premiseClass\": \"(a) both operand field declarations\", \"precept\": \"precept QC4d\\nfield Fee as money in 'USD' default '0 USD' nonnegative\\nfield Payment as money in 'USD' default '0 USD'\\nrule Payment + Fee <= '1000 USD' because \\\"combined charges stay within the ceiling\\\"\", \"expected\": \"accept\", \"observed\": \"success:true; both QualifierCompatibility obligations Proved, strategy QualifierCompatibility.\"}"
-            ]
+            ],
+            "program": "precept QC4d\nfield Fee as money in 'USD' default '0 USD' nonnegative\nfield Payment as money in 'USD' default '0 USD'\nrule Payment + Fee <= '1000 USD' because \"combined charges stay within the ceiling\""
           }
         ],
         "nearMisses": [
@@ -648,7 +710,8 @@
             "expected": {
               "outcome": "reject",
               "sameObligation": true
-            }
+            },
+            "program": "precept QC4n\nfield Fee as money in 'USD' default '0 USD' nonnegative\nfield Payment as money in 'EUR' default '0 EUR' nonnegative\nrule Payment + Fee <= '1000 USD' because \"combined charges stay within the ceiling\""
           }
         ]
       },
@@ -788,7 +851,8 @@
             },
             "notes": [
               "[carried from the pre-normalization shape] dischargeAddition: {\"premiseClass\": \"(a) both operand field declarations\", \"precept\": \"precept QC5d\\nstate Active initial terminal\\nfield Fee as money in 'USD' default '0 USD' nonnegative\\nfield Payment as money in 'USD' default '0 USD' nonnegative\\nin Active ensure Payment + Fee <= '1000 USD' because \\\"residency charges stay within the ceiling\\\"\", \"expected\": \"accept\", \"observed\": \"success:true; both QualifierCompatibility obligations Proved, strategy QualifierCompatibility.\"}"
-            ]
+            ],
+            "program": "precept QC5d\nstate Active initial terminal\nfield Fee as money in 'USD' default '0 USD' nonnegative\nfield Payment as money in 'USD' default '0 USD' nonnegative\nin Active ensure Payment + Fee <= '1000 USD' because \"residency charges stay within the ceiling\""
           }
         ],
         "nearMisses": [
@@ -804,7 +868,8 @@
             "expected": {
               "outcome": "reject",
               "sameObligation": true
-            }
+            },
+            "program": "precept QC5n\nstate Active initial terminal\nfield Fee as money in 'USD' default '0 USD' nonnegative\nfield Payment as money in 'EUR' default '0 EUR' nonnegative\nin Active ensure Payment + Fee <= '1000 USD' because \"residency charges stay within the ceiling\""
           }
         ]
       },
@@ -944,7 +1009,8 @@
             },
             "notes": [
               "[carried from the pre-normalization shape] dischargeAddition: {\"premiseClass\": \"(a) both operand field declarations\", \"precept\": \"precept QC6d\\nfield Fee as money in 'USD' default '0 USD' nonnegative\\nfield Payment as money in 'USD' default '0 USD'\\nfield Total as money <- Payment + Fee\", \"expected\": \"accept\", \"observed\": \"success:true; single QualifierCompatibility obligation Proved, strategy QualifierCompatibility (both operands resolve to USD by declaration). This is exactly the samples/invoice-line-item.precept idiom (`LineTotal as money in '{CurrencyCode}' <- TaxableAmount + TaxAmount`, both operands sharing the interpolated currency source).\"}"
-            ]
+            ],
+            "program": "precept QC6d\nfield Fee as money in 'USD' default '0 USD' nonnegative\nfield Payment as money in 'USD' default '0 USD'\nfield Total as money <- Payment + Fee"
           }
         ],
         "nearMisses": [
@@ -960,7 +1026,8 @@
             "expected": {
               "outcome": "reject",
               "sameObligation": true
-            }
+            },
+            "program": "precept QC6n\nfield Fee as money in 'USD' default '0 USD' nonnegative\nfield Payment as money in 'EUR' default '0 EUR'\nfield Total as money <- Payment + Fee"
           }
         ]
       },
