@@ -269,21 +269,19 @@ Two locked texts give incompatible answers for `field Tags as set of string note
 
 **Frank's recommendation (not ratified — owner must rule):** **string-only; `primitive-types.md:582` is the drift.** Three locked surfaces say string-only (`precept-language-spec.md:1150, :1671, :435`; `collection-types.md:794`) against primitive-types.md's one overreach. Architecturally decisive: collection cardinality vocabulary is deliberately single-source (`mincount`/`maxcount` in the Constraints catalog); making `notempty` a second spelling of `mincount 1` creates two ways to say one thing and muddies the inner-type-vs-field-level distinction (`set of string notempty` already means *each element* non-empty). Frank would downgrade this from owner-fork to **doc-drift-with-forced-resolution** — fix `primitive-types.md:582` to string-only — but keep it surfaced because it touches Constraints-catalog applicability metadata (language surface).
 
-### OF4 — Are `in`-qualified periods orderable? *(Re-extract #9)* — ✅ **RULED BY THE OWNER 2026-07-24: outcome (a) — orderable when same-basis-pinned, enforced at the comparison site.**
+### OF4 — Are `in`-qualified periods orderable? *(Re-extract #9)* — ⛔ **NOT A FORK. Locked Decision #14 already answers it: no ordering on `period`. Reopened in error 2026-07-24, corrected same day.**
 
-> **Ruling (owner, 2026-07-24):** `in`-qualified periods are **orderable exactly when both operands share one declared single basis** (`period in 'days'` vs `period in 'days'`), scalar and collection alike. Cross-basis (`days` vs `months`) and unqualified periods are **not** orderable and must be rejected at the comparison site. This is outcome (a) with the same-basis guard; it subsumes (c) (the collection-accessor position is the special case where a single basis is structurally guaranteed).
+> **Correction (2026-07-24).** This was briefly recorded as an owner ruling for "outcome (a) — orderable when same-basis-pinned." That was wrong: it overrode a **locked four-leg Decision** without ever framing it as an override (Tier-3), which the pre-design gate exists to prevent. On the owner reaffirming D14 ("14 was already decided — no comparison"), the ruling is withdrawn.
 >
-> **Deciding evidence — NodaTime 3.3.3, verified by reflection (2026-07-24).** `NodaTime.Period` implements `IEquatable` but **not** `IComparable`/`IComparable<Period>` — no `CompareTo`, no `op_LessThan`. NodaTime deliberately omits period ordering for D14's own reason (no fixed length without a reference date). `NodaTime.Duration` *is* fully orderable (`IComparable`, `IComparisonOperators`, `<`) because it is a fixed span. **But** a single-basis period's live component is a plain integer (`Period.FromDays(5).Days` → `Int32`), so same-basis ordering never calls `Period.CompareTo` — it reduces to integer comparison of the one extracted component, which is total and well-defined. Cross-basis comparison is exactly what NodaTime refuses and what has no coherent answer. So the ruling draws the orderable/not line precisely where NodaTime (and arithmetic) draws it: same basis yes, mixed basis no.
+> **Locked Decision #14 stands** (`temporal-type-system.md:1478`): *"No ordering on `period` — `==` and `!=` only,"* with full rationale (NodaTime `Period` has no `IComparable`; "is 1 month > 30 days" depends on which month). It is the authority. Periods do **not** order, including same-basis.
 >
-> **Downstream consequences (build, not settled here):**
-> - **D14 (`temporal-type-system.md:1476`) needs the same-basis carve-out** — it currently reads as an absolute "no ordering, `==`/`!=` only." `collection-types.md:533` is *not* drift under this ruling; it is the same-basis rule already applied in the accessor position.
-> - **New mechanism required → `/design`.** `TypeTrait` is a flat per-`TypeKind` flag; a qualifier-conditional, same-basis-checked ordering trait does not exist. This is new language surface (ordering operators on a type that has none today) and routes through the pre-design gate before build. Neither reading is implemented at HEAD.
-> - **Close the business-type false-clean in the same rule.** `set of money` **unqualified** → `.max` compiles today (`collection-types.md:530` says it should be a type error — a live false-clean cross-currency ordering). The same "orderable only when a single basis/currency is shared" rule should govern both the temporal and the business lanes; design them together.
-> - **BUG-047 is no longer mechanical.** Its `positive`-on-`period` strip was justified as a mechanical D14 correction; under (a) a qualified period *is* orderable against `Period.Zero`, so `positive`/`nonnegative` on a same-basis period is meaningful. Do not action the strip; re-evaluate it under this ruling.
+> **The apparent contradiction is drift, not a fork.** `collection-types.md:533` grants `.min`/`.max` on `set of period in 'days'` ("ordering is by single component value") — but that row was added in `5821c3bd` ("commit before autopilot"), a vague no-rationale commit, with no Decision behind it. It contradicts locked D14 and is the thing to correct **down** to D14, not evidence to reopen it. The AI-slop pattern: a doc departed from a locked spec Decision; that is cleanup, not a decision. `temporal-type-system.md:842`'s `nonnegative`/`nonzero` "compared against `Period.Zero`" is a per-component sign predicate against a constant, **not** a two-period ordering, so it never conflicted with D14 — the re-check overstated it.
+>
+> **Disposition:** OF4 is closed as **already-answered by locked D14**. Follow-up is a doc-fix — reconcile `collection-types.md:533` to D14 (remove the `period in 'days'` ordering grant / mark equality-only) — proposed to the owner, not a fresh ruling. The `set of money` unqualified `.max` false-clean (`collection-types.md:530`) is a genuine separate bug regardless of periods.
 
 ---
 
-*(Original 2026-07-23 re-check retained below for the reasoning that led here.)*
+*(Original 2026-07-23 re-check retained below — this is the reasoning that reframed a locked Decision as an open fork and led to the erroneous reopening. Kept as the record of the mistake.)*
 
 > **⚠️ RE-CHECKED 2026-07-23: NOT already ruled, and this entry understates it. It is a behavioural fork with three outcomes, not a doc fix.**
 
@@ -332,7 +330,19 @@ Two defensible readings (unit-pinned periods orderable by their single component
 - **⚠️ Frank explicitly flags this as philosophy-adjacent (per his charter — he surfaces, does not resolve):** "arbitrary-precision, no overflow" is a *core-guarantee / type-honesty* claim under `docs/philosophy.md` "Honesty about approximation." Deciding integer is fixed-width Int64 changes what the language promises about `integer` — **the owner must ratify the posture explicitly before the doc is edited**, even though the code has decided it de facto. **Not to be treated as a mere doc-drift fix.**
 - **OS5 re-activation flag (Frank):** if OF5 rules fixed-width, OS5 (the unary-op `ProofRequirements` empty slot) should **re-activate** — `-integer` where the operand can be `long.MinValue` is then an independently faultable overflow (`-long.MinValue` overflows), and OS5's "empty slot defensible-by-construction" assumption (MinValue-negation always caught by an enclosing containment site) becomes *testable and must be verified, not assumed*. Don't leave OS5 in the deferred bucket once OF5 rules "fixed-width."
 
-### OF6 — Currency-code case: enforce uppercase-only, or normalize case-insensitively? — ⚠️ **RE-CHECKED 2026-07-23: genuinely open, and there is now a concrete argument that was not available when this was filed.**
+### OF6 — Currency-code case: enforce uppercase-only, or normalize case-insensitively? — ✅ **RULED BY THE OWNER 2026-07-24: Read A — enforce uppercase.**
+
+> **Ruling (owner, 2026-07-24):** Currency codes are **uppercase-only**. Lowercase/mixed-case currency input (`'usd'`, `'Zar'`) is a **compile error**. Currency lookup becomes ordinal (drop `OrdinalIgnoreCase`/`ToUpperInvariant`), the `business-domain-types.md:587` teachable is wired as a live diagnostic (PRE0053 or a dedicated case code), and the currency lane matches the already-enforced UCUM-unit rule (`quantity in 'KG'` is refused).
+>
+> **Deciding evidence:** the ISO-4217 × UCUM case-folding collisions — **`ZAR`** (rand) vs **`Zar`** (zetta-are) / **`zar`** (zepto-are), and `GIP`/`GiP`. In the polymorphic `price in` slot the currency registry is consulted first (`TypeChecker.cs:651-653`), so `price in 'Zar' of 'mass'` compiles clean today — a live UCUM unit silently captured as a currency. Uppercase-only lookup makes the collision structurally impossible. Determinism did not decide it (ordinal case-folding is the sanctioned form, `primitive-types.md:494`); the collision plus the registry-asymmetry did.
+>
+> **Consequences (build):** the current `CurrencyCatalog` case-folding is the drift, not the teachable — file the missing-rejection as a bug. `TypeChecker.cs:653` no longer needs a normalization step (it stops accepting non-uppercase at all). Downstream comparisons can drop the ignore-case comparer once lookup is ordinal.
+
+---
+
+*(Original 2026-07-23 re-check retained below for the reasoning that led here.)*
+
+> **⚠️ RE-CHECKED 2026-07-23: genuinely open, and there is now a concrete argument that was not available when this was filed.**
 
 > **Canon says uppercase, four times, but never as a Decision.** No lettered Decision block in `business-domain-types.md` addresses case — D13 (self-contained registries) and D13a (string-form serialization) are both silent on it. What exists is one teachable error row (`:587` — *"Currency codes must be uppercase (ISO 4217). Use `'USD'`."*) plus content-shape descriptions at `:559`, `:2021`, `:2025`. Normative in direction, but with no four-leg rationale behind it.
 >
