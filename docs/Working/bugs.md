@@ -27,7 +27,44 @@ surfaced for proper fixing.
 
 ## Active
 
-### BUG-047: `nonzero` on a `period` establishes structural non-equality, but a `period` divisor needs elapsed length — a clean-compiling divide by zero (SOUNDNESS hole)
+### BUG-049: Unit normalization silently rounds every conversion to 24 decimal places, contradicting two canonical exactness guarantees
+
+- **Discovered**: 2026-07-23, by a canon search checking whether the quantity/price bound question was already ruled. It was not — but the rounding turns out to contradict locked spec, so this is a bug rather than an open ruling.
+- **Symptom**: `field H as quantity in 'yg' nonzero default '1 yg'` is **rejected** — `PRE0079`, default violates `nonzero` — because `1 yg` normalizes to `1e-27` base units, which the normalizer rounds to zero. A genuinely non-zero authored magnitude is refused against its own declaration. `zg` passes; `yg` does not. The boundary is an artifact, not a decision.
+- **Root cause**: `Numeric/TypedConstantNormalizer.cs:88` — `private static decimal NormalizeResult(decimal value) => decimal.Round(value, 24, MidpointRounding.ToEven);` — applied unconditionally to every conversion, offset or not. Replicated into the interval path as `TrimIntervalPrecision`.
+- **It contradicts two canonical statements**:
+  - `business-domain-types.md:426` — *"The extraction is exact; bounds never round."* Every `quantity` bound routes through the normalizer, so bounds do round. The sentence is false as written.
+  - `docs/compiler/proof-engine.md:110` — the exactness guarantee holds for units *"representable in the design's `UcumExactFactor` + `decimal` model"*. A 24-place floor is narrower than that model, whose scale runs to 28, and it discards values the model can represent. `yg` is a supported linear unit and `1e-27` is representable in `decimal`.
+- **It does NOT contradict the exact-rational-scale decision** (D12, `business-domain-types.md:1786`). The factor genuinely stays a `UcumExactFactor` through composition and collapses to `decimal` only at application, which is what that decision licenses. The defect is the extra truncation *after* that collapse.
+- **Provenance — it was never ruled.** The constant entered in commit `5797337c`, titled *"test: Slice 37 — affine matrix tests passing"*, whose only other change is a test edit, and was replicated by `c2dcf685`, *"fix: trim affine interval precision noise"*. Neither touched a doc. The number 24 appears in no canonical doc, design doc, or research file as a precision policy.
+- **Why it was added, which matters for the fix**: the affine path (`(value + offset) * scale`, for `Cel` and `[degF]`) generates trailing artifacts that broke round-trip tests. So deleting it outright is not free. The honest fix is scoped to the affine round-trip rather than a global truncation of every linear conversion — but narrowing it changes a shipped proof guarantee's wording, so the scoping is a design call.
+- **Scope / class**: over-accept in the prover's view — any magnitude below `1e-24` base units becomes exactly zero to the proof engine — and a false rejection in the observed `yg` case. It also bypasses the sanctioned channel for marking an approximate conversion, which is catalog-declared per unit and surfaced (`catalog-system.md:1203`), so the approximation is invisible where the design intends it to be visible.
+- **Status**: Active — contradicts locked spec.
+
+### BUG-048: A constraint modifier on a COMPUTED field is enforced by nothing, and is then consumed as a premise (SOUNDNESS hole)
+
+- **Discovered**: 2026-07-23, round-2 attack on the divisor validity argument. **Behaviourally confirmed via `precept_compile` at HEAD.**
+- **Symptom**: the whole file, and it compiles.
+
+  ```precept
+  precept ComputedNonzero
+
+  field A as decimal default 1
+  field B as decimal default 1
+  field D as decimal nonzero <- A - B
+  field E as decimal <- 100 / D
+  ```
+
+  → `success: true`, no errors, `Divisor must be non-zero` **Proved** by `DeclarationAttribute`. `A` and `B` have no write sites, so `D` is `0` in the only configuration that exists, and `E` divides by it.
+- **Root cause**: the obligation list contains **no** establishing obligation for `D`. A stored field declared `nonzero` with a default always produces `Default value of 'D' must satisfy 'nonzero'` — verified repeatedly today — but a computed field produces nothing. So the modifier is declared, never checked, and then read back as a premise by the divisor proof.
+- **Why the usual justification does not reach it**: every argument that consumes a declared modifier grounds it in governance at ingress — `precept-language-spec.md:268`, *"Every declared constraint is enforced on every value entering the entity from outside the definition — event arguments, construction inputs, direct field edits — at the moment it enters"*. A computed field's value never enters from outside; it is derived. Ingress governance has no purchase on it, and nothing else checks it.
+- **Wider than the divisor case**: this is a modifier on a computed field being unenforced in general. Any proof consuming any modifier on any `<-` field rests on nothing. The divisor is simply the shape that makes it visible.
+- **Also collapses a scope boundary**: a `decimal nonzero <- M1 / M2` over two `money` fields gives a covered-lane divisor whose arithmetic happened entirely on an uncovered lane, so restricting a rule to the primitive numeric lanes does not restrict what can reach it.
+- **Scope / class**: SOUNDNESS, over-accept, on the headline fault.
+- **Fix complexity**: medium — a computed field's declared constraints need an establishment obligation over its expression, which is the constraint-establishment machinery currently unlocked and being redesigned. Until then no proof may consume a modifier on a computed field.
+- **Status**: Active — soundness hole.
+
+### BUG-047: A `period` divisor slips past the single-basis rule canon already settled, and its non-zero check reads only the leading component (SOUNDNESS hole, mostly drift against settled canon)
 
 - **Discovered**: 2026-07-23, adversarial attack on the divisor validity argument, on a lane the draft never mentioned. **Behaviourally confirmed via `precept_compile` at HEAD — zero diagnostics.**
 - **Symptom**:
@@ -46,11 +83,16 @@ surfaced for proper fixing.
   ```
 
   → `success: true`, **no diagnostics at all**, `Divisor must be non-zero` **Proved** by `DeclarationAttribute`, and `Default value of 'Gap' must satisfy 'nonzero'` also `Proved`. `'1 days + -24 hours'` has an elapsed length of exactly zero.
-- **Root cause — the predicate the modifier establishes is not the predicate the operation needs.** A `period` has no magnitude to compare against zero: `temporal-type-system.md:1478` records that there is no ordering on `period` because NodaTime's `Period` has no `IComparable`, and `:1487` that its equality is structural — *"'24 hours' ≠ '1 day'"*. So `nonzero` on a `period` can only mean "structurally not the zero period", which `1 days + -24 hours` satisfies. The consuming operation, `MoneyDividePeriod`, divides by the **elapsed length**. The obligation is discharged by a fact about a different quantity than the one that ends up in the denominator.
-- **Related oddity, same root**: `field Term as period positive default '30 days'` also compiles and proves, on a type the spec says has no ordering. `Modifiers.cs:19-21` puts `TypeKind.Period` in `ZeroBoundNumericTypes`, which is what makes both modifiers declarable there.
-- **Reach**: `period` is a divisor in two catalog operations — `MoneyDividePeriod` and `QuantityDividePeriod`.
-- **Scope / class**: SOUNDNESS, over-accept, on the headline fault. Distinct from BUG-045: that one is finite-representation underflow through arithmetic, this one is a type-level mismatch between a modifier's meaning and an operation's requirement, and it fires on a bare field reference with no arithmetic at all.
-- **Fix complexity**: medium, and it is a language question as much as an engine one — either `period` leaves `ZeroBoundNumericTypes` so the modifiers are not declarable there, or the divisor requirement on a period operand names the elapsed-length predicate rather than the structural one. The second needs a length notion the type deliberately does not expose.
+- **Re-framed 2026-07-23 after a canon search. Most of this is drift against settled decisions, not an open design question.** The first version treated the whole thing as needing a ruling. Four of the five sub-questions are already answered:
+  - **`nonzero` on a `period` is canon, and its structural meaning is the ruled meaning.** `temporal-type-system.md:842` — *"`nonnegative` (value ≥ zero period), `nonzero` (value ≠ zero period) — same semantics as on numeric types, **compared against `Period.Zero`**."* Not an accident of the catalog.
+  - **`period` being a divisor at all is settled YES, and removing it was explicitly rejected by the owner.** `research/language/division-by-temporal-span-prior-art.md`, Resolution 2026-05-30 — a single-basis period divisor is *"a **deliberate, owner-authorized extension** of the prior-art type boundary, not an open question"*, with the duration-only alternative *"rejected by the owner"*. Reopening that is a Tier-3 conversation.
+  - **A period divisor must be single-basis, and canon already says so** — D15, `business-domain-types.md:1837`: a compound period *"does **not**… it is a compile error. … `CompoundPeriodDenominator` enforces this."* **The repro's divisor is compound** (`days + hours`), so under settled canon it should already be rejected. It is not, because the guard keys off the *declared* `in` basis (`TypeChecker.Expressions.cs:1460` tests `rightTemporalUnit.Components.Length > 1`), and an unqualified `field Gap as period nonzero` carries no `in`, so `rightTemporalUnit` is null and neither PRE0073 nor PRE0074 can fire. **That is the primary defect: an implementation gap against a settled decision.**
+  - **`positive` on a `period` contradicts a locked decision.** `temporal-type-system.md:842` lists only `nonnegative` and `nonzero`; Decision #14 at `:1478` locks *"No ordering on `period` — `==` and `!=` only"*. `positive` rode in as a side effect of `ZeroBoundNumericTypes` being the shared applicability array. Mechanical correction, no design needed.
+- **The mechanical cause of the clean compile**: `ProjectPeriodSign` returns the sign of the **first non-zero component** — for `'1 days + -24 hours'` it reads `Days` and never looks at the `-24 hours`. The source already documents the defect in its own summary (`TypedExpressionMagnitude.cs:22-28`): *"Mixed-SIGN periods … **misclassify** … NOT suitable for min/max bound comparison. **Period bounds need a separate design.**"*
+- **What is genuinely open, and it is one thing**: what non-zero predicate a `period` divisor must satisfy. `Operations.cs:499` and `:573` attach a plain numeric `NotEquals, 0m` — a *magnitude* predicate on a type canon says has no magnitude — and no canonical doc states what non-zero-ness means for a period divisor. Note the catalog's own asymmetry: `PriceTimesPeriod` carries a temporal-dimension chain requirement, while the two divide operations carry no basis requirement at all. A related deferral exists at `temporal-type-system.md:1711` (interval enforcement for duration/period, *"deferred"*).
+- **Reach**: `MoneyDividePeriod` and `QuantityDividePeriod`.
+- **Scope / class**: SOUNDNESS, over-accept, on the headline fault. Distinct from BUG-045 — that is finite-representation underflow through arithmetic; this fires on a bare field reference.
+- **Fix complexity**: the compound-basis half is a bounded fix against settled canon (make the check see value-compound and basis-open periods, not just declared-`in` ones), and the `positive` half is a one-line applicability correction. Only the non-zero predicate needs a ruling.
 - **Status**: Active — soundness hole.
 
 ### BUG-046: A divisor whose declared interval excludes zero is not proved non-zero — the file is rejected saying it "can be zero" (false rejection)
@@ -241,7 +283,11 @@ surfaced for proper fixing.
   `Score` is the approximate lane bounded `[0, 9]`; a governance-admissible `0.30000000000000004` renders to 19 characters against a cap of 1 the compiler proved. `Ratio` at `2.5001` renders to 6 against the same cap.
 - **Root cause**: `DecimalDigitWidth` (`ProofEngine.Lengths.cs:191-194`) refuses only when an interval's **endpoints** are non-integral — `if (decimal.Truncate(min) != min || decimal.Truncate(max) != max) return null;`. An interval with integral endpoints admits non-integral members, so `[0, 9]` is treated as one digit wide.
 - **Wider than the fractional case**: the rendered width of a business-domain hole is taken over the unit-*normalized* magnitude while the render carries the declared unit, and no allowance is made for a unit or currency suffix, a sign, or a decimal point. `quantity in 'g' min '1000 g' max '9000 g'` interpolated into `maxlength 1` also proves.
-- **Underlying gap**: canon states only that *"Any scalar type is coercible to string"* (`precept-language-spec.md:1553`). There is no specified rendering for `decimal`, `number`, temporal or business-domain values — so the width the analyzer computes is being compared against a rendering that is nowhere defined.
+- **Underlying gap — corrected 2026-07-23 after a proper canon search.** The first version of this entry said canon specifies no rendering at all beyond *"Any scalar type is coercible to string"* (`precept-language-spec.md:1553`). That was wrong: `docs/compiler/literal-system.md:531-550` carries a live **String Coercion Table** covering thirteen scalar types, and `:520` settles culture — *"String coercion is deterministic and invariant-culture. `{Amount}` always produces `"1234.56"`, never `"1.234,56"`."* Temporal rendering is specified, culture is specified, and `decimal`/`number` are specified in kind. The accurate residue is narrower and is what this bug rests on:
+  - **Precision is not pinned.** "Invariant numeric string" does not say how many decimal places. For `number` nothing says whether it is shortest-round-trippable (which is what produces the 19-character `0.30000000000000004`) or fixed. For `decimal`, .NET preserves scale, and canon never says whether the render uses the value's scale, a normalized scale, or the declared `maxplaces` — which is declarable on all four magnitude types and would pin the width if the render honoured it.
+  - **The seven business-domain types and `choice` are absent from the table entirely.** There is an adjacent serialization contract (`business-domain-types.md:530` — `"100 USD"`) and a `FormatString` delegate in the runtime API, but nothing links either to interpolation, so whether `{Amount}` on a `money` renders `100 USD` or `100` is strongly implied and nowhere stated.
+  - **Which unit a `quantity` hole renders in is unstated.** The evaluator normalizes to UCUM base units on intake; de-normalization is specified for JSON and CLR egress but interpolation is not on that list.
+  - **The `duration`/`period` format is self-contradictory across three live docs** — "NodaTime round-trip format" vs `"72:00:00"` vs `"PT72H"`. Eight characters versus five is a real width difference.
 - **Scope / class**: SOUNDNESS, over-accept, on a `[StaticallyPreventable]` fault code.
 - **Fix complexity**: medium — a numeric hole must widen to unbounded unless its type, its value bounds *and* a declared precision bound jointly pin the width in the operand's own declared unit; and the rendering contract needs stating in canon before any of that is sound.
 - **Status**: Active — soundness hole.
