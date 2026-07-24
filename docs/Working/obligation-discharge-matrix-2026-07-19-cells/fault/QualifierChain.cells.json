@@ -36,7 +36,10 @@
   "familyDischargeSummary": {
     "obligationShape": "⟨left⟩.⟨leftAxis⟩ chains-to ⟨right⟩.⟨rightAxis⟩ — the two operands' qualifier values on their (possibly different) axes must be equal (the 'chain' relation is cross-axis token equality).",
     "decisionProcedure": "A finite two-step check with no search, no interval arithmetic, no fixpoint: (1) resolve each operand's qualifier on its axis via ResolveQualifierOnAxis — a bounded walk of the operand's statically declared qualifier set (field DeclaredQualifiers / arg DeclaredQualifiers / typed-constant qualifiers / interpolation slots / transitive ResultQualifier derivation through sub-expressions, ProofEngine.Qualifiers.cs:269-489); (2) compare the two resolved tokens for equality (ExtractComparableValue ordinal string-equality, or SourceFieldName identity for interpolated qualifiers). Bounded by the operand's finite declared-qualifier set and the loop-free sub-expression depth (spec § 0.4, no loops). If either operand fails to resolve, or the two tokens are unequal, REJECT naming QualifierChain (diagnostic PRE0114 UnprovedQualifierCompatibility).",
-    "premiseClassesApplicable": ["a", "b"],
+    "premiseClassesApplicable": [
+      "a",
+      "b"
+    ],
     "premiseClassNote": "The discharging fact is the operand's DECLARED TYPE QUALIFIER — a field's declared qualifier is premise class (a) field modifier; an arg's declared qualifier is premise class (b) arg constraint. Guard narrowing — premise class (c) — DOES NOT discharge a chain: ProofEngine.Qualifiers.cs's TryQualifierCompatibilityProof consults no guard/narrowing facts for a QualifierChainProofRequirement (guard-narrowing of an open qualifier is a DIFFERENT ProofRequirement kind, AssignmentQualifier / kind 13). Premise class (d) pre-state does not apply in the runtime-value sense: a type qualifier is immutable type-level metadata, not a mutable pre-state field value. This (a)/(b)-only set is a DIVERGENCE from the fault case shape's stated '(b)/(c)/(a) per catalog ProofSatisfactions' — see openFlags OF1 and OF2.",
     "transportStory": "The discharging fact is a static type-level declaration whose read-closure over mutable fields is EMPTY: (i) for a static literal qualifier (money in 'USD', price in 'USD/kg') the token is a literal denotation fixed at declaration; (ii) for an interpolated qualifier (money in '{Ccy}') the chain is proven by field IDENTITY (SourceFieldName), not field VALUE — both operands sourcing the same currency field always carry the same runtime currency regardless of any write to that field. Either way no write on any route can change whether the chain holds, so the fact is KILL-IMMUNE (transport-rule § 7, deps(φ) ∩ mayWrite = ∅ trivially, empty deps) and available on EVERY route and every occasion. This is exactly why all five occasion-cells share one discharge contract: a type-level qualifier fact is route-invariant, so the occasion coordinate carries no proof-relevant information for this kind."
   },
@@ -70,77 +73,126 @@
       "disposition": {
         "status": "defined",
         "citations": [
-          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes", "note": "Fault family case shape" },
-          { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.Qualifiers.cs:23-32", "note": "QualifierChain discharge" }
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+            "note": "Fault family case shape"
+          },
+          {
+            "kind": "code",
+            "ref": "src/Precept/Pipeline/ProofEngine.Qualifiers.cs:23-32",
+            "note": "QualifierChain discharge"
+          }
         ]
       },
       "obligation": {
         "statement": "Subtotal.currency ⤳ Split.UnitPrice.currency  (the money operand's Currency must equal the price operand's numerator Currency)",
         "metavariables": [
-          { "name": "left", "standsFor": "the money operand (field Subtotal, money in 'USD'); LeftAxis = Currency" },
-          { "name": "right", "standsFor": "the price operand (arg Split.UnitPrice, price in 'C/kg'); RightAxis = Currency (the price's numerator currency)" }
+          {
+            "name": "left",
+            "standsFor": "the money operand (field Subtotal, money in 'USD'); LeftAxis = Currency"
+          },
+          {
+            "name": "right",
+            "standsFor": "the price operand (arg Split.UnitPrice, price in 'C/kg'); RightAxis = Currency (the price's numerator currency)"
+          }
         ],
         "normalization": [
-          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the Normalization bullet; for a qualifier chain the normal form is the ExtractComparableValue token (ProofEngine.Qualifiers.cs:237-254)" }
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet; for a qualifier chain the normal form is the ExtractComparableValue token (ProofEngine.Qualifiers.cs:237-254)"
+          }
         ],
         "wp": {
           "statement": "resolve(Subtotal, Currency) = resolve(Split.UnitPrice, Currency), both statically resolvable and token-equal"
         }
       },
-      "applicablePremiseClasses": ["b", "a"],
+      "applicablePremiseClasses": [
+        "b",
+        "a"
+      ],
       "premiseAvailability": "The right operand's currency arrives as the DECLARED qualifier on the event arg Split.UnitPrice — premise class (b), governed at ingress. The left operand's currency is the declared field qualifier on Subtotal — premise class (a). Neither is guard-narrowable for a chain (premise class (c) is inapplicable to QualifierChain; see the family premiseClassNote and openFlags). The divisor-non-zero Numeric obligation that MoneyDividePrice also mints (Operations.cs:495) is discharged separately by declaring the price arg `positive`, keeping the chain obligation the sole live diagnostic in the base.",
       "dischargeContract": [
         {
-          "premiseClasses": ["b", "a"],
+          "premiseClasses": [
+            "b",
+            "a"
+          ],
           "derivation": "resolve both operands' Currency qualifiers from their declared type qualifiers (arg DeclaredQualifiers for the price; field DeclaredQualifiers for the money), then ChainQualifiersMatch → token equality (or SourceFieldName identity)",
           "capabilityTier": "1a",
           "strategy": "QualifierCompatibility",
           "decisionProcedure": "The family decision procedure: two-step finite qualifier resolution + token equality (ProofEngine.Qualifiers.cs:23-32, :105-116, :269-489). Reject iff either resolves to null or the tokens are unequal.",
           "validityArguments": [
-            "Qualifier chain equality (owed, not yet written in the matrix's § Validity arguments — see OF1)"
+            "Qualifier chain equality"
           ],
           "validityArgumentSketch": "Truth-preservation: a declared type qualifier is fixed by the declaration and, for an arg, enforced on the incoming value by ingress governance (spec:268); it is immutable type-level metadata that no write in any plan targets (the write surface writes field VALUES, spec § 3A.4 What can write, never a field's declared qualifier). So the resolved token equals the runtime qualifier on every route, and token equality of the two resolved qualifiers implies the runtime chain holds. Determinism + purity suffice; no arithmetic identity is used, so it holds on every lane. Flagged rather than assumed: the matrix's § Validity arguments enumerates arguments for the Numeric/guard/interval derivations only; no argument is written for qualifier-chain equality. Routed in OF1.",
           "citations": [
-            { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.Qualifiers.cs:269-317", "note": "ResolveQualifierOnAxis over a TypedArgRef's DeclaredQualifiers" },
-            { "kind": "code", "ref": "src/Precept/Pipeline/TypeChecker.Expressions.cs:1250-1260", "note": "ShouldSkipPairwiseQualifierChecks → true for PriceDenominatorInherited: MoneyDividePrice's currency-axis sameness is DEFERRED to the QualifierChain obligation (comment: 'Currency-axis sameness is verified by QualifierChainProofRequirement'), so the obligation is genuinely reachable at the proof stage rather than pre-empted by a type-checker PRE0070 — unlike MoneyDivideMoneySameCurrency" }
+            {
+              "kind": "code",
+              "ref": "src/Precept/Pipeline/ProofEngine.Qualifiers.cs:269-317",
+              "note": "ResolveQualifierOnAxis over a TypedArgRef's DeclaredQualifiers"
+            },
+            {
+              "kind": "code",
+              "ref": "src/Precept/Pipeline/TypeChecker.Expressions.cs:1250-1260",
+              "note": "ShouldSkipPairwiseQualifierChecks → true for PriceDenominatorInherited: MoneyDividePrice's currency-axis sameness is DEFERRED to the QualifierChain obligation (comment: 'Currency-axis sameness is verified by QualifierChainProofRequirement'), so the obligation is genuinely reachable at the proof stage rather than pre-empted by a type-checker PRE0070 — unlike MoneyDivideMoneySameCurrency"
+            }
           ]
         }
       ],
       "suggestions": [
         {
-          "premiseClasses": ["b", "a"],
+          "premiseClasses": [
+            "b",
+            "a"
+          ],
           "schema": "align the operands' qualifiers so ⟨left⟩.⟨leftAxis⟩ = ⟨right⟩.⟨rightAxis⟩ — declare the price arg's numerator currency equal to the money field's currency (or source both from the same currency field)",
-          "citations": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "the suggestion-schema bullet; the shipped diagnostic PRE0114 already says 'Align both declarations, or insert an explicit conversion'" } ]
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "the suggestion-schema bullet; the shipped diagnostic PRE0114 already says 'Align both declarations, or insert an explicit conversion'"
+            }
+          ]
         }
       ],
       "witnesses": {
         "base": {
           "program": "precept BillingChainTransitionBase\n\nfield Subtotal as money in 'USD' default '0 USD'\nfield Units as quantity in 'kg' default '0 kg'\n\nstate Draft initial\nstate Active\n\nevent Open(Amount as money in 'USD')\nfrom Draft on Open\n    -> set Subtotal = Open.Amount\n    -> transition Active\n\nevent Split(UnitPrice as price in 'EUR/kg' positive)\nfrom Active on Split\n    -> set Units = Subtotal / Split.UnitPrice\n    -> no transition\n",
-          "expected": { "outcome": "reject", "obligation": "QualifierChain", "diagnostic": "PRE0114", "noOtherDiagnostics": true },
-          "provenance": { "mark": "syntax-verified", "tool": "precept_compile (SYNTAX/reachability only; proof verdict not treated as definition authority)", "date": "2026-07-21", "observed": "success:false, single PRE0114 error, proofObligations shows QualifierChain Unresolved + Numeric Proved (divisor discharged by `positive`)" }
+          "expected": {
+            "outcome": "reject",
+            "obligation": "QualifierChain",
+            "diagnostic": "PRE0114",
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "syntax-verified",
+            "tool": "precept_compile (SYNTAX/reachability only; proof verdict not treated as definition authority)",
+            "date": "2026-07-21",
+            "observed": "success:false, single PRE0114 error, proofObligations shows QualifierChain Unresolved + Numeric Proved (divisor discharged by `positive`)"
+          }
         },
         "discharges": [
           {
             "id": "static-currency-match",
             "kind": "arg-qualifier",
             "addition": "price arg numerator currency changed EUR → USD: Split(UnitPrice as price in 'USD/kg' positive)",
-            "premiseClasses": ["b"],
+            "premiseClasses": [
+              "b"
+            ],
             "derivation": "resolve(Subtotal,Currency)='USD', resolve(UnitPrice,Currency)='USD' → ExtractComparableValue equal → ChainQualifiersMatch true",
             "modelStatus": "provable-under-model",
             "builtStatus": "proven-today",
-            "provenance": { "mark": "syntax-verified", "tool": "precept_compile", "date": "2026-07-21", "observed": "BillingChainTransitionDischarge: success:true, zero diagnostics, QualifierChain Proved strategy QualifierCompatibility" },
-            "expected": { "outcome": "accept" }
-          },
-          {
-            "id": "symbolic-same-source",
-            "kind": "shared-source-field",
-            "addition": "MODEL path: source both money and price numerator currency from the same field — money in '{Ccy}' ÷ price in '{Ccy}/kg'",
-            "premiseClasses": ["a", "b"],
-            "derivation": "QualifiersSymbolicallyEqual matches on SourceFieldName='Ccy' (ProofEngine.Qualifiers.cs:175-187)",
-            "modelStatus": "provable-under-model",
-            "builtStatus": "blocked-at-head",
-            "builtStatusNote": "Not exercisable at HEAD for a chain whose right operand is a price: `price in '{Ccy}/kg'` does not resolve its interpolated numerator currency (precept_compile emits PRE0121 'currency doesn't match a recognized pattern' and the chain reports the price side as 'unresolved'). The symbolic-equality code path exists and is reached for same-type qualifier compatibility, but the price-numerator interpolation blocks it here. Recorded as a built-status/reachability finding, NOT claimed as a live accept.",
-            "expected": { "outcome": "accept-under-model" }
+            "provenance": {
+              "mark": "syntax-verified",
+              "tool": "precept_compile",
+              "date": "2026-07-21",
+              "observed": "BillingChainTransitionDischarge: success:true, zero diagnostics, QualifierChain Proved strategy QualifierCompatibility"
+            },
+            "expected": {
+              "outcome": "accept"
+            }
           }
         ],
         "nearMisses": [
@@ -150,17 +202,32 @@
             "addition": "money currency made dynamic from a field that holds 'USD' at runtime but is not statically the price's currency: money in '{Ccy}' (Ccy default 'USD') ÷ price in 'USD/kg'",
             "program": "precept BillingChainDynamicMoneyNearMiss\n\nfield Ccy as currency default 'USD'\nfield Subtotal as money in '{Ccy}' default '0 {Ccy}'\nfield Units as quantity in 'kg' default '0 kg'\n\nstate Draft initial\nstate Active\n\nevent Open(Amount as money in '{Ccy}', C as currency)\nfrom Draft on Open\n    -> set Ccy = Open.C\n    -> set Subtotal = Open.Amount\n    -> transition Active\n\nevent Split(UnitPrice as price in 'USD/kg' positive)\nfrom Active on Split\n    -> set Units = Subtotal / Split.UnitPrice\n    -> no transition\n",
             "whyStillRejects": "resolve(Subtotal,Currency)='{Ccy}' (SourceFieldName Ccy), resolve(UnitPrice,Currency)='USD' (no SourceFieldName): ExtractComparableValue token-unequal AND QualifiersSymbolicallyEqual fails (only one side has a SourceFieldName). Runtime-safe (Ccy holds USD) but statically unprovable → still rejects, SAME obligation. This is the band member the respellability verdict points at.",
-            "provenance": { "mark": "syntax-verified", "tool": "precept_compile", "date": "2026-07-21", "observed": "success:false, single PRE0114, QualifierChain Unresolved" },
-            "expected": { "outcome": "reject", "sameObligation": true }
+            "provenance": {
+              "mark": "syntax-verified",
+              "tool": "precept_compile",
+              "date": "2026-07-21",
+              "observed": "success:false, single PRE0114, QualifierChain Unresolved"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
           }
         ]
       },
-      "respellability": { "resolution": "family-inherited" },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
       "citations": [
-        { "kind": "catalog", "ref": "src/Precept/Language/Operations.cs:486-497", "note": "MoneyDividePrice catalog entry: QualifierChainProofRequirement(PMoney/Currency, PPrice/Currency) at :492, plus the divisor Numeric at :495" }
+        {
+          "kind": "catalog",
+          "ref": "src/Precept/Language/Operations.cs:486-497",
+          "note": "MoneyDividePrice catalog entry: QualifierChainProofRequirement(PMoney/Currency, PPrice/Currency) at :492, plus the divisor Numeric at :495"
+        }
       ],
       "notes": [
-        "Clean of the known compiler holes (corrected-input #5): this cell rests on no guard fact surviving a write, so BUG-033 (the `into` binding kill blind spot) is irrelevant; and the discharging fact is kill-immune (empty read-closure), so the open write-surface enumeration gap cannot make it falsely survive. The reject/accept verdicts are DEFINITION claims from the family discharge contract; precept_compile was used for syntax + reachability corroboration only, per the corrected inputs."
+        "Clean of the known compiler holes (corrected-input #5): this cell rests on no guard fact surviving a write, so BUG-033 (the `into` binding kill blind spot) is irrelevant; and the discharging fact is kill-immune (empty read-closure), so the open write-surface enumeration gap cannot make it falsely survive. The reject/accept verdicts are DEFINITION claims from the family discharge contract; precept_compile was used for syntax + reachability corroboration only, per the corrected inputs.",
+        "The symbolic-same-source discharge (money in '{Ccy}' / price in '{Ccy}/kg', accepted on source-field symbolic equality) is REMOVED as an authored discharge: it is the value-fact path, which the matrix's Qualifier chain equality rule scopes out (the rule licenses operands whose qualifier is type-structural, provdeps empty). The shipped engine accepts it with no frame check on the shared source field, which is BUG-035. It becomes authorable again once the qualifier-axis establishment/preservation machinery exists and the transport rule's frame-and-kill is applied on that axis."
       ]
     },
     {
@@ -176,53 +243,118 @@
       "disposition": {
         "status": "defined",
         "citations": [
-          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes", "note": "Fault family case shape" },
-          { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.Qualifiers.cs:23-32", "note": "QualifierChain discharge" }
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+            "note": "Fault family case shape"
+          },
+          {
+            "kind": "code",
+            "ref": "src/Precept/Pipeline/ProofEngine.Qualifiers.cs:23-32",
+            "note": "QualifierChain discharge"
+          }
         ]
       },
       "obligation": {
         "statement": "Subtotal.currency ⤳ UnitPrice.currency, at a `to <State> -> set ...` entry-hook RHS",
         "metavariables": [
-          { "name": "left", "standsFor": "field Subtotal (money in 'USD'); LeftAxis = Currency" },
-          { "name": "right", "standsFor": "field UnitPrice (price in 'C/kg'); RightAxis = Currency" }
+          {
+            "name": "left",
+            "standsFor": "field Subtotal (money in 'USD'); LeftAxis = Currency"
+          },
+          {
+            "name": "right",
+            "standsFor": "field UnitPrice (price in 'C/kg'); RightAxis = Currency"
+          }
         ],
-        "normalization": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "Normalization; ExtractComparableValue token" } ],
-        "wp": { "statement": "resolve(Subtotal,Currency) = resolve(UnitPrice,Currency), both statically resolvable and token-equal" }
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "Normalization; ExtractComparableValue token"
+          }
+        ],
+        "wp": {
+          "statement": "resolve(Subtotal,Currency) = resolve(UnitPrice,Currency), both statically resolvable and token-equal"
+        }
       },
-      "applicablePremiseClasses": ["a"],
+      "applicablePremiseClasses": [
+        "a"
+      ],
       "premiseAvailability": "Both operands are entity fields, so both currencies are declared field qualifiers — premise class (a). The site sits in a state entry hook (`to Active -> set Units = Subtotal / UnitPrice`); the transport story is occasion-invariant (kill-immune type-level fact), so the hook placement carries no proof-relevant difference from the transition cell. Divisor-non-zero discharged by declaring the price field `positive`.",
       "dischargeContract": [
         {
-          "premiseClasses": ["a"],
+          "premiseClasses": [
+            "a"
+          ],
           "derivation": "resolve both field Currency qualifiers from DeclaredQualifiers, ChainQualifiersMatch → token equality",
           "capabilityTier": "1a",
           "strategy": "QualifierCompatibility",
           "decisionProcedure": "Family two-step finite qualifier resolution + token equality (ProofEngine.Qualifiers.cs:23-32, :105-116, :425-489 field-ref branch).",
-          "validityArguments": ["Qualifier chain equality (owed — OF1)"],
+          "validityArguments": [
+            "Qualifier chain equality"
+          ],
           "validityArgumentSketch": "As the family sketch: a field's declared currency is immutable type metadata no write targets, so the resolved token equals the runtime currency on every route; token equality implies the chain holds. Occasion-invariant.",
-          "citations": [ { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.Qualifiers.cs:425-489", "note": "ResolveQualifierOnAxis field-ref branch (semantics.FieldsByName → DeclaredQualifiers)" } ]
+          "citations": [
+            {
+              "kind": "code",
+              "ref": "src/Precept/Pipeline/ProofEngine.Qualifiers.cs:425-489",
+              "note": "ResolveQualifierOnAxis field-ref branch (semantics.FieldsByName → DeclaredQualifiers)"
+            }
+          ]
         }
       ],
       "suggestions": [
-        { "premiseClasses": ["a"], "schema": "align the two fields' declared currencies (or source both from one currency field)", "citations": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "suggestion-schema bullet" } ] }
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "align the two fields' declared currencies (or source both from one currency field)",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "suggestion-schema bullet"
+            }
+          ]
+        }
       ],
       "witnesses": {
         "base": {
           "program": "precept BillingChainStateHookBase\n\nfield Subtotal as money in 'USD' default '0 USD'\nfield UnitPrice as price in 'EUR/kg' positive default '1 EUR/kg'\nfield Units as quantity in 'kg' default '0 kg'\n\nstate Draft initial\nstate Active terminal\n\nto Active -> set Units = Subtotal / UnitPrice\n\nevent Open(Amount as money in 'USD', Rate as price in 'EUR/kg' positive)\nfrom Draft on Open\n    -> set Subtotal = Open.Amount\n    -> set UnitPrice = Open.Rate\n    -> transition Active\n",
-          "expected": { "outcome": "reject", "obligation": "QualifierChain", "diagnostic": "PRE0114", "noOtherDiagnostics": true },
-          "provenance": { "mark": "syntax-verified", "tool": "precept_compile", "date": "2026-07-21", "observed": "success:false, single PRE0114 ('in state hook for Active'), QualifierChain Unresolved" }
+          "expected": {
+            "outcome": "reject",
+            "obligation": "QualifierChain",
+            "diagnostic": "PRE0114",
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "syntax-verified",
+            "tool": "precept_compile",
+            "date": "2026-07-21",
+            "observed": "success:false, single PRE0114 ('in state hook for Active'), QualifierChain Unresolved"
+          }
         },
         "discharges": [
           {
             "id": "static-currency-match",
             "kind": "field-qualifier",
             "addition": "UnitPrice declared USD instead of EUR: price in 'USD/kg' (and the Open.Rate arg matched to 'USD/kg')",
-            "premiseClasses": ["a"],
+            "premiseClasses": [
+              "a"
+            ],
             "derivation": "resolve(Subtotal,Currency)='USD' = resolve(UnitPrice,Currency)='USD' → ChainQualifiersMatch true",
             "modelStatus": "provable-under-model",
             "builtStatus": "proven-today",
-            "provenance": { "mark": "syntax-verified", "tool": "precept_compile", "date": "2026-07-21", "observed": "BillingChainStateHookDischarge: success:true, zero diagnostics, QualifierChain Proved strategy QualifierCompatibility" },
-            "expected": { "outcome": "accept" }
+            "provenance": {
+              "mark": "syntax-verified",
+              "tool": "precept_compile",
+              "date": "2026-07-21",
+              "observed": "BillingChainStateHookDischarge: success:true, zero diagnostics, QualifierChain Proved strategy QualifierCompatibility"
+            },
+            "expected": {
+              "outcome": "accept"
+            }
           }
         ],
         "nearMisses": [
@@ -232,15 +364,33 @@
             "addition": "money field currency made dynamic (money in '{Ccy}', Ccy default 'USD') while the price field stays static 'USD/kg'",
             "program": "precept BillingChainStateHookNearMiss\n\nfield Ccy as currency default 'USD'\nfield Subtotal as money in '{Ccy}' default '0 {Ccy}'\nfield UnitPrice as price in 'USD/kg' positive default '1 USD/kg'\nfield Units as quantity in 'kg' default '0 kg'\n\nstate Draft initial\nstate Active terminal\n\nto Active -> set Units = Subtotal / UnitPrice\n\nevent Open(Amount as money in '{Ccy}', C as currency, Rate as price in 'USD/kg' positive)\nfrom Draft on Open\n    -> set Ccy = Open.C\n    -> set Subtotal = Open.Amount\n    -> set UnitPrice = Open.Rate\n    -> transition Active\n",
             "whyStillRejects": "resolve(Subtotal,Currency)='{Ccy}' vs resolve(UnitPrice,Currency)='USD': token-unequal and only one side carries a SourceFieldName → QualifiersSymbolicallyEqual fails. Runtime-USD but statically unprovable → rejects, same obligation.",
-            "provenance": { "mark": "syntax-verified", "tool": "precept_compile", "date": "2026-07-21", "observed": "success:false, single PRE0114 ('in state hook for Active'), QualifierChain Unresolved" },
-            "expected": { "outcome": "reject", "sameObligation": true }
+            "provenance": {
+              "mark": "syntax-verified",
+              "tool": "precept_compile",
+              "date": "2026-07-21",
+              "observed": "success:false, single PRE0114 ('in state hook for Active'), QualifierChain Unresolved"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
           }
         ]
       },
-      "respellability": { "resolution": "family-inherited" },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
       "citations": [
-        { "kind": "catalog", "ref": "src/Precept/Language/Operations.cs:486-497", "note": "MoneyDividePrice catalog entry" },
-        { "kind": "sample", "ref": "samples/insurance-claim-adjudication.precept:137-140", "note": "the `to <State> -> set ...` entry-hook convention this base follows" }
+        {
+          "kind": "catalog",
+          "ref": "src/Precept/Language/Operations.cs:486-497",
+          "note": "MoneyDividePrice catalog entry"
+        },
+        {
+          "kind": "sample",
+          "ref": "samples/insurance-claim-adjudication.precept:137-140",
+          "note": "the `to <State> -> set ...` entry-hook convention this base follows"
+        }
       ],
       "notes": [
         "Clean of BUG-033 and the write-surface enumeration gap (see the transition cell's note; identical reasoning — kill-immune fact, no guard-across-write dependency)."
@@ -259,53 +409,118 @@
       "disposition": {
         "status": "defined",
         "citations": [
-          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes", "note": "Fault family case shape" },
-          { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.Qualifiers.cs:23-32", "note": "QualifierChain discharge" }
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+            "note": "Fault family case shape"
+          },
+          {
+            "kind": "code",
+            "ref": "src/Precept/Pipeline/ProofEngine.Qualifiers.cs:23-32",
+            "note": "QualifierChain discharge"
+          }
         ]
       },
       "obligation": {
         "statement": "Subtotal.currency ⤳ UnitPrice.currency, inside the condition of `rule Subtotal / UnitPrice <= '100 kg'`",
         "metavariables": [
-          { "name": "left", "standsFor": "field Subtotal (money in 'USD'); LeftAxis = Currency" },
-          { "name": "right", "standsFor": "field UnitPrice (price in 'C/kg'); RightAxis = Currency" }
+          {
+            "name": "left",
+            "standsFor": "field Subtotal (money in 'USD'); LeftAxis = Currency"
+          },
+          {
+            "name": "right",
+            "standsFor": "field UnitPrice (price in 'C/kg'); RightAxis = Currency"
+          }
         ],
-        "normalization": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "Normalization; ExtractComparableValue token" } ],
-        "wp": { "statement": "resolve(Subtotal,Currency) = resolve(UnitPrice,Currency), both statically resolvable and token-equal" }
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "Normalization; ExtractComparableValue token"
+          }
+        ],
+        "wp": {
+          "statement": "resolve(Subtotal,Currency) = resolve(UnitPrice,Currency), both statically resolvable and token-equal"
+        }
       },
-      "applicablePremiseClasses": ["a"],
+      "applicablePremiseClasses": [
+        "a"
+      ],
       "premiseAvailability": "Rule conditions read fields only (no event args, no guard on a stateless rule), so the chain's operands carry declared field qualifiers — premise class (a). The comparison `<= '100 kg'` mints its own QualifierCompatibility (Unit) obligation, which discharges statically (both 'kg'); the divisor-non-zero mints separately (discharged by `positive`). The chain obligation is the sole live diagnostic in the base.",
       "dischargeContract": [
         {
-          "premiseClasses": ["a"],
+          "premiseClasses": [
+            "a"
+          ],
           "derivation": "resolve both field Currency qualifiers, ChainQualifiersMatch → token equality",
           "capabilityTier": "1a",
           "strategy": "QualifierCompatibility",
           "decisionProcedure": "Family two-step finite qualifier resolution + token equality (ProofEngine.Qualifiers.cs:23-32, :105-116). Rule conditions are walked at ProofEngine.cs:236-239 (per the coordinate map), so the obligation is minted per route the rule evaluates on.",
-          "validityArguments": ["Qualifier chain equality (owed — OF1)"],
+          "validityArguments": [
+            "Qualifier chain equality"
+          ],
           "validityArgumentSketch": "As the family sketch; occasion-invariant. A rule's `always` bucket is evaluated on every operation except restore (transport-rule § 3 rule-condition row); the chain fact is kill-immune, so route breadth changes nothing.",
-          "citations": [ { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.Qualifiers.cs:425-489", "note": "field-ref qualifier resolution" } ]
+          "citations": [
+            {
+              "kind": "code",
+              "ref": "src/Precept/Pipeline/ProofEngine.Qualifiers.cs:425-489",
+              "note": "field-ref qualifier resolution"
+            }
+          ]
         }
       ],
       "suggestions": [
-        { "premiseClasses": ["a"], "schema": "align the two fields' declared currencies (or source both from one currency field)", "citations": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "suggestion-schema bullet" } ] }
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "align the two fields' declared currencies (or source both from one currency field)",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "suggestion-schema bullet"
+            }
+          ]
+        }
       ],
       "witnesses": {
         "base": {
           "program": "precept BillingChainRuleBase\n\nfield Subtotal as money in 'USD' default '0 USD'\nfield UnitPrice as price in 'EUR/kg' positive default '1 EUR/kg'\n\nrule Subtotal / UnitPrice <= '100 kg' because \"unit cap keeps allocation bounded\"\n\nstate Draft initial\nstate Active terminal\n\nevent Open(Amount as money in 'USD', Rate as price in 'EUR/kg' positive)\nfrom Draft on Open\n    -> set Subtotal = Open.Amount\n    -> set UnitPrice = Open.Rate\n    -> transition Active\n",
-          "expected": { "outcome": "reject", "obligation": "QualifierChain", "diagnostic": "PRE0114", "noOtherDiagnostics": true },
-          "provenance": { "mark": "syntax-verified", "tool": "precept_compile", "date": "2026-07-21", "observed": "success:false, single PRE0114 ('while evaluating rule at index 0'); QualifierChain Unresolved, unit-axis QualifierCompatibility Proved, numerics Proved" }
+          "expected": {
+            "outcome": "reject",
+            "obligation": "QualifierChain",
+            "diagnostic": "PRE0114",
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "syntax-verified",
+            "tool": "precept_compile",
+            "date": "2026-07-21",
+            "observed": "success:false, single PRE0114 ('while evaluating rule at index 0'); QualifierChain Unresolved, unit-axis QualifierCompatibility Proved, numerics Proved"
+          }
         },
         "discharges": [
           {
             "id": "static-currency-match",
             "kind": "field-qualifier",
             "addition": "UnitPrice declared USD instead of EUR: price in 'USD/kg' (Open.Rate matched)",
-            "premiseClasses": ["a"],
+            "premiseClasses": [
+              "a"
+            ],
             "derivation": "resolve(Subtotal,Currency)='USD' = resolve(UnitPrice,Currency)='USD' → ChainQualifiersMatch true",
             "modelStatus": "provable-under-model",
             "builtStatus": "proven-today",
-            "provenance": { "mark": "syntax-verified", "tool": "precept_compile", "date": "2026-07-21", "observed": "BillingChainRuleDischarge: success:true, zero diagnostics, QualifierChain Proved strategy QualifierCompatibility" },
-            "expected": { "outcome": "accept" }
+            "provenance": {
+              "mark": "syntax-verified",
+              "tool": "precept_compile",
+              "date": "2026-07-21",
+              "observed": "BillingChainRuleDischarge: success:true, zero diagnostics, QualifierChain Proved strategy QualifierCompatibility"
+            },
+            "expected": {
+              "outcome": "accept"
+            }
           }
         ],
         "nearMisses": [
@@ -315,15 +530,33 @@
             "addition": "money field currency made dynamic (money in '{Ccy}', Ccy default 'USD') while the price field stays static 'USD/kg'",
             "program": "precept BillingChainRuleNearMiss\n\nfield Ccy as currency default 'USD'\nfield Subtotal as money in '{Ccy}' default '0 {Ccy}'\nfield UnitPrice as price in 'USD/kg' positive default '1 USD/kg'\n\nrule Subtotal / UnitPrice <= '100 kg' because \"unit cap keeps allocation bounded\"\n\nstate Draft initial\nstate Active terminal\n\nevent Open(Amount as money in '{Ccy}', C as currency, Rate as price in 'USD/kg' positive)\nfrom Draft on Open\n    -> set Ccy = Open.C\n    -> set Subtotal = Open.Amount\n    -> set UnitPrice = Open.Rate\n    -> transition Active\n",
             "whyStillRejects": "resolve(Subtotal,Currency)='{Ccy}' vs 'USD': token-unequal, symbolic equality fails (one-sided SourceFieldName). Runtime-USD but statically unprovable → rejects, same obligation.",
-            "provenance": { "mark": "syntax-verified", "tool": "precept_compile", "date": "2026-07-21", "observed": "success:false, single PRE0114 ('while evaluating rule at index 0'), QualifierChain Unresolved" },
-            "expected": { "outcome": "reject", "sameObligation": true }
+            "provenance": {
+              "mark": "syntax-verified",
+              "tool": "precept_compile",
+              "date": "2026-07-21",
+              "observed": "success:false, single PRE0114 ('while evaluating rule at index 0'), QualifierChain Unresolved"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
           }
         ]
       },
-      "respellability": { "resolution": "family-inherited" },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
       "citations": [
-        { "kind": "catalog", "ref": "src/Precept/Language/Operations.cs:486-497", "note": "MoneyDividePrice catalog entry" },
-        { "kind": "sample", "ref": "samples/currency-exchange-rates.precept:44-45", "note": "the `rule ... because \"...\"` convention (double-quoted message) this base follows" }
+        {
+          "kind": "catalog",
+          "ref": "src/Precept/Language/Operations.cs:486-497",
+          "note": "MoneyDividePrice catalog entry"
+        },
+        {
+          "kind": "sample",
+          "ref": "samples/currency-exchange-rates.precept:44-45",
+          "note": "the `rule ... because \"...\"` convention (double-quoted message) this base follows"
+        }
       ],
       "notes": [
         "Clean of BUG-033 and the write-surface enumeration gap (kill-immune fact; no guard-across-write dependency)."
@@ -342,53 +575,118 @@
       "disposition": {
         "status": "defined",
         "citations": [
-          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes", "note": "Fault family case shape" },
-          { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.Qualifiers.cs:23-32", "note": "QualifierChain discharge" }
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+            "note": "Fault family case shape"
+          },
+          {
+            "kind": "code",
+            "ref": "src/Precept/Pipeline/ProofEngine.Qualifiers.cs:23-32",
+            "note": "QualifierChain discharge"
+          }
         ]
       },
       "obligation": {
         "statement": "Subtotal.currency ⤳ UnitPrice.currency, inside `in Active ensure Subtotal / UnitPrice <= '100 kg'`",
         "metavariables": [
-          { "name": "left", "standsFor": "field Subtotal (money in 'USD'); LeftAxis = Currency" },
-          { "name": "right", "standsFor": "field UnitPrice (price in 'C/kg'); RightAxis = Currency" }
+          {
+            "name": "left",
+            "standsFor": "field Subtotal (money in 'USD'); LeftAxis = Currency"
+          },
+          {
+            "name": "right",
+            "standsFor": "field UnitPrice (price in 'C/kg'); RightAxis = Currency"
+          }
         ],
-        "normalization": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "Normalization; ExtractComparableValue token" } ],
-        "wp": { "statement": "resolve(Subtotal,Currency) = resolve(UnitPrice,Currency), both statically resolvable and token-equal" }
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "Normalization; ExtractComparableValue token"
+          }
+        ],
+        "wp": {
+          "statement": "resolve(Subtotal,Currency) = resolve(UnitPrice,Currency), both statically resolvable and token-equal"
+        }
       },
-      "applicablePremiseClasses": ["a"],
+      "applicablePremiseClasses": [
+        "a"
+      ],
       "premiseAvailability": "A residency ensure reads fields only, so the chain operands carry declared field qualifiers — premise class (a). Under the site-identity ruling a residency-ensure fault site is one occasion PER entry into Active; because the chain fact is a kill-immune type-level fact identical on every entry route, all those occasions carry one discharge — the multi-route expansion the ruling warns about does not bite for this kind (unlike a divisor whose safety can differ per route). Comparison Unit-axis and divisor-non-zero discharge separately.",
       "dischargeContract": [
         {
-          "premiseClasses": ["a"],
+          "premiseClasses": [
+            "a"
+          ],
           "derivation": "resolve both field Currency qualifiers, ChainQualifiersMatch → token equality",
           "capabilityTier": "1a",
           "strategy": "QualifierCompatibility",
           "decisionProcedure": "Family two-step finite qualifier resolution + token equality (ProofEngine.Qualifiers.cs:23-32, :105-116). `in S ensure` conditions are walked at ProofEngine.cs:242-248 (per the coordinate map).",
-          "validityArguments": ["Qualifier chain equality (owed — OF1)"],
+          "validityArguments": [
+            "Qualifier chain equality"
+          ],
           "validityArgumentSketch": "As the family sketch; the residency `in <current>` bucket is evaluated on fire/update/construction (not restore) per the evaluator's constraint matrix, and the chain fact is kill-immune, so the route set breadth is immaterial. Occasion-invariant.",
-          "citations": [ { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.Qualifiers.cs:425-489", "note": "field-ref qualifier resolution" } ]
+          "citations": [
+            {
+              "kind": "code",
+              "ref": "src/Precept/Pipeline/ProofEngine.Qualifiers.cs:425-489",
+              "note": "field-ref qualifier resolution"
+            }
+          ]
         }
       ],
       "suggestions": [
-        { "premiseClasses": ["a"], "schema": "align the two fields' declared currencies (or source both from one currency field)", "citations": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "suggestion-schema bullet" } ] }
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "align the two fields' declared currencies (or source both from one currency field)",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "suggestion-schema bullet"
+            }
+          ]
+        }
       ],
       "witnesses": {
         "base": {
           "program": "precept BillingChainEnsureBase\n\nfield Subtotal as money in 'USD' default '0 USD'\nfield UnitPrice as price in 'EUR/kg' positive default '1 EUR/kg'\n\nstate Draft initial\nstate Active terminal\nin Active ensure Subtotal / UnitPrice <= '100 kg' because \"unit cap keeps allocation bounded\"\n\nevent Open(Amount as money in 'USD', Rate as price in 'EUR/kg' positive)\nfrom Draft on Open\n    -> set Subtotal = Open.Amount\n    -> set UnitPrice = Open.Rate\n    -> transition Active\n",
-          "expected": { "outcome": "reject", "obligation": "QualifierChain", "diagnostic": "PRE0114", "noOtherDiagnostics": true },
-          "provenance": { "mark": "syntax-verified", "tool": "precept_compile", "date": "2026-07-21", "observed": "success:false, single PRE0114 ('while evaluating ensure for Active'); QualifierChain Unresolved, unit-axis QualifierCompatibility Proved, numerics Proved" }
+          "expected": {
+            "outcome": "reject",
+            "obligation": "QualifierChain",
+            "diagnostic": "PRE0114",
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "syntax-verified",
+            "tool": "precept_compile",
+            "date": "2026-07-21",
+            "observed": "success:false, single PRE0114 ('while evaluating ensure for Active'); QualifierChain Unresolved, unit-axis QualifierCompatibility Proved, numerics Proved"
+          }
         },
         "discharges": [
           {
             "id": "static-currency-match",
             "kind": "field-qualifier",
             "addition": "UnitPrice declared USD instead of EUR: price in 'USD/kg' (Open.Rate matched)",
-            "premiseClasses": ["a"],
+            "premiseClasses": [
+              "a"
+            ],
             "derivation": "resolve(Subtotal,Currency)='USD' = resolve(UnitPrice,Currency)='USD' → ChainQualifiersMatch true",
             "modelStatus": "provable-under-model",
             "builtStatus": "proven-today",
-            "provenance": { "mark": "syntax-verified", "tool": "precept_compile", "date": "2026-07-21", "observed": "BillingChainEnsureDischarge: success:true, zero diagnostics, QualifierChain Proved strategy QualifierCompatibility" },
-            "expected": { "outcome": "accept" }
+            "provenance": {
+              "mark": "syntax-verified",
+              "tool": "precept_compile",
+              "date": "2026-07-21",
+              "observed": "BillingChainEnsureDischarge: success:true, zero diagnostics, QualifierChain Proved strategy QualifierCompatibility"
+            },
+            "expected": {
+              "outcome": "accept"
+            }
           }
         ],
         "nearMisses": [
@@ -398,15 +696,33 @@
             "addition": "money field currency made dynamic (money in '{Ccy}', Ccy default 'USD') while the price field stays static 'USD/kg'",
             "program": "precept BillingChainEnsureNearMiss\n\nfield Ccy as currency default 'USD'\nfield Subtotal as money in '{Ccy}' default '0 {Ccy}'\nfield UnitPrice as price in 'USD/kg' positive default '1 USD/kg'\n\nstate Draft initial\nstate Active terminal\nin Active ensure Subtotal / UnitPrice <= '100 kg' because \"unit cap keeps allocation bounded\"\n\nevent Open(Amount as money in '{Ccy}', C as currency, Rate as price in 'USD/kg' positive)\nfrom Draft on Open\n    -> set Ccy = Open.C\n    -> set Subtotal = Open.Amount\n    -> set UnitPrice = Open.Rate\n    -> transition Active\n",
             "whyStillRejects": "resolve(Subtotal,Currency)='{Ccy}' vs 'USD': token-unequal, one-sided SourceFieldName → symbolic equality fails. Runtime-USD but statically unprovable → rejects, same obligation.",
-            "provenance": { "mark": "syntax-verified", "tool": "precept_compile", "date": "2026-07-21", "observed": "success:false, single PRE0114 ('while evaluating ensure for Active'), QualifierChain Unresolved" },
-            "expected": { "outcome": "reject", "sameObligation": true }
+            "provenance": {
+              "mark": "syntax-verified",
+              "tool": "precept_compile",
+              "date": "2026-07-21",
+              "observed": "success:false, single PRE0114 ('while evaluating ensure for Active'), QualifierChain Unresolved"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
           }
         ]
       },
-      "respellability": { "resolution": "family-inherited" },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
       "citations": [
-        { "kind": "catalog", "ref": "src/Precept/Language/Operations.cs:486-497", "note": "MoneyDividePrice catalog entry" },
-        { "kind": "sample", "ref": "samples/building-access-badge-request.precept:40-41", "note": "the `in <State> ensure ... because \"...\"` residency-ensure convention this base follows" }
+        {
+          "kind": "catalog",
+          "ref": "src/Precept/Language/Operations.cs:486-497",
+          "note": "MoneyDividePrice catalog entry"
+        },
+        {
+          "kind": "sample",
+          "ref": "samples/building-access-badge-request.precept:40-41",
+          "note": "the `in <State> ensure ... because \"...\"` residency-ensure convention this base follows"
+        }
       ],
       "notes": [
         "Clean of BUG-033 and the write-surface enumeration gap (kill-immune fact; no guard-across-write dependency)."
@@ -425,53 +741,118 @@
       "disposition": {
         "status": "defined",
         "citations": [
-          { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes", "note": "Fault family case shape" },
-          { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.Qualifiers.cs:23-32", "note": "QualifierChain discharge" }
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+            "note": "Fault family case shape"
+          },
+          {
+            "kind": "code",
+            "ref": "src/Precept/Pipeline/ProofEngine.Qualifiers.cs:23-32",
+            "note": "QualifierChain discharge"
+          }
         ]
       },
       "obligation": {
         "statement": "Subtotal.currency ⤳ UnitPrice.currency, inside `field Units as quantity in 'kg' <- Subtotal / UnitPrice`",
         "metavariables": [
-          { "name": "left", "standsFor": "computed-field input Subtotal (money in 'USD'); LeftAxis = Currency" },
-          { "name": "right", "standsFor": "computed-field input UnitPrice (price in 'C/kg'); RightAxis = Currency" }
+          {
+            "name": "left",
+            "standsFor": "computed-field input Subtotal (money in 'USD'); LeftAxis = Currency"
+          },
+          {
+            "name": "right",
+            "standsFor": "computed-field input UnitPrice (price in 'C/kg'); RightAxis = Currency"
+          }
         ],
-        "normalization": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "Normalization; ExtractComparableValue token" } ],
-        "wp": { "statement": "resolve(Subtotal,Currency) = resolve(UnitPrice,Currency), both statically resolvable and token-equal" }
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "Normalization; ExtractComparableValue token"
+          }
+        ],
+        "wp": {
+          "statement": "resolve(Subtotal,Currency) = resolve(UnitPrice,Currency), both statically resolvable and token-equal"
+        }
       },
-      "applicablePremiseClasses": ["a"],
+      "applicablePremiseClasses": [
+        "a"
+      ],
       "premiseAvailability": "A computed-field expression reads its input fields, whose declared currencies are premise class (a). Under the computed-field transitivity mint rule (leg (c) of the mention set), every write to Subtotal or UnitPrice is a write site for constraints mentioning Units — but that concerns the CONSTRAINT families; the fault obligation here is the chain inside the computed expression itself, minted at ProofEngine.cs:250-257 (computed-field walk). The chain fact is kill-immune, so recomputation on every operation (including Restore) does not change it.",
       "dischargeContract": [
         {
-          "premiseClasses": ["a"],
+          "premiseClasses": [
+            "a"
+          ],
           "derivation": "resolve both input-field Currency qualifiers, ChainQualifiersMatch → token equality",
           "capabilityTier": "1a",
           "strategy": "QualifierCompatibility",
           "decisionProcedure": "Family two-step finite qualifier resolution + token equality (ProofEngine.Qualifiers.cs:23-32, :105-116). The computed-field expression is walked at ProofEngine.cs:250-257 (per the coordinate map).",
-          "validityArguments": ["Qualifier chain equality (owed — OF1)"],
+          "validityArguments": [
+            "Qualifier chain equality"
+          ],
           "validityArgumentSketch": "As the family sketch. Computed-field recomputation appears in every operation's pipeline including Restore (transport-rule § 3 computed-field-expression row), but it only ever re-reads the input fields' declared currencies, which no write mutates, so the chain verdict is invariant across recomputation. Occasion-invariant.",
-          "citations": [ { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.Qualifiers.cs:425-489", "note": "field-ref qualifier resolution" } ]
+          "citations": [
+            {
+              "kind": "code",
+              "ref": "src/Precept/Pipeline/ProofEngine.Qualifiers.cs:425-489",
+              "note": "field-ref qualifier resolution"
+            }
+          ]
         }
       ],
       "suggestions": [
-        { "premiseClasses": ["a"], "schema": "align the two input fields' declared currencies (or source both from one currency field)", "citations": [ { "kind": "matrix", "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary", "note": "suggestion-schema bullet" } ] }
+        {
+          "premiseClasses": [
+            "a"
+          ],
+          "schema": "align the two input fields' declared currencies (or source both from one currency field)",
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+              "note": "suggestion-schema bullet"
+            }
+          ]
+        }
       ],
       "witnesses": {
         "base": {
           "program": "precept BillingChainComputedBase\n\nfield Subtotal as money in 'USD' default '0 USD'\nfield UnitPrice as price in 'EUR/kg' positive default '1 EUR/kg'\nfield Units as quantity in 'kg' <- Subtotal / UnitPrice\n\nstate Draft initial\nstate Active terminal\n\nevent Open(Amount as money in 'USD', Rate as price in 'EUR/kg' positive)\nfrom Draft on Open\n    -> set Subtotal = Open.Amount\n    -> set UnitPrice = Open.Rate\n    -> transition Active\n",
-          "expected": { "outcome": "reject", "obligation": "QualifierChain", "diagnostic": "PRE0114", "noOtherDiagnostics": true },
-          "provenance": { "mark": "syntax-verified", "tool": "precept_compile", "date": "2026-07-21", "observed": "success:false, single PRE0114 ('in the computed expression for field Units'); QualifierChain Unresolved, numerics Proved. (An earlier draft without UnitPrice's write site / Active terminal marking produced extra PRE0158/PRE0119 warnings; the base shown here is cleaned so the chain obligation is the sole diagnostic.)" }
+          "expected": {
+            "outcome": "reject",
+            "obligation": "QualifierChain",
+            "diagnostic": "PRE0114",
+            "noOtherDiagnostics": true
+          },
+          "provenance": {
+            "mark": "syntax-verified",
+            "tool": "precept_compile",
+            "date": "2026-07-21",
+            "observed": "success:false, single PRE0114 ('in the computed expression for field Units'); QualifierChain Unresolved, numerics Proved. (An earlier draft without UnitPrice's write site / Active terminal marking produced extra PRE0158/PRE0119 warnings; the base shown here is cleaned so the chain obligation is the sole diagnostic.)"
+          }
         },
         "discharges": [
           {
             "id": "static-currency-match",
             "kind": "field-qualifier",
             "addition": "UnitPrice declared USD instead of EUR: price in 'USD/kg' (Open.Rate matched)",
-            "premiseClasses": ["a"],
+            "premiseClasses": [
+              "a"
+            ],
             "derivation": "resolve(Subtotal,Currency)='USD' = resolve(UnitPrice,Currency)='USD' → ChainQualifiersMatch true",
             "modelStatus": "provable-under-model",
             "builtStatus": "proven-today",
-            "provenance": { "mark": "syntax-verified", "tool": "precept_compile", "date": "2026-07-21", "observed": "BillingChainComputedDischarge: success:true, zero diagnostics, QualifierChain Proved strategy QualifierCompatibility" },
-            "expected": { "outcome": "accept" }
+            "provenance": {
+              "mark": "syntax-verified",
+              "tool": "precept_compile",
+              "date": "2026-07-21",
+              "observed": "BillingChainComputedDischarge: success:true, zero diagnostics, QualifierChain Proved strategy QualifierCompatibility"
+            },
+            "expected": {
+              "outcome": "accept"
+            }
           }
         ],
         "nearMisses": [
@@ -481,14 +862,28 @@
             "addition": "money input currency made dynamic (money in '{Ccy}', Ccy default 'USD') while the price input stays static 'USD/kg'",
             "program": "precept BillingChainComputedNearMiss\n\nfield Ccy as currency default 'USD'\nfield Subtotal as money in '{Ccy}' default '0 {Ccy}'\nfield UnitPrice as price in 'USD/kg' positive default '1 USD/kg'\nfield Units as quantity in 'kg' <- Subtotal / UnitPrice\n\nstate Draft initial\nstate Active terminal\n\nevent Open(Amount as money in '{Ccy}', C as currency, Rate as price in 'USD/kg' positive)\nfrom Draft on Open\n    -> set Ccy = Open.C\n    -> set Subtotal = Open.Amount\n    -> set UnitPrice = Open.Rate\n    -> transition Active\n",
             "whyStillRejects": "resolve(Subtotal,Currency)='{Ccy}' vs 'USD': token-unequal, one-sided SourceFieldName → symbolic equality fails. Runtime-USD but statically unprovable → rejects, same obligation.",
-            "provenance": { "mark": "syntax-verified", "tool": "precept_compile", "date": "2026-07-21", "observed": "success:false, single PRE0114 ('in the computed expression for field Units'), QualifierChain Unresolved" },
-            "expected": { "outcome": "reject", "sameObligation": true }
+            "provenance": {
+              "mark": "syntax-verified",
+              "tool": "precept_compile",
+              "date": "2026-07-21",
+              "observed": "success:false, single PRE0114 ('in the computed expression for field Units'), QualifierChain Unresolved"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
           }
         ]
       },
-      "respellability": { "resolution": "family-inherited" },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
       "citations": [
-        { "kind": "catalog", "ref": "src/Precept/Language/Operations.cs:486-497", "note": "MoneyDividePrice catalog entry" }
+        {
+          "kind": "catalog",
+          "ref": "src/Precept/Language/Operations.cs:486-497",
+          "note": "MoneyDividePrice catalog entry"
+        }
       ],
       "notes": [
         "Clean of BUG-033 and the write-surface enumeration gap (kill-immune fact; no guard-across-write dependency)."
@@ -498,9 +893,9 @@
   "openFlags": [
     "OF1 — No QualifierChain ProofSatisfaction carrier, so the fault case shape's discharge clause does not cover this kind. The matrix § Per-family case shapes Fault row says discharge is 'per catalog ProofSatisfactions', but the ProofSatisfaction DU (src/Precept/Language/ProofRequirement.cs:383-414) has NO QualifierChain subtype (nor AssignmentQualifier, DimensionalProduct, IndexBounds). QualifierChain is discharged instead by a dedicated resolver (ProofEngine.Qualifiers.cs TryQualifierCompatibilityProof), bypassing the satisfaction table entirely. The discharge contract in these cells is therefore derived from the SOURCE mechanism, not from the matrix's generative sections — the matrix owes either a QualifierChain ProofSatisfaction entry or an explicit 'discharged by the qualifier resolver, not the satisfaction table' clause in the fault case shape. Routed to owner.",
     "OF2 — Premise-class-set divergence from the fault case shape. The fault row lists premise classes '(b)/(c)/(a)'. QualifierChain admits ONLY (a) field qualifier and (b) arg qualifier; guard narrowing (c) does NOT discharge a chain (that mechanism is a separate ProofRequirement kind, AssignmentQualifier / kind 13, discharged by guard-narrowing per its own docs). And (d) pre-state has no runtime-value instantiation because a qualifier is immutable type metadata. The matrix should state, per fault sub-kind, which premise classes actually apply, rather than a single (b)/(c)/(a) list inherited by every fault kind. Routed to owner.",
-    "OF3 — The transport rule has no provenance row for an immutable type-level qualifier fact. Transport-rule § 5's provenance table nearest match is 'Carried modifier fact / pre-state constraint fact', which is marked KILLABLE 'by any ungoverned write to deps(φ)'. A declared qualifier is NOT killable: no write in the write surface (spec § 3A.4 'What can write') targets a field's or arg's declared qualifier, and for an interpolated qualifier the chain is proven by field IDENTITY (SourceFieldName) not value, so deps over mutable fields is empty and the fact survives every route. 'Literal denotation' (§5, read-closure empty, never killed) is the closest kill-immunity match but is scoped to literals in expressions, not to a field/arg declaration. The transport rule owes a provenance row for immutable type-level qualifier facts (empty read-closure, kill-immune, every route). Routed to owner.",
-    "OF4 — Citation-duty shape for an unwritable declared fact. The matrix's 2026-07-21 citation-duty ruling requires a proof consuming a declared fact to name 'the obligation that established the fact and every obligation that preserves it'. For a type qualifier the establishing obligation is the declaration's qualifier binding (plus ingress governance for an arg), and the set of PRESERVING obligations is EMPTY because no write site can alter a declared qualifier. Whether an empty preserving set satisfies the citation duty (as opposed to needing a distinct 'immutable declaration' provenance) is not settled by the matrix's generative sections. Recorded as a mild uncertainty; it collapses into OF3 if the transport rule adds the immutable-qualifier provenance row. Routed to owner.",
-    "OF5 — The QualifierChain discharge has no named validity argument. The matrix § Validity arguments enumerates arguments for the Numeric/guard/interval/inductive derivations only; none covers qualifier-chain token equality. Each cell above carries a validityArgumentSketch (determinism + purity + declaration-immutability + ingress governance), but under the ratification gate 'no cell ratifies whose derivation cites an argument-less rule', these cells cannot ratify until that argument is written into the matrix. Routed to owner. (Non-blocking for this DEFINITION pass, which authors the cells; blocking for ratification.)"
+    "OF3 — ANSWERED (2026-07-23). The transport rule now folds qualifier-fact survival into its own frame-and-kill through deps(phi) = mention-set union provdeps, and the matrix's type-structural qualifier-context argument defines the immutable case semantically as provdeps empty. CORRECTION to this flag as originally written: its claim that an interpolated qualifier's chain is proven by field IDENTITY and therefore has an empty dependency set over mutable fields is WRONG and is the reasoning BUG-035 records as a live soundness hole — an interpolated qualifier is a value-fact whose truth depends on the source field's value, so it is killable by a write to that field. Original text: OF3 — The transport rule has no provenance row for an immutable type-level qualifier fact. Transport-rule § 5's provenance table nearest match is 'Carried modifier fact / pre-state constraint fact', which is marked KILLABLE 'by any ungoverned write to deps(φ)'. A declared qualifier is NOT killable: no write in the write surface (spec § 3A.4 'What can write') targets a field's or arg's declared qualifier, and for an interpolated qualifier the chain is proven by field IDENTITY (SourceFieldName) not value, so deps over mutable fields is empty and the fact survives every route. 'Literal denotation' (§5, read-closure empty, never killed) is the closest kill-immunity match but is scoped to literals in expressions, not to a field/arg declaration. The transport rule owes a provenance row for immutable type-level qualifier facts (empty read-closure, kill-immune, every route). Routed to owner.",
+    "OF4 — ANSWERED (2026-07-23). The 2026-07-21 structural-fact citation ruling settles it: the citation duty reaches a consumed fact only where an operation can establish or invalidate it, so a fact with provdeps empty discharges as typing context — cite the declaration, empty establishing set, empty preserving set. Original text: OF4 — Citation-duty shape for an unwritable declared fact. The matrix's 2026-07-21 citation-duty ruling requires a proof consuming a declared fact to name 'the obligation that established the fact and every obligation that preserves it'. For a type qualifier the establishing obligation is the declaration's qualifier binding (plus ingress governance for an arg), and the set of PRESERVING obligations is EMPTY because no write site can alter a declared qualifier. Whether an empty preserving set satisfies the citation duty (as opposed to needing a distinct 'immutable declaration' provenance) is not settled by the matrix's generative sections. Recorded as a mild uncertainty; it collapses into OF3 if the transport rule adds the immutable-qualifier provenance row. Routed to owner.",
+    "OF5 — ANSWERED (2026-07-23). The argument is written: matrix § Rule validity, 'Qualifier chain equality — currency cancellation across two types'. It licenses declared (provdeps-empty) operands only and names the dimension-axis siblings as a separate rule, still owed. Original text: OF5 — The QualifierChain discharge has no named validity argument. The matrix § Validity arguments enumerates arguments for the Numeric/guard/interval/inductive derivations only; none covers qualifier-chain token equality. Each cell above carries a validityArgumentSketch (determinism + purity + declaration-immutability + ingress governance), but under the ratification gate 'no cell ratifies whose derivation cites an argument-less rule', these cells cannot ratify until that argument is written into the matrix. Routed to owner. (Non-blocking for this DEFINITION pass, which authors the cells; blocking for ratification.)"
   ],
-  "notes": "SCOPE. This file authors the five QualifierChain fault cells (one per committed occasion, all business-domain) per the coordinate map. All reject/accept claims are DEFINITION claims derived from the fault case shape plus the discharge mechanism read from source (ProofEngine.Qualifiers.cs); precept_compile was used ONLY for syntax validation and reachability corroboration (that the QualifierChain obligation is not pre-empted by a type-checker PRE0070 for MoneyDividePrice), never as authority for what the definition says — per the corrected inputs. Every witness/near-miss program was compiled through precept_compile at HEAD on 2026-07-21 and reduced to a single PRE0114 (base/near-miss) or zero diagnostics (discharge); the divisor-non-zero Numeric obligation MoneyDividePrice co-mints is discharged in every program by declaring the price operand `positive`, preserving base minimality (the chain obligation is the sole live diagnostic).\n\nWHY ALL FIVE CELLS SHARE ONE DISCHARGE CONTRACT. QualifierChain is discharged by a static type-level qualifier resolution + equality check whose fact is kill-immune (empty read-closure over mutable fields). A type-level fact is route-invariant, so the occasion coordinate carries no proof-relevant information for this kind — the five cells differ only in WHERE the division is written (transition-row action / entry-hook action / rule condition / residency-ensure condition / computed-field expression) and in whether the operands are args (premise class b) or fields (premise class a). This is the honest reason the family is thin, stated rather than hidden.\n\nREPRESENTATIVE OPERATION. All witnesses use MoneyDividePrice (Currency ⤳ Currency). The kind's other four mint-site operations — PriceTimesQuantity (Dimension ⤳ Dimension), PriceTimesPeriod / PriceTimesDuration (Dimension ⤳ TemporalDimension), ExchangeRateTimesMoney (FromCurrency ⤳ Currency) — sit at the same occasions with the identical type-level discharge story, differing only in which axes ResolveQualifierOnAxis resolves. Not separately witnessed here (the coordinate map keys cells by occasion × type-family, not by operation); flagged so the single-operation witnessing is not read as a claim that only MoneyDividePrice reaches these occasions."
+  "notes": "SCOPE. This file authors the five QualifierChain fault cells (one per committed occasion, all business-domain) per the coordinate map. All reject/accept claims are DEFINITION claims derived from the fault case shape plus the discharge mechanism read from source (ProofEngine.Qualifiers.cs); precept_compile was used ONLY for syntax validation and reachability corroboration (that the QualifierChain obligation is not pre-empted by a type-checker PRE0070 for MoneyDividePrice), never as authority for what the definition says — per the corrected inputs. Every witness/near-miss program was compiled through precept_compile at HEAD on 2026-07-21 and reduced to a single PRE0114 (base/near-miss) or zero diagnostics (discharge); the divisor-non-zero Numeric obligation MoneyDividePrice co-mints is discharged in every program by declaring the price operand `positive`, preserving base minimality (the chain obligation is the sole live diagnostic).\n\nWHY ALL FIVE CELLS SHARE ONE DISCHARGE CONTRACT. QualifierChain is discharged by a static type-level qualifier resolution + equality check whose fact is kill-immune (empty read-closure over mutable fields). A type-level fact is route-invariant, so the occasion coordinate carries no proof-relevant information for this kind — the five cells differ only in WHERE the division is written (transition-row action / entry-hook action / rule condition / residency-ensure condition / computed-field expression) and in whether the operands are args (premise class b) or fields (premise class a). This is the honest reason the family is thin, stated rather than hidden.\n\nREPRESENTATIVE OPERATION. All witnesses use MoneyDividePrice (Currency ⤳ Currency). The kind's other four mint-site operations — PriceTimesQuantity (Dimension ⤳ Dimension), PriceTimesPeriod / PriceTimesDuration (Dimension ⤳ TemporalDimension), ExchangeRateTimesMoney (FromCurrency ⤳ Currency) — sit at the same occasions, but only ExchangeRateTimesMoney shares this rule's discharge story. The three price-multiplication operations match on a DIMENSION rather than a currency token, which is the weaker claim: two operands can agree on dimension and differ in unit, and the language converts between commensurable values rather than rejecting (business-domain-types.md:445-450, D8). Their soundness therefore rests on that conversion being applied and exact, which the currency argument does not establish — the matrix records it as a separate rule, owed. Not separately witnessed here (the coordinate map keys cells by occasion × type-family, not by operation); flagged so the single-operation witnessing is not read as a claim that only MoneyDividePrice reaches these occasions."
 }
