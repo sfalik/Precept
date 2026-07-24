@@ -1,257 +1,539 @@
 {
   "$schema": "../cell.schema.json",
-  "definitionVersion": "obligation-discharge-matrix-2026-07-19 rev 7",
-  "family": "fault",
-  "kind": "KeyPresence",
-  "requirementKindEnum": 10,
-  "authoredAt": "2026-07-21",
-  "authoredAgainstHead": true,
-  "compileOracleDisclaimer": "Every compileEvidence block below is a live precept_compile observation at HEAD used as a SYNTAX / observed-behavior oracle only. The shipped compiler's proof verdict is never cited as authority for what the matrix definition says; the definition side of each contract is derived from the matrix generative sections and the source mint/discharge sites.",
-  "mintCompleteness": {
-    "hasCatalogSite": true,
-    "mintSites": [
-      {
-        "fileLine": "src/Precept/Language/Actions.cs:176",
-        "howMinted": "catalog-declared on ActionMeta.ProofRequirements for ActionKind.AppendBy: new KeyPresenceProofRequirement(new SelfSubject(), RequireAbsence: true, \"Ordering key must not already exist in the log-by (uniqueness)\")",
-        "instantiatedAt": "src/Precept/Pipeline/ProofEngine.cs:447-448 (foreach req in action.ProofRequirements -> obligations.Add(new ProofObligation(req, CreateActionProofSite(action, req), ctx, Unresolved, ...)))"
-      }
-    ],
-    "synthesizedSites": [],
-    "soleMintSiteVerification": "grep 'new KeyPresenceProofRequirement' over src/Precept returns exactly one instantiation (Actions.cs:176). No ProofEngine synthesis site exists for KeyPresence (unlike Presence at ProofEngine.cs:374 or CountContainment at :641). AppendBy is the only action carrying it.",
-    "logByVsQueueByAsymmetry": "ActionKind.EnqueueBy (queue of T by P, Actions.cs:242-251) declares NO ProofRequirements, so a queue-by ordering key mints no uniqueness obligation. This is a real asymmetry, not a mint gap: collection-types.md:384 declares P UNIQUE for 'log of T by P' (audit ordering key), while a queue-by 'by P' is a priority/ordering key that may repeat. KeyPresence(RequireAbsence:true) therefore has exactly one mint occasion family: append-by onto a log-by field.",
-    "requireAbsencePolarity": "RequireAbsence:true -> the key must be ABSENT (uniqueness). Diagnostic on failure is PRE0101 (DiagnosticCode.KeyUniquenessGuard, id 101), selected at src/Precept/Pipeline/ProofEngine.Diagnostics.cs:181-186 by keyReq.RequireAbsence. (RequireAbsence:false would route to PRE0099 KeyPresenceSafety, but no catalog site declares the present-required polarity, so it does not arise in the fault family today.)"
-  },
-  "dischargeSite": {
-    "strategy": "GuardInPath (ProofStrategy)",
-    "entry": "src/Precept/Pipeline/ProofEngine.cs:1119-1121 (obligation.Requirement is KeyPresenceProofRequirement -> TryKeyPresenceProof)",
-    "procedure": "src/Precept/Pipeline/ProofEngine.Strategies.cs:668 TryKeyPresenceProof -> GuardHasContainsCheck (:1289) -> WalkForContains (:1295)",
-    "killRule": "src/Precept/Pipeline/ProofEngine.Strategies.cs:678 -- if obligation.ReassignedBefore.Contains(fieldName) return false (a write to the log-by field earlier in the same action chain kills the guard fact: the membership the guard established is about the old collection value)"
-  },
-  "familyRespellability": {
-    "verdict": "yes",
-    "argument": "The only licensed discharge for KeyPresence(RequireAbsence:true) is the class-(c) guard `when not (F contains P)`. The sound-but-unprovable band is any program whose keys are genuinely unique by construction (e.g. a monotone fresh-key generator, or a first append onto a provably-empty log) but that carries no such guard. Every such program's business intent -- append a uniquely-keyed entry -- respells into the explicit guard, which passes at runtime exactly when the key is in fact fresh. The cost is authoring friction only, which the want doc deliberately embraces (want :137, 'forces authors to be more explicit'). No band member is inexpressible.",
-    "bandMemberExample": "A first `append ComplianceLog Note by Stamp` onto a default-empty log-by with no prior grow site is sound (empty collection contains no key) yet rejected today (verified: clean single-row unguarded append is Unresolved/PRE0101). Respelling: add `when not (ComplianceLog contains Stamp)`.",
-    "corpusMeasurementStatus": "pending (ratification layer 4). No log-by append-by uniqueness obligation appears discharged in samples/ today; the corpus cannot be cited as coverage."
-  },
-  "cells": [
+  "familyId": "fault-keypresence",
+  "title": "Fault family — KeyPresence: an `append … by K` into a log-by collection must prove the ordering key K is not already present",
+  "caseShape": "fault",
+  "definitionVersion": "obligation-discharge-matrix-2026-07-19 rev 10",
+  "citations": [
     {
-      "cellId": "fault-keypresence-transition-collection",
-      "occasion": "operand-free-action-precondition",
-      "hostConstruct": "transition row (from S on E ... -> append F V by K)",
-      "typeFamily": "collection",
-      "verified": true,
-      "verifiedWithFlags": [
-        "occasion-axis-incoherence",
-        "key-argument-not-matched-hole"
-      ],
-      "obligationSchema": "P not-in F -- the append-by ordering key P (the `by` operand) must not already be a key of the log-by field F, evaluated as the append action's own catalog-stamped precondition (RequireAbsence:true). Operand-free: the obligation is not an authored expression; P and F are recovered from the action's `by` slot and receiver.",
-      "routeSet": {
-        "transportCite": "transport-rule-restatement-2026-07-21 § 3, row `operand-free-action-precondition`: reached by 'fire (this row), inspect-fire, construction and its mirror'. Per the site-identity ruling (matrix § The minting rule, 'an evaluation site is an evaluation occasion, not a syntactic position'), the append mints one obligation per fire occasion selecting this row, each proved from that route's fired-guard fact.",
-        "reachedBy": [
-          "fire selecting this transition row (guard evaluated at phase 2, action at phase 5)",
-          "inspect-fire of this row",
-          "construction + mirror only if this row is a construction row (does not arise here: construction rows cannot carry `transition` and append onto an initially-empty log; see openFlags)"
-        ]
-      },
-      "dischargeContract": {
-        "premiseClassA_fieldModifiers": {
-          "applicable": false,
-          "iff": "never -- no field modifier on a log-by field expresses that a specific dynamic key value is absent from the collection. Class (a) instantiates nothing here."
-        },
-        "premiseClassB_argConstraints": {
-          "applicable": false,
-          "iff": "never -- an argument constraint bounds the VALUE of the key P (its range/sign/length), never its MEMBERSHIP in F. No arg-constraint interval implies `P not-in F`."
-        },
-        "premiseClassC_handlerGuard": {
-          "applicable": true,
-          "iff": "The obligation discharges IFF the transition row's `when` guard contains a conjunct normal-form-equal to `not (F contains P)` -- i.e. a `not` over a `contains` whose left operand is the log-by field F -- AND (transport frame) F is not written by any construct on the route between the guard's evaluation (phase 2) and the append site (phase 5): F not in mayWrite(guard, site). In the shipped analyzer the frame check is F not in obligation.ReassignedBefore (ProofEngine.Strategies.cs:678).",
-          "decisionProcedure": "Finite walk of the guard's AND-conjuncts (ExtractGuardBranches + WalkForContains, ProofEngine.Strategies.cs:689/1295) for a `not (F contains .)` node whose contains-left field name equals F's. Reject (leave Unresolved, emit PRE0101) if no such conjunct exists, or if F was reassigned earlier in this action chain. The guard set is finite (statically declared), so non-existence is decidable. Strategy: GuardInPath.",
-          "searchBound": "one pass over the guard conjunct tree; no fixpoint (expressions are finite loop-free trees, spec §0.4)."
-        },
-        "premiseClassD_preStateInductive": {
-          "applicable": false,
-          "iff": "not applicable in general -- no constraint shape in the language expresses 'this incoming key is absent from this append-only log' as an invariant over reachable configurations, and there is no establishment/preservation machinery for collection-membership facts (ProofRequirement carries no such subtype), so the citation duty (matrix § The cell, 2026-07-21 ruling) could not be satisfied even if a fact were available. One sound sub-case -- F provably empty on the route -- is NOT licensed today and sits in the respellability band (see openFlags: empty-collection-subcase)."
-        }
-      },
-      "citationDuty": {
-        "factConsumed": "a fired-guard fact (class c): the guard `not (F contains P)` evaluated true when this row was selected.",
-        "establishingObligation": "the guard's own truth at fire time -- the row's actions run only if its guard evaluated true (spec:1897, 'guards select'), earned at phase 2 (transport-rule § 5, 'Fired-guard fact, earned at phase 2, immediately after that guard evaluates').",
-        "preservingObligations": [
-          "the transport frame condition: no construct on the route between phase-2 guard evaluation and the phase-5 append writes F (F not in mayWrite(guard, site)); shipped as the ReassignedBefore kill at ProofEngine.Strategies.cs:678."
-        ],
-        "note": "The class-(c) guard fact is route-local -- established and consumed within a single operation -- so it carries no construction-establishment / every-write-preservation chain of the kind a declared field modifier or invariant would (matrix § validity argument 'Guard normal-form match'). The citation is therefore the fired-guard provenance plus the frame, not a whole-file establish+preserve set."
-      },
-      "witness": {
-        "base": "precept TransitionAuditBase\n\nstate Open initial\n\nfield ComplianceLog as log of string by instant\n\nfrom Open on RecordEvent\n    -> append ComplianceLog RecordEvent.Description by RecordEvent.Timestamp\n    -> no transition\n\nevent RecordEvent(Description as string, Timestamp as instant)",
-        "baseExpectation": "reject naming ONLY the KeyPresence obligation (base minimality).",
-        "baseCompileEvidence": "precept_compile @ HEAD: success:false, 1 diagnostic PRE0101 at line 8 ('Key element may already exist in ComplianceLog -- add a when not (ComplianceLog contains element) guard before appending'), proofObligation KeyPresence disposition:Unresolved. Exactly one diagnostic -> base-minimal.",
-        "dischargeAddition": "add `when not (ComplianceLog contains RecordEvent.Timestamp)` to the row guard: `from Open on RecordEvent when not (ComplianceLog contains RecordEvent.Timestamp) -> append ComplianceLog RecordEvent.Description by RecordEvent.Timestamp -> no transition`",
-        "dischargeClass": "(c) handler guard",
-        "dischargeCompileEvidence": "precept_compile @ HEAD: success:true, 0 diagnostics, proofObligation KeyPresence disposition:Proved strategy:GuardInPath. The guard's contained key (RecordEvent.Timestamp) matches the append `by` key, so the acceptance is sound under a key-matching implementation and does not rest on the key-argument hole."
-      },
-      "nearMiss": {
-        "snippet": "from Open on RecordEvent when ComplianceLog contains RecordEvent.Timestamp\n    -> append ComplianceLog RecordEvent.Description by RecordEvent.Timestamp\n    -> no transition",
-        "weakening": "guard on the wrong condition -- the `not` is dropped, so the guard asserts PRESENCE of the key rather than ABSENCE. This is past sufficiency: it establishes the opposite of `P not-in F`.",
-        "expectedOutcome": "still rejects, naming the SAME KeyPresence obligation (PRE0101).",
-        "nearMissCompileEvidence": "precept_compile @ HEAD: success:false, 1 diagnostic PRE0101 at line 8, KeyPresence disposition:Unresolved. WalkForContains requires the `not` wrapper when RequireAbsence (ProofEngine.Strategies.cs:1316-1327); a bare positive `contains` does not match -> definition and shipped compiler agree on reject.",
-        "whyNotWrongKey": "The wrong-KEY near-miss (`when not (F contains OtherKey)` while appending `by ActualKey`) was DELIBERATELY NOT used: it is wrongly ACCEPTED by the shipped compiler (see openFlags: key-argument-not-matched-hole), so it cannot serve as a rejecting near-miss on the oracle. Wrong-polarity is used instead because both the definition and the shipped compiler reject it."
-      },
-      "respellability": {
-        "verdict": "yes",
-        "inheritedFromFamily": true
-      },
-      "openFlags": [
-        "occasion-axis-incoherence: the coordinate map labels this cell's occasion 'operand-free-action-precondition' (an evaluation-site-category from the transport-rule axis) while the sibling cells use 'state-hook-action-operand' / 'stateless-hook-action-operand' (operand categories). But the KeyPresence obligation is operand-free (a catalog-stamped action precondition, no authored expression) in ALL THREE cells, so under the transport rule's own axis all three are 'operand-free-action-precondition' and the host construct (transition / state-hook / stateless-hook) is a separate coordinate. The map mixes host-construct into the evaluation-site-category axis. Transport-rule § 3 itself routes this: 'The occasion unit is therefore an evaluation event at a catalog-stamped fault site, not an occurrence of a written expression ... routed in § Open questions, because the matrix reserves the minting rule.' Not derivable from the matrix's generative sections -> owner ruling owed on how operand-free preconditions are keyed across host constructs.",
-        "construction-route-open: transport-rule § 3 marks operand-free-action-precondition as reached by 'construction and its mirror', but construction rows cannot carry `transition` (spec:1932) and land on an initially-empty log, and 'whether entry actions fire at construction' is unruled (spec §3A.4 Still unsettled). Whether a construction-route append-by mints/discharges is open."
-      ]
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+      "note": "fault-family case shape"
     },
     {
-      "cellId": "fault-keypresence-state-hook-collection",
-      "occasion": "state-hook-action-operand",
-      "hostConstruct": "state entry/exit action ((to|from) S when? -> append F V by K)",
-      "typeFamily": "collection",
-      "verified": true,
-      "verifiedWithFlags": [
-        "occasion-axis-incoherence",
-        "key-argument-not-matched-hole",
-        "state-action-construction-route-open"
-      ],
-      "obligationSchema": "P not-in F -- identical obligation shape to the transition cell, but hosted in a state action. Because a state action has no event, both P (the ordering key) and V (the value) must be sourced from fields, not event args.",
-      "routeSet": {
-        "transportCite": "transport-rule-restatement-2026-07-21 § 3, rows `state-hook-guard` / `state-hook-action-operand`: 'fire and inspect-fire with a transition outcome touching the anchor state; construction if the anchor is the initial state (routed)'. Split by phase: an entry action (`to S`) runs at phase 6, an exit action (`from S`) at phase 3; both are removed on a `no transition` outcome (spec:1915).",
-        "reachedBy": [
-          "fire with a transition outcome entering S (for a `to S` hook) / leaving S (for a `from S` hook), guard evaluated with the hook, action at phase 6 / phase 3",
-          "inspect-fire of the same",
-          "construction if S is the initial state -- routed/open (spec §3A.4 'whether entry actions fire at construction' unsettled)"
-        ]
-      },
-      "dischargeContract": {
-        "premiseClassA_fieldModifiers": {
-          "applicable": false,
-          "iff": "never -- as the transition cell."
-        },
-        "premiseClassB_argConstraints": {
-          "applicable": false,
-          "iff": "never, and doubly so here: a state action has no event args at all, so class (b) has no subject to instantiate."
-        },
-        "premiseClassC_handlerGuard": {
-          "applicable": true,
-          "iff": "Discharges IFF the state action's `when` guard (spec grammar: `(to|from) StateTarget (\"when\" BoolExpr)?`) contains a conjunct normal-form-equal to `not (F contains P)` on F, AND F is not written between the guard's evaluation and the append site on the route. State actions DO admit `when` guards (spec § State action; StateHookContext s => s.Hook.Guard at ProofEngine.Strategies.cs:683).",
-          "decisionProcedure": "same finite conjunct walk as the transition cell, reading the guard off StateHookContext.Hook.Guard. Strategy: GuardInPath.",
-          "searchBound": "one pass over the guard conjunct tree."
-        },
-        "premiseClassD_preStateInductive": {
-          "applicable": false,
-          "iff": "not applicable in general -- as the transition cell (no membership-fact machinery; citation duty unsatisfiable). The empty-collection sub-case is the same band member."
-        }
-      },
-      "citationDuty": {
-        "factConsumed": "a fired-guard fact (class c): the state action's guard `not (F contains P)` evaluated true when the hook fired.",
-        "establishingObligation": "the state action runs only if its `when` guard evaluated true (spec § State action, 'The guard is passed through to the AST node'); earned at the hook's phase (phase 6 entry / phase 3 exit).",
-        "preservingObligations": [
-          "frame: no construct between the hook's guard evaluation and the append writes F. Note the phase order matters -- an exit action (phase 3) precedes the row's own mutation chain (phase 5) and entry actions (phase 6); a fact earned in an exit-hook guard must survive to the append site within the same hook."
-        ],
-        "note": "route-local guard fact; no whole-file establish+preserve chain."
-      },
-      "witness": {
-        "base": "precept ArchivalAuditBase\n\nstate Active initial\nstate Archived terminal\n\nfield ComplianceLog as log of string by instant\nfield ArchiveNote as string\nfield ArchiveStamp as instant\n\nevent Create(Note as string, Stamp as instant) initial\non Create\n    -> set ArchiveNote = Create.Note\n    -> set ArchiveStamp = Create.Stamp\n\nfrom Active on Archive\n    -> transition Archived\n\nto Archived\n    -> append ComplianceLog ArchiveNote by ArchiveStamp\n\nevent Archive()",
-        "baseExpectation": "reject naming ONLY the KeyPresence obligation. (The construction event Create assigns the required fields so no PRE0093/PRE0116 presence noise contaminates base minimality.)",
-        "baseCompileEvidence": "precept_compile @ HEAD: success:false, 1 diagnostic PRE0101 at line 19 (the `to Archived` entry-action append), KeyPresence disposition:Unresolved. Exactly one diagnostic -> base-minimal.",
-        "dischargeAddition": "add a `when` guard to the entry hook: `to Archived when not (ComplianceLog contains ArchiveStamp) -> append ComplianceLog ArchiveNote by ArchiveStamp`",
-        "dischargeClass": "(c) handler guard (state-action guard)",
-        "dischargeCompileEvidence": "precept_compile @ HEAD (full witness file with the guarded entry hook): success:true, 0 diagnostics, KeyPresence disposition:Proved strategy:GuardInPath. The guarded key (ArchiveStamp) matches the append `by` key -> sound acceptance, not resting on the key-argument hole."
-      },
-      "nearMiss": {
-        "snippet": "to Archived when ComplianceLog contains ArchiveStamp\n    -> append ComplianceLog ArchiveNote by ArchiveStamp",
-        "weakening": "guard on the wrong condition -- PRESENCE asserted instead of ABSENCE (the `not` dropped).",
-        "expectedOutcome": "still rejects, naming the SAME KeyPresence obligation (PRE0101).",
-        "nearMissCompileEvidence": "precept_compile @ HEAD: PRE0101, KeyPresence disposition:Unresolved (verified in a combined state-hook file: the `to Archived when ComplianceLog contains ArchiveStamp` row reported PRE0101 at its append). Definition and shipped compiler agree on reject."
-      },
-      "respellability": {
-        "verdict": "yes",
-        "inheritedFromFamily": true
-      },
-      "openFlags": [
-        "occasion-axis-incoherence: see the transition cell's flag of the same name -- this cell's obligation is equally operand-free; the 'state-hook-action-operand' label is an operand category applied to an operand-free precondition.",
-        "state-action-construction-route-open: transport-rule § 3 routes 'construction if the anchor is the initial state', and spec §3A.4 leaves 'whether entry actions fire at construction and on a self-transition' unsettled. If S is the initial state, whether the `to S` entry-action append-by mints on the construction route (and whether a construction-route append onto the initially-empty log is trivially discharged) is open.",
-        "multi-state-action-ordering-not-must-run: if S carries more than one state action, spec §3A.4 leaves their multiplicity and order unsettled, so no state action on S is 'must-run' (transport-rule § 5 kill-on-may/establish-on-must). A guard fact earned in one such action does not establish for a sibling action's append site. The single-action witness here sidesteps this; a multi-action shape would need the guard on the appending action itself."
-      ]
+      "kind": "matrix",
+      "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Rule validity",
+      "note": "Key presence — membership established by a guard on the same key — the validity argument these contracts cite"
     },
     {
-      "cellId": "fault-keypresence-stateless-hook-collection",
-      "occasion": "stateless-hook-action-operand",
-      "hostConstruct": "stateless event hook (on E when? -> append F V by K)",
-      "typeFamily": "collection",
-      "verified": true,
-      "verifiedWithFlags": [
-        "occasion-axis-incoherence",
-        "key-argument-not-matched-hole",
-        "stateless-handler-guard-spec-conflict"
-      ],
-      "obligationSchema": "P not-in F -- identical obligation shape; hosted in a stateless `on E -> ...` event hook. P and V may be sourced from the event's args (E.Key, E.Value).",
-      "routeSet": {
-        "transportCite": "transport-rule-restatement-2026-07-21 § 3, row `stateless-hook-action-operand`: 'the stateless handler class, its inspection mirror, construction and its mirror'. The stateless handler class is first-class in the route enumeration (transport-rule § 2, 'Stateless precepts are first-class in the enumeration, not an afterthought').",
-        "reachedBy": [
-          "the stateless handler class for E (the `on E -> ...` occasion)",
-          "its inspection mirror",
-          "construction + mirror if E is the initial event"
-        ]
-      },
-      "dischargeContract": {
-        "premiseClassA_fieldModifiers": {
-          "applicable": false,
-          "iff": "never -- as the transition cell."
-        },
-        "premiseClassB_argConstraints": {
-          "applicable": false,
-          "iff": "never -- an arg constraint on E.Key bounds its value, never its membership in F."
-        },
-        "premiseClassC_handlerGuard": {
-          "applicable": true,
-          "iffAndConflict": "Discharges IFF the stateless hook's `when` guard contains a conjunct normal-form-equal to `not (F contains P)` on F, with the same transport frame. THIS DEPENDS ON A GUARD BEING ADMISSIBLE ON A STATELESS HOOK -- which is a spec-vs-implementation conflict (see openFlags: stateless-handler-guard-spec-conflict). The matrix's own generative content treats a stateless `on E when <guard>` as a class-(c) discharge (Witness Family 1 Base A, marked live-verified ✓v), and the shipped implementation parses and uses the guard (EventHandlerContext h => h.Handler.Guard, ProofEngine.Strategies.cs:684). This cell is authored on that basis. IF spec:1007 ('Handlers do not support when guards') is enforced instead, class (c) becomes structurally unavailable and -- since (a),(b),(d) are all inapplicable -- the obligation would have NO licensed discharge in a bare stateless hook, making append-by uniqueness undischargeable there.",
-          "decisionProcedure": "same finite conjunct walk, reading the guard off EventHandlerContext.Handler.Guard. Strategy: GuardInPath.",
-          "searchBound": "one pass over the guard conjunct tree."
-        },
-        "premiseClassD_preStateInductive": {
-          "applicable": false,
-          "iff": "not applicable -- as the transition cell. (A stateless precept still has no membership-fact establishment/preservation machinery; the empty-collection band sub-case applies identically.)"
-        }
-      },
-      "citationDuty": {
-        "factConsumed": "a fired-guard fact (class c): the stateless hook's guard `not (F contains P)` evaluated true.",
-        "establishingObligation": "the hook's actions run only if the guard evaluated true. CONTESTED: spec:1007 says a stateless hook carries no guard, so under a strict spec reading there IS no fired-guard provenance to cite here (routed).",
-        "preservingObligations": [
-          "frame: no construct between the guard evaluation and the append writes F (single-action stateless hook -> the append is the first write to F on the route in the witness)."
-        ],
-        "note": "route-local guard fact; the whole citation rests on the stateless-guard admissibility conflict being resolved in favor of guards."
-      },
-      "witness": {
-        "base": "precept StatelessAuditBase\n\nfield ComplianceLog as log of string by instant\n\nevent RecordEvent(Description as string, Timestamp as instant)\non RecordEvent\n    -> append ComplianceLog RecordEvent.Description by RecordEvent.Timestamp",
-        "baseExpectation": "reject naming ONLY the KeyPresence obligation.",
-        "baseCompileEvidence": "precept_compile @ HEAD: success:false, 1 diagnostic PRE0101 at line 7, KeyPresence disposition:Unresolved, eventHandlers[RecordEvent isConstruction:false]. Base-minimal.",
-        "dischargeAddition": "add a `when` guard to the stateless hook: `on RecordEvent when not (ComplianceLog contains RecordEvent.Timestamp) -> append ComplianceLog RecordEvent.Description by RecordEvent.Timestamp`",
-        "dischargeClass": "(c) handler guard (stateless-hook guard -- see conflict flag)",
-        "dischargeCompileEvidence": "precept_compile @ HEAD: success:true, 0 diagnostics, KeyPresence disposition:Proved strategy:GuardInPath. NOTE: this acceptance itself demonstrates the spec-conflict -- the shipped compiler accepted a `when` guard on a stateless hook, which spec:1007 says does not exist. The compile is clean and the key matches, so the acceptance is sound under a key-matching implementation, but it rests on the contested admissibility of the guard."
-      },
-      "nearMiss": {
-        "snippet": "on RecordEvent when ComplianceLog contains RecordEvent.Timestamp\n    -> append ComplianceLog RecordEvent.Description by RecordEvent.Timestamp",
-        "weakening": "guard on the wrong condition -- PRESENCE instead of ABSENCE.",
-        "expectedOutcome": "still rejects, naming the SAME KeyPresence obligation (PRE0101).",
-        "nearMissCompileEvidence": "precept_compile @ HEAD: success:false, 1 diagnostic PRE0101 at line 7, KeyPresence disposition:Unresolved. Definition and shipped compiler agree on reject."
-      },
-      "respellability": {
-        "verdict": "yes",
-        "inheritedFromFamily": true
-      },
-      "openFlags": [
-        "occasion-axis-incoherence: see the transition cell's flag of the same name.",
-        "stateless-handler-guard-spec-conflict: THE LOAD-BEARING FLAG for this cell. spec/precept-language-spec.md:1007 (§ Stateless event hook) states verbatim 'Handlers do not support when guards or a trailing ensure'. But (1) the shipped implementation parses and uses a stateless-hook guard -- verified: `on RecordEvent when not (ComplianceLog contains RecordEvent.Timestamp) -> append ...` compiles clean with KeyPresence Proved GuardInPath; (2) samples/Test2.precept:4 ('on Add1 when Add1.Amount1 + Add1.Amount2 <= 1000') uses one; (3) the matrix's Witness Family 1 Base A treats a stateless `on Add when <guard>` as a class-(c) discharge marked ✓v. The three disagree with spec:1007. This determines whether cell 3 has ANY licensed discharge: class (c) is the sole applicable premise class, and it exists only if the guard is admissible. Routed to owner (a spec-vs-implementation-vs-matrix conflict, not resolvable in this cell). Cross-check git history before ruling (deleted-doc precedent).",
-        "empty-collection-subcase: a first `append F V by K` in a stateless hook onto a default-empty log-by is sound (empty log has no key) but rejected today. Whether to license an emptiness-establishment discharge (analogous to the collection-growth `count>0` establishment at ProofEngine.Strategies.cs:706) is unrouted. Band member, respellable:yes (add the guard)."
-      ]
+      "kind": "code",
+      "ref": "src/Precept/Pipeline/ProofEngine.Strategies.cs:1295-1327",
+      "note": "WalkForContains"
     }
   ],
-  "familyOpenFlags": [
-    "key-argument-not-matched-hole (SOUNDNESS-CORRECTION CANDIDATE, not among the two listed known holes): the discharge walk WalkForContains (src/Precept/Pipeline/ProofEngine.Strategies.cs:1295-1332) matches only the contains-LEFT field name (fr.FieldName == fieldName), never the contained KEY operand. So `when not (F contains OtherKey)` discharges an `append F V by ActualKey` even when OtherKey != ActualKey. Verified @ HEAD: `when not (ComplianceLog contains RecordWrongKey.OtherTimestamp)` while appending `by RecordWrongKey.Timestamp` -> success:true, KeyPresence Proved GuardInPath, and an append with a colliding Timestamp is admitted. The matrix definition requires the guard conjunct to be normal-form-equal to `ActualKey not-in F` (the SPECIFIC append key), so the definition REJECTS this while the shipped compiler ACCEPTS it. Consequence for this family: all near-misses above use wrong-POLARITY (which the compiler correctly rejects), never wrong-KEY (which it wrongly accepts); a wrong-key near-miss could not be used as a rejecting oracle row. Route to /design as a soundness-correction with the witness program (major definition version, breaks certificate replay for KeyPresence cells).",
-    "operand-free-precondition-minting-phrasing-gap: the site-identity ruling (matrix § The minting rule) is phrased over 'one written expression reached by several routes'. The KeyPresence precondition is operand-free (no written expression), so the ruling's phrasing does not literally reach it. transport-rule § 3 already records this ('The occasion unit is therefore an evaluation event at a catalog-stamped fault site, not an occurrence of a written expression ... routed'). Recorded here as the minting-rule phrasing gap that governs the whole family's occasion count; owner ruling owed, per the matrix's reservation that the minting rule is 'never adjusted in passing'."
+  "respellability": {
+    "verdict": "yes",
+    "evidence": "model-derived",
+    "corpusMeasurement": "pending",
+    "citations": [
+      {
+        "kind": "matrix",
+        "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+        "note": "the Respellable bullet"
+      }
+    ],
+    "notes": [
+      "Authored 2026-07-23; the file previously carried no family-level respellability block at all, which the schema requires because every cell inherits from it.",
+      "The licensed respelling is to add the membership guard on the same key: `when not (F contains K)` on the row that appends by K. It is available at every occasion that admits a guard.",
+      "Residual band, named: an occasion with no guard position cannot host the respelling. Whether the obligation is minted at such occasions is a coordinate question this file records rather than assumes."
+    ]
+  },
+  "notes": [
+    "[carried from the pre-normalization shape] definitionVersion: \"obligation-discharge-matrix-2026-07-19 rev 7\"",
+    "[carried from the pre-normalization shape] family: \"fault\"",
+    "[carried from the pre-normalization shape] kind: \"KeyPresence\"",
+    "[carried from the pre-normalization shape] requirementKindEnum: 10",
+    "[carried from the pre-normalization shape] authoredAt: \"2026-07-21\"",
+    "[carried from the pre-normalization shape] authoredAgainstHead: true",
+    "[carried from the pre-normalization shape] compileOracleDisclaimer: \"Every compileEvidence block below is a live precept_compile observation at HEAD used as a SYNTAX / observed-behavior oracle only. The shipped compiler's proof verdict is never cited as authority for what the matrix definition says; the definition side of each contract is derived from the matrix generative sections and the source mint/discharge sites.\"",
+    "[carried from the pre-normalization shape] mintCompleteness: {\"hasCatalogSite\": true, \"mintSites\": [{\"fileLine\": \"src/Precept/Language/Actions.cs:176\", \"howMinted\": \"catalog-declared on ActionMeta.ProofRequirements for ActionKind.AppendBy: new KeyPresenceProofRequirement(new SelfSubject(), RequireAbsence: true, \\\"Ordering key must not already exist in the log-by (uniqueness)\\\")\", \"instantiatedAt\": \"src/Precept/Pipeline/ProofEngine.cs:447-448 (foreach req in action.ProofRequirements -> obligations.Add(new ProofObligation(req, CreateActionProofSite(action, req), ctx, Unresolved, ...)))\"}], \"synthesizedSites\": [], \"soleMintSiteVerification\": \"grep 'new KeyPresenceProofRequirement' over src/Precept returns exactly one instantiation (Actions.cs:176). No ProofEngine synthesis site exists for KeyPresence (unlike Presence at ProofEngine.cs:374 or CountContainment at :641). AppendBy is the only action carrying it.\", \"logByVsQueueByAsymmetry\": \"ActionKind.EnqueueBy (queue of T by P, Actions.cs:242-251) declares NO ProofRequirements, so a queue-by ordering key mints no uniqueness obligation. This is a real asymmetry, not a mint gap: collection-types.md:384 declares P UNIQUE for 'log of T by P' (audit ordering key), while a queue-by 'by P' is a priority/ordering key that may repeat. KeyPresence(RequireAbsence:true) therefore has exactly one mint occasion family: append-by onto a log-by field.\", \"requireAbsencePolarity\": \"RequireAbsence:true -> the key must be ABSENT (uniqueness). Diagnostic on failure is PRE0101 (DiagnosticCode.KeyUniquenessGuard, id 101), selected at src/Precept/Pipeline/ProofEngine.Diagnostics.cs:181-186 by keyReq.RequireAbsence. (RequireAbsence:false would route to PRE0099 KeyPresenceSafety, but no catalog site declares the present-required polarity, so it does not arise in the fault family today.)\"}",
+    "[carried from the pre-normalization shape] dischargeSite: {\"strategy\": \"GuardInPath (ProofStrategy)\", \"entry\": \"src/Precept/Pipeline/ProofEngine.cs:1119-1121 (obligation.Requirement is KeyPresenceProofRequirement -> TryKeyPresenceProof)\", \"procedure\": \"src/Precept/Pipeline/ProofEngine.Strategies.cs:668 TryKeyPresenceProof -> GuardHasContainsCheck (:1289) -> WalkForContains (:1295)\", \"killRule\": \"src/Precept/Pipeline/ProofEngine.Strategies.cs:678 -- if obligation.ReassignedBefore.Contains(fieldName) return false (a write to the log-by field earlier in the same action chain kills the guard fact: the membership the guard established is about the old collection value)\"}",
+    "[carried from the pre-normalization shape] familyRespellability: {\"verdict\": \"yes\", \"argument\": \"The only licensed discharge for KeyPresence(RequireAbsence:true) is the class-(c) guard `when not (F contains P)`. The sound-but-unprovable band is any program whose keys are genuinely unique by construction (e.g. a monotone fresh-key generator, or a first append onto a provably-empty log) but that carries no such guard. Every such program's business intent -- append a uniquely-keyed entry -- respells into the explicit guard, which passes at runtime exactly when the key is in fact fresh. The cost is authoring friction only, which the want doc deliberately embraces (want :137, 'forces authors to be more explicit'). No band member is inexpressible.\", \"bandMemberExample\": \"A first `append ComplianceLog Note by Stamp` onto a default-empty log-by with no prior grow site is sound (empty collection contains no key) yet rejected today (verified: clean single-row unguarded append is Unresolved/PRE0101). Respelling: add `when not (ComplianceLog contains Stamp)`.\", \"corpusMeasurementStatus\": \"pending (ratification layer 4). No log-by append-by uniqueness obligation appears discharged in samples/ today; the corpus cannot be cited as coverage.\"}",
+    "[carried from the pre-normalization shape] familyOpenFlags: [\"key-argument-not-matched-hole (SOUNDNESS-CORRECTION CANDIDATE, not among the two listed known holes): the discharge walk WalkForContains (src/Precept/Pipeline/ProofEngine.Strategies.cs:1295-1332) matches only the contains-LEFT field name (fr.FieldName == fieldName), never the contained KEY operand. So `when not (F contains OtherKey)` discharges an `append F V by ActualKey` even when OtherKey != ActualKey. Verified @ HEAD: `when not (ComplianceLog contains RecordWrongKey.OtherTimestamp)` while appending `by RecordWrongKey.Timestamp` -> success:true, KeyPresence Proved GuardInPath, and an append with a colliding Timestamp is admitted. The matrix definition requires the guard conjunct to be normal-form-equal to `ActualKey not-in F` (the SPECIFIC append key), so the definition REJECTS this while the shipped compiler ACCEPTS it. Consequence for this family: all near-misses above use wrong-POLARITY (which the compiler correctly rejects), never wrong-KEY (which it wrongly accepts); a wrong-key near-miss could not be used as a rejecting oracle row. Route to /design as a soundness-correction with the witness program (major definition version, breaks certificate replay for KeyPresence cells).\", \"operand-free-precondition-minting-phrasing-gap: the site-identity ruling (matrix § The minting rule) is phrased over 'one written expression reached by several routes'. The KeyPresence precondition is operand-free (no written expression), so the ruling's phrasing does not literally reach it. transport-rule § 3 already records this ('The occasion unit is therefore an evaluation event at a catalog-stamped fault site, not an occurrence of a written expression ... routed'). Recorded here as the minting-rule phrasing gap that governs the whole family's occasion count; owner ruling owed, per the matrix's reservation that the minting rule is 'never adjusted in passing'.\"]"
+  ],
+  "cells": [
+    {
+      "id": "fault-keypresence-transition-collection",
+      "label": "KeyPresence at operand-free-action-precondition — transition row (from S on E ... -> append F V by K)",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "append-by into a log-by collection",
+        "evaluationSiteCategory": "operand-free-action-precondition",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Rule validity",
+            "note": "Key presence — membership established by a guard on the same key — written 2026-07-23"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "P not-in F -- the append-by ordering key P (the `by` operand) must not already be a key of the log-by field F, evaluated as the append action's own catalog-stamped precondition (RequireAbsence:true). Operand-free: the obligation is not an authored expression; P and F are recovered from the action's `by` slot and receiver.",
+        "metavariables": [
+          {
+            "name": "K",
+            "standsFor": "the append's ordering key operand"
+          },
+          {
+            "name": "F",
+            "standsFor": "the log-by collection field"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "P not-in F -- the append-by ordering key P (the `by` operand) must not already be a key of the log-by field F, evaluated as the append action's own catalog-stamped precondition (RequireAbsence:true). Operand-free: the obligation is not an authored expression; P and F are recovered from the action's `by` slot and receiver."
+        }
+      },
+      "applicablePremiseClasses": [
+        "c"
+      ],
+      "premiseAvailability": "{\"premiseClassA_fieldModifiers\": {\"applicable\": false, \"iff\": \"never -- no field modifier on a log-by field expresses that a specific dynamic key value is absent from the collection. Class (a) instantiates nothing here.\"}, \"premiseClassB_argConstraints\": {\"applicable\": false, \"iff\": \"never -- an argument constraint bounds the VALUE of the key P (its range/sign/length), never its MEMBERSHIP in F. No arg-constraint interval implies `P not-in F`.\"}, \"premiseClassC_handlerGuard\": {\"applicable\": true, \"iff\": \"The obligation discharges IFF the transition row's `when` guard contains a conjunct normal-form-equal to `not (F contains P)` -- i.e. a `not` over a `contains` whose left operand is the log-by field F -- AND (transport frame) F is not written by any construct on the route between the guard's evaluation (phase 2) and the append site (phase 5): F not in mayWrite(guard, site). In the shipped analyzer the frame check is F not in obligation.ReassignedBefore (ProofEngine.Strategies.cs:678).\", \"decisionProcedure\": \"Finite walk of the guard's AND-conjuncts (ExtractGuardBranches + WalkForContains, ProofEngine.Strategies.cs:689/1295) for a `not (F contains .)` node whose contains-left field name equals F's. Reject (leave Unresolved, emit PRE0101) if no such conjunct exists, or if F was reassigned earlier in this action chain. The guard set is finite (statically declared), so non-existence is decidable. Strategy: GuardInPath.\", \"searchBound\": \"one pass over the guard conjunct tree; no fixpoint (expressions are finite loop-free trees, spec §0.4).\"}, \"premiseClassD_preStateInductive\": {\"applicable\": false, \"iff\": \"not applicable in general -- no constraint shape in the language expresses 'this incoming key is absent from this append-only log' as an invariant over reachable configurations, and there is no establishment/preservation machinery for collection-membership facts (ProofRequirement carries no such subtype), so the citation duty (matrix § The cell, 2026-07-21 ruling) could not be satisfied even if a fact were available. One sound sub-case -- F provably empty on the route -- is NOT licensed today and sits in the respellability band (see openFlags: empty-collection-subcase).\"}}",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "derivation": "discharge iff the governing guard carries a membership test on F whose subject is K and whose sense excludes it.",
+          "validityArguments": [
+            "Key presence — membership established by a guard on the same key"
+          ],
+          "decisionProcedure": "Walk the guard's conjunct tree for a negated `contains` whose receiver is F and whose key operand is normal-form-equal to K; reject iff no branch carries one.",
+          "openDependencies": [
+            "BUG-038, filed 2026-07-23: the compile evidence carried on this cell shows the obligation reported Proved at HEAD, but that verdict does NOT confirm this cell's contract. The engine matches the guard on collection identity alone and never reads the contains right-hand operand, and the requirement record carries no key — verified live, a guard testing a DIFFERENT key discharges the obligation and the file compiles. The rule in the matrix is stated at the strength soundness requires; the compiler is below it. Read the recorded Proved as evidence the guard route runs, never as evidence the key was checked."
+          ],
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Rule validity",
+              "note": "Key presence — membership established by a guard on the same key"
+            },
+            {
+              "kind": "packet",
+              "ref": "docs/Working/bugs.md",
+              "note": "BUG-038 — the shipped engine does not compare the key"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "schema": "add `when not (⟨F⟩ contains ⟨K⟩)` to the guard of the row that appends by ⟨K⟩"
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept TransitionAuditBase\n\nstate Open initial\n\nfield ComplianceLog as log of string by instant\n\nfrom Open on RecordEvent\n    -> append ComplianceLog RecordEvent.Description by RecordEvent.Timestamp\n    -> no transition\n\nevent RecordEvent(Description as string, Timestamp as instant)",
+          "expected": {
+            "outcome": "reject",
+            "noOtherDiagnostics": true,
+            "expectedText": "reject naming ONLY the KeyPresence obligation (base minimality)."
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "precept_compile (MCP)",
+            "date": "2026-07-21"
+          }
+        },
+        "discharges": [
+          {
+            "id": "membership-guard",
+            "kind": "guard",
+            "addition": "add `when not (ComplianceLog contains RecordEvent.Timestamp)` to the row guard: `from Open on RecordEvent when not (ComplianceLog contains RecordEvent.Timestamp) -> append ComplianceLog RecordEvent.Description by RecordEvent.Timestamp -> no transition`",
+            "premiseClasses": [
+              "c"
+            ],
+            "derivation": "the row guard carries `not (F contains K)` on the same key the append uses, so the absence fact holds when the row fires and survives to the append.",
+            "strategy": "GuardInPath",
+            "modelStatus": "licensed",
+            "builtStatus": "proven-today-but-not-for-the-stated-reason",
+            "builtStatusNote": "BUG-038, filed 2026-07-23: the compile evidence carried on this cell shows the obligation reported Proved at HEAD, but that verdict does NOT confirm this cell's contract. The engine matches the guard on collection identity alone and never reads the contains right-hand operand, and the requirement record carries no key — verified live, a guard testing a DIFFERENT key discharges the obligation and the file compiles. The rule in the matrix is stated at the strength soundness requires; the compiler is below it. Read the recorded Proved as evidence the guard route runs, never as evidence the key was checked.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "precept_compile (MCP)",
+              "date": "2026-07-21"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "precept_compile @ HEAD: success:true, 0 diagnostics, proofObligation KeyPresence disposition:Proved strategy:GuardInPath. The guard's contained key (RecordEvent.Timestamp) matches the append `by` key, so the acceptance is sound under a key-matching implementation and does not rest on the key-argument hole.",
+              "BUG-038, filed 2026-07-23: the compile evidence carried on this cell shows the obligation reported Proved at HEAD, but that verdict does NOT confirm this cell's contract. The engine matches the guard on collection identity alone and never reads the contains right-hand operand, and the requirement record carries no key — verified live, a guard testing a DIFFERENT key discharges the obligation and the file compiles. The rule in the matrix is stated at the strength soundness requires; the compiler is below it. Read the recorded Proved as evidence the guard route runs, never as evidence the key was checked."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "membership-guard",
+            "addition": "from Open on RecordEvent when ComplianceLog contains RecordEvent.Timestamp\n    -> append ComplianceLog RecordEvent.Description by RecordEvent.Timestamp\n    -> no transition",
+            "whyStillRejects": "the guard tests the positive sense (`contains`) rather than the negated one, so it establishes presence where the obligation needs absence.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "precept_compile (MCP)",
+              "date": "2026-07-21"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+          "note": "fault-family case shape"
+        }
+      ],
+      "notes": [
+        "Normalized to the cell schema 2026-07-23; keys this file invented are carried below.",
+        "BUG-038, filed 2026-07-23: the compile evidence carried on this cell shows the obligation reported Proved at HEAD, but that verdict does NOT confirm this cell's contract. The engine matches the guard on collection identity alone and never reads the contains right-hand operand, and the requirement record carries no key — verified live, a guard testing a DIFFERENT key discharges the obligation and the file compiles. The rule in the matrix is stated at the strength soundness requires; the compiler is below it. Read the recorded Proved as evidence the guard route runs, never as evidence the key was checked.",
+        "[carried from the pre-normalization shape] verified: true",
+        "[carried from the pre-normalization shape] verifiedWithFlags: [\"occasion-axis-incoherence\", \"key-argument-not-matched-hole\"]",
+        "[carried from the pre-normalization shape] routeSet: {\"transportCite\": \"transport-rule-restatement-2026-07-21 § 3, row `operand-free-action-precondition`: reached by 'fire (this row), inspect-fire, construction and its mirror'. Per the site-identity ruling (matrix § The minting rule, 'an evaluation site is an evaluation occasion, not a syntactic position'), the append mints one obligation per fire occasion selecting this row, each proved from that route's fired-guard fact.\", \"reachedBy\": [\"fire selecting this transition row (guard evaluated at phase 2, action at phase 5)\", \"inspect-fire of this row\", \"construction + mirror only if this row is a construction row (does not arise here: construction rows cannot carry `transition` and append onto an initially-empty log; see openFlags)\"]}",
+        "[carried from the pre-normalization shape] citationDuty: {\"factConsumed\": \"a fired-guard fact (class c): the guard `not (F contains P)` evaluated true when this row was selected.\", \"establishingObligation\": \"the guard's own truth at fire time -- the row's actions run only if its guard evaluated true (spec:1897, 'guards select'), earned at phase 2 (transport-rule § 5, 'Fired-guard fact, earned at phase 2, immediately after that guard evaluates').\", \"preservingObligations\": [\"the transport frame condition: no construct on the route between phase-2 guard evaluation and the phase-5 append writes F (F not in mayWrite(guard, site)); shipped as the ReassignedBefore kill at ProofEngine.Strategies.cs:678.\"], \"note\": \"The class-(c) guard fact is route-local -- established and consumed within a single operation -- so it carries no construction-establishment / every-write-preservation chain of the kind a declared field modifier or invariant would (matrix § validity argument 'Guard normal-form match'). The citation is therefore the fired-guard provenance plus the frame, not a whole-file establish+preserve set.\"}",
+        "[carried from the pre-normalization shape] openFlags: [\"occasion-axis-incoherence: the coordinate map labels this cell's occasion 'operand-free-action-precondition' (an evaluation-site-category from the transport-rule axis) while the sibling cells use 'state-hook-action-operand' / 'stateless-hook-action-operand' (operand categories). But the KeyPresence obligation is operand-free (a catalog-stamped action precondition, no authored expression) in ALL THREE cells, so under the transport rule's own axis all three are 'operand-free-action-precondition' and the host construct (transition / state-hook / stateless-hook) is a separate coordinate. The map mixes host-construct into the evaluation-site-category axis. Transport-rule § 3 itself routes this: 'The occasion unit is therefore an evaluation event at a catalog-stamped fault site, not an occurrence of a written expression ... routed in § Open questions, because the matrix reserves the minting rule.' Not derivable from the matrix's generative sections -> owner ruling owed on how operand-free preconditions are keyed across host constructs.\", \"construction-route-open: transport-rule § 3 marks operand-free-action-precondition as reached by 'construction and its mirror', but construction rows cannot carry `transition` (spec:1932) and land on an initially-empty log, and 'whether entry actions fire at construction' is unruled (spec §3A.4 Still unsettled). Whether a construction-route append-by mints/discharges is open.\"]"
+      ]
+    },
+    {
+      "id": "fault-keypresence-state-hook-collection",
+      "label": "KeyPresence at state-hook-action-operand — state entry/exit action ((to|from) S when? -> append F V by K)",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "append-by into a log-by collection",
+        "evaluationSiteCategory": "state-hook-action-operand",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Rule validity",
+            "note": "Key presence — membership established by a guard on the same key — written 2026-07-23"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "P not-in F -- identical obligation shape to the transition cell, but hosted in a state action. Because a state action has no event, both P (the ordering key) and V (the value) must be sourced from fields, not event args.",
+        "metavariables": [
+          {
+            "name": "K",
+            "standsFor": "the append's ordering key operand"
+          },
+          {
+            "name": "F",
+            "standsFor": "the log-by collection field"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "P not-in F -- identical obligation shape to the transition cell, but hosted in a state action. Because a state action has no event, both P (the ordering key) and V (the value) must be sourced from fields, not event args."
+        }
+      },
+      "applicablePremiseClasses": [
+        "c"
+      ],
+      "premiseAvailability": "{\"premiseClassA_fieldModifiers\": {\"applicable\": false, \"iff\": \"never -- as the transition cell.\"}, \"premiseClassB_argConstraints\": {\"applicable\": false, \"iff\": \"never, and doubly so here: a state action has no event args at all, so class (b) has no subject to instantiate.\"}, \"premiseClassC_handlerGuard\": {\"applicable\": true, \"iff\": \"Discharges IFF the state action's `when` guard (spec grammar: `(to|from) StateTarget (\\\"when\\\" BoolExpr)?`) contains a conjunct normal-form-equal to `not (F contains P)` on F, AND F is not written between the guard's evaluation and the append site on the route. State actions DO admit `when` guards (spec § State action; StateHookContext s => s.Hook.Guard at ProofEngine.Strategies.cs:683).\", \"decisionProcedure\": \"same finite conjunct walk as the transition cell, reading the guard off StateHookContext.Hook.Guard. Strategy: GuardInPath.\", \"searchBound\": \"one pass over the guard conjunct tree.\"}, \"premiseClassD_preStateInductive\": {\"applicable\": false, \"iff\": \"not applicable in general -- as the transition cell (no membership-fact machinery; citation duty unsatisfiable). The empty-collection sub-case is the same band member.\"}}",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "derivation": "discharge iff the governing guard carries a membership test on F whose subject is K and whose sense excludes it.",
+          "validityArguments": [
+            "Key presence — membership established by a guard on the same key"
+          ],
+          "decisionProcedure": "Walk the guard's conjunct tree for a negated `contains` whose receiver is F and whose key operand is normal-form-equal to K; reject iff no branch carries one.",
+          "openDependencies": [
+            "BUG-038, filed 2026-07-23: the compile evidence carried on this cell shows the obligation reported Proved at HEAD, but that verdict does NOT confirm this cell's contract. The engine matches the guard on collection identity alone and never reads the contains right-hand operand, and the requirement record carries no key — verified live, a guard testing a DIFFERENT key discharges the obligation and the file compiles. The rule in the matrix is stated at the strength soundness requires; the compiler is below it. Read the recorded Proved as evidence the guard route runs, never as evidence the key was checked."
+          ],
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Rule validity",
+              "note": "Key presence — membership established by a guard on the same key"
+            },
+            {
+              "kind": "packet",
+              "ref": "docs/Working/bugs.md",
+              "note": "BUG-038 — the shipped engine does not compare the key"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "schema": "add `when not (⟨F⟩ contains ⟨K⟩)` to the guard of the row that appends by ⟨K⟩"
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept ArchivalAuditBase\n\nstate Active initial\nstate Archived terminal\n\nfield ComplianceLog as log of string by instant\nfield ArchiveNote as string\nfield ArchiveStamp as instant\n\nevent Create(Note as string, Stamp as instant) initial\non Create\n    -> set ArchiveNote = Create.Note\n    -> set ArchiveStamp = Create.Stamp\n\nfrom Active on Archive\n    -> transition Archived\n\nto Archived\n    -> append ComplianceLog ArchiveNote by ArchiveStamp\n\nevent Archive()",
+          "expected": {
+            "outcome": "reject",
+            "noOtherDiagnostics": true,
+            "expectedText": "reject naming ONLY the KeyPresence obligation. (The construction event Create assigns the required fields so no PRE0093/PRE0116 presence noise contaminates base minimality.)"
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "precept_compile (MCP)",
+            "date": "2026-07-21"
+          }
+        },
+        "discharges": [
+          {
+            "id": "membership-guard",
+            "kind": "guard",
+            "addition": "add a `when` guard to the entry hook: `to Archived when not (ComplianceLog contains ArchiveStamp) -> append ComplianceLog ArchiveNote by ArchiveStamp`",
+            "premiseClasses": [
+              "c"
+            ],
+            "derivation": "the row guard carries `not (F contains K)` on the same key the append uses, so the absence fact holds when the row fires and survives to the append.",
+            "strategy": "GuardInPath",
+            "modelStatus": "licensed",
+            "builtStatus": "proven-today-but-not-for-the-stated-reason",
+            "builtStatusNote": "BUG-038, filed 2026-07-23: the compile evidence carried on this cell shows the obligation reported Proved at HEAD, but that verdict does NOT confirm this cell's contract. The engine matches the guard on collection identity alone and never reads the contains right-hand operand, and the requirement record carries no key — verified live, a guard testing a DIFFERENT key discharges the obligation and the file compiles. The rule in the matrix is stated at the strength soundness requires; the compiler is below it. Read the recorded Proved as evidence the guard route runs, never as evidence the key was checked.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "precept_compile (MCP)",
+              "date": "2026-07-21"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "precept_compile @ HEAD (full witness file with the guarded entry hook): success:true, 0 diagnostics, KeyPresence disposition:Proved strategy:GuardInPath. The guarded key (ArchiveStamp) matches the append `by` key -> sound acceptance, not resting on the key-argument hole.",
+              "BUG-038, filed 2026-07-23: the compile evidence carried on this cell shows the obligation reported Proved at HEAD, but that verdict does NOT confirm this cell's contract. The engine matches the guard on collection identity alone and never reads the contains right-hand operand, and the requirement record carries no key — verified live, a guard testing a DIFFERENT key discharges the obligation and the file compiles. The rule in the matrix is stated at the strength soundness requires; the compiler is below it. Read the recorded Proved as evidence the guard route runs, never as evidence the key was checked."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "membership-guard",
+            "addition": "to Archived when ComplianceLog contains ArchiveStamp\n    -> append ComplianceLog ArchiveNote by ArchiveStamp",
+            "whyStillRejects": "the guard tests the positive sense (`contains`) rather than the negated one, so it establishes presence where the obligation needs absence.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "precept_compile (MCP)",
+              "date": "2026-07-21"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+          "note": "fault-family case shape"
+        }
+      ],
+      "notes": [
+        "Normalized to the cell schema 2026-07-23; keys this file invented are carried below.",
+        "BUG-038, filed 2026-07-23: the compile evidence carried on this cell shows the obligation reported Proved at HEAD, but that verdict does NOT confirm this cell's contract. The engine matches the guard on collection identity alone and never reads the contains right-hand operand, and the requirement record carries no key — verified live, a guard testing a DIFFERENT key discharges the obligation and the file compiles. The rule in the matrix is stated at the strength soundness requires; the compiler is below it. Read the recorded Proved as evidence the guard route runs, never as evidence the key was checked.",
+        "[carried from the pre-normalization shape] verified: true",
+        "[carried from the pre-normalization shape] verifiedWithFlags: [\"occasion-axis-incoherence\", \"key-argument-not-matched-hole\", \"state-action-construction-route-open\"]",
+        "[carried from the pre-normalization shape] routeSet: {\"transportCite\": \"transport-rule-restatement-2026-07-21 § 3, rows `state-hook-guard` / `state-hook-action-operand`: 'fire and inspect-fire with a transition outcome touching the anchor state; construction if the anchor is the initial state (routed)'. Split by phase: an entry action (`to S`) runs at phase 6, an exit action (`from S`) at phase 3; both are removed on a `no transition` outcome (spec:1915).\", \"reachedBy\": [\"fire with a transition outcome entering S (for a `to S` hook) / leaving S (for a `from S` hook), guard evaluated with the hook, action at phase 6 / phase 3\", \"inspect-fire of the same\", \"construction if S is the initial state -- routed/open (spec §3A.4 'whether entry actions fire at construction' unsettled)\"]}",
+        "[carried from the pre-normalization shape] citationDuty: {\"factConsumed\": \"a fired-guard fact (class c): the state action's guard `not (F contains P)` evaluated true when the hook fired.\", \"establishingObligation\": \"the state action runs only if its `when` guard evaluated true (spec § State action, 'The guard is passed through to the AST node'); earned at the hook's phase (phase 6 entry / phase 3 exit).\", \"preservingObligations\": [\"frame: no construct between the hook's guard evaluation and the append writes F. Note the phase order matters -- an exit action (phase 3) precedes the row's own mutation chain (phase 5) and entry actions (phase 6); a fact earned in an exit-hook guard must survive to the append site within the same hook.\"], \"note\": \"route-local guard fact; no whole-file establish+preserve chain.\"}",
+        "[carried from the pre-normalization shape] openFlags: [\"occasion-axis-incoherence: see the transition cell's flag of the same name -- this cell's obligation is equally operand-free; the 'state-hook-action-operand' label is an operand category applied to an operand-free precondition.\", \"state-action-construction-route-open: transport-rule § 3 routes 'construction if the anchor is the initial state', and spec §3A.4 leaves 'whether entry actions fire at construction and on a self-transition' unsettled. If S is the initial state, whether the `to S` entry-action append-by mints on the construction route (and whether a construction-route append onto the initially-empty log is trivially discharged) is open.\", \"multi-state-action-ordering-not-must-run: if S carries more than one state action, spec §3A.4 leaves their multiplicity and order unsettled, so no state action on S is 'must-run' (transport-rule § 5 kill-on-may/establish-on-must). A guard fact earned in one such action does not establish for a sibling action's append site. The single-action witness here sidesteps this; a multi-action shape would need the guard on the appending action itself.\"]"
+      ]
+    },
+    {
+      "id": "fault-keypresence-stateless-hook-collection",
+      "label": "KeyPresence at stateless-hook-action-operand — stateless event hook (on E when? -> append F V by K)",
+      "coordinates": {
+        "caseShape": "fault",
+        "obligationFamily": "fault-prevention",
+        "operationKind": "append-by into a log-by collection",
+        "evaluationSiteCategory": "stateless-hook-action-operand",
+        "typeFamily": "collection"
+      },
+      "disposition": {
+        "status": "defined",
+        "citations": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Rule validity",
+            "note": "Key presence — membership established by a guard on the same key — written 2026-07-23"
+          }
+        ]
+      },
+      "obligation": {
+        "statement": "P not-in F -- identical obligation shape; hosted in a stateless `on E -> ...` event hook. P and V may be sourced from the event's args (E.Key, E.Value).",
+        "metavariables": [
+          {
+            "name": "K",
+            "standsFor": "the append's ordering key operand"
+          },
+          {
+            "name": "F",
+            "standsFor": "the log-by collection field"
+          }
+        ],
+        "normalization": [
+          {
+            "kind": "matrix",
+            "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Vocabulary",
+            "note": "the Normalization bullet"
+          }
+        ],
+        "wp": {
+          "statement": "P not-in F -- identical obligation shape; hosted in a stateless `on E -> ...` event hook. P and V may be sourced from the event's args (E.Key, E.Value)."
+        }
+      },
+      "applicablePremiseClasses": [
+        "c"
+      ],
+      "premiseAvailability": "{\"premiseClassA_fieldModifiers\": {\"applicable\": false, \"iff\": \"never -- as the transition cell.\"}, \"premiseClassB_argConstraints\": {\"applicable\": false, \"iff\": \"never -- an arg constraint on E.Key bounds its value, never its membership in F.\"}, \"premiseClassC_handlerGuard\": {\"applicable\": true, \"iffAndConflict\": \"Discharges IFF the stateless hook's `when` guard contains a conjunct normal-form-equal to `not (F contains P)` on F, with the same transport frame. THIS DEPENDS ON A GUARD BEING ADMISSIBLE ON A STATELESS HOOK -- which is a spec-vs-implementation conflict (see openFlags: stateless-handler-guard-spec-conflict). The matrix's own generative content treats a stateless `on E when <guard>` as a class-(c) discharge (Witness Family 1 Base A, marked live-verified ✓v), and the shipped implementation parses and uses the guard (EventHandlerContext h => h.Handler.Guard, ProofEngine.Strategies.cs:684). This cell is authored on that basis. IF spec:1007 ('Handlers do not support when guards') is enforced instead, class (c) becomes structurally unavailable and -- since (a),(b),(d) are all inapplicable -- the obligation would have NO licensed discharge in a bare stateless hook, making append-by uniqueness undischargeable there.\", \"decisionProcedure\": \"same finite conjunct walk, reading the guard off EventHandlerContext.Handler.Guard. Strategy: GuardInPath.\", \"searchBound\": \"one pass over the guard conjunct tree.\"}, \"premiseClassD_preStateInductive\": {\"applicable\": false, \"iff\": \"not applicable -- as the transition cell. (A stateless precept still has no membership-fact establishment/preservation machinery; the empty-collection band sub-case applies identically.)\"}}",
+      "dischargeContract": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "derivation": "discharge iff the governing guard carries a membership test on F whose subject is K and whose sense excludes it.",
+          "validityArguments": [
+            "Key presence — membership established by a guard on the same key"
+          ],
+          "decisionProcedure": "Walk the guard's conjunct tree for a negated `contains` whose receiver is F and whose key operand is normal-form-equal to K; reject iff no branch carries one.",
+          "openDependencies": [
+            "BUG-038, filed 2026-07-23: the compile evidence carried on this cell shows the obligation reported Proved at HEAD, but that verdict does NOT confirm this cell's contract. The engine matches the guard on collection identity alone and never reads the contains right-hand operand, and the requirement record carries no key — verified live, a guard testing a DIFFERENT key discharges the obligation and the file compiles. The rule in the matrix is stated at the strength soundness requires; the compiler is below it. Read the recorded Proved as evidence the guard route runs, never as evidence the key was checked."
+          ],
+          "citations": [
+            {
+              "kind": "matrix",
+              "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Rule validity",
+              "note": "Key presence — membership established by a guard on the same key"
+            },
+            {
+              "kind": "packet",
+              "ref": "docs/Working/bugs.md",
+              "note": "BUG-038 — the shipped engine does not compare the key"
+            }
+          ]
+        }
+      ],
+      "suggestions": [
+        {
+          "premiseClasses": [
+            "c"
+          ],
+          "schema": "add `when not (⟨F⟩ contains ⟨K⟩)` to the guard of the row that appends by ⟨K⟩"
+        }
+      ],
+      "witnesses": {
+        "base": {
+          "program": "precept StatelessAuditBase\n\nfield ComplianceLog as log of string by instant\n\nevent RecordEvent(Description as string, Timestamp as instant)\non RecordEvent\n    -> append ComplianceLog RecordEvent.Description by RecordEvent.Timestamp",
+          "expected": {
+            "outcome": "reject",
+            "noOtherDiagnostics": true,
+            "expectedText": "reject naming ONLY the KeyPresence obligation."
+          },
+          "provenance": {
+            "mark": "live-verified",
+            "tool": "precept_compile (MCP)",
+            "date": "2026-07-21"
+          }
+        },
+        "discharges": [
+          {
+            "id": "membership-guard",
+            "kind": "guard",
+            "addition": "add a `when` guard to the stateless hook: `on RecordEvent when not (ComplianceLog contains RecordEvent.Timestamp) -> append ComplianceLog RecordEvent.Description by RecordEvent.Timestamp`",
+            "premiseClasses": [
+              "c"
+            ],
+            "derivation": "the row guard carries `not (F contains K)` on the same key the append uses, so the absence fact holds when the row fires and survives to the append.",
+            "strategy": "GuardInPath",
+            "modelStatus": "licensed",
+            "builtStatus": "proven-today-but-not-for-the-stated-reason",
+            "builtStatusNote": "BUG-038, filed 2026-07-23: the compile evidence carried on this cell shows the obligation reported Proved at HEAD, but that verdict does NOT confirm this cell's contract. The engine matches the guard on collection identity alone and never reads the contains right-hand operand, and the requirement record carries no key — verified live, a guard testing a DIFFERENT key discharges the obligation and the file compiles. The rule in the matrix is stated at the strength soundness requires; the compiler is below it. Read the recorded Proved as evidence the guard route runs, never as evidence the key was checked.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "precept_compile (MCP)",
+              "date": "2026-07-21"
+            },
+            "expected": {
+              "outcome": "accept",
+              "premiseListRecorded": true
+            },
+            "notes": [
+              "precept_compile @ HEAD: success:true, 0 diagnostics, KeyPresence disposition:Proved strategy:GuardInPath. NOTE: this acceptance itself demonstrates the spec-conflict -- the shipped compiler accepted a `when` guard on a stateless hook, which spec:1007 says does not exist. The compile is clean and the key matches, so the acceptance is sound under a key-matching implementation, but it rests on the contested admissibility of the guard.",
+              "BUG-038, filed 2026-07-23: the compile evidence carried on this cell shows the obligation reported Proved at HEAD, but that verdict does NOT confirm this cell's contract. The engine matches the guard on collection identity alone and never reads the contains right-hand operand, and the requirement record carries no key — verified live, a guard testing a DIFFERENT key discharges the obligation and the file compiles. The rule in the matrix is stated at the strength soundness requires; the compiler is below it. Read the recorded Proved as evidence the guard route runs, never as evidence the key was checked."
+            ]
+          }
+        ],
+        "nearMisses": [
+          {
+            "pairsWith": "membership-guard",
+            "addition": "on RecordEvent when ComplianceLog contains RecordEvent.Timestamp\n    -> append ComplianceLog RecordEvent.Description by RecordEvent.Timestamp",
+            "whyStillRejects": "the guard tests the positive sense (`contains`) rather than the negated one, so it establishes presence where the obligation needs absence.",
+            "provenance": {
+              "mark": "live-verified",
+              "tool": "precept_compile (MCP)",
+              "date": "2026-07-21"
+            },
+            "expected": {
+              "outcome": "reject",
+              "sameObligation": true
+            }
+          }
+        ]
+      },
+      "respellability": {
+        "resolution": "family-inherited"
+      },
+      "citations": [
+        {
+          "kind": "matrix",
+          "ref": "docs/Working/obligation-discharge-matrix-2026-07-19.md § Per-family case shapes",
+          "note": "fault-family case shape"
+        }
+      ],
+      "notes": [
+        "Normalized to the cell schema 2026-07-23; keys this file invented are carried below.",
+        "BUG-038, filed 2026-07-23: the compile evidence carried on this cell shows the obligation reported Proved at HEAD, but that verdict does NOT confirm this cell's contract. The engine matches the guard on collection identity alone and never reads the contains right-hand operand, and the requirement record carries no key — verified live, a guard testing a DIFFERENT key discharges the obligation and the file compiles. The rule in the matrix is stated at the strength soundness requires; the compiler is below it. Read the recorded Proved as evidence the guard route runs, never as evidence the key was checked.",
+        "[carried from the pre-normalization shape] verified: true",
+        "[carried from the pre-normalization shape] verifiedWithFlags: [\"occasion-axis-incoherence\", \"key-argument-not-matched-hole\", \"stateless-handler-guard-spec-conflict\"]",
+        "[carried from the pre-normalization shape] routeSet: {\"transportCite\": \"transport-rule-restatement-2026-07-21 § 3, row `stateless-hook-action-operand`: 'the stateless handler class, its inspection mirror, construction and its mirror'. The stateless handler class is first-class in the route enumeration (transport-rule § 2, 'Stateless precepts are first-class in the enumeration, not an afterthought').\", \"reachedBy\": [\"the stateless handler class for E (the `on E -> ...` occasion)\", \"its inspection mirror\", \"construction + mirror if E is the initial event\"]}",
+        "[carried from the pre-normalization shape] citationDuty: {\"factConsumed\": \"a fired-guard fact (class c): the stateless hook's guard `not (F contains P)` evaluated true.\", \"establishingObligation\": \"the hook's actions run only if the guard evaluated true. CONTESTED: spec:1007 says a stateless hook carries no guard, so under a strict spec reading there IS no fired-guard provenance to cite here (routed).\", \"preservingObligations\": [\"frame: no construct between the guard evaluation and the append writes F (single-action stateless hook -> the append is the first write to F on the route in the witness).\"], \"note\": \"route-local guard fact; the whole citation rests on the stateless-guard admissibility conflict being resolved in favor of guards.\"}",
+        "[carried from the pre-normalization shape] openFlags: [\"occasion-axis-incoherence: see the transition cell's flag of the same name.\", \"stateless-handler-guard-spec-conflict: THE LOAD-BEARING FLAG for this cell. spec/precept-language-spec.md:1007 (§ Stateless event hook) states verbatim 'Handlers do not support when guards or a trailing ensure'. But (1) the shipped implementation parses and uses a stateless-hook guard -- verified: `on RecordEvent when not (ComplianceLog contains RecordEvent.Timestamp) -> append ...` compiles clean with KeyPresence Proved GuardInPath; (2) samples/Test2.precept:4 ('on Add1 when Add1.Amount1 + Add1.Amount2 <= 1000') uses one; (3) the matrix's Witness Family 1 Base A treats a stateless `on Add when <guard>` as a class-(c) discharge marked ✓v. The three disagree with spec:1007. This determines whether cell 3 has ANY licensed discharge: class (c) is the sole applicable premise class, and it exists only if the guard is admissible. Routed to owner (a spec-vs-implementation-vs-matrix conflict, not resolvable in this cell). Cross-check git history before ruling (deleted-doc precedent).\", \"empty-collection-subcase: a first `append F V by K` in a stateless hook onto a default-empty log-by is sound (empty log has no key) but rejected today. Whether to license an emptiness-establishment discharge (analogous to the collection-growth `count>0` establishment at ProofEngine.Strategies.cs:706) is unrouted. Band member, respellable:yes (add the guard).\"]"
+      ]
+    }
   ]
 }

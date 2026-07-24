@@ -44,7 +44,7 @@
     },
     {
       "kind": "transport-rule",
-      "ref": "docs/Working/transport-rule-restatement-2026-07-21.md § 4 The transport rule, § 5 What earns a fact, § 7 What kills",
+      "ref": "docs/Working/transport-rule-restatement-2026-07-21.md § 4. The transport rule",
       "note": "route-indexed frame-and-kill; a guard's count-narrowing fact is earned at phase 2 and killed by any construct on the route that writes the collection before the mutation runs (the 2026-07-21 soundness correction: exit actions run at phase 3, before the row's action chain)"
     },
     {
@@ -153,8 +153,8 @@
             "consumedAt": "the mutating action (phase 5 of the operation execution order — the row's mutation chain)",
             "killCondition": "the fact is killed if any construct on the route between the guard evaluation and the mutation writes F. For a transition row this includes a source-state EXIT action (phase 3, which runs BEFORE the row's action chain — the 2026-07-21 soundness correction) that grows/shrinks/clears F. SeedCountInterval narrows from the guard WITHOUT a frame-and-kill check against such interposing writers — see openFlags.",
             "citations": [
-              { "kind": "transport-rule", "ref": "docs/Working/transport-rule-restatement-2026-07-21.md § 4 The transport rule", "note": "route-indexed frame-and-kill: deps(φ) ∩ mayWrite(r, p, q) = ∅" },
-              { "kind": "transport-rule", "ref": "docs/Working/transport-rule-restatement-2026-07-21.md § 7 What kills", "note": "collection grow/shrink/clear and the exit-action chain are writers of the collection field" }
+              { "kind": "transport-rule", "ref": "docs/Working/transport-rule-restatement-2026-07-21.md § 4. The transport rule", "note": "route-indexed frame-and-kill: deps(φ) ∩ mayWrite(r, p, q) = ∅" },
+              { "kind": "transport-rule", "ref": "docs/Working/transport-rule-restatement-2026-07-21.md § 7. What kills — the write set and the read-closure", "note": "collection grow/shrink/clear and the exit-action chain are writers of the collection field" }
             ]
           },
           "citations": [
@@ -175,7 +175,7 @@
             "consumedAt": "the mutating action",
             "killCondition": "same interposing-writer hazard as the guard case; additionally, transport-rule § 5 flags predecessor exclusion as unavailable on inspect-fire routes (a shrink of the fault surface routed to the owner, N8).",
             "citations": [
-              { "kind": "transport-rule", "ref": "docs/Working/transport-rule-restatement-2026-07-21.md § 5 What earns a fact", "note": "Predecessor exclusion — earned at the earlier guard; the surviving inspect-fire restriction is routed (N8)" }
+              { "kind": "transport-rule", "ref": "docs/Working/transport-rule-restatement-2026-07-21.md § 5. What earns a fact, and on which routes", "note": "Predecessor exclusion — earned at the earlier guard; the surviving inspect-fire restriction is routed (N8)" }
             ]
           },
           "citations": [
@@ -322,7 +322,7 @@
             "earnedAt": "phase 2 (the hook's guard evaluation)",
             "consumedAt": "the hook's mutating action (phase 3 for an exit hook, phase 6 for an entry hook)",
             "killCondition": "killed if a construct between the guard and the action writes F. For an ENTRY hook (phase 6) the phase-4 `omit` reset and any earlier entry action on the same state are candidate interposers; when a state carries several entry actions their order is unruled (spec § 3A.4 Still unsettled), so a second entry action mutating F cannot be ordered against this one — handled by may-write over-approximation in the transport rule but NOT by SeedCountInterval today (see openFlags).",
-            "citations": [ { "kind": "transport-rule", "ref": "docs/Working/transport-rule-restatement-2026-07-21.md § 6 the normative phase order", "note": "exit actions phase 3, entry actions phase 6; multiplicity/order of several state actions on one state is unruled" } ]
+            "citations": [ { "kind": "transport-rule", "ref": "docs/Working/transport-rule-restatement-2026-07-21.md § 6. The order the rule is computed over — the normative phase order", "note": "exit actions phase 3, entry actions phase 6; multiplicity/order of several state actions on one state is unruled" } ]
           },
           "citations": [ { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.cs:695-728 (SeedCountInterval)" } ]
         },
@@ -447,7 +447,7 @@
             "earnedAt": "phase 2 (handler guard evaluation)",
             "consumedAt": "the handler's mutating action (phase 5)",
             "killCondition": "killed by any construct writing F between the guard and the action; a stateless handler is a flat action chain, so the only interposers are earlier actions in the same chain (handled by the sequential countIntervals tracking within the chain).",
-            "citations": [ { "kind": "transport-rule", "ref": "docs/Working/transport-rule-restatement-2026-07-21.md § 2 Routes are finitely enumerable", "note": "stateless handlers are first-class route sources" } ]
+            "citations": [ { "kind": "transport-rule", "ref": "docs/Working/transport-rule-restatement-2026-07-21.md § 2. Routes are finitely enumerable", "note": "stateless handlers are first-class route sources" } ]
           },
           "openFlagRef": "stateless-guard-spec-conflict",
           "citations": [ { "kind": "code", "ref": "src/Precept/Pipeline/ProofEngine.QualifierNarrowing.cs:201 (EventHandlerContext → h.Handler.Guard)" } ]

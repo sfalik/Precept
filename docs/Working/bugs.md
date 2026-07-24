@@ -27,6 +27,32 @@ surfaced for proper fixing.
 
 ## Active
 
+### BUG-038: A log-by uniqueness obligation is discharged by a membership guard on the WRONG key — the key operand is never compared (SOUNDNESS hole)
+
+- **Discovered**: 2026-07-23, while writing the key-presence validity argument. **Behaviourally confirmed via `precept_compile` at HEAD**; root cause line-verified in source.
+- **Symptom**: a guard testing whether the log contains one key discharges the uniqueness obligation for an append using a *different* key.
+
+  ```precept
+  precept KeyMismatch
+
+  field AuditLog as log of string by instant
+  field OtherLog as log of string by instant
+
+  event Record(Stamp as instant, Other as instant, Text as string)
+
+  on Record when not (AuditLog contains Record.Other)
+      -> append AuditLog Record.Text by Record.Stamp
+  ```
+
+  → `success: true`, `KeyPresence` **Proved**, strategy `GuardInPath`. The guard says nothing about `Record.Stamp`, so a duplicate ordering key can be appended to a collection whose uniqueness the compiler just claimed to prove.
+- **Root cause**, both halves line-verified: `WalkForContains` (`ProofEngine.Strategies.cs:1295-1327`) matches on collection identity alone — `bin.Left is TypedFieldRef fr && fr.FieldName == fieldName` — and never looks at the `contains` right-hand operand. And there is nothing to compare it against: `KeyPresenceProofRequirement` (`ProofRequirement.cs:243-247`) carries `Subject`, `RequireAbsence` and `Description` only, with **no key payload at all**. The engine establishes the fact "the guard has a membership check on collection F", which is strictly weaker than the fact the obligation needs, "the guard has a membership check on collection F for key K".
+- **Scope / class**: **SOUNDNESS** — the over-accept direction. Narrow in reach (log-by collections with an `append … by` under a membership guard) but unambiguous where it applies.
+- **Related**: the certificate-format design already flagged this as a candidate fail-open routed to a systematic sweep, with the end-state contract stated there — the discharge step "carries the key comparison, or the verdict is not `Proven`". This bug is that flag, now with a compiled witness and its own entry.
+- **Fix complexity**: medium. The requirement needs a key payload, and the guard walk needs to compare the `contains` right operand against it under the same normalization the other guard strategies use. The definitional side is written — the matrix's key-presence argument states the rule at the correct strength and records that the shipped engine does not meet it.
+- **Priority**: soundness. Narrower blast radius than BUG-035, same class.
+- **Repro**: as above.
+- **Status**: Active — soundness hole.
+
 ### BUG-037: An index-bounds obligation is discharged only from a guard, so it rejects a provably-safe access and then suggests a repair the author cannot write at that site (false rejection + unusable diagnostic)
 
 - **Discovered**: 2026-07-23, while authoring the index-bounds discharge rule for the matrix. **Behaviourally confirmed via `precept_compile` at HEAD**, both the failing and the passing case.
