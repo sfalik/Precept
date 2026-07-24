@@ -27,6 +27,37 @@ surfaced for proper fixing.
 
 ## Active
 
+### BUG-052: The collection count interval is re-seeded per action chain, so two chains in one operation each prove a bound the pair breaks (SOUNDNESS hole)
+
+- **Discovered**: 2026-07-23, probe pass before drafting the count-containment validity argument. **Confirmed via `precept_compile` at HEAD — zero diagnostics.**
+- **Symptom A — across phases**:
+
+  ```precept
+  precept CrossPhaseCount
+
+  field Q as queue of string maxcount 3
+
+  state Open initial
+  state Closed terminal
+
+  event Go()
+
+  from Open when Q.count < 3
+      -> enqueue Q "a"
+
+  from Open on Go when Q.count < 3
+      -> enqueue Q "b"
+      -> transition Closed
+  ```
+
+  → `success: true`, **no diagnostics**, two `CountContainment` obligations both **Proved**. Starting from count 2: the row's guard is evaluated at phase 2 and sees 2; the exit action enqueues at phase 3 giving 3; the row's own action enqueues at phase 5 giving **4**, past `maxcount 3`. Each chain proved its own bound against a seed the other chain invalidated. The mirror case in the shrink direction against `mincount` behaves the same with `dequeue`.
+- **Symptom B — re-seed after replacement**: `when Q.count < 3 -> set Q = Load.Items -> append Q "x"` with an unbounded argument compiles clean and proves. `ReplacesValue` drops the interval, and the following grow re-seeds from the band intersected with a guard that was evaluated *before* the write, with no `ReassignedBefore` check — the same missing frame check as BUG-050, reached through the seed rather than the fact.
+- **Root cause**: the count-interval dictionary is allocated inside `WalkActions` (`ProofEngine.cs:437`), so it is per-chain rather than per-operation. Every chain re-seeds from the declared band, and nothing carries one chain's effect into the next.
+- **Why it is the same shape as an already-corrected defect**: the 2026-07-21 guard-normal-form soundness correction fixed exactly this asymmetry for guard facts — a row's guard is evaluated at phase 2 while state exit actions run at phase 3, before the row's own chain. That correction did not reach the count interval, which re-seeds instead of being framed.
+- **Scope / class**: SOUNDNESS, over-accept, on declared collection bounds.
+- **Fix complexity**: medium — the interval needs to be operation-scoped and advanced across constructs in phase order, rather than allocated per chain.
+- **Status**: Active — soundness hole.
+
 ### BUG-051: A `mincount` is consumed as proof a collection is non-empty, with no establishment obligation anywhere (SOUNDNESS hole)
 
 - **Discovered**: 2026-07-23, probe pass before drafting the collection-non-empty validity argument. **Confirmed via `precept_compile` at HEAD.**
